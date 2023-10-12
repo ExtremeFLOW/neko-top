@@ -1,0 +1,43 @@
+# Ignore all with no extension by looking for the "." in the filename
+*
+!*.*
+!*/
+
+# Directory
+[Bb]uild/
+[Ll]ogs/
+[Rr]esults/
+
+# Neko generated results
+*.nek5000
+field*.f*
+bdry*.f*
+
+# Compiled Object files
+*.o
+*.mod
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+
+# Compiled Static libraries
+*.a
+
+# Executables
+*.exe
+*.out
+
+# Fortran-specific files
+*.f90~
+*.f90.bak
+*.mod
+*.smod
+*.L
+*.L2
+*.lst
+*.il
+*.dSYM/
+
+# LSF 10 specific files
+*.err
