@@ -14,7 +14,7 @@
 # --  Technical Options
 
 # Queue name
-#BSUB -q "gpuv100"
+#BSUB -q "gpua100"
 
 # Ask for n cores placed on R host.
 #BSUB -n 4
@@ -24,11 +24,11 @@
 # Memory specifications. Amount we need and when to kill the
 # program using too much memory.
 
-#BSUB -R "rusage[mem=10GB]"
-#BSUB -M 10GB
+#BSUB -R "rusage[mem=5GB]"
+#BSUB -M 5GB
 
 # Time specifications (hh:mm)
-#BSUB -W 00:10
+#BSUB -W 02:00
 
 # -- Notification options
 
@@ -44,12 +44,14 @@
 # ============================================================================ #
 # Determine if the script is run on the HPC or locally
 
+set -e
+
 if [[ -z "$LSB_JOBNAME" && (($# > 0)) ]]; then
     example=$1
 elif [ ! -z "$LSB_JOBNAME" ]; then
     example=$LSB_JOBNAME
 else
-    echo "No example supplied" >&2
+    printf "ERROR: No example supplied" >&2
     exit 1
 fi
 
@@ -58,31 +60,69 @@ if [ ! -z $(which module) ]; then
     module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
 fi
 
+# ============================================================================ #
+# Execute the example
+
+printf "=%.0s" {1..80} && printf "\n"
+printf "Running example: %s.\n" $example
+
 casefile=$(find . -name "*.case")
 
-START=$(date +%s)
-mpirun --pernode ./neko $casefile 1>neko.out
-END=$(date +%s)
-DIFF=$(($END - $START))
+# Run the example
+printf "=%.0s" {1..80} && printf "\n"
+printf "Executing Neko. See neko.out for the status output.\n"
+{ time $(mpirun --pernode ./neko $casefile 1>neko.out 2>error.err); } 2>&1
 
-echo "It took $DIFF seconds"
-
-if [ ! -s "error.err" ]; then
-    rm -fr $RPATH/$example && mkdir -p $RPATH/$example
-
-    # Move the field and boundary files to the results folder
-    mkdir -p $RPATH/$example/field $RPATH/$example/bdry
-    mv -t $RPATH/$example/field field*
-    mv -t $RPATH/$example/bdry bdry*
-
-    # Move all files which are not the error or executable files to the log folder
-    find ./ -type f -not -name "error.err" -not -name "neko" -exec mv -t $RPATH/$example {} +
-
-    # Remove all but the log files
-    find ./ -type f -not -name "error.err" -not -name "output.out" -delete
-
-    rm -f output.out
-    touch output.out
+if [ -s "error.err" ]; then
+    printf "\nERROR: An error occured during execution. See error.err for details.\n"
+    exit 1
+else
+    printf "\nNeko execution concluded.\n"
 fi
+
+# ============================================================================ #
+# Move the results to the results folder
+results=$RPATH/$example
+printf "=%.0s" {1..80} && printf "\n"
+printf "Moving files to results folder: \n\t$results\n\n"
+
+# Remove the results folder if it exists and create a new one
+rm -fr $results && mkdir -p $results
+
+# Move all the nek5000 files to the results folder and compress them.
+for nek in $(find ./ -maxdepth 1 -name "*.nek5000"); do
+    printf "Archiving:  %s\n" $nek
+
+    base=$(basename ${nek%.*})
+    field=$(ls $base.f*)
+    mkdir -p $results/$base
+    mv -t $results/$base $nek $field
+done
+printf "\n"
+
+# Move all files which are not the error or executable files to the log folder
+find ./ -type f \
+    -not -name "error.err" \
+    -not -name "neko" \
+    -not -name "output.out" \
+    -not -name "*.chkp" \
+    -exec mv -t $results {} +
+
+if [ -s "error.err" ]; then
+    printf "ERROR: An error occured during execution. See error.err for details.\n"
+    exit 1
+else
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Example concluded.\n"
+    printf "=%.0s" {1..80} && printf "\n"
+fi
+
+# Remove all but the log files
+find ./ -type f -not -name "error.err" -not -name "output.out" -delete
+
+# Clear the output file to indicate successful completion
+cp -ft $results output.out
+rm -f output.out
+touch output.out
 
 # ==============================   End of File   ==============================

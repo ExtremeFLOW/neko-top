@@ -42,7 +42,6 @@ export RPATH=$MAINDIR/$RPATH
 export LPATH=$MAINDIR/$LPATH
 export HPATH=$MAINDIR/$HPATH
 
-mkdir -p $RPATH $LPATH
 # ============================================================================ #
 # Keywords
 
@@ -56,15 +55,29 @@ examples=""
 for in in $@; do
 
     # Opions and flags
-    if [[ ${in::1} == "-" ]]; then
+    if [[ ${in:0:2} == "--" ]]; then
+        case "${in:2}" in
+        "all") ALL=true ;;       # Run all examples available
+        "clean") CLEAN=true ;;   # Clean logs
+        "help") HELP=true ;;     # Print help
+        "delete") DELETE=true ;; # Delete previous runs
+        *) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
+        esac
+
+        if [ $HELP ]; then help && exit; fi
+
+    elif [[ ${in:0:1} == "-" ]]; then
         for ((i = 1; i < ${#in}; i++)); do
             case "${in:$i:1}" in
-            "a" | "-all") ALL=true ;;       # Run all examples available
-            "c" | "-clean") CLEAN=true ;;   # Clean logs
-            "h" | "-help") help && exit ;;  # Print help
-            "d" | "-delete") DELETE=true ;; # Delete previous runs
+            "a") ALL=true ;;    # Run all examples available
+            "c") CLEAN=true ;;  # Clean logs
+            "h") HELP=true ;;   # Print help
+            "d") DELETE=true ;; # Delete previous runs
+            *) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
             esac
         done
+
+        if [ $HELP ]; then help && exit; fi
 
     # Ignore invalid inputs
     elif [[ -z $(ls $EPATH/$in 2>/dev/null) ]]; then
@@ -125,7 +138,7 @@ function Run() {
 
     # Run the example and pipe stdout and stderr to the log files
     ./job_script.sh $example >output.out 2>error.err &
-    printf '  %-13s %-64s\n' "Started:" "${example:0:64}"
+    printf '  %-10s %-s\n' "Started:" "$example"
     wait
 
     cd $MAINDIR
@@ -141,7 +154,7 @@ function Submit() {
 
     export BSUB_QUIET=Y
     bsub -J $example -env "RPATH=$RPATH" <./job_script.sh
-    printf '  %-13s %-64s\n' "Submitted:" "${example:0:64}"
+    printf '  %-10s %-s\n' "Submitted:" "$example"
 
     cd $MAINDIR
 }
@@ -150,11 +163,12 @@ function Submit() {
 # Run the examples
 full_start=$(date +%s.%N)
 
+mkdir -p $RPATH $LPATH
 printf "\n\e[4mQueueing examples.\e[0m\n"
 for example in $examples; do
     if [ ! -f $EPATH/$example/neko ]; then
-        printf '  %-13s %-64s\n' "Not Compiled:" "$example"
-        continue
+        printf '  \e[1;31m%-13s\e[m %-s\n' "Error:" "Not Compiled: $example" >&2
+        exit 1
     fi
 
     # Create the folder needed

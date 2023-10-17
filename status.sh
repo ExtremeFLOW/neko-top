@@ -68,7 +68,7 @@ if [ -z "$tests" ]; then exit; fi
 # If we are running in LSF-10 mode, print the running jobs.
 if [ "$(which bsub)" ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
-    bjobs -ro -noheader "job_name:-4 time_left:8 job_name"
+    bjobs -ro -noheader "time_left:8 job_name"
 fi
 
 printf "\n\e[4mTest status.\e[m\n"
