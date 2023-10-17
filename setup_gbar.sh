@@ -21,11 +21,15 @@ git submodule update --force --remote --init
 # ============================================================================ #
 # Install dependencies
 
+if [ -z "$CC" ]; then export CC=$(which gcc); fi
+if [ -z "$CXX" ]; then export CXX=$(which g++); fi
+if [ -z "$FC" ]; then export FC=$(which gfortran); fi
+if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); fi
+
 MAIN_DIR="$PWD"
 EXTERNAL_DIR="$PWD/External"
 
-CC=gcc CXX=g++ FC=gfortran \
-    cmake -S $EXTERNAL_DIR/json-fortran \
+cmake -S $EXTERNAL_DIR/json-fortran \
     -B $EXTERNAL_DIR/json-fortran/build \
     --install-prefix $EXTERNAL_DIR/json-fortran \
     -Wno-dev \
@@ -55,3 +59,9 @@ cd $EXTERNAL_DIR/neko
 ./configure --prefix=$EXTERNAL_DIR/neko --with-cuda=$CUDA_DIR --with-blas=$BLAS_DIR/lib/libopenblas.so
 make install -j
 cd ../../
+
+# ============================================================================ #
+# Compile the example codes.
+
+cmake -B build/ -S ./ -DCMAKE_BUILD_TYPE=Release
+cmake --build build/ --parallel

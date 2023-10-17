@@ -1,6 +1,8 @@
 [submodule "External/json-fortran"]
 	path = External/json-fortran
 	url = https://github.com/jacobwilliams/json-fortran.git
+	branch = master
 [submodule "External/neko"]
 	path = External/neko
 	url = https://github.com/ExtremeFlow/neko.git
+	branch = develop
