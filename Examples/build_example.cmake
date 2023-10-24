@@ -1,3 +1,24 @@
+# Build the examples.
+#
+# This function is called by the CMakeLists.txt file in the examples directory.
+#
+# The function takes one argument, which is the type of driver to use. The
+# following driver types are supported:
+#
+#   - user:    The user provides a driver file in the examples directory.
+#   - custom:  The user provides a driver file in the current directory.
+#   - default: The driver file in the examples directory is used.
+#
+# The function also looks at the following variables:
+#
+#   - DRIVER:        The name of the driver file to use.
+#   - EXTRA_SOURCES: A list of extra source files to compile.
+#
+# The function creates an executable with the name neko in the current
+# directory. The CMake target name is constructed from the relative path to the
+# example directory. For example, the example in the directory
+# examples/01_basic/01_harmonic_oscillator will have the CMake target name
+# examples_01_basic_01_harmonic_oscillator.
 function(build_example DRIVER_TYPE)
 
     # ........................................................................ #
