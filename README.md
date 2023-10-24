@@ -30,6 +30,18 @@ NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
 
+### Notes on the InnoTop machine
+
+On the InnoTop machine a spack environment have been constructed which can be
+loaded with:
+
+```bash
+spack env activate neko-top
+```
+
+This will load all required packages from spack, after which the
+`setup_local.sh` script should work as intended.
+
 ## Job execution
 
 The run.sh script is the main driver for any example.
