@@ -66,12 +66,15 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Running example: %s.\n" $example
 
-casefile=$(find . -name "*.case")
-
 # Run the example
 printf "=%.0s" {1..80} && printf "\n"
-printf "Executing Neko. See neko.out for the status output.\n"
-{ time $(mpirun --pernode ./neko $casefile 1>neko.out 2>error.err); } 2>&1
+printf "Executing Neko.\n\n"
+
+for casefile in $(find . -name "*.case"); do
+    casename=$(basename -- $casefile)
+    printf "See $casename.out for the status output.\n"
+    { time $(mpirun --pernode ./neko $casefile 1>$casename.out 2>error.err); } 2>&1
+done
 
 if [ -s "error.err" ]; then
     printf "\nERROR: An error occured during execution. See error.err for details.\n"
