@@ -17,24 +17,13 @@
 # The function creates an executable with the name neko in the current
 # directory. The CMake target name is constructed from the relative path to the
 # example directory. For example, the example in the directory
-# examples/01_basic/01_harmonic_oscillator will have the CMake target name
-# examples_01_basic_01_harmonic_oscillator.
+# examples/neko_examples/2d_cylinder will have the CMake target name
+# examples_neko_examples_2d_cylinder.
 function(build_example DRIVER_TYPE)
 
     # ........................................................................ #
-    # Setup of the external libraries.
-
-    # Check for the required libraries.
-    find_package(jsonfortran-gnu REQUIRED)
-    find_package(LAPACK REQUIRED)
-    find_package(BLAS REQUIRED)
-
-    # Check for the optional libraries.
-    find_package(CUDAToolkit QUIET)
-    find_package(MPI QUIET)
-
-    # ........................................................................ #
     # Define the executable.
+    file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
     if (${DRIVER_TYPE} STREQUAL "user")
         set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
@@ -53,20 +42,30 @@ function(build_example DRIVER_TYPE)
         message(FATAL_ERROR "Unknown driver type: ${DRIVER_TYPE}")
     endif()
 
-    # Construct example name from the folder structure relative to EXAMPLES_DIR.
-    file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
-
+    # ........................................................................ #
     # Print a message if we are compiling in DEBUG mode.
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(STATUS "Building example: ${EXAMPLE_NAME}")
         message(STATUS "  Driver type:    ${DRIVER_TYPE}")
         message(STATUS "  Driver:         ${DRIVER}")
         if (DEFINED EXTRA_SOURCES)
-            message(STATUS "  Extra sources:  ${EXTRA_SOURCES}")
+            set(first_line TRUE)
+            foreach(SOURCE ${EXTRA_SOURCES})
+                if (first_line)
+                    set(first_line FALSE)
+                    message(STATUS "  Extra sources:  ${SOURCE}")
+                else()
+                    message(STATUS "                  ${SOURCE}")
+                endif()
+            endforeach()
         endif()
+        message(STATUS "")
     endif()
 
-    # Replace slashes with underscores to get a valid CMake target name.
+    # ........................................................................ #
+    # Construct example name from the folder structure relative to EXAMPLES_DIR.
+
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
 
     add_executable(${EXAMPLE_NAME} ${DRIVER} ${EXTRA_SOURCES})
@@ -80,6 +79,7 @@ function(build_example DRIVER_TYPE)
 
     # ........................................................................ #
     # Link the executable to the required libraries.
+
     target_link_libraries(${EXAMPLE_NAME}
         jsonfortran-gnu::jsonfortran LAPACK::LAPACK BLAS::BLAS PkgConfig::neko)
 

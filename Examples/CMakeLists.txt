@@ -13,8 +13,22 @@
 #                DRIVER cmake vatiable in the example CMakeLists.txt file or
 #                stored as a file named "driver.f90" in the example directory.
 
+
+# ============================================================================ #
+# Setup of the external libraries.
+
+# Check for the required libraries.
+find_package(LAPACK REQUIRED)
+find_package(BLAS REQUIRED)
+
+# Check for the optional libraries.
+find_package(CUDAToolkit QUIET)
+find_package(MPI QUIET)
+
+# ============================================================================ #
 # Include the build_example function
 include(build_example.cmake)
+
 # Set the examples directory
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory")
 
