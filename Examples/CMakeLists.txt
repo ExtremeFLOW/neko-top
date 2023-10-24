@@ -24,3 +24,4 @@ set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory"
 add_subdirectory(neko_examples/tgv)
 add_subdirectory(neko_examples/turb_channel)
 add_subdirectory(neko_examples/2d_cylinder)
+add_subdirectory(neko_examples/rayleigh-benard)

@@ -37,10 +37,12 @@ function(build_example DRIVER_TYPE)
 
     # Print a message if we are compiling in DEBUG mode.
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        message(STATUS "Compiling example: ${EXAMPLE_NAME}")
-        message(STATUS "  Driver type:   ${DRIVER_TYPE}")
-        message(STATUS "  Driver:        ${DRIVER}")
-        message(STATUS "  Extra sources: ${EXTRA_SOURCES}")
+        message(STATUS "Building example: ${EXAMPLE_NAME}")
+        message(STATUS "  Driver type:    ${DRIVER_TYPE}")
+        message(STATUS "  Driver:         ${DRIVER}")
+        if (DEFINED EXTRA_SOURCES)
+            message(STATUS "  Extra sources:  ${EXTRA_SOURCES}")
+        endif()
     endif()
 
     # Replace slashes with underscores to get a valid CMake target name.
