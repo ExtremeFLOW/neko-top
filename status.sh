@@ -4,7 +4,7 @@
 # User defined inputs.
 
 # Define all needed folders relative to the Testing folder. (without trailing /)
-RPATH="Results" # Result export location
+RPATH="results" # Result export location
 LPATH="logs"    # Logging locations
 
 # Define executable name needed in all tests

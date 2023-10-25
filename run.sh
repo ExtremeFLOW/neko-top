@@ -6,10 +6,10 @@ set -e
 # User defined inputs.
 
 # Define all needed folders relative to the project folder. (without trailing /)
-EPATH="Examples" # Examples scripts
-RPATH="Results"  # Result export location
+EPATH="examples" # Examples scripts
+RPATH="results"  # Result export location
 LPATH="logs"     # Logging locations
-HPATH="Scripts"  # Submition settings
+HPATH="scripts"  # Submission settings
 
 # End of user inputs
 # ============================================================================ #

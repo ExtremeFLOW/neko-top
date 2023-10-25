@@ -27,7 +27,7 @@ if [ -z "$FC" ]; then export FC=$(which gfortran); fi
 if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); fi
 
 MAIN_DIR="$PWD"
-EXTERNAL_DIR="$PWD/External"
+EXTERNAL_DIR="$PWD/external"
 
 cmake -S $EXTERNAL_DIR/json-fortran \
     -B $EXTERNAL_DIR/json-fortran/build \

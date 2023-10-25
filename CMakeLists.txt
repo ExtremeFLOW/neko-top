@@ -27,8 +27,8 @@ set(CMAKE_Fortran_STANDARD 2008)
 # Setup of JSON-Fortran
 
 # If the user did not specify JSONFORTRAN_DIR, default to the
-# External/json-fortran directory
-set(JSONFORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External/json-fortran CACHE PATH "Path to the JSON-Fortran installation")
+# external/json-fortran directory
+set(JSONFORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran CACHE PATH "Path to the JSON-Fortran installation")
 
 # Check that the JSONFORTRAN_DIR directories exist
 if (NOT IS_DIRECTORY ${JSONFORTRAN_DIR})
@@ -53,8 +53,8 @@ find_package(jsonfortran-gnu REQUIRED)
 # ............................................................................ #
 # Setup of the Neko library
 
-# If the user did not specify NEKO_DIR, default to the External/neko directory
-set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/External/neko CACHE PATH "Path to the Neko installation")
+# If the user did not specify NEKO_DIR, default to the external/neko directory
+set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko CACHE PATH "Path to the Neko installation")
 
 # Check that the NEKO_DIR directories exist
 if (NOT IS_DIRECTORY ${NEKO_DIR})
@@ -70,4 +70,4 @@ pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 # ============================================================================ #
 # Add examples
 
-add_subdirectory(Examples)
+add_subdirectory(examples)
