@@ -47,7 +47,7 @@ This will load all required packages from spack, after which the
 The run.sh script is the main driver for any example.
 The run script will construct a local system for execution of any example
 defined in the examples folder. Each example should contain a .case file and a
-compiled version of neko ready to be executed. This is in general provided by
+compiled version of Neko ready to be executed. This is in general provided by
 our CMake setup.
 
 The contents of Example/EXAMPLE_NAME will be copied to a temporary
@@ -55,7 +55,7 @@ log/EXAMPLE_NAME along with a job_script. This job_script can be user defined by
 adding a bash file in the Scripts folder. If no specific file is found, the 
 default is used.
 
-After successful execution of neko, the results will be moved to the Results
+After successful execution of Neko, the results will be moved to the Results
 folder and the log folder will be cleaned.
 
 The status script provide a simple way of probing the current status of an
@@ -79,3 +79,23 @@ Current driver types:
 - "custom":  use the driver.f90 provided in the current example folder or read
              the cmake variable DRIVER.
 - "default": pure neko with no user defined source files.
+
+### Case files and meshes.
+
+When running an example a link is made to the local data folder if it exists.
+This folder can include anything needed by the examples to run. In general it is
+used for local copies of meshes which can be accessed by all examples to avoid
+redundancy and copying massive folders around.
+
+#### Meshing
+
+A system have been setup to allow the user to create new meshes using Cubit.
+A journal fle should be placed in the example folder to which it applies. The
+`mesh.sh` script can then be used to generate the mesh and convert it to a Neko
+supported format. It is assumed the mesh is exported as an exodus file with same
+basename as the journal file.
+
+To avoid cluttering the example folder with unnecessary and large files, the
+generated mesh is placed in the [data](data/) folder under the same
+folder structure as the example that was run. This is checked if no .nmsh file
+is found in the example folder by run.sh.
