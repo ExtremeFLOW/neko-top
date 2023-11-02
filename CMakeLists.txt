@@ -68,6 +68,11 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
 # ============================================================================ #
-# Add examples
+# Setup the Neko-TOP library
 
-add_subdirectory(examples)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
+
+# ============================================================================ #
+# Build the examples
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
