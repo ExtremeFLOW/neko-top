@@ -13,6 +13,15 @@
 #                DRIVER cmake vatiable in the example CMakeLists.txt file or
 #                stored as a file named "driver.f90" in the example directory.
 
+# ============================================================================ #
+# Determine if we wish to build the examples.
+option(BUILD_EXAMPLES "Build the examples" ON)
+
+if(NOT BUILD_EXAMPLES)
+    return()
+else()
+    message(STATUS "Building examples")
+endif()
 
 # ============================================================================ #
 # Setup of the external libraries.
@@ -27,7 +36,8 @@ find_package(MPI QUIET)
 
 # ============================================================================ #
 # Include the build_example function
-include(build_example.cmake)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
+include(build_example)
 
 # Set the examples directory
 set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory")
@@ -39,3 +49,5 @@ add_subdirectory(neko_examples/tgv)
 add_subdirectory(neko_examples/turb_channel)
 add_subdirectory(neko_examples/2d_cylinder)
 add_subdirectory(neko_examples/rayleigh-benard)
+add_subdirectory(topopt)
+add_subdirectory(thermal_mix_channel)

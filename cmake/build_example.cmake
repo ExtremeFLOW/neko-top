@@ -25,8 +25,13 @@ function(build_example DRIVER_TYPE)
     # Define the executable.
     file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
-    if (${DRIVER_TYPE} STREQUAL "user")
+    if (DEFINED DRIVER)
+        set(DRIVER ${DRIVER})
+        set(DRIVER_TYPE "custom")
+
+    elseif (${DRIVER_TYPE} STREQUAL "user")
         set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
+
     elseif (${DRIVER_TYPE} STREQUAL "custom")
         if (NOT DEFINED DRIVER)
             set(DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)
@@ -35,6 +40,9 @@ function(build_example DRIVER_TYPE)
         if (NOT DEFINED DRIVER)
             message(FATAL_ERROR "No custom driver file found. Please specify through DRIVER.")
         endif()
+
+    elseif(${DRIVER_TYPE} STREQUAL "topopt")
+        set(DRIVER ${CMAKE_SOURCE_DIR}/sources/topopt_driver.f90)
 
     elseif(${DRIVER_TYPE} STREQUAL "default")
         set(DRIVER ${EXAMPLES_DIR}/driver.f90)
@@ -91,6 +99,11 @@ function(build_example DRIVER_TYPE)
     # If MPI is available, link the executable to the MPI library.
     if(MPI_FOUND)
         target_link_libraries(${EXAMPLE_NAME} MPI::MPI_Fortran)
+    endif()
+
+    # Link our local Neko-TOP library to the driver
+    if (${DRIVER_TYPE} STREQUAL "topopt")
+        target_link_libraries(${EXAMPLE_NAME} Neko-TOP)
     endif()
 
 endfunction()

@@ -1,0 +1,85 @@
+reset
+
+# ============================================================================ #
+# Set a few parameters which will be used to define the geometry and meshing.
+
+#{ pipe_length = 10 }
+#{ pipe_aspect_ratio = 0.1 }
+
+#{ element_size = 0.2 }
+#{ element_aspect_ratio = 0.5 }
+#{ wall_bias = 0.5 }
+
+# ============================================================================ #
+# Define the derived parameters and the geometry of the pipe.
+
+#{ pipe_width = pipe_aspect_ratio * pipe_length }
+
+brick    x {pipe_length}     y {pipe_width}     z {pipe_width}
+move all location {pipe_length / 2} 0 0
+
+# Split the pipe to allow top and bottom inlets
+split surface with y_coord=0
+
+# ============================================================================ #
+# Setup the meshing scheme and mesh the pipe.
+
+curve with length={pipe_width / 2} and x_coord=0 and y_coord= {pipe_width / 4} and z_coord=-{pipe_width / 2} scheme bias {1.0 / (1.0 + wall_bias)}
+curve with length={pipe_width / 2} and x_coord=0 and y_coord=-{pipe_width / 4} and z_coord=-{pipe_width / 2} scheme bias {1.0 + wall_bias}
+curve with length={pipe_width / 2} and x_coord=0 and y_coord= {pipe_width / 4} and z_coord={pipe_width / 2} scheme bias {1.0 + wall_bias}
+curve with length={pipe_width / 2} and x_coord=0 and y_coord=-{pipe_width / 4} and z_coord={pipe_width / 2} scheme bias {1.0 / (1.0 + wall_bias)}
+
+curve with length={pipe_width / 2} and x_coord={pipe_length} and y_coord={pipe_width / 4} and z_coord=-{pipe_width / 2} scheme bias {1.0 + wall_bias}
+curve with length={pipe_width / 2} and x_coord={pipe_length} and y_coord=-{pipe_width / 4} and z_coord=-{pipe_width / 2} scheme bias {1.0 / (1.0 + wall_bias)}
+curve with length={pipe_width / 2} and x_coord={pipe_length} and y_coord={pipe_width / 4} and z_coord={pipe_width / 2} scheme bias {1.0 / (1.0 + wall_bias)}
+curve with length={pipe_width / 2} and x_coord={pipe_length} and y_coord=-{pipe_width / 4} and z_coord={pipe_width / 2} scheme bias {1.0 + wall_bias}
+
+curve with length={pipe_width} scheme dualbias {1.0 + wall_bias} {1.0 + wall_bias}
+
+curve with length={pipe_length}    interval size {element_size}
+curve with length={pipe_width}     interval size {element_aspect_ratio * element_size}
+curve with length={pipe_width / 2} interval size {element_aspect_ratio * element_size}
+curve with length={pipe_width}     interval size {element_aspect_ratio * element_size}
+
+mesh curve all
+surface all scheme map
+mesh surface all
+volume all scheme map
+mesh volume all
+
+# ============================================================================ #
+# Setup the blocks and sides of the domain for boundary conditions.
+
+block 1 add volume 1
+block 1 name "Domain"
+block 1 element type hex20
+
+# Define boundary conditions
+#
+sideset 1 add surface with x_coord=0 and y_coord<0
+sideset 1 name "inlet cold"
+
+sideset 2 add surface with x_coord=0 and y_coord>0
+sideset 2 name "inlet hot"
+
+sideset 3 add surface with x_coord={pipe_length}
+sideset 3 name "outlet"
+
+sideset 4 add surface with x_coord={pipe_length / 2} and y_coord={pipe_width / 2}
+sideset 4 name "wall"
+
+sideset 5 add surface with x_coord={pipe_length / 2} and y_coord=-{pipe_width / 2}
+sideset 5 name "wall"
+
+sideset 6 add surface with x_coord={pipe_length / 2} and z_coord={pipe_width / 2}
+sideset 6 name "periodic left"
+
+sideset 7 add surface with x_coord={pipe_length / 2} and z_coord=-{pipe_width / 2}
+sideset 7 name "periodic right"
+
+# ============================================================================ #
+# Export the mesh
+#
+set exodus netcdf4 off
+set large exodus file on
+export mesh "test_pipe.exo" overwrite
