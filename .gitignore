@@ -2,7 +2,7 @@
 [Bb]uild/
 [Ll]ogs/
 [Rr]esults/
-[Dd]ata/
+[Dd]ata_local/
 
 # Project specific files
 neko
@@ -19,3 +19,5 @@ fort.9
 # Animations
 *.mp4
 *.gif
+
+.vscode/

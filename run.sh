@@ -179,6 +179,7 @@ for case in $case_files; do
     done
 
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi
+    if [ -d "$MAIN_DIR/data_local" ]; then ln -fs $MAIN_DIR/data_local $log; fi
 
     # Done with the setup
     # ======================================================================== #

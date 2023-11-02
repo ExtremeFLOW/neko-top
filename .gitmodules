@@ -6,3 +6,7 @@
 	path = external/neko
 	url = https://github.com/ExtremeFlow/neko.git
 	branch = develop
+[submodule "Nek5000"]
+	path = external/Nek5000
+	url = https://github.com/Nek5000/Nek5000.git
+	branch = master
