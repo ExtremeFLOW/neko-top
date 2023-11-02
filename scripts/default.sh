@@ -70,11 +70,18 @@ printf "Running example: %s.\n" $example
 printf "=%.0s" {1..80} && printf "\n"
 printf "Executing Neko.\n\n"
 
-for casefile in $(find . -name "*.case"); do
-    casename=$(basename -- $casefile)
-    printf "See $casename.out for the status output.\n"
-    { time $(mpirun --pernode ./neko $casefile 1>$casename.out 2>error.err); } 2>&1
-done
+casefile=$(find . -name "*.case")
+if [ -z "$casefile" ]; then
+    printf "ERROR: No case file found.\n" >&2
+    exit 1
+elif [ $(echo "$casefile" | wc -l) -gt 1 ]; then
+    printf "ERROR: Multiple case files found.\n" >&2
+    exit 1
+fi
+
+casename=$(basename -- ${casefile%.*})
+printf "See $casename.out for the status output.\n"
+{ time $(mpirun --pernode ./neko $casefile 1>$casename.out 2>error.err); } 2>&1
 
 if [ -s "error.err" ]; then
     printf "\nERROR: An error occured during execution. See error.err for details.\n"
@@ -90,10 +97,10 @@ printf "=%.0s" {1..80} && printf "\n"
 printf "Moving files to results folder: \n\t$results\n\n"
 
 # Remove the results folder if it exists and create a new one
-rm -fr $results && mkdir -p $results
+mkdir -p $results && rm -fr $results/*
 
 # Move all the nek5000 files to the results folder and compress them.
-for nek in $(find ./ -maxdepth 1 -name "*.nek5000"); do
+for nek in $(find ./ -name "*.nek5000"); do
     printf "Archiving:  %s\n" $nek
 
     base=$(basename ${nek%.*})

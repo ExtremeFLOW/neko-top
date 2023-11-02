@@ -1,14 +1,18 @@
-# Ignore all with no extension by looking for the "." in the filename
-*
-!*.*
-!*/
-
 # Directory
 [Bb]uild/
 [Ll]ogs/
 [Rr]esults/
+[Dd]ata/
+
+# Project specific files
+neko
+
+# Temporary files
+*.exo
+*.re2
 
 # Fortran-specific files
+fort.9
 *.f90~
 *.f90.bak
 

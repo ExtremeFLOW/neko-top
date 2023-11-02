@@ -21,13 +21,13 @@ function help() {
 }
 
 # Variable setups
-WORKDIR=$PWD
+MAIN_DIR=$(dirname $(realpath $0))
 
-DPATH=$WORKDIR/$DPATH
-RPATH=$WORKDIR/$RPATH
-LPATH=$WORKDIR/$LPATH
+RPATH=$MAIN_DIR/$RPATH
+LPATH=$MAIN_DIR/$LPATH
 
-mkdir -p $DPATH $RPATH
+if [[ ! -d $RPATH && ! -d $LPATH ]]; then exit 0; fi
+
 # ============================================================================ #
 # Keywords
 
@@ -42,24 +42,9 @@ done
 # Print status
 
 # List all the tests, if there are none we return
-for test in $(ls $LPATH 2>/dev/null); do
-    if [ ! -d $LPATH/$test ]; then
-        continue
-    fi
-
-    if [ -f $LPATH/$test/output.out ]; then
-        tests+="$test "
-    else
-        # Remove empty test suites
-        if [ ! "$(ls $LPATH/$test/)" ]; then
-            rm -fr $LPATH/$test
-            continue
-        fi
-        for t in $(ls $LPATH/$test/); do
-            if [ -f $LPATH//$test/$t/output.out ]; then
-                tests+="$test/$t "
-            fi
-        done
+for test in $(find $LPATH -type d 2>/dev/null); do
+    if [ -f $test/output.out ]; then
+        tests+="${test#$LPATH/} "
     fi
 done
 
@@ -81,7 +66,7 @@ for test in $tests; do
 done
 
 for test in $tests; do
-    if [[ -s /$LPATH/$test/output.out && ! -s $LPATH/$test/error.err ]]; then
+    if [[ -f $LPATH/$test/neko && ! -s $LPATH/$test/error.err ]]; then
         printf '  \e[1;33m%-10s\e[m %-s\n' "Running:" "$test"
     fi
 done
