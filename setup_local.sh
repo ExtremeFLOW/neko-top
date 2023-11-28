@@ -13,21 +13,12 @@ CUDA_DIR="/usr/local/cuda"
 
 # Everything past this point should be general across all setups.
 # ============================================================================ #
-# Cleanup the external dependencies to ensure a clean build
-
-git submodule foreach git clean -fdx
-git submodule update --force --remote --init
-
-# ============================================================================ #
 # Install dependencies
 
-if [ -z "$CC" ]; then export CC=$(which gcc); fi
-if [ -z "$CXX" ]; then export CXX=$(which g++); fi
-if [ -z "$FC" ]; then export FC=$(which gfortran); fi
-if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); fi
+MAIN_DIR=$(dirname $(realpath $0))
+EXTERNAL_DIR="$MAIN_DIR/external"
 
-MAIN_DIR="$PWD"
-EXTERNAL_DIR="$PWD/external"
+FEATURES=""
 
 cmake -S $EXTERNAL_DIR/json-fortran \
     -B $EXTERNAL_DIR/json-fortran/build \
@@ -46,6 +37,30 @@ elif [ -d "$EXTERNAL_DIR/json-fortran/lib64" ]; then
     JSON_FORTRAN_LIB="$EXTERNAL_DIR/json-fortran/lib64"
 fi
 
+# Setup GSLIB
+if [ -z "$GSLIB_DIR" ]; then
+    GSLIB_DIR="$EXTERNAL_DIR/Nek5000/3rd_party/gslib"
+fi
+
+if [ ! -f "$GSLIB_DIR/lib*/libgs.a" ]; then
+    if [ -f "$GSLIB_DIR/install" ]; then
+        cd $GSLIB_DIR
+        ./install
+        GSLIB_DIR="$GSLIB_DIR/gslib/build/"
+        cd $MAIN_DIR
+    else
+        printf "GSLIB not found at GSLIB_DIR: \n\t$GSLIB_DIR" >&2
+        exit 1
+    fi
+    FEATURES+="--with-gslib=$GSLIB_DIR "
+fi
+
+if [ -d "$CUDA_DIR" ]; then
+    FEATURES+="--with-cuda=$CUDA_DIR "
+else
+    CUDA_DIR=""
+fi
+
 # ============================================================================ #
 # Install Neko
 
@@ -55,13 +70,36 @@ export LD_LIBRARY_PATH="$JSON_FORTRAN_LIB:$LD_LIBRARY_PATH"
 
 # Setup Neko
 cd $EXTERNAL_DIR/neko
-./regen.sh
-./configure --prefix=$EXTERNAL_DIR/neko --with-cuda=$CUDA_DIR
+if [ ! -f "Makefile" ]; then
+    ./regen.sh
+    ./configure --prefix=$EXTERNAL_DIR/neko $FEATURES
+fi
 make install -j
 cd ../../
 
 # ============================================================================ #
 # Compile the example codes.
+rm -fr $MAIN_DIR/build/
+cmake -G Ninja -B $MAIN_DIR/build/ -S $MAIN_DIR
+cmake --build $MAIN_DIR/build/ --parallel --clean-first
 
-cmake -B build/ -S ./
-cmake --build build/ --parallel
+# ============================================================================ #
+# Print the status of the build
+
+printf "\n\n"
+printf "Neko-TOP Installation Complete\n"
+printf "===============================\n"
+printf "Neko installed to: $EXTERNAL_DIR/neko\n"
+printf "Supported features:\n"
+printf "\tCUDA:"
+if [ -z "$CUDA_DIR" ]; then
+    printf " NO\n"
+else
+    printf " YES\n"
+fi
+printf "\tMPI: YES\n"
+printf "\tOpenCL: NO\n"
+
+printf "\n\n"
+
+# EOF

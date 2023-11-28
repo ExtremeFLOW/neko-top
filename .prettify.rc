@@ -1,0 +1,16 @@
+case = [1,1,1,1]
+line-length = 80
+indent = 2
+disable-indent = false
+strict-indent = false
+whitespace = 2
+whitespace-comma = true
+whitespace-assignment = true
+enable-decl = true
+whitespace-decl = true
+whitespace-relational = true
+whitespace-logical = true
+whitespace-multdiv = true
+whitespace-print = true
+whitespace-type = false
+whitespace-intrinsics = true

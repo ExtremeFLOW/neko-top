@@ -4,14 +4,21 @@
 [Rr]esults/
 [Dd]ata_local/
 
+examples/debug/*
+!examples/debug/debug.case
+!examples/debug/CMakeLists.txt
+
 # Project specific files
 neko
+*.nek5000
+*.f*
 
 # Temporary files
 *.exo
 *.re2
 
 # Fortran-specific files
+!*.f90
 fort.9
 *.f90~
 *.f90.bak
@@ -19,5 +26,3 @@ fort.9
 # Animations
 *.mp4
 *.gif
-
-.vscode/
