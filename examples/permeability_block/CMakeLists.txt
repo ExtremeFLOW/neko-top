@@ -1,7 +1,7 @@
 # Simple setup to compile the current example.
-set(DRIVER_TYPE "topopt")
+set(DRIVER_TYPE "user")
 set(EXTRA_SOURCES
-    ${NEKO_DIR}/examples/turb_channel/turb_channel.f90
+    ${CMAKE_SOURCE_DIR}/sources/user_modules/permeability_user.f90
 )
 
 build_example(${DRIVER_TYPE})

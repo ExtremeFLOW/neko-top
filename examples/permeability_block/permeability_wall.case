@@ -1,0 +1,70 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "data_local/thermal_mix_channel/square_pipe_with_wall.nmsh",
+        "output_directory": "fields",
+        "output_at_end": true,
+        "end_time": 5.0,
+        "timestep": 5e-6,
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 7,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 2000.0,
+            "perm": 1.0,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "inflow_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-7,
+                "max_iterations": 800
+            },
+            "output_control": "nsamples",
+            "output_value": 250,
+            "boundary_types": [
+                "v",
+                "v",
+                "o",
+                "w",
+                "w",
+                "w",
+                "w"
+            ]
+        },
+        "scalar": {
+            "enabled": true,
+            "Pe": 1000.0,
+            "initial_condition": {
+                "type": "user"
+            },
+            "boundary_types": [
+                "d=0",
+                "d=1"
+            ]
+        }
+    }
+}

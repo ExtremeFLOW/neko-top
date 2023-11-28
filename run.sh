@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -166,8 +166,8 @@ for case in $case_files; do
     rm -f $log/output.out $log/error.err
 
     # Determine if we have a HPC file
-    setting=$HPATH/${case}.sh
-    if [ ! -f $setting ]; then setting=$HPATH/${case%/*}.sh; fi
+    setting=$HPATH/${case%.*}.sh
+    if [ ! -f $setting ]; then setting=$HPATH/$case_dir/default.sh; fi
     if [ ! -f $setting ]; then setting=$HPATH/default.sh; fi
 
     cp -ft $log $EPATH/$case $EPATH/$case_dir/neko

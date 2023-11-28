@@ -1,12 +1,10 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data/thermal_mix_channel/test_pipe.nmsh",
-        "output_checkpoints": false,
+        "mesh_file": "data_local/thermal_mix_channel/square_pipe.nmsh",
         "output_at_end": true,
-        "end_time": 20.0,
-        "timestep": 1e-3,
-        "output_directory": "Re_1000",
+        "end_time": 5.0,
+        "timestep": 5e-5,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -14,7 +12,8 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1000.0,
+            "Re": 2000.0,
+            "perm": 1e-3,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -23,18 +22,24 @@
                     0.0
                 ]
             },
+            "inflow_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0
+                ]
+            },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-9,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
-                "projection_space_size": 8,
-                "absolute_tolerance": 1e-6,
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
             "output_control": "nsamples",
@@ -48,29 +53,40 @@
                 "w",
                 "w"
             ],
-            "inflow_conditions": [
+            "source_terms": [
                 {
-                    "type": "uniform",
-                    "value": [
-                        1.0,
-                        0.0,
-                        0.0
-                    ]
+                    "type": "user_vector"
                 }
-            ],
-            "flow_rate_force": {
-                "direction": 1,
-                "value": 1.0,
-                "use_averaged_flow": true
-            }
+            ]
         },
         "scalar": {
             "enabled": true,
             "Pe": 1000.0,
+            "initial_condition": {
+                "type": "user"
+            },
             "boundary_types": [
-                "d=1",
-                "d=0"
+                "d=0",
+                "d=1"
             ]
-        }
+        },
+        "point_zones": [
+            {
+                "name": "lowperm",
+                "geometry": "box",
+                "x_bounds": [
+                    4.75,
+                    5.25
+                ],
+                "y_bounds": [
+                    -0.5,
+                    0.5
+                ],
+                "z_bounds": [
+                    -0.5,
+                    0.0
+                ]
+            }
+        ]
     }
 }
