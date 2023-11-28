@@ -26,10 +26,11 @@ function help() {
     echo -e ""
 
     printf "\e[4mOptions:\e[0m\n"
-    printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
-    printf "  -%-1s, --%-10s %-60s\n" "c" "clean" "Clean remeshing."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
+    printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
+    printf "  -%-1s, --%-10s %-60s\n" "k" "keep" "Keep logs and temporaries."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
+    printf "  -%-1s, --%-10s %-60s\n" "r" "remesh" "Do complete remesh."
 
     exit 0
 }
@@ -123,20 +124,22 @@ for in in $@; do
     # Opions and flags
     if [[ ${in:0:2} == "--" ]]; then
         case "${in:2}" in
-        "all") ALL=true ;;       # Run all journals available
-        "clean") CLEAN=true ;;   # Clean logs
         "help") help ;;          # Print help
+        "all") ALL=true ;;       # Run all journals available
+        "keep") KEEP=true ;;     # Clean logs
         "delete") DELETE=true ;; # Delete previous runs
+        "remesh") REMESH=true ;; # Do complete remesh
         \?) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
         esac
 
     elif [[ ${in:0:1} == "-" ]]; then
         for ((i = 1; i < ${#in}; i++)); do
             case "${in:$i:1}" in
-            "a") ALL=true ;;    # Run all journals available
-            "c") CLEAN=true ;;  # Clean logs
             "h") help ;;        # Print help
+            "a") ALL=true ;;    # Run all journals available
+            "k") KEEP=true ;;   # Clean logs
             "d") DELETE=true ;; # Delete previous runs
+            "r") REMESH=true ;; # Do complete remesh
             \?) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
             esac
         done
@@ -148,7 +151,7 @@ for in in $@; do
     # Extract the journals from the input
     elif [[ ! $ALL ]]; then
         for journal in $(find $INPUT_PATH/$in -name "*.jou"); do
-            journals+="${journal#$INPUT_PATH/} "
+            journals+="$journal "
         done
     fi
 done
@@ -156,7 +159,7 @@ done
 if [ $ALL ]; then
     journals=""
     for journal in $(find $INPUT_PATH -name "*.jou" 2>>/dev/null); do
-        journals+="${journal#$INPUT_PATH/} "
+        journals+="$journal "
     done
 fi
 
@@ -184,7 +187,7 @@ function mesh() {
     rm -fr ${journal_name%.*}.log error.log
 
     # Construct the mesh using Cubit
-    $cubit $journal_name 1>>${journal_name%.*}.log 2>>error.log
+    $cubit $1 1>>${journal_name%.*}.log 2>>error.log
 
     if [[ ! -s error.log && $(find ./ -name "*.exo" | wc -l) -lt 1 ]]; then
         printf "\n\e[4mError:\e[0m\n" 2>>error.log
@@ -218,14 +221,12 @@ function mesh() {
         exit 1
     fi
 
-    # Move the mesh to the data folder
-    mkdir -p $OUTPUT_PATH/${journal_dir}
-    mv ${journal_name%.*}.nmsh $OUTPUT_PATH/${journal%.*}.nmsh
-
     # Cleanup the unwanted files
-    rm -f ${journal_name%.*}.log error.log
-    rm -f ${journal_name%.*}.exo
-    rm -f ${journal_name%.*}.re2
+    if [ ! $KEEP ]; then
+        rm -f ${journal_name%.*}.log error.log
+        rm -f ${journal_name%.*}.exo
+        rm -f ${journal_name%.*}.re2
+    fi
 }
 
 # ============================================================================ #
@@ -236,20 +237,23 @@ full_start=$(date +%s.%N)
 mkdir -p $OUTPUT_PATH $LPATH
 printf "\n\e[4mQueueing journals.\e[0m\n"
 for journal in $journals; do
-    journal_dir=$(dirname $journal)
+    journal_name=${journal#$INPUT_PATH/}
+    journal_dir=$(dirname $journal_name)
 
-    if [ -f "$OUTPUT_PATH/${journal%.*}.nmsh" ]; then
-        if [ $CLEAN ]; then
-            printf '  %-10s %-67s\n' "Remeshing:" "$journal"
-            rm -f $OUTPUT_PATH/${journal%.*}.nmsh
+    if [ -f "$OUTPUT_PATH/${journal_name%.*}.nmsh" ]; then
+        if [ $REMESH ]; then
+            printf '  %-10s %-67s\n' "Remeshing:" "$journal_name"
+            rm -f $OUTPUT_PATH/${journal_name%.*}.nmsh
         else
-            printf '  %-10s %-67s\n' "Skipping:" "$journal"
+            printf '  %-10s %-67s\n' "Skipping:" "$journal_name"
             continue
         fi
     else
-        printf '  %-10s %-67s\n' "Meshing:" "$journal"
+        printf '  %-10s %-67s\n' "Meshing:" "$journal_name"
     fi
-    cd $INPUT_PATH/$journal_dir
+
+    mkdir -p $OUTPUT_PATH/$journal_dir
+    cd $OUTPUT_PATH/$journal_dir
 
     mesh $journal
 
