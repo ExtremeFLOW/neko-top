@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.0)
-project(Neko-TOP VERSION 0.1.0 LANGUAGES C CXX Fortran)
+project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
 
 # ============================================================================ #
 # Setup CMake
@@ -10,7 +10,7 @@ include(CPack)
 
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
 endif()
 
 # ============================================================================ #
@@ -24,15 +24,31 @@ set(CMAKE_Fortran_STANDARD 2008)
 # ============================================================================ #
 # Setup External Libraries
 # ............................................................................ #
+# Check for the required libraries.
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
+
+# Check for the optional libraries.
+find_package(CUDAToolkit QUIET)
+find_package(MPI QUIET)
+
+# ............................................................................ #
 # Setup of JSON-Fortran
 
 # If the user did not specify JSONFORTRAN_DIR, default to the
 # external/json-fortran directory
-set(JSONFORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran CACHE PATH "Path to the JSON-Fortran installation")
+set(JSONFORTRAN_DIR
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+    CACHE PATH
+    "Path to the JSON-Fortran installation"
+)
 
 # Check that the JSONFORTRAN_DIR directories exist
 if (NOT IS_DIRECTORY ${JSONFORTRAN_DIR})
-    message(FATAL_ERROR "JSON-Fortran directory not found (${JSONFORTRAN_DIR}). Please run `git submodule update --init` to download the external libraries.")
+    message(FATAL_ERROR
+        "JSON-Fortran directory not found (${JSONFORTRAN_DIR})."
+        "Please run `git submodule update --init` to download the external libraries."
+    )
 endif()
 
 # Find the JSON-Fortran library and add it to the CMake search path
@@ -58,7 +74,10 @@ set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko CACHE PATH "Path to the N
 
 # Check that the NEKO_DIR directories exist
 if (NOT IS_DIRECTORY ${NEKO_DIR})
-    message(FATAL_ERROR "Neko directory not found (${JSONFORTRAN_DIR}). Please run `git submodule update --init` to download the external libraries.")
+    message(FATAL_ERROR
+        "Neko directory not found (${NEKO_DIR})."
+        "Please run `git submodule update --init` to download the external libraries."
+    )
 endif()
 
 # Set the proper paths for the NEKO_DIR and JSONFORTRAN_DIR directories

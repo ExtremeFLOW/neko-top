@@ -1,17 +1,18 @@
-program topneko
-   use neko
-   use user
-   use neko_top
-   type(case_t) :: C
+! ============================================================================ !
+! Neko Top program
+! ============================================================================ !
 
-   call user_setup(C%usr)
-   call neko_init(C)
+program nekotop
+   use neko_top, only: case_t, topology_t
+   use neko_top, only: neko_top_init, neko_top_solve, neko_top_finalize
 
-   call top_setup(C)
+   implicit none
 
-   call neko_solve(C)
-   call neko_finalize(C)
+   type(case_t) :: neko_case
+   type(topology_t) :: topology
 
+   call neko_top_init(neko_case, topology)
+   call neko_top_solve(neko_case, topology)
+   call neko_top_finalize(neko_case, topology)
 
-end program topneko
-
+end program nekotop

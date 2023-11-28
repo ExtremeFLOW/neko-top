@@ -24,17 +24,6 @@ else()
 endif()
 
 # ============================================================================ #
-# Setup of the external libraries.
-
-# Check for the required libraries.
-find_package(LAPACK REQUIRED)
-find_package(BLAS REQUIRED)
-
-# Check for the optional libraries.
-find_package(CUDAToolkit QUIET)
-find_package(MPI QUIET)
-
-# ============================================================================ #
 # Include the build_example function
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(build_example)
@@ -45,9 +34,12 @@ set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory"
 # ============================================================================ #
 # Add the example directories.
 
-add_subdirectory(neko_examples/tgv)
-add_subdirectory(neko_examples/turb_channel)
-add_subdirectory(neko_examples/2d_cylinder)
-add_subdirectory(neko_examples/rayleigh-benard)
-add_subdirectory(topopt)
-add_subdirectory(thermal_mix_channel)
+# Find all subdirectories in the examples directory
+file(GLOB EXAMPLES_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+
+# Add each subdirectory, if it contains a CMakelists.txt file
+foreach(EXAMPLE_DIR ${EXAMPLES_DIRS})
+    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
+        add_subdirectory(${EXAMPLE_DIR})
+    endif()
+endforeach()

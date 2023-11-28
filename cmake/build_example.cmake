@@ -89,7 +89,11 @@ function(build_example DRIVER_TYPE)
     # Link the executable to the required libraries.
 
     target_link_libraries(${EXAMPLE_NAME}
-        jsonfortran-gnu::jsonfortran LAPACK::LAPACK BLAS::BLAS PkgConfig::neko)
+        BLAS::BLAS
+        LAPACK::LAPACK
+        jsonfortran-gnu::jsonfortran
+        PkgConfig::neko
+    )
 
     # If CUDA is available, link the executable to the CUDA runtime library.
     if(CUDAToolkit_FOUND)
