@@ -17,6 +17,8 @@ if [ "$(which module)" ]; then
 
     BLAS_DIR="/appl/OpenBLAS/0.3.23/$CPUTYPEV/gcc-12.2.0"
     CUDA_DIR="/appl/cuda/12.2.0"
+elif [ "$(which spack)" ]; then
+    spack env activate neko-top
 fi
 
 # Look for CUDA if it is not defined as environment variable
