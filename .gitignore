@@ -16,8 +16,11 @@ neko
 # Temporary files
 *.exo
 *.re2
+__pycache__/
+.venv
 
 # Fortran-specific files
+!*.fprettify.rc
 !*.f90
 fort.9
 *.f90~
