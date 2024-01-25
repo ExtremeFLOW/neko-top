@@ -2,7 +2,7 @@
     "version": 1.0,
     "case": {
         // "mesh_file": "data_local/output_00059.vtk", //
-        "mesh_file": "../data_local/output_00059.vtk", //
+        "mesh_file": "../../data_local/petsc_static_mixer_lowest.vtk", //
         // "output_checkpoint": true,
         // "restart_file": "fields/fluid00001.chkp",
         "output_directory": "fields",
