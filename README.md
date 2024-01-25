@@ -1,4 +1,4 @@
-# NekoTOP (Topology Optimization in Neko)
+# Neko-TOP (Topology Optimization in Neko)
 
 Short description of what we are trying to accomplish
 
