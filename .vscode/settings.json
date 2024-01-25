@@ -10,28 +10,26 @@
     "fortran.linter.modOutput": "${workspaceFolder}/build/modules",
     "fortran.linter.compiler": "gfortran",
     "fortran.linter.compilerPath": "/usr/bin/gfortran",
-    "fortran.formatting.formatter": "fprettify",
-    "fortran.formatting.fprettifyArgs": [
-        "-c",
-        "--case=[1,1,1,1]",
-        "--line-length=80",
-        "--indent=2",
-        "--disable-indent=false",
-        "--strict-indent=false",
-        "--whitespace=2",
-        "--whitespace-comma=true",
-        "--whitespace-assignment=true",
-        "--enable-decl=true",
-        "--whitespace-decl=true",
-        "--whitespace-relational=true",
-        "--whitespace-logical=true",
-        "--whitespace-multdiv=true",
-        "--whitespace-print=true",
-        "--whitespace-type=false",
-        "--whitespace-intrinsics=true",
+    "fortran.formatting.formatter": "findent",
+    "fortran.formatting.findentArgs": [
+        "-Rr", // Auto fill end statements with type of block and name
+        "-i2", // Default indentation
+        "-d3", // Indentation for do loops
+        "-f3", // Indentation for if statements
+        "-s3", // Indentation for select case statements
+        "-w3", // Indentation for where statements
+        "-t3", // Indentation for type statements
+        "-j3", // Indentation for interface statements
+        "-kd", // Indentation for continuation lines (-: no change, d: default)
+        "--ws_remred", // Remove redundant white space
+        "--align_paren", // Align parenthesis across continuation lines
+        "--indent_ampersand", // Indentation for continuation lines with preceeding &
     ],
     "files.exclude": {
         "**/*.mod": true,
         "**/*.o": true,
-    }
+    },
+    "python.analysis.extraPaths": [
+        "/usr/local/lib/python3.10/site-packages",
+    ]
 }

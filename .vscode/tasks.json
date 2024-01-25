@@ -20,6 +20,15 @@
 			"command": "configure",
 			"group": "build",
 			"problemMatcher": [],
-		}
+		},
+		{
+			"detail": "Execution of setup script",
+			"type": "shell",
+			"label": "Setup",
+			"command": "./setup.sh",
+			"group": "build",
+			"problemMatcher": [],
+			"dependsOn": []
+		},
 	]
 }

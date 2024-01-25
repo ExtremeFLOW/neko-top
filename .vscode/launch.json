@@ -17,7 +17,7 @@
             "environment": [
                 {
                     "name": "NEKO_LOG_LEVEL",
-                    "value": "0"
+                    "value": "10"
                 }
             ],
             "externalConsole": false,

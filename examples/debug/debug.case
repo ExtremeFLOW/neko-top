@@ -1,12 +1,12 @@
 {
     "version": 1.0,
     "case": {
-        // "mesh_file": "data_local/debugging_pipe.nmsh", // Run.sh path to mesh
-        "mesh_file": "../../data_local/debugging_pipe.nmsh", // Local path to mesh
-        // "mesh_file": "../../data_local/thermal_mix_channel/square_pipe.nmsh",
+        "mesh_file": "data/debugging_pipe.nmsh", // Run.sh path to mesh
+        // "mesh_file": "../../data_local/debugging_pipe.nmsh", // Local path to mesh
         "output_directory": "fields",
         "output_at_end": true,
-        "end_time": 0.02,
+        "output_boundary": true,
+        "end_time": 2.0,
         "timestep": 5e-4,
         "numerics": {
             "time_order": 3,
@@ -16,7 +16,6 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 1000.0,
-            "perm": 1e-2,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -51,9 +50,6 @@
                 "v",
                 "v",
                 "o",
-                "w",
-                "w",
-                "w",
                 "w"
             ],
             "source_terms": [
@@ -71,7 +67,12 @@
             "boundary_types": [
                 "d=0",
                 "d=1"
-            ]
+            ],
+            "source_terms": [
+                {
+                    "type": "user_vector"
+                }
+            ],
         },
         "point_zones": [
             {
@@ -90,6 +91,13 @@
                     0.0
                 ]
             }
-        ]
+        ],
+        "topology_optimization": {
+            "sensitivity_analysis": {
+                "type": "sensitivity",
+                "compute_control": "tsteps",
+                "compute_value": 5
+            }
+        }
     }
 }
