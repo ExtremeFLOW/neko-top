@@ -19,15 +19,21 @@
 # example directory. For example, the example in the directory
 # examples/neko_examples/2d_cylinder will have the CMake target name
 # examples_neko_examples_2d_cylinder.
-function(build_example DRIVER_TYPE)
+function(build_example)
 
     # ........................................................................ #
     # Define the executable.
-    file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+    if (NOT DEFINED EXAMPLE_NAME)
+        file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+    endif()
 
     if (DEFINED DRIVER)
         set(DRIVER ${DRIVER})
         set(DRIVER_TYPE "custom")
+
+    elseif(NOT DEFINED DRIVER_TYPE)
+        set(DRIVER_TYPE "default")
+        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "user")
         set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
@@ -46,6 +52,7 @@ function(build_example DRIVER_TYPE)
 
     elseif(${DRIVER_TYPE} STREQUAL "default")
         set(DRIVER ${EXAMPLES_DIR}/driver.f90)
+
     else()
         message(FATAL_ERROR "Unknown driver type: ${DRIVER_TYPE}")
     endif()
@@ -73,7 +80,7 @@ function(build_example DRIVER_TYPE)
 
     # ........................................................................ #
     # Construct example name from the folder structure relative to EXAMPLES_DIR.
-
+    set(TARGET_DIRECTORY ${EXAMPLES_DIR}/${EXAMPLE_NAME})
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
 
     add_executable(${EXAMPLE_NAME} ${DRIVER} ${EXTRA_SOURCES})
@@ -82,7 +89,7 @@ function(build_example DRIVER_TYPE)
     set_target_properties(${EXAMPLE_NAME}
         PROPERTIES
         OUTPUT_NAME "neko"
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        RUNTIME_OUTPUT_DIRECTORY "${TARGET_DIRECTORY}"
     )
 
     # ........................................................................ #

@@ -2,24 +2,34 @@
 # CMakeLists.txt for the Neko-TOP library
 # ============================================================================ #
 # Set CMake Variables.
-set( CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules )
+
+# Setup the global inclusion for fortran
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
+include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
+
+add_library(Neko-TOP STATIC)
+
+# Add the local neko extension library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 
 # ============================================================================ #
 # Define the library sources and targets
-set(neko-top_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
-    ${CMAKE_CURRENT_SOURCE_DIR}/assorted/develop.f90
-    ${CMAKE_CURRENT_SOURCE_DIR}/assorted/topology.f90
-    ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
-)
+target_sources(Neko-TOP
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
 
-add_library(Neko-TOP STATIC ${neko-top_SOURCES})
+        ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
+)
 
 # ============================================================================ #
 # Specify compile options
 
 target_include_directories(Neko-TOP
-    PUBLIC ${CMAKE_Fortran_MODULE_DIRECTORY}
+    PUBLIC
+        ${CMAKE_Fortran_MODULE_DIRECTORY}
 )
 
 target_link_libraries(Neko-TOP
@@ -35,6 +45,7 @@ endif()
 
 if(CUDAToolkit_FOUND)
     target_link_libraries(Neko-TOP CUDA::cudart)
+    set(ENV{HAVE_CUDA} TRUE)
 endif()
 
 # ============================================================================ #

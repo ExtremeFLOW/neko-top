@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.0.0)
+cmake_minimum_required(VERSION 3.5.0)
 project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
 
 # ============================================================================ #
@@ -11,6 +11,13 @@ include(CPack)
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+# If we are building in Debug mode, enable -g and -Wall for all languages
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
+    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -Wall")
 endif()
 
 # ============================================================================ #
@@ -31,6 +38,14 @@ find_package(LAPACK REQUIRED)
 # Check for the optional libraries.
 find_package(CUDAToolkit QUIET)
 find_package(MPI QUIET)
+
+if (CUDAToolkit_FOUND)
+    message(STATUS "CUDA Toolkit found")
+    enable_language(CUDA)
+    add_compile_options(-DHAVE_CUDA)
+else()
+    message(STATUS "CUDA Toolkit not found")
+endif()
 
 # ............................................................................ #
 # Setup of JSON-Fortran
@@ -70,7 +85,8 @@ find_package(jsonfortran-gnu REQUIRED)
 # Setup of the Neko library
 
 # If the user did not specify NEKO_DIR, default to the external/neko directory
-set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko CACHE PATH "Path to the Neko installation")
+set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko CACHE PATH
+    "Path to the Neko installation")
 
 # Check that the NEKO_DIR directories exist
 if (NOT IS_DIRECTORY ${NEKO_DIR})

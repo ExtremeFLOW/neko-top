@@ -35,11 +35,29 @@ set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory"
 # Add the example directories.
 
 # Find all subdirectories in the examples directory
-file(GLOB EXAMPLES_DIRS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*)
+file(GLOB_RECURSE CASE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} */*.case)
 
-# Add each subdirectory, if it contains a CMakelists.txt file
+# Save only the directory names
+foreach(EXAMPLE_DIR ${CASE_FILES})
+    get_filename_component(DIRECTORY ${EXAMPLE_DIR} DIRECTORY)
+    # If the directory is already in the list, don't add it again
+    list(FIND EXAMPLES_DIRS ${DIRECTORY} INDEX)
+    if(${INDEX} EQUAL -1)
+        list(APPEND EXAMPLES_DIRS ${DIRECTORY})
+    endif()
+endforeach()
+
+# Add each subdirectory, if it contains a CMakelists.txt file otherwise call the
+# build_example function.
 foreach(EXAMPLE_DIR ${EXAMPLES_DIRS})
+    message(STATUS "Adding example: ${EXAMPLE_DIR}")
+
+    # Check if the example directory contains a CMakeLists.txt file
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
         add_subdirectory(${EXAMPLE_DIR})
+    else()
+        set(EXAMPLE_NAME ${EXAMPLE_DIR})
+        build_example()
+        unset(EXAMPLE_NAME)
     endif()
 endforeach()
