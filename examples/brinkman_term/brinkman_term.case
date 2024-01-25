@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "thermal_mix_channel/square_pipe.nmsh",
+        "mesh_file": "data_local/thermal_mix_channel/square_pipe.nmsh",
         "output_directory": "fields",
         "output_at_end": true,
         "output_boundary": true,

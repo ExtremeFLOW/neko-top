@@ -23,7 +23,6 @@ if(CUDAToolkit_FOUND)
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/math_ext_kernel.h
     )
 
-    target_link_libraries(Neko-TOP CUDA::cudart)
     target_include_directories(Neko-TOP
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
