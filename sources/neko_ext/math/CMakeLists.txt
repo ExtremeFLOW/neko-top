@@ -16,7 +16,7 @@ target_include_directories(Neko-TOP
         ${NEKO_DIR}/src
 )
 
-if(CUDAToolkit_FOUND)
+if(CMAKE_CUDA_COMPILER)
     target_sources(Neko-TOP
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/math_ext.cu
@@ -27,7 +27,7 @@ if(CUDAToolkit_FOUND)
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
     )
-    if(CMAKE_VERSION VERSION_LESS "3.24.0")
+    if(CMAKE_VERSION VERSION_GREATER "3.24.0")
         set_target_properties(Neko-TOP PROPERTIES CUDA_ARCHITECTURES native)
     endif()
 endif()

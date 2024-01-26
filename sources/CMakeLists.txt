@@ -43,13 +43,8 @@ if(MPI_FOUND)
     target_link_libraries(Neko-TOP MPI::MPI_Fortran)
 endif()
 
-if(CUDAToolkit_FOUND)
-    target_link_libraries(Neko-TOP CUDA::cudart)
-    set(ENV{HAVE_CUDA} TRUE)
-endif()
-
 # ============================================================================ #
 # Specify installation instructions
 
-install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/Lib/ )
+install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/ )
 install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})

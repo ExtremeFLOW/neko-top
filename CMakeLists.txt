@@ -28,6 +28,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
 
+# Enforce compiler options
+add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-cpp>) # Enable preprocessing
+
 # ============================================================================ #
 # Setup External Libraries
 # ............................................................................ #
@@ -36,15 +39,17 @@ find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 # Check for the optional libraries.
-find_package(CUDAToolkit QUIET)
 find_package(MPI QUIET)
 
-if (CUDAToolkit_FOUND)
-    message(STATUS "CUDA Toolkit found")
+# ============================================================================ #
+# Enable devices
+include(CheckLanguage)
+
+# Enable CUDA if the compiler is found
+check_language(CUDA)
+if (CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
-    add_compile_options(-DHAVE_CUDA)
-else()
-    message(STATUS "CUDA Toolkit not found")
+    add_compile_definitions(HAVE_CUDA)
 endif()
 
 # ............................................................................ #
