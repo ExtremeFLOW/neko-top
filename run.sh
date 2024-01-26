@@ -39,11 +39,11 @@ if [ $# -lt 1 ]; then help; fi
 MAIN_DIR=$(dirname $(realpath $0))
 
 # Define all needed folders relative to the project folder. (without trailing /)
-export EPATH="$MAIN_DIR/examples"   # Examples scripts
-export RPATH="$MAIN_DIR/results"    # Result export location
-export LPATH="$MAIN_DIR/logs"       # Logging locations
-export HPATH="$MAIN_DIR/jobscripts" # Submission settings
-export DPATH="$MAIN_DIR/data"       # Meshes
+export EPATH="$MAIN_DIR/examples"                 # Examples scripts
+export RPATH="$MAIN_DIR/results"                  # Result export location
+export LPATH="$MAIN_DIR/logs"                     # Logging locations
+export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
+export DPATH="$MAIN_DIR/data"                     # Meshes
 
 # End of user inputs
 # ============================================================================ #
