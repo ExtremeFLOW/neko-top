@@ -67,7 +67,15 @@ done
 
 for test in $tests; do
     if [[ -f $LPATH/$test/neko && ! -s $LPATH/$test/error.err ]]; then
-        printf '  \e[1;33m%-10s\e[m %-s\n' "Running:" "$test"
+        file=$(find $LPATH/$test -type f -name "*.case")
+        progress=$(
+            grep 't = ' "${file%.*}.out" |     # Get all lines with t = in them
+                tail -n 1 |                    # Get the last line
+                sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
+                xargs                          # Trim whitespace
+        )
+
+        printf '  \e[1;33m%-10s\e[m [ %6s ] %-s' "Running:" "$progress" "$test"
     fi
 done
 
