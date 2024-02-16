@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.18)
 project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
 
 # ============================================================================ #
@@ -15,10 +15,12 @@ endif()
 
 # If we are building in Debug mode, enable -g and -Wall for all languages
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
-    set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -Wall")
+    add_compile_options(
+        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
+        -Wall -Wextra -Wpedantic -Wno-unused-dummy-argument
+        )
 endif()
+add_compile_definitions("DEBUG=$<CONFIG:Debug>")
 
 # ============================================================================ #
 # Setup Compilers
@@ -29,7 +31,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # Enforce compiler options
-add_compile_options($<$<COMPILE_LANGUAGE:Fortran>:-cpp>) # Enable preprocessing
+set(CMAKE_Fortran_PREPROCESS ON)
 
 # ============================================================================ #
 # Setup External Libraries

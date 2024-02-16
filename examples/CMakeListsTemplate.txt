@@ -1,5 +1,10 @@
 # Define the type of driver to use.
-set(DRIVER_TYPE "user")
+# Options are:
+#   - default: Clean neko driver
+#   - user: Neko driver with user defined elements
+#   - topopt: TopOpt driver
+#   - custom: Custom driver
+set(DRIVER_TYPE "default")
 
 # If example require a custom driver, define the source file here, or store it
 # as driver.f90 in the example directory.

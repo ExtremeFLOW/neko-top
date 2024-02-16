@@ -113,8 +113,6 @@ function(build_example)
     endif()
 
     # Link our local Neko-TOP library to the driver
-    if (${DRIVER_TYPE} STREQUAL "topopt")
-        target_link_libraries(${EXAMPLE_NAME} Neko-TOP)
-    endif()
+    target_link_libraries(${EXAMPLE_NAME} Neko-TOP)
 
 endfunction()

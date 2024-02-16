@@ -50,14 +50,13 @@ endforeach()
 # Add each subdirectory, if it contains a CMakelists.txt file otherwise call the
 # build_example function.
 foreach(EXAMPLE_DIR ${EXAMPLES_DIRS})
-    message(STATUS "Adding example: ${EXAMPLE_DIR}")
 
     # Check if the example directory contains a CMakeLists.txt file
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
-        add_subdirectory(${EXAMPLE_DIR})
-    else()
-        set(EXAMPLE_NAME ${EXAMPLE_DIR})
-        build_example()
-        unset(EXAMPLE_NAME)
+    if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
+        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/CMakeListsTemplate.txt
+                       ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt
+                       COPYONLY)
     endif()
+
+    add_subdirectory(${EXAMPLE_DIR})
 endforeach()
