@@ -41,6 +41,7 @@ if [ $# -lt 1 ]; then help; fi
 # User defined inputs.
 
 # Define all needed folders relative to the project folder. (without trailing /)
+CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 INPUT_PATH="$MAIN_DIR/data"        # Journal files
 OUTPUT_PATH="$MAIN_DIR/data_local" # Meshes
@@ -89,9 +90,9 @@ if [ ! -z "$(which exo2nek)" ]; then
 elif [ -f "$NEK5000_DIR/bin/exo2nek" ]; then
     exo2nek="$NEK5000_DIR/bin/exo2nek"
 elif [ -f "$NEK5000_DIR/tools/maketools" ]; then
-    cd "$NEK5000_DIR/tools"
+    cd $NEK5000_DIR/tools
     ./maketools exo2nek
-    cd "$MAIN_DIR"
+    cd $CURRENT_DIR
     exo2nek="$NEK5000_DIR/bin/exo2nek"
 else
     echo "exo2nek not found. Please ensure it is installed and available in the PATH."
@@ -220,13 +221,6 @@ function mesh() {
         printf "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $journal" 2>>error.log
         exit 1
     fi
-
-    # Cleanup the unwanted files
-    if [ ! $KEEP ]; then
-        rm -f ${journal_name%.*}.log error.log
-        rm -f ${journal_name%.*}.exo
-        rm -f ${journal_name%.*}.re2
-    fi
 }
 
 # ============================================================================ #
@@ -252,12 +246,16 @@ for journal in $journals; do
         printf '  %-10s %-67s\n' "Meshing:" "$journal_name"
     fi
 
-    mkdir -p $OUTPUT_PATH/$journal_dir
-    cd $OUTPUT_PATH/$journal_dir
+    mkdir -p $OUTPUT_PATH/$journal_dir/tmp
+    cd $OUTPUT_PATH/$journal_dir/tmp
 
     mesh $journal
 
-    cd $MAIN_DIR
+    cp ./*.nmsh -ft $OUTPUT_PATH/$journal_dir
+    if [ ! $KEEP ]; then
+        rm -fr $OUTPUT_PATH/$journal_dir/tmp
+    fi
+    cd $CURRENT_DIR
 done
 
 # ============================================================================ #

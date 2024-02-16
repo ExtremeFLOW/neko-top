@@ -11,7 +11,16 @@
 			],
 			"group": "build",
 			"problemMatcher": [],
-			"dependsOn": []
+			"dependsOn": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "never",
+				"revealProblems": "onProblem",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": true
+			}
 		},
 		{
 			"detail": "CMake template configure task",
@@ -28,7 +37,16 @@
 			"command": "./setup.sh",
 			"group": "build",
 			"problemMatcher": [],
-			"dependsOn": []
+			"dependsOn": [],
+			"presentation": {
+				"echo": true,
+				"reveal": "never",
+				"revealProblems": "onProblem",
+				"focus": false,
+				"panel": "shared",
+				"showReuseMessage": false,
+				"clear": true
+			}
 		},
 	]
 }

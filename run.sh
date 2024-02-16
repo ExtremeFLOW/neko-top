@@ -37,6 +37,7 @@ if [ $# -lt 1 ]; then help; fi
 # ============================================================================ #
 # User defined inputs.
 MAIN_DIR=$(dirname $(realpath $0))
+CURRENT_DIR=$(pwd)
 
 # Define all needed folders relative to the project folder. (without trailing /)
 export EPATH="$MAIN_DIR/examples"                 # Examples scripts
@@ -170,7 +171,11 @@ for case in $case_files; do
     if [ ! -f $setting ]; then setting=$HPATH/$case_dir/default.sh; fi
     if [ ! -f $setting ]; then setting=$HPATH/default.sh; fi
 
-    cp -ft $log $EPATH/$case $EPATH/$case_dir/neko
+    # Copy the case files to the log folder
+    cp -ft $log $EPATH/$case
+    # Copy all data from the case folder to the log folder
+    find $EPATH/$case_dir/* -maxdepth 0 -not -name "*.case" -exec rsync {} $log \;
+    # Copy the job script to the log folder
     cp -f $setting $log/job_script.sh
 
     # Create symbolic links to the mesh files to avoid copying massive files
@@ -193,11 +198,11 @@ for case in $case_files; do
         Run $example
     fi
 
-    cd $MAIN_DIR
+    cd $CURRENT_DIR
 done
 
 if [ ! "$(which bsub)" ]; then
-    ./status.sh
+    $MAIN_DIR/status.sh
 fi
 
 printf "\n"

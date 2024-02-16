@@ -6,6 +6,7 @@ set -e # Exit with nonzero exit code if anything fails
 # running the neko installation.
 
 # Set main directories
+CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
 FEATURES=""
@@ -15,7 +16,7 @@ if [ "$(which module)" ]; then
     module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39
     module --silent load openblas/0.3.23 cuda/12.2
 
-    BLAS_DIR="/appl/OpenBLAS/0.3.23/$CPUTYPEV/gcc-12.2.0"
+    BLAS_DIR="/appl/OpenBLAS/0.3.23/$CPUTYPEV/gcc-12.2.0/lib/"
     CUDA_DIR="/appl/cuda/12.2.0"
 elif [ "$(which spack)" ]; then
     spack env activate neko-top
@@ -83,7 +84,7 @@ if [ ! -f "$GSLIB_DIR/lib*/libgs.a" ]; then
         cd $GSLIB_DIR
         CC=mpicc ./install
         GSLIB_DIR="$GSLIB_DIR/gslib/build/"
-        cd $MAIN_DIR
+        cd $CURRENT_DIR
     else
         printf "GSLIB not found at GSLIB_DIR: \n\t$GSLIB_DIR" >&2
         exit 1
@@ -113,9 +114,12 @@ cd $NEKO_DIR
 if ! make --quiet install -j; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
-    make --quiet install -j
+    if ! make --quiet install; then
+        printf "Neko installation failed\n" >&2
+        exit 1
+    fi
 fi
-cd $MAIN_DIR
+cd $CURRENT_DIR
 
 # ============================================================================ #
 # Compile the example codes.
