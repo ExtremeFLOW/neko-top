@@ -9,7 +9,6 @@ set -e # Exit with nonzero exit code if anything fails
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
-FEATURES=""
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.sh" ]; then
@@ -26,9 +25,11 @@ fi
 if [ -z "$NEK5000_DIR" ]; then
     NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
 fi
-
 if [ -z "$PFUNIT_DIR" ]; then
-    PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
+    PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
+fi
+if [[ -z "$GSLIB_DIR" && -d "$NEK5000_DIR/3rd_party/gslib" ]]; then
+    GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
 fi
 
 # Define standard compilers if they are not defined as environment variables
@@ -41,32 +42,31 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 # ============================================================================ #
 # Install dependencies
 
-cmake -S $JSON_FORTRAN_DIR \
-    -B $JSON_FORTRAN_DIR/build \
-    --install-prefix $JSON_FORTRAN_DIR \
-    -Wno-dev \
-    -DUSE_GNU_INSTALL_CONVENTION=ON \
-    -DSKIP_DOC_GEN=ON
+# Install Json-Fortran
+if [[ ! -f "$JSON_FORTRAN_DIR/lib*/jsonfortran.so" &&
+    -f "$JSON_FORTRAN_DIR/CMakeLists.txt" ]]; then
 
-cmake --build $JSON_FORTRAN_DIR/build --parallel
-cmake --install $JSON_FORTRAN_DIR/build
+    cmake -S $JSON_FORTRAN_DIR \
+        -B $JSON_FORTRAN_DIR/build \
+        --install-prefix $JSON_FORTRAN_DIR \
+        -Wno-dev \
+        -DUSE_GNU_INSTALL_CONVENTION=ON \
+        -DSKIP_DOC_GEN=ON
 
-JSON_FORTRAN_LIB=""
+    cmake --build $JSON_FORTRAN_DIR/build --parallel
+    cmake --install $JSON_FORTRAN_DIR/build
+fi
+
 if [ -d "$JSON_FORTRAN_DIR/lib" ]; then
     JSON_FORTRAN_LIB="$JSON_FORTRAN_DIR/lib"
 elif [ -d "$JSON_FORTRAN_DIR/lib64" ]; then
     JSON_FORTRAN_LIB="$JSON_FORTRAN_DIR/lib64"
+else
+    printf "Json-Fortran not found at JSON_FORTRAN_DIR: \n\t$JSON_FORTRAN_DIR" >&2
+    exit 1
 fi
-
-# Done settng up external dependencies
-# ============================================================================ #
-# Define features available to neko
 
 # Setup GSLIB
-if [[ -z "$GSLIB_DIR" && -d "$NEK5000_DIR/3rd_party/gslib" ]]; then
-    GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
-fi
-
 if [ ! -f "$GSLIB_DIR/lib*/libgs.a" ]; then
     if [ -f "$GSLIB_DIR/install" ]; then
         cd $GSLIB_DIR
@@ -80,14 +80,42 @@ if [ ! -f "$GSLIB_DIR/lib*/libgs.a" ]; then
     FEATURES+="--with-gslib=$GSLIB_DIR "
 fi
 
+# Install pFunit
+if [ ! -f "$PFUNIT_DIR/PFUNIT-*/lib*/libpfunit.a" ]; then
+    if [ ! -f "$PFUNIT_DIR/CMakeLists.txt" ]; then
+        git submodule init $PFUNIT_DIR
+    fi
+
+    cmake -S $PFUNIT_DIR -B $PFUNIT_DIR/build -G "Unix Makefiles" \
+        --install-prefix $PFUNIT_DIR \
+        -DSKIP_MPI=False
+
+    cmake --build $PFUNIT_DIR/build --parallel
+    cmake --install $PFUNIT_DIR/build
+fi
+
+# Done settng up external dependencies
+# ============================================================================ #
+# Define features available to neko
+FEATURES=""
+
+if [ -f "$GSLIB_DIR/lib*/libgs.a" ]; then
+    FEATURES+="--with-gslib=$GSLIB_DIR "
+fi
+
 if [ -d "$CUDA_DIR" ]; then
     FEATURES+="--with-cuda=$CUDA_DIR "
 else
     CUDA_DIR=""
 fi
 
-if [ ! -z "$BLAS_DIR" ]; then
+if [ -d "$BLAS_DIR" ]; then
     FEATURES+="--with-blas=$BLAS_DIR "
+fi
+
+if [ -d "$(realpath $PFUNIT_DIR/PFUNIT-*)" ]; then
+    PFUNIT_DIR="$(realpath $PFUNIT_DIR/PFUNIT-*)"
+    FEATURES+="--with-pfunit=$PFUNIT_DIR "
 fi
 
 # ============================================================================ #
@@ -102,6 +130,7 @@ cd $NEKO_DIR
 if ! make --quiet install -j; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
+
     if ! make --quiet install; then
         printf "Neko installation failed\n" >&2
         exit 1
@@ -112,7 +141,7 @@ cd $CURRENT_DIR
 # ============================================================================ #
 # Compile the example codes.
 cmake -B $MAIN_DIR/build/ -S $MAIN_DIR
-cmake --build $MAIN_DIR/build/ --parallel --clean-first
+cmake --build $MAIN_DIR/build/ --clean-first
 
 # ============================================================================ #
 # Print the status of the build
