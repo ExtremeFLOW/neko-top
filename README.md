@@ -8,7 +8,8 @@ Additional information can be found in the general
 ## Quick-start
 
 To compile and run the Taylor-Green-Vortex example from Neko, please execute the
-following commands.
+following commands. Please note that any custom paths can be read from the
+environment or loaded from a `prepare.sh` script.
 
 ```sh
 ./setup.sh

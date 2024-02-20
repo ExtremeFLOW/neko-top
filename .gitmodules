@@ -13,4 +13,4 @@
 [submodule "pFUnit"]
 	path = external/pfunit
 	url = https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
-	branch = master
+	branch = main

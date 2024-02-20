@@ -1,36 +1,58 @@
 #!/bin/bash
 set -e # Exit with nonzero exit code if anything fails
 # ============================================================================ #
-# This section contain all the settings which are unique for this specific
-# setup. This should allow us to have a relatively platform independent way of
-# running the neko installation.
+# Print the help message
+function help() {
+    echo "Usage: $0 [options]"
+    echo "Options:"
+    echo "  -h, --help        Show this help message and exit"
+    echo ""
+    echo "Compilation and setup of Neko-TOP, this script will install all the"
+    echo "dependencies and compile the Neko-TOP code."
+    echo ""
+    echo "Environment Variables:"
+    echo "  NEKO_DIR          The directory where Neko is installed"
+    echo "  JSON_FORTRAN_DIR  The directory where JSON-Fortran is installed"
+    echo "  NEK5000_DIR       The directory where Nek5000 is installed"
+    echo "  PFUNIT_DIR        The directory where PFUnit is installed"
+    echo "  GSLIB_DIR         The directory where GSLIB is installed"
+    echo "  CUDA_DIR          The directory where CUDA is installed"
+    echo "  BLAS_DIR          The directory where BLAS is installed"
+    echo "  CC                The C compiler to use"
+    echo "  CXX               The C++ compiler to use"
+    echo "  FC                The Fortran compiler to use"
+    echo "  NVCC              The CUDA compiler to use"
+    exit 0
+}
 
+while [ "$1" != "" ]; do
+    case $1 in
+    -h | --help) help ;;
+    esac
+    shift
+done
+
+# ============================================================================ #
 # Set main directories
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
 
+# ============================================================================ #
+# Execute the preparation script if it exists and prepare the environment
+
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.sh" ]; then
     source $MAIN_DIR/prepare.sh
 fi
+source $MAIN_DIR/scripts/dependencies.sh
 
 # Ensure local dependencies are used if they are not defined as environment
-if [ -z "$NEKO_DIR" ]; then
-    NEKO_DIR="$EXTERNAL_DIR/neko"
-fi
-if [ -z "$JSON_FORTRAN_DIR" ]; then
-    JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
-fi
-if [ -z "$NEK5000_DIR" ]; then
-    NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
-fi
-if [ -z "$PFUNIT_DIR" ]; then
-    PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
-fi
-if [[ -z "$GSLIB_DIR" && -d "$NEK5000_DIR/3rd_party/gslib" ]]; then
-    GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
-fi
+[ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
+[ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
+[ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
+[ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
+[ -z "$GSLIB_DIR" ] && GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
 
 # Define standard compilers if they are not defined as environment variables
 if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
@@ -40,98 +62,34 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 
 # Everything past this point should be general across all setups.
 # ============================================================================ #
-# Install dependencies
+# Install dependencies (See scripts/dependencies.sh for details)
 
-# Install Json-Fortran
-if [[ ! -f "$JSON_FORTRAN_DIR/lib*/jsonfortran.so" &&
-    -f "$JSON_FORTRAN_DIR/CMakeLists.txt" ]]; then
+find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
+find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
+find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 
-    cmake -S $JSON_FORTRAN_DIR \
-        -B $JSON_FORTRAN_DIR/build \
-        --install-prefix $JSON_FORTRAN_DIR \
-        -Wno-dev \
-        -DUSE_GNU_INSTALL_CONVENTION=ON \
-        -DSKIP_DOC_GEN=ON
+# Setup environment variables
+export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
+export LD_LIBRARY_PATH="$JSON_FORTRAN):$LD_LIBRARY_PATH"
 
-    cmake --build $JSON_FORTRAN_DIR/build --parallel
-    cmake --install $JSON_FORTRAN_DIR/build
-fi
+# Define Neko features
+FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
-if [ -d "$JSON_FORTRAN_DIR/lib" ]; then
-    JSON_FORTRAN_LIB="$JSON_FORTRAN_DIR/lib"
-elif [ -d "$JSON_FORTRAN_DIR/lib64" ]; then
-    JSON_FORTRAN_LIB="$JSON_FORTRAN_DIR/lib64"
-else
-    printf "Json-Fortran not found at JSON_FORTRAN_DIR: \n\t$JSON_FORTRAN_DIR" >&2
-    exit 1
-fi
-
-# Setup GSLIB
-if [ ! -f "$GSLIB_DIR/lib*/libgs.a" ]; then
-    if [ -f "$GSLIB_DIR/install" ]; then
-        cd $GSLIB_DIR
-        CC=mpicc ./install
-        GSLIB_DIR="$GSLIB_DIR/gslib/build/"
-        cd $CURRENT_DIR
-    else
-        printf "GSLIB not found at GSLIB_DIR: \n\t$GSLIB_DIR" >&2
-        exit 1
-    fi
-    FEATURES+="--with-gslib=$GSLIB_DIR "
-fi
-
-# Install pFunit
-if [ ! -f "$PFUNIT_DIR/PFUNIT-*/lib*/libpfunit.a" ]; then
-    if [ ! -f "$PFUNIT_DIR/CMakeLists.txt" ]; then
-        git submodule init $PFUNIT_DIR
-    fi
-
-    cmake -S $PFUNIT_DIR -B $PFUNIT_DIR/build -G "Unix Makefiles" \
-        --install-prefix $PFUNIT_DIR \
-        -DSKIP_MPI=False
-
-    cmake --build $PFUNIT_DIR/build --parallel
-    cmake --install $PFUNIT_DIR/build
-fi
+# Define optional features
+[ -d "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
+[ -d "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
 
 # Done settng up external dependencies
 # ============================================================================ #
-# Define features available to neko
-FEATURES=""
-
-if [ -f "$GSLIB_DIR/lib*/libgs.a" ]; then
-    FEATURES+="--with-gslib=$GSLIB_DIR "
-fi
-
-if [ -d "$CUDA_DIR" ]; then
-    FEATURES+="--with-cuda=$CUDA_DIR "
-else
-    CUDA_DIR=""
-fi
-
-if [ -d "$BLAS_DIR" ]; then
-    FEATURES+="--with-blas=$BLAS_DIR "
-fi
-
-if [ -d "$(realpath $PFUNIT_DIR/PFUNIT-*)" ]; then
-    PFUNIT_DIR="$(realpath $PFUNIT_DIR/PFUNIT-*)"
-    FEATURES+="--with-pfunit=$PFUNIT_DIR "
-fi
-
-# ============================================================================ #
 # Install Neko
-
-# Setup environment variables
-export PKG_CONFIG_PATH="$JSON_FORTRAN_LIB/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="$JSON_FORTRAN_LIB:$LD_LIBRARY_PATH"
 
 # Setup Neko
 cd $NEKO_DIR
-if ! make --quiet install -j; then
+if ! $(make --quiet install -j 1>/dev/null); then
     ./regen.sh
-    ./configure --prefix=$NEKO_DIR $FEATURES
+    FCFLAGS="-w" ./configure --prefix=$NEKO_DIR $FEATURES
 
-    if ! make --quiet install; then
+    if ! make --quiet -j install; then
         printf "Neko installation failed\n" >&2
         exit 1
     fi
@@ -140,22 +98,18 @@ cd $CURRENT_DIR
 
 # ============================================================================ #
 # Compile the example codes.
+
+printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build/ -S $MAIN_DIR
-cmake --build $MAIN_DIR/build/ --clean-first
+cmake --build $MAIN_DIR/build/ --parallel
 
 # ============================================================================ #
 # Print the status of the build
 
-printf "\n\n"
 printf "Neko-TOP Installation Complete\n"
 printf "===============================\n"
 printf "Neko installed to: $NEKO_DIR\n"
 printf "Supported features:\n"
-printf "\tCUDA:"
-if [ -z "$CUDA_DIR" ]; then printf " NO\n"; else printf " YES\n"; fi
+printf "\tCUDA: " && [[ $FEATURES == *"cuda"* ]] && printf "YES\n" || printf "NO\n"
 printf "\tMPI: YES\n"
 printf "\tOpenCL: NO\n"
-
-printf "\n\n"
-
-# EOF
