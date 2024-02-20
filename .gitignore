@@ -8,6 +8,10 @@ examples/debug/*
 !examples/debug/debug.case
 !examples/debug/CMakeLists.txt
 
+# Preparation scripts
+prepare.sh
+!*/**/prepare.sh
+
 # Project specific files
 neko
 *.nek5000

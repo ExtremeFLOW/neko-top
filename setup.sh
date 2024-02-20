@@ -11,21 +11,9 @@ MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
 FEATURES=""
 
-# Load modules when module command is available
-if [ "$(which module)" ]; then
-    module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39
-    module --silent load openblas/0.3.23 cuda/12.2
-
-    BLAS_DIR="/appl/OpenBLAS/0.3.23/$CPUTYPEV/gcc-12.2.0/lib/"
-    CUDA_DIR="/appl/cuda/12.2.0"
-elif [ "$(which spack)" ]; then
-    spack env activate neko-top
-fi
-
-# Look for CUDA if it is not defined as environment variable
-if [[ -z "$CUDA_DIR" && -d "/usr/local/cuda" ]]; then
-    CUDA_DIR="/usr/local/cuda"
-    NVCC="$CUDA_DIR/bin/nvcc"
+# Execute the preparation script if it exists
+if [ -f "$MAIN_DIR/prepare.sh" ]; then
+    source $MAIN_DIR/prepare.sh
 fi
 
 # Ensure local dependencies are used if they are not defined as environment
