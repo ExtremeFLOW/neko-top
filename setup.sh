@@ -9,7 +9,6 @@ set -e # Exit with nonzero exit code if anything fails
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
-FEATURES=""
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.sh" ]; then
@@ -26,7 +25,6 @@ fi
 if [ -z "$NEK5000_DIR" ]; then
     NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
 fi
-
 if [ -z "$PFUNIT_DIR" ]; then
     PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
 fi
@@ -61,6 +59,7 @@ fi
 # Done settng up external dependencies
 # ============================================================================ #
 # Define features available to neko
+FEATURES=""
 
 # Setup GSLIB
 if [[ -z "$GSLIB_DIR" && -d "$NEK5000_DIR/3rd_party/gslib" ]]; then

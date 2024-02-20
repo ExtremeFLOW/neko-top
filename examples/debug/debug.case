@@ -68,11 +68,6 @@
                 "d=0",
                 "d=1"
             ],
-            "source_terms": [
-                {
-                    "type": "user_vector"
-                }
-            ],
         },
         "point_zones": [
             {
