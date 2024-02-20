@@ -7,16 +7,33 @@ Additional information can be found in the general
 
 ## Quick-start
 
+To compile and run the Taylor-Green-Vortex example from Neko, please execute the
+following commands.
+
 ```sh
-./setup_local.sh
+./setup.sh
+./run.sh neko_examples/tgv
 ```
 
-### Compilation of Neko and JSON-Fortran
+### Long-start
 
-We have setup a few scripts which should help to setup the neko and
-JSON-Fortran.
+The setup script is an automated setup of Neko, Neko-TOP and other required
+dependencies. The script relies in a number of environment variables, which can
+be used to modify the behaviour of the system and allow the user to specify
+custom install locations for the given dependencies.
 
-Both of these libraries are included as submodules to the system. 
+| Variable           | Description                                                         | Default               |
+| ------------------ | ------------------------------------------------------------------- | --------------------- |
+| `NEKO_DIR`         | Location of the Neko library.                                       | external/neko         |
+| `JSON_FORTRAN_DIR` | JSON-Fortran library, required dependency of Neko.                  | external/json-fortran |
+| `NEK5000_DIR`      | Nek5000, primarily used for meshing and for GSLib.                  | external/Nek5000      |
+| `PFUNIT_DIR`       | Unit testing library used in Neko.                                  | external/pFUnit       |
+| `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support | -                     |
+
+These can be defined either on the command line by the user or in a `prepare.sh`
+file which is loaded by the setup script if it exists in the root of Neko-TOP.
+The prepare script provide a convenient way to use module systems such as
+`spack` or similar to activate environments and such before compilation.
 
 ### Compilation of examples
 
@@ -35,18 +52,6 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
-
-### Notes on the InnoTop machine
-
-On the InnoTop machine a spack environment have been constructed which can be
-loaded with:
-
-```bash
-spack env activate neko-top
-```
-
-This will load all required packages from spack, after which the
-`setup_local.sh` script should work as intended.
 
 ## Job execution
 
