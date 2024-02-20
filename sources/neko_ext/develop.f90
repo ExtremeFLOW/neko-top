@@ -37,8 +37,8 @@ contains
     use num_types
     implicit none
 
-    real(kind=rp), dimension(3), intent(in) :: a(3)
-    real(kind=rp), dimension(3), intent(in) :: b(3)
+    real(kind=rp), dimension(3), intent(in) :: a
+    real(kind=rp), dimension(3), intent(in) :: b
     real(kind=rp) :: d
 
     d = a(1) * b(1) + a(2) * b(2) + a(3) * b(3)
@@ -324,4 +324,18 @@ contains
 
   end subroutine estimate_temperature
 
+  subroutine assert(condition, message)
+    use utils, only: neko_error
+    implicit none
+
+    logical, intent(in) :: condition
+    character(len=*), intent(in), optional :: message
+
+#if (DEBUG)
+    if (.not. condition) then
+       call neko_error(message)
+    end if
+#endif
+
+  end subroutine assert
 end module develop
