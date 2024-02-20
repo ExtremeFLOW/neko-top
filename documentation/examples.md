@@ -14,10 +14,11 @@ driver needed. An error is thrown if a non-supported driver type is requested.
 
 Current driver types:
 
-- "user":    equivalent to using makeneko to generate the executable.
-- "custom":  use the driver.f90 provided in the current example folder or read
+- "user":    Equivalent to using makeneko to generate the executable.
+- "custom":  Use the driver.f90 provided in the current example folder or read
              the cmake variable DRIVER.
-- "default": pure neko with no user defined source files.
+- "default": Pure neko with no user defined source files.
+- "topopt":  Topology optimization driver defined in the Neko-TOP library.
 
 ### Case files and meshes.
 
