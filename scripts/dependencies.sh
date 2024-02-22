@@ -15,8 +15,8 @@ function find_json_fortran() {
         cmake --build $1/build --parallel
         cmake --install $1/build
 
-        rm -fr $1/build
     fi
+    rm -fr $1/build
 
     JSON_FORTRAN=$(find $1 -type d -exec test -f '{}'/libjsonfortran.so \; -print)
     if [ -z "$JSON_FORTRAN" ]; then
@@ -32,6 +32,10 @@ function find_json_fortran() {
     fi
 
     export JSON_FORTRAN=$(realpath $JSON_FORTRAN)
+
+    # Setup environment variables
+    export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="$JSON_FORTRAN):$LD_LIBRARY_PATH"
 }
 
 # ============================================================================ #

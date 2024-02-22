@@ -68,10 +68,6 @@ find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
 find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
 find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 
-# Setup environment variables
-export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
-export LD_LIBRARY_PATH="$JSON_FORTRAN):$LD_LIBRARY_PATH"
-
 # Define Neko features
 FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
@@ -85,9 +81,9 @@ FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
 # Setup Neko
 cd $NEKO_DIR
-if ! $(make --quiet install -j 1>/dev/null); then
+if [ ! $(make --quiet install -j 1>/dev/null 2>/dev/null) ]; then
     ./regen.sh
-    FCFLAGS="-w" ./configure --prefix=$NEKO_DIR $FEATURES
+    ./configure --prefix=$NEKO_DIR $FEATURES
 
     if ! make --quiet -j install; then
         printf "Neko installation failed\n" >&2
