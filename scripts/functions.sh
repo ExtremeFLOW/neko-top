@@ -15,7 +15,7 @@ function run {
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
     else
-        find $NEKO_DIR -name neko -exec cp -t ./ {} \;
+        find $NEKO_DIR -type f -name neko -exec cp -t ./ {} \;
         neko=$(realpath ./neko)
     fi
 
