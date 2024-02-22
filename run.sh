@@ -144,9 +144,8 @@ function Run() {
     echo "Launching case on local machine" 1>output.log
 
     # Run the case and pipe stdout and stderr to the log files
-    ./job_script.sh $case >output.log 2>error.err &
     printf '  %-10s %-s\n' "Started:" "$case"
-    wait
+    ./job_script.sh $case >output.log 2>error.err
 }
 
 # Function for submitting the examples
