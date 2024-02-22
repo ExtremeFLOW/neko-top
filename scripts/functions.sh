@@ -11,7 +11,7 @@ function run {
 
     if [ -f neko ]; then
         neko=$(realpath ./neko)
-    elif [ ! -z "$(ls *.f90)" ]; then
+    elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
     else

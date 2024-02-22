@@ -92,6 +92,7 @@ if [ $NEKO ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
+    export HPATH="$HPATH/neko"
 fi
 
 for in in $@; do
@@ -185,10 +186,12 @@ for case in $case_files; do
     # Remove old output and error files
     rm -f $log/output.log $log/error.err
 
-    # Determine if we have a HPC file
+    # Find the setting file for the case recursively
     setting=$HPATH/${case%.*}.sh
-    if [ ! -f $setting ]; then setting=$HPATH/$case_dir/default.sh; fi
-    if [ ! -f $setting ]; then setting=$HPATH/default.sh; fi
+    [ ! -f $setting ] && setting=$(dirname $setting)/default.sh
+    while [ ! -f $setting ]; do
+        setting=$(realpath "$(dirname ${setting%/*})")/default.sh
+    done
 
     # Copy the case files to the log folder
     cp -ft $log $EPATH/$case
