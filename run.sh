@@ -44,13 +44,11 @@ CURRENT_DIR=$(pwd)
 export EPATH="$MAIN_DIR/examples"                 # Examples scripts
 export RPATH="$MAIN_DIR/results"                  # Result export location
 export LPATH="$MAIN_DIR/logs"                     # Logging locations
+export SPATH="$MAIN_DIR/scripts/"                 # Scripts folder
 export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
 export DPATH="$MAIN_DIR/data"                     # Meshes
 
-# Ensure the environment is set up
 [ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
-[ -z "$JSON_FORTRAN_DIR" ] && export JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
-export LD_LIBRARY_PATH="$JSON_FORTRAN_DIR/lib:$LD_LIBRARY_PATH"
 
 # End of user inputs
 # ============================================================================ #
@@ -144,10 +142,10 @@ function Run() {
 # Function for submitting the examples
 function Submit() {
     case=$1
-    echo "Launching case on HPC" 1>output.out
+    echo "Submitting case on HPC" 1>output.out
 
     export BSUB_QUIET=Y
-    bsub -J $case -env "RPATH=$RPATH,NEKO_DIR=$NEKO_DIR" <job_script.sh
+    bsub -J $case -env "MAIN_DIR=$MAIN_DIR,NEKO_DIR=$NEKO_DIR" <job_script.sh
     printf '  %-10s %-s\n' "Submitted:" "$case"
 }
 
@@ -185,6 +183,7 @@ for case in $case_files; do
     find $EPATH/$case_dir/* -maxdepth 0 -not -name "*.case" -exec rsync -r {} $log \;
     # Copy the job script to the log folder
     cp -f $setting $log/job_script.sh
+    cp -f $SPATH/functions.sh $log/functions.sh
 
     # Create symbolic links to the mesh files to avoid copying massive files
     for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
