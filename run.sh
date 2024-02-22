@@ -172,7 +172,11 @@ for case in $case_files; do
 
     # Setup the log folder
     log=$LPATH/$example && mkdir -p $log
-    if [ $CLEAN ]; then rm -fr $log/*; fi
+    if [ $CLEAN ]; then
+        rm -fr $log/*
+    else
+        find $log -type f -name "*.log" -delete
+    fi
 
     # Remove old output and error files
     rm -f $log/output.log $log/error.err
