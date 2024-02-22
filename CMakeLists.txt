@@ -17,7 +17,8 @@ endif()
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
         $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
-        -Wall -Wextra -Wpedantic -Wno-unused-dummy-argument
+        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
+        -Wall -Wextra -Wno-unused-dummy-argument
         )
 endif()
 add_compile_definitions("DEBUG=$<CONFIG:Debug>")
