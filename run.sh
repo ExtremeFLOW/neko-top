@@ -37,7 +37,7 @@ if [ $# -lt 1 ]; then help; fi
 
 # ============================================================================ #
 # User defined inputs.
-MAIN_DIR=$(dirname $(realpath $0))
+export MAIN_DIR=$(dirname $(realpath $0))
 CURRENT_DIR=$(pwd)
 
 # Define all needed folders relative to the project folder. (without trailing /)
