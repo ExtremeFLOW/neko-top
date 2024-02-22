@@ -40,11 +40,11 @@ function run {
     fi
 
     casename=$(basename -- ${casefile%.*})
-    printf "See $casename.out for the status output.\n"
+    printf "See $casename.log for the status output.\n"
     if [ -f "run.sh" ]; then
         { time $(./run.sh $casefile); } 2>&1
     else
-        { time $(mpirun --pernode neko $casefile 1>$casename.out 2>error.err); } 2>&1
+        { time $(mpirun --pernode neko $casefile 1>$casename.log 2>error.err); } 2>&1
     fi
 
     if [ -s "error.err" ]; then
@@ -78,7 +78,7 @@ function run {
     find ./ -type f \
         -not -name "error.err" \
         -not -name "neko" \
-        -not -name "output.out" \
+        -not -name "output.log" \
         -not -name "*.chkp" \
         -exec mv -t $results {} +
 
@@ -92,11 +92,11 @@ function run {
     fi
 
     # Remove all but the log files
-    find ./ -type f -not -name "error.err" -not -name "output.out" -delete
+    find ./ -type f -not -name "error.err" -not -name "output.log" -delete
 
     # Clear the output file to indicate successful completion
-    cp -ft $results output.out
-    rm -f output.out
-    touch output.out
+    cp -ft $results output.log
+    rm -f output.log
+    touch output.log
 
 }

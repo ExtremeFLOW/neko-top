@@ -38,7 +38,7 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
-#BSUB -o output.out
+#BSUB -o output.log
 #BSUB -e error.err
 
 # ============================================================================ #
@@ -80,8 +80,8 @@ elif [ $(echo "$casefile" | wc -l) -gt 1 ]; then
 fi
 
 casename=$(basename -- ${casefile%.*})
-printf "See $casename.out for the status output.\n"
-{ time $(mpirun --pernode ./neko $casefile 1>$casename.out 2>error.err); } 2>&1
+printf "See $casename.log for the status output.\n"
+{ time $(mpirun --pernode ./neko $casefile 1>$casename.log 2>error.err); } 2>&1
 
 if [ -s "error.err" ]; then
     printf "\nERROR: An error occured during execution. See error.err for details.\n" >&2
@@ -114,7 +114,7 @@ printf "\n"
 find ./ -type f \
     -not -name "error.err" \
     -not -name "neko" \
-    -not -name "output.out" \
+    -not -name "output.log" \
     -not -name "*.chkp" \
     -exec mv -t $results {} +
 
@@ -128,11 +128,11 @@ else
 fi
 
 # Remove all but the log files
-find ./ -type f -not -name "error.err" -not -name "output.out" -delete
+find ./ -type f -not -name "error.err" -not -name "output.log" -delete
 
 # Clear the output file to indicate successful completion
-cp -ft $results output.out
-rm -f output.out
-touch output.out
+cp -ft $results output.log
+rm -f output.log
+touch output.log
 
 # ==============================   End of File   ==============================

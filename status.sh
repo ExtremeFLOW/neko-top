@@ -40,7 +40,7 @@ done
 
 # List all the tests, if there are none we return
 for test in $(find $LPATH -type d 2>/dev/null); do
-    if [ -f $test/output.out ]; then
+    if [ -f $test/output.log ]; then
         tests+="${test#$LPATH/} "
     fi
 done
@@ -56,7 +56,7 @@ fi
 printf "\n\e[4mTest status.\e[m\n"
 
 for test in $tests; do
-    if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.out && ! -s $LPATH/$test/error.err ]]; then
+    if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         printf '  \e[1;32m%-10s\e[m %-s\n' "Complete:" "$test"
         rm -fr $LPATH/$test
     fi
@@ -65,9 +65,9 @@ done
 for test in $tests; do
     if [[ -d $LPATH/$test && ! -s $LPATH/$test/error.err ]]; then
         file=$(find $LPATH/$test -type f -name "*.case")
-        if [ -f "${file%.*}.out" ]; then
+        if [ -f "${file%.*}.log" ]; then
             progress=$(
-                grep 't = ' "${file%.*}.out" |     # Get all lines with t = in them
+                grep 't = ' "${file%.*}.log" |     # Get all lines with t = in them
                     tail -n 1 |                    # Get the last line
                     sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                     xargs                          # Trim whitespace

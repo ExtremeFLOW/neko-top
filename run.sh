@@ -136,10 +136,10 @@ fi
 # Function for running the examples
 function Run() {
     case=$1
-    echo "Launching case on local machine" 1>output.out
+    echo "Launching case on local machine" 1>output.log
 
     # Run the case and pipe stdout and stderr to the log files
-    ./job_script.sh $case >output.out 2>error.err &
+    ./job_script.sh $case >output.log 2>error.err &
     printf '  %-10s %-s\n' "Started:" "$case"
     wait
 }
@@ -147,7 +147,7 @@ function Run() {
 # Function for submitting the examples
 function Submit() {
     case=$1
-    echo "Submitting case on HPC" 1>output.out
+    echo "Submitting case on HPC" 1>output.log
 
     export BSUB_QUIET=Y
     bsub -J $case -env "all" <job_script.sh
@@ -175,7 +175,7 @@ for case in $case_files; do
     if [ $CLEAN ]; then rm -fr $log/*; fi
 
     # Remove old output and error files
-    rm -f $log/output.out $log/error.err
+    rm -f $log/output.log $log/error.err
 
     # Determine if we have a HPC file
     setting=$HPATH/${case%.*}.sh

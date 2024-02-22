@@ -38,7 +38,7 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
-#BSUB -o output.out
+#BSUB -o output.log
 #BSUB -e error.err
 
 # ============================================================================ #
