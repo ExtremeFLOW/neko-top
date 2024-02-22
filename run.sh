@@ -48,6 +48,9 @@ export SPATH="$MAIN_DIR/scripts/"                 # Scripts folder
 export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
 export DPATH="$MAIN_DIR/data"                     # Meshes
 
+if [ -f "$MAIN_DIR/prepare.sh" ]; then
+    source $MAIN_DIR/prepare.sh
+fi
 [ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
 
 # End of user inputs
