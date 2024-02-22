@@ -88,6 +88,7 @@ done
 if [ $NEKO ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
+    export LPATH="$LPATH/neko"
 fi
 
 for in in $@; do

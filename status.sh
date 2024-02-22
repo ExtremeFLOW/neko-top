@@ -63,7 +63,7 @@ for test in $tests; do
 done
 
 for test in $tests; do
-    if [[ -d $LPATH/$test && ! -s $LPATH/$test/error.err ]]; then
+    if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         file=$(find $LPATH/$test -type f -name "*.case")
         if [ -f "${file%.*}.log" ]; then
             progress=$(
