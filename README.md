@@ -42,13 +42,19 @@ defined in the examples folder. Each example should contain a .case file and a
 compiled version of Neko ready to be executed. This is in general provided by
 our CMake setup.
 
-The contents of Example/EXAMPLE_NAME will be copied to a temporary
-log/EXAMPLE_NAME along with a job_script. This job_script can be user defined by
+The contents of `example/EXAMPLE_NAME` will be copied to a temporary
+`log/EXAMPLE_NAME` along with a job_script. This job_script can be user defined by
 adding a bash file in the Scripts folder. If no specific file is found, the 
-default is used.
+default is used. If the user wish to execute one of the Neko examples, then the
+`run.sh` script can be invoked with the name of the example as an argument along
+the switch `-n` or `--neko`.
 
-After successful execution of Neko, the results will be moved to the Results
+```sh
+./run.sh --neko tgv
+```
+
+After successful execution of Neko, the results will be moved to the `results`
 folder and the log folder will be cleaned.
 
-The status script provide a simple way of probing the current status of an
+The `status.sh` script provide a simple way of probing the current status of an
 example.
