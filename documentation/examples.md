@@ -1,7 +1,5 @@
 ## Examples
 
-## Example guide:
-
 To construct new examples, place a folder in the Examples root. Each example
 should be self-contained with a case file, the nmsh required and a simple
 CMakeLists.txt. Any additional source files should ideally be placed in that
@@ -20,7 +18,26 @@ Current driver types:
 - "default": Pure neko with no user defined source files.
 - "topopt":  Topology optimization driver defined in the Neko-TOP library.
 
-### Case files and meshes.
+## Execution
+
+The run.sh script is the main driver for any example. The run script will
+construct a local system for execution of any example defined in the examples
+folder. Each example should contain a .case file and a compiled version of Neko
+ready to be executed. This is in general provided by our CMake setup.
+
+The contents of `example/EXAMPLE_NAME` will be copied to a temporary
+`log/EXAMPLE_NAME` along with a job_script. This job_script can be user defined
+by
+adding a bash file in the Scripts folder. If no specific file is found, the
+default is used. If the user wish to execute one of the Neko examples, then the
+`run.sh` script can be invoked with the name of the example as an argument along
+the switch `-n` or `--neko`.
+
+```sh
+./run.sh --neko tgv
+```
+
+## Case files and meshes.
 
 When running an example a link is made to the local data folder if it exists.
 This folder can include anything needed by the examples to run. In general it is

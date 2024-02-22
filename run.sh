@@ -25,7 +25,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "c" "clean" "Clean artifacts from previous runs."
     printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
-    printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for example in neko."
+    printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
     for case in $(find $EPATH -name "*.case" 2>/dev/null); do

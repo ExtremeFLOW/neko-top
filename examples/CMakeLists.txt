@@ -6,12 +6,13 @@
 # CMakeListsTemplate.txt for an example.
 #
 # The following driver types are currently supported:
-#  - "default" : Unmodified neko driver.
-#  - "user"    : Driver initializing the neko library and calling the user code.
+# - "default" : Unmodified neko driver.
+# - "user"    : Driver initializing the neko library and calling the user code.
 #                This is equivalent to calling makeneko from the original neko.
-#  - "custom"  : Custom driver defined by a f90 file. Either set through the
+# - "custom"  : Custom driver defined by a f90 file. Either set through the
 #                DRIVER cmake vatiable in the example CMakeLists.txt file or
 #                stored as a file named "driver.f90" in the example directory.
+# - "topopt"  : Topology optimization driver.
 
 # ============================================================================ #
 # Determine if we wish to build the examples.
