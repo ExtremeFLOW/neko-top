@@ -22,3 +22,13 @@ These can be defined either on the command line by the user or in a `prepare.sh`
 file which is loaded by the setup script if it exists in the root of Neko-TOP.
 The prepare script provide a convenient way to use module systems such as
 `spack` or similar to activate environments and such before compilation.
+
+An example of a `prepare.sh` file is shown below:
+
+```bash
+#!/bin/bash
+module load cuda/10.1
+
+export CUDA_DIR=$CUDA_HOME
+export NEKO_DIR=$HOME/neko
+```

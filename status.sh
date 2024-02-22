@@ -7,9 +7,6 @@
 RPATH="results" # Result export location
 LPATH="logs"    # Logging locations
 
-# Define executable name needed in all tests
-# export EXEC="SurfaceGeneration.exe OptimisedGeneration.exe Hexmeshing.exe"
-
 # End of user inputs
 # ============================================================================ #
 # Help commands
