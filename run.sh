@@ -88,6 +88,8 @@ for in in $@; do
 done
 
 for in in $@; do
+    if [ ${in:0:1} == "-" ]; then continue; fi
+
     # Ignore invalid inputs
     if [[ -z $(ls $EPATH/$in 2>/dev/null) ]]; then
         printf '  %-10s %-67s\n' "Not Found:" "$in"
