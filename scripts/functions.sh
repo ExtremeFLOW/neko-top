@@ -15,7 +15,8 @@ function run {
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
     else
-        neko=$NEKO_DIR/bin/neko
+        find $NEKO_DIR -name neko -exec cp -t ./ {} \;
+        neko=$(realpath ./neko)
     fi
 
     if [ -z "$neko" ]; then
@@ -42,9 +43,9 @@ function run {
     casename=$(basename -- ${casefile%.*})
     printf "See $casename.log for the status output.\n"
     if [ -f "run.sh" ]; then
-        { time $(./run.sh $casefile); } 2>&1
+        { time $(PATH="$NEKO_DIR/bin:$PATH" ./run.sh $casefile); } 2>&1
     else
-        { time $(mpirun --pernode neko $casefile 1>$casename.log 2>error.err); } 2>&1
+        { time $(mpirun --pernode ./neko $casefile 1>$casename.log 2>error.err); } 2>&1
     fi
 
     if [ -s "error.err" ]; then
