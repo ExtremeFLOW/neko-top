@@ -81,7 +81,7 @@ FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
 # Setup Neko
 cd $NEKO_DIR
-if [ ! $(make --quiet install -j 1>/dev/null 2>/dev/null) ]; then
+if [ ! $(make --quiet install -j) ]; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
 

@@ -60,6 +60,20 @@ if [ ! -z $(which module) ]; then
     module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
 fi
 
+if [ -f neko ]; then
+    neko=$(realpath ./neko)
+elif [ ! -z "$(ls *.f90)" ]; then
+    $NEKO_DIR/bin/makeneko *.f90
+    neko=$(realpath ./neko)
+else
+    neko=$NEKO_DIR/bin/neko
+fi
+
+if [ -z "$neko" ]; then
+    printf "ERROR: Neko executable not found." >&2
+    exit 1
+fi
+
 # ============================================================================ #
 # Execute the example
 
@@ -74,14 +88,15 @@ casefile=$(find . -name "*.case")
 if [ -z "$casefile" ]; then
     printf "ERROR: No case file found.\n" >&2
     exit 1
-elif [ $(echo "$casefile" | wc -l) -gt 1 ]; then
-    printf "ERROR: Multiple case files found.\n" >&2
-    exit 1
 fi
 
 casename=$(basename -- ${casefile%.*})
 printf "See $casename.out for the status output.\n"
-{ time $(mpirun --pernode ./neko $casefile 1>$casename.out 2>error.err); } 2>&1
+if [ -f "run.sh" ]; then
+    { time $(./run.sh $casefile); } 2>&1
+else
+    { time $(mpirun --pernode neko $casefile 1>$casename.out 2>error.err); } 2>&1
+fi
 
 if [ -s "error.err" ]; then
     printf "\nERROR: An error occured during execution. See error.err for details.\n" >&2
