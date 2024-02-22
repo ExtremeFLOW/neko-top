@@ -63,27 +63,32 @@ for in in $@; do
     # Opions and flags
     if [[ ${in:0:2} == "--" ]]; then
         case "${in:2}" in
-        "all") ALL=true ;;                           # Run all examples available
-        "clean") CLEAN=true ;;                       # Clean logs
-        "help") help ;;                              # Print help
-        "neko") export EPATH="$NEKO_DIR/examples" ;; # Look for example in neko
-        "delete") DELETE=true ;;                     # Delete previous runs
+        "all") ALL=true ;;       # Run all examples available
+        "clean") CLEAN=true ;;   # Clean logs
+        "help") help ;;          # Print help
+        "neko") NEKO=true ;;     # Look for example in neko
+        "delete") DELETE=true ;; # Delete previous runs
         *) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
         esac
 
     elif [[ ${in:0:1} == "-" ]]; then
         for ((i = 1; i < ${#in}; i++)); do
             case "${in:$i:1}" in
-            "a") ALL=true ;;                          # Run all examples available
-            "c") CLEAN=true ;;                        # Clean logs
-            "h") help ;;                              # Print help
-            "n") export EPATH="$NEKO_DIR/examples" ;; # Look for example in neko
-            "d") DELETE=true ;;                       # Delete previous runs
+            "a") ALL=true ;;    # Run all examples available
+            "c") CLEAN=true ;;  # Clean logs
+            "h") help ;;        # Print help
+            "n") NEKO=true ;;   # Look for example in neko
+            "d") DELETE=true ;; # Delete previous runs
             *) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
             esac
         done
     fi
 done
+
+if [ $NEKO ]; then
+    export EPATH="$NEKO_DIR/examples"
+    export RPATH="$RPATH/neko"
+fi
 
 for in in $@; do
     if [ ${in:0:1} == "-" ]; then continue; fi
@@ -145,7 +150,7 @@ function Submit() {
     echo "Submitting case on HPC" 1>output.out
 
     export BSUB_QUIET=Y
-    bsub -J $case -env "MAIN_DIR=$MAIN_DIR,NEKO_DIR=$NEKO_DIR" <job_script.sh
+    bsub -J $case -env "all" <job_script.sh
     printf '  %-10s %-s\n' "Submitted:" "$case"
 }
 

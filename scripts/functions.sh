@@ -56,7 +56,7 @@ function run {
 
     # ============================================================================ #
     # Move the results to the results folder
-    results=$MAIN_DIR/results/$example
+    results=$RPATH/$example
     printf "=%.0s" {1..80} && printf "\n"
     printf "Moving files to results folder: \n\t$results\n\n"
 
