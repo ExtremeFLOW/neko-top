@@ -72,8 +72,8 @@ find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
 # Define optional features
-[ -d "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
-[ -d "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
+[ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
+[ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
 
 # Done settng up external dependencies
 # ============================================================================ #
