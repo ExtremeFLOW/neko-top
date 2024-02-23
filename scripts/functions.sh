@@ -43,7 +43,8 @@ function run {
     casename=$(basename -- ${casefile%.*})
     printf "See $casename.log for the status output.\n"
     if [ -f "run.sh" ]; then
-        { time $(PATH="$NEKO_DIR/bin:$PATH" ./run.sh $casefile); } 2>&1
+        export PATH="$NEKO_DIR/bin:$PATH"
+        { time ./run.sh $casefile 1>$casename.log 2>error.err; } 2>&1
     else
         { time $(mpirun --pernode ./neko $casefile 1>$casename.log 2>error.err); } 2>&1
     fi
