@@ -35,6 +35,7 @@
     "cmake.generator": "Unix Makefiles",
     "cmake.ctestArgs": [
         "--output-on-failure",
-        "--stop-on-failure"
-    ]
+        "--timeout",
+        "60",
+    ],
 }
