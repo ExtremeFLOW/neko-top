@@ -31,5 +31,10 @@
     },
     "python.analysis.extraPaths": [
         "/usr/local/lib/python3.10/site-packages",
+    ],
+    "cmake.generator": "Unix Makefiles",
+    "cmake.ctestArgs": [
+        "--output-on-failure",
+        "--stop-on-failure"
     ]
 }

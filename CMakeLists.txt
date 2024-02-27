@@ -4,10 +4,6 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
 # ============================================================================ #
 # Setup CMake
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
-
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
@@ -20,8 +16,9 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
         -Wall -Wextra -Wno-unused-dummy-argument
         )
+
+    set(BUILD_TESTS ON CACHE BOOL "Build the tests" FORCE)
 endif()
-add_compile_definitions("DEBUG=$<CONFIG:Debug>")
 
 # ============================================================================ #
 # Setup Compilers
@@ -93,7 +90,7 @@ find_package(jsonfortran-gnu REQUIRED)
 # Setup of the Neko library
 
 # If the user did not specify NEKO_DIR, default to the external/neko directory
-set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko CACHE PATH
+set(NEKO_DIR ${CMAKE_SOURCE_DIR}/external/neko CACHE PATH
     "Path to the Neko installation")
 
 # Check that the NEKO_DIR directories exist
@@ -110,6 +107,22 @@ set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR})
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
+# ............................................................................ #
+# Setup of the pFUnit library
+
+find_package(pFUnit QUIET)
+if (NOT PFUNIT_FOUND)
+    include(FetchContent)
+    message(STATUS "pFUnit not found. Fetching pFUnit from GitHub")
+    set(ENABLE_TESTS OFF)
+    FetchContent_Declare(
+        pFUnit
+        GIT_REPOSITORY https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
+        GIT_TAG        v4.8.0
+    )
+  FetchContent_MakeAvailable(pFUnit)
+endif()
+
 # ============================================================================ #
 # Setup the Neko-TOP library
 
@@ -119,3 +132,11 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
 # Build the examples
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
+
+# ============================================================================ #
+# Build the tests
+
+include(CTest)
+if (BUILD_TESTING)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif()

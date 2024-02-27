@@ -6,6 +6,7 @@ function help() {
     echo "Usage: $0 [options]"
     echo "Options:"
     echo "  -h, --help        Show this help message and exit"
+    echo "  -t, --test        Run the tests after the installation"
     echo ""
     echo "Compilation and setup of Neko-TOP, this script will install all the"
     echo "dependencies and compile the Neko-TOP code."
@@ -28,6 +29,7 @@ function help() {
 while [ "$1" != "" ]; do
     case $1 in
     -h | --help) help ;;
+    -t | --test) TEST=1 ;;
     esac
     shift
 done
@@ -51,7 +53,6 @@ source $MAIN_DIR/scripts/dependencies.sh
 [ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
 [ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
-[ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pfunit"
 [ -z "$GSLIB_DIR" ] && GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
 
 # Define standard compilers if they are not defined as environment variables
@@ -66,10 +67,9 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 
 find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
 find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
-find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 
 # Define Neko features
-FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
+FEATURES="--with-gslib=$GSLIB"
 
 # Define optional features
 [ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
@@ -81,11 +81,13 @@ FEATURES="--with-gslib=$GSLIB --with-pfunit=$PFUNIT"
 
 # Setup Neko
 cd $NEKO_DIR
-if ! $(make --quiet install -j); then
+if [[ ! $(make --quiet install -j) ]]; then
+    FCFLAGS="-g -w"
+
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
 
-    if ! make --quiet -j install; then
+    if [[ ! $(make --quiet -j install) ]]; then
         printf "Neko installation failed\n" >&2
         exit 1
     fi
@@ -109,3 +111,11 @@ printf "Supported features:\n"
 printf "\tCUDA: " && [[ $FEATURES == *"cuda"* ]] && printf "YES\n" || printf "NO\n"
 printf "\tMPI: YES\n"
 printf "\tOpenCL: NO\n"
+
+# ============================================================================ #
+# Run the tests if requested
+
+if [ ! -z "$TEST" ]; then
+    printf "Running the tests\n"
+    ctest --test-dir $MAIN_DIR/build --output-on-failure --stop-on-failure
+fi

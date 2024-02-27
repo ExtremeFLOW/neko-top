@@ -65,40 +65,6 @@ function find_gslib() {
 }
 
 # ============================================================================ #
-# Ensure pFunit is installed, if not install it.
-function find_pfunit() {
-
-    # Install pFunit
-    PFUNIT=$(find $1 -type d -exec test -f '{}'/libpfunit.a \; -print)
-
-    if [ -z "$(find $1 -name libpfunit.a)" ]; then
-
-        cmake -S $1 -B $1/build -G "Unix Makefiles" \
-            --install-prefix $1 \
-            -DSKIP_MPI=False
-
-        cmake --build $1/build --parallel
-        cmake --install $1/build
-        rm -fr $1/build
-    fi
-
-    PFUNIT=$(find $1 -type d -exec test -f '{}'/libpfunit.a \; -print)
-    if [ -z "$PFUNIT" ]; then
-        error "pFunit not found at:"
-        error "\t$1"
-        error "Please set PFUNIT_DIR to the directory containing the"
-        error "pFunit source code."
-        error "You can download the source code from:"
-        error "\thttps://github.com/Goddard-Fortran-Ecosystem/pFUnit"
-        error "Or invoke the git submodule command:"
-        error "\tgit submodule update --init --recursive"
-        exit 1
-    fi
-
-    export PFUNIT=$(realpath $PFUNIT)
-}
-
-# ============================================================================ #
 # Helper function to print errors
 function error() {
     echo -e "$1" >&2
