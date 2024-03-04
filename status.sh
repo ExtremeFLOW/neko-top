@@ -57,7 +57,7 @@ printf "\n\e[4mTest status.\e[m\n"
 
 for test in $tests; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
-        printf '  \e[1;32m%-10s\e[m %-s\n' "Complete:" "$test"
+        printf '  \e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
         rm -fr $LPATH/$test
     fi
 done
@@ -72,9 +72,9 @@ for test in $tests; do
                     sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                     xargs                          # Trim whitespace
             )
-            printf '  \e[1;33m%-10s\e[m [ %6s ] %s %-s\n' "Running:" "$progress" "$test"
+            printf '  \e[1;33m%-12s\e[m [ %6s ] %s %-s\n' "Running:" "$progress" "$test"
         else
-            printf '  \e[1;33m%-10s\e[m %s %-s\n' "Pending:" "$test"
+            printf '  \e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
         fi
     fi
 done
@@ -82,7 +82,12 @@ done
 for test in $tests; do
     # Check if there were errors. Print them if there were.
     if [ -s $LPATH/$test/error.err ]; then
-        printf '  \e[1;31m%-10s\e[m %-s\n' "Error:" "$test"
+
+        if [ "$(head -n 1 $LPATH/$test/error.err)" = "Interrupted" ]; then
+            printf '  \e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
+        else
+            printf '  \e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
+        fi
     fi
 done
 
@@ -92,6 +97,11 @@ done
 for test in $tests; do
     # Check if there were errors. Print them if there were.
     if [ -s $LPATH/$test/error.err ]; then
+
+        if [ "$(head -n 1 $LPATH/$test/error.err)" = "Interrupted" ]; then
+            continue
+        fi
+
         printf '\n\e[4;31m%-s\e[m' "${test:0:79}"
         printf '\e[4;31m%.0s_\e[m' $(seq 1 $((80 - ${#test}))) && printf '\n'
         head -n 10 $LPATH/$test/error.err | fold -w 80
