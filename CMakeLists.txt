@@ -20,6 +20,20 @@ find_package(LAPACK REQUIRED)
 find_package(MPI QUIET)
 
 # ============================================================================ #
+# Documentation
+# ============================================================================ #
+
+option(BUILD_DOCS "Build documentation" ON)
+option(ONLY_DOCS "Build only documentation" OFF)
+if (BUILD_DOCS OR ONLY_DOCS)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
+
+    if (ONLY_DOCS)
+        return()
+    endif()
+endif()
+
+# ============================================================================ #
 # Enable devices
 include(CheckLanguage)
 
@@ -102,6 +116,7 @@ endif()
 
 # ============================================================================ #
 # Setup Build options
+# ============================================================================ #
 
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)
@@ -126,18 +141,23 @@ set(CMAKE_Fortran_PREPROCESS ON)
 
 # ============================================================================ #
 # Setup the Neko-TOP library
+# ============================================================================ #
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
 
 # ============================================================================ #
 # Build the examples
+# ============================================================================ #
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
 # ============================================================================ #
 # Build the tests
+# ============================================================================ #
 
 include(CTest)
 if (BUILD_TESTING)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
+
+# ============================================================================ #
