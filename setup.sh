@@ -81,13 +81,11 @@ FEATURES="--with-gslib=$GSLIB"
 
 # Setup Neko
 cd $NEKO_DIR
-if [[ ! $(make --quiet install -j) ]]; then
-    FCFLAGS="-g -w"
-
+if ! $(make -j install 1>/dev/null); then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
 
-    if [[ ! $(make --quiet -j install) ]]; then
+    if ! $(make -j install 1>/dev/null); then
         printf "Neko installation failed\n" >&2
         exit 1
     fi
