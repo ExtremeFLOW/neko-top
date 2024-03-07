@@ -228,17 +228,15 @@ for case in $case_files; do
     # Indicate that the case is ready to be run
     printf 'Ready' >$log/output.log
 
-    if [ "$(which bsub)" ]; then
-        Submit $example
-    else
-        QUEUE="$QUEUE $example"
+    QUEUE="$QUEUE $example"
+    if [ -z "$(which bsub)" ]; then
         printf '  %-12s %-s\n' "Queued:" "$example"
     fi
 done
 
 # Done with the setup
 # ============================================================================ #
-# Move to the directory submit the code and return
+# Move to the directory submit or run the code and return
 
 for example in $QUEUE; do
 
@@ -246,7 +244,9 @@ for example in $QUEUE; do
     cd $LPATH/$example
     if [ $INTERRUPTED == 1 ]; then
         printf "Interrupted" >error.err
-    elif [ -z "$(which bsub)" ]; then
+    elif [ "$(which bsub)" ]; then
+        Submit $example
+    else
         Run $example
     fi
     cd $CURRENT_DIR
