@@ -2,8 +2,10 @@
 
 Short description of what we are trying to accomplish
 
-Additional information can be found in the general
-[documentation](./Documentation/neko-top.md).
+Additional information can be found in the doxygen based documentation in the
+`documentation` folder. To view the documentation, please open the
+[documentation/html/index.html](./documentation/html/index.html) file in a web
+browser. 
 
 ## Quick-start
 
@@ -20,19 +22,6 @@ environment or loaded from a `prepare.sh` script.
 
 When one have run the appropriate setup script, then one should use cmake to
 compile all example files.
-
-### Notes on linking against CUDA on WSL.
-
-Look through the following documentations:
-
-1. https://learn.microsoft.com/en-us/windows/ai/directml/gpu-cuda-in-wsl
-2. https://docs.nvidia.com/cuda/wsl-user-guide/index.html#getting-started-with-cuda-on-wsl
-3. https://developer.nvidia.com/cuda-downloads?target_os=Linux&target_arch=x86_64&Distribution=WSL-Ubuntu&target_version=2.0&target_type=deb_local
-
-Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
-NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
-link to download instructions for CUDA toolkit and drivers to WSL. Remember to
-update NVidia graphics drivers on the windows side as well.
 
 ## Job execution
 
