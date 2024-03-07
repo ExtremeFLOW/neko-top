@@ -195,7 +195,8 @@ for case in $case_files; do
     # Copy the case files to the log folder
     cp -ft $log $EPATH/$case
     # Copy all data from the case folder to the log folder
-    find $EPATH/$case_dir/* -maxdepth 0 -not -name "*.case" -exec rsync -r {} $log \;
+    find $EPATH/$case_dir/* -maxdepth 0 \
+        -not -name "*.case" -and -not -name "*.nmsh" -exec rsync -r {} $log \;
     # Copy the job script to the log folder
     cp -f $setting $log/job_script.sh
     cp -f $SPATH/functions.sh $log/functions.sh
