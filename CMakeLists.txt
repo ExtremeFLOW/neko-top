@@ -2,34 +2,12 @@ cmake_minimum_required(VERSION 3.18)
 project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
 
 # ============================================================================ #
-# Setup CMake
-
-# If the user did not specify a build type, default to Release
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
-endif()
-
-# If we are building in Debug mode, enable -g and -Wall for all languages
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    add_compile_options(
-        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
-        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
-        -Wall -Wextra -Wno-unused-dummy-argument
-        )
-
-    set(BUILD_TESTS ON CACHE BOOL "Build the tests" FORCE)
-endif()
-
-# ============================================================================ #
 # Setup Compilers
 
 # Set language standards
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
-
-# Enforce compiler options
-set(CMAKE_Fortran_PREPROCESS ON)
 
 # ============================================================================ #
 # Setup External Libraries
@@ -114,14 +92,37 @@ find_package(pFUnit QUIET)
 if (NOT PFUNIT_FOUND)
     include(FetchContent)
     message(STATUS "pFUnit not found. Fetching pFUnit from GitHub")
-    set(ENABLE_TESTS OFF)
     FetchContent_Declare(
         pFUnit
         GIT_REPOSITORY https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
         GIT_TAG        v4.8.0
     )
-  FetchContent_MakeAvailable(pFUnit)
+    FetchContent_MakeAvailable(pFUnit)
 endif()
+
+# ============================================================================ #
+# Setup Build options
+
+# If the user did not specify a build type, default to Release
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+endif()
+
+# If we are building in Debug mode, enable -g and -Wall for all languages
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(
+        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
+        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
+        -Wall -Wextra -Wno-unused-dummy-argument
+        )
+
+    set(BUILD_TESTING ON CACHE BOOL "Build the tests" FORCE)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(BUILD_TESTING OFF CACHE BOOL "Build the tests" FORCE)
+endif()
+
+# Enforce compiler options
+set(CMAKE_Fortran_PREPROCESS ON)
 
 # ============================================================================ #
 # Setup the Neko-TOP library
