@@ -1,13 +1,6 @@
 # Setup of testing framework using pFUnit as the library
 # and CMake as the build system.
 #
-include(CTest)
-
-if (NOT ${BUILD_TESTING})
-  message(STATUS "Tests are disabled")
-  return()
-endif()
-
 find_package(MPI REQUIRED)
 find_package(PkgConfig REQUIRED)
 
