@@ -209,9 +209,30 @@ for case in $case_files; do
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi
     if [ -d "$MAIN_DIR/data_local" ]; then ln -fs $MAIN_DIR/data_local $log; fi
 
-    # Done with the setup
-    # ======================================================================== #
-    # Move to the directory submit the code and return
+    # Indicate that the case is ready to be run
+    touch $log/output.log $log/error.err
+    printf 'Ready' >$log/output.log
+
+    printf '  %-10s %-s\n' "Queued:" "$example"
+done
+
+# Done with the setup
+# ============================================================================ #
+# Move to the directory submit the code and return
+
+for case in $case_files; do
+    case_name=$(basename ${case%.case})
+    case_dir=$(dirname $case)
+
+    # Define the name of the current exampel, if there are multiple cases in the
+    # same folder, we add the case name to the example name.
+    example=${case_dir#$EPATH/}
+    if [[ $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
+        example=$example/$case_name
+    fi
+
+    # Setup the log folder
+    log=$LPATH/$example
 
     cd $log
 
