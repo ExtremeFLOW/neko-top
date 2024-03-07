@@ -100,7 +100,7 @@ for in in $@; do
 
     # Ignore invalid inputs
     if [[ -z $(ls $EPATH/$in 2>/dev/null) ]]; then
-        printf '  %-10s %-67s\n' "Not Found:" "$in"
+        printf '  %-12s %-67s\n' "Not Found:" "$in"
 
     # Extract the examples from the input
     elif [[ ! $ALL ]]; then
@@ -144,7 +144,7 @@ function Run() {
     echo "Launching case on local machine" 1>output.log
 
     # Run the case and pipe stdout and stderr to the log files
-    printf '  %-10s %-s\n' "Started:" "$case"
+    printf '  %-12s %-s\n' "Started:" "$case"
     ./job_script.sh $case >output.log 2>error.err
 }
 
@@ -155,8 +155,16 @@ function Submit() {
 
     export BSUB_QUIET=Y
     bsub -J $case -env "all" <job_script.sh
-    printf '  %-10s %-s\n' "Submitted:" "$case"
+    printf '  %-12s %-s\n' "Submitted:" "$case"
 }
+INTERRUPTED=0
+function handler() {
+    if [ "$MAIN_DIR" != "$(pwd)" ]; then
+        printf "Interrupted" >error.err
+    fi
+    INTERRUPTED=1
+}
+trap 'handler' SIGINT
 
 # ============================================================================ #
 # Run the examples
@@ -184,6 +192,7 @@ for case in $case_files; do
 
     # Remove old output and error files
     rm -f $log/output.log $log/error.err
+    touch $log/output.log $log/error.err
 
     # Find the setting file for the case recursively
     setting=$HPATH/${case%.*}.sh
@@ -210,10 +219,13 @@ for case in $case_files; do
     if [ -d "$MAIN_DIR/data_local" ]; then ln -fs $MAIN_DIR/data_local $log; fi
 
     # Indicate that the case is ready to be run
-    touch $log/output.log $log/error.err
     printf 'Ready' >$log/output.log
 
-    printf '  %-10s %-s\n' "Queued:" "$example"
+    if [ "$(which bsub)" ]; then
+        Submit $example
+    else
+        printf '  %-12s %-s\n' "Queued:" "$example"
+    fi
 done
 
 # Done with the setup
@@ -236,9 +248,9 @@ for case in $case_files; do
 
     cd $log
 
-    if [ "$(which bsub)" ]; then
-        Submit $example
-    else
+    if [ $INTERRUPTED == 1 ]; then
+        printf "Interrupted" >error.err
+    elif [ -z "$(which bsub)" ]; then
         Run $example
     fi
 
