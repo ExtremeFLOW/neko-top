@@ -169,6 +169,7 @@ trap 'handler' SIGINT
 # ============================================================================ #
 # Run the examples
 full_start=$(date +%s.%N)
+QUEUE=""
 
 printf "\n\e[4mQueueing case files.\e[0m\n"
 for case in $case_files; do
@@ -178,12 +179,18 @@ for case in $case_files; do
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
     example=${case_dir#$EPATH/}
-    if [[ $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
+    if [[ ! -f "$EPATH/$case_dir/run.sh" &&
+        $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 
-    # Setup the log folder
     log=$LPATH/$example && mkdir -p $log
+
+    # Setup the log folder
+    if [[ -f $log/output.log && "$(head -n 1 $log/output.log)" == "Ready" ]]; then
+        continue
+    fi
+
     if [ $CLEAN ]; then
         rm -fr $log/*
     else
@@ -224,6 +231,7 @@ for case in $case_files; do
     if [ "$(which bsub)" ]; then
         Submit $example
     else
+        QUEUE="$QUEUE $example"
         printf '  %-12s %-s\n' "Queued:" "$example"
     fi
 done
@@ -232,28 +240,15 @@ done
 # ============================================================================ #
 # Move to the directory submit the code and return
 
-for case in $case_files; do
-    case_name=$(basename ${case%.case})
-    case_dir=$(dirname $case)
+for example in $QUEUE; do
 
-    # Define the name of the current exampel, if there are multiple cases in the
-    # same folder, we add the case name to the example name.
-    example=${case_dir#$EPATH/}
-    if [[ $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
-        example=$example/$case_name
-    fi
-
-    # Setup the log folder
-    log=$LPATH/$example
-
-    cd $log
-
+    # Move to the log folder and submit the job
+    cd $LPATH/$example
     if [ $INTERRUPTED == 1 ]; then
         printf "Interrupted" >error.err
     elif [ -z "$(which bsub)" ]; then
         Run $example
     fi
-
     cd $CURRENT_DIR
 done
 
