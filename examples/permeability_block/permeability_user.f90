@@ -11,7 +11,7 @@ module user
 
   implicit none
 
-  real(kind=rp) :: perm = 1.0_rp
+  real(kind=rp) :: perm = 0.0_rp
   real(kind=rp), allocatable :: resistance(:)
   type(c_ptr) :: resistance_d = c_null_ptr
   logical :: is_initialized = .false.
@@ -26,6 +26,7 @@ contains
     u%scalar_user_ic => initial_condition
   end subroutine user_setup
 
+  !> Read the material properties from the JSON file
   subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
@@ -89,7 +90,7 @@ contains
        call rzero(resistance, f%dm%size())
 
        do i = 1, my_point_zone%size
-          resistance(my_point_zone%mask(i)) = 1.0_rp - 1.0_rp/perm
+          resistance(my_point_zone%mask(i)) = -perm
        end do
 
        ! Copy to device
