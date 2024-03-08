@@ -1,9 +1,17 @@
-## Examples {#examples}
+# Examples {#examples}
+\tableofcontents
+
+The execution of examples have been automated to allow for easy testing and
+development of new features. The examples are located in the `examples` folder
+and are self-contained with case files and the nmsh files required (or details on
+how to get them). The examples are compiled and executed using the `run.sh`
+script.
+
+## Adding examples
 
 To construct new examples, place a folder in the `examples` folder. Each example
-should be self-contained with case files, the nmsh required and a simple
-CMakeLists.txt. Any additional source files should ideally be placed in that
-folder as well.
+should be self-contained with case files, the nmsh required. Any additional
+source files should ideally be placed in that folder as well.
 
 ### Execution of examples
 
