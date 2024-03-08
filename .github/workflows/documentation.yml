@@ -38,7 +38,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y git cmake doxygen graphviz
-          cmake -B build -S . -DONLY_DOCS=ON
+          cmake -B build -S .
           cmake --build build --target documentation
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
