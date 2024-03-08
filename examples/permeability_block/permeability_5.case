@@ -13,7 +13,7 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 2000.0,
-            "perm": 1e-5,
+            "perm": 1e5,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
