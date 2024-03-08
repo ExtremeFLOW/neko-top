@@ -19,18 +19,9 @@ find_package(LAPACK REQUIRED)
 # Check for the optional libraries.
 find_package(MPI QUIET)
 
-# ============================================================================ #
-# Documentation
-# ============================================================================ #
-
-option(BUILD_DOCS "Build documentation" ON)
-option(ONLY_DOCS "Build only documentation" OFF)
-if (BUILD_DOCS OR ONLY_DOCS)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
-
-    if (ONLY_DOCS)
-        return()
-    endif()
+# If the user did not specify a build type, default to Release
+if (NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
 endif()
 
 # ============================================================================ #
@@ -118,11 +109,6 @@ endif()
 # Setup Build options
 # ============================================================================ #
 
-# If the user did not specify a build type, default to Release
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
-endif()
-
 # If we are building in Debug mode, enable -g and -Wall for all languages
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
@@ -158,6 +144,15 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 include(CTest)
 if (BUILD_TESTING)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
+endif()
+
+# ============================================================================ #
+# Documentation
+# ============================================================================ #
+
+option(BUILD_DOCS "Build documentation" ON)
+if (BUILD_DOCS)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
 endif()
 
 # ============================================================================ #
