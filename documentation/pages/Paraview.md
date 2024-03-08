@@ -1,4 +1,5 @@
 # Paraview for working with Neko-TOP {#paraview}
+\tableofcontents
 
 Paraview is one of the main systems we use to inspect and visualise our work.
 However it can be tricky to get the integration between python and Paraview to

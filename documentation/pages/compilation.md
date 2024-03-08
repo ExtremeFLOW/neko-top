@@ -1,4 +1,5 @@
-## Compilation of Neko-TOP {#compilation}
+# Compilation of Neko-TOP {#compilation}
+\tableofcontents
 
 The setup script is an automated setup of Neko, Neko-TOP and other required
 dependencies. The script relies in a number of environment variables, which can
