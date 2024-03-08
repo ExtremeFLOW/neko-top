@@ -7,13 +7,17 @@ and are self-contained with case files and the nmsh files required (or details o
 how to get them). The examples are compiled and executed using the `run.sh`
 script.
 
+## List of examples
+
+1. \subpage permeability_block
+
 ## Adding examples
 
 To construct new examples, place a folder in the `examples` folder. Each example
 should be self-contained with case files, the nmsh required. Any additional
 source files should ideally be placed in that folder as well.
 
-### Execution of examples
+## Execution of examples
 
 The run.sh script is the main driver for any example. The run script will
 construct a local system for execution of any example defined in the examples
@@ -39,7 +43,7 @@ This folder can include anything needed by the examples to run. In general it is
 used for local copies of meshes which can be accessed by all examples to avoid
 redundancy and copying massive folders around.
 
-### Advanced example setups
+## Advanced example setups
 
 Elaborate examples can be constructed by using the CMakeLists.txt file to
 specify the source files and the driver type. The driver type is used to
@@ -76,17 +80,3 @@ set(DRIVER_TYPE "default")
 build_example()
 
 ```
-
-#### Meshing
-
-A system have been setup to allow the user to create new meshes using Cubit.
-A journal fle should be placed in the example folder to which it applies. The
-`mesh.sh` script can then be used to generate the mesh and convert it to a Neko
-supported format. It is assumed the mesh is exported as an exodus file with same
-basename as the journal file.
-
-To avoid cluttering the example folder with unnecessary and large files, the
-generated mesh is placed in the [data](data/) folder under the same
-folder structure as the example that was run. This is checked if no .nmsh file
-is found in the example folder by run.sh.
-
