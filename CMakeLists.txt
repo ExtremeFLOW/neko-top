@@ -10,6 +10,20 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # ============================================================================ #
+# Documentation
+# ============================================================================ #
+
+option(BUILD_DOCS "Build documentation" ON)
+option(ONLY_DOCS "Only build the documentation" OFF)
+if (BUILD_DOCS OR ONLY_DOCS)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
+
+    if (ONLY_DOCS)
+        return()
+    endif()
+endif()
+
+# ============================================================================ #
 # Setup External Libraries
 # ............................................................................ #
 # Check for the required libraries.
@@ -144,15 +158,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 include(CTest)
 if (BUILD_TESTING)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
-endif()
-
-# ============================================================================ #
-# Documentation
-# ============================================================================ #
-
-option(BUILD_DOCS "Build documentation" ON)
-if (BUILD_DOCS)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
 endif()
 
 # ============================================================================ #
