@@ -13,7 +13,7 @@ set(CMAKE_Fortran_STANDARD 2008)
 # Documentation
 # ============================================================================ #
 
-option(BUILD_DOCS "Build documentation" ON)
+option(BUILD_DOCS "Build documentation" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 if (BUILD_DOCS OR ONLY_DOCS)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)

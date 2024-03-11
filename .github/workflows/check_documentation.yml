@@ -4,7 +4,7 @@ name: Check Documentation
 
 on:
   pull_request:
-        branches: [main]
+        branches: [main, develop]
 
 jobs:
   test_documentation:
