@@ -17,7 +17,7 @@ find_package(BLAS REQUIRED)
 find_package(LAPACK REQUIRED)
 
 # Check for the optional libraries.
-find_package(MPI QUIET)
+find_package(MPI REQUIRED)
 
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)

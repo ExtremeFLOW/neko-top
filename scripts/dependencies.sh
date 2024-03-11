@@ -1,6 +1,30 @@
 #!/bin/bash
 
 # ============================================================================ #
+# Check system dependencies
+function check_system_dependencies() {
+    MISSING=()
+
+    [ -z "$(which cmake)" ] && MISSING+=("CMake")
+    [ -z "$(which make)" ] && MISSING+=("Make")
+    [ -z "$(which git)" ] && MISSING+=("Git")
+    [ -z "$(which mpicc)" ] && MISSING+=("MPICC")
+    [ -z "$(which mpif90)" ] && MISSING+=("MPIF90")
+    [ -z "$(which aclocal)" ] && MISSING+=("Aclocal")
+    [ -z "$(which autoconf)" ] && MISSING+=("Autoconf")
+    [ -z "$(which automake)" ] && MISSING+=("Automake")
+    [ -z "$(which pkg-config)" ] && MISSING+=("Pkg-config")
+
+    if [ ! -z "$MISSING" ]; then
+        printf "The following dependencies are not installed:\n"
+        for dep in "${MISSING[@]}"; do
+            printf "  - $dep\n"
+        done
+        exit 1
+    fi
+}
+
+# ============================================================================ #
 # Ensure JSON-Fortran is installed, if not install it.
 function find_json_fortran() {
 

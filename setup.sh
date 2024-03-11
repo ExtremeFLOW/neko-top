@@ -49,6 +49,9 @@ if [ -f "$MAIN_DIR/prepare.sh" ]; then
 fi
 source $MAIN_DIR/scripts/dependencies.sh
 
+# Check system dependencies
+check_system_dependencies
+
 # Ensure local dependencies are used if they are not defined as environment
 [ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
