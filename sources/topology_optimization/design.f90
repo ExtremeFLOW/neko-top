@@ -185,6 +185,9 @@ contains
   end subroutine free_design
 
   !> @brief Update the topology
+  !!
+  !! @todo This is currently just a dummy function. We need to implement
+  !!       the actual topology optimization algorithm here.
   subroutine update_design(this, converged)
     use neko_config, only: NEKO_BCKND_DEVICE
     use math, only: cadd
@@ -201,9 +204,6 @@ contains
     ! ---------------------------------------------------------------------- !
     ! Update the design
     ! ---------------------------------------------------------------------- !
-
-    ! Todo: This is currently just a dummy function. We need to implement
-    !      the actual topology optimization algorithm here.
 
     associate(x => this%design_field%x, &
               x_d => this%design_field%x_d, &
