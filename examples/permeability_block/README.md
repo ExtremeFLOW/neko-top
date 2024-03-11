@@ -14,9 +14,7 @@ the local velocity. The permeability is defined as a scalar value and is added
 to the case file as a parameter.
 
 $$
-    \begin{align*}
-        \mathbf{f}(x) &= - perm * u(x)\\
-    \end{align*}
+    f(x) = - perm * u(x)
 $$
 
 1. `permeability_3`: The permeability is set to 1000.
