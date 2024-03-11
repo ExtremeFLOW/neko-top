@@ -1,0 +1,20 @@
+# This check is used to ensure documentation can be built from the main branch.
+
+name: Check Documentation
+
+on:
+  pull_request:
+        branches: [main]
+
+jobs:
+  test_documentation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Build documentation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git cmake doxygen graphviz
+          cmake -DONLY_DOCS=ON -B build -S .
+          cmake --build build --target documentation
