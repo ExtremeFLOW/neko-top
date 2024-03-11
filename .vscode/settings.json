@@ -38,4 +38,7 @@
         "--timeout",
         "60",
     ],
+    "todo-tree.tree.showCountsInTree": true,
+    "todo-tree.tree.showBadges": true,
+    "todo-tree.tree.disableCompactFolders": false,
 }

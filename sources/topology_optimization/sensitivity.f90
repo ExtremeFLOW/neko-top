@@ -1,6 +1,9 @@
-! Todo: This module should follow the templates of simulation components. This
-! should make it easier to add new components to the code, whenever user
-! components gets supported.
+!> @file sensitivity.f90
+!! @brief Sensitivity module.
+!!
+!! @todo This module should follow the templates of simulation components. This
+!! should make it easier to add new components to the code, whenever user
+!! components gets supported.
 
 !> Sensitivity module.
 !! This module contains the sensitivity computation of the topology optimization.

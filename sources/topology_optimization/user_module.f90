@@ -30,6 +30,13 @@ module topology_optimization_user_module
 contains
 
   !> Assign user conditions for the neko case
+  !!
+  !!
+  !! \param[inout] neko_case The neko case to setup the user interface for
+  !!
+  !! @todo We use a hacky way to run the physics and adjoint physics. This
+  !! should be replaced with a more robust way to run the physics and adjoint
+  !! physics.
   subroutine setup_topology_optimization_user_case(neko_case)
 
     implicit none
