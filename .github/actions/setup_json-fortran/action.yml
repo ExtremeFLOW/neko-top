@@ -4,33 +4,37 @@ description: |
 
 inputs:
   install-dir:
-    description: 'The directory to install the JSON-Fortran library.'
+    description: "The directory to install the JSON-Fortran library."
     required: false
-    default: '/home/runner/pkg/json-fortran'
+    default: "/home/runner/pkg/json-fortran"
   working-dir:
-    description: 'The directory to work in.'
+    description: "The directory to work in."
     required: false
-    default: '/home/runner/tmp/json-fortran'
+    default: "/home/runner/tmp/json-fortran"
   os:
-    description: 'The operating system to use.'
+    description: "The operating system to use."
     required: false
-    default: '${{ runner.os }}'
+    default: "${{ runner.os }}"
   compiler:
-    description: 'The compiler to use.'
+    description: "The compiler to use."
     required: false
-    default: 'gfortran'
+    default: "gfortran"
   compiler-flags:
-    description: 'The compiler flag to use.'
+    description: "The compiler flag to use."
     required: false
-    default: '-O3'
+    default: "-O3"
   build-options:
-    description: 'The build option to use.'
+    description: "The build option to use."
     required: false
-    default: '--parallel $(nproc)'
+    default: "--parallel $(nproc)"
+  version:
+    description: "The version of the JSON-Fortran library to use."
+    required: false
+    default: "8.3.0"
 
 outputs:
   install-dir:
-    description: 'The directory where the JSON-Fortran library was installed.'
+    description: "The directory where the JSON-Fortran library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
 runs:
@@ -41,37 +45,32 @@ runs:
       uses: actions/cache@v3
       with:
         path: ${{ inputs.install-dir }}
-        key: json-fortran-${{ inputs.os }}-${{ inputs.compiler }}
-
-    - name: Set output
-      id: set-output
-      run: echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
-      shell: bash
-
-    - name: Cache found
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit == 'true' }}
-      shell: bash
-      run: exit 0
+        key: json-fortran-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.compiler }}
 
     - name: Create working directory
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         mkdir -p ${{ inputs.working-dir }}
 
     - name: Clone json-fortran
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
-      shell: bash
+        REPO: https://github.com/jacobwilliams/json-fortran.git
+        VERSION: ${{ inputs.version }}
       run: |
-        git clone https://github.com/jacobwilliams/json-fortran.git $WORKING_DIR
+        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
     - name: Configure json-fortran
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
-      shell: bash
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR \
           -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
@@ -79,19 +78,25 @@ runs:
           -DSKIP_DOC_GEN=ON
 
     - name: Install json-fortran
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
-      shell: bash
       run: |
         cmake --build $WORKING_DIR/build --config Release ${{ inputs.build-options }}
         cmake --install $WORKING_DIR/build
 
     - name: Cleanup
+      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
           rm -rf ${{ inputs.working-dir }}
         fi
 
+    - name: Set output
+      shell: bash
+      id: set-output
+      run: echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
