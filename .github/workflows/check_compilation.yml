@@ -1,47 +1,36 @@
 # This check is used to ensure documentation can be built from the main branch.
-
-name: Compilation test Ubuntu
+name: Check Compilation and Testing
 
 on:
-# Todo: Remove the push events before merging to develop
+  workflow_call:
+  # Todo: Remove the push events before merging to develop
   push:
     branches: [cicd/develop]
 
-  pull_request:
-        branches: [main, develop]
-
 jobs:
-  format:
+  compile-and-test:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Get system cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: autotools-dev automake autoconf pkg-config libopenblas-dev liblapack-dev
+          version: 1.0
+
       - name: Setup system
         run: |
           sudo apt-get update
-          sudo apt-get install -y python3-pip
-          pip3 install findent
-      - name: Format
-        run: |
-          export FINDENT_FLAGS="-Rr -i2 -d3 -f3 -s3 -w3 -t3 -j3 -kd --ws_remred --align_paren --indent_ampersand"
-          find sources/ -name "*.f90" -exec bash -c "findent < \"{}\" > \"{}\".tmp && mv -f \"{}\".tmp \"{}\"" \;
-      - name: Check format
-        run: |
-          git diff --exit-code
+          sudo apt-get install -y openmpi-bin libopenmpi-dev
 
-  # compile:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
-  #     - name: Setup system
-  #       run: |
-  #         sudo apt-get update
-  #         sudo apt-get install -y git cmake doxygen graphviz
-  #         sudo apt-get install -y autotools-dev automake autoconf pkg-config
-  #         sudo apt-get install -y openmpi-bin libopenmpi-dev
-  #         sudo apt-get install -y libopenblas-dev liblapack-dev
-  #     - name: Build
-  #       run: |
-  #         ./setup.sh
+      - name: Setup json-fortran
+        id: setup-json-fortran
+        uses: ./.github/actions/setup_json-fortran
 
+      - name: Build
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.setup-json-fortran.outputs.install-dir }}
+        run: |
+          ./setup.sh

@@ -28,6 +28,11 @@ inputs:
     required: false
     default: '--parallel $(nproc)'
 
+outputs:
+  install-dir:
+    description: 'The directory where the JSON-Fortran library was installed.'
+    value: ${{ steps.set-output.outputs.install-dir }}
+
 runs:
   using: composite
   steps:
@@ -37,6 +42,11 @@ runs:
       with:
         path: ${{ inputs.install-dir }}
         key: json-fortran-${{ inputs.os }}-${{ inputs.compiler }}
+
+    - name: Set output
+      id: set-output
+      run: echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
+      shell: bash
 
     - name: Cache found
       if: ${{ steps.cache-json-fortran.outputs.cache-hit == 'true' }}
