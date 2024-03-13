@@ -1,0 +1,30 @@
+# cat .github/workflows/deploy.yml
+# Todo: Add the deployment steps here when ready. Please check the pr_develop when doing so.
+
+
+
+# name: Check Development PRs
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Pull in the external workflows so we avoid duplication
+  check_documentation:
+    uses: ./.github/workflows/check_documentation.yml
+  check_formatting:
+    uses: ./.github/workflows/check_formatting.yml
+  check_compilation:
+    uses: ./.github/workflows/check_compilation.yml
+
+  # Dummy job to trigger the other jobs
+  check-develop:
+    name: Run all checks for development PRs
+    needs:
+      - check_documentation
+      - check_formatting
+      - check_compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Success
+        run: echo "All checks passed"
