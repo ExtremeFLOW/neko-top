@@ -4,7 +4,7 @@
 	branch = master
 [submodule "neko"]
 	path = external/neko
-	url = git@github.com:ExtremeFLOW/neko.git
+	url = https://github.com/ExtremeFLOW/neko.git
 	branch = develop
 [submodule "Nek5000"]
 	path = external/Nek5000
