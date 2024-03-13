@@ -71,10 +71,8 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
 find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
 
-# Define Neko features
-FEATURES="--with-gslib=$GSLIB"
-
 # Define optional features
+[ ! -z "$GSLIB" ] && FEATURES+="--with-gslib=$GSLIB"
 [ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
 [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
 
@@ -82,24 +80,35 @@ FEATURES="--with-gslib=$GSLIB"
 # ============================================================================ #
 # Install Neko
 
-# Setup Neko
-cd $NEKO_DIR
-if ! $(make -j install 1>/dev/null); then
+# Ensure Neko is installed, if not install it.
+if [ ! -f $NEKO_DIR/Makefile ]; then
+    printf "Neko is not installed, installing it now\n"
+    git submodule update --init external/neko
+    cd $NEKO_DIR
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
-
+    make -j install
+    cd $CURRENT_DIR
+else
+    # Setup Neko
+    cd $NEKO_DIR
     if ! $(make -j install 1>/dev/null); then
-        printf "Neko installation failed\n" >&2
-        exit 1
+        ./regen.sh
+        ./configure --prefix=$NEKO_DIR $FEATURES
+
+        if ! $(make -j install 1>/dev/null); then
+            printf "Neko installation failed\n" >&2
+            exit 1
+        fi
     fi
+    cd $CURRENT_DIR
 fi
-cd $CURRENT_DIR
 
 # ============================================================================ #
 # Compile the example codes.
 
 printf "Compiling the example codes and Neko-TOP\n"
-cmake -B $MAIN_DIR/build/ -S $MAIN_DIR
+cmake -B $MAIN_DIR/build/ -S $MAIN_DIR -DJSON_FORTRAN_DIR=$JSON_FORTRAN
 cmake --build $MAIN_DIR/build/ --parallel
 
 # ============================================================================ #

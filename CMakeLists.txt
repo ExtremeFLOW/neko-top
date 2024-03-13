@@ -52,24 +52,24 @@ endif()
 # ............................................................................ #
 # Setup of JSON-Fortran
 
-# If the user did not specify JSONFORTRAN_DIR, default to the
+# If the user did not specify JSON_FORTRAN_DIR, default to the
 # external/json-fortran directory
-set(JSONFORTRAN_DIR
+set(JSON_FORTRAN_DIR
     ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
     CACHE PATH
     "Path to the JSON-Fortran installation"
 )
 
-# Check that the JSONFORTRAN_DIR directories exist
-if (NOT IS_DIRECTORY ${JSONFORTRAN_DIR})
+# Check that the JSON_FORTRAN_DIR directories exist
+if (NOT IS_DIRECTORY ${JSON_FORTRAN_DIR})
     message(FATAL_ERROR
-        "JSON-Fortran directory not found (${JSONFORTRAN_DIR})."
+        "JSON-Fortran directory not found (${JSON_FORTRAN_DIR})."
         "Please run `git submodule update --init` to download the external libraries."
     )
 endif()
 
 # Find the JSON-Fortran library and add it to the CMake search path
-set(jsonfortran-gnu_DIR ${JSONFORTRAN_DIR})
+set(jsonfortran-gnu_DIR ${JSON_FORTRAN_DIR})
 if (IS_DIRECTORY ${jsonfortran-gnu_DIR}/lib)
     set(jsonfortran-gnu_DIR ${jsonfortran-gnu_DIR}/lib)
 elseif(IS_DIRECTORY ${jsonfortran-gnu_DIR}/lib64)
@@ -98,7 +98,7 @@ if (NOT IS_DIRECTORY ${NEKO_DIR})
     )
 endif()
 
-# Set the proper paths for the NEKO_DIR and JSONFORTRAN_DIR directories
+# Set the proper paths for the NEKO_DIR and JSON_FORTRAN_DIR directories
 set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR})
 
 find_package(PkgConfig REQUIRED)
