@@ -1,20 +1,24 @@
 # This check is used to ensure documentation can be built from the main branch.
-
 name: Check Documentation
 
-on:
-  pull_request:
-        branches: [main, develop]
+# This workflow is only defined here. It is triggered from other workflows.
+on: [workflow_call]
 
 jobs:
   test_documentation:
+    name: Test the documenation build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup system cached
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: git cmake doxygen graphviz
+          version: 1.0
+
       - name: Build documentation
         run: |
-          sudo apt-get update
-          sudo apt-get install -y git cmake doxygen graphviz
           cmake -DONLY_DOCS=ON -B build -S .
           cmake --build build --target documentation
