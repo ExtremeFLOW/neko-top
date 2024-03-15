@@ -25,7 +25,7 @@ contains
     real(kind=rp) :: z_value, split_value
     integer :: i
 
-    call json_get_or_default(params,                                &
+    call json_get_or_default(params, &
                              'case.scalar.initial_condition.value', &
                              split_value, 0.0_rp)
 
