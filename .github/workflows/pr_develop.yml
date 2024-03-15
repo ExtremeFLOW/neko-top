@@ -16,3 +16,13 @@ jobs:
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: "develop"
+
+  check_complete:
+    name: Complete
+    needs:
+      - check_formatting
+      - check_compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "All checks passed"
