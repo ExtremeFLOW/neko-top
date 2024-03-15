@@ -1,24 +1,37 @@
-# This check is used to ensure documentation can be built from the main branch.
+# Check the formatting of source files
+#
+# This workflow checks the formatting of the source files in the repository. It
+# uses the `findent` tool to format the Fortran source files. This allow us to
+# enforce rather strickt formatting rules.
+
 name: Check Formatting
 
-on: [workflow_call]
+on:
+  # Allow the workflow to be called from other workflows.
+  # This is useful when we want to run the workflow on a specific event.
+  workflow_call:
+
+  # Allow debugging the CI/CD pipeline by running the workflow on push events
+  # targeting the `cicd/develop` branch.
+  push:
+    branches: [cicd/develop]
 
 jobs:
-  check:
+  check-formatting:
+    name: Check the formatting of source files
     runs-on: ubuntu-latest
     steps:
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup cache
+      - name: Setup python cache
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          cache: 'pip'
-          cache-dependency-path: '**/requirements-formatting.txt'
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: "**/requirements-formatting.txt"
 
-      - name: Install findent
+      - name: Install requirements
         run: |
           pip install -r .github/workflows/extra/requirements-formatting.txt
 
