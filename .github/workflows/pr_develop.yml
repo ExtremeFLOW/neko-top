@@ -11,14 +11,12 @@ jobs:
 
   check_compilation:
     name: Compilation
-    needs:
-      - check_formatting
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: "develop"
 
   check_complete:
-    name: Complete
+    name: Complete Develop PR Checks
     needs:
       - check_formatting
       - check_compilation
