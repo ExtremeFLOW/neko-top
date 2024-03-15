@@ -11,8 +11,16 @@ jobs:
 
   check_compilation:
     name: Compilation
-    needs:
-      - check_formatting
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: "develop"
+
+  check_complete:
+    name: Complete Develop PR Checks
+    needs:
+      - check_formatting
+      - check_compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "All checks passed"
