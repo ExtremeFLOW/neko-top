@@ -136,12 +136,15 @@ cmake --build $MAIN_DIR/build --parallel
 
 printf "Neko-TOP Installation Complete\n"
 printf "===============================\n"
-printf "Neko installed to: $NEKO_DIR\n"
+printf "Neko installed to:\n"
+printf "\t$NEKO_DIR\n"
 printf "Supported features:\n"
 printf "\tCUDA: " && [[ $FEATURES == *"cuda"* ]] && printf "YES\n" || printf "NO\n"
 printf "\tMPI: YES\n"
 printf "\tOpenCL: NO\n"
 printf "\tTests: " && [[ $TEST ]] && printf "YES\n" || printf "NO\n"
 printf "===============================\n"
-printf "To run the tests, execute the following command:\n"
-printf "\tctest --test-dir $MAIN_DIR/build\n"
+if [ $TEST ]; then
+    printf "To run the tests, execute the following command:\n"
+    printf "\tctest --test-dir $MAIN_DIR/build\n"
+fi
