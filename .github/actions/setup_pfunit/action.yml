@@ -1,0 +1,101 @@
+name: Setup the pFUnit library
+description: |
+  This action sets up the pFUnit library for use in the main workflow.
+
+inputs:
+  install-dir:
+    description: "The directory to install the pFUnit library."
+    required: false
+    default: "/home/runner/pkg/pfunit"
+  working-dir:
+    description: "The directory to work in."
+    required: false
+    default: "/home/runner/tmp/pfunit"
+  os:
+    description: "The operating system to use."
+    required: false
+    default: "${{ runner.os }}"
+  compiler:
+    description: "The compiler to use."
+    required: false
+    default: "mpif90"
+  compiler-flags:
+    description: "The compiler flag to use."
+    required: false
+    default: "-O3"
+  build-options:
+    description: "The build option to use."
+    required: false
+    default: "--parallel $(nproc)"
+  version:
+    description: "The version of the pFUnit library to use."
+    required: false
+    default: "v4.8.0"
+
+outputs:
+  install-dir:
+    description: "The directory where the pFUnit library was installed."
+    value: ${{ steps.set-output.outputs.install-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache
+      id: cache-pfunit
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.install-dir }}
+        key: |
+          pfunit-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.compiler }}
+
+    - name: Clone
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+        REPO: https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
+        VERSION: ${{ inputs.version }}
+      run: |
+        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+
+    - name: Configure
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
+        FC: ${{ inputs.compiler }}
+        FCFLAGS: ${{ inputs.compiler-flags }}
+      run: |
+        cmake -B $WORKING_DIR/build -S $WORKING_DIR \
+          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+
+    - name: Build
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: |
+        cmake --build $WORKING_DIR/build ${{ inputs.build-options }}
+
+    - name: Install
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: |
+        cmake --install $WORKING_DIR/build
+
+    - name: Cleanup
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
+          rm -rf ${{ inputs.working-dir }}
+        fi
+
+    - name: Set output
+      shell: bash
+      id: set-output
+      run: |
+        echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT

@@ -1,0 +1,23 @@
+name: Check Pull Requests onto main
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check_formatting:
+    name: Formatting
+    uses: ./.github/workflows/check_formatting.yml
+
+  check_documentation:
+    name: Documentation
+    uses: ./.github/workflows/check_documentation.yml
+
+  check_compilation:
+    name: Compilation
+    needs:
+      - check_formatting
+      - check_documentation
+    uses: ./.github/workflows/check_neko-top.yml
+    with:
+      neko-version: "master"

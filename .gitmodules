@@ -4,9 +4,13 @@
 	branch = master
 [submodule "neko"]
 	path = external/neko
-	url = git@github.com:ExtremeFLOW/neko.git
+	url = https://github.com/ExtremeFLOW/neko.git
 	branch = develop
 [submodule "Nek5000"]
 	path = external/Nek5000
 	url = https://github.com/Nek5000/Nek5000.git
 	branch = master
+[submodule "pFUnit"]
+	path = external/pFUnit
+	url = https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
+	branch = main
