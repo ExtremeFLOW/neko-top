@@ -1,0 +1,124 @@
+name: Setup the Neko library
+description: |
+  This action sets up the Neko library for use in the main workflow.
+
+inputs:
+  install-dir:
+    description: "The directory to install the Neko library."
+    required: false
+    default: "/home/runner/pkg/neko"
+  working-dir:
+    description: "The directory to work in when compiling Neko."
+    required: false
+    default: "/home/runner/tmp/neko"
+  json-fortran-dir:
+    description: "The directory where the JSON-Fortran library was installed."
+    required: false
+    default: "/home/runner/pkg/json-fortran"
+  os:
+    description: "The operating system to use."
+    required: false
+    default: "${{ runner.os }}"
+  compiler:
+    description: "The compiler to use."
+    required: false
+    default: "gfortran"
+  compiler-flags:
+    description: "The compiler flag to use."
+    required: false
+    default: "-O3"
+  build-options:
+    description: "The build option to use."
+    required: false
+    default: "-j $(nproc)"
+  version:
+    description: "The version of the Neko library to use."
+    required: false
+    default: "v0.7.2"
+
+outputs:
+  install-dir:
+    description: "The directory where the Neko library was installed."
+    value: ${{ steps.set-output.outputs.install-dir }}
+
+runs:
+  using: composite
+  steps:
+    # ........................................................................ #
+    # Cache the Neko library
+    #
+    # This step caches the Neko library to speed up the workflow.
+    # If we wish to use the developer version of the Neko library, we
+    # we will use the date as the cache key. Otherwise, we will use the
+    # version of the Neko library as the cache key.
+
+    - name: Create cache key based on version, OS, and compiler
+      id: create-key
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        OS: ${{ inputs.os }}
+        COMPILER: ${{ inputs.compiler }}
+      run: |
+        key="neko-$VERSION-$OS-$COMPILER"
+        [ $VERSION == "develop" ] && key="$key-$(/bin/date -u "+%Y%m%d")"
+        echo "key=$key" >> $GITHUB_OUTPUT
+
+    - name: Create cache for the Neko library
+      id: cache-neko
+      uses: actions/cache@v3
+      with:
+        path: ${{ inputs.install-dir }}
+        key: neko-${{ steps.create-key.outputs.key }}
+
+    # ........................................................................ #
+    # Clone and build the Neko library
+    #
+    # This step clones the Neko library and builds it.
+
+    - name: Clone neko
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+        REPO: https://github.com/ExtremeFLOW/neko.git
+        VERSION: ${{ inputs.version }}
+      run: |
+        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+
+    - name: Configure and install neko
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
+        FC: ${{ inputs.compiler }}
+        FCFLAGS: ${{ inputs.compiler-flags }}
+        JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
+      run: |
+        export PKG_CONFIG_PATH=$JSON_FORTRAN_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+        export LD_LIBRARY_PATH=$JSON_FORTRAN_DIR/lib:$LD_LIBRARY_PATH
+
+        cd $WORKING_DIR
+        ./regen.sh
+        ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS=$FCFLAGS
+        make install ${{ inputs.build-options }}
+
+    # ........................................................................ #
+    # Cleanup and outputs
+    #
+    # This step cleans up the working directory and sets the output.
+
+    - name: Cleanup
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
+          rm -rf ${{ inputs.working-dir }}
+        fi
+
+    - name: Set output
+      id: set-output
+      shell: bash
+      run: |
+        echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
