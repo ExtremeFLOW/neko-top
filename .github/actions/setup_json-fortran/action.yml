@@ -40,20 +40,14 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Cache json-fortran
+    - name: Cache
       id: cache-json-fortran
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ inputs.install-dir }}
         key: json-fortran-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.compiler }}
 
-    - name: Create working directory
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        mkdir -p ${{ inputs.working-dir }}
-
-    - name: Clone json-fortran
+    - name: Clone
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
@@ -63,7 +57,7 @@ runs:
       run: |
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
-    - name: Configure json-fortran
+    - name: Configure
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
@@ -77,7 +71,7 @@ runs:
           -DUSE_GNU_INSTALL_CONVENTION=ON \
           -DSKIP_DOC_GEN=ON
 
-    - name: Install json-fortran
+    - name: Install
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
@@ -97,6 +91,6 @@ runs:
         fi
 
     - name: Set output
-      shell: bash
       id: set-output
+      shell: bash
       run: echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
