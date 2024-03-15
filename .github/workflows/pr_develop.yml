@@ -1,25 +1,18 @@
-name: Check Development PRs
+name: Check Pull Requests onto develop
+
 on:
   pull_request:
     branches: [develop]
 
 jobs:
-  # Pull in the external workflows so we avoid duplication
-  check_documentation:
-    uses: ./.github/workflows/check_documentation.yml
   check_formatting:
+    name: Formatting
     uses: ./.github/workflows/check_formatting.yml
-  check_compilation:
-    uses: ./.github/workflows/check_compilation.yml
 
-  # Dummy job to trigger the other jobs
-  check-develop:
-    name: Run all checks for development PRs
+  check_compilation:
+    name: Compilation
     needs:
       - check_formatting
-      - check_documentation
-      - check_compilation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Success
-        run: echo "All checks passed"
+    uses: ./.github/workflows/check_neko-top.yml
+    with:
+      neko-version: "develop"

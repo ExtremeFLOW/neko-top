@@ -5,11 +5,6 @@ on:
   # This workflow is only defined here. It is triggered from other workflows.
   workflow_call:
 
-  # Allow debugging the CI/CD pipeline by running the workflow on push events
-  # targeting the `cicd/develop` branch.
-  push:
-    branches: [cicd/develop]
-
 jobs:
   test_documentation:
     name: Test the documenation build

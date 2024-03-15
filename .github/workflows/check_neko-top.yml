@@ -1,18 +1,18 @@
 # This check is used to ensure documentation can be built from the main branch.
-name: Check Compilation and Run Tests
+name: Check Neko-TOP compilation and tests
 
 on:
   # This workflow is only defined here. It is triggered from other workflows.
   workflow_call:
-
-  # Allow debugging the CI/CD pipeline by running the workflow on push events
-  # targeting the `cicd/develop` branch.
-  push:
-    branches: [cicd/develop]
+    inputs:
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
 
 jobs:
   pfunit:
-    name: Setup and cache pFUnit library
+    name: Cache pFUnit
     runs-on: ubuntu-latest
 
     outputs:
@@ -37,7 +37,7 @@ jobs:
         uses: ./.github/actions/setup_pfunit
 
   json-fortran:
-    name: Setup and cache json-fortran library
+    name: Cache JSON-fortran
     runs-on: ubuntu-latest
 
     outputs:
@@ -52,7 +52,7 @@ jobs:
         uses: ./.github/actions/setup_json-fortran
 
   neko:
-    name: Setup and cache Neko library
+    name: Cache Neko
     runs-on: ubuntu-latest
     needs:
       - json-fortran
@@ -83,7 +83,7 @@ jobs:
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.setup-json-fortran.outputs.install-dir }}
-          version: develop
+          version: ${{ inputs.neko-version }}
 
   neko-top-tests:
     name: Compile Neko-TOP and run tests
@@ -100,12 +100,12 @@ jobs:
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: autotools-dev automake autoconf openmpi-bin pkg-config libopenblas-dev liblapack-dev
+          packages: autotools-dev automake autoconf openmpi-bin pkg-config liblapack-dev
           version: 1.0
 
       - name: Setup system
         run: |
-          sudo apt-get install libopenmpi-dev
+          sudo apt-get install libopenmpi-dev libopenblas-dev
 
       - name: Setup json-fortran
         id: setup-json-fortran
@@ -116,7 +116,7 @@ jobs:
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.setup-json-fortran.outputs.install-dir }}
-          version: develop
+          version: ${{ inputs.neko-version }}
 
       - name: Setup pFUnit
         id: setup-pfunit

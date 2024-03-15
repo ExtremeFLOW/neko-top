@@ -66,10 +66,10 @@ runs:
 
     - name: Create cache for the Neko library
       id: cache-neko
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ inputs.install-dir }}
-        key: neko-${{ steps.create-key.outputs.key }}
+        key: ${{ steps.create-key.outputs.key }}
 
     # ........................................................................ #
     # Clone and build the Neko library

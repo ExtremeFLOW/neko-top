@@ -1,30 +1,23 @@
-# cat .github/workflows/deploy.yml
-# Todo: Add the deployment steps here when ready. Please check the pr_develop when doing so.
+name: Check Pull Requests onto main
 
-
-
-# name: Check Development PRs
 on:
   pull_request:
     branches: [main]
 
 jobs:
-  # Pull in the external workflows so we avoid duplication
-  check_documentation:
-    uses: ./.github/workflows/check_documentation.yml
   check_formatting:
+    name: Formatting
     uses: ./.github/workflows/check_formatting.yml
-  check_compilation:
-    uses: ./.github/workflows/check_compilation.yml
 
-  # Dummy job to trigger the other jobs
-  check-develop:
-    name: Run all checks for development PRs
+  check_documentation:
+    name: Documentation
+    uses: ./.github/workflows/check_documentation.yml
+
+  check_compilation:
+    name: Compilation
     needs:
-      - check_documentation
       - check_formatting
-      - check_compilation
-    runs-on: ubuntu-latest
-    steps:
-      - name: Success
-        run: echo "All checks passed"
+      - check_documentation
+    uses: ./.github/workflows/check_neko-top.yml
+    with:
+      neko-version: "master"

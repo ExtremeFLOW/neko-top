@@ -11,11 +11,6 @@ on:
   # This is useful when we want to run the workflow on a specific event.
   workflow_call:
 
-  # Allow debugging the CI/CD pipeline by running the workflow on push events
-  # targeting the `cicd/develop` branch.
-  push:
-    branches: [cicd/develop]
-
 jobs:
   check-formatting:
     name: Check the formatting of source files
