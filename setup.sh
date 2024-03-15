@@ -7,6 +7,7 @@ function help() {
     echo "Options:"
     echo "  -h, --help        Show this help message and exit"
     echo "  -t, --test        Run the tests after the installation"
+    echo "  -c, --clean       Clean the build directory before compiling"
     echo ""
     echo "Compilation and setup of Neko-TOP, this script will install all the"
     echo "dependencies and compile the Neko-TOP code."
@@ -30,6 +31,7 @@ while [ "$1" != "" ]; do
     case $1 in
     -h | --help) help ;;
     -t | --test) TEST=1 ;;
+    -c | --clean) CLEAN=1 ;;
     esac
     shift
 done
@@ -57,6 +59,7 @@ check_system_dependencies
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
 [ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
 [ -z "$GSLIB_DIR" ] && GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
+[ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
 
 # Define standard compilers if they are not defined as environment variables
 if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
@@ -80,36 +83,53 @@ find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
 # ============================================================================ #
 # Install Neko
 
+if [ ! -z "$CLEAN" ]; then
+    printf "Cleaning the build directory\n"
+    rm -rf $MAIN_DIR/build
+    cd $NEKO_DIR
+    git clean -dfx
+    cd $CURRENT_DIR
+fi
+
 # Ensure Neko is installed, if not install it.
-if [ ! -f $NEKO_DIR/Makefile ]; then
+if [[ -z "$(find $NEKO_DIR -name libneko.a)" ]]; then
     printf "Neko is not installed, installing it now\n"
-    git submodule update --init external/neko
+    if [ ! -f "$NEKO_DIR/regen.sh" ]; then
+        git submodule update --init external/neko
+    fi
     cd $NEKO_DIR
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
     make -j install
     cd $CURRENT_DIR
-else
-    # Setup Neko
-    cd $NEKO_DIR
-    if ! $(make -j install 1>/dev/null); then
-        ./regen.sh
-        ./configure --prefix=$NEKO_DIR $FEATURES
-
-        if ! $(make -j install 1>/dev/null); then
-            printf "Neko installation failed\n" >&2
-            exit 1
-        fi
-    fi
-    cd $CURRENT_DIR
 fi
+export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+
+# ============================================================================ #
+# Install PFUnit
+
+if [[ "$TEST" && -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
+
+    if [ ! -f "$PFUNIT_DIR/CMakeLists.txt" ]; then
+        printf "Installing PFUnit\n"
+        git submodule update --init external/pFUnit
+    fi
+
+    cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR
+    cmake --build $PFUNIT_DIR/build --parallel
+    cmake --install $PFUNIT_DIR/build
+fi
+export PFUNIT_DIR=$(find $PFUNIT_DIR -type d -exec test -f '{}'/lib/libpfunit.a \; -print)
 
 # ============================================================================ #
 # Compile the example codes.
 
+VARIABLES="-DJSON_FORTRAN_DIR=$JSON_FORTRAN"
+[ "$TEST" ] && VARIABLES+=" -DBUILD_TESTING=ON -DPFUNIT_DIR=$PFUNIT_DIR/cmake"
+
 printf "Compiling the example codes and Neko-TOP\n"
-cmake -B $MAIN_DIR/build/ -S $MAIN_DIR -DJSON_FORTRAN_DIR=$JSON_FORTRAN
-cmake --build $MAIN_DIR/build/ --parallel
+cmake -B $MAIN_DIR/build -S $MAIN_DIR $VARIABLES
+cmake --build $MAIN_DIR/build --parallel
 
 # ============================================================================ #
 # Print the status of the build
@@ -121,11 +141,7 @@ printf "Supported features:\n"
 printf "\tCUDA: " && [[ $FEATURES == *"cuda"* ]] && printf "YES\n" || printf "NO\n"
 printf "\tMPI: YES\n"
 printf "\tOpenCL: NO\n"
-
-# ============================================================================ #
-# Run the tests if requested
-
-if [ ! -z "$TEST" ]; then
-    printf "Running the tests\n"
-    ctest --test-dir $MAIN_DIR/build --output-on-failure --stop-on-failure
-fi
+printf "\tTests: " && [[ $TEST ]] && printf "YES\n" || printf "NO\n"
+printf "===============================\n"
+printf "To run the tests, execute the following command:\n"
+printf "\tctest --test-dir $MAIN_DIR/build\n"

@@ -35,30 +35,19 @@ find_package(MPI REQUIRED)
 
 # If the user did not specify a build type, default to Release
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build." FORCE)
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build.")
 endif()
 
-# ============================================================================ #
-# Enable devices
-include(CheckLanguage)
-
-# Enable CUDA if the compiler is found
-check_language(CUDA)
-if (CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA)
-endif()
+# Set default paths for the external dependencies
+set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+    CACHE STRING "Path to the JSON-Fortran installation")
+set(NEKO_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
+    CACHE STRING "Path to the Neko installation")
+set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
+    CACHE STRING "Path to the pFUnit installation")
 
 # ............................................................................ #
 # Setup of JSON-Fortran
-
-# If the user did not specify JSON_FORTRAN_DIR, default to the
-# external/json-fortran directory
-set(JSON_FORTRAN_DIR
-    ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
-    CACHE PATH
-    "Path to the JSON-Fortran installation"
-)
 
 # Check that the JSON_FORTRAN_DIR directories exist
 if (NOT IS_DIRECTORY ${JSON_FORTRAN_DIR})
@@ -86,10 +75,6 @@ find_package(jsonfortran-gnu REQUIRED)
 # ............................................................................ #
 # Setup of the Neko library
 
-# If the user did not specify NEKO_DIR, default to the external/neko directory
-set(NEKO_DIR ${CMAKE_SOURCE_DIR}/external/neko CACHE PATH
-    "Path to the Neko installation")
-
 # Check that the NEKO_DIR directories exist
 if (NOT IS_DIRECTORY ${NEKO_DIR})
     message(FATAL_ERROR
@@ -99,29 +84,22 @@ if (NOT IS_DIRECTORY ${NEKO_DIR})
 endif()
 
 # Set the proper paths for the NEKO_DIR and JSON_FORTRAN_DIR directories
-set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR})
+set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
-# ............................................................................ #
-# Setup of the pFUnit library
-
-find_package(pFUnit QUIET)
-if (NOT PFUNIT_FOUND)
-    include(FetchContent)
-    message(STATUS "pFUnit not found. Fetching pFUnit from GitHub")
-    FetchContent_Declare(
-        pFUnit
-        GIT_REPOSITORY https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
-        GIT_TAG        v4.8.0
-    )
-    FetchContent_MakeAvailable(pFUnit)
-endif()
-
 # ============================================================================ #
 # Setup Build options
 # ============================================================================ #
+# Enable devices
+include(CheckLanguage)
+
+check_language(CUDA)
+if (CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA)
+endif()
 
 # If we are building in Debug mode, enable -g and -Wall for all languages
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -129,11 +107,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
         $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
         -Wall -Wextra -Wno-unused-dummy-argument
-        )
-
-    set(BUILD_TESTING ON CACHE BOOL "Build the tests" FORCE)
-elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
-    set(BUILD_TESTING OFF CACHE BOOL "Build the tests" FORCE)
+    )
 endif()
 
 # Enforce compiler options
@@ -155,8 +129,12 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 # Build the tests
 # ============================================================================ #
 
+# Setup testing
+option(BUILD_TESTING "Build the tests" OFF)
+
 include(CTest)
 if (BUILD_TESTING)
+    find_package(PFUNIT REQUIRED)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
