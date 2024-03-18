@@ -13,30 +13,42 @@ on:
 
 jobs:
   check-formatting:
-    name: Check the formatting of source files
+    name: Formatting
     runs-on: ubuntu-latest
     steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup python cache
+      - name: Python cache
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
           cache-dependency-path: "**/requirements-formatting.txt"
 
-      - name: Install requirements
+      - name: Install findent
         run: |
           pip install -r .github/workflows/extra/requirements-formatting.txt
+
+      # ---------------------------------------------------------------------- #
+      # Format the source files and check the formatting
+      # ---------------------------------------------------------------------- #
 
       - name: Format sources
         env:
           FINDENT_FLAGS: ${{ vars.FINDENT_FLAGS }}
         run: |
-          find sources/ -name "*.f90" -type f -exec bash -c \
-            "findent < \"{}\" > \"{}\".tmp && mv -f \"{}\".tmp \"{}\"" \;
+          find sources/ -iname "*.f90" -type f \
+            -exec bash -c 'findent < {} > {}.tmp; mv -f {}.tmp {}' \;
 
       - name: Check format
         run: |
-          git diff --exit-code
+          if [[ $(git diff --exit-code) ]]; then
+            echo "The formatting of the source files is incorrect." >&2
+            git diff >&2
+            exit 1
+          fi

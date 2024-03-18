@@ -7,13 +7,13 @@ on:
 
 jobs:
   test_documentation:
-    name: Test the documenation build
+    name: Documentation
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup system cached
+      - name: Setup system
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: git cmake doxygen graphviz
