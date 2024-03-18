@@ -34,9 +34,13 @@ jobs:
         env:
           FINDENT_FLAGS: ${{ vars.FINDENT_FLAGS }}
         run: |
-          find sources/ -name "*.f90" -type f -exec bash -c \
-            "findent < \"{}\" > \"{}\".tmp && mv -f \"{}\".tmp \"{}\"" \;
+          find sources/ -iname "*.f90" -type f \
+            -exec bash -c 'findent < {} > {}.tmp; mv -f {}.tmp {}' \;
 
       - name: Check format
         run: |
-          git diff --exit-code
+          if [[ $(git diff --exit-code) ]]; then
+            echo "The formatting of the source files is incorrect." >&2
+            git diff >&2
+            exit 1
+          fi
