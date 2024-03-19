@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 0.1,
-        "timestep": 5e-5,
+        "end_time": 200.0,
+        "timestep": 1e-4,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 8,
@@ -61,6 +61,10 @@
                         {
                             "type": "point_zone",
                             "name": "cylinder"
+                        },
+                        {
+                            "type": "point_zone",
+                            "name": "ball"
                         }
                     ],
                     "brinkman": {
@@ -75,19 +79,16 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 1000.0,
-            "boundary_types": [
-                "",
-                "",
-                "",
-                "",
-                "d=1",
-                ""
-            ],
+            "Pe": 2000.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": 0.0
-            }
+            },
+            "source_terms": [
+                {
+                    "type": "user_vector"
+                }
+            ]
         },
         "point_zones": [
             {

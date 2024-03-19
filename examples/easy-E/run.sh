@@ -28,7 +28,7 @@ function help() {
 }
 
 # Handle options
-Nx=32 && Ny=8 && Nz=8
+Nx=64 && Ny=16 && Nz=16
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -79,9 +79,9 @@ genmeshbox 0 4 0 1 0 1 $Nx $Ny $Nz .false. .false. .false.
 for case in $cases; do
     echo "Running case: $case"
     if [ "$QUIET" ]; then
-        neko $case >/dev/null
+        ./neko $case >/dev/null
     else
-        neko $case >${case%.case}.log
+        ./neko $case >${case%.case}.log
     fi
 done
 
