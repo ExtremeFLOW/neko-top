@@ -93,4 +93,17 @@ void cuda_col3_mask(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+/** Fortran wrapper for sub3_mask
+ * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
+ */
+void cuda_sub3_mask(
+    void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
+
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
+
+    sub3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
+        (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
+    CUDA_CHECK(cudaGetLastError());
+}
 }

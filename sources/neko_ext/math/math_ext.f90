@@ -83,4 +83,20 @@ contains
 
   end subroutine col3_mask
 
+  !> @brief Subtract 2 masked vectors. Save the result in a new vector.
+  !! \f$ a_i = b_i - c_i, for i in mask \f$
+  subroutine sub3_mask(a, b, c, size, mask, mask_size)
+    real(kind=rp), dimension(size), intent(inout) :: a
+    real(kind=rp), dimension(size), intent(in) :: b, c
+    integer, intent(in) :: size
+    integer, dimension(mask_size), intent(in) :: mask
+    integer, intent(in) :: mask_size
+    integer :: i
+
+    do i = 1, mask_size
+       a(mask(i)) = b(mask(i)) - c(mask(i))
+    end do
+
+  end subroutine sub3_mask
+
 end module math_ext
