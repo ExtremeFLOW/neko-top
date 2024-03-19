@@ -1,0 +1,69 @@
+# This check is used to ensure documentation can be built from the main branch.
+name: Check Neko-TOP compilation and tests
+
+on:
+  # This workflow is only defined here. It is triggered from other workflows.
+  workflow_call:
+    inputs:
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
+
+jobs:
+  neko-top-tests:
+    name: Test Neko-TOP
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get system cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: autotools-dev automake autoconf openmpi-bin pkg-config liblapack-dev
+          version: 1.0
+
+      - name: Setup system
+        run: |
+          sudo apt-get install libopenmpi-dev libopenblas-dev
+
+      # ---------------------------------------------------------------------- #
+      # Setup the external dependencies
+      # ---------------------------------------------------------------------- #
+
+      - name: Setup json-fortran
+        id: setup-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+
+      - name: Setup neko
+        id: setup-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.setup-json-fortran.outputs.install-dir }}
+          version: ${{ inputs.neko-version }}
+
+      - name: Setup pFUnit
+        id: setup-pfunit
+        uses: ./.github/actions/setup_pfunit
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
+
+      - name: Build
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.setup-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.setup-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.setup-pfunit.outputs.install-dir }}
+        run: |
+          ./setup.sh --test
+
+      - name: Run tests
+        run: |
+          ctest --test-dir build --output-on-failure --stop-on-failure

@@ -1,0 +1,26 @@
+name: Check Pull Requests onto develop
+
+on:
+  pull_request:
+    branches: [develop]
+
+jobs:
+  check_formatting:
+    name: Formatting
+    uses: ./.github/workflows/check_formatting.yml
+
+  check_compilation:
+    name: Compilation
+    uses: ./.github/workflows/check_neko-top.yml
+    with:
+      neko-version: "develop"
+
+  check_complete:
+    name: Complete Develop PR Checks
+    needs:
+      - check_formatting
+      - check_compilation
+    runs-on: ubuntu-latest
+    steps:
+      - name: All checks passed
+        run: echo "All checks passed"
