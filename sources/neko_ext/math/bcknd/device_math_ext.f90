@@ -42,6 +42,18 @@ module device_math_ext
 #elif HAVE_CUDA
 
   interface
+     subroutine cuda_cfill_mask(a_d, c, size, mask_d, mask_size) &
+       bind(c, name='cuda_cfill_mask')
+       use, intrinsic :: iso_c_binding
+       import c_rp
+       type(c_ptr), value :: a_d
+       real(c_rp) :: c
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine cuda_cfill_mask
+  end interface
+  interface
      subroutine cuda_cadd_mask(a_d, c, size, mask_d, mask_size) &
        bind(c, name='cuda_cadd_mask')
        use, intrinsic :: iso_c_binding
@@ -108,6 +120,19 @@ module device_math_ext
 #endif
 
 contains
+
+  subroutine device_cfill_mask(a_d, c, size, mask_d, mask_size)
+    type(c_ptr) :: a_d
+    real(kind=rp), intent(in) :: c
+    integer :: size
+    type(c_ptr) :: mask_d
+    integer :: mask_size
+#ifdef HAVE_CUDA
+    call cuda_cfill_mask(a_d, c, size, mask_d, mask_size)
+#else
+    call neko_error('No device backend configured')
+#endif
+  end subroutine device_cfill_mask
 
   subroutine device_cadd_mask(a_d, c, size, mask_d, mask_size)
     type(c_ptr) :: a_d
