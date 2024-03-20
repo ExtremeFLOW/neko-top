@@ -188,10 +188,14 @@ for case in $case_files; do
 
     # Setup the log folder
     if [[ -f $log/output.log && "$(head -n 1 $log/output.log)" == "Ready" ]]; then
+        rm -f $log/error.err && touch $log/error.err
+
+        [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
+        QUEUE="$QUEUE $example"
         continue
     fi
 
-    if [ $CLEAN ]; then
+    if [[ $CLEAN ]]; then
         rm -fr $log/*
     else
         find $log -type f -name "*.log" -delete
@@ -229,9 +233,7 @@ for case in $case_files; do
     printf 'Ready' >$log/output.log
 
     QUEUE="$QUEUE $example"
-    if [ -z "$(which bsub)" ]; then
-        printf '  %-12s %-s\n' "Queued:" "$example"
-    fi
+    [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
 done
 
 # Done with the setup

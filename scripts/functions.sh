@@ -9,6 +9,24 @@ function run {
     JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d -exec test -f '{}'/libjsonfortran.so \; -print)
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
 
+    # Run preparation if it exists
+    if [ -f "prepare.sh" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Preparing example.\n\n"
+
+        { time ./prepare.sh; } 2>&1
+
+        if [ -s "error.err" ]; then
+            printf "\nERROR: An error occured during preparation. See error.err for details.\n" >&2
+            exit 1
+        else
+            printf "\nPreparation concluded.\n"
+        fi
+    fi
+
+    # ======================================================================== #
+    #
+
     if [ -f neko ]; then
         neko=$(realpath ./neko)
     elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
@@ -24,7 +42,7 @@ function run {
         exit 1
     fi
 
-    # ============================================================================ #
+    # ======================================================================== #
     # Execute the example
 
     printf "=%.0s" {1..80} && printf "\n"
@@ -55,13 +73,14 @@ function run {
     fi
 
     if [ -s "error.err" ]; then
-        printf "\nERROR: An error occured during execution. See error.err for details.\n" >&2
+        printf "\nERROR: An error occured during execution. " >&2
+        printf "See error.err for details.\n" >&2
         exit 1
     else
         printf "\nNeko execution concluded.\n"
     fi
 
-    # ============================================================================ #
+    # ======================================================================== #
     # Move the results to the results folder
     results=$RPATH/$example
     printf "=%.0s" {1..80} && printf "\n"
@@ -81,7 +100,8 @@ function run {
     done
     printf "\n"
 
-    # Move all files which are not the error or executable files to the log folder
+    # Move all files which are not the error or executable files to the log
+    # folder
     find ./ -type f \
         -not -name "error.err" \
         -not -name "neko" \
@@ -90,7 +110,8 @@ function run {
         -exec mv -t $results {} +
 
     if [ -s "error.err" ]; then
-        printf "ERROR: An error occured during execution. See error.err for details.\n"
+        printf "ERROR: An error occured during execution. " >&2
+        printf "See error.err for details.\n" >&2
         exit 1
     else
         printf "=%.0s" {1..80} && printf "\n"
