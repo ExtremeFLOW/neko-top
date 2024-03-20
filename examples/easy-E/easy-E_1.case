@@ -2,11 +2,11 @@
     "version": 1.0,
     "case": {
         "mesh_file": "box.nmsh",
-        "output_directory": "cylinder_fields",
+        "output_directory": "easy-E_1_fields",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 200.0,
+        "end_time": 1.0,
         "timestep": 1e-4,
         "numerics": {
             "time_order": 3,
@@ -80,10 +80,14 @@
         "scalar": {
             "enabled": true,
             "Pe": 2000.0,
+            "target_temperature": 1.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": 0.0
             },
+            "boundary_types": [
+                "d=0",
+            ],
             "source_terms": [
                 {
                     "type": "user_vector"
