@@ -2,12 +2,12 @@
     "version": 1.0,
     "case": {
         "mesh_file": "box.nmsh",
-        "output_directory": "easy-E_20_fields",
+        "output_directory": "easy-E_1_fields",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 10.0,
-        "timestep": 5e-5,
+        "end_time": 200.0,
+        "timestep": 1e-4,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 8,
@@ -85,6 +85,9 @@
                 "type": "uniform",
                 "value": 0.0
             },
+            "boundary_types": [
+                "d=0",
+            ],
             "source_terms": [
                 {
                     "type": "user_vector"
@@ -105,7 +108,7 @@
                     0.5,
                     0.5
                 ],
-                "radius": 0.1
+                "radius": 0.10
             },
             {
                 "name": "ball",
@@ -115,7 +118,7 @@
                     0.5,
                     0.5
                 ],
-                "radius": 0.1
+                "radius": 0.10
             }
         ]
     }
