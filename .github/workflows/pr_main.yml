@@ -1,4 +1,4 @@
-name: Check Pull Requests onto main
+name: Main Checks
 
 on:
   pull_request:
@@ -20,7 +20,7 @@ jobs:
       neko-version: "master"
 
   check_complete:
-    name: Complete Main PR Checks
+    name: Main Checks
     needs:
       - check_formatting
       - check_documentation
