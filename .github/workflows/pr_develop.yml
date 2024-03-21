@@ -1,9 +1,8 @@
-name: Check Pull Requests onto develop
+name: Develop PR Checks
 
 on:
   pull_request:
-    branches:
-      - develop
+    branches: [develop]
     types:
       - opened
       - synchronize
@@ -21,25 +20,20 @@ jobs:
         run: echo "This PR is a draft"
 
   check_formatting:
-    if: github.event.pull_request.draft != true
-
     name: Formatting
-    needs: is_draft
+    if: github.event.pull_request.draft != true
     uses: ./.github/workflows/check_formatting.yml
 
   check_compilation:
-    if: github.event.pull_request.draft != true
-
     name: Compilation
+    if: github.event.pull_request.draft != true
     uses: ./.github/workflows/check_neko-top.yml
-
     with:
       neko-version: "develop"
 
   check_complete:
+    name: Develop PR Ready
     if: github.event.pull_request.draft != true
-
-    name: Complete Develop PR Checks
     needs:
       - check_formatting
       - check_compilation
