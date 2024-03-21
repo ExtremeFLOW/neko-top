@@ -2,16 +2,34 @@ name: Check Pull Requests onto develop
 
 on:
   pull_request:
-    branches: [develop]
+    branches:
+      - develop
 
 jobs:
+  is_draft:
+    name: Check if PR is a draft
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if PR is a draft
+        id: is_draft
+        run: echo ::set-output name=is_draft::$(jq -r .pull_request.draft $GITHUB_EVENT_PATH)
+      - name: Exit if PR is a draft
+        run: |
+          if [ ${{ steps.is_draft.outputs.is_draft }} = "true" ]; then
+            echo "PR is a draft, exiting"
+            exit 78
+          fi
+
   check_formatting:
     name: Formatting
+    needs: is_draft
     uses: ./.github/workflows/check_formatting.yml
 
   check_compilation:
     name: Compilation
+    needs: is_draft
     uses: ./.github/workflows/check_neko-top.yml
+
     with:
       neko-version: "develop"
 
@@ -20,6 +38,8 @@ jobs:
     needs:
       - check_formatting
       - check_compilation
+      - is_draft
+
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
