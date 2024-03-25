@@ -78,6 +78,41 @@ function find_gslib() {
 }
 
 # ============================================================================ #
+# Ensure PFUnit is installed, if not install it.
+
+function find_pfunit() {
+
+    if [ ! $TEST ]; then return; fi
+
+    if [[ -z "$(find $1 -name libpfunit.a)" && -f $1/CMakeLists.txt ]]; then
+
+        if [ ! -f "$1/CMakeLists.txt" ]; then
+            printf "Installing PFUnit\n"
+            git submodule update --init external/pFUnit
+        fi
+
+        cmake -B $1/build -S $1 -G "Unix Makefiles" \
+            -DCMAKE_INSTALL_PREFIX=$1
+        cmake --build $1/build --parallel
+        cmake --install $1/build
+    fi
+
+    PFUNIT_DIR=$(find $1 -type d -exec test -f '{}'/lib/libpfunit.a \; -print)
+    if [ -z "$PFUNIT_DIR" ]; then
+        error "JSON-Fortran not found at:"
+        error "\t$1"
+        error "Please set JSON_FORTRAN_DIR to the directory containing"
+        error "the JSON-Fortran source code."
+        error "You can download the source code from:"
+        error "\thttps://github.com/jacobwilliams/json-fortran"
+        error "Or invoke the git submodule command:"
+        error "\tgit submodule update --init --recursive"
+        exit 1
+    fi
+
+    export PFUNIT_DIR=$(realpath $PFUNIT_DIR)
+}
+# ============================================================================ #
 # Helper function to print errors
 function error() {
     echo -e "$1" >&2
