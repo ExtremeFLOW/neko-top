@@ -20,7 +20,7 @@ endif()
 
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_EXAMPLES "Build the examples" ON)
-option(BUILD_TESTING "Build the tests" ON)
+option(BUILD_TESTING "Build the tests" OFF)
 
 # Advanced options
 include(CMakeDependentOption)
