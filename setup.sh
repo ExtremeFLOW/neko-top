@@ -96,11 +96,13 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 
 find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
 find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
+find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 
 # Define optional features
 [ ! -z "$GSLIB" ] && FEATURES+="--with-gslib=$GSLIB"
 [ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
 [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
+[ $TEST ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
 # Done settng up external dependencies
 # ============================================================================ #
@@ -127,22 +129,6 @@ if [ $TEST ]; then
     cd $CURRENT_DIR
 fi
 export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
-
-# ============================================================================ #
-# Install PFUnit
-
-if [[ "$TEST" && -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
-
-    if [ ! -f "$PFUNIT_DIR/CMakeLists.txt" ]; then
-        printf "Installing PFUnit\n"
-        git submodule update --init external/pFUnit
-    fi
-
-    cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR
-    cmake --build $PFUNIT_DIR/build --parallel
-    cmake --install $PFUNIT_DIR/build
-fi
-export PFUNIT_DIR=$(find $PFUNIT_DIR -type d -exec test -f '{}'/lib/libpfunit.a \; -print)
 
 # ============================================================================ #
 # Compile the example codes.
