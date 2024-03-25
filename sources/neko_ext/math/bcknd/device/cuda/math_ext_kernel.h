@@ -36,6 +36,20 @@
 #define __NEKO_CUDA_MATH_EXT_KERNELS__
 
 /**
+ * Device kernel for cfill_mask
+ */
+template <typename T>
+__global__ void cfill_mask_kernel(
+    T* __restrict__ a, const T c, const int size, int* __restrict__ mask,
+    const int mask_size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < mask_size; i += str) { a[mask[i]-1] = c; }
+}
+
+/**
  * Device kernel for cadd_mask
  */
 template <typename T>
@@ -46,7 +60,7 @@ __global__ void cadd_mask_kernel(
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < mask_size; i += str) { a[mask[i]] = a[mask[i]] + c; }
+    for (int i = idx; i < mask_size; i += str) { a[mask[i]-1] = a[mask[i]-1] + c; }
 }
 
 /**
@@ -61,7 +75,7 @@ __global__ void invcol1_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]] = 1.0 / a[mask[i]];
+        a[mask[i]-1] = 1.0 / a[mask[i]-1];
     }
 }
 
@@ -77,7 +91,7 @@ __global__ void col2_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]] = a[mask[i]] * b[mask[i]];
+        a[mask[i]-1] = a[mask[i]-1] * b[mask[i]-1];
     }
 }
 
@@ -93,7 +107,23 @@ __global__ void col3_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]] = b[mask[i]] * c[mask[i]];
+        a[mask[i]-1] = b[mask[i]-1] * c[mask[i]-1];
+    }
+}
+
+/**
+ * Device kernel for sub3_mask
+ */
+template <typename T>
+__global__ void sub3_mask_kernel(
+    T* __restrict__ a, T* __restrict__ b, T* __restrict__ c, const int size,
+    int* __restrict__ mask, const int mask_size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = b[mask[i]-1] - c[mask[i]-1];
     }
 }
 
