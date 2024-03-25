@@ -6,6 +6,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
 
+# Enable devices
+include(CheckLanguage)
+
 check_language(CUDA)
 if (CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
@@ -36,9 +39,6 @@ set(NEKO_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
     CACHE STRING "Path to the Neko installation")
 set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
     CACHE STRING "Path to the pFUnit installation")
-
-# Enable devices
-include(CheckLanguage)
 
 
 # ============================================================================ #
