@@ -4,6 +4,22 @@ module math_ext
 
 contains
 
+  !> @brief Fill a constant to a masked vector.
+  !! \f$ a_i = c, for i in mask \f$
+  subroutine cfill_mask(a, c, size, mask, mask_size)
+    real(kind=rp), dimension(size), intent(inout) :: a
+    real(kind=rp), intent(in) :: c
+    integer, intent(in) :: size
+    integer, dimension(mask_size), intent(in) :: mask
+    integer, intent(in) :: mask_size
+    integer :: i
+
+    do i = 1, mask_size
+       a(mask(i)) = c
+    end do
+
+  end subroutine cfill_mask
+
   !> @brief Add a constant to a masked vector.
   !! \f$ a_i = a_i + c, for i in mask \f$
   subroutine cadd_mask(a, c, size, mask, mask_size)
@@ -82,5 +98,21 @@ contains
     end do
 
   end subroutine col3_mask
+
+  !> @brief Subtract 2 masked vectors. Save the result in a new vector.
+  !! \f$ a_i = b_i - c_i, for i in mask \f$
+  subroutine sub3_mask(a, b, c, size, mask, mask_size)
+    real(kind=rp), dimension(size), intent(inout) :: a
+    real(kind=rp), dimension(size), intent(in) :: b, c
+    integer, intent(in) :: size
+    integer, dimension(mask_size), intent(in) :: mask
+    integer, intent(in) :: mask_size
+    integer :: i
+
+    do i = 1, mask_size
+       a(mask(i)) = b(mask(i)) - c(mask(i))
+    end do
+
+  end subroutine sub3_mask
 
 end module math_ext
