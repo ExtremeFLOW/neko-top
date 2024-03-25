@@ -9,8 +9,8 @@ function help() {
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e ""
-    echo -e "Compilation and setup of Neko-TOP, this script will install all the"
-    echo -e "dependencies and compile the Neko-TOP code."
+    echo -e "Compilation and setup of Neko-TOP, this script will install all"
+    echo -e "the dependencies and compile the Neko-TOP code."
     echo -e ""
     echo -e "Environment Variables:"
     echo -e "\tNEKO_DIR          The directory where Neko is installed"
@@ -36,7 +36,10 @@ for in in $@; do
         "test") TEST=true ;;   # Build the tests
         "clean") CLEAN=true ;; # Clean compilation
 
-        *) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
+        *)
+            printf '  %-10s %-67s\n' "Invalid option:" "$in"
+            exit 1
+            ;;
         esac
 
     elif [[ ${in:0:1} == "-" ]]; then
@@ -46,11 +49,15 @@ for in in $@; do
             "t") TEST=true ;;  # Build the tests
             "c") CLEAN=true ;; # Clean compilation
 
-            *) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
+            *)
+                printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}"
+                exit 1
+                ;;
             esac
         done
     fi
 done
+export TEST=$TEST
 
 # ============================================================================ #
 # Set main directories
@@ -99,16 +106,8 @@ find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
 # ============================================================================ #
 # Install Neko
 
-if [ ! -z "$CLEAN" ]; then
-    printf "Cleaning the build directory\n"
-    rm -rf $MAIN_DIR/build
-    cd $NEKO_DIR
-    git clean -dfx
-    cd $CURRENT_DIR
-fi
-
 # Ensure Neko is installed, if not install it.
-if [[ -z "$(find $NEKO_DIR -name libneko.a)" ]]; then
+if [[ -z "$(find $NEKO_DIR -name libneko.a)" || $CLEAN ]]; then
     printf "Neko is not installed, installing it now\n"
     if [ ! -f "$NEKO_DIR/regen.sh" ]; then
         git submodule update --init external/neko
@@ -117,6 +116,14 @@ if [[ -z "$(find $NEKO_DIR -name libneko.a)" ]]; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
     make -j install
+    cd $CURRENT_DIR
+fi
+
+# Run Tests if the flag is set
+if [ $TEST ]; then
+    printf "Running Neko tests\n"
+    cd $NEKO_DIR
+    make check
     cd $CURRENT_DIR
 fi
 export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
@@ -140,8 +147,11 @@ export PFUNIT_DIR=$(find $PFUNIT_DIR -type d -exec test -f '{}'/lib/libpfunit.a 
 # ============================================================================ #
 # Compile the example codes.
 
+# Clean the build directory if the clean flag is set
+[ $CLEAN ] && rm -rf $MAIN_DIR/build
+
 VARIABLES="-DJSON_FORTRAN_DIR=$JSON_FORTRAN"
-[ "$TEST" ] && VARIABLES+=" -DBUILD_TESTING=ON -DPFUNIT_DIR=$PFUNIT_DIR/cmake"
+[ $TEST ] && VARIABLES+=" -DBUILD_TESTING=ON -DPFUNIT_DIR=$PFUNIT_DIR/cmake"
 
 printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR $VARIABLES
