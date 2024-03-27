@@ -4,9 +4,12 @@ function run {
 
     # Ensure the environment is set up
     [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
-    [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
+    if [ -z "$JSON_FORTRAN_DIR" ]; then
+        JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
+    fi
 
-    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d -exec test -f '{}'/libjsonfortran.so \; -print)
+    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
+        -exec test -f '{}'/libjsonfortran.so \; -print)
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
 
     # Run preparation if it exists
@@ -17,7 +20,8 @@ function run {
         { time ./prepare.sh; } 2>&1
 
         if [ -s "error.err" ]; then
-            printf "\nERROR: An error occured during preparation. See error.err for details.\n" >&2
+            printf "\nERROR: An error occured during preparation. " >&2
+            printf "See error.err for details.\n" >&2
             exit 1
         else
             printf "\nPreparation concluded.\n"
@@ -69,7 +73,9 @@ function run {
         casename=$(basename -- ${casefile%.*})
         printf "See $casename.log for the status output.\n"
 
-        { time $(mpirun --pernode ./neko $casefile 1>$casename.log 2>error.err); } 2>&1
+        {
+            time $(mpirun --pernode $neko $casefile 1>$casename.log 2>error.err)
+        } 2>&1
     fi
 
     if [ -s "error.err" ]; then

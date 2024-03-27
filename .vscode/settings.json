@@ -41,4 +41,9 @@
     "todo-tree.tree.showCountsInTree": true,
     "todo-tree.tree.showBadges": true,
     "todo-tree.tree.disableCompactFolders": false,
+    "[FortranFreeForm]": {
+        "editor.insertSpaces": true,
+        "editor.tabSize": 2,
+        "editor.detectIndentation": false
+    },
 }
