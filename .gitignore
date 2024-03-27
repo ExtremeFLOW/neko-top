@@ -9,8 +9,7 @@ examples/debug/*
 !examples/debug/CMakeLists.txt
 
 # Preparation scripts
-prepare.sh
-!*/**/prepare.sh
+prepare.env
 
 # Project specific files
 neko

@@ -69,8 +69,8 @@ EXTERNAL_DIR="$MAIN_DIR/external"
 # Execute the preparation script if it exists and prepare the environment
 
 # Execute the preparation script if it exists
-if [ -f "$MAIN_DIR/prepare.sh" ]; then
-    source $MAIN_DIR/prepare.sh
+if [ -f "$MAIN_DIR/prepare.env" ]; then
+    source $MAIN_DIR/prepare.env
 fi
 source $MAIN_DIR/scripts/dependencies.sh
 
