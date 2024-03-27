@@ -75,15 +75,15 @@ custom install locations for the given dependencies.
 | `PFUNIT_DIR`       | Unit testing library used in Neko.                                   | -                     |
 | `CUDA_DIR`         | Location of the CUDA library folders, needed for Nvidia GPU support. | -                     |
 
-These can be defined either on the command line by the user or in a `prepare.sh`
-file which is loaded by the setup script if it exists in the root of Neko-TOP.
-This preparation script will also be loaded by the `run.sh` script, so it is
-possible to define environment variables for the execution of the examples as
-well.
-The prepare script provide a convenient way to use module systems such as
-`spack` or similar to activate environments and such before compilation.
+These can be defined either on the command line by the user or in a
+`prepare.env` file which is loaded by the setup script if it exists in the root
+of Neko-TOP. This preparation script will also be loaded by the `run.sh` script,
+so it is possible to define environment variables for the execution of the
+examples as well. The prepare script provide a convenient way to use module
+systems such as `spack` or similar to activate environments and such before
+compilation.
 
-An example of a `prepare.sh` file is shown below:
+An example of a `prepare.env` file is shown below:
 
 ```bash
 #!/bin/bash
