@@ -118,6 +118,7 @@ cd $NEKO_DIR
 if [[ $CLEAN || ! -f configure ]]; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
+    cd src && make depend && cd ..
 fi
 
 [ $QUIET ] && make -s -j install || make -j install
