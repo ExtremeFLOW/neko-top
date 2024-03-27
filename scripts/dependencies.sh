@@ -96,7 +96,6 @@ function find_gslib() {
 
 # ============================================================================ #
 # Ensure PFUnit is installed, if not install it.
-
 function find_pfunit() {
 
     if [ ! $TEST ]; then return; fi
@@ -128,6 +127,7 @@ function find_pfunit() {
 
     export PFUNIT_DIR=$(realpath $PFUNIT_DIR)
 }
+
 # ============================================================================ #
 # Helper function to print errors
 function error() {

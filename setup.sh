@@ -110,7 +110,7 @@ find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 # Install Neko
 
 # Ensure Neko is installed, if not install it.
-if [ ! -f "$NEKO_DIR/regen.sh" ]; then
+if [[ ! -f $NEKO_DIR/lib/libneko.a && ! -f $NEKO_DIR/regen.sh ]]; then
     git clone https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
 fi
 
