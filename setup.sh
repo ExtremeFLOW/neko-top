@@ -8,6 +8,7 @@ function help() {
     echo -e "\t-h, --help        Show this help message and exit"
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
+    echo -e "\t-q, --quiet       Suppress output"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -35,6 +36,7 @@ for in in $@; do
         "help") help ;;        # Print help
         "test") TEST=true ;;   # Build the tests
         "clean") CLEAN=true ;; # Clean compilation
+        "quiet") QUIET=true ;; # Suppress output
 
         *)
             printf '  %-10s %-67s\n' "Invalid option:" "$in"
@@ -48,6 +50,7 @@ for in in $@; do
             "h") help ;;       # Print help
             "t") TEST=true ;;  # Build the tests
             "c") CLEAN=true ;; # Clean compilation
+            "q") QUIET=true ;; # Suppress output
 
             *)
                 printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}"
@@ -69,13 +72,10 @@ EXTERNAL_DIR="$MAIN_DIR/external"
 # Execute the preparation script if it exists and prepare the environment
 
 # Execute the preparation script if it exists
-if [ -f "$MAIN_DIR/prepare.sh" ]; then
-    source $MAIN_DIR/prepare.sh
+if [ -f "$MAIN_DIR/prepare.env" ]; then
+    source $MAIN_DIR/prepare.env
 fi
 source $MAIN_DIR/scripts/dependencies.sh
-
-# Check system dependencies
-check_system_dependencies
 
 # Ensure local dependencies are used if they are not defined as environment
 [ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
@@ -94,12 +94,13 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 # ============================================================================ #
 # Install dependencies (See scripts/dependencies.sh for details)
 
-find_json_fortran $JSON_FORTRAN_DIR # Defines the JSON_FORTRAN variable.
-find_gslib $GSLIB_DIR               # Defines the GSLIB variable.
-find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
+check_system_dependencies           # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
+find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 
 # Define optional features
-[ ! -z "$GSLIB" ] && FEATURES+="--with-gslib=$GSLIB"
+[ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
 [ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
 [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
 [ $TEST ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
@@ -109,25 +110,25 @@ find_pfunit $PFUNIT_DIR             # Defines the PFUNIT variable.
 # Install Neko
 
 # Ensure Neko is installed, if not install it.
-if [[ -z "$(find $NEKO_DIR -name libneko.a)" || $CLEAN ]]; then
-    printf "Neko is not installed, installing it now\n"
-    if [ ! -f "$NEKO_DIR/regen.sh" ]; then
-        git submodule update --init external/neko
-    fi
-    cd $NEKO_DIR
+if [[ ! -f $NEKO_DIR/lib/libneko.a && ! -f $NEKO_DIR/regen.sh ]]; then
+    git clone https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+fi
+
+cd $NEKO_DIR
+if [[ $CLEAN || ! -f configure ]]; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
-    make -j install
-    cd $CURRENT_DIR
 fi
+
+[ $QUIET ] && make -s -j install || make -j install
 
 # Run Tests if the flag is set
 if [ $TEST ]; then
     printf "Running Neko tests\n"
-    cd $NEKO_DIR
     make check
-    cd $CURRENT_DIR
 fi
+cd $CURRENT_DIR
+
 export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
 
 # ============================================================================ #
