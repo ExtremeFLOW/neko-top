@@ -93,18 +93,16 @@
                         "amount": 3
                     },
                     {
-                        "type": "line",
-                        "start": [ 0.0, 0.0, 0.0 ],
-                        "end": [ 1.0, 0.0, 0.0 ],
-                        "amount": 3
-                    },
-                    {
                         "type": "circle",
                         "center": [ 0.0, 0.0, 0.0 ],
                         "normal": [ 0.0, 0.01, 1.0 ],
                         "axis": "x",
                         "radius": 0.5,
                         "amount": 4
+                    },
+                    {
+                        "type": "point_zone",
+                        "name": "probes"
                     }
                 ]
             }
@@ -124,6 +122,21 @@
                     1.0
                 ],
                 "radius": 0.5
+            },
+            {
+                "name": "probes",
+                "geometry": "cylinder",
+                "start": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "end": [
+                    -1.0,
+                    0.0,
+                    0.0
+                ],
+                "radius": 0.2
             }
         ]
     }
