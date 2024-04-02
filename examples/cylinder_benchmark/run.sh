@@ -50,6 +50,7 @@ done
 
 cases=(
     "brinkman_explicit.case"
+    "meshed.case"
 )
 
 # ============================================================================ #
@@ -73,7 +74,7 @@ Nx=$(python3 -c "print(5. / 3. * $N)") && Ny=$(($N)) && Nz=1
 Nx=${Nx%.*}
 Z=$(python3 -c "print(0.5*30./$N)")
 
-for case in $cases; do
+for case in "${cases[@]}"; do
     echo "Running case: $case"
     if [ "$QUIET" ]; then
         neko $case >/dev/null
