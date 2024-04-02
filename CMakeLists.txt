@@ -1,21 +1,54 @@
+# Copyright (c) 2023-2024, The Neko-TOP Authors
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#   * Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#
+#   * Redistributions in binary form must reproduce the above
+#     copyright notice, this list of conditions and the following
+#     disclaimer in the documentation and/or other materials provided
+#     with the distribution.
+#
+#   * Neither the name of the authors nor the names of its
+#     contributors may be used to endorse or promote products derived
+#     from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+# COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+# INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+# BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+# ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+# ============================================================================ #
+# Neko-TOP: Neko Topology Optimization Package
+# ============================================================================ #
+
 cmake_minimum_required(VERSION 3.18)
-project(Neko-TOP VERSION 0.0.1 LANGUAGES C CXX Fortran)
+project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
 # Set language standards
-set(CMAKE_C_STANDARD 11)
-set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # Enable devices
 include(CheckLanguage)
-
 check_language(CUDA)
 if (CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA)
 endif()
 
-# ============================================================================ #
+# ............................................................................ #
 # Options
 
 option(BUILD_DOCS "Build documentation" OFF)
@@ -40,16 +73,16 @@ set(NEKO_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
 set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
     CACHE STRING "Path to the pFUnit installation")
 
-
-# ============================================================================ #
+# ............................................................................ #
 # Define compiler flags
 
 set(CMAKE_Fortran_PREPROCESS ON)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
-        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Og>
-        $<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:-Wpedantic>
-        -Wall -Wextra -Wno-unused-dummy-argument
+        $<$<COMPILE_LANGUAGE:Fortran>:-Og>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wpedantic>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
+        -Wall -Wextra -Werror
     )
 endif()
 
@@ -57,12 +90,12 @@ endif()
 # Documentation
 # ============================================================================ #
 
-if (BUILD_DOCS OR ONLY_DOCS)
+if (BUILD_DOCS)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
+endif()
 
-    if (ONLY_DOCS)
-        return()
-    endif()
+if (ONLY_DOCS)
+    return()
 endif()
 
 # ============================================================================ #
