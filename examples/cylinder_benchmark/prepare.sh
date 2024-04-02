@@ -73,14 +73,9 @@ Nx=$(python3 -c "print(5. / 3. * $N)") && Ny=$(($N)) && Nz=1
 Nx=${Nx%.*}
 Z=$(python3 -c "print(0.5*30./$N)")
 
-for case in $cases; do
-    echo "Running case: $case"
-    if [ "$QUIET" ]; then
-        neko $case >/dev/null
-    else
-        neko $case >${case%.case}.log
-    fi
-done
+echo "Generating mesh with dimensions: [-15 35, -15, 15, -$Z, $Z] $Nx $Ny $Nz"
+
+genmeshbox -15 35 -15 15 -$Z $Z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #
