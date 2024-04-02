@@ -123,11 +123,9 @@ if [[ $CLEAN || ! -f configure ]]; then
     if [ ! -z "$(which makedepf90)" ]; then
         cd $NEKO_DIR/src/ && make depend && cd $NEKO_DIR
     fi
-
-    make -j install
-    cd $CURRENT_DIR
 fi
 
+[ $CLEAN ] && make clean
 [ $QUIET ] && make -s -j install || make -j install
 
 # Run Tests if the flag is set
