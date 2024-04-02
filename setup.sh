@@ -118,7 +118,14 @@ cd $NEKO_DIR
 if [[ $CLEAN || ! -f configure ]]; then
     ./regen.sh
     ./configure --prefix=$NEKO_DIR $FEATURES
-    cd src && make depend && cd ..
+
+    # Update the dependencies
+    if [ ! -z "$(which makedepf90)" ]; then
+        cd $NEKO_DIR/src/ && make depend && cd $NEKO_DIR
+    fi
+
+    make -j install
+    cd $CURRENT_DIR
 fi
 
 [ $QUIET ] && make -s -j install || make -j install
