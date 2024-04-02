@@ -38,6 +38,27 @@
             },
             "output_control": "simulationtime",
             "output_value": 0.1
-        }
+        },
+        "simulation_components": [
+            {
+                "type": "probes",
+                "fields": [
+                    "u",
+                    "v",
+                    "w"
+                ],
+                "output_file": "inflection.csv",
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.0 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
+                        "radius": 0.55,
+                        "amount": 7
+                    }
+                ]
+            }
+        ]
     }
 }
