@@ -60,7 +60,7 @@ fi
 # Empty input
 if [ $# -lt 1 ]; then help; fi
 
-case_files=""
+example_list=()
 for in in $@; do
 
     # Opions and flags
@@ -98,27 +98,49 @@ fi
 for in in $@; do
     if [ ${in:0:1} == "-" ]; then continue; fi
 
-    # Ignore invalid inputs
-    if [[ -z $(ls $EPATH/$in 2>/dev/null) ]]; then
-        printf '  %-12s %-67s\n' "Not Found:" "$in"
-
     # Extract the examples from the input
-    elif [[ ! $ALL ]]; then
-        for case in $(find $EPATH/$in -name "*.case"); do
-            case_files+="${case#$EPATH/} "
+    if [[ ! $ALL ]]; then
+        file_list=$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null)
+        file_list+=$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null)
+
+        for file in $file_list; do
+            dir=$(dirname $file)
+            run_files=$(find $dir -name "run.sh" 2>/dev/null)
+            case_files=$(find $dir -name "*.case" 2>/dev/null)
+
+            if [ ! -z "$run_files" ]; then
+                for run_f in $run_files; do
+                    run_f=${run_f#$EPATH/}
+                    example_list+=("${run_f%/run.sh}")
+                done
+            elif [ ! -z "$case_files" ]; then
+                for case in $case_files; do
+                    example_list+=("${case#$EPATH/}")
+                done
+            fi
         done
     fi
 done
 
 if [ $ALL ]; then
-    case_files=""
-    for case in $(find $EPATH/ -name "*.case"); do
-        case_files+="${case#$EPATH/} "
+    example_list=()
+    for dir in $(find $EPATH/* -type d); do
+        if [ -f "$dir/run.sh" ]; then
+            example_list+=("${dir#$EPATH/}")
+        else
+            for case in $(find $dir -name "*.case" 2>/dev/null); do
+                example_list+=("${case#$EPATH/}")
+            done
+        fi
     done
 fi
 
-if [ ! "$case_files" ]; then
-    exit
+# Remove duplicates
+example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
+
+# Check if any examples were found, if not, exit.
+if [ ! "$example_list" ]; then
+    printf "No examples found.\n" >&2 && exit
 fi
 
 # ============================================================================ #
@@ -172,13 +194,14 @@ full_start=$(date +%s.%N)
 QUEUE=""
 
 printf "\n\e[4mQueueing case files.\e[0m\n"
-for case in $case_files; do
+for case in ${example_list[@]}; do
     case_name=$(basename ${case%.case})
-    case_dir=$(dirname $case)
+    [ -f $EPATH/$case ] && case_dir=$(dirname $case)
+    [ -d $EPATH/$case ] && case_dir=$case
 
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
-    example=${case_dir#$EPATH/}
+    example=$case_dir
     if [[ ! -f "$EPATH/$case_dir/run.sh" &&
         $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
         example=$example/$case_name
@@ -187,7 +210,8 @@ for case in $case_files; do
     log=$LPATH/$example && mkdir -p $log
 
     # Setup the log folder
-    if [[ -f $log/output.log && "$(head -n 1 $log/output.log)" == "Ready" ]]; then
+    if [[ -f "$log/output.log" &&
+        "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
         [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
@@ -213,10 +237,13 @@ for case in $case_files; do
     done
 
     # Copy the case files to the log folder
-    cp -ft $log $EPATH/$case
+    [ -f $EPATH/$case ] && cp -ft $log $EPATH/$case
+    [ -d $EPATH/$case ] && cp -ft $log $EPATH/$case/*.case
+
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
         -not -name "*.case" -and -not -name "*.nmsh" -exec rsync -r {} $log \;
+
     # Copy the job script to the log folder
     cp -f $setting $log/job_script.sh
     cp -f $SPATH/functions.sh $log/functions.sh
