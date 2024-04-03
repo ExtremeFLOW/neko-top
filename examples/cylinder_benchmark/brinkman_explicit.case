@@ -2,6 +2,7 @@
     "version": 1.0,
     "case": {
         "mesh_file": "box.nmsh",
+        "output_directory": "explicit",
         "output_checkpoints": false,
         "output_at_end": true,
         "end_time": 0.01,

@@ -2,6 +2,7 @@
     "version": 1.0,
     "case": {
         "mesh_file": "ext_cyl.nmsh",
+        "output_directory": "meshed",
         "output_checkpoints": false,
         "output_at_end": true,
         "end_time": 200.0,
@@ -55,7 +56,7 @@
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.55,
-                        "amount": 7
+                        "amount": 20
                     }
                 ]
             }
