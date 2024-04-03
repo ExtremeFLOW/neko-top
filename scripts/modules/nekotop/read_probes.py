@@ -40,7 +40,7 @@ def read_probes(file_name) -> tuple:
 
         points = np.array([next(reader) for _ in range(N_points)], dtype=float)
         fields = np.array([next(reader) for _ in range(N_times)], dtype=float)
-        times = fields[:, 0]
+        times = fields[1::N_points, 0]
         fields = fields[:, 1:]
 
     return points, fields, times, field_names
