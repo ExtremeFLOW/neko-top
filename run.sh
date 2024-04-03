@@ -96,30 +96,29 @@ if [ $NEKO ]; then
 fi
 
 for in in $@; do
+    [ $ALL ] && break
     if [ ${in:0:1} == "-" ]; then continue; fi
 
     # Extract the examples from the input
-    if [[ ! $ALL ]]; then
-        file_list=$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null)
-        file_list+=$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null)
+    file_list="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
+    file_list+="$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null) "
 
-        for file in $file_list; do
-            dir=$(dirname $file)
-            run_files=$(find $dir -name "run.sh" 2>/dev/null)
-            case_files=$(find $dir -name "*.case" 2>/dev/null)
+    for file in $file_list; do
+        dir=$(dirname $file)
+        run_files=$(find $dir -name "run.sh" 2>/dev/null)
+        case_files=$(find $dir -name "*.case" 2>/dev/null)
 
-            if [ ! -z "$run_files" ]; then
-                for run_f in $run_files; do
-                    run_f=${run_f#$EPATH/}
-                    example_list+=("${run_f%/run.sh}")
-                done
-            elif [ ! -z "$case_files" ]; then
-                for case in $case_files; do
-                    example_list+=("${case#$EPATH/}")
-                done
-            fi
-        done
-    fi
+        if [ ! -z "$run_files" ]; then
+            for run_f in $run_files; do
+                run_f=${run_f#$EPATH/}
+                example_list+=("${run_f%/run.sh}")
+            done
+        elif [ ! -z "$case_files" ]; then
+            for case in $case_files; do
+                example_list+=("${case#$EPATH/}")
+            done
+        fi
+    done
 done
 
 if [ $ALL ]; then
