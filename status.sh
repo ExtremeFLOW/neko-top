@@ -71,13 +71,19 @@ for test in $tests; do
             printf '  \e[1;33m%-12s\e[m %s %-s\n' "Running:" "$test"
         else
             for f in $file; do
-                progress=$(
-                    grep 't = ' "${f%.*}.log" |        # Get all lines with t = in them
-                        tail -n 1 |                    # Get the last line
-                        sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
-                        xargs                          # Trim whitespace
-                )
-                printf '  \e[1;33m%-12s\e[m [ %6s ] %s %-s\n' "Running:" "$progress" "$test/$(basename $f)"
+                if [ "$(tail -n 1 ${f%.*}.log | xargs)" == "Normal end." ]; then
+                    stat="Complete:"
+                    progress="100.00%"
+                else
+                    stat="Running:"
+                    progress=$(
+                        grep 't = ' "${f%.*}.log" |        # Get all lines with t = in them
+                            tail -n 1 |                    # Get the last line
+                            sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
+                            xargs                          # Trim whitespace
+                    )
+                fi
+                printf '  \e[1;33m%-12s\e[m [%7s] %s %-s\n' "$stat" "$progress" "$test/$(basename $f)"
             done
         fi
     fi
