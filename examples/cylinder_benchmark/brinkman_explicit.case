@@ -84,27 +84,21 @@
                     }
                 ]
             },
-            {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w"
-                ],
-                "output_file": "leakage.csv",
-                "points": [
-                    {
-                        "type": "point_zone",
-                        "name": "cylinder"
-                    }
-                ]
-            },
-            {
-                "type": "field_writer",
-                "fields": [ "brinkman_indicator" ],
-                "output_filename": "myfields",
-                "precision": "double"
-            }
+            // {
+            //     "type": "probes",
+            //     "fields": [
+            //         "u",
+            //         "v",
+            //         "w"
+            //     ],
+            //     "output_file": "leakage.csv",
+            //     "points": [
+            //         {
+            //             "type": "point_zone",
+            //             "name": "cylinder"
+            //         }
+            //     ]
+            // }
         ],
         "point_zones": [
             {
