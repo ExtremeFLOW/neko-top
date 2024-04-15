@@ -2,7 +2,47 @@ import csv
 import numpy as np
 
 
-def read_probes(file_name: str) -> tuple:
+class Probes:
+    """
+    A class to read probed fields from a Neko simulation.
+
+    Attributes
+    ----------
+    points : np.ndarray of floats
+        The probe locations.
+    times : np.array of floats
+        The times at each time step.
+    field_names : list of strings
+        The names of the fields.
+    fields : dictionary of np.array
+        The fields at each time step.
+    """
+
+    def __init__(self, file_name: str):
+        """
+        Read in the probes file and return the points, fields, times and field
+        names.
+
+        Parameters
+        ----------
+        file_name : str
+            The name of the file to read in.
+            Currently only supports .csv files.
+        """
+
+        if file_name.endswith(".csv"):
+            points, fields, times, field_names = read_probes_csv(file_name)
+        else:
+            raise ValueError("Unsupported probe format.")
+
+        # Save the attributes
+        self.points = points
+        self.times = times
+        self.field_names = field_names
+        self.fields = fields
+
+
+def read_probes_csv(file_name: str) -> tuple:
     """
     Read in the probes file and return the points, fields, times and field
     names.
@@ -37,9 +77,11 @@ def read_probes(file_name: str) -> tuple:
         field_names = header[2:]
 
         points = np.asarray([next(reader) for _ in range(N_p)], dtype=float)
-        fields = np.asarray([next(reader) for _ in range(N_s)], dtype=float)
+        tmp = np.asarray([next(reader) for _ in range(N_s)], dtype=float)
 
-        times = fields[0::N_p, 0]
-        fields = fields[:, 1:]
+        times = tmp[0::N_p, 0]
+        fields = dict()
+        for i, field_name in enumerate(field_names):
+            fields[field_name] = tmp[:, i + 1]
 
     return (points, fields, times, field_names)
