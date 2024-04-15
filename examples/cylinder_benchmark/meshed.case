@@ -38,7 +38,7 @@
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
-            "output_value": 0.1
+            "output_value": 0.05
         },
         "simulation_components": [
             {
