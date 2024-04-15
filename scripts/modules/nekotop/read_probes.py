@@ -2,7 +2,7 @@ import csv
 import numpy as np
 
 
-def read_probes(file_name) -> tuple:
+def read_probes(file_name: str) -> tuple:
     """
     Read in the probes file and return the points, fields, times and field
     names.
@@ -24,22 +24,22 @@ def read_probes(file_name) -> tuple:
         The names of the fields.
     """
 
-    with open(file_name) as f:
-        N_lines = sum(1 for _ in f)
+    with open(file_name) as file:
+        N_lines = sum(1 for _ in file)
 
-    with open(file_name, 'r') as f:
-        reader = csv.reader(f)
+    with open(file_name, "r") as file:
+        reader = csv.reader(file)
 
         # Read in the header
         header = next(reader)
-        N_points = int(header[0])
+        N_p = int(header[0])
+        N_s = int((N_lines - 1 - N_p) / (N_p)) * N_p
         field_names = header[2:]
 
-        N_times = (N_lines - 1 - N_points)
+        points = np.asarray([next(reader) for _ in range(N_p)], dtype=float)
+        fields = np.asarray([next(reader) for _ in range(N_s)], dtype=float)
 
-        points = np.array([next(reader) for _ in range(N_points)], dtype=float)
-        fields = np.array([next(reader) for _ in range(N_times)], dtype=float)
-        times = fields[1::N_points, 0]
+        times = fields[0::N_p, 0]
         fields = fields[:, 1:]
 
-    return points, fields, times, field_names
+    return (points, fields, times, field_names)
