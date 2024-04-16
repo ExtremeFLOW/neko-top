@@ -5,7 +5,7 @@
         "output_directory": "explicit",
         "output_checkpoints": false,
         "output_at_end": true,
-        "end_time": 0.01,
+        "end_time": 200.0,
         "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
@@ -14,7 +14,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 100,
+            "Re": 200,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -38,7 +38,7 @@
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
-            "output_value": 0.1,
+            "output_value": 0.05,
             "boundary_types": [
                 "v",
                 "o",
@@ -50,14 +50,16 @@
             "source_terms": [
                 {
                     "type": "brinkman",
-                    "region": {
-                        "type": "point_zone",
-                        "name": "cylinder"
-                    },
+                    "objects": [
+                        {
+                            "type": "point_zone",
+                            "name": "cylinder"
+                        }
+                    ],
                     "brinkman": {
                         "limits": [
                             0.0,
-                            1500.0
+                            200.0
                         ],
                         "penalty": 1.0
                     }
@@ -72,7 +74,7 @@
                     "v",
                     "w"
                 ],
-                "output_file": "inflection.csv",
+                "output_file": "explicit_inflection.csv",
                 "points": [
                     {
                         "type": "circle",
@@ -80,10 +82,10 @@
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.55,
-                        "amount": 7
+                        "amount": 50
                     }
                 ]
-            },
+            }
             // {
             //     "type": "probes",
             //     "fields": [
@@ -105,16 +107,16 @@
                 "name": "cylinder",
                 "geometry": "cylinder",
                 "start": [
-                    1.0,
+                    0.0,
                     0.0,
                     -0.5
                 ],
                 "end": [
-                    -1.0,
                     0.0,
-                    1.5
+                    0.0,
+                    0.5
                 ],
-                "radius": 10.0
+                "radius": 0.5
             }
         ]
     }
