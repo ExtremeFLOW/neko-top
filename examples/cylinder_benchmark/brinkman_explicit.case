@@ -74,7 +74,7 @@
                     "v",
                     "w"
                 ],
-                "output_file": "explicit_inflection.csv",
+                "output_file": "inflection.csv",
                 "points": [
                     {
                         "type": "circle",
