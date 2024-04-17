@@ -38,7 +38,7 @@
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
-            "output_value": 0.05,
+            "output_value": 0.1,
             "boundary_types": [
                 "v",
                 "o",
@@ -69,12 +69,14 @@
         "simulation_components": [
             {
                 "type": "probes",
+                "output_file": "inflection.csv",
+                "compute_control": "simulationtime",
+                "compute_value": 0.05,
                 "fields": [
                     "u",
                     "v",
                     "w"
                 ],
-                "output_file": "inflection.csv",
                 "points": [
                     {
                         "type": "circle",
