@@ -203,6 +203,7 @@ for case in ${example_list[@]}; do
     fi
 
     log=$LPATH/$example && mkdir -p $log
+    [ $CLEAN ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
@@ -214,14 +215,8 @@ for case in ${example_list[@]}; do
         continue
     fi
 
-    if [[ $CLEAN ]]; then
-        rm -fr $log/*
-    else
-        find $log -type f -name "*.log" -delete
-    fi
-
     # Remove old output and error files
-    rm -f $log/output.log $log/error.err
+    find $log -type f -name "*.log" -or -name "error.err" -delete
     touch $log/output.log $log/error.err
 
     # Find the setting file for the case recursively
