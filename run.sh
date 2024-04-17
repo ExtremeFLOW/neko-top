@@ -46,7 +46,8 @@ export RPATH="$MAIN_DIR/results"                  # Result export location
 export LPATH="$MAIN_DIR/logs"                     # Logging locations
 export SPATH="$MAIN_DIR/scripts/"                 # Scripts folder
 export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
-export DPATH="$MAIN_DIR/data"                     # Meshes
+export DPATH="$MAIN_DIR/data"                     # Official data
+export DLPATH="$MAIN_DIR/data_local"              # Local data
 
 if [ -f "$MAIN_DIR/prepare.env" ]; then
     source $MAIN_DIR/prepare.env
@@ -100,13 +101,18 @@ for in in $@; do
     if [ ${in:0:1} == "-" ]; then continue; fi
 
     # Extract the examples from the input
-    file_list="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
+    file_list=""
+    file_list+="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
     file_list+="$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null) "
+
+    printf "File List: \n$file_list\n\n"
 
     for file in $file_list; do
         dir=$(dirname $file)
         run_files=$(find $dir -name "run.sh" 2>/dev/null)
-        case_files=$(find $dir -name "*.case" 2>/dev/null)
+
+        [ -f $file ] && case_files=$file
+        [ -d $file ] && case_files=$(find $dir -name "*.case" 2>/dev/null)
 
         if [ ! -z "$run_files" ]; then
             for run_f in $run_files; do
@@ -137,6 +143,11 @@ fi
 # Remove duplicates
 example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
 
+printf "Example list:\n"
+for example in ${example_list[@]}; do
+    printf "  $example\n"
+done
+
 # Check if any examples were found, if not, exit.
 if [ ! "$example_list" ]; then
     printf "No examples found.\n" >&2 && exit
@@ -161,22 +172,15 @@ fi
 
 # Function for running the examples
 function Run() {
-    case=$1
-    echo "Launching case on local machine" 1>output.log
-
-    # Run the case and pipe stdout and stderr to the log files
-    printf '  %-12s %-s\n' "Started:" "$case"
-    ./job_script.sh $case >output.log 2>error.err
+    printf '  %-12s %-s\n' "Started:" "$1"
+    ./job_script.sh $1 >output.log 2>error.err
 }
 
 # Function for submitting the examples
 function Submit() {
-    case=$1
-    echo "Submitting case on HPC" 1>output.log
-
     export BSUB_QUIET=Y
-    bsub -J $case -env "all" <job_script.sh
-    printf '  %-12s %-s\n' "Submitted:" "$case"
+    bsub -J $1 -env "all" <job_script.sh
+    printf '  %-12s %-s\n' "Submitted:" "$1"
 }
 INTERRUPTED=0
 function handler() {
@@ -241,19 +245,21 @@ for case in ${example_list[@]}; do
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
-        -not -name "*.case" -and -not -name "*.nmsh" -exec rsync -r {} $log \;
-
-    # Copy the job script to the log folder
-    cp -f $setting $log/job_script.sh
-    cp -f $SPATH/functions.sh $log/functions.sh
+        -not -name "*.case" -and -not -name "*.nmsh" \
+        -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
     for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
         ln -fs $file $log
     done
 
+    # Copy the job script to the log folder
+    cp -f $setting $log/job_script.sh
+    cp -f $SPATH/functions.sh $log/functions.sh
+
+    # Assign links to the data folders
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi
-    if [ -d "$MAIN_DIR/data_local" ]; then ln -fs $MAIN_DIR/data_local $log; fi
+    if [ -d "$DLPATH" ]; then ln -fs $DLPATH $log; fi
 
     # Indicate that the case is ready to be run
     printf 'Ready' >$log/output.log
