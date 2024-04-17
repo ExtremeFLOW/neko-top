@@ -101,11 +101,8 @@ for in in $@; do
     if [ ${in:0:1} == "-" ]; then continue; fi
 
     # Extract the examples from the input
-    file_list=""
-    file_list+="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
+    file_list="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
     file_list+="$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null) "
-
-    printf "File List: \n$file_list\n\n"
 
     for file in $file_list; do
         dir=$(dirname $file)
@@ -142,11 +139,6 @@ fi
 
 # Remove duplicates
 example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
-
-printf "Example list:\n"
-for example in ${example_list[@]}; do
-    printf "  $example\n"
-done
 
 # Check if any examples were found, if not, exit.
 if [ ! "$example_list" ]; then
