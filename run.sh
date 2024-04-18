@@ -109,6 +109,7 @@ for in in $@; do
         run_files=$(find $dir -name "run.sh" 2>/dev/null)
 
         [ -f $file ] && case_files=$file
+        [ -f $file.case ] && case_files=$file.case
         [ -d $file ] && case_files=$(find $dir -name "*.case" 2>/dev/null)
 
         if [ ! -z "$run_files" ]; then
