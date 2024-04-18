@@ -1,8 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "box.nmsh",
-        "output_directory": "explicit",
+        "mesh_file": "data_local/cylinder_benchmark/high_brink_cyl.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
         "end_time": 200.0,
@@ -70,13 +69,12 @@
             {
                 "type": "probes",
                 "output_file": "inflection.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.05,
                 "fields": [
                     "u",
-                    "v",
-                    "w"
+                    "v"
                 ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -84,25 +82,44 @@
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.55,
-                        "amount": 50
+                        "amount": 100
+                    }
+                ]
+            },
+            {
+                "type": "probes",
+                "output_file": "backdraft.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "line",
+                        "start": [ 0.5, 0.0, 0.0 ],
+                        "end": [ 5.0, 0.0, 0.0 ],
+                        "amount": 30
+                    }
+                ]
+            },
+            {
+                "type": "probes",
+                "output_file": "leakage.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "point_zone",
+                        "name": "cylinder"
                     }
                 ]
             }
-            // {
-            //     "type": "probes",
-            //     "fields": [
-            //         "u",
-            //         "v",
-            //         "w"
-            //     ],
-            //     "output_file": "leakage.csv",
-            //     "points": [
-            //         {
-            //             "type": "point_zone",
-            //             "name": "cylinder"
-            //         }
-            //     ]
-            // }
         ],
         "point_zones": [
             {

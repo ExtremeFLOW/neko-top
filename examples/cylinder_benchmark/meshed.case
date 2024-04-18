@@ -44,13 +44,12 @@
             {
                 "type": "probes",
                 "output_file": "inflection.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.05,
                 "fields": [
                     "u",
-                    "v",
-                    "w"
+                    "v"
                 ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -58,10 +57,29 @@
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.55,
-                        "amount": 50
+                        "amount": 100
+                    }
+                ]
+            },
+            {
+                "type": "probes",
+                "output_file": "backdraft.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "line",
+                        "start": [ 0.5, 0.0, 0.0 ],
+                        "end": [ 5.0, 0.0, 0.0 ],
+                        "amount": 30
                     }
                 ]
             }
         ]
+
     }
 }
