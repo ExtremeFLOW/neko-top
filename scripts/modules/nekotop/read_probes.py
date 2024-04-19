@@ -82,6 +82,7 @@ def read_probes_csv(file_name: str) -> tuple:
         times = tmp[0::N_p, 0]
         fields = dict()
         for i, field_name in enumerate(field_names):
-            fields[field_name] = tmp[:, i + 1]
+            fields[field_name] = np.reshape(tmp[:, i + 1], (N_p, -1),
+                                            order="F")
 
     return (points, fields, times, field_names)
