@@ -4,7 +4,7 @@
         "mesh_file": "data_local/cylinder_benchmark/high_brink_cyl.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "end_time": 200.0,
+        "end_time": 400.0,
         "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
@@ -58,7 +58,7 @@
                     "brinkman": {
                         "limits": [
                             0.0,
-                            100.0
+                            800.0
                         ],
                         "penalty": 1.0
                     }

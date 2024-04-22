@@ -1,11 +1,10 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "ext_cyl.nmsh",
-        "output_directory": "meshed",
+        "mesh_file": "data_local/cylinder_benchmark/high_brink_cyl.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "end_time": 400.0,
+        "end_time": 40.0,
         "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
@@ -38,7 +37,33 @@
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
-            "output_value": 0.1
+            "output_value": 0.1,
+            "boundary_types": [
+                "v",
+                "o",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "source_terms": [
+                {
+                    "type": "brinkman",
+                    "objects": [
+                        {
+                            "type": "point_zone",
+                            "name": "cylinder"
+                        }
+                    ],
+                    "brinkman": {
+                        "limits": [
+                            0.0,
+                            100.0
+                        ],
+                        "penalty": 1.0
+                    }
+                }
+            ]
         },
         "simulation_components": [
             {
@@ -73,13 +98,45 @@
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.501, 0.0, 0.0 ],
+                        "start": [ 0.5, 0.0, 0.0 ],
                         "end": [ 5.0, 0.0, 0.0 ],
                         "amount": 30
                     }
                 ]
+            },
+            {
+                "type": "probes",
+                "output_file": "leakage.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "point_zone",
+                        "name": "cylinder"
+                    }
+                ]
+            }
+        ],
+        "point_zones": [
+            {
+                "name": "cylinder",
+                "geometry": "cylinder",
+                "start": [
+                    0.0,
+                    0.0,
+                    -0.5
+                ],
+                "end": [
+                    0.0,
+                    0.0,
+                    0.5
+                ],
+                "radius": 0.5
             }
         ]
-
     }
 }
