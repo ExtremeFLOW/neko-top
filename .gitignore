@@ -31,6 +31,7 @@ fort.9
 *.f90.bak
 
 # Animations
+manim_media/
 *.mp4
 *.gif
 
