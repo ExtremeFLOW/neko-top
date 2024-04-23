@@ -30,7 +30,11 @@
         "**/*.o": true,
     },
     "python.analysis.extraPaths": [
-        "/usr/local/lib/python3.10/site-packages",
+        "${workspaceFolder}/.venv/lib/python3.10/site-packages",
+        "${workspaceFolder}/scripts",
+        "${workspaceFolder}/scripts/modules",
+        "${workspaceFolder}/scripts/functions",
+        "${workspaceFolder}/scripts/notebook",
     ],
     "cmake.generator": "Unix Makefiles",
     "cmake.ctestArgs": [

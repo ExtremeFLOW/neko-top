@@ -1,8 +1,8 @@
 # Directory
-[Bb]uild/
-[Ll]ogs/
-[Rr]esults/
-[Dd]ata_local/
+[Bb]uild
+[Ll]ogs
+[Rr]esults
+[Dd]ata_local
 
 examples/debug/*
 !examples/debug/debug.case
@@ -31,7 +31,9 @@ fort.9
 *.f90.bak
 
 # Animations
+manim_media/
 *.mp4
 *.gif
 
 html/
+*.html
