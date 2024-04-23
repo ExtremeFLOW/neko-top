@@ -36,3 +36,4 @@ manim_media/
 *.gif
 
 html/
+*.html
