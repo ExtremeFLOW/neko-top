@@ -46,7 +46,8 @@ export RPATH="$MAIN_DIR/results"                  # Result export location
 export LPATH="$MAIN_DIR/logs"                     # Logging locations
 export SPATH="$MAIN_DIR/scripts/"                 # Scripts folder
 export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
-export DPATH="$MAIN_DIR/data"                     # Meshes
+export DPATH="$MAIN_DIR/data"                     # Official data
+export DLPATH="$MAIN_DIR/data_local"              # Local data
 
 if [ -f "$MAIN_DIR/prepare.env" ]; then
     source $MAIN_DIR/prepare.env
@@ -96,30 +97,32 @@ if [ $NEKO ]; then
 fi
 
 for in in $@; do
+    [ $ALL ] && break
     if [ ${in:0:1} == "-" ]; then continue; fi
 
     # Extract the examples from the input
-    if [[ ! $ALL ]]; then
-        file_list=$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null)
-        file_list+=$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null)
+    file_list="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
+    file_list+="$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null) "
 
-        for file in $file_list; do
-            dir=$(dirname $file)
-            run_files=$(find $dir -name "run.sh" 2>/dev/null)
-            case_files=$(find $dir -name "*.case" 2>/dev/null)
+    for file in $file_list; do
+        dir=$(dirname $file)
+        run_files=$(find $dir -name "run.sh" 2>/dev/null)
 
-            if [ ! -z "$run_files" ]; then
-                for run_f in $run_files; do
-                    run_f=${run_f#$EPATH/}
-                    example_list+=("${run_f%/run.sh}")
-                done
-            elif [ ! -z "$case_files" ]; then
-                for case in $case_files; do
-                    example_list+=("${case#$EPATH/}")
-                done
-            fi
-        done
-    fi
+        [ -f $file ] && case_files=$file
+        [ -f $file.case ] && case_files=$file.case
+        [ -d $file ] && case_files=$(find $dir -name "*.case" 2>/dev/null)
+
+        if [ ! -z "$run_files" ]; then
+            for run_f in $run_files; do
+                run_f=${run_f#$EPATH/}
+                example_list+=("${run_f%/run.sh}")
+            done
+        elif [ ! -z "$case_files" ]; then
+            for case in $case_files; do
+                example_list+=("${case#$EPATH/}")
+            done
+        fi
+    done
 done
 
 if [ $ALL ]; then
@@ -162,22 +165,15 @@ fi
 
 # Function for running the examples
 function Run() {
-    case=$1
-    echo "Launching case on local machine" 1>output.log
-
-    # Run the case and pipe stdout and stderr to the log files
-    printf '  %-12s %-s\n' "Started:" "$case"
-    ./job_script.sh $case >output.log 2>error.err
+    printf '  %-12s %-s\n' "Started:" "$1"
+    ./job_script.sh $1 >output.log 2>error.err
 }
 
 # Function for submitting the examples
 function Submit() {
-    case=$1
-    echo "Submitting case on HPC" 1>output.log
-
     export BSUB_QUIET=Y
-    bsub -J $case -env "all" <job_script.sh
-    printf '  %-12s %-s\n' "Submitted:" "$case"
+    bsub -J $1 -env "all" <job_script.sh
+    printf '  %-12s %-s\n' "Submitted:" "$1"
 }
 INTERRUPTED=0
 function handler() {
@@ -208,6 +204,7 @@ for case in ${example_list[@]}; do
     fi
 
     log=$LPATH/$example && mkdir -p $log
+    [ $CLEAN ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
@@ -219,14 +216,8 @@ for case in ${example_list[@]}; do
         continue
     fi
 
-    if [[ $CLEAN ]]; then
-        rm -fr $log/*
-    else
-        find $log -type f -name "*.log" -delete
-    fi
-
     # Remove old output and error files
-    rm -f $log/output.log $log/error.err
+    find $log -type f -name "*.log" -or -name "error.err" -delete
     touch $log/output.log $log/error.err
 
     # Find the setting file for the case recursively
@@ -242,19 +233,21 @@ for case in ${example_list[@]}; do
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
-        -not -name "*.case" -and -not -name "*.nmsh" -exec rsync -r {} $log \;
-
-    # Copy the job script to the log folder
-    cp -f $setting $log/job_script.sh
-    cp -f $SPATH/functions.sh $log/functions.sh
+        -not -name "*.case" -and -not -name "*.nmsh" \
+        -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
     for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
         ln -fs $file $log
     done
 
+    # Copy the job script to the log folder
+    cp -f $setting $log/job_script.sh
+    cp -f $SPATH/functions.sh $log/functions.sh
+
+    # Assign links to the data folders
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi
-    if [ -d "$MAIN_DIR/data_local" ]; then ln -fs $MAIN_DIR/data_local $log; fi
+    if [ -d "$DLPATH" ]; then ln -fs $DLPATH $log; fi
 
     # Indicate that the case is ready to be run
     printf 'Ready' >$log/output.log
