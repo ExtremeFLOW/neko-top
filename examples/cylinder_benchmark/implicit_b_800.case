@@ -61,7 +61,7 @@
                             800.0
                         ],
                         "penalty": 1.0,
-                        "implicit": false
+                        "implicit": true
                     }
                 }
             ]
