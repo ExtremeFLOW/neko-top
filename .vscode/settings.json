@@ -17,13 +17,14 @@
         "-d3", // Indentation for do loops
         "-f3", // Indentation for if statements
         "-s3", // Indentation for select case statements
+        "-c3", // Indentation for case statements
         "-w3", // Indentation for where statements
         "-t3", // Indentation for type statements
         "-j3", // Indentation for interface statements
-        "-kd", // Indentation for continuation lines (-: no change, d: default)
+        "-k5", // Indentation for continuation lines (-: no change, d: default)
         "--ws_remred", // Remove redundant white space
         "--align_paren", // Align parenthesis across continuation lines
-        "--indent_ampersand", // Indentation for continuation lines with preceeding &
+        "--indent_ampersand", // Indentation for continuation lines with start &
     ],
     "files.exclude": {
         "**/*.mod": true,
