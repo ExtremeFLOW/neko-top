@@ -54,15 +54,15 @@ contains
     class(point_zone_t), pointer :: cylinder
 
     call cfill(u%x, 1.0_rp, u%dof%size())
-    call cfill(v%x, 1.0_rp, v%dof%size())
-    call cfill(w%x, 1.0_rp, w%dof%size())
+    call cfill(v%x, 0.0_rp, v%dof%size())
+    call cfill(w%x, 0.0_rp, w%dof%size())
+
+    ! Apply a random perturbation to the initial condition.
 
     if (neko_point_zone_registry%point_zone_exists("cylinder")) then
        cylinder => neko_point_zone_registry%get_point_zone("cylinder")
 
        call cfill_mask(u%x, 0.0_rp, u%dof%size(), cylinder%mask, cylinder%size)
-       call cfill_mask(v%x, 0.0_rp, v%dof%size(), cylinder%mask, cylinder%size)
-       call cfill_mask(w%x, 0.0_rp, w%dof%size(), cylinder%mask, cylinder%size)
     end if
 
 
