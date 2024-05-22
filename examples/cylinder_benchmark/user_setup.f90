@@ -52,6 +52,8 @@ contains
     type(json_file), intent(inout) :: params
 
     class(point_zone_t), pointer :: cylinder
+    real(kind=rp) :: noise, noise_scale
+    integer :: i
 
     call cfill(u%x, 1.0_rp, u%dof%size())
     call cfill(v%x, 0.0_rp, v%dof%size())
@@ -64,6 +66,17 @@ contains
 
        call cfill_mask(u%x, 0.0_rp, u%dof%size(), cylinder%mask, cylinder%size)
     end if
+
+    noise = 0.0_rp
+    noise_scale = 1e-2_rp
+    do i = 1, u%dof%size()
+       call random_number(noise)
+       u%x(i, 1, 1, 1) = u%x(i, 1, 1, 1) + noise_scale * noise
+       call random_number(noise)
+       v%x(i, 1, 1, 1) = v%x(i, 1, 1, 1) + noise_scale * noise
+       call random_number(noise)
+       w%x(i, 1, 1, 1) = w%x(i, 1, 1, 1) + noise_scale * noise
+    end do
 
 
   end subroutine cylinder_ic
