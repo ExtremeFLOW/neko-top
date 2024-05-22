@@ -121,19 +121,6 @@ module device_math_ext
 
 contains
 
-  subroutine device_cfill_mask(a_d, c, size, mask_d, mask_size)
-    type(c_ptr) :: a_d
-    real(kind=rp), intent(in) :: c
-    integer :: size
-    type(c_ptr) :: mask_d
-    integer :: mask_size
-#ifdef HAVE_CUDA
-    call cuda_cfill_mask(a_d, c, size, mask_d, mask_size)
-#else
-    call neko_error('No device backend configured')
-#endif
-  end subroutine device_cfill_mask
-
   subroutine device_cadd_mask(a_d, c, size, mask_d, mask_size)
     type(c_ptr) :: a_d
     real(kind=rp), intent(in) :: c
