@@ -6,6 +6,9 @@
 !> @brief User defined user region
 module user
   use neko
+  use math_ext, only: cfill_mask
+  use device_math_ext, only: device_cfill_mask
+
   use, intrinsic :: iso_c_binding, only: c_ptr, c_null_ptr
 
   implicit none
