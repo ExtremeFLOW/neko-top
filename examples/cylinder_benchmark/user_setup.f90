@@ -52,18 +52,12 @@ contains
     real(kind=rp) :: noise, noise_scale
     integer :: i
 
+    ! Set a uniform flow field.
     call cfill(u%x, 1.0_rp, u%dof%size())
     call cfill(v%x, 0.0_rp, v%dof%size())
     call cfill(w%x, 0.0_rp, w%dof%size())
 
     ! Apply a random perturbation to the initial condition.
-
-    if (neko_point_zone_registry%point_zone_exists("cylinder")) then
-       cylinder => neko_point_zone_registry%get_point_zone("cylinder")
-
-       call cfill_mask(u%x, 0.0_rp, u%dof%size(), cylinder%mask, cylinder%size)
-    end if
-
     noise = 0.0_rp
     noise_scale = 1e-2_rp
     do i = 1, u%dof%size()
@@ -75,6 +69,12 @@ contains
        w%x(i, 1, 1, 1) = w%x(i, 1, 1, 1) + noise_scale * noise
     end do
 
+    ! Set flow to zero in the cylinder.
+    if (neko_point_zone_registry%point_zone_exists("cylinder")) then
+       cylinder => neko_point_zone_registry%get_point_zone("cylinder")
+
+       call cfill_mask(u%x, 0.0_rp, u%dof%size(), cylinder%mask, cylinder%size)
+    end if
 
   end subroutine cylinder_ic
 end module user
