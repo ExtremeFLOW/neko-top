@@ -39,13 +39,13 @@ done
 # Print status
 
 # List all the tests, if there are none we return
-for test in $(find $LPATH -type d 2>/dev/null); do
-    if [ -f $test/output.log ]; then
-        tests+="${test#$LPATH/} "
-    fi
-done
+tests=($(find $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
+for ((i = 0; i < ${#tests[@]}; i++)); do tests[$i]="${tests[$i]#$LPATH/}"; done
 
-if [ -z "$tests" ]; then exit; fi
+if [ ${#tests[@]} -eq 0 ]; then
+    printf "No tests found.\n"
+    exit 0
+fi
 
 # If we are running in LSF-10 mode, print the running jobs.
 if [ "$(which bsub)" ]; then
@@ -57,7 +57,7 @@ printf "\n\e[4mTest status.\e[m\n"
 
 for test in $tests; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
-        printf '  \e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
+        printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
         rm -fr $LPATH/$test
     fi
 done
@@ -66,9 +66,9 @@ for test in $tests; do
     if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         file=$(find $LPATH/$test -type f -name "*.case")
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
-            printf '  \e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
+            printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
         elif [ -z "$file" ]; then
-            printf '  \e[1;33m%-12s\e[m %s %-s\n' "Running:" "$test"
+            printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Running:" "$test"
         else
             for f in $file; do
                 if [ "$(tail -n 1 ${f%.*}.log | xargs)" == "Normal end." ]; then
@@ -83,7 +83,7 @@ for test in $tests; do
                             xargs                          # Trim whitespace
                     )
                 fi
-                printf '  \e[1;33m%-12s\e[m [%7s] %s %-s\n' "$stat" "$progress" "$test/$(basename $f)"
+                printf '\t\e[1;33m%-12s\e[m [%7s] %s %-s\n' "$stat" "$progress" "$test/$(basename $f)"
             done
         fi
     fi
@@ -94,9 +94,9 @@ for test in $tests; do
     if [ -s $LPATH/$test/error.err ]; then
 
         if [ "$(head -n 1 $LPATH/$test/error.err)" = "Interrupted" ]; then
-            printf '  \e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
+            printf '\t\e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
         else
-            printf '  \e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
+            printf '\t\e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
         fi
     fi
 done

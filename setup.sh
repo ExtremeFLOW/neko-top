@@ -9,6 +9,7 @@ function help() {
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
+    echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -21,49 +22,40 @@ function help() {
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
-    echo -e "\tCC                The C compiler to use"
-    echo -e "\tCXX               The C++ compiler to use"
-    echo -e "\tFC                The Fortran compiler to use"
-    echo -e "\tNVCC              The CUDA compiler to use"
-    exit 0
 }
 
-for in in $@; do
+# Assign default values to the options
+DEVICE_TYPE="OFF"
+CLEAN=false
+QUIET=false
+TEST=false
 
-    # Opions and flags
-    if [[ ${in:0:2} == "--" ]]; then
-        case "${in:2}" in
-        "help") help ;;        # Print help
-        "test") TEST=true ;;   # Build the tests
-        "clean") CLEAN=true ;; # Clean compilation
-        "quiet") QUIET=true ;; # Suppress output
+# List possible options
+OPTIONS=help,test,clean,quiet,device:
+OPT=h,t,c,q,d:
 
-        *)
-            printf '  %-10s %-67s\n' "Invalid option:" "$in"
-            exit 1
-            ;;
-        esac
+# Parse the inputs for options
+PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+eval set -- "$PARSED"
 
-    elif [[ ${in:0:1} == "-" ]]; then
-        for ((i = 1; i < ${#in}; i++)); do
-            case "${in:$i:1}" in
-            "h") help ;;       # Print help
-            "t") TEST=true ;;  # Build the tests
-            "c") CLEAN=true ;; # Clean compilation
-            "q") QUIET=true ;; # Suppress output
+# Loop through the options and set the variables
+while true; do
+    case "$1" in
+    "-h" | "--help") help && exit ;;                  # Print help
+    "-t" | "--test") TEST=true && shift ;;            # Build the tests
+    "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
+    "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
+    "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
 
-            *)
-                printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}"
-                exit 1
-                ;;
-            esac
-        done
-    fi
+    # End of options
+    "--") shift && break ;;
+    esac
 done
-export TEST=$TEST
+export TEST CLEAN QUIET DEVICE_TYPE
 
 # ============================================================================ #
 # Set main directories
+
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 EXTERNAL_DIR="$MAIN_DIR/external"
@@ -77,7 +69,7 @@ if [ -f "$MAIN_DIR/prepare.env" ]; then
 fi
 source $MAIN_DIR/scripts/dependencies.sh
 
-# Ensure local dependencies are used if they are not defined as environment
+# Ensure local dependencies are used if they are not defined by the environment
 [ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
 [ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
@@ -98,56 +90,23 @@ check_system_dependencies           # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
 find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
 find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
-
-# Define optional features
-[ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
-[ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
-[ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
-[ $TEST ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #
-# Install Neko
+# Compile the Neko-TOP and example codes.
 
-# Ensure Neko is installed, if not install it.
-if [[ ! -f $NEKO_DIR/lib/libneko.a && ! -f $NEKO_DIR/regen.sh ]]; then
-    git clone https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
-fi
-
-cd $NEKO_DIR
-if [[ $CLEAN || ! -f configure ]]; then
-    ./regen.sh
-    ./configure --prefix=$NEKO_DIR $FEATURES
-
-    # Update the dependencies
-    if [ ! -z "$(which makedepf90)" ]; then
-        cd $NEKO_DIR/src/ && make depend && cd $NEKO_DIR
-    fi
-fi
-
-[ $CLEAN ] && make clean
-[ $QUIET ] && make -s -j install || make -j install
-
-# Run Tests if the flag is set
-if [ $TEST ]; then
-    printf "Running Neko tests\n"
-    make check
-fi
-cd $CURRENT_DIR
-
-export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
-
-# ============================================================================ #
-# Compile the example codes.
+# Set the variables for the compilation
+VARIABLES=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN")
+[ "$TEST" == true ] && VARIABLES+=("-DBUILD_TESTING=ON")
+[ "$TEST" == true ] && VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
+[ "$DEVICE_TYPE" != "OFF" ] && VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
 # Clean the build directory if the clean flag is set
-[ $CLEAN ] && rm -rf $MAIN_DIR/build
-
-VARIABLES="-DJSON_FORTRAN_DIR=$JSON_FORTRAN"
-[ $TEST ] && VARIABLES+=" -DBUILD_TESTING=ON -DPFUNIT_DIR=$PFUNIT_DIR/cmake"
+[ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
 
 printf "Compiling the example codes and Neko-TOP\n"
-cmake -B $MAIN_DIR/build -S $MAIN_DIR $VARIABLES
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
 
 # ============================================================================ #
@@ -158,12 +117,11 @@ printf "=%.0s" {1..80} && printf "\n"
 printf "Neko installed to:\n"
 printf "\t$NEKO_DIR\n"
 printf "Supported features:\n"
-printf "\tCUDA: " && [[ $FEATURES == *"cuda"* ]] && printf "YES\n" || printf "NO\n"
 printf "\tMPI: YES\n"
-printf "\tOpenCL: NO\n"
-printf "\tTests: " && [[ $TEST ]] && printf "YES\n" || printf "NO\n"
+printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
+printf "\tDevice: $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
-if [ $TEST ]; then
+if [ "$TEST" == true ]; then
     printf "To run the tests, execute the following command:\n"
     printf "\tctest --test-dir $MAIN_DIR/build\n"
 fi

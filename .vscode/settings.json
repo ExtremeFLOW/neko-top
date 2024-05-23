@@ -1,7 +1,8 @@
 {
     "fortran.linter.includePaths": [
         "${workspaceFolder}/build/modules",
-        "${workspaceFolder}/external/**/include/**",
+        "${workspaceFolder}/external/neko/**",
+        "${workspaceFolder}/external/json-fortran/**",
     ],
     "fortran.fortls.excludeDirectories": [
         "${workspaceFolder}/build",
@@ -17,18 +18,18 @@
         "-d3", // Indentation for do loops
         "-f3", // Indentation for if statements
         "-s3", // Indentation for select case statements
-        "-c3", // Indentation for case statements
         "-w3", // Indentation for where statements
         "-t3", // Indentation for type statements
         "-j3", // Indentation for interface statements
-        "-k5", // Indentation for continuation lines (-: no change, d: default)
+        "-kd", // Indentation for continuation lines (-: no change, d: default)
         "--ws_remred", // Remove redundant white space
         "--align_paren", // Align parenthesis across continuation lines
-        "--indent_ampersand", // Indentation for continuation lines with start &
+        "--indent_ampersand", // Indentation for continuation lines with preceeding &
     ],
     "files.exclude": {
         "**/*.mod": true,
         "**/*.o": true,
+        "**/*.dirstamp": true,
     },
     "python.analysis.extraPaths": [
         "${workspaceFolder}/.venv/lib/python3.10/site-packages",
