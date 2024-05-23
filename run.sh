@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set -e # Exit with nonzero exit code if anything fails
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -26,17 +26,17 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
+    printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
     for case in $(find $EPATH -name "*.case" 2>/dev/null); do
         printf '  - %-s\n' ${case#$EPATH/}
     done
-    exit 0
 }
 if [ $# -lt 1 ]; then help; fi
 
 # ============================================================================ #
-# User defined inputs.
+# Define environment
 export MAIN_DIR=$(dirname $(realpath $0))
 CURRENT_DIR=$(pwd)
 
@@ -53,42 +53,45 @@ if [ -f "$MAIN_DIR/prepare.env" ]; then
     source $MAIN_DIR/prepare.env
 fi
 [ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
+export NEKO_DIR=$(realpath $NEKO_DIR)
 
-# End of user inputs
 # ============================================================================ #
-# Keywords
+# User defined inputs.
 
-# Empty input
-if [ $# -lt 1 ]; then help; fi
+# Assign default values to the options
+ALL=false
+CLEAN=false
+NEKO=false
+DELETE=false
+DRY=false
 
-example_list=()
-for in in $@; do
+# List possible options
+OPTIONS=all,clean,help,neko,delete,dryrun
+OPT="a,c,h,n,d"
 
-    # Opions and flags
-    if [[ ${in:0:2} == "--" ]]; then
-        case "${in:2}" in
-        "all") ALL=true ;;       # Run all examples available
-        "clean") CLEAN=true ;;   # Clean logs
-        "help") help ;;          # Print help
-        "neko") NEKO=true ;;     # Look for example in neko
-        "delete") DELETE=true ;; # Delete previous runs
-        *) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
-        esac
+# Parse the inputs for options
+echo Parse options
+PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+eval set -- "$PARSED"
 
-    elif [[ ${in:0:1} == "-" ]]; then
-        for ((i = 1; i < ${#in}; i++)); do
-            case "${in:$i:1}" in
-            "a") ALL=true ;;    # Run all examples available
-            "c") CLEAN=true ;;  # Clean logs
-            "h") help ;;        # Print help
-            "n") NEKO=true ;;   # Look for example in neko
-            "d") DELETE=true ;; # Delete previous runs
-            *) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
-            esac
-        done
-    fi
+echo read options
+echo $PARSED
+
+# Loop through the options and set the variables
+while true; do
+    case "$1" in
+    "-a" | "--all") ALL=true && shift ;;       # Run all examples available
+    "-c" | "--clean") CLEAN=true && shift ;;   # Clean logs
+    "-h" | "--help") help && exit ;;           # Print help
+    "-n" | "--neko") NEKO=true && shift ;;     # Look for example in neko
+    "-d" | "--delete") DELETE=true && shift ;; # Delete previous runs
+    "--dryrun") DRY=true && shift ;;           # Dry run
+
+    # End of options
+    "--") shift && break ;;
+    esac
 done
-
+echo done reading options
 if [ $NEKO ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
@@ -96,8 +99,13 @@ if [ $NEKO ]; then
     export HPATH="$HPATH/neko"
 fi
 
+# End of user inputs
+# ============================================================================ #
+# Find the examples to run
+
+example_list=()
 for in in $@; do
-    [ $ALL ] && break
+    [ "$ALL" == true ] && break
     if [ ${in:0:1} == "-" ]; then continue; fi
 
     # Extract the examples from the input
@@ -125,7 +133,7 @@ for in in $@; do
     done
 done
 
-if [ $ALL ]; then
+if [ "$ALL" == true ]; then
     example_list=()
     for dir in $(find $EPATH/* -type d); do
         if [ -f "$dir/run.sh" ]; then
@@ -149,7 +157,7 @@ fi
 # ============================================================================ #
 # Handle settings
 
-if [ $DELETE ]; then
+if [ "$DELETE" == true ]; then
     printf 'Do you wish to delete ALL results? [Yes No]\n'
     read -p '> ' yn
     case $yn in
@@ -165,15 +173,19 @@ fi
 
 # Function for running the examples
 function Run() {
+    cd $LPATH/$example
     printf '  %-12s %-s\n' "Started:" "$1"
     ./job_script.sh $1 >output.log 2>error.err
+    cd $CURRENT_DIR
 }
 
 # Function for submitting the examples
 function Submit() {
+    cd $LPATH/$example
     export BSUB_QUIET=Y
     bsub -J $1 -env "all" <job_script.sh
     printf '  %-12s %-s\n' "Submitted:" "$1"
+    cd $CURRENT_DIR
 }
 INTERRUPTED=0
 function handler() {
@@ -186,6 +198,7 @@ trap 'handler' SIGINT
 
 # ============================================================================ #
 # Run the examples
+set +e # Do not exit on error during execution
 full_start=$(date +%s.%N)
 QUEUE=""
 
@@ -204,7 +217,7 @@ for case in ${example_list[@]}; do
     fi
 
     log=$LPATH/$example && mkdir -p $log
-    [ $CLEAN ] && rm -fr $log/*
+    [ "$CLEAN" = true ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
@@ -260,18 +273,22 @@ done
 # ============================================================================ #
 # Move to the directory submit or run the code and return
 
+# If we are just doing a dry-run, we exit here
+if [ "$DRY" = true ]; then
+    $MAIN_DIR/status.sh
+    exit
+fi
+
 for example in $QUEUE; do
 
     # Move to the log folder and submit the job
-    cd $LPATH/$example
     if [ $INTERRUPTED == 1 ]; then
-        printf "Interrupted" >error.err
+        continue
     elif [ "$(which bsub)" ]; then
         Submit $example
     else
         Run $example
     fi
-    cd $CURRENT_DIR
 done
 
 if [ ! "$(which bsub)" ]; then
