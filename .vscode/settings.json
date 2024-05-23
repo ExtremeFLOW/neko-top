@@ -1,7 +1,8 @@
 {
     "fortran.linter.includePaths": [
         "${workspaceFolder}/build/modules",
-        "${workspaceFolder}/external/**/include/**",
+        "${workspaceFolder}/external/neko/**",
+        "${workspaceFolder}/external/json-fortran/**",
     ],
     "fortran.fortls.excludeDirectories": [
         "${workspaceFolder}/build",
@@ -28,11 +29,14 @@
     "files.exclude": {
         "**/*.mod": true,
         "**/*.o": true,
+        "**/*.dirstamp": true,
     },
     "python.analysis.extraPaths": [
-        "/usr/local/lib/python3.10/site-packages",
+        "${workspaceFolder}/.venv/lib/python3.10/site-packages",
+        "${workspaceFolder}/scripts",
         "${workspaceFolder}/scripts/modules",
         "${workspaceFolder}/scripts/functions",
+        "${workspaceFolder}/scripts/notebook",
     ],
     "cmake.generator": "Unix Makefiles",
     "cmake.ctestArgs": [
