@@ -88,6 +88,7 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 
 check_system_dependencies           # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000 $NEK5000_DIR           # Re-defines the NEK5000_DIR variable.
 find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
 find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
