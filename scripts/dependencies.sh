@@ -152,10 +152,10 @@ find_neko() {
 
     if [[ -z "$(find $1 -name libneko.a)" || "$CLEAN" == true ]]; then
         cd $1
-        if [ ! -f "configure" || "$CLEAN" == true ]; then
+        if [[ ! -f "configure" || "$CLEAN" == true ]]; then
             ./regen.sh
         fi
-        if [ ! -f Makefile || "$CLEAN" == true ]; then
+        if [[ ! -f Makefile || "$CLEAN" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
