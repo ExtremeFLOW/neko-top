@@ -55,14 +55,14 @@ fi
 
 printf "\n\e[4mTest status.\e[m\n"
 
-for test in $tests; do
+for test in ${tests[@]}; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
         rm -fr $LPATH/$test
     fi
 done
 
-for test in $tests; do
+for test in ${tests[@]}; do
     if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         file=$(find $LPATH/$test -type f -name "*.case")
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
@@ -89,7 +89,7 @@ for test in $tests; do
     fi
 done
 
-for test in $tests; do
+for test in ${tests[@]}; do
     # Check if there were errors. Print them if there were.
     if [ -s $LPATH/$test/error.err ]; then
 
@@ -104,7 +104,7 @@ done
 # ============================================================================ #
 # Print errors for all unfinished tests
 
-for test in $tests; do
+for test in ${tests[@]}; do
     # Check if there were errors. Print them if there were.
     if [ -s $LPATH/$test/error.err ]; then
 
