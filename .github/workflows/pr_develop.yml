@@ -37,11 +37,12 @@ jobs:
     needs:
       - check_formatting
       - check_compilation
+
+    runs-on: ubuntu-latest
     env:
       check_formatting: ${{ needs.check_formatting.result }}
       check_compilation: ${{ needs.check_compilation.result }}
 
-    runs-on: ubuntu-latest
     steps:
       - name: All checks passed
         run: |
