@@ -48,7 +48,7 @@ jobs:
           if [ "$check_formatting" != "success" ]; then
             echo "Formatting check failed"
             exit 1
-          elif [ "${{ inputs.check_compilation }}" != "success" ]; then
+          elif [ "$check_compilation" != "success" ]; then
             echo "Compilation check failed"
             exit 1
           fi
