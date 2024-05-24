@@ -28,12 +28,12 @@ function check_system_dependencies() {
 # Ensure JSON-Fortran is installed, if not install it.
 function find_json_fortran() {
 
+    if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
+        git clone --depth=1 https://github.com/jacobwilliams/json-fortran $1
+    fi
+
     # Ensure JSON-Fortran is installed, if not install it.
     if [[ -z "$(find $1 -name libjsonfortran.so)" ]]; then
-        if [ ! -f "$1/CMakeLists.txt" ]; then
-            git clone https://github.com/jacobwilliams/json-fortran $1
-        fi
-
         cmake -S $1 -B $1/build \
             --install-prefix $1 \
             -Wno-dev \
@@ -54,8 +54,6 @@ function find_json_fortran() {
         error "the JSON-Fortran source code."
         error "You can download the source code from:"
         error "\thttps://github.com/jacobwilliams/json-fortran"
-        error "Or invoke the git submodule command:"
-        error "\tgit submodule update --init --recursive"
         exit 1
     fi
 
@@ -64,6 +62,15 @@ function find_json_fortran() {
     # Setup environment variables
     export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+}
+
+# ============================================================================ #
+# Ensure Nek5000 is installed, if not install it.
+function find_nek5000() {
+
+    if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
+        git clone --depth 1 https://github.com/Nek5000/Nek5000.git $1
+    fi
 }
 
 # ============================================================================ #
@@ -86,8 +93,6 @@ function find_gslib() {
         error "the GSLIB source code."
         error "You can download the source code from:"
         error "\thttps://github.com/Nek5000/gslib"
-        error "Or invoke the git submodule command:"
-        error "\tgit submodule update --init --recursive"
         exit 1
     fi
 
@@ -100,12 +105,12 @@ function find_pfunit() {
 
     if [ ! $TEST ]; then return; fi
 
+    if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
+        git clone --depth=1 \
+            https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
+    fi
+
     if [[ -z "$(find $1 -name libpfunit.a)" ]]; then
-
-        if [ ! -f "$1/CMakeLists.txt" ]; then
-            git clone https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
-        fi
-
         cmake -B $1/build -S $1 -G "Unix Makefiles" \
             -DCMAKE_INSTALL_PREFIX=$1
         cmake --build $1/build --parallel
@@ -120,8 +125,6 @@ function find_pfunit() {
         error "the pFUnit source code."
         error "You can download the source code from:"
         error "\thttps://github.com/Goddard-Fortran-Ecosystem/pFUnit.git"
-        error "Or invoke the git submodule command:"
-        error "\tgit submodule update --init --recursive"
         exit 1
     fi
 
@@ -188,8 +191,6 @@ find_neko() {
         error "the Neko source code."
         error "You can download the source code from:"
         error "\thttps://github.com/ExtremeFLOW/neko.git"
-        error "Or invoke the git submodule command:"
-        error "\tgit submodule update --init --recursive"
         exit 1
     fi
 

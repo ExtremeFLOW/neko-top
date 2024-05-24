@@ -3,6 +3,7 @@
 [Ll]ogs
 [Rr]esults
 [Dd]ata_local
+[Ee]xternal/
 
 examples/debug/*
 !examples/debug/debug.case
