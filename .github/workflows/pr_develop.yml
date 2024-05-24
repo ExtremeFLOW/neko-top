@@ -33,12 +33,23 @@ jobs:
 
   check_complete:
     name: Develop PR Ready
-    if: github.event.pull_request.draft != true
+    if: github.event.pull_request.draft != true && ${{ always() }}
     needs:
       - check_formatting
       - check_compilation
+    env:
+      check_formatting: ${{ needs.check_formatting.result }}
+      check_compilation: ${{ needs.check_compilation.result }}
 
     runs-on: ubuntu-latest
     steps:
       - name: All checks passed
-        run: echo "All checks passed"
+        run: |
+          if [ "$check_formatting" != "success" ]; then
+            echo "Formatting check failed"
+            exit 1
+          else if [ "${{ inputs.check_compilation }}" != "success" ]; then
+            echo "Compilation check failed"
+            exit 1
+          fi
+          echo "All checks passed"
