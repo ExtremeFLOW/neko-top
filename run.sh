@@ -70,12 +70,8 @@ OPTIONS=all,clean,help,neko,delete,dryrun
 OPT="a,c,h,n,d"
 
 # Parse the inputs for options
-echo Parse options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
 eval set -- "$PARSED"
-
-echo read options
-echo $PARSED
 
 # Loop through the options and set the variables
 while true; do
@@ -91,7 +87,7 @@ while true; do
     "--") shift && break ;;
     esac
 done
-echo done reading options
+
 if [ $NEKO ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
