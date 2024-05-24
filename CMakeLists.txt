@@ -63,10 +63,12 @@ option(BUILD_TESTING "Build the tests" OFF)
 # Advanced options
 include(CMakeDependentOption)
 
-cmake_dependent_option(
-    ONLY_DOCS "Only build the documentation" OFF
-    "BUILD_DOCS" OFF
-)
+option(ONLY_DOCS "Only build the documentation" OFF)
+if (ONLY_DOCS)
+    set(BUILD_DOCS ON)
+    set(BUILD_EXAMPLES OFF)
+    set(BUILD_TESTING OFF)
+endif()
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build.")
 
