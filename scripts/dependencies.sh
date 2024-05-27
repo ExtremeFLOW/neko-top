@@ -48,9 +48,9 @@ function find_json_fortran() {
         rm -fr $1/build
     fi
 
-    JSON_FORTRAN=$(find $1 -type d \
+    JSON_FORTRAN_LIB=$(find $1 -type d \
         -exec test -f '{}'/libjsonfortran.so \; -print)
-    if [ -z "$JSON_FORTRAN" ]; then
+    if [ -z "$JSON_FORTRAN_LIB" ]; then
         error "JSON-Fortran not found at:"
         error "\t$1"
         error "Please set JSON_FORTRAN_DIR to the directory containing"
@@ -60,11 +60,12 @@ function find_json_fortran() {
         exit 1
     fi
 
-    export JSON_FORTRAN=$(realpath $JSON_FORTRAN)
+    JSON_FORTRAN_LIB=$(realpath $JSON_FORTRAN_LIB)
 
     # Setup environment variables
-    export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_LIB/../)
+    export PKG_CONFIG_PATH="$JSON_FORTRAN_LIB/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="$JSON_FORTRAN_LIB:$LD_LIBRARY_PATH"
 }
 
 # ============================================================================ #
