@@ -29,7 +29,10 @@ function check_system_dependencies() {
 function find_json_fortran() {
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth=1 https://github.com/jacobwilliams/json-fortran $1
+        [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
+
+        git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
+            https://github.com/jacobwilliams/json-fortran $1
     fi
 
     # Ensure JSON-Fortran is installed, if not install it.
@@ -69,7 +72,10 @@ function find_json_fortran() {
 function find_nek5000() {
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth 1 https://github.com/Nek5000/Nek5000.git $1
+        [ -z "$NEK5000_VERSION" ] && NEK5000_VERSION="master"
+
+        git clone --depth 1 --branch $NEK5000_VERSION \
+            https://github.com/Nek5000/Nek5000.git $1
     fi
 }
 
@@ -106,7 +112,9 @@ function find_pfunit() {
     if [ ! $TEST ]; then return; fi
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone -b master --depth=1 \
+        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="main"
+
+        git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
     fi
 
@@ -137,7 +145,10 @@ find_neko() {
 
     # Clone Neko from the repository if it does not exist.
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth 1 https://github.com/ExtremeFLOW/neko.git $1
+        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="master"
+
+        git clone --depth 1 --branch $NEKO_VERSION \
+            https://github.com/ExtremeFLOW/neko.git $1
     fi
 
     # Determine available features
