@@ -113,7 +113,7 @@ function find_pfunit() {
     if [ ! $TEST ]; then return; fi
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="main"
+        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.4.2"
 
         git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
@@ -126,8 +126,9 @@ function find_pfunit() {
         cmake --install $1/build
     fi
 
-    PFUNIT_DIR=$(find $1 -type d -exec test -f '{}'/lib/libpfunit.a \; -print)
-    if [ -z "$PFUNIT_DIR" ]; then
+    PFUNIT_LIB=$(find $1 -type d -name 'lib*' \
+        -exec test -f '{}'/libpfunit.a \; -print)
+    if [ -z "$PFUNIT_LIB" ]; then
         error "pFUnit not found at:"
         error "\t$1"
         error "Please set PFUNIT_DIR to the directory containing"
@@ -137,7 +138,7 @@ function find_pfunit() {
         exit 1
     fi
 
-    export PFUNIT_DIR=$(realpath $PFUNIT_DIR)
+    export PFUNIT_DIR=$(realpath $PFUNIT_LIB/../)
 }
 
 # ============================================================================ #
