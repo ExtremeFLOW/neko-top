@@ -29,7 +29,10 @@ function check_system_dependencies() {
 function find_json_fortran() {
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth=1 https://github.com/jacobwilliams/json-fortran $1
+        [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
+
+        git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
+            https://github.com/jacobwilliams/json-fortran $1
     fi
 
     # Ensure JSON-Fortran is installed, if not install it.
@@ -45,9 +48,9 @@ function find_json_fortran() {
         rm -fr $1/build
     fi
 
-    JSON_FORTRAN=$(find $1 -type d \
+    JSON_FORTRAN_LIB=$(find $1 -type d \
         -exec test -f '{}'/libjsonfortran.so \; -print)
-    if [ -z "$JSON_FORTRAN" ]; then
+    if [ -z "$JSON_FORTRAN_LIB" ]; then
         error "JSON-Fortran not found at:"
         error "\t$1"
         error "Please set JSON_FORTRAN_DIR to the directory containing"
@@ -57,11 +60,12 @@ function find_json_fortran() {
         exit 1
     fi
 
-    export JSON_FORTRAN=$(realpath $JSON_FORTRAN)
+    JSON_FORTRAN_LIB=$(realpath $JSON_FORTRAN_LIB)
 
     # Setup environment variables
-    export PKG_CONFIG_PATH="$JSON_FORTRAN/pkgconfig:$PKG_CONFIG_PATH"
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_LIB/../)
+    export PKG_CONFIG_PATH="$JSON_FORTRAN_LIB/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="$JSON_FORTRAN_LIB:$LD_LIBRARY_PATH"
 }
 
 # ============================================================================ #
@@ -69,7 +73,10 @@ function find_json_fortran() {
 function find_nek5000() {
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth 1 https://github.com/Nek5000/Nek5000.git $1
+        [ -z "$NEK5000_VERSION" ] && NEK5000_VERSION="master"
+
+        git clone --depth 1 --branch $NEK5000_VERSION \
+            https://github.com/Nek5000/Nek5000.git $1
     fi
 }
 
@@ -85,8 +92,9 @@ function find_gslib() {
         cd $current
     fi
 
-    GSLIB_DIR="$(find $1 -type d -exec test -f '{}/lib/libgs.a' \; -print)"
-    if [ -z "$GSLIB_DIR" ]; then
+    GSLIB_LIB=$(find $1 -type d -name 'lib*' \
+        -exec test -f '{}/libgs.a' \; -print)
+    if [ -z "$GSLIB_LIB" ]; then
         error "GSLIB not found at:"
         error "\t$1"
         error "Please set GSLIB_DIR to the directory containing"
@@ -96,7 +104,7 @@ function find_gslib() {
         exit 1
     fi
 
-    export GSLIB_DIR=$(realpath $GSLIB_DIR)
+    export GSLIB_DIR=$(realpath $GSLIB_LIB/../)
 }
 
 # ============================================================================ #
@@ -106,7 +114,9 @@ function find_pfunit() {
     if [ ! $TEST ]; then return; fi
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth=1 \
+        [ -z "$PFUNIT_VERSION" ] && PFUNIT_VERSION="v4.4.2"
+
+        git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
     fi
 
@@ -117,8 +127,9 @@ function find_pfunit() {
         cmake --install $1/build
     fi
 
-    PFUNIT_DIR=$(find $1 -type d -exec test -f '{}'/lib/libpfunit.a \; -print)
-    if [ -z "$PFUNIT_DIR" ]; then
+    PFUNIT_LIB=$(find $1 -type d -name 'lib*' \
+        -exec test -f '{}'/libpfunit.a \; -print)
+    if [ -z "$PFUNIT_LIB" ]; then
         error "pFUnit not found at:"
         error "\t$1"
         error "Please set PFUNIT_DIR to the directory containing"
@@ -128,7 +139,7 @@ function find_pfunit() {
         exit 1
     fi
 
-    export PFUNIT_DIR=$(realpath $PFUNIT_DIR)
+    export PFUNIT_DIR=$(realpath $PFUNIT_LIB/../)
 }
 
 # ============================================================================ #
@@ -137,7 +148,10 @@ find_neko() {
 
     # Clone Neko from the repository if it does not exist.
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth 1 https://github.com/ExtremeFLOW/neko.git $1
+        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="master"
+
+        git clone --depth 1 --branch $NEKO_VERSION \
+            https://github.com/ExtremeFLOW/neko.git $1
     fi
 
     # Determine available features
