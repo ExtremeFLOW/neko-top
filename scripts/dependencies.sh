@@ -106,7 +106,7 @@ function find_pfunit() {
     if [ ! $TEST ]; then return; fi
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        git clone --depth=1 \
+        git clone -b master --depth=1 \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
     fi
 
