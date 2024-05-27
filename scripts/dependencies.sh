@@ -92,8 +92,9 @@ function find_gslib() {
         cd $current
     fi
 
-    GSLIB_DIR="$(find $1 -type d -exec test -f '{}/lib/libgs.a' \; -print)"
-    if [ -z "$GSLIB_DIR" ]; then
+    GSLIB_LIB=$(find $1 -type d -name 'lib*' \
+        -exec test -f '{}/libgs.a' \; -print)
+    if [ -z "$GSLIB_LIB" ]; then
         error "GSLIB not found at:"
         error "\t$1"
         error "Please set GSLIB_DIR to the directory containing"
@@ -103,7 +104,7 @@ function find_gslib() {
         exit 1
     fi
 
-    export GSLIB_DIR=$(realpath $GSLIB_DIR)
+    export GSLIB_DIR=$(realpath $GSLIB_LIB/../)
 }
 
 # ============================================================================ #
