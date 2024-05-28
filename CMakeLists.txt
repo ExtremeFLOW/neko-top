@@ -63,10 +63,12 @@ option(BUILD_TESTING "Build the tests" OFF)
 # Advanced options
 include(CMakeDependentOption)
 
-cmake_dependent_option(
-    ONLY_DOCS "Only build the documentation" OFF
-    "BUILD_DOCS" OFF
-)
+option(ONLY_DOCS "Only build the documentation" OFF)
+if (ONLY_DOCS)
+    set(BUILD_DOCS ON)
+    set(BUILD_EXAMPLES OFF)
+    set(BUILD_TESTING OFF)
+endif()
 
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build.")
 
@@ -116,26 +118,10 @@ find_package(MPI REQUIRED)
 # ............................................................................ #
 # Setup of JSON-Fortran
 
-# Check that the JSON_FORTRAN_DIR directories exist
-if (NOT IS_DIRECTORY ${JSON_FORTRAN_DIR})
-    message(FATAL_ERROR
-        "JSON-Fortran directory not found (${JSON_FORTRAN_DIR})."
-        "Please run `git submodule update --init` to download the external "
-        "libraries."
-    )
+# Set the proper paths for the JSON_FORTRAN_DIR directory
+if (IS_DIRECTORY ${JSON_FORTRAN_DIR})
+    set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
 endif()
-
-# Find the JSON-Fortran library and add it to the CMake search path
-set(jsonfortran-gnu_DIR ${JSON_FORTRAN_DIR})
-if (IS_DIRECTORY ${jsonfortran-gnu_DIR}/lib)
-    set(jsonfortran-gnu_DIR ${jsonfortran-gnu_DIR}/lib)
-elseif(IS_DIRECTORY ${jsonfortran-gnu_DIR}/lib64)
-    set(jsonfortran-gnu_DIR ${jsonfortran-gnu_DIR}/lib64)
-elseif(IS_DIRECTORY ${jsonfortran-gnu_DIR}/lib32)
-    set(jsonfortran-gnu_DIR ${jsonfortran-gnu_DIR}/lib32)
-endif()
-
-set(jsonfortran-gnu_DIR ${jsonfortran-gnu_DIR}/cmake/jsonfortran-gnu-8.3.0)
 
 # Check that the JSON-Fortran library was found
 find_package(jsonfortran-gnu REQUIRED)

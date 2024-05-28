@@ -26,7 +26,8 @@ jobs:
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: autotools-dev automake autoconf openmpi-bin pkg-config liblapack-dev
+          packages: autotools-dev automake autoconf openmpi-bin pkg-config \
+            liblapack-dev
           version: 1.0
 
       - name: Setup system

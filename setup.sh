@@ -98,7 +98,8 @@ find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
 # Compile the Neko-TOP and example codes.
 
 # Set the variables for the compilation
-VARIABLES=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN")
+VARIABLES=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
+VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
