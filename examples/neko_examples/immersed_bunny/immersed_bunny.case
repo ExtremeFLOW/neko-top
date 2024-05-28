@@ -7,7 +7,7 @@
         "output_boundary": true,
         "output_checkpoints": false,
         "end_time": 2.00,
-        "timestep": 1e-4,
+        "timestep": 5e-5,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 8,
