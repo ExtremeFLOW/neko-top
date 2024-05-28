@@ -5,7 +5,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Fortran Neko-Top Debugging",
+            "name": "Neko-Top Debugging",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/examples/debug/neko",
@@ -30,6 +30,33 @@
                 }
             ],
             "preLaunchTask": "CMake: build"
+        },
+        {
+            "name": "Petsc Static Mixer Debugging",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/petsc_static_mixer/neko",
+            "args": [
+                "debug.case"
+            ],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/examples/petsc_static_mixer",
+            "environment": [
+                {
+                    "name": "NEKO_LOG_LEVEL",
+                    "value": "10"
+                }
+            ],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "Setup"
         }
     ]
 }
