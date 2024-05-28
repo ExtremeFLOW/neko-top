@@ -32,7 +32,7 @@ contains
     do i = 1, s%dof%size()
        z_value = s%dof%z(i, 1, 1, 1)
 
-       if (z_value .gt. 0.0_rp) then
+       if (z_value .gt. split_value) then
           s%x(i, 1, 1, 1) = 0.0_rp
        else
           s%x(i, 1, 1, 1) = 1.0_rp
