@@ -1,4 +1,5 @@
 # Documentation for Neko-TOP {#index}
+\tableofcontents
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
