@@ -18,6 +18,8 @@ target_sources(Neko-TOP
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/mesh_operations.f90
+
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
