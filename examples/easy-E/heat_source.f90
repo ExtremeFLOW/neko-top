@@ -50,8 +50,8 @@ contains
 
   !> Heat source
   subroutine heat_source(rhs, t)
-    use math_ext, only: sub3_mask, cfill_mask
-    use device_math_ext, only: device_sub3_mask, device_cfill_mask
+    use math_ext, only: sub3_mask
+    use device_math_ext, only: device_sub3_mask
 
     class(scalar_user_source_term_t), intent(inout) :: rhs
     real(kind=rp), intent(in) :: t
