@@ -55,7 +55,17 @@ contains
     do iter = 1, max_iter
        call setup_iteration(neko_case, iter)
 
+       ! Forward analysis
        call neko_solve(neko_case)
+
+
+
+       ! If converged, exit the loop
+       if (converged) exit
+
+       ! Call the design update routine
+
+
 
        ! Update the permeability
        call design%update(converged)
