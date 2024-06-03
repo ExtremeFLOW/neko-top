@@ -10,6 +10,7 @@ script.
 ## List of examples
 
 1. \subpage permeability_block
+2. \subpage easy-E
 
 ## Adding examples
 

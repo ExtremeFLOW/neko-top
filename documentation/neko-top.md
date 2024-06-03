@@ -1,4 +1,4 @@
-# Documentation for Neko-TOP {#index}
+# Documentation for Neko-TOP
 \tableofcontents
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
