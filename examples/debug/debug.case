@@ -1,12 +1,11 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data/debugging_pipe.nmsh", // Run.sh path to mesh
-        // "mesh_file": "../../data_local/debugging_pipe.nmsh", // Local path to mesh
+        "mesh_file": "data/debugging_pipe.nmsh",
         "output_directory": "fields",
         "output_at_end": true,
         "output_boundary": true,
-        "end_time": 2.0,
+        "end_time": 0.05,
         "timestep": 5e-4,
         "numerics": {
             "time_order": 3,
@@ -67,11 +66,6 @@
             "boundary_types": [
                 "d=0",
                 "d=1"
-            ],
-            "source_terms": [
-                {
-                    "type": "user_vector"
-                }
             ],
         },
         "point_zones": [

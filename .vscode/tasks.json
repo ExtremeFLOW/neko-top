@@ -1,52 +1,98 @@
 {
-	"version": "2.0.0",
-	"tasks": [
-		{
-			"detail": "CMake template build task",
-			"type": "cmake",
-			"label": "CMake: build",
-			"command": "build",
-			"targets": [
-				"all"
-			],
-			"group": "build",
-			"problemMatcher": [],
-			"dependsOn": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "never",
-				"revealProblems": "onProblem",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": false,
-				"clear": true
-			}
-		},
-		{
-			"detail": "CMake template configure task",
-			"type": "cmake",
-			"label": "CMake: configure",
-			"command": "configure",
-			"group": "build",
-			"problemMatcher": [],
-		},
-		{
-			"detail": "Execution of setup script",
-			"type": "shell",
-			"label": "Setup",
-			"command": "./setup.sh",
-			"group": "build",
-			"problemMatcher": [],
-			"dependsOn": [],
-			"presentation": {
-				"echo": true,
-				"reveal": "never",
-				"revealProblems": "onProblem",
-				"focus": false,
-				"panel": "shared",
-				"showReuseMessage": false,
-				"clear": true
-			}
-		},
-	]
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "detail": "Prepare the Neko-TOP debug environment",
+            "type": "shell",
+            "label": "Neko-TOP Debug",
+            "command": "${workspaceFolder}/run.sh",
+            "args": [
+                "--dry-run",
+                "debug"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [ ],
+            "dependsOn": [
+                "Setup",
+                "Cleanup debug"
+            ],
+        },
+        {
+            "detail": "Execution of setup script",
+            "type": "shell",
+            "label": "Setup",
+            "command": "${workspaceFolder}/setup.sh",
+            "args": [
+                "--device",
+                "CUDA"
+            ],
+            "group": "build",
+            "problemMatcher": [ ],
+            "dependsOn": [ ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "detail": "Execution of cleanup script",
+            "type": "shell",
+            "label": "Cleanup debug",
+            "command": "rm",
+            "args": [
+                "-fr",
+                "${workspaceFolder}/logs/debug"
+            ],
+            "group": "build",
+            "problemMatcher": [ ],
+            "dependsOn": [ ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "detail": "CMake template build task",
+            "type": "cmake",
+            "label": "CMake: build",
+            "command": "build",
+            "targets": [
+                "all"
+            ],
+            "group": "build",
+            "problemMatcher": [ ],
+            "dependsOn": [ ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true
+            }
+        },
+        {
+            "detail": "CMake template configure task",
+            "type": "cmake",
+            "label": "CMake: configure",
+            "command": "configure",
+            "group": "build",
+            "problemMatcher": [ ],
+        },
+
+    ]
 }

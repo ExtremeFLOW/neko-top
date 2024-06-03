@@ -66,7 +66,7 @@ DELETE=false
 DRY=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,dryrun
+OPTIONS=all,clean,help,neko,delete,dry-run
 OPT="a,c,h,n,d"
 
 # Parse the inputs for options
@@ -81,14 +81,14 @@ while true; do
     "-h" | "--help") help && exit ;;           # Print help
     "-n" | "--neko") NEKO=true && shift ;;     # Look for example in neko
     "-d" | "--delete") DELETE=true && shift ;; # Delete previous runs
-    "--dryrun") DRY=true && shift ;;           # Dry run
+    "--dry-run") DRY=true && shift ;;          # Dry run
 
     # End of options
     "--") shift && break ;;
     esac
 done
 
-if [ $NEKO ]; then
+if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
@@ -147,7 +147,7 @@ example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
 
 # Check if any examples were found, if not, exit.
 if [ ! "$example_list" ]; then
-    printf "No examples found.\n" >&2 && exit
+    printf "No examples found.\n" >&2 && exit 2
 fi
 
 # ============================================================================ #
@@ -272,7 +272,7 @@ done
 # If we are just doing a dry-run, we exit here
 if [ "$DRY" = true ]; then
     $MAIN_DIR/status.sh
-    exit
+    exit 0
 fi
 
 for example in $QUEUE; do
