@@ -143,6 +143,46 @@ function find_pfunit() {
 }
 
 # ============================================================================ #
+# Ensure HDF5 is installed, if not install it.
+function find_hdf5() {
+
+    # Clone HDF5 from the repository if it does not exist.
+    if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
+        [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1_14"
+
+        git clone --depth 1 --branch $HDF5_VERSION \
+            https://github.com/HDFGroup/hdf5.git $1
+    fi
+
+    # Ensure HDF5 is installed, if not install it.
+    if [[ -z "$(find $1 -name libhdf5.a)" ]]; then
+        cmake -B $1/build -S $1 \
+            --install-prefix=$1 \
+            -DHDF5_BUILD_FORTRAN=ON \
+            -DHDF5_ENABLE_PARALLEL=ON \
+            -DHDF5_BUILD_SHARED=OFF
+        cmake --build $1/build --parallel
+        cmake --install $1/build
+    fi
+
+    HDF5_LIB=$(find $1 -type d -name 'lib*' \
+        -exec test -f '{}'/libhdf5.a \; -print)
+    if [ -z "$HDF5_LIB" ]; then
+        error "HDF5 not found at:"
+        error "\t$1"
+        error "Please set HDF5_DIR to the directory containing"
+        error "the HDF5 source code."
+        error "You can download the source code from:"
+        error "\thttps://www.hdfgroup.org/downloads/hdf5/"
+        exit 1
+    fi
+
+    export HDF5_DIR=$(realpath $HDF5_LIB/../)
+    export PKG_CONFIG_PATH="$HDF5_LIB/pkgconfig:$PKG_CONFIG_PATH"
+    export LD_LIBRARY_PATH="$HDF5_LIB:$LD_LIBRARY_PATH"
+}
+
+# ============================================================================ #
 # Ensure Neko is installed, if not install it.
 find_neko() {
 
@@ -157,6 +197,7 @@ find_neko() {
     # Determine available features
     [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
     [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
+    [ ! -z "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
     [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
     # Handle device specific features
