@@ -10,5 +10,6 @@ observe the documentation for Neko for specific details on case files and the
 user interface.
 
 1. \subpage compilation
-2. [Examples](#examples)
-3. [Tools and Utilities](#tools)
+2. \subpage code-structure
+3. [Examples](#examples)
+4. [Tools and Utilities](#tools)
