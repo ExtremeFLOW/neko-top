@@ -19,10 +19,11 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 
 ## Execution of examples
 
-The run.sh script is the main driver for any example. The run script will
-construct a local system for execution of any example defined in the examples
-folder. Each example should contain a .case file and a compiled version of Neko
-ready to be executed. This is in general provided by our CMake setup.
+The [run.sh](../../run.sh) script is the main driver for all examples.
+The run script will construct a local system for execution of any example
+defined in the examples folder. Each example should at least contain a .case
+file with the specifications to Neko. The run script will copy the contents of
+the example folder to a temporary folder and execute the example from there.
 
 The contents of `example/EXAMPLE_NAME` will be copied to a temporary
 `log/EXAMPLE_NAME` along with a job_script. This job_script can be user defined
