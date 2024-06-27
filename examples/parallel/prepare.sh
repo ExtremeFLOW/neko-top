@@ -76,15 +76,5 @@ fi
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
 genmeshbox 0 4 0 1 0 1 $Nx $Ny $Nz .false. .false. .false.
 
-# Tie the GPU's to the MPI ranks
-export CUDA_VISIBLE_DEVICES=$OMPI_COMM_WORLD_LOCAL_RANK
-
-echo $CUDA_VISIBLE_DEVICES
-
-# for case in $cases; do
-#     echo "Running case: $case"
-#     mpirun --pernode neko $case >${case%.case}.log
-# done
-
 # End of file
 # ============================================================================ #

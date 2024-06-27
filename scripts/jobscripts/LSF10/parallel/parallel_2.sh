@@ -60,6 +60,9 @@ if [ ! -z $(which module) ]; then
     module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
 fi
 
+# Tie the GPU's to the MPI ranks
+export CUDA_VISIBLE_DEVICES=$OMPI_COMM_WORLD_LOCAL_RANK
+
 source functions.sh
 run $example
 
