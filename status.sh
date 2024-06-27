@@ -65,25 +65,37 @@ done
 for test in ${tests[@]}; do
     if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
         file=$(find $LPATH/$test -type f -name "*.case")
+        file+=" $LPATH/$test/output.log"
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
             printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
-        elif [ -z "$file" ]; then
-            printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Running:" "$test"
         else
             for f in $file; do
+                logfile=${f%.*}.log
+
+                if [ ! -f $logfile ]; then
+                    continue
+                fi
+
                 if [ "$(tail -n 1 ${f%.*}.log | xargs)" == "Normal end." ]; then
                     stat="Complete:"
-                    progress="100.00%"
                 else
                     stat="Running:"
                     progress=$(
-                        grep 't = ' "${f%.*}.log" |        # Get all lines with t = in them
+                        grep 't = ' "${f%.*}.log" |        # Get all timestamps
                             tail -n 1 |                    # Get the last line
                             sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                             xargs                          # Trim whitespace
                     )
                 fi
-                printf '\t\e[1;33m%-12s\e[m [%7s] %s %-s\n' "$stat" "$progress" "$test/$(basename $f)"
+                printf '\t\e[1;33m%-12s\e[m' "$stat"
+                if [ "$stat" == "Running:" ]; then
+                    printf ' [%7s]' "$progress"
+                fi
+                if [ $(basename $f) = "output.log" ]; then
+                    printf " %s\n" "$test"
+                else
+                    printf " %s\n" "$test/$(basename $f)"
+                fi
             done
         fi
     fi
@@ -114,7 +126,13 @@ for test in ${tests[@]}; do
 
         printf '\n\e[4;31m%-s\e[m' "${test:0:79}"
         printf '\e[4;31m%.0s_\e[m' $(seq 1 $((80 - ${#test}))) && printf '\n'
-        head -n 10 $LPATH/$test/error.err | fold -w 80
+        if [ $(cat $LPATH/$test/error.err | wc -l) -ge "10" ]; then
+            head -n 5 $LPATH/$test/error.err | fold -w 80
+            printf ".....\n"
+            tail -n 5 $LPATH/$test/error.err | fold -w 80
+        else
+            cat $LPATH/$test/error.err | fold -w 80
+        fi
     fi
 done
 printf "\n"
