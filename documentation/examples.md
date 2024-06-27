@@ -3,19 +3,19 @@
 
 The execution of examples have been automated to allow for easy testing and
 development of new features. The examples are located in the `examples` folder
-and are self-contained with case files and the nmsh files required (or details on
-how to get them). The examples are compiled and executed using the `run.sh`
+and are self-contained with case files and the nmsh files required (or details
+on how to get them). The examples are compiled and executed using the `run.sh`
 script.
+
+For inline help on the `run.sh` script, use the `-h` or `--help` switch.
+
+```sh
+./run.sh [-h] [--help]
+```
 
 ## List of examples
 
 1. \subpage permeability_block
-
-## Adding examples
-
-To construct new examples, place a folder in the `examples` folder. Each example
-should be self-contained with case files, the nmsh required. Any additional
-source files should ideally be placed in that folder as well.
 
 ## Execution of examples
 
@@ -35,6 +35,21 @@ the switch `-n` or `--neko`.
 ```sh
 ./run.sh --neko tgv
 ```
+
+## Adding examples
+
+To construct new examples, place a folder in the `examples` folder. Each example
+should be self-contained with case files, the nmsh required. Any additional
+source files should ideally be placed in that folder as well.
+
+Additionally the following constraints on the structure of the example folder
+are required:
+
+- The example is required to only contain a single `run.sh` script. This script
+  indicate the root of the example.
+- The example may contain any number of case files, but if there is no `run.sh`
+  script, all of them should be placed in the root of the example folder.
+  Otherwise, each folder containing a case file will be considered an example.
 
 ## Case files and meshes.
 
