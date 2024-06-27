@@ -262,7 +262,7 @@ for case in ${example_list[@]}; do
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
     example=$case_dir
-    if [[ ! -f "$EPATH/$case_dir/run.sh" &&
+    if [[ ${case: -5} == ".case" &&
         $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
@@ -292,8 +292,11 @@ for case in ${example_list[@]}; do
     setting=$(realpath $setting)
 
     # Copy the case files to the log folder
-    [ -f $EPATH/$case ] && cp -ft $log $EPATH/$case
-    [ -d $EPATH/$case ] && cp -ft $log $EPATH/$case/*.case
+    if [ ${case: -3} == ".sh" ]; then
+        find $EPATH/$case_dir -name "*.case" -exec cp -ft $log {} +
+    elif [ ${case: -5} == ".case" ]; then
+        cp -ft $log $EPATH/$case
+    fi
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
