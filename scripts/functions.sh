@@ -86,6 +86,8 @@ function prepare {
     if [ -f neko ]; then
         neko=$(realpath ./neko)
     elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Building user Neko\n"
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
     else
