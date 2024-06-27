@@ -225,7 +225,7 @@ fi
 # Function for running the examples
 function Run() {
     cd $LPATH/$example
-    printf '  %-12s %-s\n' "Started:" "$1"
+    printf '\t%-12s %-s\n' "Started:" "$1"
     ./job_script.sh $1 >output.log 2>error.err
     cd $CURRENT_DIR
 }
@@ -235,7 +235,7 @@ function Submit() {
     cd $LPATH/$example
     export BSUB_QUIET=Y
     bsub -J $1 -env "all" <job_script.sh
-    printf '  %-12s %-s\n' "Submitted:" "$1"
+    printf '\t%-12s %-s\n' "Submitted:" "$1"
     cd $CURRENT_DIR
 }
 INTERRUPTED=0
@@ -275,7 +275,7 @@ for case in ${example_list[@]}; do
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
-        [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
+        [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
     fi
