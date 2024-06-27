@@ -3,7 +3,7 @@
     "case": {
         "mesh_file": "box.nmsh",
         "output_directory": "sequential",
-        "load_balancing": true,
+        "load_balancing": false,
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,

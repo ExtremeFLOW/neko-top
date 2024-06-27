@@ -26,7 +26,6 @@ function help() {
     echo -e "  See Readme for additional details."
     exit 0
 }
-if [ $# -eq 0 ]; then help; fi
 
 # Handle options
 Nx=32 && Ny=8 && Nz=8
@@ -77,14 +76,15 @@ fi
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
 genmeshbox 0 4 0 1 0 1 $Nx $Ny $Nz .false. .false. .false.
 
-for case in $cases; do
-    echo "Running case: $case"
-    if [ "$QUIET" ]; then
-        mpirun --pernode neko $case >/dev/null
-    else
-        mpirun --pernode neko $case >${case%.case}.log
-    fi
-done
+# Tie the GPU's to the MPI ranks
+export CUDA_VISIBLE_DEVICES=$OMPI_COMM_WORLD_LOCAL_RANK
+
+echo $CUDA_VISIBLE_DEVICES
+
+# for case in $cases; do
+#     echo "Running case: $case"
+#     mpirun --pernode neko $case >${case%.case}.log
+# done
 
 # End of file
 # ============================================================================ #
