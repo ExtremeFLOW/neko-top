@@ -63,7 +63,7 @@ if [ "$NEKO_DIR" ]; then
     PATH=$NEKO_DIR/bin:$PATH
 fi
 
-if [[ -z $(which neko) ]]; then
+if [[ -z $(which genmeshbox) ]]; then
     echo -e "Neko not found." >&2
     echo -e "Please ensure Neko is installed and in your PATH." >&2
     echo -e "Alternatively, set the NEKO_DIR environment variable." >&2
