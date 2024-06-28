@@ -86,12 +86,19 @@
                 ]
             }
         ],
-        "topology_optimization": {
-            "sensitivity_analysis": {
-                "type": "sensitivity",
-                "compute_control": "tsteps",
-                "compute_value": 5
+    },
+    "topology_optimization": {
+        "sensitivity_analysis": {
+            "type": "sensitivity",
+            "compute_control": "tsteps",
+            "compute_value": 5
+        },
+
+        "components": [
+            {
+                "type": "design",
+                "is_user": true
             }
-        }
-    }
+        ]
+    },
 }
