@@ -37,7 +37,6 @@ contains
 
     call neko_log%section('Initialize Topology Optimization')
 
-
     ! ------------------------------------------------------------------------ !
     ! Initialize the neko solver
     ! ------------------------------------------------------------------------ !
@@ -61,6 +60,7 @@ contains
     call neko_case%params%get('topology_optimization.components', simcomp_object, found)
     comp_subdict = json_file(simcomp_object)
 
+    ! Allocation of the design
     allocate(design)
     design_params = simulation_component_user_settings('design', comp_subdict)
     call topopt_components%add_user_simcomp(design, design_params)
@@ -70,7 +70,6 @@ contains
     call neko_log%end()
 
     call neko_log%end()
-
   end subroutine neko_top_init
 
   subroutine neko_top_solve(neko_case)
