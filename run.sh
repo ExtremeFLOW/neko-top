@@ -102,52 +102,107 @@ fi
 example_list=()
 for in in $@; do
     [ "$ALL" == true ] && break
-    if [ ${in:0:1} == "-" ]; then continue; fi
+
+    # Decompose the input into the directory and the base name
+    [ $(dirname $in) == "." ] && dir="" || dir=$(dirname $in)
+    base=$(basename $in)
 
     # Extract the examples from the input
-    file_list="$(find $EPATH/$in -maxdepth 1 -name "run.sh" 2>/dev/null) "
-    file_list+="$(find $EPATH/$in -maxdepth 1 -name "*.case" 2>/dev/null) "
+    matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
+    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
+    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
 
-    for file in $file_list; do
-        dir=$(dirname $file)
-        run_files=$(find $dir -name "run.sh" 2>/dev/null)
-
-        [ -f $file ] && case_files=$file
-        [ -f $file.case ] && case_files=$file.case
-        [ -d $file ] && case_files=$(find $dir -name "*.case" 2>/dev/null)
-
-        if [ ! -z "$run_files" ]; then
-            for run_f in $run_files; do
-                run_f=${run_f#$EPATH/}
-                example_list+=("${run_f%/run.sh}")
-            done
-        elif [ ! -z "$case_files" ]; then
-            for case in $case_files; do
-                example_list+=("${case#$EPATH/}")
-            done
+    for match in ${matches[@]}; do
+        file_list=()
+        if [ -d $match ]; then
+            file_list=($(find $match -name "run.sh" 2>/dev/null))
+            file_list+=($(find $match -name "*.case" 2>/dev/null))
         fi
+        if [ -f $match ]; then
+            file_list+=($match)
+        fi
+
+        for file in ${file_list[@]}; do
+            dir=$(dirname $file)
+            if [[ -f $dir/run.sh ]]; then
+                example_list+=("${dir#$EPATH/}/run.sh")
+            elif [ $(basename $file) == "run.sh" ]; then
+                example_list+=("${dir#$EPATH/}")
+            else
+                example_list+=("${file#$EPATH/}")
+            fi
+        done
+
     done
 done
 
 if [ "$ALL" == true ]; then
+    file_list=($(find $EPATH -name "run.sh" 2>/dev/null))
+    file_list+=($(find $EPATH -name "*.case" 2>/dev/null))
+
     example_list=()
-    for dir in $(find $EPATH/* -type d); do
-        if [ -f "$dir/run.sh" ]; then
+    for file in ${file_list[@]}; do
+        dir=$(dirname $file)
+        if [[ -f $dir/run.sh ]]; then
+            example_list+=("${dir#$EPATH/}/run.sh")
+        elif [ $(basename $file) == "run.sh" ]; then
             example_list+=("${dir#$EPATH/}")
         else
-            for case in $(find $dir -name "*.case" 2>/dev/null); do
-                example_list+=("${case#$EPATH/}")
-            done
+            example_list+=("${file#$EPATH/}")
         fi
     done
 fi
 
-# Remove duplicates
+# Make sure run.sh in parent folders are used if present.
+for i in ${!example_list[@]}; do
+    example=${example_list[$i]}
+
+    run_file=$(dirname ${example%/run.sh})/run.sh
+    while [[ $run_file != "./run.sh" && ! -f $EPATH/$run_file ]]; do
+        run_file=$(dirname ${run_file%/run.sh})/run.sh
+    done
+
+    if [[ -f $EPATH/$run_file && ${example: -3} == '.sh' ]]; then
+
+        printf >&2 "\e[1;31mInvalid run file:\e[m\n"
+        printf >&2 "$EPATH/$example\n"
+        printf >&2 "\tNested run files are not allowed.\n"
+
+        unset example_list[$i]
+    elif [[ -f $EPATH/$run_file && ${example: -3} != '.sh' ]]; then
+        example_list[$i]=$run_file
+    fi
+done
+
+# Case files may not be nested in example folders
+for i in ${!example_list[@]}; do
+    example=${example_list[$i]}
+    parent=$(dirname ${example%/*.*})
+    while [[ $parent != "." &&
+        -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case')" ]]; do
+        parent=$(dirname $parent)
+    done
+
+    if [ $parent != "." ]; then
+
+        printf >&2 "\e[1;31mInvalid example file:\e[m\n"
+        printf >&2 "$EPATH/$example\n"
+        printf <&2 "\tNested examples are not allowed.\n"
+        printf <&2 "\tMove the $example file to the root of example suite\n"
+        if [ ${example: -5} == ".case" ]; then
+            printf >&2 "\tor create a run.sh file in the parent folder.\n"
+        fi
+
+        unset example_list[$i]
+    fi
+done
+
+# Remove duplicates and check for nested examples
 example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
 
 # Check if any examples were found, if not, exit.
-if [ ! "$example_list" ]; then
-    printf "No examples found.\n" >&2 && exit 2
+if [ -z $example_list ]; then
+    printf "No examples found.\n" >&2 && exit
 fi
 
 # ============================================================================ #
@@ -170,7 +225,7 @@ fi
 # Function for running the examples
 function Run() {
     cd $LPATH/$example
-    printf '  %-12s %-s\n' "Started:" "$1"
+    printf '\t%-12s %-s\n' "Started:" "$1"
     ./job_script.sh $1 >output.log 2>error.err
     cd $CURRENT_DIR
 }
@@ -180,7 +235,7 @@ function Submit() {
     cd $LPATH/$example
     export BSUB_QUIET=Y
     bsub -J $1 -env "all" <job_script.sh
-    printf '  %-12s %-s\n' "Submitted:" "$1"
+    printf '\t%-12s %-s\n' "Submitted:" "$1"
     cd $CURRENT_DIR
 }
 INTERRUPTED=0
@@ -200,14 +255,14 @@ QUEUE=""
 
 printf "\n\e[4mQueueing case files.\e[0m\n"
 for case in ${example_list[@]}; do
-    case_name=$(basename ${case%.case})
-    [ -f $EPATH/$case ] && case_dir=$(dirname $case)
-    [ -d $EPATH/$case ] && case_dir=$case
+
+    case_name=$(basename ${case%.*})
+    case_dir=$(dirname $case)
 
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
     example=$case_dir
-    if [[ ! -f "$EPATH/$case_dir/run.sh" &&
+    if [[ ${case: -5} == ".case" &&
         $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
@@ -220,7 +275,7 @@ for case in ${example_list[@]}; do
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
-        [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
+        [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
     fi
@@ -231,14 +286,17 @@ for case in ${example_list[@]}; do
 
     # Find the setting file for the case recursively
     setting=$HPATH/${case%.*}.sh
-    [ ! -f $setting ] && setting=$(dirname $setting)/default.sh
-    while [ ! -f $setting ]; do
-        setting=$(realpath "$(dirname ${setting%/*})")/default.sh
+    while [[ ! -f $setting && ! -z "$setting" ]]; do
+        setting=$(dirname ${setting%/default.sh})/default.sh
     done
+    setting=$(realpath $setting)
 
     # Copy the case files to the log folder
-    [ -f $EPATH/$case ] && cp -ft $log $EPATH/$case
-    [ -d $EPATH/$case ] && cp -ft $log $EPATH/$case/*.case
+    if [ ${case: -3} == ".sh" ]; then
+        find $EPATH/$case_dir -name "*.case" -exec cp -ft $log {} +
+    elif [ ${case: -5} == ".case" ]; then
+        cp -ft $log $EPATH/$case
+    fi
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
@@ -262,7 +320,7 @@ for case in ${example_list[@]}; do
     printf 'Ready' >$log/output.log
 
     QUEUE="$QUEUE $example"
-    [ -z "$(which bsub)" ] && printf '  %-12s %-s\n' "Queued:" "$example"
+    [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
 done
 
 # Done with the setup
