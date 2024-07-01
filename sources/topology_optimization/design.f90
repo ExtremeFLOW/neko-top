@@ -184,11 +184,10 @@ contains
     ! Assign the resistance function to be the source term
     ! ---------------------------------------------------------------------- !
 
-    this%case%usr%fluid_user_f_vector => topopt_permeability_force
-
-    if (.not. associated(this%case%usr%fluid_user_f_vector, target = topopt_permeability_force)) then
-       call neko_error("The fluid user source term is not set.")
+    if (associated(this%case%usr%fluid_user_f_vector)) then
+       nullify(this%case%usr%fluid_user_f_vector)
     end if
+    this%case%usr%fluid_user_f_vector => topopt_permeability_force
 
   end subroutine init_design
 
