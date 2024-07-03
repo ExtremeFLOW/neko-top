@@ -69,7 +69,7 @@ function prepare {
         printf "=%.0s" {1..80} && printf "\n"
         printf "Preparing example.\n\n"
 
-        { time ./prepare.sh; } 2>&1
+        ./prepare.sh
 
         if [ -s "error.err" ]; then
             printf "\nERROR: An error occured during preparation. " >&2
@@ -105,6 +105,11 @@ function prepare {
 # Define the run function
 
 function run {
+
+    function handler() {
+        printf "An error occured" >error.err
+    }
+    trap 'handler' SIGINT
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
@@ -152,4 +157,5 @@ function run {
     # ------------------------------------------------------------------------ #
     # Clean up the results
     cleanup
+
 }
