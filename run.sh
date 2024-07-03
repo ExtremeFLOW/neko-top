@@ -104,22 +104,18 @@ for in in $@; do
     [ "$ALL" == true ] && break
 
     # Decompose the input into the directory and the base name
-    [ $(dirname $in) == "." ] && dir="" || dir=$(dirname $in)
-    base=$(basename $in)
+    [ $(dirname $in) == "." ] && dir=$EPATH || dir=$EPATH/$(dirname $in)
+    base=$(basename ${in})
 
     # Extract the examples from the input
-    matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
+    matches=($(find $dir -mindepth 1 -maxdepth 1 -type d -name "$base"))
+    matches+=($(find $dir -maxdepth 1 -type f -name "$base.case"))
 
     for match in ${matches[@]}; do
-        file_list=()
         if [ -d $match ]; then
-            file_list=($(find $match -name "run.sh" 2>/dev/null))
-            file_list+=($(find $match -name "*.case" 2>/dev/null))
-        fi
-        if [ -f $match ]; then
-            file_list+=($match)
+            file_list=($(find $match -name "run.sh" -or -name "*.case"))
+        elif [ -f $match ]; then
+            file_list=($match)
         fi
 
         for file in ${file_list[@]}; do

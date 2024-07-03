@@ -64,12 +64,14 @@ done
 
 for test in ${tests[@]}; do
     if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
-        file=$(find $LPATH/$test -type f -name "*.case")
-        file+=" $LPATH/$test/output.log"
+        files=($(find $LPATH/$test -type f -name "*.case"))
+        if [ -f $LPATH/$test/run.sh ]; then
+            files+=("$LPATH/$test/output.log")
+        fi
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
             printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
         else
-            for f in $file; do
+            for f in ${files[@]}; do
                 logfile=${f%.*}.log
 
                 if [ ! -f $logfile ]; then
@@ -88,10 +90,11 @@ for test in ${tests[@]}; do
                     )
                 fi
                 printf '\t\e[1;33m%-12s\e[m' "$stat"
-                if [ "$stat" == "Running:" ]; then
+                if [[ "$stat" == "Running:" && ! -z "$progress" ]]; then
                     printf ' [%7s]' "$progress"
                 fi
-                if [ $(basename $f) = "output.log" ]; then
+
+                if [[ $(basename $f) == "output.log" || ${#files[@]} -eq 1 ]]; then
                     printf " %s\n" "$test"
                 else
                     printf " %s\n" "$test/$(basename $f)"
