@@ -155,7 +155,8 @@ find_neko() {
     fi
 
     # Determine available features
-    [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
+    FEATURES="--enable-contrib"
+    [ ! -z "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
     [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
     [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
