@@ -75,6 +75,7 @@ source $MAIN_DIR/scripts/dependencies.sh
 [ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
 [ -z "$GSLIB_DIR" ] && GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
 [ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
+[ -z "$PARMETIS_DIR" ] && PARMETIS_DIR="$EXTERNAL_DIR/parmetis"
 
 # Define standard compilers if they are not defined as environment variables
 if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
@@ -91,6 +92,7 @@ find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
 find_nek5000 $NEK5000_DIR           # Re-defines the NEK5000_DIR variable.
 find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
 find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
+find_parmetis $PARMETIS_DIR         # Re-defines the PARMETIS_DIR variable.
 find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
 
 # Done settng up external dependencies

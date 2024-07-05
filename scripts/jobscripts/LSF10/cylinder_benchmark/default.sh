@@ -14,10 +14,10 @@
 # --  Technical Options
 
 # Queue name
-#BSUB -q "gpuv100"
+#BSUB -q "gpua100"
 
 # Ask for n cores placed on R host.
-#BSUB -n 8
+#BSUB -n 4
 #BSUB -R "span[ptile=4]"
 #BSUB -gpu "num=1:mode=exclusive_process"
 
@@ -64,3 +64,4 @@ source functions.sh
 run $example
 
 # ==============================   End of File   ==============================
+

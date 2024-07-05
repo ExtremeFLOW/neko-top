@@ -14,7 +14,7 @@
 # --  Technical Options
 
 # Queue name
-#BSUB -q "gpua100"
+#BSUB -q "gpuv100"
 
 # Ask for n cores placed on R host.
 #BSUB -n 4

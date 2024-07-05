@@ -2,17 +2,13 @@
     "version": 1.0,
     "case": {
         "mesh_file": "box.nmsh",
-        "output_directory": "parallel_2",
         "load_balancing": true,
-        "output_at_end": false,
-        "output_boundary": false,
-        "output_checkpoints": false,
-        "end_time": 20.0,
+        "end_time": 10.0,
         "timestep": 5e-5,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 8,
-            "dealias": true
+            "dealias": false
         },
         "fluid": {
             "scheme": "pnpn",
