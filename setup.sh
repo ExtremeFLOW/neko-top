@@ -22,6 +22,7 @@ function help() {
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
+    echo -e "\tPARMETIS_DIR      The directory where ParMETIS is installed"
 }
 
 # Assign default values to the options
