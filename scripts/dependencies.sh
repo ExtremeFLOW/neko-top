@@ -149,7 +149,8 @@ function find_parmetis() {
 
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
         mkdir -p $1
-        wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz -O $1/parmetis.tar.gz
+        wget http://glaros.dtc.umn.edu/gkhome/fetch/sw/parmetis/parmetis-4.0.3.tar.gz \
+            -O $1/parmetis.tar.gz
         tar xzf $1/parmetis.tar.gz --directory $1 --strip-components=1
         rm -fr $1/parmetis.tar.gz
     fi
@@ -157,7 +158,7 @@ function find_parmetis() {
     if [[ -z "$(find $1 -name libparmetis.a)" ]]; then
         cd $1
         CMAKE_GENERATOR="Unix Makefiles" make config prefix=$1
-        make -j$(nproc) && make install && make distclean
+        make -j && make install && make distclean
         cd $CURRENT_DIR
     fi
 
@@ -172,7 +173,7 @@ function find_parmetis() {
         error "\thttps://github.com/KarypisLab/ParMETIS.git"
         exit 1
     fi
-	
+
     export PARMETIS_DIR=$(realpath $PARMETIS_LIB/../)
 }
 
