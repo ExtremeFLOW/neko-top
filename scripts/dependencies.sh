@@ -15,7 +15,7 @@ function check_system_dependencies() {
     [ -z "$(which automake)" ] && MISSING+=("Automake")
     [ -z "$(which pkg-config)" ] && MISSING+=("Pkg-config")
 
-    if [ ! -z "$MISSING" ]; then
+    if [ ${#MISSING} != 0 ]; then
         printf "The following dependencies are not installed:\n"
         for dep in "${MISSING[@]}"; do
             printf "  - $dep\n"
