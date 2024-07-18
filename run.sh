@@ -280,8 +280,14 @@ for case in ${example_list[@]}; do
     find $log -type f -name "*.log" -or -name "error.err" -delete
     touch $log/output.log $log/error.err
 
-    # Find the setting file for the case recursively
+    # Find the setting file for the case file or directory of the case file
     setting=$HPATH/${case%.*}.sh
+    if [ ! -f $setting ]; then
+        setting=$HPATH/${case_dir%/}.sh
+    fi
+
+    # If none have been found yet, we recursively search for the default setting
+    if [ ! -f $setting ]; then setting=$HPATH/${case%.*}/default.sh; fi
     while [[ ! -f $setting && ! -z "$setting" ]]; do
         setting=$(dirname ${setting%/default.sh})/default.sh
     done
