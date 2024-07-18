@@ -156,6 +156,9 @@ function find_parmetis() {
     fi
 
     if [[ -z "$(find $1 -name libparmetis.a)" ]]; then
+        cd $1/metis
+        CMAKE_GENERATOR="Unix Makefiles" make config prefix=$1
+        make -j && make install && make distclean
         cd $1
         CMAKE_GENERATOR="Unix Makefiles" make config prefix=$1
         make -j && make install && make distclean
@@ -216,7 +219,7 @@ function find_neko() {
         # Update compile dependencies if makedepf90 is installed
         if [ ! -z "$(which makedepf90)" ]; then
             size_pre=$(stat -c %s src/.depends)
-            cd src/ && make depend && cd ../
+            cd $1/src/ && make depend && cd $1
             if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
                 automake -a
                 rm -fr autom4te.cache
