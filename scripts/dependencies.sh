@@ -155,8 +155,10 @@ function find_parmetis() {
     fi
 
     if [[ -z "$(find $1 -name libparmetis.a)" ]]; then
-        CMAKE_GENERATOR="Unix Makefiles" make -C $1 config prefix=$1
-        make -C $1 -j$(nproc) && make -C $1 install && make -C $1 distclean
+        cd $1
+        CMAKE_GENERATOR="Unix Makefiles" make config prefix=$1
+        make -j$(nproc) && make install && make distclean
+        cd $CURRENT_DIR
     fi
 
     PARMETIS_LIB=$(find $1 -type d -name 'lib*' \
@@ -170,7 +172,7 @@ function find_parmetis() {
         error "\thttps://github.com/KarypisLab/ParMETIS.git"
         exit 1
     fi
-
+	
     export PARMETIS_DIR=$(realpath $PARMETIS_LIB/../)
 }
 
