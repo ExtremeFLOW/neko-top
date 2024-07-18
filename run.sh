@@ -183,8 +183,8 @@ for i in ${!example_list[@]}; do
 
         printf >&2 "\e[1;31mInvalid example file:\e[m\n"
         printf >&2 "$EPATH/$example\n"
-        printf <&2 "\tNested examples are not allowed.\n"
-        printf <&2 "\tMove the $example file to the root of example suite\n"
+        printf >&2 "\tNested examples are not allowed.\n"
+        printf >&2 "\tMove the $example file to the root of example suite\n"
         if [ ${example: -5} == ".case" ]; then
             printf >&2 "\tor create a run.sh file in the parent folder.\n"
         fi
