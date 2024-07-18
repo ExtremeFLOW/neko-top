@@ -1,8 +1,9 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "box.nmsh",
+        "mesh_file": "box_2.nmsh",
         "load_balancing": true,
+        "output_partition": true,
         "end_time": 10.0,
         "timestep": 5e-5,
         "numerics": {
