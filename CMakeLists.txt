@@ -165,7 +165,7 @@ endif()
 # Setup testing
 include(CTest)
 if (BUILD_TESTING)
-    find_package(PFUNIT REQUIRED)
+    find_package(PFUNIT REQUIRED HINTS ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
