@@ -7,6 +7,7 @@ module design_module
 
   use case, only: case_t
   use fluid_user_source_term, only: fluid_user_source_term_t
+  ! use fluid_source_term, only: fluid_source_term_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use num_types, only: rp
@@ -25,6 +26,7 @@ module design_module
   use json_module, only: json_file
   use utils, only: neko_error
   use, intrinsic :: iso_c_binding, only: c_ptr, c_null_ptr
+  ! use topopt_brinkman_source_term, only: topopt_brinkman_source_term_t
   implicit none
 
 
@@ -106,6 +108,8 @@ contains
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
 
+    ! type(fluid_source_term_t), allocatable :: brinkman_source_term
+
     ! Base initialization
     call this%free()
     call this%init_base(json, case)
@@ -170,6 +174,9 @@ contains
     ! Initialize the resistance array
     ! ---------------------------------------------------------------------- !
 
+    ! allocate(brinkman_source_term)
+
+
     this%total_size = this%design_field%dof%size()
     this%design_size = this%design_domain%size
 
@@ -179,6 +186,8 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_map(resistance, resistance_d, this%total_size)
     end if
+
+
 
     ! ---------------------------------------------------------------------- !
     ! Assign the resistance function to be the source term

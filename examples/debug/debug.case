@@ -50,11 +50,6 @@
                 "v",
                 "o",
                 "w"
-            ],
-            "source_terms": [
-                {
-                    "type": "user_vector"
-                }
             ]
         },
         "scalar": {
