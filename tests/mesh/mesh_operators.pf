@@ -1,12 +1,17 @@
-! module mesh_operators_test
+module mesh_operators
 !   use mpi
-!   use pfunit
+  use pfunit
 !   use mesh_operators
 !   use num_types, only: dp
 !   use comm, only : NEKO_COMM, pe_rank, pe_size
 !   implicit none
 
-! contains
+contains
+
+  @test
+  subroutine dummy_test
+    @assertTrue(.true.)
+  end subroutine dummy_test
 
 !   @test
 !   subroutine transform
@@ -423,4 +428,4 @@
 
 !     end subroutine test_math_glsc3
 
-!   end subroutine transform
+end module mesh_operators
