@@ -157,7 +157,7 @@ contains
                              'case.output_directory', dirname, './')
 
     write (file_name, '(a,a,i5.5,a)') &
-      trim(adjustl(dirname)), '/topopt_', iter, '_.fld'
+         trim(adjustl(dirname)), '/topopt_', iter, '_.fld'
 
     neko_case%f_out%output_t%file_%file_type%fname = trim(file_name)
     neko_case%f_out%output_t%file_%file_type%counter = 0
