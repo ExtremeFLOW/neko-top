@@ -87,9 +87,11 @@ set(CMAKE_Fortran_PREPROCESS ON)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-Og>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wpedantic>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
-        -Wall -Wextra -Werror
+        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
     )
 endif()
 
