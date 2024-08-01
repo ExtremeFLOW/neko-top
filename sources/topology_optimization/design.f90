@@ -194,7 +194,7 @@ contains
     use math_ext, only: cadd_mask
     use device_math_ext, only: device_cadd_mask
     use device_math, only: device_cadd
-    use device, only: device_memcpy, host_to_device
+    use device, only: device_memcpy
     implicit none
 
     class(design_t), intent(inout) :: this

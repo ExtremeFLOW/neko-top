@@ -11,5 +11,5 @@ user interface.
 
 1. \subpage compilation
    a. \subpage testing
-2. [Examples](#examples)
-3. [Tools and Utilities](#tools)
+2. [Examples](@ref examples)
+3. [Tools and Utilities](@ref tools)

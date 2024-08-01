@@ -3,27 +3,28 @@
 
 The execution of examples have been automated to allow for easy testing and
 development of new features. The examples are located in the `examples` folder
-and are self-contained with case files and the nmsh files required (or details on
-how to get them). The examples are compiled and executed using the `run.sh`
+and are self-contained with case files and the nmsh files required (or details
+on how to get them). The examples are compiled and executed using the `run.sh`
 script.
+
+For inline help on the `run.sh` script, use the `-h` or `--help` switch.
+
+```sh
+./run.sh [-h] [--help]
+```
 
 ## List of examples
 
 1. \subpage permeability_block
 2. \subpage easy-E
 
-## Adding examples
-
-To construct new examples, place a folder in the `examples` folder. Each example
-should be self-contained with case files, the nmsh required. Any additional
-source files should ideally be placed in that folder as well.
-
 ## Execution of examples
 
-The run.sh script is the main driver for any example. The run script will
-construct a local system for execution of any example defined in the examples
-folder. Each example should contain a .case file and a compiled version of Neko
-ready to be executed. This is in general provided by our CMake setup.
+The [run.sh](../../run.sh) script is the main driver for all examples.
+The run script will construct a local system for execution of any example
+defined in the examples folder. Each example should at least contain a .case
+file with the specifications to Neko. The run script will copy the contents of
+the example folder to a temporary folder and execute the example from there.
 
 The contents of `example/EXAMPLE_NAME` will be copied to a temporary
 `log/EXAMPLE_NAME` along with a job_script. This job_script can be user defined
@@ -36,6 +37,21 @@ the switch `-n` or `--neko`.
 ```sh
 ./run.sh --neko tgv
 ```
+
+## Adding examples
+
+To construct new examples, place a folder in the `examples` folder. Each example
+should be self-contained with case files, the nmsh required. Any additional
+source files should ideally be placed in that folder as well.
+
+Additionally the following constraints on the structure of the example folder
+are required:
+
+- The example is required to only contain a single `run.sh` script. This script
+  indicate the root of the example.
+- The example may contain any number of case files, but if there is no `run.sh`
+  script, all of them should be placed in the root of the example folder.
+  Otherwise, each folder containing a case file will be considered an example.
 
 ## Case files and meshes.
 
