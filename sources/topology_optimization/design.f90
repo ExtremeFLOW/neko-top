@@ -118,7 +118,7 @@ contains
 
     if (neko_point_zone_registry%point_zone_exists("design_domain") ) then
        this%design_domain => &
-         neko_point_zone_registry%get_point_zone("design_domain")
+            neko_point_zone_registry%get_point_zone("design_domain")
     else
        call neko_log%error("design_domain point zone does not exist")
     end if
@@ -307,7 +307,7 @@ contains
     use neko_config, only: NEKO_BCKND_DEVICE
     use math, only: col2, cmult, invcol1, cadd, add2, cfill
     use device_math, only: device_col2, device_cmult, device_invcol1, &
-      device_cadd, device_add2, device_cfill
+         device_cadd, device_add2, device_cfill
 
     implicit none
 
@@ -318,7 +318,7 @@ contains
     real(kind=rp) :: constant
 
     constant = (this%perm_0 - this%perm_1) &
-      * (this%perm_penalty + 1.0_rp)
+         * (this%perm_penalty + 1.0_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill(resistance_d, this%perm_penalty, this%total_size)
