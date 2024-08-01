@@ -82,9 +82,9 @@ contains
 
   end subroutine compute_sensitivity
 
-  subroutine compute_adjoint(this)
-    class(sensitivity_t), intent(inout) :: this
+  ! subroutine compute_adjoint(this)
+  !   class(sensitivity_t), intent(inout) :: this
 
-  end subroutine compute_adjoint
+  ! end subroutine compute_adjoint
 
 end module sensitivity
