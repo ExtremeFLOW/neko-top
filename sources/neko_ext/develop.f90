@@ -316,8 +316,8 @@ contains
                                          facet_area)
 
     write (log_buf, '(a,f15.7)') &
-      "Outlet area-weighted average temperature deviation: ", &
-      temperature_mean
+         "Outlet area-weighted average temperature deviation: ", &
+         temperature_mean
     call neko_log%message(log_buf)
 
     call interpolator%free()
