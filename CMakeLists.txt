@@ -95,6 +95,17 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     )
 endif()
 
+# ............................................................................ #
+# Write messages to the user about the options and paths
+
+message(STATUS "BUILD_DOCS: ${BUILD_DOCS}")
+message(STATUS "BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
+message(STATUS "BUILD_TESTING: ${BUILD_TESTING}")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
+message(STATUS "NEKO_DIR: ${NEKO_DIR}")
+message(STATUS "PFUNIT_DIR: ${PFUNIT_DIR}")
+
 # ============================================================================ #
 # Documentation
 # ============================================================================ #
@@ -111,8 +122,8 @@ endif()
 # Setup External Libraries
 # ............................................................................ #
 # Check for the required libraries.
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+find_package(BLAS REQUIRED QUIET)
+find_package(LAPACK REQUIRED QUIET)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
