@@ -344,31 +344,61 @@ contains
 
   ! ========================================================================== !
 
-  ! @test
-  ! subroutine test_distance_tetrahedron
-  !   real(kind=dp), dimension(3) :: p
-  !   type(tet_t) :: tetrahedron
-  !   real(kind=dp) :: distance_1, distance_2
+  @test
+  subroutine test_distance_tetrahedron
+    real(kind=dp), dimension(3) :: p
+    type(tet_t) :: tetrahedron
+    real(kind=dp) :: distance_1, distance_2
 
-  !   type(point_t) :: point_0, point_1, point_2, point_3
-  !   integer :: dummy_id
+    type(point_t) :: point_0, point_1, point_2, point_3
+    integer :: dummy_id
+    character(len=100) :: message
 
-  !   p = [1.0_dp, 2.0_dp, 3.0_dp]
-  !   point_0 = point_t(4.0_dp, 5.0_dp, 6.0_dp)
-  !   point_1 = point_t(7.0_dp, 8.0_dp, 9.0_dp)
-  !   point_2 = point_t(10.0_dp, 11.0_dp, 12.0_dp)
-  !   point_3 = point_t(13.0_dp, 14.0_dp, 15.0_dp)
+    ! Define a unit tetrahedron, centered on the origin
+    dummy_id = 0
+    point_0 = point_t(0.0_dp, 0.0_dp, 1.0_dp)
+    point_1 = point_t(sqrt(8.0_dp / 9.0_dp), 0.0_dp, &
+                      -1.0_dp / 3.0_dp)
+    point_2 = point_t(-sqrt(2.0_dp / 9.0_dp), sqrt(2.0_dp / 3.0_dp), &
+                      -1.0_dp / 3.0_dp)
+    point_3 = point_t(-sqrt(2.0_dp / 9.0_dp), -sqrt(2.0_dp / 3.0_dp), &
+                      -1.0_dp / 3.0_dp)
+    call tetrahedron%init(dummy_id, point_0, point_1, point_2, point_3)
 
-  !   dummy_id = 0
-  !   call tetrahedron%init(dummy_id, point_0, point_1, point_2, point_3)
+    ! ------------------------------------------------------------------------ !
+    message = "Simple tetrahedron centered on the origin, &
+         & point is at (0, 0, 1), distance should be 0"
+    p = [0.0_dp, 0.0_dp, 1.0_dp]
 
-  !   distance_1 = distance_tetrahedron(p, tetrahedron)
-  !   distance_2 = distance_element(p, tetrahedron)
-  !   @assertEqual(sqrt(27.0_dp), distance_1, 1e-12_dp)
-  !   @assertEqual(sqrt(27.0_dp), distance_2, 1e-12_dp)
+    distance_1 = distance_tetrahedron(p, tetrahedron)
+    distance_2 = distance_element(p, tetrahedron)
+    @assertEqual(0.0_dp, distance_1, 1e-12_dp, message)
+    @assertEqual(0.0_dp, distance_2, 1e-12_dp, message)
 
-  !   @assertEqual(1, 0, 1e-12_dp)
+    ! ------------------------------------------------------------------------ !
+    message = "Simple tetrahedron centered on the origin, &
+         & point is at (0, 0, 0), distance should be -1/3"
 
-  ! end subroutine test_distance_tetrahedron
+    p = [0.0_dp, 0.0_dp, 0.0_dp]
+    distance_1 = distance_tetrahedron(p, tetrahedron)
+    @assertEqual(- 1.0_dp / 3.0_dp, distance_1, 1e-12_dp, message)
+
+    ! ------------------------------------------------------------------------ !
+    message = "Simple tetrahedron centered on the origin, &
+         & point is at (0, 0, -1), distance should be 2/3"
+
+    p = [0.0_dp, 0.0_dp, -1.0_dp]
+    distance_1 = distance_tetrahedron(p, tetrahedron)
+    @assertEqual(2.0_dp / 3.0_dp, distance_1, 1e-12_dp, message)
+
+    ! ------------------------------------------------------------------------ !
+    message = "Simple tetrahedron centered on the origin, &
+         & point is at (0, 0, 2), distance should be 1"
+
+    p = [0.0_dp, 0.0_dp, 2.0_dp]
+    distance_1 = distance_tetrahedron(p, tetrahedron)
+    @assertEqual(1.0_dp, distance_1, 1e-12_dp, message)
+
+  end subroutine test_distance_tetrahedron
 
 end module distance
