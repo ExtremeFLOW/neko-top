@@ -167,8 +167,8 @@ find_neko() {
         exit 1
     fi
 
+    cd $1
     if [[ -z "$(find $1 -name libneko.a)" || "$CLEAN" == true ]]; then
-        cd $1
         if [[ ! -f "configure" || "$CLEAN" == true ]]; then
             ./regen.sh
         fi
@@ -185,17 +185,17 @@ find_neko() {
                 rm -fr autom4te.cache
             fi
         fi
-
         [ "$CLEAN" == true ] && make clean
-        [ "$QUIET" == true ] && make -s -j install || make -j install
-
-        # Run Tests if the flag is set
-        if [ "$TEST" == true ]; then
-            printf "Running Neko tests\n"
-            make check
-        fi
-        cd $CURRENT_DIR
     fi
+
+    [ "$QUIET" == true ] && make -s -j install || make -j install
+
+    # Run Tests if the flag is set
+    if [ "$TEST" == true ]; then
+        printf "Running Neko tests\n"
+        make check
+    fi
+    cd $CURRENT_DIR
 
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)
     if [ -z "$NEKO_DIR" ]; then
