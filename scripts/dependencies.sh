@@ -118,6 +118,26 @@ function find_pfunit() {
 
         git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
+
+        # Patch pFUnit to work with Neko
+        cur=$(pwd)
+        cd $1
+        cat >>pfunit_error_stop.patch <<_ACEOF
+diff --git a/src/funit/FUnit.F90 b/src/funit/FUnit.F90
+index 7df7b65..4f7dbf5 100644
+--- a/src/funit/FUnit.F90
++++ b/src/funit/FUnit.F90
+@@ -168,6 +168,6 @@ contains
+ #if defined(PGI)
+          call exit(-1)
+ #else
+-         stop '*** Encountered 1 or more failures/errors during testing. ***'
++         error stop '*** Encountered 1 or more failures/errors during testing. ***'
+ #endif
+       end if
+_ACEOF
+        git apply pfunit_error_stop.patch
+        cd $cur
     fi
 
     if [[ -z "$(find $1 -name libpfunit.a)" ]]; then
