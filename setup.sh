@@ -124,6 +124,5 @@ printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDevice: $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
 if [ "$TEST" == true ]; then
-    printf "To run the tests, execute the following command:\n"
-    printf "\tctest --test-dir $MAIN_DIR/build\n"
+    ctest -C Debug --output-on-failure --test-dir $MAIN_DIR/build --parallel
 fi
