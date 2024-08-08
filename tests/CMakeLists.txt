@@ -4,19 +4,7 @@
 # This CMakeLists.txt file is used to define the tests for the Neko-TOP
 # library. The tests are defined using the pFUnit testing framework, which
 # is a Fortran testing framework that is used to test the Neko-TOP library.
-
-# ============================================================================ #
-# External dependencies
-# ============================================================================ #
-
-# Setup of testing framework using pFUnit as the library
-# and CMake as the build system.
-
-find_package(MPI REQUIRED)
-find_package(PkgConfig REQUIRED)
-
-pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
-
+#
 # ============================================================================ #
 # Setup the Neko-TOP tests
 # ============================================================================ #
@@ -63,7 +51,7 @@ foreach(folder ${folder_list})
                 message(STATUS "Adding test: ${pf_file}")
                 add_pfunit_ctest(${test_name}-${pf_file_name}
                     TEST_SOURCES ${pf_file}
-                    LINK_LIBRARIES PkgConfig::neko MPI::MPI_Fortran Neko-TOP
+                    LINK_LIBRARIES PkgConfig::neko MPI::MPI_Fortran neko-top
                 )
             endforeach()
         endif()

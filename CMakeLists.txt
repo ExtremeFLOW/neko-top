@@ -42,8 +42,6 @@ set(CMAKE_Fortran_STANDARD 2008)
 
 # Enable devices
 option(DEVICE_TYPE "Enable device support" OFF)
-
-message(STATUS "DEVICE_TYPE: ${DEVICE_TYPE}")
 if (DEVICE_TYPE STREQUAL "CUDA")
     include(CheckLanguage)
     check_language(CUDA)
@@ -70,7 +68,10 @@ if (ONLY_DOCS)
     set(BUILD_TESTING OFF)
 endif()
 
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build.")
+if (CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "Release"
+        CACHE STRING "Choose the type of build" FORCE)
+endif()
 
 # Set default paths for the external dependencies
 set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
@@ -93,18 +94,17 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
     )
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:Fortran>:-O3>
+        $<$<COMPILE_LANGUAGE:Fortran>:-march=native>
+        $<$<COMPILE_LANGUAGE:Fortran>:-mtune=native>
+        $<$<COMPILE_LANGUAGE:Fortran>:-funroll-loops>
+        $<$<COMPILE_LANGUAGE:Fortran>:-flto>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fwhole-program>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
+    )
 endif()
-
-# ............................................................................ #
-# Write messages to the user about the options and paths
-
-message(STATUS "BUILD_DOCS: ${BUILD_DOCS}")
-message(STATUS "BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
-message(STATUS "BUILD_TESTING: ${BUILD_TESTING}")
-message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-message(STATUS "JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
-message(STATUS "NEKO_DIR: ${NEKO_DIR}")
-message(STATUS "PFUNIT_DIR: ${PFUNIT_DIR}")
 
 # ============================================================================ #
 # Documentation
@@ -122,8 +122,8 @@ endif()
 # Setup External Libraries
 # ............................................................................ #
 # Check for the required libraries.
-find_package(BLAS REQUIRED QUIET)
-find_package(LAPACK REQUIRED QUIET)
+find_package(BLAS REQUIRED)
+find_package(LAPACK REQUIRED)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
@@ -178,8 +178,31 @@ endif()
 # Setup testing
 include(CTest)
 if (BUILD_TESTING)
-    find_package(PFUNIT REQUIRED HINTS ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit)
+    find_package(PFUNIT REQUIRED
+        HINTS ${PFUNIT_DIR}
+    )
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 endif()
 
 # ============================================================================ #
+# Write messages to the user about the options and paths
+
+message(STATUS "==============================================================")
+message(STATUS "Neko-TOP: Neko Topology Optimization Package")
+message(STATUS "")
+message(STATUS "Current configuration:")
+message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
+message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
+message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
+message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
+message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
+message(STATUS "")
+message(STATUS "External dependencies:")
+message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
+message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
+message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
+message(STATUS "==============================================================")
+
+# ============================================================================ #
+# End of file
