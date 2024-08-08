@@ -185,24 +185,33 @@ if (BUILD_TESTING)
 endif()
 
 # ============================================================================ #
-# Write messages to the user about the options and paths
+# Write messages to the user about the options and paths if we are at the top
+# level of the build.
 
-message(STATUS "==============================================================")
-message(STATUS "Neko-TOP: Neko Topology Optimization Package")
-message(STATUS "")
-message(STATUS "Current configuration:")
-message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
-message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
-message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
-message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
-message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
-message(STATUS "")
-message(STATUS "External dependencies:")
-message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
-message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
-message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
-message(STATUS "==============================================================")
+if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
+
+    string(REPEAT "=" 80 BARRIER)
+
+    message(STATUS "")
+    message(STATUS ${BARRIER})
+    message(STATUS "Neko-TOP: Neko Topology Optimization Package")
+    message(STATUS "")
+    message(STATUS "Current configuration:")
+    message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+    message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
+    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
+    message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
+    message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
+    message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
+    message(STATUS "")
+    message(STATUS "External dependencies:")
+    message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
+    message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
+    message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
+    message(STATUS ${BARRIER})
+    message(STATUS "")
+
+endif()
 
 # ============================================================================ #
 # End of file
