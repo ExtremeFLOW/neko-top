@@ -73,7 +73,7 @@ source $MAIN_DIR/scripts/dependencies.sh
 [ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
 [ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
-[ -z "$GSLIB_DIR" ] && GSLIB_DIR="$NEK5000_DIR/3rd_party/gslib"
+[ -z "$GSLIB_DIR" ] && GSLIB_DIR="$EXTERNAL_DIR/gslib"
 [ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
 
 # Define standard compilers if they are not defined as environment variables
@@ -89,7 +89,6 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 check_system_dependencies           # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
 find_nek5000 $NEK5000_DIR           # Re-defines the NEK5000_DIR variable.
-find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
 find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
 find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
 

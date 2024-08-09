@@ -173,6 +173,11 @@ _ACEOF
 # Ensure Neko is installed, if not install it.
 find_neko() {
 
+    # Find the required external dependencies
+    find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+    find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
+    find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
+
     # Clone Neko from the repository if it does not exist.
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
         [ -z "$NEKO_VERSION" ] && NEKO_VERSION="master"
@@ -220,7 +225,7 @@ find_neko() {
     fi
 
     # Run Tests if the flag is set
-    if [ "$TEST" == true ]; then
+    if [[ "$TEST" == true && -f Makefile ]]; then
         printf "Running Neko tests\n"
         make check
     fi
