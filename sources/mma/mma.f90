@@ -661,10 +661,8 @@ module mma
 
     end subroutine mma_KKT
 
+    !> Deallocate the MMA object.
     subroutine mma_free(this)
-        ! ----------------------------------------------------- !
-        ! Deallocate the mma object                             !
-        ! ----------------------------------------------------- !
 
         class(mma_t), intent(inout) :: this
 
