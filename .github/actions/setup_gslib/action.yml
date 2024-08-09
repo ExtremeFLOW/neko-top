@@ -57,8 +57,10 @@ runs:
       if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       shell: bash
       env:
+        WORKING_DIR: ${{ inputs.working-dir }}
         INSTALL_DIR: ${{ inputs.install-dir }}
       run: |
+        cd $WORKING_DIR
         make CC=mpicc DESTDIR=$INSTALL_DIR -j
 
     - name: Install
@@ -66,7 +68,9 @@ runs:
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
+        INSTALL_DIR: ${{ inputs.install-dir }}
       run: |
+        cd $WORKING_DIR
         make CC=mpicc DESTDIR=$INSTALL_DIR install
 
     - name: Cleanup
