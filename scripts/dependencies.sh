@@ -215,7 +215,9 @@ find_neko() {
         [ "$CLEAN" == true ] && make clean
     fi
 
-    [ "$QUIET" == true ] && make -s -j install || make -j install
+    if [ -f "Makefile" ]; then
+        [ "$QUIET" == true ] && make -s -j install || make -j install
+    fi
 
     # Run Tests if the flag is set
     if [ "$TEST" == true ]; then
