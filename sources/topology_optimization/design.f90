@@ -19,7 +19,7 @@ module design_module
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col3, rzero, col2, cmult, invcol1, cadd, add2, cfill
   use device_math, only: device_col3, device_rzero, device_col2, device_cmult, &
-    device_invcol1, device_cadd, device_add2, device_cfill
+       device_invcol1, device_cadd, device_add2, device_cfill
   use math_ext, only: cadd_mask, col3_mask
   use device_math_ext, only: device_cadd_mask, device_col3_mask
   use simulation_component, only: simulation_component_t
@@ -131,7 +131,7 @@ contains
 
     if (neko_point_zone_registry%point_zone_exists("design_domain") ) then
        this%design_domain => &
-         neko_point_zone_registry%get_point_zone("design_domain")
+            neko_point_zone_registry%get_point_zone("design_domain")
     else
        call neko_log%error("design_domain point zone does not exist")
     end if
