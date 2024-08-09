@@ -70,7 +70,6 @@ jobs:
         run: |
           cmake -B build -S . -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
             -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
-            -DGSLIB_DIR=$GSLIB_DIR \
             -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=OFF
 
       - name: Build Neko-TOP
