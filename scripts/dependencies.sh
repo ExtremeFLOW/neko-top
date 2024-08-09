@@ -171,7 +171,7 @@ _ACEOF
 
 # ============================================================================ #
 # Ensure Neko is installed, if not install it.
-find_neko() {
+function find_neko() {
 
     # Find the required external dependencies
     find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
@@ -200,14 +200,14 @@ find_neko() {
     fi
 
     cd $1
-    if [[ -z "$(find $1 -name libneko.a)" || "$CLEAN" == true ]]; then
-        if [[ ! -f "configure" || "$CLEAN" == true ]]; then
-            ./regen.sh
-        fi
-        if [[ ! -f Makefile || "$CLEAN" == true ]]; then
-            ./configure --prefix="$(realpath ./)" $FEATURES
-        fi
+    if [[ -f regen.sh && (! -f "configure" || "$CLEAN" == true) ]]; then
+        ./regen.sh
+    fi
+    if [[ -f configure && (! -f Makefile || "$CLEAN" == true) ]]; then
+        ./configure --prefix="$(realpath ./)" $FEATURES
+    fi
 
+    if [ -f Makefile ]; then
         # Update compile dependencies if makedepf90 is installed
         if [ ! -z "$(which makedepf90)" ]; then
             size_pre=$(stat -c %s src/.depends)
@@ -218,17 +218,10 @@ find_neko() {
             fi
         fi
         [ "$CLEAN" == true ] && make clean
-    fi
-
-    if [ -f "Makefile" ]; then
         [ "$QUIET" == true ] && make -s -j install || make -j install
+        [ "$TEST" == true ] && make check
     fi
 
-    # Run Tests if the flag is set
-    if [[ "$TEST" == true && -f Makefile ]]; then
-        printf "Running Neko tests\n"
-        make check
-    fi
     cd $CURRENT_DIR
 
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)

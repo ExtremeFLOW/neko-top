@@ -13,7 +13,7 @@
                 "debug.case"
             ],
             "stopAtEntry": false,
-            "cwd": "${workspaceFolder}/examples/debug",
+            "cwd": "${workspaceFolder}/logs/debug",
             "environment": [
                 {
                     "name": "NEKO_LOG_LEVEL",
@@ -29,7 +29,8 @@
                     "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "CMake: build"
+            "preLaunchTask": "Initialize Debug",
+            "postDebugTask": "Finalize debug",
         }
     ]
 }

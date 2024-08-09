@@ -124,8 +124,18 @@ for test in ${tests[@]}; do
             continue
         fi
 
+        # Print the header with example name
         printf '\n\e[4;31m%-s\e[m' "${test:0:79}"
         printf '\e[4;31m%.0s_\e[m' $(seq 1 $((80 - ${#test}))) && printf '\n'
+
+        # Find the "*** ERROR: " line in the log file and print it.
+        for f in $(find $LPATH/$test -type f -name "*.log"); do
+            if [ "$(grep -i 'error' $f)" ]; then
+                grep -i '*** error: ' $f | fold -w 80
+            fi
+        done
+
+        printf "\n"
         if [ $(cat $LPATH/$test/error.err | wc -l) -ge "10" ]; then
             head -n 5 $LPATH/$test/error.err | fold -w 80
             printf ".....\n"
@@ -133,6 +143,8 @@ for test in ${tests[@]}; do
         else
             cat $LPATH/$test/error.err | fold -w 80
         fi
+        printf "\n"
+
     fi
 done
 printf "\n"
