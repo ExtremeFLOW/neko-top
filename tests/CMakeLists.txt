@@ -46,7 +46,8 @@ foreach(folder ${folder_list})
             file(GLOB pf_files ${CMAKE_CURRENT_SOURCE_DIR}/${folder}/*.pf)
             foreach(pf_file ${pf_files})
                 get_filename_component(pf_file_name ${pf_file} NAME_WE)
-                file(RELATIVE_PATH pf_file ${CMAKE_CURRENT_SOURCE_DIR} ${pf_file})
+                file(RELATIVE_PATH pf_file
+                    ${CMAKE_CURRENT_SOURCE_DIR} ${pf_file})
                 message(STATUS "Adding test: ${pf_file_name}")
                 message(STATUS "Adding test: ${pf_file}")
                 add_pfunit_ctest(${test_name}-${pf_file_name}
