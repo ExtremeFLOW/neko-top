@@ -1,4 +1,4 @@
-# Thermal dissipation from a rod
+# Thermal dissipation from a rod {#easy-E}
 
 This showcases a very crude example of handling heat transfer from a rod to the
 surrounding fluid. The rod have an assigned temperature and the fluid has an
