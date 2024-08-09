@@ -10,5 +10,6 @@ observe the documentation for Neko for specific details on case files and the
 user interface.
 
 1. \subpage compilation
+   a. \subpage testing
 2. [Examples](@ref examples)
 3. [Tools and Utilities](@ref tools)

@@ -83,13 +83,20 @@ function find_nek5000() {
 # ============================================================================ #
 # Ensure GSLIB is installed, if not install it.
 function find_gslib() {
-    if [ ! -d $1 ]; then return; fi
+    if [ ! -d $1 ]; then
+        git clone --depth 1 --branch master \
+            https://github.com/nek5000/gslib.git $1
+    fi
 
     if [ -z "$(find $1 -name libgs.a)" ]; then
+        echo "Building GSLIB"
         current=$(pwd)
         cd $1
-        CC=mpicc ./install
+        make CC=mpicc
+        make install DESTDIR=.
+        rm -fr build
         cd $current
+        echo "GSLIB built"
     fi
 
     GSLIB_LIB=$(find $1 -type d -name 'lib*' \
@@ -118,6 +125,26 @@ function find_pfunit() {
 
         git clone --depth=1 --branch $PFUNIT_VERSION \
             https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git $1
+
+        # Patch pFUnit to work with Neko
+        cur=$(pwd)
+        cd $1
+        cat >>pfunit_error_stop.patch <<_ACEOF
+diff --git a/src/funit/FUnit.F90 b/src/funit/FUnit.F90
+index 7df7b65..4f7dbf5 100644
+--- a/src/funit/FUnit.F90
++++ b/src/funit/FUnit.F90
+@@ -168,6 +168,6 @@ contains
+ #if defined(PGI)
+          call exit(-1)
+ #else
+-         stop '*** Encountered 1 or more failures/errors during testing. ***'
++         error stop '*** Encountered 1 or more failures/errors during testing. ***'
+ #endif
+       end if
+_ACEOF
+        git apply pfunit_error_stop.patch
+        cd $cur
     fi
 
     if [[ -z "$(find $1 -name libpfunit.a)" ]]; then
@@ -146,6 +173,11 @@ function find_pfunit() {
 # Ensure Neko is installed, if not install it.
 find_neko() {
 
+    # Find the required external dependencies
+    find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
+    find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
+    find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
+
     # Clone Neko from the repository if it does not exist.
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
         [ -z "$NEKO_VERSION" ] && NEKO_VERSION="master"
@@ -167,8 +199,8 @@ find_neko() {
         exit 1
     fi
 
+    cd $1
     if [[ -z "$(find $1 -name libneko.a)" || "$CLEAN" == true ]]; then
-        cd $1
         if [[ ! -f "configure" || "$CLEAN" == true ]]; then
             ./regen.sh
         fi
@@ -185,17 +217,19 @@ find_neko() {
                 rm -fr autom4te.cache
             fi
         fi
-
         [ "$CLEAN" == true ] && make clean
-        [ "$QUIET" == true ] && make -s -j install || make -j install
-
-        # Run Tests if the flag is set
-        if [ "$TEST" == true ]; then
-            printf "Running Neko tests\n"
-            make check
-        fi
-        cd $CURRENT_DIR
     fi
+
+    if [ -f "Makefile" ]; then
+        [ "$QUIET" == true ] && make -s -j install || make -j install
+    fi
+
+    # Run Tests if the flag is set
+    if [[ "$TEST" == true && -f Makefile ]]; then
+        printf "Running Neko tests\n"
+        make check
+    fi
+    cd $CURRENT_DIR
 
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)
     if [ -z "$NEKO_DIR" ]; then

@@ -24,7 +24,8 @@ function(build_example)
     # ........................................................................ #
     # Define the executable.
     if (NOT DEFINED EXAMPLE_NAME)
-        file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
+        file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR}
+            ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
 
     if (DEFINED DRIVER)
@@ -44,7 +45,8 @@ function(build_example)
         endif()
 
         if (NOT DEFINED DRIVER)
-            message(FATAL_ERROR "No custom driver file found. Please specify through DRIVER.")
+            message(FATAL_ERROR
+                "No custom driver file found. Please specify through DRIVER.")
         endif()
 
     elseif(${DRIVER_TYPE} STREQUAL "topopt")
@@ -103,7 +105,7 @@ function(build_example)
     )
 
     # If CUDA is available, link the executable to the CUDA runtime library.
-    if(CUDAToolkit_FOUND)
+    if(DEVICE_TYPE STREQUAL "CUDA")
         target_link_libraries(${EXAMPLE_NAME} CUDA::cudart)
     endif()
 
@@ -113,6 +115,6 @@ function(build_example)
     endif()
 
     # Link our local Neko-TOP library to the driver
-    target_link_libraries(${EXAMPLE_NAME} Neko-TOP)
+    target_link_libraries(${EXAMPLE_NAME} neko-top)
 
 endfunction()

@@ -16,6 +16,7 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ## List of examples
 
 1. \subpage permeability_block
+2. \subpage easy-E
 
 ## Execution of examples
 
