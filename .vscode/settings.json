@@ -11,6 +11,11 @@
     "fortran.linter.modOutput": "${workspaceFolder}/build/modules",
     "fortran.linter.compiler": "gfortran",
     "fortran.linter.compilerPath": "/usr/bin/gfortran",
+    "fortran.linter.extraArgs": [
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+    ],
     "fortran.formatting.formatter": "findent",
     "fortran.formatting.findentArgs": [
         "-Rr", // Auto fill end statements with type of block and name
