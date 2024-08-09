@@ -58,7 +58,7 @@
             "label": "Setup",
             "command": "${workspaceFolder}/setup.sh",
             "args": [
-                "--device",
+                "--devic",
                 "CUDA"
             ],
             "group": "build",
@@ -96,6 +96,29 @@
                 "panel": "shared",
                 "showReuseMessage": false,
                 "clear": true,
+                "close": true
+            }
+        },
+        {
+            "detail": "Finalize the debug run",
+            "type": "shell",
+            "label": "Finalize debug",
+            "command": "rsync",
+            "args": [
+                "-a",
+                "--info=progress2",
+                "--delete-before",
+                "--remove-source-files",
+                "${workspaceFolder}/logs/debug",
+                "${workspaceFolder}/results/"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false,
                 "close": true
             }
         },
