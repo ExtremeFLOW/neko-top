@@ -83,12 +83,17 @@ function find_nek5000() {
 # ============================================================================ #
 # Ensure GSLIB is installed, if not install it.
 function find_gslib() {
-    if [ ! -d $1 ]; then return; fi
+    if [ ! -d $1 ]; then
+        git clone --depth 1 --branch master \
+            https://github.com/nek5000/gslib.git $1
+    fi
 
     if [ -z "$(find $1 -name libgs.a)" ]; then
         current=$(pwd)
         cd $1
-        CC=mpicc ./install
+        make CC=mpicc
+        make install DESTDIR=.
+        rm -fr build
         cd $current
     fi
 

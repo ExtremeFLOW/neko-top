@@ -53,6 +53,10 @@ jobs:
         id: setup-pfunit
         uses: ./.github/actions/setup_pfunit
 
+      - name: Setup GSLib
+        id: setup-gslib
+        uses: ./.github/actions/setup_gslib
+
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
@@ -62,6 +66,7 @@ jobs:
           JSON_FORTRAN_DIR: ${{ steps.setup-json-fortran.outputs.install-dir }}
           NEKO_DIR: ${{ steps.setup-neko.outputs.install-dir }}
           PFUNIT_DIR: ${{ steps.setup-pfunit.outputs.install-dir }}
+          GSLIB_DIR: ${{ steps.setup-gslib.outputs.install-dir }}
         run: |
           ./setup.sh --test
 

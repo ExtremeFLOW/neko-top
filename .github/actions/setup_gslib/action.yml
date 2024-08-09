@@ -1,0 +1,84 @@
+name: Setup the GSLib library
+description: |
+  This action sets up the GSLib library for use in the main workflow.
+  Note that the GSLib library is pulled from Nek5000's fork of the GSLib
+  library.
+
+inputs:
+  install-dir:
+    description: "The directory to install the GSLib library."
+    required: false
+    default: "/home/runner/pkg/gslib"
+  working-dir:
+    description: "The directory to work in."
+    required: false
+    default: "/home/runner/tmp/gslib"
+  os:
+    description: "The operating system to use."
+    required: false
+    default: "${{ runner.os }}"
+  build-options:
+    description: "The build option to use."
+    required: false
+    default: "--parallel $(nproc)"
+  version:
+    description: "The version of the GSLib library to use."
+    required: false
+    default: "v1.0.8"
+
+outputs:
+  install-dir:
+    description: "The directory where the GSLib library was installed."
+    value: ${{ steps.set-output.outputs.install-dir }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache
+      id: cache-gslib
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.install-dir }}
+        key: |
+          gslib-${{ inputs.version }}-${{ inputs.os }}
+
+    - name: Clone
+      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+        REPO: https://github.com/Nek5000/gslib.git
+        VERSION: ${{ inputs.version }}
+      run: |
+        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+        cd $WORKING_DIR
+
+    - name: Build
+      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+      run: |
+        make CC=mpicc DESTDIR=$INSTALL_DIR -j
+
+    - name: Install
+      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: |
+        make CC=mpicc DESTDIR=$INSTALL_DIR install
+
+    - name: Cleanup
+      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      shell: bash
+      run: |
+        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
+          rm -rf ${{ inputs.working-dir }}
+        fi
+
+    - name: Set output
+      shell: bash
+      id: set-output
+      run: |
+        echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
