@@ -104,11 +104,6 @@ function(build_example)
         PkgConfig::neko
     )
 
-    # If CUDA is available, link the executable to the CUDA runtime library.
-    if(DEVICE_TYPE STREQUAL "CUDA")
-        target_link_libraries(${EXAMPLE_NAME} CUDA::cudart)
-    endif()
-
     # If MPI is available, link the executable to the MPI library.
     if(MPI_FOUND)
         target_link_libraries(${EXAMPLE_NAME} MPI::MPI_Fortran)
