@@ -227,17 +227,6 @@ function find_neko() {
     fi
     cd $CURRENT_DIR
 
-    if [ -f "Makefile" ]; then
-        [ "$QUIET" == true ] && make -s -j install || make -j install
-    fi
-
-    # Run Tests if the flag is set
-    if [[ "$TEST" == true && -f Makefile ]]; then
-        printf "Running Neko tests\n"
-        make check
-    fi
-    cd $CURRENT_DIR
-
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)
     if [ -z "$NEKO_DIR" ]; then
         error "Neko not found at:"
