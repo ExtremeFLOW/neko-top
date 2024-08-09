@@ -89,12 +89,14 @@ function find_gslib() {
     fi
 
     if [ -z "$(find $1 -name libgs.a)" ]; then
+        echo "Building GSLIB"
         current=$(pwd)
         cd $1
         make CC=mpicc
         make install DESTDIR=.
         rm -fr build
         cd $current
+        echo "GSLIB built"
     fi
 
     GSLIB_LIB=$(find $1 -type d -name 'lib*' \
