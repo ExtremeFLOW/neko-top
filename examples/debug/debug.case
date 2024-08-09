@@ -6,7 +6,7 @@
         "output_directory": "fields",
         "output_at_end": true,
         "output_boundary": true,
-        "end_time": 0.5,
+        "end_time": 0.01,
         "timestep": 5e-4,
         "numerics": {
             "time_order": 3,

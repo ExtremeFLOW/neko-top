@@ -20,6 +20,16 @@
                 "Setup",
                 "Cleanup debug"
             ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false,
+                "close": true
+            }
         },
         {
             "detail": "Execution of environment preparation script",
@@ -38,7 +48,8 @@
                 "focus": false,
                 "panel": "shared",
                 "showReuseMessage": false,
-                "clear": true
+                "clear": true,
+                "close": true
             }
         },
         {
@@ -62,7 +73,8 @@
                 "focus": false,
                 "panel": "shared",
                 "showReuseMessage": false,
-                "clear": true
+                "clear": true,
+                "close": true
             }
         },
         {
@@ -83,7 +95,8 @@
                 "focus": false,
                 "panel": "shared",
                 "showReuseMessage": false,
-                "clear": true
+                "clear": true,
+                "close": true
             }
         },
         {
