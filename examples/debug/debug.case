@@ -6,7 +6,7 @@
         "output_directory": "fields",
         "output_at_end": true,
         "output_boundary": true,
-        "end_time": 2.0,
+        "end_time": 0.5,
         "timestep": 5e-4,
         "numerics": {
             "time_order": 3,
@@ -51,28 +51,19 @@
                 "v",
                 "o",
                 "w"
-            ],
-            "source_terms": [
-                {
-                    "type": "user_vector"
-                }
             ]
         },
         "scalar": {
             "enabled": true,
             "Pe": 1000.0,
             "initial_condition": {
-                "type": "user"
+                "type": "uniform",
+                "value": 0.0
             },
             "boundary_types": [
                 "d=0",
                 "d=1"
-            ],
-            "source_terms": [
-                {
-                    "type": "user_vector"
-                }
-            ],
+            ]
         },
         "point_zones": [
             {
