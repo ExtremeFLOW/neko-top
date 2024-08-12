@@ -22,6 +22,8 @@ target_sources(Neko-TOP
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/mma.f90
 )
 
 # ============================================================================ #

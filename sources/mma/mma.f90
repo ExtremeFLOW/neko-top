@@ -32,7 +32,7 @@
 !===========================================================================!
 
 module mma
-    use num_types
+    use num_types, only: rp
 
     type :: mma_t
         real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, & 
@@ -43,7 +43,6 @@ module mma
 
         logical, private :: is_initialized = .false.
         logical, private :: is_updated = .false.
-        !internal dummy variables for MMA, should be private
         real(kind=rp), private , allocatable :: p0j(:), q0j(:)
         real(kind=rp), private , allocatable :: pij(:,:), qij(:,:)
         real(kind=rp), private , allocatable :: bi(:)
@@ -81,7 +80,7 @@ module mma
         end do 
     end function mma_diag
 
-    subroutine mma_init(this, x, n, m)
+    subroutine mma_init(this, x, n, m, a0, a, c, d, xmin, xmax)
         ! ----------------------------------------------------- !
         ! Initializing the mma object and all the parameters    !
         ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -97,88 +96,62 @@ module mma
         class(mma_t), intent(inout) :: this
         integer, intent(in) :: n, m
         real(kind=rp), intent(in), dimension(n) :: x
-
+        ! -------------------------------------------------------------------!
+        !      Internal parameters for MMA                                   !
+        !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
+        !    subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m             !
+        !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
+        !                z >= 0,   y_i >= 0,         i = 1,...,m             !
+        ! -------------------------------------------------------------------!
+        real(kind=rp), dimension(n) ::  xmax, xmin
+        real(kind=rp), dimension(m) ::a, c, d
+        real(kind=rp) :: a0
 
         this%n = n
         this%m = m
 
-        if (allocated(this%x)) deallocate(this%x)
         allocate(this%x(n))
         this%x = x
-        if (allocated(this%xold1)) deallocate(this%xold1)
         allocate(this%xold1(n))
-        if (allocated(this%xold2)) deallocate(this%xold2)
         allocate(this%xold2(n))
         this%xold1 = this%x
         this%xold2 = this%x
 
-        if (allocated(this%alpha)) deallocate(this%alpha)
         allocate(this%alpha(n))
-        if (allocated(this%beta)) deallocate(this%beta)
         allocate(this%beta(n))
 
-        if (allocated(this%a)) deallocate(this%a) 
         allocate(this%a(m))
-        if (allocated(this%c)) deallocate(this%c) 
         allocate(this%c(m))
-        if (allocated(this%d)) deallocate(this%d) 
         allocate(this%d(m))
-        if (allocated(this%low)) deallocate(this%low) 
         allocate(this%low(n))
-        if (allocated(this%upp)) deallocate(this%upp) 
         allocate(this%upp(n))
-        if (allocated(this%xmax)) deallocate(this%xmax) 
         allocate(this%xmax(n))
-        if (allocated(this%xmin)) deallocate(this%xmin) 
         allocate(this%xmin(n))
-
         !internal dummy variables for MMA
-        if (allocated(this%p0j)) deallocate(this%p0j) 
         allocate(this%p0j(n))
-        if (allocated(this%q0j)) deallocate(this%q0j) 
         allocate(this%q0j(n))
-        if (allocated(this%pij)) deallocate(this%pij) 
         allocate(this%pij(m,n))
-        if (allocated(this%qij)) deallocate(this%qij) 
         allocate(this%qij(m,n))
-        if (allocated(this%bi)) deallocate(this%bi) 
         allocate(this%bi(m))
         !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-        if (allocated(this%y)) deallocate(this%y) 
         allocate(this%y(m))
-        if (allocated(this%lambda)) deallocate(this%lambda) 
         allocate(this%lambda(m))
-        if (allocated(this%s)) deallocate(this%s) 
         allocate(this%s(m))
-        if (allocated(this%mu)) deallocate(this%mu) 
         allocate(this%mu(m))
-        if (allocated(this%xsi)) deallocate(this%xsi) 
         allocate(this%xsi(n))
-        if (allocated(this%eta)) deallocate(this%eta) 
         allocate(this%eta(n))
 
 
-        this%epsimin =  1.0e-10 !0.0000001
-        
+        this%epsimin =  1.0e-10_rp !0.0000001
         this%max_iter = 100
 
-        !!!!!!! For TEST_CASE_1
-        this%a0=1
-        this%a=0
-        this%c=1000
-        this%d=0
+        this%a0=a0
+        this%a=a
+        this%c=c
+        this%d=d
         !setting the bounds for the design variable based on the problem
-        this%xmax(:) = 10
-        this%xmin(:) = 0 !1e-8 !0.00000001
-
-        !!!!!!! For TEST_CASE_2
-        ! this%a0=1.0
-        ! this%a=0
-        ! this%c=1000
-        ! this%d=1
-        ! !setting the bounds for the design variable based on the problem
-        ! this%xmax(:) = 5
-        ! this%xmin(:) = 0
+        this%xmax = xmax
+        this%xmin = xmin
 
 
 
@@ -187,17 +160,17 @@ module mma
         this%upp(:) = maxval(x)
 
         !following parameters are set based on eq.3.8:--------
-        this%asyinit = 0.5 !
-        this%asyincr = 1.2 ! 1.1
-        this%asydecr = 0.7; !0.65
+        this%asyinit = 0.5_rp !
+        this%asyincr = 1.2_rp ! 1.1
+        this%asydecr = 0.7_rp !0.65
 
         !setting KKT norms to a large number for the initial design
-        this%residumax = 10**5
-        this%residunorm = 10**5
+        this%residumax = 10**5_rp
+        this%residunorm = 10**5_rp
         
         !the object is correctly initialized
         this%is_initialized = .true.
-    end subroutine mma_init 
+    end subroutine mma_init  
 
     subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
         ! ----------------------------------------------------- !
@@ -214,9 +187,11 @@ module mma
         real(kind=rp), dimension(this%m), intent(in) :: fval(:)
         real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
 
-        if (.not.this%is_initialized) print*,"The MMA object is not &
-            initialized. Please call MMA_obj.init() first and then & 
-            call MMA_obj.update()."
+        if (.not.this%is_initialized) then
+            print*,"The MMA object is not initialized. Please call &
+             MMA_obj.init() first and then call MMA_obj.update()." 
+        end if
+
         this%x=x
 
         ! generate a convex approximation of the problem
@@ -357,13 +332,19 @@ module mma
         class(mma_t), intent(inout) :: this
 
         integer :: i, j, iter, ggdumiter, itto
-        real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
-            delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
+        real(kind=rp) :: epsi, residumax, residunorm, &
+                        z, zeta, rez, rezeta, &
+                        delz, dz, dzeta, &
+                        steg, dummy_one, zold, zetaold, newresidu
         real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
-            rey, relambda, remu, res, dely, dellambda, dummyGDinv, &
-            dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
-        real(kind=rp), dimension(this%n) :: x, xsi, eta, rex, rexsi, reeta, &
-            delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
+                                            rey, relambda, remu, res, &
+                                            dely, dellambda, dummyGDinv, &
+                                            dy, dlambda, ds, dmu, &
+                                            yold, lambdaold, sold, muold
+        real(kind=rp), dimension(this%n) :: x, xsi, eta, &
+                                            rex, rexsi, reeta, &
+                                            delx, diagx, dx, dxsi, deta, &
+                                            xold, xsiold, etaold
         real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
         real(kind=rp), dimension(2*this%n+4*this%m+2) :: xx, dxx
 
@@ -457,6 +438,7 @@ module mma
                 !assembling the coefficients matrix AA based on eq(5.20)
                 AA(1:this%m,1:this%m) =  &
                     matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
+                    
                 AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
                     mma_diag(s(:)/lambda(:) + 1.0/(this%d(:) + (mu(:)/y(:))))
                          
@@ -567,42 +549,6 @@ module mma
         this%mu=mu
         this%s=s
 
-
-        ! print *, "x=", x
-        ! print *, "y=", y
-        ! print *, "z=", z
-        ! print *, "lambda=", lambda
-        ! print *, "xsi=", xsi
-        ! print *, "eta=", eta
-        ! print *, "mu=", mu
-        ! print *, "zeta=", zeta
-        ! print *, "s=", s
-
-        !print *, steg
-
-        !print *, dy
-        !print *, dxsi
-        !print *, deta
-        !print *, dmu
-        !print *, dzeta
-        !print *, ds
-        !print *, info
-        !print *, steg
-
-        ! print *, delx
-        ! print *, dely
-        ! print *, delz
-        ! print *, dellambda
-        !print *, relambda
-        !print *, residumax
-        !print *, norm2(residu)
-        !print *, residu
-
-        ! print *, this%alpha
-        ! print *, x
-        ! print *, this%beta
-        ! print *, xsi(:)*(x(:)-this%alpha(:))
-        ! print *, epsi
     end subroutine
 
     subroutine mma_KKT(this,df0dx,fval,dfdx)
