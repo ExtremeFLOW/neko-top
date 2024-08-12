@@ -110,6 +110,8 @@ module mma
         this%n = n
         this%m = m
 
+        call this%free()
+
         allocate(this%x(n))
         this%x = x
         allocate(this%xold1(n))
@@ -438,7 +440,7 @@ module mma
                 !assembling the coefficients matrix AA based on eq(5.20)
                 AA(1:this%m,1:this%m) =  &
                     matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
-                    
+
                 AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
                     mma_diag(s(:)/lambda(:) + 1.0/(this%d(:) + (mu(:)/y(:))))
                          
