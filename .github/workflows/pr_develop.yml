@@ -91,7 +91,7 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_lint.yml
     with:
-      flint-global-minimum: ${{ needs.prepare.outputs.flint-global-minimum }}
+      global-minimum-score: ${{ needs.prepare.outputs.flint-global-minimum }}
       changed-files-minimum-score: ${{ needs.prepare.outputs.flint-changed-minimum }}
 
   check_formatting:
