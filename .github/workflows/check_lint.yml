@@ -43,7 +43,7 @@ jobs:
 
       - name: Lint repository
         run: |
-          flint score src/ -d 10 -r flinter_rc.yml | tee flint.txt
+          flint score sources/ -d 10 -r flinter_rc.yml | tee flint.txt
 
       - name: Check the score
         run: |
