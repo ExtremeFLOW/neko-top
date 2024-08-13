@@ -19,6 +19,11 @@ jobs:
       - name: Check if PR is a draft
         run: echo "This PR is a draft"
 
+  check_lint:
+    name: Linting
+    if: github.event.pull_request.draft != true
+    uses: ./.github/workflows/check_lint.yml
+
   check_formatting:
     name: Formatting
     if: github.event.pull_request.draft != true
