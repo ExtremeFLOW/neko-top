@@ -41,7 +41,7 @@ on:
 # will store them in a file that the other jobs can read.
 
 env:
-  FLINT_GLOBAL_MINIMUM: ${{ vars.FLINT_GLOBAL_MINIMUM || 99.0 }}
+  FLINT_GLOBAL_MINIMUM: ${{ vars.ENV_REPOSITORY_FLINT_GLOBAL_MINIMUM || 99.0 }}
   FLINT_CHANGED_FILES_MINIMUM: 10.0
   PFUNIT_VERSION: v4.4.2
   JSON_FORTRAN_VERSION: 8.3.0
