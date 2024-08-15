@@ -4,7 +4,7 @@
         {
             "detail": "Prepare the Neko-TOP debug environment",
             "type": "shell",
-            "label": "Neko-TOP Debug",
+            "label": "Initialize Debug",
             "command": "${workspaceFolder}/run.sh",
             "args": [
                 "--dry-run",
@@ -16,9 +16,41 @@
             },
             "problemMatcher": [ ],
             "dependsOn": [
+                "Prepare environment",
                 "Setup",
                 "Cleanup debug"
             ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false,
+                "close": true
+            }
+        },
+        {
+            "detail": "Execution of environment preparation script",
+            "type": "shell",
+            "label": "Prepare environment",
+            "command": "source",
+            "args": [
+                "${workspaceFolder}/prepare.env",
+            ],
+            "group": "build",
+            "problemMatcher": [ ],
+            "presentation": {
+                "echo": true,
+                "reveal": "never",
+                "revealProblems": "onProblem",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": false,
+                "clear": true,
+                "close": true
+            }
         },
         {
             "detail": "Execution of setup script",
@@ -31,7 +63,9 @@
             ],
             "group": "build",
             "problemMatcher": [ ],
-            "dependsOn": [ ],
+            "dependsOn": [
+                "Prepare environment"
+            ],
             "presentation": {
                 "echo": true,
                 "reveal": "never",
@@ -39,7 +73,8 @@
                 "focus": false,
                 "panel": "shared",
                 "showReuseMessage": false,
-                "clear": true
+                "clear": true,
+                "close": true
             }
         },
         {
@@ -53,7 +88,6 @@
             ],
             "group": "build",
             "problemMatcher": [ ],
-            "dependsOn": [ ],
             "presentation": {
                 "echo": true,
                 "reveal": "never",
@@ -61,7 +95,31 @@
                 "focus": false,
                 "panel": "shared",
                 "showReuseMessage": false,
-                "clear": true
+                "clear": true,
+                "close": true
+            }
+        },
+        {
+            "detail": "Finalize the debug run",
+            "type": "shell",
+            "label": "Finalize debug",
+            "command": "rsync",
+            "args": [
+                "-a",
+                "--info=progress2",
+                "--delete-before",
+                "--remove-source-files",
+                "${workspaceFolder}/logs/debug",
+                "${workspaceFolder}/results/"
+            ],
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false,
+                "close": true
             }
         },
         {

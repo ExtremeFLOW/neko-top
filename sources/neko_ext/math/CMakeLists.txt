@@ -16,7 +16,7 @@ target_include_directories(neko-top
         ${NEKO_DIR}/src
 )
 
-if(CMAKE_CUDA_COMPILER)
+if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/math_ext.cu

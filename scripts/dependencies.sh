@@ -200,31 +200,28 @@ function find_neko() {
     fi
 
     cd $1
-    if [[ ! -f "configure" || "$CLEAN" == true ]]; then
+    if [[ -f regen.sh && (! -f "configure" || "$CLEAN" == true) ]]; then
         ./regen.sh
     fi
-    if [[ ! -f Makefile || "$CLEAN" == true ]]; then
+    if [[ -f configure && (! -f Makefile || "$CLEAN" == true) ]]; then
         ./configure --prefix="$(realpath ./)" $FEATURES
     fi
 
-    # Update compile dependencies if makedepf90 is installed
-    if [ ! -z "$(which makedepf90)" ]; then
-        size_pre=$(stat -c %s src/.depends)
-        cd src/ && make depend && cd ../
-        if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
-            automake -a
-            rm -fr autom4te.cache
+    if [ -f Makefile ]; then
+        # Update compile dependencies if makedepf90 is installed
+        if [ ! -z "$(which makedepf90)" ]; then
+            size_pre=$(stat -c %s src/.depends)
+            cd src/ && make depend && cd ../
+            if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
+                automake -a
+                rm -fr autom4te.cache
+            fi
         fi
+        [ "$CLEAN" == true ] && make clean
+        [ "$QUIET" == true ] && make -s -j install || make -j install
+        [ "$TEST" == true ] && make check
     fi
 
-    [ "$CLEAN" == true ] && make clean
-    [ "$QUIET" == true ] && make -s -j install || make -j install
-
-    # Run Tests if the flag is set
-    if [ "$TEST" == true ]; then
-        printf "Running Neko tests\n"
-        make check
-    fi
     cd $CURRENT_DIR
 
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)
