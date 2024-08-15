@@ -28,7 +28,7 @@ contains
   !> Register user defined functions (see nekos user_intf.f90)
   subroutine neko_top_init(neko_case)
     type(case_t), intent(inout) :: neko_case
-    type(json_file) :: params, design_params
+    type(json_file) :: design_params
     type(design_t), allocatable :: design
     type(json_value), pointer :: simcomp_object
     type(json_file) :: comp_subdict
@@ -86,8 +86,8 @@ contains
     logical :: converged = .false.
 
     call json_get_or_default(neko_case%params, &
-                             'case.topology_optimization.max_iter', &
-                             max_iter, 4)
+         'case.topology_optimization.max_iter', &
+         max_iter, 4)
 
     do iter = 1, max_iter
        call setup_iteration(neko_case, iter)
@@ -126,7 +126,7 @@ contains
     ! ---------------------------------------------------------------------- !
     ! Read the case file for options
     call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-                             temperature_enabled, .false.)
+         temperature_enabled, .false.)
 
     if (temperature_enabled) then
        call estimate_temperature(neko_case)
