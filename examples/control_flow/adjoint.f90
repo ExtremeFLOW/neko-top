@@ -44,6 +44,7 @@ module simcomp_example
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2
   use math, only: glsc2
   use device_math, only: device_glsc2
+  use adv_lin_no_dealias, only: adv_lin_no_dealias_t
   use comm
   implicit none
   private
@@ -58,6 +59,8 @@ module simcomp_example
      real(kind=rp) :: tol
 
      logical :: have_scalar = .false.
+
+     type(adv_lin_no_dealias_t), pointer :: advection
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -102,6 +105,9 @@ contains
        this%s_old = case%scalar%s
        call field_cfill(this%s_old, 0.0_rp)
     end if
+
+    ! Initialize the advection operator
+    call this%advection%init(this%case%fluid%c_Xh)
 
   end subroutine simcomp_test_init_from_json
 
@@ -188,6 +194,16 @@ contains
           converged = .true.
        end if
     end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Computation of the adjoint field.
+    !
+    ! This is where the actual computation of the adjoint field should be
+    ! implemented. This will so far just be a steady state field based on the
+    ! current state of the fluid fields.
+
+
+
 
 
   end subroutine simcomp_test_compute
