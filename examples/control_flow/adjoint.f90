@@ -54,7 +54,7 @@ module simcomp_example
 
      integer, dimension(5) :: scratch_list
 
-     type(field_t), pointer :: u_old, v_old, w_old, p_old, s_old
+     type(field_t) :: u_old, v_old, w_old, p_old, s_old
      real(kind=rp) :: tol
 
      logical :: have_scalar = .false.
@@ -86,10 +86,10 @@ contains
     call json_get_or_default(json, "tol", this%tol, 1.0e-6_rp)
 
     ! Point local fields to the scratch fields
-    call neko_scratch_registry%request_field(this%u_old, this%scratch_list(1))
-    call neko_scratch_registry%request_field(this%v_old, this%scratch_list(2))
-    call neko_scratch_registry%request_field(this%w_old, this%scratch_list(3))
-    call neko_scratch_registry%request_field(this%p_old, this%scratch_list(4))
+    this%u_old = case%fluid%u
+    this%v_old = case%fluid%v
+    this%w_old = case%fluid%w
+    this%p_old = case%fluid%p
 
     call field_cfill(this%u_old, 0.0_rp)
     call field_cfill(this%v_old, 0.0_rp)
@@ -99,8 +99,7 @@ contains
     ! Check if the scalar field is allocated
     if (allocated(case%scalar)) then
        this%have_scalar = .true.
-       call neko_scratch_registry%request_field(this%s_old, &
-            this%scratch_list(5))
+       this%s_old = case%scalar%s
        call field_cfill(this%s_old, 0.0_rp)
     end if
 
@@ -115,7 +114,13 @@ contains
   subroutine simcomp_test_free(this)
     class(adjoint_t), intent(inout) :: this
 
-    call neko_scratch_registry%relinquish_field(this%scratch_list)
+    call this%u_old%free()
+    call this%v_old%free()
+    call this%w_old%free()
+    call this%p_old%free()
+    if (this%have_scalar) then
+       call this%s_old%free()
+    end if
     call this%free_base()
 
   end subroutine simcomp_test_free
@@ -138,46 +143,50 @@ contains
     ! the old and new fields is below a certain tolerance.
     ! @todo: This should be refactored into a separate function.
 
-    u => neko_field_registry%get_field("u")
-    v => neko_field_registry%get_field("v")
-    w => neko_field_registry%get_field("w")
-    p => neko_field_registry%get_field("p")
-    if (this%have_scalar) then
-       s => neko_field_registry%get_field("s")
-    else
-       s => null()
-    end if
-
-    ! Compute the difference between the old and new fields
-    call field_sub2(this%u_old, u)
-    call field_sub2(this%v_old, v)
-    call field_sub2(this%w_old, w)
-    call field_sub2(this%p_old, p)
-    if (this%have_scalar) then
-       call field_sub2(this%s_old, s)
-    end if
-
-    ! Compute the normed difference
-    normed_diff(1) = field_glsc2(this%u_old, this%u_old)
-    normed_diff(2) = field_glsc2(this%v_old, this%v_old)
-    normed_diff(3) = field_glsc2(this%w_old, this%w_old)
-    normed_diff(4) = field_glsc2(this%p_old, this%p_old)
-    if (this%have_scalar) then
-       normed_diff(5) = field_glsc2(this%s_old, this%s_old)
-    end if
-
-    if (maxval(normed_diff) .gt. this%tol) then
-       ! Copy the new fields to the old fields
-       call field_copy(this%u_old, u)
-       call field_copy(this%v_old, v)
-       call field_copy(this%w_old, w)
-       call field_copy(this%p_old, p)
+    if (.not. converged) then
+       u => neko_field_registry%get_field("u")
+       v => neko_field_registry%get_field("v")
+       w => neko_field_registry%get_field("w")
+       p => neko_field_registry%get_field("p")
        if (this%have_scalar) then
-          call field_copy(this%s_old, s)
+          s => neko_field_registry%get_field("s")
+       else
+          s => null()
        end if
-    else
-       this%case%fluid%freeze = .true.
-       converged = .true.
+
+       ! Compute the difference between the old and new fields
+       call field_sub2(this%u_old, u)
+       call field_sub2(this%v_old, v)
+       call field_sub2(this%w_old, w)
+       call field_sub2(this%p_old, p)
+       if (this%have_scalar) then
+          call field_sub2(this%s_old, s)
+       end if
+
+       ! Compute the normed difference
+       normed_diff(1) = field_glsc2(this%u_old, this%u_old)
+       normed_diff(2) = field_glsc2(this%v_old, this%v_old)
+       normed_diff(3) = field_glsc2(this%w_old, this%w_old)
+       normed_diff(4) = field_glsc2(this%p_old, this%p_old)
+       if (this%have_scalar) then
+          normed_diff(5) = field_glsc2(this%s_old, this%s_old)
+       end if
+
+       if (maxval(normed_diff) .gt. this%tol) then
+          ! Copy the new fields to the old fields
+          call field_copy(this%u_old, u)
+          call field_copy(this%v_old, v)
+          call field_copy(this%w_old, w)
+          call field_copy(this%p_old, p)
+          if (this%have_scalar) then
+             call field_copy(this%s_old, s)
+          end if
+
+          return
+       else
+          this%case%fluid%freeze = .true.
+          converged = .true.
+       end if
     end if
 
 
