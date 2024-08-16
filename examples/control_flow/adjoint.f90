@@ -32,16 +32,32 @@
 
  ! Implements the `adjoint_t` type.
 module simcomp_example
-  use num_types, only : rp
-  use json_module, only : json_file
-  use simulation_component, only : simulation_component_t
-  use case, only : case_t
+  use num_types, only: rp
+  use json_module, only: json_file
+  use json_utils, only: json_get_or_default
+  use simulation_component, only: simulation_component_t
+  use case, only: case_t
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use scratch_registry, only: neko_scratch_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2
+  use math, only: glsc2
+  use device_math, only: device_glsc2
+  use comm
   implicit none
   private
 
   ! An empty user defined simulation component.
   ! This is a simple example of a user-defined simulation component.
   type, public, extends(simulation_component_t) :: adjoint_t
+
+     integer, dimension(5) :: scratch_list
+
+     type(field_t), pointer :: u_old, v_old, w_old, p_old, s_old
+     real(kind=rp) :: tol
+
+     logical :: have_scalar = .false.
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -66,21 +82,42 @@ contains
     call this%init_from_attributes()
     call this%init_base(json, case)
 
+    ! Read the tolerance
+    call json_get_or_default(json, "tol", this%tol, 1.0e-6_rp)
+
+    ! Point local fields to the scratch fields
+    call neko_scratch_registry%request_field(this%u_old, this%scratch_list(1))
+    call neko_scratch_registry%request_field(this%v_old, this%scratch_list(2))
+    call neko_scratch_registry%request_field(this%w_old, this%scratch_list(3))
+    call neko_scratch_registry%request_field(this%p_old, this%scratch_list(4))
+
+    call field_cfill(this%u_old, 0.0_rp)
+    call field_cfill(this%v_old, 0.0_rp)
+    call field_cfill(this%w_old, 0.0_rp)
+    call field_cfill(this%p_old, 0.0_rp)
+
+    ! Check if the scalar field is allocated
+    if (allocated(case%scalar)) then
+       this%have_scalar = .true.
+       call neko_scratch_registry%request_field(this%s_old, &
+            this%scratch_list(5))
+       call field_cfill(this%s_old, 0.0_rp)
+    end if
+
   end subroutine simcomp_test_init_from_json
 
   ! Actual constructor.
   subroutine simcomp_test_init_from_attributes(this)
     class(adjoint_t), intent(inout) :: this
-
-    write(*,*) "Initializing simcomp_test field"
   end subroutine simcomp_test_init_from_attributes
 
   ! Destructor.
   subroutine simcomp_test_free(this)
     class(adjoint_t), intent(inout) :: this
 
-    write(*,*) "Freeing simcomp_test field"
+    call neko_scratch_registry%relinquish_field(this%scratch_list)
     call this%free_base()
+
   end subroutine simcomp_test_free
 
   ! Compute the simcomp_test field.
@@ -89,7 +126,60 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    write(*,*) "Computing simcomp_test field"
+    real(kind=rp), dimension(5) :: normed_diff
+    type(field_t), pointer :: u, v, w, p, s
+
+    logical :: converged = .false.
+
+    ! ------------------------------------------------------------------------ !
+    ! Computation of the maximal normed difference.
+    !
+    ! Our goal is to freeze the simulation when the normed difference between
+    ! the old and new fields is below a certain tolerance.
+    ! @todo: This should be refactored into a separate function.
+
+    u => neko_field_registry%get_field("u")
+    v => neko_field_registry%get_field("v")
+    w => neko_field_registry%get_field("w")
+    p => neko_field_registry%get_field("p")
+    if (this%have_scalar) then
+       s => neko_field_registry%get_field("s")
+    else
+       s => null()
+    end if
+
+    ! Compute the difference between the old and new fields
+    call field_sub2(this%u_old, u)
+    call field_sub2(this%v_old, v)
+    call field_sub2(this%w_old, w)
+    call field_sub2(this%p_old, p)
+    if (this%have_scalar) then
+       call field_sub2(this%s_old, s)
+    end if
+
+    ! Compute the normed difference
+    normed_diff(1) = field_glsc2(this%u_old, this%u_old)
+    normed_diff(2) = field_glsc2(this%v_old, this%v_old)
+    normed_diff(3) = field_glsc2(this%w_old, this%w_old)
+    normed_diff(4) = field_glsc2(this%p_old, this%p_old)
+    if (this%have_scalar) then
+       normed_diff(5) = field_glsc2(this%s_old, this%s_old)
+    end if
+
+    if (maxval(normed_diff) .gt. this%tol) then
+       ! Copy the new fields to the old fields
+       call field_copy(this%u_old, u)
+       call field_copy(this%v_old, v)
+       call field_copy(this%w_old, w)
+       call field_copy(this%p_old, p)
+       if (this%have_scalar) then
+          call field_copy(this%s_old, s)
+       end if
+    else
+       this%case%fluid%freeze = .true.
+       converged = .true.
+    end if
+
 
   end subroutine simcomp_test_compute
 
