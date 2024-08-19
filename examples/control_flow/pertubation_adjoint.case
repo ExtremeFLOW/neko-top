@@ -15,8 +15,8 @@
         },
         "fluid": {
             "scheme": "pnpn_perturb",
-            "adjoint": true,
-            "Re": 100,
+            "adjoint": "adjoint",
+            "Re": 10,
 
             "initial_condition": {
                 "type": "uniform",
@@ -27,7 +27,7 @@
             "inflow_condition": {
                 "type": "uniform",
                 "value": [
-                    1.0, 0.0, 0.0
+                    0.0, 0.0, 0.0
                 ]
             },
             "velocity_solver": {
