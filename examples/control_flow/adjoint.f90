@@ -42,6 +42,7 @@ module simcomp_example
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2
+  use field_math, only: field_add2
   use math, only: glsc2
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
@@ -139,6 +140,7 @@ contains
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
+    type(field_t), pointer :: u_base, v_base, w_base, p_base, s_base
 
     logical :: converged = .false.
 
@@ -149,7 +151,7 @@ contains
     ! the old and new fields is below a certain tolerance.
     ! @todo: This should be refactored into a separate function.
 
-    if (.not. converged) then
+    if (.not. this%case%fluid%freeze) then
        u => neko_field_registry%get_field("u")
        v => neko_field_registry%get_field("v")
        w => neko_field_registry%get_field("w")
@@ -189,9 +191,30 @@ contains
           end if
 
           return
+       else if (.not. converged) then
+          u_base => neko_field_registry%get_field("u_b")
+          v_base => neko_field_registry%get_field("v_b")
+          w_base => neko_field_registry%get_field("w_b")
+          p_base => neko_field_registry%get_field("p_b")
+          if (this%have_scalar) then
+             s_base => neko_field_registry%get_field("s_b")
+          else
+             s_base => null()
+          end if
+
+          call field_add2(u_base, this%u_old)
+          call field_add2(v_base, this%v_old)
+          call field_add2(w_base, this%w_old)
+          call field_add2(p_base, this%p_old)
+          if (this%have_scalar) then
+             call field_add2(s_base, this%s_old)
+          end if
+
+          this%case%fluid%toggle_adjoint = .true.
+          converged = .true.
+
        else
           this%case%fluid%freeze = .true.
-          converged = .true.
        end if
     end if
 
