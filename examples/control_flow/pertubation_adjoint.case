@@ -15,7 +15,7 @@
         },
         "fluid": {
             "scheme": "pnpn_perturb",
-            "adjoint": "adjoint",
+            "adjoint": true,
             "Re": 10,
 
             "initial_condition": {
