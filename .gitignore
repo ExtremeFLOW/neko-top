@@ -26,6 +26,7 @@ neko
 *.re2
 __pycache__/
 .venv
+*.swp
 
 # Fortran-specific files
 !*.fprettify.rc
