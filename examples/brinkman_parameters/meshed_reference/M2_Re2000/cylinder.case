@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "../../MESHES/meshed_M2.nmsh",
+        "mesh_file": "data/brinkman_parameters/meshed_M2.nmsh",
         "output_directory": "cylinder_fields",
         "output_at_end": false,
         "output_boundary": false,
@@ -14,11 +14,11 @@
             "dealias": true
         },
         "statistics": {
-        "enabled": true,
-        "output_control": "simulationtime",
-        "output_value": 50.0,
-        "start_time": 150.0,
-        "sampling_interval": 10
+            "enabled": true,
+            "output_control": "simulationtime",
+            "output_value": 50.0,
+            "start_time": 150.0,
+            "sampling_interval": 10
         },
         "fluid": {
             "scheme": "pnpn",
@@ -55,28 +55,28 @@
                 "on",
                 "on",
             ],
-//            "source_terms": [
-//                {
-//                    "type": "brinkman",
-//                    "objects": [
-//                        {
-//                            "type": "point_zone",
-//                            "name": "cylinder"
-//                        }
-//                    ],
-//                    "brinkman": {
-//                        "limits": [
-//                            0.0,
-//                            150.0
-//                        ],
-//                        "penalty": 1.0,
-//                    },
-//                    "filter": {
-//                    	 "type" : "PDE",
-//                    	 "radius" : 0.05
-//						  }
-//                }
-//            ]
+            //            "source_terms": [
+            //                {
+            //                    "type": "brinkman",
+            //                    "objects": [
+            //                        {
+            //                            "type": "point_zone",
+            //                            "name": "cylinder"
+            //                        }
+            //                    ],
+            //                    "brinkman": {
+            //                        "limits": [
+            //                            0.0,
+            //                            150.0
+            //                        ],
+            //                        "penalty": 1.0,
+            //                    },
+            //                    "filter": {
+            //                    	 "type" : "PDE",
+            //                    	 "radius" : 0.05
+            //						  }
+            //                }
+            //            ]
         },
         "point_zones": [
             {
@@ -95,7 +95,7 @@
                 "radius": 0.5
             }
         ],
-                "simulation_components": [
+        "simulation_components": [
             // the one for leakage
             {
                 "type": "probes",
@@ -107,16 +107,16 @@
                 ],
                 "output_file": "leakage_up.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.0,  0.5, 0.5 ],
-                        "end":   [ 0.0,  5.0, 0.5 ],
+                        "start": [ 0.0, 0.5, 0.5 ],
+                        "end": [ 0.0, 5.0, 0.5 ],
                         "amount": 50
                     }
                 ]
-    			},
+            },
             // the one for leakage
             {
                 "type": "probes",
@@ -128,16 +128,16 @@
                 ],
                 "output_file": "leakage_down.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
                         "start": [ 0.0, -5.0, 0.5 ],
-                        "end":   [ 0.0, -0.5, 0.5 ],
+                        "end": [ 0.0, -0.5, 0.5 ],
                         "amount": 50
                     }
                 ]
-    			},
+            },
             // the one for recirculation length
             {
                 "type": "probes",
@@ -149,17 +149,17 @@
                 ],
                 "output_file": "recirculation_up.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
                         "start": [ -1.0, -0.5, 0.5 ],
-                        "end":   [ 20.0,  0.0, 0.5 ],
+                        "end": [ 20.0, 0.0, 0.5 ],
                         "amount": 50
                     }
                 ]
-    			},
-    			
+            },
+
             // the one for recirculation length
             {
                 "type": "probes",
@@ -171,16 +171,16 @@
                 ],
                 "output_file": "recirculation_down.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
                         "start": [ 0.5, 0.0, 0.5 ],
-                        "end":   [ 20.0,  0.0, 0.5 ],
+                        "end": [ 20.0, 0.0, 0.5 ],
                         "amount": 100
                     }
                 ]
-    			},
+            },
 
             // one BL (45 degrees)
             {
@@ -193,16 +193,16 @@
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
                         "start": [ 0.3535533906, 0.3535533906, 0.5 ],
-                        "end":   [ 0.53033008589, 0.53033008589, 0.5 ],
+                        "end": [ 0.53033008589, 0.53033008589, 0.5 ],
                         "amount": 200
                     }
                 ]
-    			},
+            },
 
             // one BL (30 degrees)
             {
@@ -215,16 +215,16 @@
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
                         "start": [ 0.43301270189, 0.25, 0.5 ],
-                        "end":   [ 0.64951905283, 0.375, 0.5 ],
+                        "end": [ 0.64951905283, 0.375, 0.5 ],
                         "amount": 200
                     }
                 ]
-    			},
+            },
 
             // one BL (60 degrees)
             {
@@ -237,16 +237,16 @@
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.25,  0.43301270189, 0.5 ],
-                        "end":   [ 0.375, 0.64951905283, 0.5 ],
+                        "start": [ 0.25, 0.43301270189, 0.5 ],
+                        "end": [ 0.375, 0.64951905283, 0.5 ],
                         "amount": 200
                     }
                 ]
-    			},
+            },
 
 
             // circles 0.52
@@ -260,18 +260,18 @@
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "circle",
                         "center": [ 0.0, 0.0, 0.5 ],
-                        "normal":   [ 0.0, 0.0, 1.0 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.52,
                         "amount": 720
                     }
                 ]
-    			},
+            },
 
             // circles 0.55
             {
@@ -284,28 +284,28 @@
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
-					 "compute_value"    : 0.05,
+                "compute_value": 0.05,
                 "points": [
                     {
                         "type": "circle",
                         "center": [ 0.0, 0.0, 0.5 ],
-                        "normal":   [ 0.0, 0.0, 1.0 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
                         "radius": 0.55,
                         "amount": 720
                     }
                 ]
-    			},
-    			// divergence
-    			{
-				  "type": "field_writer",
-				  "fields": ["div_fam"],
-				  "output_filename": "divergence",
-				  "precision": "double",
-				  "output_control" : "simulationtime",
-				  "output_value" : 2.50
-				}
+            },
+            // divergence
+            {
+                "type": "field_writer",
+                "fields": [ "div_fam" ],
+                "output_filename": "divergence",
+                "precision": "double",
+                "output_control": "simulationtime",
+                "output_value": 2.50
+            }
 
-    ]
-	 }
+        ]
+    }
 }
