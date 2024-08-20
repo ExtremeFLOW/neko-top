@@ -54,14 +54,10 @@ module simcomp_example
   ! This is a simple example of a user-defined simulation component.
   type, public, extends(simulation_component_t) :: adjoint_t
 
-     integer, dimension(5) :: scratch_list
-
      type(field_t) :: u_old, v_old, w_old, p_old, s_old
      real(kind=rp) :: tol
 
      logical :: have_scalar = .false.
-
-     type(adv_lin_no_dealias_t), pointer :: advection
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -106,9 +102,6 @@ contains
        this%s_old = case%scalar%s
        call field_cfill(this%s_old, 0.0_rp)
     end if
-
-    ! Initialize the advection operator
-    call this%advection%init(this%case%fluid%c_Xh)
 
   end subroutine simcomp_test_init_from_json
 
