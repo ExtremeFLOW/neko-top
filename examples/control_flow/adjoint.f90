@@ -46,6 +46,7 @@ module simcomp_example
   use math, only: glsc2
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
+  use logger, only: neko_log
   use comm
   implicit none
   private
@@ -134,6 +135,7 @@ contains
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
     type(field_t), pointer :: u_base, v_base, w_base, p_base, s_base
+    character(len=256) :: msg
 
     logical :: converged = .false.
 
@@ -173,6 +175,9 @@ contains
           normed_diff(5) = field_glsc2(this%s_old, this%s_old)
        end if
 
+       write(msg, '(A,ES8.2)' ) "normed_diff = ", maxval(normed_diff)
+       call neko_log%message(msg)
+
        if (maxval(normed_diff) .gt. this%tol) then
           ! Copy the new fields to the old fields
           call field_copy(this%u_old, u)
@@ -184,30 +189,30 @@ contains
           end if
 
           return
-       else if (.not. converged) then
-          u_base => neko_field_registry%get_field("u_b")
-          v_base => neko_field_registry%get_field("v_b")
-          w_base => neko_field_registry%get_field("w_b")
-          p_base => neko_field_registry%get_field("p_b")
-          if (this%have_scalar) then
-             s_base => neko_field_registry%get_field("s_b")
-          else
-             s_base => null()
-          end if
+          !  else if (.not. converged) then
+          !     u_base => neko_field_registry%get_field("u_b")
+          !     v_base => neko_field_registry%get_field("v_b")
+          !     w_base => neko_field_registry%get_field("w_b")
+          !     p_base => neko_field_registry%get_field("p_b")
+          !     if (this%have_scalar) then
+          !        s_base => neko_field_registry%get_field("s_b")
+          !     else
+          !        s_base => null()
+          !     end if
 
-          call field_add2(u_base, this%u_old)
-          call field_add2(v_base, this%v_old)
-          call field_add2(w_base, this%w_old)
-          call field_add2(p_base, this%p_old)
-          if (this%have_scalar) then
-             call field_add2(s_base, this%s_old)
-          end if
+          !     call field_add2(u_base, this%u_old)
+          !     call field_add2(v_base, this%v_old)
+          !     call field_add2(w_base, this%w_old)
+          !     call field_add2(p_base, this%p_old)
+          !     if (this%have_scalar) then
+          !        call field_add2(s_base, this%s_old)
+          !     end if
 
-          this%case%fluid%toggle_adjoint = .true.
-          converged = .true.
+          !     this%case%fluid%toggle_adjoint = .true.
+          !     converged = .true.
 
-       else
-          this%case%fluid%freeze = .true.
+          !  else
+          !     this%case%fluid%freeze = .true.
        end if
     end if
 

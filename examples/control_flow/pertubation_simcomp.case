@@ -27,7 +27,7 @@
             "inflow_condition": {
                 "type": "uniform",
                 "value": [
-                    0.0, 0.0, 0.0
+                    1.0, 0.0, 0.0
                 ]
             },
             "velocity_solver": {
