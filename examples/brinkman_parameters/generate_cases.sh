@@ -53,7 +53,16 @@ make_a_case () {
 		sed -i $new_line $name/cylinder.case
 		new_line='72s#.*#"implicit":'$implicit',#'
 		sed -i $new_line $name/cylinder.case
+
+		# radius is also strange if we want no filtering
+		# (not exactly the same as filter radius = 0)
+		if [ $radius = "0" ]
+		  then
+		# note filter type is line 75
+		new_line='75s#.*#"type":"none",#'
+		  else
 		new_line='76s#.*#"radius":'$radius',#'
+		fi
 		sed -i $new_line $name/cylinder.case
 	
 		# time step is a bit strange
@@ -92,6 +101,21 @@ implicit_list=("true" "false")
 radius_list=("0.05")
 
 case_name="Implementation"
+make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
+
+
+# I still don't know exactly what the remaining cases should be..
+
+
+
+# Can we do the filter radius??
+mesh_list=( "3" )
+Re_list=("200")
+chi_list=("1000")
+implicit_list=("true")
+radius_list=("0" "0.01" "0.05" "0.1")
+
+case_name="Filter_radius"
 make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
 
 
