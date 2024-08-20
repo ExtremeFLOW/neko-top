@@ -6,7 +6,7 @@
         "output_checkpoints": false,
         "output_at_end": true,
         "output_boundary": true,
-        "end_time": 200.0,
+        "end_time": 10.0,
         "timestep": 1e-2,
         "numerics": {
             "time_order": 3,
@@ -44,8 +44,8 @@
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
-            "output_control": "simulationtime",
-            "output_value": 1.0,
+            "output_control": "nsamples",
+            "output_value": 100,
             "baseflow": {
                 "type": "file",
                 "file_name": "data_local/control_flow/baseflow0.fld"
@@ -54,7 +54,13 @@
         "simulation_components": [
             {
                 "type": "adjoint",
-                "is_user": true
+                "is_user": true,
+                "tol": 1e-2
+            },
+            {
+                "type": "field_writer",
+                "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
+                "output_file": "adjoint.fld"
             }
         ]
     }

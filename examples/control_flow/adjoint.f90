@@ -97,6 +97,17 @@ contains
     call field_cfill(this%w_old, 0.0_rp)
     call field_cfill(this%p_old, 0.0_rp)
 
+    call neko_field_registry%add_field(this%u_old%dof, "u_b", .true.)
+    call neko_field_registry%add_field(this%v_old%dof, "v_b", .true.)
+    call neko_field_registry%add_field(this%w_old%dof, "w_b", .true.)
+    call neko_field_registry%add_field(this%p_old%dof, "p_b", .true.)
+
+    call neko_field_registry%add_field(this%u_old%dof, "u_adj", .true.)
+    call neko_field_registry%add_field(this%v_old%dof, "v_adj", .true.)
+    call neko_field_registry%add_field(this%w_old%dof, "w_adj", .true.)
+    call neko_field_registry%add_field(this%p_old%dof, "p_adj", .true.)
+
+
     ! Check if the scalar field is allocated
     if (allocated(case%scalar)) then
        this%have_scalar = .true.
@@ -135,6 +146,7 @@ contains
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
     type(field_t), pointer :: u_base, v_base, w_base, p_base, s_base
+    type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
     character(len=256) :: msg
 
     logical :: converged = .false.
@@ -189,30 +201,31 @@ contains
           end if
 
           return
-          !  else if (.not. converged) then
-          !     u_base => neko_field_registry%get_field("u_b")
-          !     v_base => neko_field_registry%get_field("v_b")
-          !     w_base => neko_field_registry%get_field("w_b")
-          !     p_base => neko_field_registry%get_field("p_b")
-          !     if (this%have_scalar) then
-          !        s_base => neko_field_registry%get_field("s_b")
-          !     else
-          !        s_base => null()
-          !     end if
+       else if (.not. converged) then
 
-          !     call field_add2(u_base, this%u_old)
-          !     call field_add2(v_base, this%v_old)
-          !     call field_add2(w_base, this%w_old)
-          !     call field_add2(p_base, this%p_old)
-          !     if (this%have_scalar) then
-          !        call field_add2(s_base, this%s_old)
-          !     end if
+          u_base => neko_field_registry%get_field("u_b")
+          v_base => neko_field_registry%get_field("v_b")
+          w_base => neko_field_registry%get_field("w_b")
+          p_base => neko_field_registry%get_field("p_b")
+          if (this%have_scalar) then
+             s_base => neko_field_registry%get_field("s_b")
+          else
+             s_base => null()
+          end if
 
-          !     this%case%fluid%toggle_adjoint = .true.
-          !     converged = .true.
+          call field_add2(u_base, u)
+          call field_add2(v_base, v)
+          call field_add2(w_base, w)
+          call field_add2(p_base, p)
+          if (this%have_scalar) then
+             call field_add2(s_base, s)
+          end if
 
-          !  else
-          !     this%case%fluid%freeze = .true.
+          this%case%fluid%toggle_adjoint = .true.
+          converged = .true.
+
+       else
+          this%case%fluid%freeze = .true.
        end if
     end if
 
