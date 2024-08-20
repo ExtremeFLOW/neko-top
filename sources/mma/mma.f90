@@ -352,7 +352,7 @@ module mma
 
         real(kind=rp), dimension(this%m,this%n) :: GG
         real(kind=rp), dimension(this%m+1) :: bb
-        real(kind=rp), dimension(this%m+1, this%m+1) :: AA
+        real(kind=rp), dimension(this%m+1, this%m+1) :: AA, abbas
         ! using DGESV( N, NRHS, A, LDA, IPIV, B, LDB, INFO ) in lapack to solve
         ! the linear system which needs the following parameters
         integer :: info
@@ -401,9 +401,9 @@ module mma
             residunorm = norm2(residu)
             do iter = 1, this%max_iter !ittt
                 if (iter .gt. (this%max_iter -2)) then
-                    print *, "The mma inner loop seems not to converge"
-                    print *, "residumax=", residumax, "for epsi=", epsi, &
-                            ", ittt =", iter, "out of ", this%max_iter
+                    ! print *, "The mma inner loop seems not to converge"
+                    ! print *, "residumax=", residumax, "for epsi=", epsi, &
+                    !         ", ittt =", iter, "out of ", this%max_iter
                 end if
                 !Check the condition
                 if (residumax .lt. epsi) exit
@@ -441,15 +441,16 @@ module mma
                 AA(1:this%m,1:this%m) =  &
                     matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
 
+                !update diag(AA)
                 AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
                     mma_diag(s(:)/lambda(:) + 1.0/(this%d(:) + (mu(:)/y(:))))
-                         
+
+
                 AA(1:this%m,this%m+1) = this%a(:)
                 AA(this%m+1, 1:this%m) = this%a(:)
                 AA(this%m+1, this%m+1) = -zeta/z 
 
-                !print *, AA
-                !print *, bb
+
                 call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
                 ! if info!=0 then DGESV is failed.
                 if (info.ne.0) then
