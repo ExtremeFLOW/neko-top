@@ -42,7 +42,7 @@ module simcomp_example
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2
-  use field_math, only: field_add2
+  use field_math, only: field_add2, field_add3
   use math, only: glsc2
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
@@ -59,6 +59,7 @@ module simcomp_example
      real(kind=rp) :: tol
 
      logical :: have_scalar = .false.
+     logical :: converged = .false.
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -149,8 +150,6 @@ contains
     type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
     character(len=256) :: msg
 
-    logical :: converged = .false.
-
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
     !
@@ -158,16 +157,28 @@ contains
     ! the old and new fields is below a certain tolerance.
     ! @todo: This should be refactored into a separate function.
 
-    if (.not. this%case%fluid%freeze) then
-       u => neko_field_registry%get_field("u")
-       v => neko_field_registry%get_field("v")
-       w => neko_field_registry%get_field("w")
-       p => neko_field_registry%get_field("p")
-       if (this%have_scalar) then
-          s => neko_field_registry%get_field("s")
-       else
-          s => null()
-       end if
+    u => neko_field_registry%get_field("u")
+    v => neko_field_registry%get_field("v")
+    w => neko_field_registry%get_field("w")
+    p => neko_field_registry%get_field("p")
+
+    if (this%have_scalar) then
+       s => neko_field_registry%get_field("s")
+    else
+       s => null()
+    end if
+
+    u_base => neko_field_registry%get_field("u_b")
+    v_base => neko_field_registry%get_field("v_b")
+    w_base => neko_field_registry%get_field("w_b")
+    p_base => neko_field_registry%get_field("p_b")
+    if (this%have_scalar) then
+       s_base => neko_field_registry%get_field("s_b")
+    else
+       s_base => null()
+    end if
+
+    if (.not. this%converged) then
 
        ! Compute the difference between the old and new fields
        call field_sub2(this%u_old, u)
@@ -187,11 +198,10 @@ contains
           normed_diff(5) = field_glsc2(this%s_old, this%s_old)
        end if
 
-       write(msg, '(A,ES8.2)' ) "normed_diff = ", maxval(normed_diff)
-       call neko_log%message(msg)
-
+       ! If the normed difference is below the tolerance, we consider the
+       ! simulation to have converged. Otherwise, we copy the new fields to the
+       ! old fields and continue the simulation.
        if (maxval(normed_diff) .gt. this%tol) then
-          ! Copy the new fields to the old fields
           call field_copy(this%u_old, u)
           call field_copy(this%v_old, v)
           call field_copy(this%w_old, w)
@@ -199,19 +209,7 @@ contains
           if (this%have_scalar) then
              call field_copy(this%s_old, s)
           end if
-
-          return
-       else if (.not. converged) then
-
-          u_base => neko_field_registry%get_field("u_b")
-          v_base => neko_field_registry%get_field("v_b")
-          w_base => neko_field_registry%get_field("w_b")
-          p_base => neko_field_registry%get_field("p_b")
-          if (this%have_scalar) then
-             s_base => neko_field_registry%get_field("s_b")
-          else
-             s_base => null()
-          end if
+       else
 
           call field_add2(u_base, u)
           call field_add2(v_base, v)
@@ -222,11 +220,13 @@ contains
           end if
 
           this%case%fluid%toggle_adjoint = .true.
-          converged = .true.
-
-       else
-          this%case%fluid%freeze = .true.
+          this%converged = .true.
        end if
+    end if
+
+    ! Return if the simulation has not converged
+    if (.not. this%converged) then
+       return
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -236,8 +236,24 @@ contains
     ! implemented. This will so far just be a steady state field based on the
     ! current state of the fluid fields.
 
+    u_adj => neko_field_registry%get_field("u_adj")
+    v_adj => neko_field_registry%get_field("v_adj")
+    w_adj => neko_field_registry%get_field("w_adj")
+    p_adj => neko_field_registry%get_field("p_adj")
 
+    if (this%have_scalar) then
+       s_adj => neko_field_registry%get_field("s_adj")
+    else
+       s_adj => null()
+    end if
 
+    call field_add3(u_adj, u, u_base)
+    call field_add3(v_adj, v, v_base)
+    call field_add3(w_adj, w, w_base)
+    call field_add3(p_adj, p, p_base)
+    if (this%have_scalar) then
+       call field_add3(s_adj, s, s_base)
+    end if
 
 
   end subroutine simcomp_test_compute

@@ -60,7 +60,7 @@
             {
                 "type": "field_writer",
                 "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
-                "output_file": "adjoint.fld"
+                "output_filename": "adjoint"
             }
         ]
     }
