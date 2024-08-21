@@ -108,7 +108,6 @@ contains
     call neko_field_registry%add_field(this%w_old%dof, "w_adj", .true.)
     call neko_field_registry%add_field(this%p_old%dof, "p_adj", .true.)
 
-
     ! Check if the scalar field is allocated
     if (allocated(case%scalar)) then
        this%have_scalar = .true.
