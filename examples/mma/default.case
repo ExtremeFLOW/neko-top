@@ -10,7 +10,12 @@
             {
                 "type": "mma",
                 "is_user": true,
-                "tol": 1e-6
+                "tol": 1e-6,
+                "m": 1,
+                "a0_const": 1.0,
+                "a_const": 0,
+                "c_const": 1000.0,
+                "d_const": 1.0
             }
         ],
         "numerics": {

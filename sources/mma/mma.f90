@@ -63,22 +63,37 @@ module mma
         procedure, private, pass(this) :: mma_subsolve_dpip
 
     end type mma_t
-
+        private :: mma_diag
  contains
 
-    function mma_diag(v) result(Av)
-        ! ----------------------------------------------------- !
-        ! returns diagonal matrix A(mxm) for a given vector v(m)!
-        ! such that Av(i,i) = v(i), A(i,j) = 0 if i!=j          !
-        ! ----------------------------------------------------- !
+    ! function mma_diag(v) result(Av)
+    !     ! ----------------------------------------------------- !
+    !     ! returns diagonal matrix A(mxm) for a given vector v(m)!
+    !     ! such that Av(i,i) = v(i), A(i,j) = 0 if i!=j          !
+    !     ! ----------------------------------------------------- !
+    !     integer :: kk
+    !     real(kind=rp), intent(in) :: v(:)
+    !     real(kind=rp), dimension(size(v,1),size(v,1)) :: Av
+    !     Av=0
+    !     print *, "over hereeeeeEEEEE"
+    !     do kk=1, size(v,1)
+    !         Av(kk,kk)=v(kk)
+    !     end do 
+    ! end function mma_diag
+
+    subroutine mma_diag(Av, v)
+        ! -----------------------------------------------------  !
+        ! returns diagonal matrix Av(mxm) for a given vector v(m)!
+        ! such that Av(i,i) = v(i), A(i,j) = 0 if i!=j           !
+        ! -----------------------------------------------------  !
         integer :: kk
         real(kind=rp), intent(in) :: v(:)
-        real(kind=rp), dimension(size(v,1),size(v,1)) :: Av
+        real(kind=rp), intent(inout), dimension(size(v,1),size(v,1)) :: Av
         Av=0
         do kk=1, size(v,1)
             Av(kk,kk)=v(kk)
         end do 
-    end function mma_diag
+    end subroutine mma_diag
 
     subroutine mma_init(this, x, n, m, a0, a, c, d, xmin, xmax)
         ! ----------------------------------------------------- !
@@ -352,7 +367,11 @@ module mma
 
         real(kind=rp), dimension(this%m,this%n) :: GG
         real(kind=rp), dimension(this%m+1) :: bb
-        real(kind=rp), dimension(this%m+1, this%m+1) :: AA, abbas
+        real(kind=rp), dimension(this%m+1, this%m+1) :: AA
+
+        !To be used with subroutine mma_diag
+        real(kind=rp), allocatable :: dummy_diagMatrix(:,:)
+
         ! using DGESV( N, NRHS, A, LDA, IPIV, B, LDB, INFO ) in lapack to solve
         ! the linear system which needs the following parameters
         integer :: info
@@ -373,7 +392,7 @@ module mma
         mu(:) = max(1.0, 0.5*this%c(:))
 
         do while (epsi .gt. 0.9*this%epsimin)
-            ! print *, "epsi=", epsi, ", and epsimin=", this%epsimin
+            print *, "epsi=", epsi, ", and epsimin=", this%epsimin
             
             ! calculating residuals based on 
             ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
@@ -407,7 +426,6 @@ module mma
                 end if
                 !Check the condition
                 if (residumax .lt. epsi) exit
-                
 
                 delx(:) = ((this%p0j(:) + matmul(transpose(this%pij(:,:)), &
                     lambda(:)))/(this%upp(:) - x(:))**2 - &
@@ -437,21 +455,32 @@ module mma
                 bb = [dellambda + dely(:)/(this%d(:) + &
                         (mu(:)/y(:))) - matmul(GG,delx/diagx) , delz ]
 
+                print *,"ready?"
+
+                allocate(dummy_diagMatrix(this%n,this%n))
+                call mma_diag(dummy_diagMatrix,1/diagx)         
                 !assembling the coefficients matrix AA based on eq(5.20)
                 AA(1:this%m,1:this%m) =  &
-                    matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
+                    matmul(matmul(GG,dummy_diagMatrix), transpose(GG))
+                deallocate(dummy_diagMatrix)
 
+                allocate(dummy_diagMatrix(this%m,this%m))
+                call mma_diag(dummy_diagMatrix,s(:)/lambda(:) + 1.0/(this%d(:) + (mu(:)/y(:))))        
                 !update diag(AA)
                 AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
-                    mma_diag(s(:)/lambda(:) + 1.0/(this%d(:) + (mu(:)/y(:))))
+                    dummy_diagMatrix
+                    
+                deallocate(dummy_diagMatrix)
 
-
+                print *, "AA ready"
                 AA(1:this%m,this%m+1) = this%a(:)
                 AA(this%m+1, 1:this%m) = this%a(:)
                 AA(this%m+1, this%m+1) = -zeta/z 
 
-
-                call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
+                print *, "this%m=", this%m
+                print *, "AA=", size(AA)
+                ! call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
+                call dgesv(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
                 ! if info!=0 then DGESV is failed.
                 if (info.ne.0) then
                     print *, "DGESV failed to solve the linear system in MMA."

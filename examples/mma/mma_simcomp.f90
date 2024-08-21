@@ -50,8 +50,19 @@ module mma_simcomp
      real(kind=rp) :: tol !< Just some dummy variable to show it working.
      type(field_t) :: tmp !< Just some dummy field to show it working.
 
-     type(mma_t) :: mma !< The actual MMA simulation component.
 
+     type(field_t) :: designx !< Just some dummy field to show it working.
+     type(field_t) :: xmax !< Just some dummy field to show it working.
+     type(field_t) :: xmin !< Just some dummy field to show it working.
+
+     integer :: m !< Just some dummy variable to show it working.
+     real(kind=rp) :: a0_const !< Just some dummy variable to show it working.
+     real(kind=rp) :: a_const !< Just some dummy variable to show it working.
+     real(kind=rp) :: c_const !< Just some dummy variable to show it working.
+     real(kind=rp) :: d_const !< Just some dummy variable to show it working.
+
+     type(mma_t) :: mma !< The actual MMA simulation component.
+    
    contains
      ! Constructor from json, wrapping the actual constructor.
      procedure, pass(this) :: init => simcomp_test_init_from_json
@@ -73,9 +84,17 @@ contains
     class(case_t), intent(inout), target :: case
 
     call this%tmp%init(case%msh, case%fluid%Xh, "tmp")
+    call this%designx%init(case%msh, case%fluid%Xh, "designx")
+    call this%xmax%init(case%msh, case%fluid%Xh, "xmax")
+    call this%xmin%init(case%msh, case%fluid%Xh, "xmin")
 
     ! Read the tolerance
     call json_get_or_default(json, "tol", this%tol, 1.0e-6_rp)
+    call json_get_or_default(json, "m", this%m, 1)
+    call json_get_or_default(json, "a0_const", this%a0_const, 1.0_rp)
+    call json_get_or_default(json, "a_const", this%a_const, 0.0_rp)
+    call json_get_or_default(json, "c_const", this%c_const, 1000.0_rp)
+    call json_get_or_default(json, "d_const", this%d_const, 1.0_rp)
 
     call this%init_from_attributes()
     call this%init_base(json, case)
@@ -84,6 +103,40 @@ contains
   ! Actual constructor.
   subroutine simcomp_test_init_from_attributes(this)
     class(mma_comp_t), intent(inout) :: this
+
+    ! integer :: n
+    ! real(kind=rp), dimension(n) ::  xmax, xmin
+    real(kind=rp), allocatable ::a(:), c(:), d(:)
+    real(kind=rp) :: a0
+
+    allocate(a(this%m))
+    allocate(c(this%m))
+    allocate(d(this%m))
+    a0= this%a0_const
+    a= this%a_const
+    c= this%c_const
+    d= this%d_const
+    ! a0= 1.0
+    ! a= 0
+    ! c= 1000.0
+    ! d= 1.0
+
+    ! n=this%designx%dof%size()
+
+
+    call this%mma%init(this%designx%x, this%designx%dof%size(), this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
+    print *, "yooooooooooooo"
+    print *, this%designx%dof%size()
+    ! print *, size(this%designx%x)
+    ! print *, size(this%designx%x,1)
+    ! print *, size(this%designx%x,2)
+    ! print *, size(this%designx%x,3)
+    ! print *, size(this%designx%x,4)
+    ! print *, size(this%designx%msh%elements)
+    ! print *, this%designx%msh%elements(160)%e%pts(1)%p%x
+
+    ! print *, this%designx%x(10)
+
   end subroutine simcomp_test_init_from_attributes
 
   ! Destructor.
@@ -102,8 +155,53 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
+    !     ! Declarations
+    ! integer :: n, nrhs, lda, ldb, info
+    ! integer, allocatable :: ipiv(:)
+    ! double precision, allocatable :: A(:,:), B(:,:)
 
+    ! ! Matrix and vector dimensions
+    ! n = 3     ! Size of the matrix A (n x n)
+    ! nrhs = 1  ! Number of right-hand sides, i.e., number of columns of B
+    ! lda = n   ! Leading dimension of A
+    ! ldb = n   ! Leading dimension of B
 
+    ! ! Allocate arrays
+    ! allocate(A(n, n), B(n, nrhs), ipiv(n))
+
+    ! ! Define the matrix A (example: A = [3, 1, 2; 1, 4, 0; 2, 0, 5])
+    ! A = reshape([3.0d0, 1.0d0, 2.0d0, &
+    !              1.0d0, 4.0d0, 0.0d0, &
+    !              2.0d0, 0.0d0, 5.0d0], &
+    !              shape(A))
+
+    ! ! Define the right-hand side vector B (example: B = [10; 10; 10])
+    ! B = reshape([10.0d0, 10.0d0, 10.0d0], shape(B))
+
+    ! ! Call DGESV to solve the system A * X = B
+    ! call dgesv(n, nrhs, A, lda, ipiv, B, ldb, info)
+
+    ! ! Check if the solution was successful
+    ! if (info == 0) then
+    !     print *, "Solution found:"
+    !     print *, "X = ", B
+    ! else
+    !     print *, "DGESV failed with error code ", info
+    ! end if
+
+    real(kind=rp), allocatable ::df0dx(:), fval(:), dfdx(:,:)
+   
+    allocate(df0dx(this%designx%dof%size()))
+    allocate(fval(this%m))
+    allocate(dfdx(this%m,this%designx%dof%size()))
+
+    df0dx=0
+    fval=0
+    dfdx=0
+    ! update(iter, x, df0dx, fval, dfdx)
+    call this%mma%update(this%m, this%designx%x, df0dx, fval, dfdx)
+
+    print *, "The stuff is computed and this%designx%x is updated"
 
   end subroutine simcomp_test_compute
 
