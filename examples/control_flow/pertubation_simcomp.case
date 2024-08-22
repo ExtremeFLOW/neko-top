@@ -14,8 +14,7 @@
             "dealias": false
         },
         "fluid": {
-            "scheme": "pnpn_perturb",
-            "adjoint": false,
+            "scheme": "pnpn",
             "Re": 10,
 
             "initial_condition": {
@@ -57,11 +56,11 @@
                 "is_user": true,
                 "tol": 1e-2
             },
-            {
-                "type": "field_writer",
-                "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
-                "output_filename": "adjoint"
-            }
+            // {
+            //     "type": "field_writer",
+            //     "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
+            //     "output_filename": "adjoint"
+            // }
         ]
     }
 }
