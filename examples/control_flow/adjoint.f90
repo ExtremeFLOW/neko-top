@@ -107,6 +107,7 @@ module simcomp_example
      type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
      real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
+     type(sampler_t) :: s
 
      logical :: have_scalar = .false.
      logical :: converged = .false.
@@ -320,7 +321,7 @@ contains
     !
     ! Setup sampler
     !
-    ! call C%s%init(C%end_time)
+    call this%s%init(C%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, C%scalar, &
             path = trim(output_directory))
@@ -335,15 +336,15 @@ contains
     if (trim(string_val) .eq. 'org') then
        ! yes, it should be real_val below for type compatibility
        call json_get(C%params, 'case.nsamples', real_val)
-       call C%s%add(this%f_out, real_val, 'nsamples')
+       call this%s%add(this%f_out, real_val, 'nsamples')
     else if (trim(string_val) .eq. 'never') then
        ! Fix a dummy 0.0 output_value
        call json_get_or_default(C%params, 'case.fluid.output_value', real_val, &
             0.0_rp)
-       call C%s%add(this%f_out, 0.0_rp, string_val)
+       call this%s%add(this%f_out, 0.0_rp, string_val)
     else
        call json_get(C%params, 'case.fluid.output_value', real_val)
-       call C%s%add(this%f_out, real_val, string_val)
+       call this%s%add(this%f_out, real_val, string_val)
     end if
 
     ! !
@@ -360,7 +361,7 @@ contains
     !         string_val, "simulationtime")
     !    call json_get_or_default(C%params, 'case.checkpoint_value', real_val,&
     !         1e10_rp)
-    !   !  call C%s%add(C%f_chkp, real_val, string_val)
+    !   !  call this%s%add(C%f_chkp, real_val, string_val)
     ! end if
 
   end subroutine adjoint_case_init_common
