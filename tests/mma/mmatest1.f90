@@ -75,14 +75,14 @@ program mmatest
         call optprob%update(iter, x, df0dx, fval, dfdx)
         
         !Updating the design variables
-        x= optprob%x(:)
+        ! x= optprob%x(:)
 
 
         !update the function value and derivatives
         
         !!!!!!! TEST_CASE_1
         call func1 (n, m, x, f0val , df0dx, fval , dfdx)
-        call optprob%KKT(df0dx,fval,dfdx)
+        call optprob%KKT(x,df0dx,fval,dfdx)
         print '(A,I3,A,5F10.4,A,F10.7,A,F10.7,A,E10.4,A,E10.4)', &
             'iter=', iter, ' , x= ', x, &
             '-------,f0val= ', f0val, ',   fval= ', fval, &
