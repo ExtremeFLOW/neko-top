@@ -535,7 +535,7 @@ contains
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
     call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-    call this%case%s%sample(t_adj, tstep_adj)
+    call this%s%sample(t_adj, tstep_adj)
 
     call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
@@ -589,7 +589,7 @@ contains
        call neko_log%section('Postprocessing')
 
        call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-       call this%case%s%sample(t_adj, tstep_adj)
+       call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties
        call this%case%usr%material_properties(t_adj, tstep_adj, this%case%material_properties%rho,&
@@ -607,7 +607,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%case%s%sample(t_adj, tstep_adj, output_at_end)
+    call this%s%sample(t_adj, tstep_adj, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
