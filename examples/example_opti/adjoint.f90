@@ -445,14 +445,20 @@ contains
           call field_sub2(this%s_old, s)
        end if
 
+          if (this%have_scalar) then
+       ! passive scalars can be checked later
+          else
        ! Compute the normed difference
        normed_diff(1) = field_energy_norm(this%u_old, this%v_old, this%w_old, &
         this%case%fluid%c_Xh)
+       normed_diff(1) = normed_diff(1)/this%case%dt
+       ! Maybe normalize by domain size too...
+         endif
 
        ! If the normed difference is below the tolerance, we consider the
        ! simulation to have converged. Otherwise, we copy the new fields to the
        ! old fields and continue the simulation.
-       if (maxval(normed_diff) .gt. this%tol) then
+       if (normed_diff(1) .gt. this%tol) then
           call field_copy(this%u_old, u)
           call field_copy(this%v_old, v)
           call field_copy(this%w_old, w)
@@ -460,6 +466,8 @@ contains
           if (this%have_scalar) then
              call field_copy(this%s_old, s)
           end if
+    write(log_buf,'(A, E15.7)') 'norm: ', normed_diff(1)
+    call neko_log%message(log_buf)
 
        else
           this%case%fluid%freeze = .true.

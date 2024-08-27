@@ -534,6 +534,8 @@ contains
     call this%f_adj_z%init(this%dm_Xh, fld_name = "adjoint_rhs_z")
 
     ! Initialize the source term
+    ! OK... I think we need a different init here...
+    ! OR! you/we need to put some "if allocated" into the brinkman source term
     call this%source_term%init(params, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
          user)
 

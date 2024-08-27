@@ -52,12 +52,12 @@ module adjoint_pnpn
   use projection, only : projection_t
   use device, only : device_memcpy, HOST_TO_DEVICE
   use logger, only : neko_log, NEKO_LOG_DEBUG
-  use advection, only : advection_lin_t
+  use advection_lin, only : advection_lin_t
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
   use material_properties, only : material_properties_t
-  use advection_fctry, only : advection_lin_factory
+  use advection_lin_fctry, only : advection_lin_factory
   use ax_product, only : ax_t
   use field, only : field_t
   use dirichlet, only : dirichlet_t
@@ -396,15 +396,16 @@ contains
     call json_get_or_default(params, 'norm_scaling', &
          this%norm_scaling, 0.5_rp)
 
-    ! Read the baseflow from file or user input.
-    call neko_field_registry%add_field(this%dm_Xh, 'u_b')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_b')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_b')
-    call neko_field_registry%add_field(this%dm_Xh, 'p_b')
-    this%u_b => neko_field_registry%get_field('u_b')
-    this%v_b => neko_field_registry%get_field('v_b')
-    this%w_b => neko_field_registry%get_field('w_b')
-    this%p_b => neko_field_registry%get_field('p_b')
+    ! The baseflow is the solution to the forward.
+    ! Userdefined baseflows can be invoked via setting initial conditions
+    ! call neko_field_registry%add_field(this%dm_Xh, 'u')
+    ! call neko_field_registry%add_field(this%dm_Xh, 'v')
+    ! call neko_field_registry%add_field(this%dm_Xh, 'w')
+    ! call neko_field_registry%add_field(this%dm_Xh, 'p')
+    this%u_b => neko_field_registry%get_field('u')
+    this%v_b => neko_field_registry%get_field('v')
+    this%w_b => neko_field_registry%get_field('w')
+    this%p_b => neko_field_registry%get_field('p')
 
     ! Read the json file
     call json_get_or_default(params, 'norm_target', &
@@ -1011,7 +1012,8 @@ contains
     end if
 
     ! Log the results
-    call neko_log%section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    !call neko_log%section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    call neko_log%section('Power Iterations')
 
     write (log_message, '(A7,E20.14)') 'Norm: ', norm_l2
     call neko_log%message(log_message, lvl=NEKO_LOG_DEBUG)
@@ -1023,7 +1025,8 @@ contains
     data_line%x = [norm_l2, scaling_factor]
     call this%file_output%write(data_line, t)
 
-    call neko_log%end_section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    !call neko_log%end_section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
 
 
