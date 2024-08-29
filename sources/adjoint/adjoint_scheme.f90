@@ -395,12 +395,17 @@ contains
     !
     if (params%valid_path('case.fluid.inflow_condition')) then
        call json_get(params, 'case.fluid.inflow_condition.type', string_val1)
+       ! HARRY
+       ! all inflow BC's become walls in adjoint
        if (trim(string_val1) .eq. "uniform") then
-          allocate(inflow_t::this%bc_inflow)
+          !allocate(inflow_t::this%bc_inflow)
+          allocate(no_slip_wall_t::this%bc_inflow)
        else if (trim(string_val1) .eq. "blasius") then
-          allocate(blasius_t::this%bc_inflow)
+          !allocate(blasius_t::this%bc_inflow)
+          allocate(no_slip_wall_t::this%bc_inflow)
        else if (trim(string_val1) .eq. "user") then
-          allocate(usr_inflow_t::this%bc_inflow)
+          !allocate(usr_inflow_t::this%bc_inflow)
+          allocate(no_slip_wall_t::this%bc_inflow)
        else
           call neko_error('Invalid inflow condition '//string_val1)
        end if
@@ -412,26 +417,26 @@ contains
        call this%bc_inflow%finalize()
        call bc_list_add(this%bclst_vel, this%bc_inflow)
 
-       if (trim(string_val1) .eq. "uniform") then
-          call json_get(params, 'case.fluid.inflow_condition.value', real_vec)
-          select type (bc_if => this%bc_inflow)
-            type is (inflow_t)
-             call bc_if%set_inflow(real_vec)
-          end select
-       else if (trim(string_val1) .eq. "blasius") then
-          select type (bc_if => this%bc_inflow)
-            type is (blasius_t)
-             call json_get(params, 'case.fluid.blasius.delta', real_val)
-             call json_get(params, 'case.fluid.blasius.approximation',&
-                  string_val2)
-             call json_get(params, 'case.fluid.blasius.freestream_velocity',&
-                  real_vec)
+       !if (trim(string_val1) .eq. "uniform") then
+       !   call json_get(params, 'case.fluid.inflow_condition.value', real_vec)
+       !   select type (bc_if => this%bc_inflow)
+       !     type is (inflow_t)
+       !      call bc_if%set_inflow(real_vec)
+       !   end select
+       !else if (trim(string_val1) .eq. "blasius") then
+       !   select type (bc_if => this%bc_inflow)
+       !     type is (blasius_t)
+       !      call json_get(params, 'case.fluid.blasius.delta', real_val)
+       !      call json_get(params, 'case.fluid.blasius.approximation',&
+       !           string_val2)
+       !      call json_get(params, 'case.fluid.blasius.freestream_velocity',&
+       !           real_vec)
 
-             call bc_if%set_params(real_vec, real_val, string_val2)
+       !      call bc_if%set_params(real_vec, real_val, string_val2)
 
-          end select
-       else if (trim(string_val1) .eq. "user") then
-       end if
+       !   end select
+       !else if (trim(string_val1) .eq. "user") then
+       !end if
     end if
 
     call this%bc_wall%init_base(this%c_Xh)
@@ -441,6 +446,9 @@ contains
     call this%bc_wall%finalize()
     call bc_list_add(this%bclst_vel, this%bc_wall)
 
+	 ! HARRY
+	 ! I don't understand these user_field_bc's
+	 ! We'll have to talk to The Bear when he gets back from vacation
     ! Setup field dirichlet bc for u-velocity
     call this%user_field_bc_vel%bc_u%init_base(this%c_Xh)
     call this%user_field_bc_vel%bc_u%mark_zones_from_list(msh%labeled_zones,&

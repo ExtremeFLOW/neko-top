@@ -2,11 +2,11 @@
     "version": 1.0,
     "case":
     {
-        "mesh_file": "data_local/control_flow/ext_cyl.nmsh",
+        "mesh_file": "data/control_flow/ext_cyl.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "output_boundary": true,
-        "end_time": 10.0,
+        "output_boundary": false,
+        "end_time": 100.0,
         "timestep": 1e-2,
         "numerics": {
             "time_order": 3,
@@ -15,7 +15,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 10,
+            "Re": 2,
 
             "initial_condition": {
                 "type": "uniform",
@@ -43,18 +43,17 @@
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
-            "output_control": "nsamples",
-            "output_value": 100,
-            "baseflow": {
-                "type": "file",
-                "file_name": "data_local/control_flow/baseflow0.fld"
-            }
+            "boundary_types": ["w", "v", "o"],
+            "output_control": "tsteps",
+            "output_value": 50,
         },
         "simulation_components": [
             {
                 "type": "adjoint",
                 "is_user": true,
-                "tol": 1e-2
+                "tol": 1e-2,
+                "compute_control": "tsteps",
+            	 "compute_value": 1,
             },
             // {
             //     "type": "field_writer",

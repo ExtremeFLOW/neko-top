@@ -448,6 +448,9 @@ contains
        ! Compute the normed difference
        normed_diff(1) = field_energy_norm(this%u_old, this%v_old, this%w_old, &
         this%case%fluid%c_Xh)
+       ! divide by timestep
+       normed_diff(1) = normed_diff(1)/this%case%dt
+       print*, 'NORM', normed_diff(1)
 
        ! If the normed difference is below the tolerance, we consider the
        ! simulation to have converged. Otherwise, we copy the new fields to the
