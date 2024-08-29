@@ -2,6 +2,7 @@
 ! Supporting functions
 ! ============================================================================ !
 module develop
+  use utils, only: neko_error
 
   integer, public, parameter :: facet_type_interior = 0
   integer, public, parameter :: facet_type_outlet = 1
@@ -274,7 +275,7 @@ contains
 
     ! Read the case file for options
     call json_get_or_default(neko_case%params, 'topopt.target_temperature', &
-                             target_temperature, 0.5_rp)
+         target_temperature, 0.5_rp)
 
     ! Initialize the global interpolation
     call interpolator%init(neko_case%scalar%dm_xh)
@@ -312,8 +313,8 @@ contains
     call interpolator%evaluate(temperature_local, neko_case%scalar%s%x)
 
     temperature_mean = average_weighted( &
-                                         temperature_local - target_temperature, &
-                                         facet_area)
+         temperature_local - target_temperature, &
+         facet_area)
 
     write (log_buf, '(a,f15.7)') &
          "Outlet area-weighted average temperature deviation: ", &

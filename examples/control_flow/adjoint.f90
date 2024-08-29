@@ -60,7 +60,7 @@ module simcomp_example
        profiler_end_region
   use file, only: file_t
   use num_types, only : rp, sp, dp
-  use fluid_fctry, only : fluid_scheme_factory
+  use fluid_scheme, only : fluid_scheme_factory
   use fluid_pnpn, only : fluid_pnpn_t
   use fluid_scheme, only : fluid_scheme_t
   use fluid_output, only : fluid_output_t
@@ -271,7 +271,7 @@ contains
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
 
-		! baseflow is solution to forward problem
+       ! baseflow is solution to forward problem
        u_b => neko_field_registry%get_field('u')
        v_b => neko_field_registry%get_field('v')
        w_b => neko_field_registry%get_field('w')
@@ -291,7 +291,7 @@ contains
 
 
 
-		! Tim what is this for?
+       ! Tim what is this for?
        call field_cfill(f%u_b, 0.0_rp)
        call field_cfill(f%v_b, 0.0_rp)
        call field_cfill(f%w_b, 0.0_rp)
@@ -447,7 +447,7 @@ contains
 
        ! Compute the normed difference
        normed_diff(1) = field_energy_norm(this%u_old, this%v_old, this%w_old, &
-        this%case%fluid%c_Xh)
+            this%case%fluid%c_Xh)
        ! divide by timestep
        normed_diff(1) = normed_diff(1)/this%case%dt
        print*, 'NORM', normed_diff(1)
@@ -711,10 +711,10 @@ contains
 
   end subroutine simulation_joblimit_chkp
 
-    function field_energy_norm(u, v, w, coef, n) result(norm)
+  function field_energy_norm(u, v, w, coef, n) result(norm)
     ! I'm new to field maths... but the problem is u,v,w are fields
     ! and coef%B is an array.
-    ! But I would assume the norm we're interested in is some measure of 
+    ! But I would assume the norm we're interested in is some measure of
     ! |du/dt|
     ! which is approximated by
     ! |(u_{n} - u_{n-1})/(t_{n} - t_{n_1})|
@@ -722,7 +722,7 @@ contains
     ! So I would imagine we would want to take:
     !
     ! sqrt(int (du**2 + dv**2 + dw**2))
-    ! 
+    !
     ! and then divide by the timestep outside
     integer, intent(in), optional :: n
     type(coef_t), intent(in) :: coef
@@ -742,7 +742,7 @@ contains
        norm = energy_norm(u%x, v%x, w%x, coef%B, size)
     end if
 
-  	 end function field_energy_norm
+  end function field_energy_norm
 
   function energy_norm(a, b, c, d, n)
     integer, intent(in) :: n
@@ -755,13 +755,13 @@ contains
 
     tmp = 0.0_rp
     do i = 1, n
-       tmp = tmp + (a(i)**2 +  b(i)**2 + c(i)**2) * d(i)
+       tmp = tmp + (a(i)**2 + b(i)**2 + c(i)**2) * d(i)
     end do
 
     call MPI_Allreduce(tmp, energy_norm, 1, &
-                       MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM, ierr)
     energy_norm = sqrt(energy_norm)
-    
+
 
   end function energy_norm
 
