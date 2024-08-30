@@ -244,11 +244,9 @@ contains
     ! Setup initial conditions
     !
 
-    !call json_get(C%params, 'case.fluid.initial_condition.type',&
-    !     string_val)
-    ! This should be unique from forward solution
-    call json_get(C%params, 'initial_condition.type',&
+    call json_get(C%params, 'case.fluid.initial_condition.type',&
          string_val)
+    ! This should be unique from forward solution
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
             this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
