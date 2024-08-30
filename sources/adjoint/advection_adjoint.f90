@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Subroutines to add advection terms to the RHS of a transport equation.
-module advection_lin
+module advection_adjoint
   use num_types, only : rp
   use space, only : space_t
   use field, only : field_t
@@ -49,14 +49,14 @@ module advection_lin
   private
 
   !> Base abstract type for computing the advection operator
-  type, public, abstract :: advection_lin_t
+  type, public, abstract :: advection_adjoint_t
    contains
      procedure(compute_adv_lin), pass(this), deferred :: compute_linear
      procedure(compute_adv_lin), pass(this), deferred :: compute_adjoint
 ! TODO
 !     procedure(compute_scalar_adv_lin), pass(this), deferred :: compute_scalar
-     procedure(advection_lin_free), pass(this), deferred :: free
-  end type advection_lin_t
+     procedure(advection_adjoint_free), pass(this), deferred :: free
+  end type advection_adjoint_t
 
   ! ========================================================================== !
   ! Linearized advection operator interface
@@ -74,13 +74,13 @@ module advection_lin
      !! @param coef The coefficients of the (Xh, mesh) pair.
      !! @param n Typically the size of the mesh.
      subroutine compute_adv_lin(this, vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, &
-                                Xh, coef, n)
-       import :: advection_lin_t
+          Xh, coef, n)
+       import :: advection_adjoint_t
        import :: coef_t
        import :: space_t
        import :: field_t
        import :: rp
-       class(advection_lin_t), intent(inout) :: this
+       class(advection_adjoint_t), intent(inout) :: this
        type(space_t), intent(inout) :: Xh
        type(coef_t), intent(inout) :: coef
        type(field_t), intent(inout) :: vx, vy, vz
@@ -102,12 +102,12 @@ module advection_lin
      !! @param coef The coefficients of the (Xh, mesh) pair.
      !! @param n Typically the size of the mesh.
      subroutine compute_scalar_adv_lin(this, vx, vy, vz, s, fs, Xh, coef, n)
-       import :: advection_lin_t
+       import :: advection_adjoint_t
        import :: coef_t
        import :: space_t
        import :: field_t
        import :: rp
-       class(advection_lin_t), intent(inout) :: this
+       class(advection_adjoint_t), intent(inout) :: this
        type(field_t), intent(inout) :: vx, vy, vz
        type(field_t), intent(inout) :: s
        type(field_t), intent(inout) :: fs
@@ -119,10 +119,10 @@ module advection_lin
 
   abstract interface
      !> Destructor
-     subroutine advection_lin_free(this)
-       import :: advection_lin_t
-       class(advection_lin_t), intent(inout) :: this
-     end subroutine advection_lin_free
+     subroutine advection_adjoint_free(this)
+       import :: advection_adjoint_t
+       class(advection_adjoint_t), intent(inout) :: this
+     end subroutine advection_adjoint_free
   end interface
 
-end module advection_lin
+end module advection_adjoint

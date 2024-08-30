@@ -31,14 +31,14 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Contains the factory routine for `advection_t` children.
-module advection_lin_fctry
+module advection_adjoint_fctry
   use num_types, only : rp
   use coefs, only : coef_t
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
 
   ! Advection and derivatives
-  use advection_lin, only : advection_lin_t
+  use advection_adjoint, only : advection_adjoint_t
   use adv_dealias, only : adv_dealias_t
   use adv_no_dealias, only : adv_no_dealias_t
   use adv_lin_dealias, only : adv_lin_dealias_t
@@ -47,7 +47,7 @@ module advection_lin_fctry
   implicit none
   private
 
-  public :: advection_lin_factory
+  public :: advection_adjoint_factory
 
 contains
 
@@ -56,9 +56,9 @@ contains
   !! @param json The parameter file.
   !! @param coef The coefficients of the (space, mesh) pair.
   !! @note The factory both allocates and initializes `object`.
-  subroutine advection_lin_factory(object, json, coef)
+  subroutine advection_adjoint_factory(object, json, coef)
     implicit none
-    class(advection_lin_t), allocatable, intent(inout) :: object
+    class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(coef_t), target :: coef
     logical :: dealias, found
@@ -95,7 +95,7 @@ contains
        call adv%init(coef)
     end select
 
-  end subroutine advection_lin_factory
+  end subroutine advection_adjoint_factory
 
 
-end module advection_lin_fctry
+end module advection_adjoint_fctry

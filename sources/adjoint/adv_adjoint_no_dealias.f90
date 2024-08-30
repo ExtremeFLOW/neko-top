@@ -32,7 +32,7 @@
 !
 !> Subroutines to add perturbed advection terms to the RHS of a transport equation.
 module adv_lin_no_dealias
-  use advection_lin, only: advection_lin_t
+  use advection_adjoint, only: advection_adjoint_t
   use num_types, only: rp
   use math, only: vdot3, sub2, subcol3, rzero
   use utils, only: neko_error
@@ -41,27 +41,27 @@ module adv_lin_no_dealias
   use coefs, only: coef_t
   use scratch_registry, only : neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
-    NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
+       NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
   use interpolation, only: interpolator_t
   use device_math
   use device, only: device_free, device_map, device_memcpy, device_get_ptr, &
-    HOST_TO_DEVICE
+       HOST_TO_DEVICE
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, &
-    c_associated
+       c_associated
   implicit none
   private
 
   !> Type encapsulating advection routines with no dealiasing applied
-  type, public, extends(advection_lin_t) :: adv_lin_no_dealias_t
+  type, public, extends(advection_adjoint_t) :: adv_lin_no_dealias_t
      real(kind=rp), allocatable :: temp(:)
      type(c_ptr) :: temp_d = C_NULL_PTR
    contains
-     !> Add the linearized advection term for the fluid, i.e. 
+     !> Add the linearized advection term for the fluid, i.e.
      !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
      !! the RHS.
      procedure, pass(this) :: compute_linear => linear_advection_no_dealias
-     !> Add the adjoint advection term for the fluid in weak form, i.e. 
+     !> Add the adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
      !! the RHS.
@@ -100,7 +100,7 @@ contains
     end if
   end subroutine free_no_dealias
 
-  !> Add the adjoint advection term for the fluid in weak form, i.e. 
+  !> Add the adjoint advection term for the fluid in weak form, i.e.
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
   !! the RHS.
@@ -168,36 +168,36 @@ contains
 
        ! traspose and multiply
        call device_vdot3(this%temp_d, vx_d, vy_d, vz_d, &
-                         tduxb%x_d, tdvxb%x_d, tdwxb%x_d, n)
+            tduxb%x_d, tdvxb%x_d, tdwxb%x_d, n)
        call device_sub2(fx_d, this%temp_d, n)
 
        call device_vdot3(this%temp_d, vx_d, vy_d, vz_d, &
-                         tduyb%x_d, tdvyb%x_d, tdwyb%x_d, n)
+            tduyb%x_d, tdvyb%x_d, tdwyb%x_d, n)
        call device_sub2(fy_d, this%temp_d, n)
 
        call device_vdot3(this%temp_d, vx_d, vy_d, vz_d, &
-                         tduzb%x_d, tdvzb%x_d, tdwzb%x_d, n)
+            tduzb%x_d, tdvzb%x_d, tdwzb%x_d, n)
        call device_sub2(fz_d, this%temp_d, n)
 
        ! \int \grad v . U_b ^ u
        ! with '^' an outer product
        call adjoint_weak_no_dealias_device(fx_d, vx_d, &
-                                           vxb%x, vyb%x, vzb%x, &
-                                           coef, Xh, n, &
-                                           tduxb, tdvxb, tdwxb, &
-                                           tduyb, tdvyb, tdwyb)
+            vxb%x, vyb%x, vzb%x, &
+            coef, Xh, n, &
+            tduxb, tdvxb, tdwxb, &
+            tduyb, tdvyb, tdwyb)
 
        call adjoint_weak_no_dealias_device(fy_d, vy_d, &
-                                           vxb%x, vyb%x, vzb%x, &
-                                           coef, Xh, n, &
-                                           tduxb, tdvxb, tdwxb, &
-                                           tduyb, tdvyb, tdwyb)
+            vxb%x, vyb%x, vzb%x, &
+            coef, Xh, n, &
+            tduxb, tdvxb, tdwxb, &
+            tduyb, tdvyb, tdwyb)
 
        call adjoint_weak_no_dealias_device(fz_d, vz_d, &
-                                           vxb%x, vyb%x, vzb%x, &
-                                           coef, Xh, n, &
-                                           tduxb, tdvxb, tdwxb, &
-                                           tduyb, tdvyb, tdwyb)
+            vxb%x, vyb%x, vzb%x, &
+            coef, Xh, n, &
+            tduxb, tdvxb, tdwxb, &
+            tduyb, tdvyb, tdwyb)
 
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
@@ -213,47 +213,47 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-               & vx%x(i,1,1,e)*duxb(i) + &
-               & vy%x(i,1,1,e)*dvxb(i) + &
-               & vz%x(i,1,1,e)*dwxb(i) )
+                  & vx%x(i,1,1,e)*duxb(i) + &
+                  & vy%x(i,1,1,e)*dvxb(i) + &
+                  & vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-               & vx%x(i,1,1,e)*duyb(i) + &
-               & vy%x(i,1,1,e)*dvyb(i) + &
-               & vz%x(i,1,1,e)*dwyb(i))
+                  & vx%x(i,1,1,e)*duyb(i) + &
+                  & vy%x(i,1,1,e)*dvyb(i) + &
+                  & vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-               & vx%x(i,1,1,e)*duzb(i) + &
-               & vy%x(i,1,1,e)*dvzb(i) + &
-               & vz%x(i,1,1,e)*dwzb(i))
+                  & vx%x(i,1,1,e)*duzb(i) + &
+                  & vy%x(i,1,1,e)*dvzb(i) + &
+                  & vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
           call adjoint_weak_no_dealias_cpu( &
-            & fx%x(:,:,:,e), vx%x(1,1,1,e), &
-            & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            & e, coef, Xh, Xh%lxyz, &
-            & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               & fx%x(:,:,:,e), vx%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-            & fy%x(:,:,:,e), vy%x(1,1,1,e), &
-            & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            & e, coef, Xh, Xh%lxyz, &
-            & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               & fy%x(:,:,:,e), vy%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-            & fz%x(:,:,:,e), vz%x(1,1,1,e), &
-            & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            & e, coef, Xh, Xh%lxyz, &
-            & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               & fz%x(:,:,:,e), vz%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
        enddo
 
     end if
 
   end subroutine adjoint_advection_no_dealias
 
-  !> Compute a single component of 
+  !> Compute a single component of
   !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$, to
   !! the RHS on device.
   !! @param f_d The i'th component of this term.
@@ -265,7 +265,7 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, n, &
-                                            work1, work2, work3, w1, w2, w3)
+       work1, work2, work3, w1, w2, w3)
     implicit none
     type(c_ptr), intent(inout) :: f_d
     type(c_ptr), intent(in) :: u_i_d
@@ -302,7 +302,7 @@ contains
     call device_sub2(f_d, work1_d, n)
   end subroutine adjoint_weak_no_dealias_device
 
-  !> Compute a single component of 
+  !> Compute a single component of
   !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$, to
   !! the RHS on CPU.
   !! @param f The i'th component of this term.
@@ -345,7 +345,7 @@ contains
 
 
 
-  !> Add the linearized advection term for the fluid, i.e. 
+  !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
   !! @param vx The x component of perturbed velocity.

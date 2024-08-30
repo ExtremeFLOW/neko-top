@@ -34,12 +34,12 @@
 module adjoint_pnpn
   use num_types, only : rp, dp
   use krylov, only : ksp_monitor_t
-  use pnpn_res_fctry, only : pnpn_prs_res_factory, pnpn_vel_res_factory
-  use pnpn_res_stress_fctry, only : pnpn_prs_res_stress_factory, &
+  use pnpn_residual, only : pnpn_prs_res_factory, pnpn_vel_res_factory
+  use pnpn_residual, only : pnpn_prs_res_stress_factory, &
        pnpn_vel_res_stress_factory
   use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t
-  use ax_helm_fctry, only : ax_helm_factory
-  use rhs_maker_fctry, only : rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
+  use ax_product, only : ax_helm_factory
+  use rhs_maker, only : rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry
   use rhs_maker, only : rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t
   use fluid_volflow, only : fluid_volflow_t
@@ -52,12 +52,12 @@ module adjoint_pnpn
   use projection, only : projection_t
   use device, only : device_memcpy, HOST_TO_DEVICE
   use logger, only : neko_log, NEKO_LOG_DEBUG
-  use advection_lin, only : advection_lin_t
+  use advection_adjoint, only : advection_adjoint_t
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
   use material_properties, only : material_properties_t
-  use advection_lin_fctry, only : advection_lin_factory
+  use advection_adjoint_fctry, only : advection_adjoint_factory
   use ax_product, only : ax_t
   use field, only : field_t
   use dirichlet, only : dirichlet_t
@@ -121,7 +121,7 @@ module adjoint_pnpn
      type(bc_list_t) :: bclst_dw
      type(bc_list_t) :: bclst_dp
 
-     class(advection_lin_t), allocatable :: adv
+     class(advection_adjoint_t), allocatable :: adv
 
      ! Time variables
      type(field_t) :: abx1, aby1, abz1
@@ -383,7 +383,7 @@ contains
     ! Add lagged term to checkpoint
     call this%chkp%add_lag(this%ulag, this%vlag, this%wlag)
 
-    call advection_lin_factory(this%adv, params, this%c_Xh)
+    call advection_adjoint_factory(this%adv, params, this%c_Xh)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
        call this%vol_flow%init(this%dm_Xh, params)

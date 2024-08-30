@@ -45,7 +45,7 @@ module adjoint_scheme
   use field, only : field_t
   use space
   use dofmap, only : dofmap_t
-  use krylov, only : ksp_t
+  use krylov, only : ksp_t, krylov_solver_factory, krylov_solver_destroy
   use coefs, only: coef_t
   use wall, only : no_slip_wall_t
   use inflow, only : inflow_t
@@ -61,9 +61,7 @@ module adjoint_scheme
   use sx_jacobi, only : sx_jacobi_t
   use device_jacobi, only : device_jacobi_t
   use hsmg, only : hsmg_t
-  use precon, only : pc_t
-  use krylov_fctry
-  use precon_fctry
+  use precon, only : pc_t, precon_factory, precon_destroy
   use fluid_stats, only : fluid_stats_t
   use bc
   use mesh
@@ -84,9 +82,10 @@ module adjoint_scheme
   use time_step_controller
   use field_math, only : field_cfill
   implicit none
+  private
 
   !> Base type of all fluid formulations
-  type, abstract :: adjoint_scheme_t
+  type, abstract, public :: adjoint_scheme_t
      type(field_t), pointer :: u_adj => null() !< x-component of Velocity
      type(field_t), pointer :: v_adj => null() !< y-component of Velocity
      type(field_t), pointer :: w_adj => null() !< z-component of Velocity
@@ -446,9 +445,9 @@ contains
     call this%bc_wall%finalize()
     call bc_list_add(this%bclst_vel, this%bc_wall)
 
-	 ! HARRY
-	 ! I don't understand these user_field_bc's
-	 ! We'll have to talk to The Bear when he gets back from vacation
+    ! HARRY
+    ! I don't understand these user_field_bc's
+    ! We'll have to talk to The Bear when he gets back from vacation
     ! Setup field dirichlet bc for u-velocity
     call this%user_field_bc_vel%bc_u%init_base(this%c_Xh)
     call this%user_field_bc_vel%bc_u%mark_zones_from_list(msh%labeled_zones,&

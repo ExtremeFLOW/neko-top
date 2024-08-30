@@ -27,10 +27,10 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_lin_no_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_lin_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_lin.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_lin_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
 )
 
 # ============================================================================ #
