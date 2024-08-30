@@ -82,9 +82,10 @@ module adjoint_scheme
   use time_step_controller
   use field_math, only : field_cfill
   implicit none
+  private
 
   !> Base type of all fluid formulations
-  type, abstract :: adjoint_scheme_t
+  type, abstract, public :: adjoint_scheme_t
      type(field_t), pointer :: u_adj => null() !< x-component of Velocity
      type(field_t), pointer :: v_adj => null() !< y-component of Velocity
      type(field_t), pointer :: w_adj => null() !< z-component of Velocity
