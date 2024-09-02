@@ -413,93 +413,11 @@ contains
     integer :: idx
 
     ! ------------------------------------------------------------------------ !
-    ! Computation of the maximal normed difference.
-    !
-    ! Our goal is to freeze the simulation when the normed difference between
-    ! the old and new fields is below a certain tolerance.
-    ! @todo: This should be refactored into a separate function.
-    !
-    ! Tim I'm making the following changes:
-    ! - no u_b
-
-    u => neko_field_registry%get_field("u")
-    v => neko_field_registry%get_field("v")
-    w => neko_field_registry%get_field("w")
-    p => neko_field_registry%get_field("p")
-
-    if (this%have_scalar) then
-       s => neko_field_registry%get_field("s")
-    else
-       s => null()
-    end if
-
-
-    if (.not. this%converged) then
-
-       ! Compute the difference between the old and new fields
-       call field_sub2(this%u_old, u)
-       call field_sub2(this%v_old, v)
-       call field_sub2(this%w_old, w)
-       call field_sub2(this%p_old, p)
-       if (this%have_scalar) then
-          call field_sub2(this%s_old, s)
-       end if
-
-       ! Compute the normed difference
-       normed_diff(1) = field_energy_norm(this%u_old, this%v_old, this%w_old, &
-            this%case%fluid%c_Xh)
-       ! divide by timestep
-       normed_diff(1) = normed_diff(1)/this%case%dt
-       print*, 'NORM', normed_diff(1)
-
-       ! If the normed difference is below the tolerance, we consider the
-       ! simulation to have converged. Otherwise, we copy the new fields to the
-       ! old fields and continue the simulation.
-       if (maxval(normed_diff) .gt. this%tol) then
-          call field_copy(this%u_old, u)
-          call field_copy(this%v_old, v)
-          call field_copy(this%w_old, w)
-          call field_copy(this%p_old, p)
-          if (this%have_scalar) then
-             call field_copy(this%s_old, s)
-          end if
-
-       else
-          this%case%fluid%freeze = .true.
-          this%converged = .true.
-       end if
-    end if
-
-    ! Return if the simulation has not converged
-    if (.not. this%converged .or. this%computed) then
-       return
-    end if
-
-    ! ------------------------------------------------------------------------ !
     ! Computation of the adjoint field.
     !
     ! This is where the actual computation of the adjoint field should be
     ! implemented. This will so far just be a steady state field based on the
     ! current state of the fluid fields.
-
-    ! ! Hack: Lets modify settings of the case.
-    ! this%case%f_out%file_%file_type%fname = "adjoint.fld"
-    ! call this%case%f_out%set_counter(0)
-    ! do idx = 1, size(this%case%f_out%fluid%items)
-    !    if (this%case%f_out%fluid%items(idx)%ptr%name == "u") then
-    !       this%case%f_out%fluid%items(idx)%ptr => this%u_adj
-    !    end if
-    !    if (this%case%f_out%fluid%items(idx)%ptr%name == "v") then
-    !       this%case%f_out%fluid%items(idx)%ptr => this%v_adj
-    !    end if
-    !    if (this%case%f_out%fluid%items(idx)%ptr%name == "w") then
-    !       this%case%f_out%fluid%items(idx)%ptr => this%w_adj
-    !    end if
-    !    if (this%case%f_out%fluid%items(idx)%ptr%name == "p") then
-    !       this%case%f_out%fluid%items(idx)%ptr => this%p_adj
-    !    end if
-    ! end do
-
 
     ! ------------------------------------------------------------------------ !
     ! Full copy of the `simulation.f90` file from the Neko source code.
@@ -710,61 +628,6 @@ contains
     call neko_log%message(log_buf)
 
   end subroutine simulation_joblimit_chkp
-
-  function field_energy_norm(u, v, w, coef, n) result(norm)
-    ! I'm new to field maths... but the problem is u,v,w are fields
-    ! and coef%B is an array.
-    ! But I would assume the norm we're interested in is some measure of
-    ! |du/dt|
-    ! which is approximated by
-    ! |(u_{n} - u_{n-1})/(t_{n} - t_{n_1})|
-    !
-    ! So I would imagine we would want to take:
-    !
-    ! sqrt(int (du**2 + dv**2 + dw**2))
-    !
-    ! and then divide by the timestep outside
-    integer, intent(in), optional :: n
-    type(coef_t), intent(in) :: coef
-    type(field_t), intent(in) :: u,v,w
-    real(kind=rp) :: norm
-    integer :: size
-
-    if (present(n)) then
-       size = n
-    else
-       size = u%size()
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       ! fill this in later
-    else
-       norm = energy_norm(u%x, v%x, w%x, coef%B, size)
-    end if
-
-  end function field_energy_norm
-
-  function energy_norm(a, b, c, d, n)
-    integer, intent(in) :: n
-    real(kind=rp), dimension(n), intent(in) :: a
-    real(kind=rp), dimension(n), intent(in) :: b
-    real(kind=rp), dimension(n), intent(in) :: c
-    real(kind=rp), dimension(n), intent(in) :: d
-    real(kind=rp) :: energy_norm, tmp
-    integer :: i, ierr
-
-    tmp = 0.0_rp
-    do i = 1, n
-       tmp = tmp + (a(i)**2 + b(i)**2 + c(i)**2) * d(i)
-    end do
-
-    call MPI_Allreduce(tmp, energy_norm, 1, &
-         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM, ierr)
-    energy_norm = sqrt(energy_norm)
-
-
-  end function energy_norm
-
 
 
 end module simcomp_example

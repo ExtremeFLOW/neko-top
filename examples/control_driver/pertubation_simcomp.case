@@ -48,8 +48,15 @@
             "output_value": 50,
         },
         "simulation_components": [
+            // {
+            //     "type": "adjoint",
+            //     "is_user": true,
+            //     "tol": 1e-2,
+            //     "compute_control": "tsteps",
+            //     "compute_value": 1,
+            // },
             {
-                "type": "adjoint",
+                "type": "steady",
                 "is_user": true,
                 "tol": 1e-2,
                 "compute_control": "tsteps",

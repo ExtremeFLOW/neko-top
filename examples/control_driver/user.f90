@@ -2,7 +2,7 @@
 module user
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
-  use simcomp_example, only: adjoint_t
+  use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   implicit none
 
@@ -16,14 +16,14 @@ contains
 
   subroutine user_simcomp(params)
     type(json_file), intent(inout) :: params
-    type(adjoint_t), allocatable :: my_simcomp
+    type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
 
     ! Allocate a simulation component
-    allocate(my_simcomp)
-    simcomp_settings = simulation_component_user_settings("adjoint", params)
+    allocate(steady_comp)
+    simcomp_settings = simulation_component_user_settings("steady", params)
 
-    call neko_simcomps%add_user_simcomp(my_simcomp, simcomp_settings)
+    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
 
   end subroutine user_simcomp
 
