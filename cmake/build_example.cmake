@@ -11,7 +11,7 @@
 #
 # The function also looks at the following variables:
 #
-#   - DRIVER:        The name of the driver file to use.
+#   - DRIVER_SOURCE:        The name of the driver file to use.
 #   - EXTRA_SOURCES: A list of extra source files to compile.
 #
 # The function creates an executable with the name neko in the current
@@ -28,32 +28,33 @@ function(build_example)
             ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
 
-    if (DEFINED DRIVER)
-        set(DRIVER ${DRIVER})
+    if (DEFINED DRIVER_SOURCE)
+        set(DRIVER_SOURCE ${DRIVER_SOURCE})
         set(DRIVER_TYPE "custom")
 
     elseif(NOT DEFINED DRIVER_TYPE)
         set(DRIVER_TYPE "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
+        set(DRIVER_SOURCE ${EXAMPLES_DIR}/driver.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "user")
-        set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
+        set(DRIVER_SOURCE ${EXAMPLES_DIR}/usr_driver.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "custom")
-        if (NOT DEFINED DRIVER)
-            set(DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)
+        if (NOT DEFINED DRIVER_SOURCE)
+            set(DRIVER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)
         endif()
 
-        if (NOT DEFINED DRIVER)
+        if (NOT DEFINED DRIVER_SOURCE)
             message(FATAL_ERROR
-                "No custom driver file found. Please specify through DRIVER.")
+                "No custom driver file found."
+                "Please specify through DRIVER_SOURCE.")
         endif()
 
     elseif(${DRIVER_TYPE} STREQUAL "topopt")
-        set(DRIVER ${CMAKE_SOURCE_DIR}/sources/topopt_driver.f90)
+        set(DRIVER_SOURCE ${CMAKE_SOURCE_DIR}/sources/topopt_driver.f90)
 
     elseif(${DRIVER_TYPE} STREQUAL "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
+        set(DRIVER_SOURCE ${EXAMPLES_DIR}/driver.f90)
 
     else()
         message(FATAL_ERROR "Unknown driver type: ${DRIVER_TYPE}")
@@ -65,7 +66,7 @@ function(build_example)
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(STATUS "Building example: ${EXAMPLE_NAME}")
         message(STATUS "  Driver type:    ${DRIVER_TYPE}")
-        message(STATUS "  Driver:         ${DRIVER}")
+        message(STATUS "  Driver:         ${DRIVER_SOURCE}")
         if (DEFINED EXTRA_SOURCES)
             set(first_line TRUE)
             foreach(SOURCE ${EXTRA_SOURCES})
@@ -85,7 +86,7 @@ function(build_example)
     set(TARGET_DIRECTORY ${EXAMPLES_DIR}/${EXAMPLE_NAME})
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
 
-    add_executable(${EXAMPLE_NAME} ${DRIVER} ${EXTRA_SOURCES})
+    add_executable(${EXAMPLE_NAME} ${DRIVER_SOURCE} ${EXTRA_SOURCES})
 
     # Set the output directory of the executable.
     set_target_properties(${EXAMPLE_NAME}
