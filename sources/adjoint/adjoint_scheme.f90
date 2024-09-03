@@ -178,6 +178,7 @@ module adjoint_scheme
           adjoint_scheme_update_material_properties
   end type adjoint_scheme_t
 
+
   !> Abstract interface to initialize a fluid formulation
   abstract interface
      subroutine adjoint_scheme_init_intrf(this, msh, lx, params, user, &
@@ -234,6 +235,23 @@ module adjoint_scheme
 
 contains
 
+! TODO
+! HARRY
+! I tried this... and it didn't work...
+! But I think it would clean up a lot of the if statements throughout this...
+
+!  subroutine check_adjoint_json(this_json, fluid_json, adjoint_json, str_val)
+!   type(json_file), intent(inout) :: this_json
+!   type(json_file), intent(in) ::    fluid_json, adjoint_json
+!  	character(len=*), intent(in) :: str_val
+!
+!    if (adjoint_json%valid_path(str_val)) then
+!    	this_json = adjoint_json
+!    else
+!    	this_json = fluid_json
+!    endif
+!  end subroutine check_adjoint_json
+
   !> Initialize common data for the current scheme
   subroutine adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
        material_properties, kspv_init)
@@ -253,6 +271,25 @@ contains
     logical :: logical_val
     integer :: integer_val, ierr
     character(len=:), allocatable :: string_val1, string_val2
+
+
+	 ! -------------------------------------------------------------------
+    ! A subdictionary which should be passed into "fluid" or "adjoint" source term
+    type(json_file) :: fluid_json
+    type(json_file) :: adjoint_json
+    type(json_file) :: this_json
+    type(json_core) :: core
+    type(json_value), pointer :: ptr
+    character(len=:), allocatable :: buffer
+    logical :: found
+
+    call params%get("case.fluid", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call fluid_json%load_from_string(buffer)
+    call params%get("case.adjoint", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call adjoint_json%load_from_string(buffer)
+	 ! -------------------------------------------------------------------
 
 
     !
@@ -289,12 +326,14 @@ contains
     !
     ! Turbulence modelling and variable material properties
     !
-    if (params%valid_path('case.fluid.nut_field')) then
-       call json_get(params, 'case.fluid.nut_field', this%nut_field_name)
-       this%variable_material_properties = .true.
-    else
+    ! HARRY
+    ! this isn't applicable to us
+    !if (params%valid_path('case.fluid.nut_field')) then
+    !   call json_get(params, 'case.fluid.nut_field', this%nut_field_name)
+    !   this%variable_material_properties = .true.
+    !else
        this%nut_field_name = ""
-    end if
+    !end if
 
     ! Fill mu and rho field with the physical value
 
@@ -313,25 +352,63 @@ contains
 
 
     ! Projection spaces
-    call json_get_or_default(params, &
-         'case.fluid.velocity_solver.projection_space_size',&
+    ! this was my first idea, to check if "adjoint_json" could find it,
+    ! if not, read fluid json
+    if (adjoint_json%valid_path('velocity_solver.projection_space_size')) then
+    	this_json = adjoint_json
+    else
+    	this_json = fluid_json
+    endif
+    call json_get_or_default(this_json, &
+         'velocity_solver.projection_space_size',&
          this%vel_projection_dim, 20)
+    ! But I couldn't make a subroutine that does the "check_adjoint" so I gave up...
+    !
+    ! instead I'm just checking the hardcoded way
+    if (params%valid_path('case.adjoint.pressure_solver.projection_space_size')) then
+    call json_get_or_default(params, &
+         'case.adjoint.pressure_solver.projection_space_size',&
+         this%pr_projection_dim, 20)
+    else
     call json_get_or_default(params, &
          'case.fluid.pressure_solver.projection_space_size',&
          this%pr_projection_dim, 20)
+    endif
+    if (params%valid_path('case.adjoint.velocity_solver.projection_hold_steps')) then
+    call json_get_or_default(params, &
+         'case.adjoint.velocity_solver.projection_hold_steps',&
+         this%vel_projection_activ_step, 5)
+    else
     call json_get_or_default(params, &
          'case.fluid.velocity_solver.projection_hold_steps',&
          this%vel_projection_activ_step, 5)
+    endif
+    if (params%valid_path('case.adjoint.pressure_solver.projection_hold_steps')) then
+    call json_get_or_default(params, &
+         'case.adjoint.pressure_solver.projection_hold_steps',&
+         this%pr_projection_activ_step, 5)
+    else
     call json_get_or_default(params, &
          'case.fluid.pressure_solver.projection_hold_steps',&
          this%pr_projection_activ_step, 5)
+    endif
 
 
+    if (params%valid_path('case.adjoint.freeze')) then
+    call json_get_or_default(params, 'case.adjoint.freeze', this%freeze, .false.)
+    else
     call json_get_or_default(params, 'case.fluid.freeze', this%freeze, .false.)
+    endif
 
-    if (params%valid_path("case.fluid.flow_rate_force")) then
-       this%forced_flow_rate = .true.
-    end if
+	 ! TODO
+	 ! This needs to be discussed... In pricipal, I think if the forward is forced to a
+	 ! certain flow rate, then the adjoint should be forced to zero flow rate,
+	 ! we had a derivation in 
+	 ! https://www.sciencedirect.com/science/article/pii/S0045782522006764
+	 ! for now I'm commenting this out
+    !if (params%valid_path("case.fluid.flow_rate_force")) then
+    !   this%forced_flow_rate = .true.
+    !end if
 
 
     !
@@ -357,10 +434,14 @@ contains
     write(log_buf, '(A,ES13.6)') 'mu         :', this%mu
     call neko_log%message(log_buf)
 
+	 ! this will be the same for both the forward and adjoint
     call json_get(params, 'case.numerics.dealias', logical_val)
     write(log_buf, '(A, L1)') 'Dealias    : ', logical_val
     call neko_log%message(log_buf)
 
+	 ! hmmmmmm....
+	 ! This doesn't necessarily have to be the same for forward and adjoint...
+	 ! but it doesn't belong to fluid, so I guess we'll keep it the same
     call json_get_or_default(params, 'case.output_boundary', logical_val, &
          .false.)
     write(log_buf, '(A, L1)') 'Save bdry  : ', logical_val
@@ -373,6 +454,18 @@ contains
     allocate(this%bc_labels(NEKO_MSH_MAX_ZLBLS))
     this%bc_labels = "not"
 
+	 ! OK now things get very tricky
+	 ! in my mind, we can either 
+	 ! 1) leave BC's to the user to prescribe in the adjoint,
+	 ! 2) or assume that all 'v' -> 'w' in the adjoint.
+	 ! for now I'm opting for (2), so we'll read everything from fluid and make adjustments
+	 ! we may need to change this if we do a case with strange BC
+    if (params%valid_path('case.adjoint.boundary_types')) then
+    	! here we could give users a chance to prescribe something funky
+    	! perhaps I should throw an error here
+    	call neko_error('Currently BCs are handled based on the forward solution')
+    endif
+	 
     if (params%valid_path('case.fluid.boundary_types')) then
        call json_get(params, &
             'case.fluid.boundary_types', &
@@ -396,6 +489,7 @@ contains
        call json_get(params, 'case.fluid.inflow_condition.type', string_val1)
        ! HARRY
        ! all inflow BC's become walls in adjoint
+       !---------------------------------------------------------------
        if (trim(string_val1) .eq. "uniform") then
           !allocate(inflow_t::this%bc_inflow)
           allocate(no_slip_wall_t::this%bc_inflow)
@@ -408,6 +502,7 @@ contains
        else
           call neko_error('Invalid inflow condition '//string_val1)
        end if
+       !---------------------------------------------------------------
 
        call this%bc_inflow%init_base(this%c_Xh)
        call this%bc_inflow%mark_zone(msh%inlet)
@@ -445,6 +540,7 @@ contains
     call this%bc_wall%finalize()
     call bc_list_add(this%bclst_vel, this%bc_wall)
 
+	 ! TODO
     ! HARRY
     ! I don't understand these user_field_bc's
     ! We'll have to talk to The Bear when he gets back from vacation
@@ -541,18 +637,55 @@ contains
     call this%f_adj_z%init(this%dm_Xh, fld_name = "adjoint_rhs_z")
 
     ! Initialize the source term
-    ! OK... I think we need a different init here...
-    ! OR! you/we need to put some "if allocated" into the brinkman source term
-    call this%source_term%init(params, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
+    ! TODO
+    ! HARRY
+    ! Ok, this one I dislike the most... I think the CORRECT solution here is to modify 
+    ! the fluid_source_term.f90 so that case.fluid is not hardcoded 
+    ! whoever coded it originally is probably much smarter than me and has their reasons
+    ! 
+    ! I would envision somehow merging fluid_source_term and scalar_source_term 
+    ! (maybe they're different because because it's a vector forcing vs a scalar forcing,
+    ! but still...
+    ! 
+    ! this is my attempt...
+    ! params replaced by adjoint_json
+    !call this%source_term%init(params, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
+    !     user)
+    call this%source_term%init(adjoint_json, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
          user)
 
     ! If case.output_boundary is true, set the values for the bc types in the
     ! output of the field.
     call this%set_bc_type_output(params)
 
-    ! Initialize velocity solver
+	 ! HARRY
+	 ! -----------------------------------------------------------------------------
+	 ! ok here is a chance that we can maybe steal the krylov solvers from the forward??
+	 !
+	 ! something along the lines of 
+	 !
+    ! if (.not.params%valid_path('case.adjoint.velocity_solver')) then
+    ! 	this%ksp_vel => case%fluid%ksp_vel
+    ! 	this%pc_vel => case%fluid%ksp_vel
+    ! else
+    !  initialize everything
+    ! endif
+    !
+    ! but I don't know how we can steal the krylov solvers out of the forward,
+    ! so for now we'll just initialize two of them...
+    !  Initialize velocity solver
     if (kspv_init) then
-       call neko_log%section("Velocity solver")
+       call neko_log%section("Adjoint Velocity solver")
+       if (params%valid_path('case.adjoint.velocity_solver')) then
+       call json_get_or_default(params, &
+            'case.adjoint.velocity_solver.max_iterations', &
+            integer_val, 800)
+       call json_get(params, 'case.adjoint.velocity_solver.type', string_val1)
+       call json_get(params, 'case.adjoint.velocity_solver.preconditioner', &
+            string_val2)
+       call json_get(params, 'case.adjoint.velocity_solver.absolute_tolerance', &
+            real_val)
+       else
        call json_get_or_default(params, &
             'case.fluid.velocity_solver.max_iterations', &
             integer_val, 800)
@@ -561,6 +694,7 @@ contains
             string_val2)
        call json_get(params, 'case.fluid.velocity_solver.absolute_tolerance', &
             real_val)
+       endif
 
        call neko_log%message('Type       : ('// trim(string_val1) // &
             ', ' // trim(string_val2) // ')')
@@ -614,6 +748,11 @@ contains
     call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
     this%p_adj => neko_field_registry%get_field('p_adj')
 
+	 ! HARRY
+	 ! Holy shit pressure BC's confuse me on a good day... 
+	 ! but they're especially confusing for the adjoint.
+	 ! for now... I'm keeping them the same as the primal
+	 ! but I wouldn't be surprised if this is incorrect for the adjoint
     !
     ! Setup pressure boundary conditions
     !
@@ -659,9 +798,21 @@ contains
     call bc_list_add(this%bclst_prs, this%bc_dong)
 
     ! Pressure solver
+    ! hopefully we can do the same trick here as we will eventually do for the
+    ! velocity solver
     if (kspp_init) then
        call neko_log%section("Pressure solver")
 
+       if (params%valid_path('case.adjoint.pressure_solver')) then
+       call json_get_or_default(params, &
+            'case.adjoint.pressure_solver.max_iterations', &
+            integer_val, 800)
+       call json_get(params, 'case.adjoint.pressure_solver.type', solver_type)
+       call json_get(params, 'case.adjoint.pressure_solver.preconditioner', &
+            precon_type)
+       call json_get(params, 'case.adjoint.pressure_solver.absolute_tolerance', &
+            abs_tol)
+       else
        call json_get_or_default(params, &
             'case.fluid.pressure_solver.max_iterations', &
             integer_val, 800)
@@ -670,6 +821,7 @@ contains
             precon_type)
        call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
             abs_tol)
+       endif
        call neko_log%message('Type       : ('// trim(solver_type) // &
             ', ' // trim(precon_type) // ')')
        write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
@@ -829,6 +981,11 @@ contains
     !
     ! Setup mean flow fields if requested
     !
+    ! HARRY
+    ! damn this one is confusing again because it belongs to case not fluid
+    ! I could envision a time we would want to calculate the statistics for the 
+    ! forward and adjoint separately
+    ! I bet we're going to get killed in the field registry here :/
     if (this%params%valid_path('case.statistics')) then
        call json_get_or_default(this%params, 'case.statistics.enabled',&
             logical_val, .true.)
@@ -931,6 +1088,22 @@ contains
   end subroutine adjoint_scheme_set_usr_inflow
 
   !> Compute CFL
+  ! TODO
+  ! HARRY
+  ! ok this needs to be discussed. 
+  ! To me, the CFL is based on the convecting velocity, so I would argue
+  ! that the CFL of the adjoint is based on 
+  ! u, v, w 
+  ! not 
+  ! u_adj, v_adj, w_adj
+  !
+  ! Then again, this function is really only used for varaible timestep,
+  ! which we can't use if we're checkpointing...
+  !
+  ! hmmmmm.... requires more thought. Because people optimal ICs or Arnouldi 
+  ! may use variable timesteps... or us in a steady case..
+  !
+  ! for now.... let's ignore it
   function adjoint_compute_cfl(this, dt) result(c)
     class(adjoint_scheme_t), intent(in) :: this
     real(kind=rp), intent(in) :: dt
@@ -1033,5 +1206,6 @@ contains
     end if
 
   end subroutine adjoint_scheme_update_material_properties
+
 
 end module adjoint_scheme

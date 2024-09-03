@@ -183,13 +183,25 @@ contains
     integer :: output_dir_len
     integer :: precision
     type(field_t), pointer :: u_b, v_b, w_b
+    ! HARRY
+    ! extra things for json
+    type(json_file) :: adjoint_json
+    type(json_core) :: core
+    type(json_value), pointer :: ptr
+    character(len=:), allocatable :: buffer
+
+
 
     !
     ! Setup fluid scheme
     !
+    ! HARRY
+    ! keep the schemes the same for SURE
     call json_get(C%params, 'case.fluid.scheme', string_val)
     call adjoint_scheme_factory(this%scheme, trim(string_val))
 
+    ! HARRY
+    ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(C%msh, lx, C%params, C%usr, C%material_properties)
@@ -227,12 +239,20 @@ contains
     !
     ! Setup user defined conditions
     !
+    if (C%params%valid_path('case.adjoint.inflow_condition')) then
+       call json_get(C%params, 'case.adjoint.inflow_condition.type',&
+            string_val)
+       if (trim(string_val) .eq. 'user') then
+          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+       end if
+    else
     if (C%params%valid_path('case.fluid.inflow_condition')) then
        call json_get(C%params, 'case.fluid.inflow_condition.type',&
             string_val)
        if (trim(string_val) .eq. 'user') then
           call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
        end if
+    end if
     end if
 
     ! ! Setup user boundary conditions for the scalar.
@@ -243,13 +263,36 @@ contains
     !
     ! Setup initial conditions
     !
-
+    ! This should be unique from forward solution
+    ! HARRY
+    ! ------------------------------------------------------------
+    ! I want to give a subdictionary to IC's so we can different ICs
+    ! for different solvers,
+    ! (not hardcoded to fluid)
+    !
+    if (C%params%valid_path('case.adjoint.initial_condition')) then
+    call C%params%get("case.adjoint", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call adjoint_json%load_from_string(buffer)
+    call json_get(C%params, 'case.adjoint.initial_condition.type',&
+         string_val)
+    else
+    	! this is stupid naming... but here "adjoint_json" would be fluid_json
+    call C%params%get("case.fluid", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call adjoint_json%load_from_string(buffer)
     call json_get(C%params, 'case.fluid.initial_condition.type',&
          string_val)
-    ! This should be unique from forward solution
+    endif
+
+
     if (trim(string_val) .ne. 'user') then
+       !call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+       !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+       !
+       ! passing adjoint_json
        call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     else
        call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
             this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, C%params)
@@ -335,6 +378,8 @@ contains
             path = trim(output_directory))
     end if
 
+	 ! HARRY
+	 ! fuck the sampler we're changing this anyway
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
