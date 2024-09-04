@@ -2,7 +2,7 @@
     "version": 1.0,
     "case":
     {
-        "mesh_file": "data/control_flow/ext_cyl.nmsh",
+        "mesh_file": "data_local/control_flow/ext_cyl.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
         "output_boundary": false,
@@ -72,7 +72,7 @@
             "output_control": "tsteps",
             "output_value": 50,
         },
-               "point_zones": [
+        "point_zones": [
             {
                 "name": "cylinder",
                 "geometry": "cylinder",

@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Simulation driver
-module solve_adjoint
+module solve_adjoint_mod
   use mpi_f08
   use case, only : case_t
   use num_types, only : rp, dp
@@ -45,158 +45,145 @@ module solve_adjoint
   use simcomp_executor, only : neko_simcomps
   use json_utils, only : json_get_or_default
   use time_step_controller, only : time_step_controller_t
+  use adjoint_mod, only : adjoint_obj
   implicit none
   private
 
-  public :: neko_solve_steady
+  public :: solve_adjoint
 
 contains
 
-  !> Main driver to solve a case @a C
-  subroutine neko_solve_steady(C)
-    type(case_t), target, intent(inout) :: C
-    real(kind=rp) :: t, cfl
-    real(kind=dp) :: start_time_org, start_time, end_time, tstep_start_time
-    character(len=LOG_SIZE) :: log_buf
+  ! Compute the simcomp_test field.
+  subroutine solve_adjoint(this)
+    type(adjoint_obj), intent(inout) :: this
+    real(kind=rp) :: t
     integer :: tstep
+
+    real(kind=rp), dimension(5) :: normed_diff
+    type(field_t), pointer :: u, v, w, p, s
+    character(len=256) :: msg
+
+    real(kind=rp) :: t_adj, cfl
+    real(kind=dp) :: start_time_org, start_time, end_time
+    character(len=LOG_SIZE) :: log_buf
+    integer :: tstep_adj
     character(len=:), allocatable :: restart_file
     logical :: output_at_end, found
     ! for variable_tsteping
     real(kind=rp) :: cfl_avrg = 0.0_rp
     type(time_step_controller_t) :: dt_controller
+    integer :: idx
 
-    t = 0d0
-    tstep = 0
-    call neko_log%section('Starting simulation')
-    write(log_buf, '(A, E15.7,A,E15.7,A)') 'T  : [', 0d0, ',', C%end_time, ')'
+    ! ------------------------------------------------------------------------ !
+    ! Computation of the adjoint field.
+    !
+    ! This is where the actual computation of the adjoint field should be
+    ! implemented. This will so far just be a steady state field based on the
+    ! current state of the fluid fields.
+
+    ! ------------------------------------------------------------------------ !
+    ! Full copy of the `simulation.f90` file from the Neko source code.
+    t_adj = this%case%end_time
+    tstep_adj = 0
+    call neko_log%section('Starting adjoint')
+    write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
     call neko_log%message(log_buf)
-    call dt_controller%init(C%params)
+    call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf, '(A, E15.7)') 'dt :  ', C%dt
+       write(log_buf,'(A, E15.7)') 'dt :  ', this%case%dt
        call neko_log%message(log_buf)
     else
-       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
+       write(log_buf,'(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
        call neko_log%message(log_buf)
-    end if
-
-    call C%params%get('case.restart_file', restart_file, found)
-    if (found .and. len_trim(restart_file) .gt. 0) then
-       ! Restart the case
-       call simulation_restart(C, t)
-
-       ! Restart the simulation components
-       call neko_simcomps%restart(t)
     end if
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
-    call C%q%eval(t, C%dt, tstep)
-    call C%s%sample(t, tstep)
+    call this%s%sample(t_adj, tstep_adj)
 
-    call C%usr%user_init_modules(t, C%fluid%u, C%fluid%v, C%fluid%w,&
-         C%fluid%p, C%fluid%c_Xh, C%params)
+    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, &
+         this%scheme%v_adj, this%scheme%w_adj, &
+         this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
 
     call profiler_start
-    cfl = C%fluid%compute_cfl(C%dt)
+    cfl = this%scheme%compute_cfl(this%case%dt)
     start_time_org = MPI_WTIME()
 
-    do while (t .lt. C%end_time .and. (.not. jobctrl_time_limit()))
+    do while (t_adj .gt. 0.0_rp .and. (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
-       tstep = tstep + 1
+       tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
-       tstep_start_time = start_time
        if (dt_controller%dt_last_change .eq. 0) then
           cfl_avrg = cfl
        end if
-       call dt_controller%set_dt(C%dt, cfl, cfl_avrg, tstep)
+       call dt_controller%set_dt(this%case%dt, cfl, cfl_avrg, tstep_adj)
        !calculate the cfl after the possibly varied dt
-       cfl = C%fluid%compute_cfl(C%dt)
+       cfl = this%scheme%compute_cfl(this%case%dt)
 
-       call neko_log%status(t, C%end_time)
-       write(log_buf, '(A,I6)') 'Time-step: ', tstep
+       call neko_log%status(t_adj, this%case%end_time)
+       write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
        call neko_log%message(log_buf)
        call neko_log%begin()
 
-       write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', C%dt
+       write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t, C%dt, C%ext_bdf, C%tlag, C%dtlag, tstep)
-
-       ! Run the preprocessing
-       call neko_log%section('Preprocessing')
-       call neko_simcomps%preprocess(t, tstep)
-       call neko_log%end_section()
+       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Fluid')
-       call C%fluid%step(t, tstep, C%dt, C%ext_bdf, dt_controller)
+       call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
-       write(log_buf, '(A,E15.7)') &
-            'Fluid step time (s):   ', end_time-start_time
-       call neko_log%message(log_buf)
-       write(log_buf, '(A,E15.7)') &
-            'Total elapsed time (s):', end_time-start_time_org
+       write(log_buf, '(A,E15.7,A,E15.7)') &
+            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+            end_time-start_time
        call neko_log%end_section(log_buf)
 
        ! Scalar step
-       if (allocated(C%scalar)) then
+       if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call C%scalar%step(t, tstep, C%dt, C%ext_bdf, dt_controller)
+          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
-          write(log_buf, '(A,E15.7)') &
-               'Scalar step time:      ', end_time-start_time
-          call neko_log%message(log_buf)
-          write(log_buf, '(A,E15.7)') &
-               'Total elapsed time (s):', end_time-start_time_org
+          write(log_buf, '(A,E15.7,A,E15.7)') &
+               'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+               end_time-start_time
           call neko_log%end_section(log_buf)
        end if
 
        call neko_log%section('Postprocessing')
-       ! Execute all simulation components
-       call neko_simcomps%compute(t, tstep)
 
-       call C%q%eval(t, C%dt, tstep)
-       call C%s%sample(t, tstep)
+       call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+       call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties
-       call C%usr%material_properties(t, tstep, C%material_properties%rho,&
-            C%material_properties%mu, &
-            C%material_properties%cp, &
-            C%material_properties%lambda, &
-            C%params)
-
-       call C%usr%user_check(t, tstep, C%fluid%u, C%fluid%v, C%fluid%w, &
-            C%fluid%p, C%fluid%c_Xh, C%params)
+       call this%case%usr%material_properties(t_adj, tstep_adj, this%case%material_properties%rho,&
+            this%case%material_properties%mu, &
+            this%case%material_properties%cp, &
+            this%case%material_properties%lambda, &
+            this%case%params)
 
        call neko_log%end_section()
-       end_time = MPI_WTIME()
-       call neko_log%section('Step summary')
-       write(log_buf, '(A,I8,A,E15.7)') &
-            'Total time for step ', tstep, ' (s): ', end_time-tstep_start_time
-       call neko_log%message(log_buf)
-       write(log_buf, '(A,E15.7)') &
-            'Total elapsed time (s):           ', end_time-start_time_org
-       call neko_log%message(log_buf)
-       call neko_log%end_section()
+
        call neko_log%end()
        call profiler_end_region
     end do
     call profiler_stop
 
-    call json_get_or_default(C%params, 'case.output_at_end',&
+    call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call C%s%sample(t, tstep, output_at_end)
+    call this%s%sample(t_adj, tstep_adj, output_at_end)
 
-    if (.not. (output_at_end) .and. t .lt. C%end_time) then
-       call simulation_joblimit_chkp(C, t)
+    if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
+       call simulation_joblimit_chkp(this%case, t_adj)
     end if
 
-    call C%usr%user_finalize_modules(t, C%params)
+    call this%case%usr%user_finalize_modules(t_adj, this%case%params)
 
     call neko_log%end_section('Normal end.')
+    this%computed = .true.
 
-  end subroutine neko_solve_steady
+  end subroutine solve_adjoint
 
   subroutine simulation_settime(t, dt, ext_bdf, tlag, dtlag, step)
     real(kind=rp), intent(inout) :: t
@@ -220,13 +207,13 @@ contains
        tlag(2) = t
     end if
 
-    t = t + dt
+    t = t - dt
 
     call ext_bdf%set_coeffs(dtlag)
 
   end subroutine simulation_settime
 
-  !> Restart a case @a C from a given checkpoint
+!> Restart a case @a C from a given checkpoint
   subroutine simulation_restart(C, t)
     implicit none
     type(case_t), intent(inout) :: C
@@ -269,17 +256,17 @@ contains
 
     t = C%fluid%chkp%restart_time()
     call neko_log%section('Restarting from checkpoint')
-    write(log_buf, '(A,A)') 'File :   ', &
+    write(log_buf,'(A,A)') 'File :   ', &
          trim(restart_file)
     call neko_log%message(log_buf)
-    write(log_buf, '(A,E15.7)') 'Time : ', t
+    write(log_buf,'(A,E15.7)') 'Time : ', t
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
     call C%s%set_counter(t)
   end subroutine simulation_restart
 
-  !> Write a checkpoint at joblimit
+!> Write a checkpoint at joblimit
   subroutine simulation_joblimit_chkp(C, t)
     type(case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: t
@@ -304,6 +291,7 @@ contains
 
   end subroutine simulation_joblimit_chkp
 
-end module solve_adjoint
+
+end module solve_adjoint_mod
 
 

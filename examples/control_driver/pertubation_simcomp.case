@@ -48,25 +48,13 @@
             "output_value": 50,
         },
         "simulation_components": [
-            // {
-            //     "type": "adjoint",
-            //     "is_user": true,
-            //     "tol": 1e-2,
-            //     "compute_control": "tsteps",
-            //     "compute_value": 1,
-            // },
             {
                 "type": "steady",
                 "is_user": true,
                 "tol": 1e-2,
                 "compute_control": "tsteps",
-                "compute_value": 1,
-            },
-            // {
-            //     "type": "field_writer",
-            //     "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
-            //     "output_filename": "adjoint"
-            // }
+                "compute_value": 1
+            }
         ]
     }
 }

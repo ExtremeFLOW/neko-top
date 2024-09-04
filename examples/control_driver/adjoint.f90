@@ -31,7 +31,7 @@
  ! POSSIBILITY OF SUCH DAMAGE.
 
  ! Implements the `adjoint_t` type.
-module simcomp_example
+module adjoint_mod
   use num_types, only: rp, dp
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
@@ -92,18 +92,18 @@ module simcomp_example
   use scratch_registry, only : scratch_registry_t, neko_scratch_registry
   use point_zone_registry, only: neko_point_zone_registry
   use material_properties, only : material_properties_t
+  use adjoint_ic, only : set_adjoint_ic
   implicit none
   private
 
   ! An empty user defined simulation component.
   ! This is a simple example of a user-defined simulation component.
-  type, public, extends(simulation_component_t) :: adjoint_t
+  type, public :: adjoint_obj
 
      class(adjoint_scheme_t), allocatable :: scheme
+     type(case_t), pointer :: case
 
      ! Fields
-     type(field_t) :: u_old, v_old, w_old, p_old, s_old
-     type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
      real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
      type(sampler_t) :: s
@@ -114,62 +114,49 @@ module simcomp_example
 
    contains
      ! Constructor from json, wrapping the actual constructor.
-     procedure, pass(this) :: init => simcomp_test_init_from_json
+     procedure, pass(this) :: init => adjoint_init_from_json
      ! Actual constructor.
      procedure, pass(this) :: init_from_attributes => &
-          simcomp_test_init_from_attributes
+          adjoint_init_from_attributes
      ! Destructor.
-     procedure, pass(this) :: free => simcomp_test_free
-     ! Compute the simcomp_test field.
-     procedure, pass(this) :: compute_ => simcomp_test_compute
-  end type adjoint_t
+     procedure, pass(this) :: free => adjoint_free
+  end type adjoint_obj
 
 contains
 
   ! Constructor from json.
-  subroutine simcomp_test_init_from_json(this, json, case)
-    class(adjoint_t), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    class(case_t), intent(inout), target :: case
-
-    call this%init_from_attributes()
-    call this%init_base(json, case)
-
-    call adjoint_case_init_common(this, case)
+  subroutine adjoint_init_from_json(this, case)
+    class(adjoint_obj), intent(inout) :: this
+    type(case_t), intent(inout), target :: case
 
     ! Read the tolerance
-    call json_get_or_default(json, "tol", this%tol, 1.0e-6_rp)
-
-    ! Point local fields to the scratch fields
-    this%u_old = case%fluid%u
-    this%v_old = case%fluid%v
-    this%w_old = case%fluid%w
-    this%p_old = case%fluid%p
-
-    call field_cfill(this%u_old, 0.0_rp)
-    call field_cfill(this%v_old, 0.0_rp)
-    call field_cfill(this%w_old, 0.0_rp)
-    call field_cfill(this%p_old, 0.0_rp)
+    call json_get_or_default(case%params, "tol", this%tol, 1.0e-6_rp)
 
     ! Check if the scalar field is allocated
     if (allocated(case%scalar)) then
        this%have_scalar = .true.
-       this%s_old = case%scalar%s
-       call field_cfill(this%s_old, 0.0_rp)
     end if
 
-    ! Point to the adjoint fields
-    this%u_adj => this%scheme%u_adj
-    this%v_adj => this%scheme%v_adj
-    this%w_adj => this%scheme%w_adj
-    this%p_adj => this%scheme%p_adj
+    call this%init_from_attributes(case, this%tol)
 
-  end subroutine simcomp_test_init_from_json
+  end subroutine adjoint_init_from_json
+
+  ! Constructor from attributes
+  subroutine adjoint_init_from_attributes(this, case, tol)
+    class(adjoint_obj), intent(inout) :: this
+    class(case_t), intent(inout), target :: case
+    real(kind=rp), intent(in), optional :: tol
+
+    this%case => case
+    this%tol = tol
+    call adjoint_case_init_common(this, case)
+
+  end subroutine adjoint_init_from_attributes
 
   !> Initialize a case from its (loaded) params object
   subroutine adjoint_case_init_common(this, C)
-    class(adjoint_t), intent(inout) :: this
-    type(case_t), target, intent(inout) :: C
+    class(adjoint_obj), intent(inout) :: this
+    type(case_t), intent(inout) :: C
     character(len=:), allocatable :: output_directory
     integer :: lx = 0
     logical :: scalar = .false.
@@ -182,7 +169,15 @@ contains
     integer :: stats_sampling_interval
     integer :: output_dir_len
     integer :: precision
-    type(field_t), pointer :: u_b, v_b, w_b
+
+    ! -------------------------------------------------------------------
+    ! A subdictionary which should be passed into "fluid" or "adjoint" source term
+    type(json_file) :: fluid_json
+    type(json_file) :: adjoint_json
+    type(json_file) :: this_json
+    type(json_core) :: core
+    type(json_value), pointer :: ptr
+    character(len=:), allocatable :: buffer
 
     !
     ! Setup fluid scheme
@@ -243,14 +238,39 @@ contains
     !
     ! Setup initial conditions
     !
-    call json_get(C%params, 'case.fluid.initial_condition.type',&
-         string_val)
-    if (trim(string_val) .ne. 'user') then
-       call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+    ! This should be unique from forward solution
+    ! HARRY
+    ! ------------------------------------------------------------
+    ! I want to give a subdictionary to IC's so we can different ICs
+    ! for different solvers,
+    ! (not hardcoded to fluid)
+    !
+    if (C%params%valid_path('case.adjoint.initial_condition')) then
+       call C%params%get("case.adjoint", ptr, found)
+       call core%print_to_string(ptr, buffer)
+       call adjoint_json%load_from_string(buffer)
+       call json_get(C%params, 'case.adjoint.initial_condition.type',&
+            string_val)
     else
-       call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, C%params)
+       ! this is stupid naming... but here "adjoint_json" would be fluid_json
+       call C%params%get("case.fluid", ptr, found)
+       call core%print_to_string(ptr, buffer)
+       call adjoint_json%load_from_string(buffer)
+       call json_get(C%params, 'case.fluid.initial_condition.type',&
+            string_val)
+    endif
+
+
+    if (trim(string_val) .ne. 'user') then
+       !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+       !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+       !
+       ! passing adjoint_json
+       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
+    else
+       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
     end if
 
     ! if (scalar) then
@@ -270,32 +290,6 @@ contains
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
-
-       ! baseflow is solution to forward problem
-       u_b => neko_field_registry%get_field('u')
-       v_b => neko_field_registry%get_field('v')
-       w_b => neko_field_registry%get_field('w')
-
-       !!
-       !! Setup initial baseflow
-       !!
-       !call json_get(C%params, 'case.fluid.baseflow.type', string_val)
-
-       !if (trim(string_val) .ne. 'user') then
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
-       !        string_val, C%params)
-       !else
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
-       !        C%usr%baseflow_user, C%params)
-       !end if
-
-
-
-       ! Tim what is this for?
-       call field_cfill(f%u_b, 0.0_rp)
-       call field_cfill(f%v_b, 0.0_rp)
-       call field_cfill(f%w_b, 0.0_rp)
-
 
     end select
 
@@ -369,266 +363,14 @@ contains
 
   end subroutine adjoint_case_init_common
 
-  ! Actual constructor.
-  subroutine simcomp_test_init_from_attributes(this)
-    class(adjoint_t), intent(inout) :: this
-  end subroutine simcomp_test_init_from_attributes
-
   ! Destructor.
-  subroutine simcomp_test_free(this)
-    class(adjoint_t), intent(inout) :: this
-
-    call this%u_old%free()
-    call this%v_old%free()
-    call this%w_old%free()
-    call this%p_old%free()
-    if (this%have_scalar) then
-       call this%s_old%free()
-    end if
+  subroutine adjoint_free(this)
+    class(adjoint_obj), intent(inout) :: this
 
     call this%scheme%free()
-    call this%free_base()
+    call this%s%free()
 
-  end subroutine simcomp_test_free
+  end subroutine adjoint_free
 
-  ! Compute the simcomp_test field.
-  subroutine simcomp_test_compute(this, t, tstep)
-    class(adjoint_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-
-    real(kind=rp), dimension(5) :: normed_diff
-    type(field_t), pointer :: u, v, w, p, s
-    character(len=256) :: msg
-
-    real(kind=rp) :: t_adj, cfl
-    real(kind=dp) :: start_time_org, start_time, end_time
-    character(len=LOG_SIZE) :: log_buf
-    integer :: tstep_adj
-    character(len=:), allocatable :: restart_file
-    logical :: output_at_end, found
-    ! for variable_tsteping
-    real(kind=rp) :: cfl_avrg = 0.0_rp
-    type(time_step_controller_t) :: dt_controller
-    integer :: idx
-
-    ! ------------------------------------------------------------------------ !
-    ! Computation of the adjoint field.
-    !
-    ! This is where the actual computation of the adjoint field should be
-    ! implemented. This will so far just be a steady state field based on the
-    ! current state of the fluid fields.
-
-    ! ------------------------------------------------------------------------ !
-    ! Full copy of the `simulation.f90` file from the Neko source code.
-    t_adj = 0d0
-    tstep_adj = 0
-    call neko_log%section('Starting adjoint')
-    write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
-    call neko_log%message(log_buf)
-    call dt_controller%init(this%case%params)
-    if (.not. dt_controller%if_variable_dt) then
-       write(log_buf,'(A, E15.7)') 'dt :  ', this%case%dt
-       call neko_log%message(log_buf)
-    else
-       write(log_buf,'(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
-       call neko_log%message(log_buf)
-    end if
-
-    !> Call stats, samplers and user-init before time loop
-    call neko_log%section('Postprocessing')
-    call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-    call this%s%sample(t_adj, tstep_adj)
-
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
-         this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
-    call neko_log%end_section()
-    call neko_log%newline()
-
-    call profiler_start
-    cfl = this%scheme%compute_cfl(this%case%dt)
-    start_time_org = MPI_WTIME()
-
-    do while (t_adj .lt. this%case%end_time .and. (.not. jobctrl_time_limit()))
-       call profiler_start_region('Time-Step')
-       tstep_adj = tstep_adj + 1
-       start_time = MPI_WTIME()
-       if (dt_controller%dt_last_change .eq. 0) then
-          cfl_avrg = cfl
-       end if
-       call dt_controller%set_dt(this%case%dt, cfl, cfl_avrg, tstep_adj)
-       !calculate the cfl after the possibly varied dt
-       cfl = this%scheme%compute_cfl(this%case%dt)
-
-       call neko_log%status(t_adj, this%case%end_time)
-       write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
-       call neko_log%message(log_buf)
-       call neko_log%begin()
-
-       write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
-       call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
-
-       call neko_log%section('Fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
-       end_time = MPI_WTIME()
-       write(log_buf, '(A,E15.7,A,E15.7)') &
-            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-            end_time-start_time
-       call neko_log%end_section(log_buf)
-
-       ! Scalar step
-       if (allocated(this%case%scalar)) then
-          start_time = MPI_WTIME()
-          call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
-          end_time = MPI_WTIME()
-          write(log_buf, '(A,E15.7,A,E15.7)') &
-               'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-               end_time-start_time
-          call neko_log%end_section(log_buf)
-       end if
-
-       call neko_log%section('Postprocessing')
-
-       call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-       call this%s%sample(t_adj, tstep_adj)
-
-       ! Update material properties
-       call this%case%usr%material_properties(t_adj, tstep_adj, this%case%material_properties%rho,&
-            this%case%material_properties%mu, &
-            this%case%material_properties%cp, &
-            this%case%material_properties%lambda, &
-            this%case%params)
-
-       call neko_log%end_section()
-
-       call neko_log%end()
-       call profiler_end_region
-    end do
-    call profiler_stop
-
-    call json_get_or_default(this%case%params, 'case.output_at_end',&
-         output_at_end, .true.)
-    call this%s%sample(t_adj, tstep_adj, output_at_end)
-
-    if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
-       call simulation_joblimit_chkp(this%case, t_adj)
-    end if
-
-    call this%case%usr%user_finalize_modules(t_adj, this%case%params)
-
-    call neko_log%end_section('Normal end.')
-    this%computed = .true.
-
-  end subroutine simcomp_test_compute
-
-  subroutine simulation_settime(t, dt, ext_bdf, tlag, dtlag, step)
-    real(kind=rp), intent(inout) :: t
-    real(kind=rp), intent(in) :: dt
-    type(time_scheme_controller_t), intent(inout) :: ext_bdf
-    real(kind=rp), dimension(10) :: tlag
-    real(kind=rp), dimension(10) :: dtlag
-    integer, intent(in) :: step
-    integer :: i
-
-
-    do i = 10, 2, -1
-       tlag(i) = tlag(i-1)
-       dtlag(i) = dtlag(i-1)
-    end do
-
-    dtlag(1) = dt
-    tlag(1) = t
-    if (ext_bdf%ndiff .eq. 0) then
-       dtlag(2) = dt
-       tlag(2) = t
-    end if
-
-    t = t + dt
-
-    call ext_bdf%set_coeffs(dtlag)
-
-  end subroutine simulation_settime
-
-  !> Restart a case @a C from a given checkpoint
-  subroutine simulation_restart(C, t)
-    implicit none
-    type(case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: t
-    integer :: i
-    type(file_t) :: chkpf, previous_meshf
-    character(len=LOG_SIZE) :: log_buf
-    character(len=:), allocatable :: restart_file
-    character(len=:), allocatable :: restart_mesh_file
-    real(kind=rp) :: tol
-    logical :: found
-
-    call C%params%get('case.restart_file', restart_file, found)
-    call C%params%get('case.restart_mesh_file', restart_mesh_file,&
-         found)
-
-    if (found) then
-       previous_meshf = file_t(trim(restart_mesh_file))
-       call previous_meshf%read(C%fluid%chkp%previous_mesh)
-    end if
-
-    call C%params%get('case.mesh2mesh_tolerance', tol,&
-         found)
-
-    if (found) C%fluid%chkp%mesh2mesh_tol = tol
-
-    chkpf = file_t(trim(restart_file))
-    call chkpf%read(C%fluid%chkp)
-    C%dtlag = C%fluid%chkp%dtlag
-    C%tlag = C%fluid%chkp%tlag
-
-    !Free the previous mesh, dont need it anymore
-    call C%fluid%chkp%previous_mesh%free()
-    do i = 1, size(C%dtlag)
-       call C%ext_bdf%set_coeffs(C%dtlag)
-    end do
-
-    call C%fluid%restart(C%dtlag, C%tlag)
-    if (allocated(C%scalar)) call C%scalar%restart( C%dtlag, C%tlag)
-
-    t = C%fluid%chkp%restart_time()
-    call neko_log%section('Restarting from checkpoint')
-    write(log_buf,'(A,A)') 'File :   ', &
-         trim(restart_file)
-    call neko_log%message(log_buf)
-    write(log_buf,'(A,E15.7)') 'Time : ', t
-    call neko_log%message(log_buf)
-    call neko_log%end_section()
-
-    call C%s%set_counter(t)
-  end subroutine simulation_restart
-
-  !> Write a checkpoint at joblimit
-  subroutine simulation_joblimit_chkp(C, t)
-    type(case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: t
-    type(file_t) :: chkpf
-    character(len=:), allocatable :: chkp_format
-    character(len=LOG_SIZE) :: log_buf
-    character(len=10) :: format_str
-    logical :: found
-
-    call C%params%get('case.checkpoint_format', chkp_format, found)
-    call C%fluid%chkp%sync_host()
-    format_str = '.chkp'
-    if (found) then
-       if (chkp_format .eq. 'hdf5') then
-          format_str = '.h5'
-       end if
-    end if
-    chkpf = file_t('joblimit'//trim(format_str))
-    call chkpf%write(C%fluid%chkp, t)
-    write(log_buf, '(A)') '! saving checkpoint >>>'
-    call neko_log%message(log_buf)
-
-  end subroutine simulation_joblimit_chkp
-
-
-end module simcomp_example
+end module adjoint_mod
 

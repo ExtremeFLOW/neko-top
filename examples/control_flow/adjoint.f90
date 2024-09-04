@@ -73,7 +73,7 @@ module simcomp_example
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
   use sampler, only : sampler_t
-  use flow_ic, only : set_flow_ic
+  use adjoint_ic, only : set_adjoint_ic
   use scalar_ic, only : set_scalar_ic
   use field, only : field_t
   use field_registry, only : neko_field_registry
@@ -190,8 +190,6 @@ contains
     type(json_value), pointer :: ptr
     character(len=:), allocatable :: buffer
 
-
-
     !
     ! Setup fluid scheme
     !
@@ -246,13 +244,13 @@ contains
           call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
        end if
     else
-    if (C%params%valid_path('case.fluid.inflow_condition')) then
-       call json_get(C%params, 'case.fluid.inflow_condition.type',&
-            string_val)
-       if (trim(string_val) .eq. 'user') then
-          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+       if (C%params%valid_path('case.fluid.inflow_condition')) then
+          call json_get(C%params, 'case.fluid.inflow_condition.type',&
+               string_val)
+          if (trim(string_val) .eq. 'user') then
+             call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+          end if
        end if
-    end if
     end if
 
     ! ! Setup user boundary conditions for the scalar.
@@ -271,31 +269,31 @@ contains
     ! (not hardcoded to fluid)
     !
     if (C%params%valid_path('case.adjoint.initial_condition')) then
-    call C%params%get("case.adjoint", ptr, found)
-    call core%print_to_string(ptr, buffer)
-    call adjoint_json%load_from_string(buffer)
-    call json_get(C%params, 'case.adjoint.initial_condition.type',&
-         string_val)
+       call C%params%get("case.adjoint", ptr, found)
+       call core%print_to_string(ptr, buffer)
+       call adjoint_json%load_from_string(buffer)
+       call json_get(C%params, 'case.adjoint.initial_condition.type',&
+            string_val)
     else
-    	! this is stupid naming... but here "adjoint_json" would be fluid_json
-    call C%params%get("case.fluid", ptr, found)
-    call core%print_to_string(ptr, buffer)
-    call adjoint_json%load_from_string(buffer)
-    call json_get(C%params, 'case.fluid.initial_condition.type',&
-         string_val)
+       ! this is stupid naming... but here "adjoint_json" would be fluid_json
+       call C%params%get("case.fluid", ptr, found)
+       call core%print_to_string(ptr, buffer)
+       call adjoint_json%load_from_string(buffer)
+       call json_get(C%params, 'case.fluid.initial_condition.type',&
+            string_val)
     endif
 
 
     if (trim(string_val) .ne. 'user') then
-       !call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+       !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
        !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
        !
        ! passing adjoint_json
-       call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
             this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     else
-       call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, C%params)
+       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
     end if
 
     ! if (scalar) then
@@ -378,8 +376,8 @@ contains
             path = trim(output_directory))
     end if
 
-	 ! HARRY
-	 ! fuck the sampler we're changing this anyway
+    ! HARRY
+    ! fuck the sampler we're changing this anyway
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
@@ -569,8 +567,8 @@ contains
     call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
     call this%s%sample(t_adj, tstep_adj)
 
-	 ! HARRY	
-	 ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
+    ! HARRY
+    ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
     call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
