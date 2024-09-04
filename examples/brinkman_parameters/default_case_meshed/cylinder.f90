@@ -32,7 +32,7 @@ contains
     real(kind=rp) :: leakage
     real(kind=rp) :: div_tot
 
-    call neko_field_registry%add_field(u%dof, "div_fam", .false.)
+    call neko_field_registry%add_field(u%dof, "div_fam", .true.)
 
 !    brinkman => neko_field_registry%get_field("brinkman_indicator")
     divergence => neko_field_registry%get_field_by_name('div_fam')
