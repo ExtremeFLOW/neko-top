@@ -5,13 +5,41 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "output_boundary": true,
-        "end_time": 10.0,
-        "timestep": 1e-2,
+        "output_boundary": false,
+        "end_time": 100.0,
+        "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
             "dealias": false
+        },
+        "adjoint": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 1.0, 0.0
+                ]
+            },
+            "source_terms": [
+                {
+                    "type": "user_vector",
+                    "type": "brinkman",
+                    "objects": [
+                        {
+                            "type": "point_zone",
+                            "name": "cylinder"
+                        }
+                    ],
+                    "brinkman": {
+                        "limits": [
+                            0.0,
+                            150.0
+                        ],
+                        "penalty": 1.0,
+                        "adjoint": true
+                    }
+                }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
@@ -33,19 +61,19 @@
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-8,
+                "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
             "boundary_types": ["v", "o", "v", "v"],
-            "output_control": "nsamples",
-            "output_value": 100,
+            "output_control": "tsteps",
+            "output_value": 200,
                         "source_terms": [
                 {
                     "type": "brinkman",
@@ -58,7 +86,7 @@
                     "brinkman": {
                         "limits": [
                             0.0,
-                            1500.0
+                            150.0
                         ],
                         "penalty": 1.0
                     }
@@ -79,14 +107,16 @@
                     0.0,
                     1.0
                 ],
-                "radius": 0.1
+                "radius": 0.2
             }
         ],
         "simulation_components": [
             {
                 "type": "adjoint",
                 "is_user": true,
-                "tol": 1e-8
+                "tol": 1e-4,
+                "compute_control": "tsteps",
+                "compute_value": 1,
             },
             // {
             //     "type": "field_writer",

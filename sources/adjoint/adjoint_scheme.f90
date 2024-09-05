@@ -651,6 +651,7 @@ contains
     ! params replaced by adjoint_json
     !call this%source_term%init(params, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
     !     user)
+    
     call this%source_term%init(adjoint_json, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
          user)
 

@@ -814,7 +814,12 @@ contains
     call profiler_end_region
 
     ! Compute the norm of the field and determine if we should do a rescale.
-    call this%PW_compute_(t, tstep)
+    ! HARRY
+    ! TODO
+    ! we need to discuss this rescaling in the context of topology optimization
+    ! vs stability analysis,
+    ! for now I'm commenting this out
+    !call this%PW_compute_(t, tstep)
 
   end subroutine adjoint_pnpn_step
 
