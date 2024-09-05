@@ -83,7 +83,7 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Full copy of the `simulation.f90` file from the Neko source code.
-    t_adj = this%case%end_time
+    t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
     write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
@@ -99,10 +99,12 @@ contains
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
+    call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
     call this%s%sample(t_adj, tstep_adj)
 
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, &
-         this%scheme%v_adj, this%scheme%w_adj, &
+    ! HARRY
+    ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
+    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -111,7 +113,7 @@ contains
     cfl = this%scheme%compute_cfl(this%case%dt)
     start_time_org = MPI_WTIME()
 
-    do while (t_adj .gt. 0.0_rp .and. (.not. jobctrl_time_limit()))
+    do while (t_adj .lt. this%case%end_time .and. (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
