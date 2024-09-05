@@ -45,7 +45,7 @@ module simcomp_example
   use adjoint_output, only: adjoint_output_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, field_glsc3
-  use field_math, only: field_add2
+  use field_math, only: field_add2, field_vdot3
   use math, only: glsc2, glsc3
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
@@ -92,6 +92,7 @@ module simcomp_example
   use scratch_registry, only : scratch_registry_t, neko_scratch_registry
   use point_zone_registry, only: neko_point_zone_registry
   use material_properties, only : material_properties_t
+  use operators, only : opgrad
   implicit none
   private
 
@@ -107,10 +108,13 @@ module simcomp_example
      real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
      type(sampler_t) :: s
+     type(sampler_t) :: useful_sampler
+     type(field_t) :: sensitivity
 
      logical :: have_scalar = .false.
      logical :: converged = .false.
      logical :: computed = .false.
+     logical :: converged_adjoint = .false.
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -183,13 +187,25 @@ contains
     integer :: output_dir_len
     integer :: precision
     type(field_t), pointer :: u_b, v_b, w_b
+    ! HARRY
+    ! extra things for json
+    type(json_file) :: adjoint_json
+    type(json_core) :: core
+    type(json_value), pointer :: ptr
+    character(len=:), allocatable :: buffer
+
+
 
     !
     ! Setup fluid scheme
     !
+    ! HARRY
+    ! keep the schemes the same for SURE
     call json_get(C%params, 'case.fluid.scheme', string_val)
     call adjoint_scheme_factory(this%scheme, trim(string_val))
 
+    ! HARRY
+    ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(C%msh, lx, C%params, C%usr, C%material_properties)
@@ -227,12 +243,20 @@ contains
     !
     ! Setup user defined conditions
     !
+    if (C%params%valid_path('case.adjoint.inflow_condition')) then
+       call json_get(C%params, 'case.adjoint.inflow_condition.type',&
+            string_val)
+       if (trim(string_val) .eq. 'user') then
+          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+       end if
+    else
     if (C%params%valid_path('case.fluid.inflow_condition')) then
        call json_get(C%params, 'case.fluid.inflow_condition.type',&
             string_val)
        if (trim(string_val) .eq. 'user') then
           call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
        end if
+    end if
     end if
 
     ! ! Setup user boundary conditions for the scalar.
@@ -243,11 +267,36 @@ contains
     !
     ! Setup initial conditions
     !
+    ! This should be unique from forward solution
+    ! HARRY
+    ! ------------------------------------------------------------
+    ! I want to give a subdictionary to IC's so we can different ICs
+    ! for different solvers,
+    ! (not hardcoded to fluid)
+    !
+    if (C%params%valid_path('case.adjoint.initial_condition')) then
+    call C%params%get("case.adjoint", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call adjoint_json%load_from_string(buffer)
+    call json_get(C%params, 'case.adjoint.initial_condition.type',&
+         string_val)
+    else
+    	! this is stupid naming... but here "adjoint_json" would be fluid_json
+    call C%params%get("case.fluid", ptr, found)
+    call core%print_to_string(ptr, buffer)
+    call adjoint_json%load_from_string(buffer)
     call json_get(C%params, 'case.fluid.initial_condition.type',&
          string_val)
+    endif
+
+
     if (trim(string_val) .ne. 'user') then
+       !call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+       !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+       !
+       ! passing adjoint_json
        call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     else
        call set_flow_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
             this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, C%params)
@@ -333,6 +382,8 @@ contains
             path = trim(output_directory))
     end if
 
+	 ! HARRY
+	 ! fuck the sampler we're changing this anyway
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
@@ -411,6 +462,7 @@ contains
     real(kind=rp) :: cfl_avrg = 0.0_rp
     type(time_step_controller_t) :: dt_controller
     integer :: idx
+    real(kind=rp) :: obj, norm
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
@@ -435,45 +487,18 @@ contains
 
 
     if (.not. this%converged) then
-
-       ! Compute the difference between the old and new fields
-       call field_sub2(this%u_old, u)
-       call field_sub2(this%v_old, v)
-       call field_sub2(this%w_old, w)
-       call field_sub2(this%p_old, p)
-       if (this%have_scalar) then
-          call field_sub2(this%s_old, s)
-       end if
-
-       if (this%have_scalar) then
-          ! passive scalars can be checked later
-       else
-          ! Compute the normed difference
-          normed_diff(1) = field_energy_norm(this%u_old, this%v_old, this%w_old, &
-               this%case%fluid%c_Xh)
-          normed_diff(1) = normed_diff(1)/this%case%dt
-          ! Maybe normalize by domain size too...
-       endif
-
+    call check_norm(norm, u,v,w, this%u_old,this%v_old,this%w_old, this%case%fluid%c_Xh, this%case%dt)
        ! If the normed difference is below the tolerance, we consider the
        ! simulation to have converged. Otherwise, we copy the new fields to the
        ! old fields and continue the simulation.
-       if (normed_diff(1) .gt. this%tol) then
-          call field_copy(this%u_old, u)
-          call field_copy(this%v_old, v)
-          call field_copy(this%w_old, w)
-          call field_copy(this%p_old, p)
-          if (this%have_scalar) then
-             call field_copy(this%s_old, s)
-          end if
-          write(log_buf,'(A, E15.7)') 'norm: ', normed_diff(1)
-          call neko_log%message(log_buf)
-
-       else
+       if (norm .lt. this%tol) then
           this%case%fluid%freeze = .true.
           this%converged = .true.
        end if
     end if
+    ! can delete this later
+    obj = objective_fn(u,v,w,this%case%fluid%c_Xh)
+    print*, 'OBJECTIVE', obj
 
     ! Return if the simulation has not converged
     if (.not. this%converged .or. this%computed) then
@@ -505,6 +530,8 @@ contains
     !    end if
     ! end do
 
+    obj = objective_fn(u,v,w,this%case%fluid%c_Xh)
+    print*, 'FINAL OBJECTIVE FUNCTION', obj
 
     ! ------------------------------------------------------------------------ !
     ! Full copy of the `simulation.f90` file from the Neko source code.
@@ -527,6 +554,8 @@ contains
     call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
     call this%s%sample(t_adj, tstep_adj)
 
+	 ! HARRY	
+	 ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
     call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
@@ -536,7 +565,7 @@ contains
     cfl = this%scheme%compute_cfl(this%case%dt)
     start_time_org = MPI_WTIME()
 
-    do while (t_adj .lt. this%case%end_time .and. (.not. jobctrl_time_limit()))
+    do while (.not.this%converged_adjoint .and. (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
@@ -592,8 +621,29 @@ contains
 
        call neko_log%end()
        call profiler_end_region
+
+    call check_norm(norm, this%u_adj,this%v_adj,this%w_adj,& 
+    this%u_old,this%v_old,this%w_old, this%case%fluid%c_Xh, this%case%dt)
+    ! THE NORM CONFUSES ME FOR THE ADJOINT!!!
+    ! in this case the magnitude of the adjoint it set by the forcing term
+    ! so we don't have to worry about renormalizing
+
+!       ! If the normed difference is below the tolerance, we consider the
+!       ! simulation to have converged. Otherwise, we copy the new fields to the
+!       ! old fields and continue the simulation.
+!       if (norm .lt. this%tol) then
+!          this%case%fluid%freeze = .true.
+!          this%converged = .true.
+!       end if
+!    end if
+	if(norm.lt.this%tol) this%converged_adjoint = .true.
     end do
     call profiler_stop
+
+    !------------- Here we would compute sensitivity!!!
+    call 	field_vdot3(this%sensitivity,u,v,w,this%u_adj,this%v_adj, this%w_adj)
+    ! I'm confused with the sampler ...
+    ! I just want to outpost this field
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
@@ -716,6 +766,29 @@ contains
 
   end subroutine simulation_joblimit_chkp
 
+  subroutine check_norm(norm, u,v,w, u_old,v_old,w_old, coef, dt)
+  type(coef_t), intent(in) :: coef
+  type(field_t), intent(inout) :: u,v,w
+  type(field_t), intent(inout) :: u_old,v_old,w_old
+  real(kind=rp), intent(out) :: norm, dt
+
+  ! Compute the difference between the old and new fields
+  call field_sub2(u_old, u)
+  call field_sub2(v_old, v)
+  call field_sub2(w_old, w)
+
+  ! Compute the normed difference
+  norm = field_energy_norm(u_old,v_old,w_old, coef)
+  ! divide by timestep
+  norm = norm/dt
+  print*, 'NORM', norm
+
+  ! copy it over
+  call field_copy(u_old, u)
+  call field_copy(v_old, v)
+  call field_copy(w_old, w)
+  end subroutine check_norm
+
   function field_energy_norm(u, v, w, coef, n) result(norm)
     ! I'm new to field maths... but the problem is u,v,w are fields
     ! and coef%B is an array.
@@ -771,6 +844,40 @@ contains
   end function energy_norm
 
 
+  function objective_fn(u, v, w, coef)
+    type(field_t), intent(in) :: u,v,w
+    type(coef_t), intent(in) :: coef
+    real(kind=rp) :: objective_fn, tmp
+    type(field_t), pointer :: wo1, wo2, wo3
+    integer :: temp_indices(3)
+    integer :: n, ierr
+    ! ok for now the objective function is 1/2|\nabla u|²
+
+    call neko_scratch_registry%request_field(wo1, temp_indices(1))
+    call neko_scratch_registry%request_field(wo2, temp_indices(2))
+    call neko_scratch_registry%request_field(wo3, temp_indices(3))
+	 n = u%dof%size()
+
+	 tmp = 0_rp
+	 call opgrad (wo1%x, wo2%x, wo3%x, u%x, coef)
+	 tmp = tmp + glsc3(wo1%x,wo1%x,coef%B,n)
+	 tmp = tmp + glsc3(wo2%x,wo2%x,coef%B,n)
+	 tmp = tmp + glsc3(wo3%x,wo3%x,coef%B,n)
+	 call opgrad (wo1%x, wo2%x, wo3%x, v%x, coef)
+	 tmp = tmp + glsc3(wo1%x,wo1%x,coef%B,n)
+	 tmp = tmp + glsc3(wo2%x,wo2%x,coef%B,n)
+	 tmp = tmp + glsc3(wo3%x,wo3%x,coef%B,n)
+	 call opgrad (wo1%x, wo2%x, wo3%x, w%x, coef)
+	 tmp = tmp + glsc3(wo1%x,wo1%x,coef%B,n)
+	 tmp = tmp + glsc3(wo2%x,wo2%x,coef%B,n)
+	 tmp = tmp + glsc3(wo3%x,wo3%x,coef%B,n)
+    objective_fn = tmp/2.0_rp
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+
+
+  end function objective_fn
 
 end module simcomp_example
 
