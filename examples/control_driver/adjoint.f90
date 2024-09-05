@@ -169,12 +169,9 @@ contains
     integer :: stats_sampling_interval
     integer :: output_dir_len
     integer :: precision
-
-    ! -------------------------------------------------------------------
-    ! A subdictionary which should be passed into "fluid" or "adjoint" source term
-    type(json_file) :: fluid_json
+    ! HARRY
+    ! extra things for json
     type(json_file) :: adjoint_json
-    type(json_file) :: this_json
     type(json_core) :: core
     type(json_value), pointer :: ptr
     character(len=:), allocatable :: buffer
@@ -182,9 +179,13 @@ contains
     !
     ! Setup fluid scheme
     !
+    ! HARRY
+    ! keep the schemes the same for SURE
     call json_get(C%params, 'case.fluid.scheme', string_val)
     call adjoint_scheme_factory(this%scheme, trim(string_val))
 
+    ! HARRY
+    ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(C%msh, lx, C%params, C%usr, C%material_properties)
@@ -222,7 +223,13 @@ contains
     !
     ! Setup user defined conditions
     !
-    if (C%params%valid_path('case.fluid.inflow_condition')) then
+    if (C%params%valid_path('case.adjoint.inflow_condition')) then
+       call json_get(C%params, 'case.adjoint.inflow_condition.type',&
+            string_val)
+       if (trim(string_val) .eq. 'user') then
+          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+       end if
+    else if (C%params%valid_path('case.fluid.inflow_condition')) then
        call json_get(C%params, 'case.fluid.inflow_condition.type',&
             string_val)
        if (trim(string_val) .eq. 'user') then
@@ -291,6 +298,32 @@ contains
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
 
+       ! baseflow is solution to forward problem
+       !  u_b => neko_field_registry%get_field('u')
+       !  v_b => neko_field_registry%get_field('v')
+       !  w_b => neko_field_registry%get_field('w')
+
+       !!
+       !! Setup initial baseflow
+       !!
+       !call json_get(C%params, 'case.fluid.baseflow.type', string_val)
+
+       !if (trim(string_val) .ne. 'user') then
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !        string_val, C%params)
+       !else
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !        C%usr%baseflow_user, C%params)
+       !end if
+
+
+
+       !  ! Tim what is this for?
+       !  call field_cfill(f%u_b, 0.0_rp)
+       !  call field_cfill(f%v_b, 0.0_rp)
+       !  call field_cfill(f%w_b, 0.0_rp)
+
+
     end select
 
     !
@@ -327,6 +360,8 @@ contains
             path = trim(output_directory))
     end if
 
+    ! HARRY
+    ! fuck the sampler we're changing this anyway
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
