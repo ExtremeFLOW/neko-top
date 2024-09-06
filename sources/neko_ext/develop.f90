@@ -2,6 +2,15 @@
 ! Supporting functions
 ! ============================================================================ !
 module develop
+  use case, only: case_t
+  use global_interpolation, only: global_interpolation_t
+  use json_utils, only: json_get_or_default
+  use logger, only: neko_log, LOG_SIZE
+  use num_types, only: rp
+  use tuple, only: tuple4_i4_t
+  use utils, only: neko_error
+  use hex, only: hex_t
+  implicit none
 
   integer, public, parameter :: facet_type_interior = 0
   integer, public, parameter :: facet_type_outlet = 1
@@ -16,9 +25,6 @@ contains
   !> @param[in] b Second vector
   !> @return Cross product \f$ a \times b \f$
   pure function cross(a, b) result(c)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(3), intent(in) :: a
     real(kind=rp), dimension(3), intent(in) :: b
     real(kind=rp), dimension(3) :: c
@@ -34,9 +40,6 @@ contains
   !> @param[in] b Second vector.
   !> @return dot product \f$ a \cdot b \f$.
   pure function dot(a, b) result(d)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(3), intent(in) :: a(3)
     real(kind=rp), dimension(3), intent(in) :: b(3)
     real(kind=rp) :: d
@@ -52,8 +55,6 @@ contains
   !> @note The vertices must be ordered in order either clockwise or
   !> counter-clockwise around the polygon.
   pure function area(nv, vertices) result(a)
-    use num_types
-    implicit none
     integer, intent(in) :: nv
     real(kind=rp), dimension(3, nv), intent(in) :: vertices
     real(kind=rp) :: a
@@ -83,9 +84,6 @@ contains
   !> @param[in] facet_type Type of facet, optional,
   !> (0 = interior, 1 = outlet [default]).
   subroutine get_facets(C, out, facet_type)
-    use case
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, dimension(:, :), allocatable, intent(out) :: out
     integer, intent(in), optional :: facet_type
@@ -136,9 +134,6 @@ contains
   !> @param[out] out List of outlet facets, size (2, N_facets),
   !> first row is element ID, second row is facet ID.
   subroutine get_facets_outlet(C, out)
-    use case, only: case_t
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, dimension(:, :), allocatable, intent(out) :: out
 
@@ -153,9 +148,6 @@ contains
   !> weights must be the same size as the array. If no weights are supplied, the
   !> unweighted sum is computed.
   pure function sum_weighted(a, w) result(s)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(:), intent(in) :: a
     real(kind=rp), dimension(:), intent(in), optional :: w
     real(kind=rp) :: s
@@ -175,9 +167,6 @@ contains
   !> @details This function computes the weighted average of an array. The
   !> weights must be the same size as the array.
   pure function average_weighted(a, w) result(m)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(:), intent(in) :: a
     real(kind=rp), dimension(:), intent(in), optional :: w
     real(kind=rp) :: m
@@ -196,12 +185,6 @@ contains
   !> @param[in] facet_id Facet ID.
   !> @param[out] nodes Node list.
   subroutine get_facet_nodes(C, element_id, facet_id, nodes)
-    use case
-    use num_types
-    use tuple
-    use hex
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, intent(in) :: element_id
     integer, intent(in) :: facet_id
@@ -245,14 +228,6 @@ contains
   end subroutine get_facet_nodes
 
   subroutine estimate_temperature(neko_case)
-    use case, only: case_t
-    use global_interpolation, only: global_interpolation_t
-    use json_utils, only: json_get_or_default
-    use logger, only: neko_log, LOG_SIZE
-    use num_types, only: rp
-    use tuple, only: tuple4_i4_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     type(global_interpolation_t) :: interpolator
 
@@ -274,7 +249,7 @@ contains
 
     ! Read the case file for options
     call json_get_or_default(neko_case%params, 'topopt.target_temperature', &
-                             target_temperature, 0.5_rp)
+         target_temperature, 0.5_rp)
 
     ! Initialize the global interpolation
     call interpolator%init(neko_case%scalar%dm_xh)
@@ -312,8 +287,8 @@ contains
     call interpolator%evaluate(temperature_local, neko_case%scalar%s%x)
 
     temperature_mean = average_weighted( &
-                                         temperature_local - target_temperature, &
-                                         facet_area)
+         temperature_local - target_temperature, &
+         facet_area)
 
     write (log_buf, '(a,f15.7)') &
          "Outlet area-weighted average temperature deviation: ", &
