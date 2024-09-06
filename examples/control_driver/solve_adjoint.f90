@@ -59,18 +59,15 @@ contains
     real(kind=rp) :: t
     integer :: tstep
 
-    real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
     character(len=256) :: msg
 
-    real(kind=rp) :: t_adj, cfl
+    real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time
     character(len=LOG_SIZE) :: log_buf
     integer :: tstep_adj
     character(len=:), allocatable :: restart_file
     logical :: output_at_end, found
-    ! for variable_tsteping
-    real(kind=rp) :: cfl_avrg = 0.0_rp
     type(time_step_controller_t) :: dt_controller
     integer :: idx
 
@@ -82,7 +79,7 @@ contains
     ! current state of the fluid fields.
 
     ! ------------------------------------------------------------------------ !
-    ! Full copy of the `simulation.f90` file from the Neko source code.
+
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
@@ -110,30 +107,23 @@ contains
     call neko_log%newline()
 
     call profiler_start
-    cfl = this%scheme%compute_cfl(this%case%dt)
     start_time_org = MPI_WTIME()
 
     do while (t_adj .lt. this%case%end_time .and. (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
-       if (dt_controller%dt_last_change .eq. 0) then
-          cfl_avrg = cfl
-       end if
-       call dt_controller%set_dt(this%case%dt, cfl, cfl_avrg, tstep_adj)
-       !calculate the cfl after the possibly varied dt
-       cfl = this%scheme%compute_cfl(this%case%dt)
 
-       call neko_log%status(this%case%end_time - t_adj, this%case%end_time)
+       call neko_log%status(t_adj, this%case%end_time)
        write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
        call neko_log%message(log_buf)
        call neko_log%begin()
 
-       write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
+       !  write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
        call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
 
-       call neko_log%section('Fluid')
+       call neko_log%section('Adjoint fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -159,7 +149,8 @@ contains
        call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties
-       call this%case%usr%material_properties(t_adj, tstep_adj, this%case%material_properties%rho,&
+       call this%case%usr%material_properties(t_adj, tstep_adj, &
+            this%case%material_properties%rho, &
             this%case%material_properties%mu, &
             this%case%material_properties%cp, &
             this%case%material_properties%lambda, &
@@ -183,7 +174,6 @@ contains
     call this%case%usr%user_finalize_modules(t_adj, this%case%params)
 
     call neko_log%end_section('Normal end.')
-    this%computed = .true.
 
   end subroutine solve_adjoint
 
@@ -209,7 +199,7 @@ contains
        tlag(2) = t
     end if
 
-    t = t - dt
+    t = t + dt
 
     call ext_bdf%set_coeffs(dtlag)
 
