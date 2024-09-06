@@ -89,16 +89,16 @@ contains
     ! ------------------------------------------------------------------------ !
 
     call json_get(neko_case%params, &
-                  'case.fluid.initial_condition.type', string_val)
+         'case.fluid.initial_condition.type', string_val)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u, v, w, p, &
-                        neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-                        string_val, neko_case%params)
+            neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
+            string_val, neko_case%params)
     else
        call set_flow_ic(u, v, w, p, &
-                        neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-                        neko_case%usr%fluid_user_ic, neko_case%params)
+            neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
+            neko_case%usr%fluid_user_ic, neko_case%params)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -106,22 +106,22 @@ contains
     ! ------------------------------------------------------------------------ !
 
     call json_get_or_default(neko_case%params, &
-                             'case.scalar.enabled', has_scalar, .false.)
+         'case.scalar.enabled', has_scalar, .false.)
 
     if (has_scalar) then
        call json_get(neko_case%params, &
-                     'case.scalar.initial_condition.type', string_val)
+            'case.scalar.initial_condition.type', string_val)
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(s, &
-                             neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-                             string_val, &
-                             neko_case%params)
+               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
+               string_val, &
+               neko_case%params)
        else
           call set_scalar_ic(s, &
-                             neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-                             neko_case%usr%scalar_user_ic, &
-                             neko_case%params)
+               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
+               neko_case%usr%scalar_user_ic, &
+               neko_case%params)
        end if
     end if
 
@@ -154,7 +154,7 @@ contains
     end if
 
     call json_get_or_default(neko_case%params, &
-                             'case.output_directory', dirname, './')
+         'case.output_directory', dirname, './')
 
     write (file_name, '(a,a,i5.5,a)') &
          trim(adjustl(dirname)), '/topopt_', iter, '_.fld'
