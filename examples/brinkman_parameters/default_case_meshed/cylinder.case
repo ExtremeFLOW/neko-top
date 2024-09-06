@@ -2,7 +2,7 @@
     "version": 1.0,
     "case": {
         "mesh_file": "data/brinkman_parameters/meshed_M3.nmsh",
-        "output_directory": "cylinder_fields",
+        // "output_directory": "cylinder_fields",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
