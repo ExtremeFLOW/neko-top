@@ -124,7 +124,7 @@ contains
        !calculate the cfl after the possibly varied dt
        cfl = this%scheme%compute_cfl(this%case%dt)
 
-       call neko_log%status(t_adj, this%case%end_time)
+       call neko_log%status(this%case%end_time - t_adj, this%case%end_time)
        write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
        call neko_log%message(log_buf)
        call neko_log%begin()

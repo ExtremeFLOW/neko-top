@@ -229,6 +229,12 @@ contains
        if (trim(string_val) .eq. 'user') then
           call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
        end if
+    else if (C%params%valid_path('case.fluid.inflow_condition')) then
+       call json_get(C%params, 'case.fluid.inflow_condition.type',&
+            string_val)
+       if (trim(string_val) .eq. 'user') then
+          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+       end if
     else
        if (C%params%valid_path('case.fluid.inflow_condition')) then
           call json_get(C%params, 'case.fluid.inflow_condition.type',&

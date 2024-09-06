@@ -23,6 +23,8 @@
             "source_terms": [
                 {
                     "type": "user_vector",
+                },
+                {
                     "type": "brinkman",
                     "objects": [
                         {
@@ -33,7 +35,7 @@
                     "brinkman": {
                         "limits": [
                             0.0,
-                            150.0
+                            500.0
                         ],
                         "penalty": 1.0,
                         "adjoint": true

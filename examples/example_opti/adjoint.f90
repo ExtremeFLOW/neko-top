@@ -46,7 +46,7 @@ module simcomp_example
   use neko_config, only: NEKO_BCKND_DEVICE
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, field_glsc3
   use field_math, only: field_add2, field_vdot3
-  use math, only: glsc2, glsc3
+  use math, only: glsc2, glsc3, vdot3, rzero
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
   use logger, only: neko_log, LOG_SIZE
@@ -167,6 +167,7 @@ contains
     this%v_adj => this%scheme%v_adj
     this%w_adj => this%scheme%w_adj
     this%p_adj => this%scheme%p_adj
+
 
   end subroutine simcomp_test_init_from_json
 
@@ -418,6 +419,8 @@ contains
     !   !  call this%s%add(C%f_chkp, real_val, string_val)
     ! end if
 
+
+
   end subroutine adjoint_case_init_common
 
   ! Actual constructor.
@@ -433,6 +436,7 @@ contains
     call this%v_old%free()
     call this%w_old%free()
     call this%p_old%free()
+    call this%sensitivity%free()
     if (this%have_scalar) then
        call this%s_old%free()
     end if
@@ -463,6 +467,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     integer :: idx
     real(kind=rp) :: obj, norm
+    integer :: n
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
@@ -492,7 +497,7 @@ contains
        ! simulation to have converged. Otherwise, we copy the new fields to the
        ! old fields and continue the simulation.
        if (norm .lt. this%tol) then
-          this%case%fluid%freeze = .true.
+          this%case%fluid%freeze = .false.
           this%converged = .true.
        end if
     end if
@@ -641,9 +646,36 @@ contains
     call profiler_stop
 
     !------------- Here we would compute sensitivity!!!
-    call 	field_vdot3(this%sensitivity,u,v,w,this%u_adj,this%v_adj, this%w_adj)
-    ! I'm confused with the sampler ...
-    ! I just want to outpost this field
+    n = u%dof%size()
+	 ! sensitivity
+    call this%sensitivity%init(u%dof)
+    call 	vdot3(this%sensitivity%x,& 
+    							u%x,v%x,w%x, &
+    							this%u_adj%x,this%v_adj%x, this%w_adj%x, u%dof%size())
+
+    ! then we would call mma and update the field
+    !
+    !
+    !
+    ! then we would reset the fluid 
+    call rzero(u%x, n)
+    call rzero(v%x, n)
+    call rzero(w%x, n)
+    ! and probably the lag terms
+    ! but I couldn't figure this out
+    !this%case%fluid%ulag%set(u)
+    !this%case%fluid%vlag%set(v)
+    !this%case%fluid%wlag%set(w)
+
+	 ! and the adjoint
+    call rzero(this%u_adj%x, n)
+    call rzero(this%v_adj%x, n)
+    call rzero(this%w_adj%x, n)
+    ! return to fluid simulation
+    this%case%fluid%freeze = .false.
+    this%converged = .false.
+    !-------------------------------------------------
+
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
@@ -656,7 +688,7 @@ contains
     call this%case%usr%user_finalize_modules(t_adj, this%case%params)
 
     call neko_log%end_section('Normal end.')
-    this%computed = .true.
+    !this%computed = .true.
 
   end subroutine simcomp_test_compute
 
