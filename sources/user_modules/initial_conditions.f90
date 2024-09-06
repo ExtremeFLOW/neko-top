@@ -26,8 +26,8 @@ contains
     integer :: i
 
     call json_get_or_default(params, &
-                             'case.scalar.initial_condition.value', &
-                             split_value, 0.0_rp)
+         'case.scalar.initial_condition.value', &
+         split_value, 0.0_rp)
 
     do i = 1, s%dof%size()
        z_value = s%dof%z(i, 1, 1, 1)
