@@ -84,6 +84,9 @@ else
 fi
 cubit="$cubit -nojournal -nographics -batch -noecho"
 
+source $MAIN_DIR/scripts/dependencies.sh
+find_nek5000 $NEK5000_DIR
+
 # Check if exo2nek is available
 if [ ! -z "$(which exo2nek)" ]; then
     exo2nek=$(which exo2nek)
