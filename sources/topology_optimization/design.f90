@@ -118,12 +118,12 @@ contains
     ! Assign local variables
     ! ---------------------------------------------------------------------- !
 
-    call json_get_or_default(json, "perm_penalty", &
-                             this%perm_penalty, 1.0_rp)
-    call json_get_or_default(json, "perm_0", &
-                             this%perm_0, 1000.0_rp)
-    call json_get_or_default(json, "perm_1", &
-                             this%perm_1, 0.0_rp)
+    call json_get_or_default(json, "topopt.perm_penalty", &
+         this%perm_penalty, 1.0_rp)
+    call json_get_or_default(json, "topopt.perm_0", &
+         this%perm_0, 1000.0_rp)
+    call json_get_or_default(json, "topopt.perm_1", &
+         this%perm_1, 0.0_rp)
 
     ! ---------------------------------------------------------------------- !
     ! Set the design domain
@@ -141,14 +141,14 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_log%warning("We assume that NEKO is using the old design " // &
-                             "domain masks. Please check the status of PR " // &
-                             "on masks if results seem wonky.")
+            "domain masks. Please check the status of PR " // &
+            "on masks if results seem wonky.")
 
        design_domain_mask = design_domain_mask -1
        call device_memcpy(design_domain_mask, design_domain_mask_d,&
-                          this%design_domain%size, HOST_TO_DEVICE, &
-                          .true. &
-                          )
+            this%design_domain%size, HOST_TO_DEVICE, &
+            .true. &
+            )
        design_domain_mask = design_domain_mask + 1
 
     end if
@@ -229,16 +229,16 @@ contains
     ! ---------------------------------------------------------------------- !
 
     associate(x => this%design_field%x, &
-              x_d => this%design_field%x_d, &
-              mask => this%design_domain%mask, &
-              mask_d => this%design_domain%mask_d &
-              )
+         x_d => this%design_field%x_d, &
+         mask => this%design_domain%mask, &
+         mask_d => this%design_domain%mask_d &
+         )
 
       if (.not. NEKO_BCKND_DEVICE .eq. 1) then
          call cadd_mask(x, 0.3_rp, this%total_size, mask, this%design_size)
       else
          call device_cadd_mask(x_d, 0.3_rp, this%total_size, &
-                               mask_d, this%design_size)
+              mask_d, this%design_size)
       end if
     end associate
 
@@ -275,18 +275,18 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_col3_mask(f%u_d, u%x_d, resistance_d, total_size, &
-                             design_domain_mask_d, design_size)
+            design_domain_mask_d, design_size)
        call device_col3_mask(f%v_d, v%x_d, resistance_d, total_size, &
-                             design_domain_mask_d, design_size)
+            design_domain_mask_d, design_size)
        call device_col3_mask(f%w_d, w%x_d, resistance_d, total_size, &
-                             design_domain_mask_d, design_size)
+            design_domain_mask_d, design_size)
     else
        call col3_mask(f%u, u%x, resistance, total_size, &
-                      design_domain_mask, design_size)
+            design_domain_mask, design_size)
        call col3_mask(f%v, v%x, resistance, total_size, &
-                      design_domain_mask, design_size)
+            design_domain_mask, design_size)
        call col3_mask(f%w, w%x, resistance, total_size, &
-                      design_domain_mask, design_size)
+            design_domain_mask, design_size)
     end if
   end subroutine topopt_permeability_force
 
