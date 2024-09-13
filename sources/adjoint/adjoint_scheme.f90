@@ -80,6 +80,8 @@ module adjoint_scheme
   use field_series
   use time_step_controller
   use field_math, only : field_cfill
+
+  use json_utils_ext, only: json_key_fallback
   implicit none
   private
 
@@ -234,23 +236,6 @@ module adjoint_scheme
 
 contains
 
-! TODO
-! HARRY
-! I tried this... and it didn't work...
-! But I think it would clean up a lot of the if statements throughout this...
-
-!  subroutine check_adjoint_json(this_json, fluid_json, adjoint_json, str_val)
-!   type(json_file), intent(inout) :: this_json
-!   type(json_file), intent(in) ::    fluid_json, adjoint_json
-!  	character(len=*), intent(in) :: str_val
-!
-!    if (adjoint_json%valid_path(str_val)) then
-!    	this_json = adjoint_json
-!    else
-!    	this_json = fluid_json
-!    endif
-!  end subroutine check_adjoint_json
-
   !> Initialize common data for the current scheme
   subroutine adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
        material_properties, kspv_init)
@@ -270,25 +255,26 @@ contains
     logical :: logical_val
     integer :: integer_val, ierr
     character(len=:), allocatable :: string_val1, string_val2
+    character(len=:), allocatable :: json_key
 
 
-    ! -------------------------------------------------------------------
-    ! A subdictionary which should be passed into "fluid" or "adjoint" source term
-    type(json_file) :: fluid_json
-    type(json_file) :: adjoint_json
-    type(json_file) :: this_json
-    type(json_core) :: core
-    type(json_value), pointer :: ptr
-    character(len=:), allocatable :: buffer
-    logical :: found
+    ! ! -------------------------------------------------------------------
+    ! ! A subdictionary which should be passed into "fluid" or "adjoint" source term
+    ! type(json_file) :: fluid_json
+    ! type(json_file) :: adjoint_json
+    ! type(json_file) :: this_json
+    ! type(json_core) :: core
+    ! type(json_value), pointer :: ptr
+    ! character(len=:), allocatable :: buffer
+    ! logical :: found
 
-    call params%get("case.fluid", ptr, found)
-    call core%print_to_string(ptr, buffer)
-    call fluid_json%load_from_string(buffer)
-    call params%get("case.adjoint", ptr, found)
-    call core%print_to_string(ptr, buffer)
-    call adjoint_json%load_from_string(buffer)
-    ! -------------------------------------------------------------------
+    ! call params%get("case.fluid", ptr, found)
+    ! call core%print_to_string(ptr, buffer)
+    ! call fluid_json%load_from_string(buffer)
+    ! call params%get("case.adjoint", ptr, found)
+    ! call core%print_to_string(ptr, buffer)
+    ! call adjoint_json%load_from_string(buffer)
+    ! ! -------------------------------------------------------------------
 
 
     !
@@ -349,55 +335,25 @@ contains
        call cfill(this%rho_field%x, this%rho, this%rho_field%size())
     end if
 
-
     ! Projection spaces
-    ! this was my first idea, to check if "adjoint_json" could find it,
-    ! if not, read fluid json
-    if (adjoint_json%valid_path('velocity_solver.projection_space_size')) then
-       this_json = adjoint_json
-    else
-       this_json = fluid_json
-    endif
-    call json_get_or_default(this_json, &
-         'velocity_solver.projection_space_size',&
-         this%vel_projection_dim, 20)
-    ! But I couldn't make a subroutine that does the "check_adjoint" so I gave up...
-    !
-    ! instead I'm just checking the hardcoded way
-    if (params%valid_path('case.adjoint.pressure_solver.projection_space_size')) then
-       call json_get_or_default(params, &
-            'case.adjoint.pressure_solver.projection_space_size',&
-            this%pr_projection_dim, 20)
-    else
-       call json_get_or_default(params, &
-            'case.fluid.pressure_solver.projection_space_size',&
-            this%pr_projection_dim, 20)
-    endif
-    if (params%valid_path('case.adjoint.velocity_solver.projection_hold_steps')) then
-       call json_get_or_default(params, &
-            'case.adjoint.velocity_solver.projection_hold_steps',&
-            this%vel_projection_activ_step, 5)
-    else
-       call json_get_or_default(params, &
-            'case.fluid.velocity_solver.projection_hold_steps',&
-            this%vel_projection_activ_step, 5)
-    endif
-    if (params%valid_path('case.adjoint.pressure_solver.projection_hold_steps')) then
-       call json_get_or_default(params, &
-            'case.adjoint.pressure_solver.projection_hold_steps',&
-            this%pr_projection_activ_step, 5)
-    else
-       call json_get_or_default(params, &
-            'case.fluid.pressure_solver.projection_hold_steps',&
-            this%pr_projection_activ_step, 5)
-    endif
+    json_key = json_key_fallback(params, &
+         'velocity_solver.projection_space_size', 'case.adjoint', 'case.fluid')
+    call json_get_or_default(params, json_key, this%vel_projection_dim, 20)
+    json_key = json_key_fallback(params, &
+         'pressure_solver.projection_space_size', 'case.adjoint', 'case.fluid')
+    call json_get_or_default(params, json_key, this%pr_projection_dim, 20)
 
+    json_key = json_key_fallback(params, &
+         'velocity_solver.projection_hold_steps', 'case.adjoint', 'case.fluid')
+    call json_get_or_default(params, json_key, &
+         this%vel_projection_activ_step, 5)
+    json_key = json_key_fallback(params, &
+         'pressure_solver.projection_hold_steps', 'case.adjoint', 'case.fluid')
+    call json_get_or_default(params, json_key, &
+         this%pr_projection_activ_step, 5)
 
-    if (params%valid_path('case.adjoint.freeze')) then
-       call json_get_or_default(params, 'case.adjoint.freeze', this%freeze, .false.)
-    else
-       call json_get_or_default(params, 'case.fluid.freeze', this%freeze, .false.)
-    endif
+    json_key = json_key_fallback(params, 'freeze', 'case.adjoint', 'case.fluid')
+    call json_get_or_default(params, json_key, this%freeze, .false.)
 
     ! TODO
     ! This needs to be discussed... In pricipal, I think if the forward is forced to a
@@ -677,25 +633,23 @@ contains
     !  Initialize velocity solver
     if (kspv_init) then
        call neko_log%section("Adjoint Velocity solver")
-       if (params%valid_path('case.adjoint.velocity_solver')) then
-          call json_get_or_default(params, &
-               'case.adjoint.velocity_solver.max_iterations', &
-               integer_val, 800)
-          call json_get(params, 'case.adjoint.velocity_solver.type', string_val1)
-          call json_get(params, 'case.adjoint.velocity_solver.preconditioner', &
-               string_val2)
-          call json_get(params, 'case.adjoint.velocity_solver.absolute_tolerance', &
-               real_val)
-       else
-          call json_get_or_default(params, &
-               'case.fluid.velocity_solver.max_iterations', &
-               integer_val, 800)
-          call json_get(params, 'case.fluid.velocity_solver.type', string_val1)
-          call json_get(params, 'case.fluid.velocity_solver.preconditioner', &
-               string_val2)
-          call json_get(params, 'case.fluid.velocity_solver.absolute_tolerance', &
-               real_val)
-       endif
+
+       json_key = json_key_fallback(params, 'velocity_solver.max_iterations', &
+            'case.adjoint', 'case.fluid')
+       call json_get_or_default(params, json_key, integer_val, 800)
+
+       json_key = json_key_fallback(params, 'velocity_solver.type', &
+            'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, string_val1)
+
+       json_key = json_key_fallback(params, 'velocity_solver.preconditioner', &
+            'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, string_val2)
+
+       json_key = json_key_fallback(params, &
+            'velocity_solver.absolute_tolerance', 'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, real_val)
+
 
        call neko_log%message('Type       : ('// trim(string_val1) // &
             ', ' // trim(string_val2) // ')')
@@ -740,7 +694,7 @@ contains
     character(len=*), intent(in) :: scheme
     real(kind=rp) :: abs_tol
     integer :: integer_val, ierr
-    character(len=:), allocatable :: solver_type, precon_type
+    character(len=:), allocatable :: solver_type, precon_type, json_key
     character(len=LOG_SIZE) :: log_buf
 
     call adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
@@ -804,25 +758,20 @@ contains
     if (kspp_init) then
        call neko_log%section("Pressure solver")
 
-       if (params%valid_path('case.adjoint.pressure_solver')) then
-          call json_get_or_default(params, &
-               'case.adjoint.pressure_solver.max_iterations', &
-               integer_val, 800)
-          call json_get(params, 'case.adjoint.pressure_solver.type', solver_type)
-          call json_get(params, 'case.adjoint.pressure_solver.preconditioner', &
-               precon_type)
-          call json_get(params, 'case.adjoint.pressure_solver.absolute_tolerance', &
-               abs_tol)
-       else
-          call json_get_or_default(params, &
-               'case.fluid.pressure_solver.max_iterations', &
-               integer_val, 800)
-          call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
-          call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
-               precon_type)
-          call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
-               abs_tol)
-       endif
+       json_key = json_key_fallback(params, 'pressure_solver.max_iterations', &
+            'case.adjoint', 'case.fluid')
+       call json_get_or_default(params, json_key, integer_val, 800)
+
+       json_key = json_key_fallback(params, 'pressure_solver.type', &
+            'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, solver_type)
+       json_key = json_key_fallback(params, 'pressure_solver.preconditioner', &
+            'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, precon_type)
+       json_key = json_key_fallback(params, &
+            'pressure_solver.absolute_tolerance', 'case.adjoint', 'case.fluid')
+       call json_get(params, json_key, abs_tol)
+
        call neko_log%message('Type       : ('// trim(solver_type) // &
             ', ' // trim(precon_type) // ')')
        write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
