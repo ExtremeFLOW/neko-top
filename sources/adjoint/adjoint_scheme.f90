@@ -337,22 +337,27 @@ contains
 
     ! Projection spaces
     json_key = json_key_fallback(params, &
-         'velocity_solver.projection_space_size', 'case.adjoint', 'case.fluid')
+         'case.adjoint.velocity_solver.projection_space_size', &
+         'case.fluid.velocity_solver.projection_space_size')
     call json_get_or_default(params, json_key, this%vel_projection_dim, 20)
     json_key = json_key_fallback(params, &
-         'pressure_solver.projection_space_size', 'case.adjoint', 'case.fluid')
+         'case.adjoint.pressure_solver.projection_space_size', &
+         'case.fluid.pressure_solver.projection_space_size')
     call json_get_or_default(params, json_key, this%pr_projection_dim, 20)
 
     json_key = json_key_fallback(params, &
-         'velocity_solver.projection_hold_steps', 'case.adjoint', 'case.fluid')
+         'case.adjoint.velocity_solver.projection_hold_steps', &
+         'case.fluid.velocity_solver.projection_hold_steps')
     call json_get_or_default(params, json_key, &
          this%vel_projection_activ_step, 5)
     json_key = json_key_fallback(params, &
-         'pressure_solver.projection_hold_steps', 'case.adjoint', 'case.fluid')
+         'case.adjoint.pressure_solver.projection_hold_steps', &
+         'case.fluid.pressure_solver.projection_hold_steps')
     call json_get_or_default(params, json_key, &
          this%pr_projection_activ_step, 5)
 
-    json_key = json_key_fallback(params, 'freeze', 'case.adjoint', 'case.fluid')
+    json_key = json_key_fallback(params, 'case.adjoint.freeze', &
+         'case.fluid.freeze')
     call json_get_or_default(params, json_key, this%freeze, .false.)
 
     ! TODO
@@ -634,20 +639,24 @@ contains
     if (kspv_init) then
        call neko_log%section("Adjoint Velocity solver")
 
-       json_key = json_key_fallback(params, 'velocity_solver.max_iterations', &
-            'case.adjoint', 'case.fluid')
+       json_key = json_key_fallback(params, &
+            'case.adjoint.velocity_solver.max_iterations', &
+            'case.fluid.velocity_solver.max_iterations')
        call json_get_or_default(params, json_key, integer_val, 800)
 
-       json_key = json_key_fallback(params, 'velocity_solver.type', &
-            'case.adjoint', 'case.fluid')
+       json_key = json_key_fallback(params, &
+            'case.adjoint.velocity_solver.type', &
+            'case.fluid.velocity_solver.type')
        call json_get(params, json_key, string_val1)
 
-       json_key = json_key_fallback(params, 'velocity_solver.preconditioner', &
-            'case.adjoint', 'case.fluid')
+       json_key = json_key_fallback(params, &
+            'case.adjoint.velocity_solver.preconditioner', &
+            'case.fluid.velocity_solver.preconditioner')
        call json_get(params, json_key, string_val2)
 
        json_key = json_key_fallback(params, &
-            'velocity_solver.absolute_tolerance', 'case.adjoint', 'case.fluid')
+            'case.adjoint.velocity_solver.absolute_tolerance', &
+            'case.fluid.velocity_solver.absolute_tolerance')
        call json_get(params, json_key, real_val)
 
 
@@ -758,18 +767,24 @@ contains
     if (kspp_init) then
        call neko_log%section("Pressure solver")
 
-       json_key = json_key_fallback(params, 'pressure_solver.max_iterations', &
-            'case.adjoint', 'case.fluid')
+       json_key = json_key_fallback(params, &
+            'case.adjoint.pressure_solver.max_iterations', &
+            'case.fluid.pressure_solver.max_iterations')
        call json_get_or_default(params, json_key, integer_val, 800)
 
-       json_key = json_key_fallback(params, 'pressure_solver.type', &
-            'case.adjoint', 'case.fluid')
-       call json_get(params, json_key, solver_type)
-       json_key = json_key_fallback(params, 'pressure_solver.preconditioner', &
-            'case.adjoint', 'case.fluid')
-       call json_get(params, json_key, precon_type)
        json_key = json_key_fallback(params, &
-            'pressure_solver.absolute_tolerance', 'case.adjoint', 'case.fluid')
+            'case.adjoint.pressure_solver.type', &
+            'case.fluid.pressure_solver.type')
+       call json_get(params, json_key, solver_type)
+
+       json_key = json_key_fallback(params, &
+            'case.adjoint.pressure_solver.preconditioner', &
+            'case.fluid.pressure_solver.preconditioner')
+       call json_get(params, json_key, precon_type)
+
+       json_key = json_key_fallback(params, &
+            'case.adjoint.pressure_solver.absolute_tolerance', &
+            'case.fluid.pressure_solver.absolute_tolerance')
        call json_get(params, json_key, abs_tol)
 
        call neko_log%message('Type       : ('// trim(solver_type) // &

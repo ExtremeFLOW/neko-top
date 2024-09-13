@@ -93,6 +93,8 @@ module adjoint_mod
   use point_zone_registry, only: neko_point_zone_registry
   use material_properties, only : material_properties_t
   use adjoint_ic, only : set_adjoint_ic
+
+  use json_utils_ext, only: json_key_fallback
   implicit none
   private
 
@@ -223,27 +225,14 @@ contains
     !
     ! Setup user defined conditions
     !
-    if (C%params%valid_path('case.adjoint.inflow_condition')) then
-       call json_get(C%params, 'case.adjoint.inflow_condition.type',&
-            string_val)
-       if (trim(string_val) .eq. 'user') then
-          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
-       end if
-    else if (C%params%valid_path('case.fluid.inflow_condition')) then
-       call json_get(C%params, 'case.fluid.inflow_condition.type',&
-            string_val)
-       if (trim(string_val) .eq. 'user') then
-          call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
-       end if
-    else
-       if (C%params%valid_path('case.fluid.inflow_condition')) then
-          call json_get(C%params, 'case.fluid.inflow_condition.type',&
-               string_val)
-          if (trim(string_val) .eq. 'user') then
-             call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
-          end if
-       end if
+    json_key = json_key_fallback(C%params, 'case.adjoint.boundary_condition', &
+         'case.fluid.boundary_condition')
+
+    call json_get(C%params, json_key, string_val)
+    if (trim(string_val) .eq. 'user') then
+       call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
     end if
+
 
     ! ! Setup user boundary conditions for the scalar.
     ! if (scalar) then

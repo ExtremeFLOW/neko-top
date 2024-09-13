@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Simulation driver
+!> Adjoint simulation driver
 module solve_adjoint_mod
   use mpi_f08
   use case, only : case_t
