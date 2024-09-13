@@ -20,7 +20,7 @@
         ],
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 3,
+            "polynomial_order": 2,
             "dealias": true
         },
         "fluid": {
