@@ -63,7 +63,7 @@ contains
   subroutine adjoint_source_term_init(this, f_x, f_y, f_z, coef, user)
     class(adjoint_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
-    type(coef_t), target, intent(in) :: coef
+    type(coef_t), target, intent(inout) :: coef
     type(user_t), target, intent(in) :: user
 
     type(field_list_t) :: rhs_fields
