@@ -36,7 +36,7 @@ module adjoint_ic
   use gather_scatter, only : gs_t, GS_OP_ADD
   use neko_config, only : NEKO_BCKND_DEVICE
   use flow_profile, only : blasius_profile, blasius_linear, blasius_cubic, &
-    blasius_quadratic, blasius_quartic, blasius_sin
+       blasius_quadratic, blasius_quartic, blasius_sin
   use device, only: device_memcpy, HOST_TO_DEVICE
   use field, only : field_t
   use utils, only : neko_error
@@ -60,7 +60,7 @@ module adjoint_ic
 contains
 
   !> Set initial flow condition (builtin)
-  subroutine set_adjoint_ic_int(u, v, w, p, coef, gs, type, params)
+  subroutine set_adjoint_ic_int(u, v, w, p, coef, gs, type, params, root)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -69,6 +69,7 @@ contains
     type(gs_t), intent(inout) :: gs
     character(len=*) :: type
     type(json_file), intent(inout) :: params
+    character(len=*), intent(in) :: root
     real(kind=rp) :: delta
     real(kind=rp), allocatable :: uinf(:)
     real(kind=rp), allocatable :: zone_value(:)
@@ -76,20 +77,20 @@ contains
     character(len=:), allocatable :: zone_name
 
     if (trim(type) .eq. 'uniform') then
-       call json_get(params, 'initial_condition.value', uinf)
+       call json_get(params, root//'.value', uinf)
        call set_adjoint_ic_uniform(u, v, w, uinf)
     else if (trim(type) .eq. 'blasius') then
-       call json_get(params, 'blasius.delta', delta)
-       call json_get(params, 'blasius.approximation', &
-                     blasius_approximation)
-       call json_get(params, 'blasius.freestream_velocity', uinf)
+       call json_get(params, root//'.blasius.delta', delta)
+       call json_get(params, root//'.blasius.approximation', &
+            blasius_approximation)
+       call json_get(params, root//'.blasius.freestream_velocity', uinf)
        call set_adjoint_ic_blasius(u, v, w, delta, uinf, blasius_approximation)
-    else if (trim(type) .eq. 'point_zone') then
-       call json_get(params, 'initial_condition.base_value', uinf)
-       call json_get(params, 'initial_condition.zone_name', &
-                     zone_name)
-       call json_get(params, 'initial_condition.zone_value', &
-                     zone_value)
+    else if (trim(type) .eq. root//'.point_zone') then
+       call json_get(params, root//'.base_value', uinf)
+       call json_get(params, root//'.zone_name', &
+            zone_name)
+       call json_get(params, root//'.zone_value', &
+            zone_value)
        call set_adjoint_ic_point_zone(u, v, w, uinf, zone_name, zone_value)
     else
        call neko_error('Invalid initial condition')
@@ -100,7 +101,7 @@ contains
   end subroutine set_adjoint_ic_int
 
   !> Set intial flow condition (user defined)
-  subroutine set_adjoint_ic_usr(u, v, w, p, coef, gs, usr_ic, params)
+  subroutine set_adjoint_ic_usr(u, v, w, p, coef, gs, usr_ic, params, root)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -109,6 +110,7 @@ contains
     type(gs_t), intent(inout) :: gs
     procedure(useric) :: usr_ic
     type(json_file), intent(inout) :: params
+    character(len=*), intent(in) :: root
 
     call usr_ic(u, v, w, p, params)
 
@@ -129,11 +131,11 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(u%x, u%x_d, n, &
-                          HOST_TO_DEVICE, sync=.false.)
+            HOST_TO_DEVICE, sync=.false.)
        call device_memcpy(v%x, v%x_d, n, &
-                          HOST_TO_DEVICE, sync=.false.)
+            HOST_TO_DEVICE, sync=.false.)
        call device_memcpy(w%x, w%x_d, n, &
-                          HOST_TO_DEVICE, sync=.false.)
+            HOST_TO_DEVICE, sync=.false.)
     end if
 
     ! Ensure continuity across elements for initial conditions
@@ -185,36 +187,36 @@ contains
     integer :: i
 
     select case(trim(type))
-    case('linear')
+      case('linear')
        bla => blasius_linear
-    case('quadratic')
+      case('quadratic')
        bla => blasius_quadratic
-    case('cubic')
+      case('cubic')
        bla => blasius_cubic
-    case('quartic')
+      case('quartic')
        bla => blasius_quartic
-    case('sin')
+      case('sin')
        bla => blasius_sin
-    case default
+      case default
        call neko_error('Invalid Blasius approximation')
     end select
 
     if ((uinf(1) .gt. 0.0_rp) .and. (uinf(2) .eq. 0.0_rp) &
-       .and. (uinf(3) .eq. 0.0_rp)) then
+         .and. (uinf(3) .eq. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = bla(u%dof%z(i,1,1,1), delta, uinf(1))
           v%x(i,1,1,1) = 0.0_rp
           w%x(i,1,1,1) = 0.0_rp
        end do
     else if ((uinf(1) .eq. 0.0_rp) .and. (uinf(2) .gt. 0.0_rp) &
-            .and. (uinf(3) .eq. 0.0_rp)) then
+         .and. (uinf(3) .eq. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = 0.0_rp
           v%x(i,1,1,1) = bla(u%dof%x(i,1,1,1), delta, uinf(2))
           w%x(i,1,1,1) = 0.0_rp
        end do
     else if ((uinf(1) .eq. 0.0_rp) .and. (uinf(2) .eq. 0.0_rp) &
-            .and. (uinf(3) .gt. 0.0_rp)) then
+         .and. (uinf(3) .gt. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = 0.0_rp
           v%x(i,1,1,1) = 0.0_rp

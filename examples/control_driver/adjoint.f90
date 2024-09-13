@@ -93,7 +93,7 @@ module adjoint_mod
   use point_zone_registry, only: neko_point_zone_registry
   use material_properties, only : material_properties_t
   use adjoint_ic, only : set_adjoint_ic
-
+  use json_utils, only : json_extract_item
   use json_utils_ext, only: json_key_fallback
   implicit none
   private
@@ -171,12 +171,9 @@ contains
     integer :: stats_sampling_interval
     integer :: output_dir_len
     integer :: precision
-    ! HARRY
+
     ! extra things for json
-    type(json_file) :: adjoint_json
-    type(json_core) :: core
-    type(json_value), pointer :: ptr
-    character(len=:), allocatable :: buffer
+    type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
 
     !
@@ -226,8 +223,8 @@ contains
     !
     ! Setup user defined conditions
     !
-    json_key = json_key_fallback(C%params, 'case.adjoint.boundary_condition', &
-         'case.fluid.boundary_condition')
+    json_key = json_key_fallback(C%params, 'case.adjoint.boundary_types', &
+         'case.fluid.boundary_types')
 
     call json_get(C%params, json_key, string_val)
     if (trim(string_val) .eq. 'user') then
@@ -250,32 +247,20 @@ contains
     ! for different solvers,
     ! (not hardcoded to fluid)
     !
-    if (C%params%valid_path('case.adjoint.initial_condition')) then
-       call C%params%get("case.adjoint", ptr, found)
-       call core%print_to_string(ptr, buffer)
-       call adjoint_json%load_from_string(buffer)
-       call json_get(C%params, 'case.adjoint.initial_condition.type',&
-            string_val)
-    else
-       ! this is stupid naming... but here "adjoint_json" would be fluid_json
-       call C%params%get("case.fluid", ptr, found)
-       call core%print_to_string(ptr, buffer)
-       call adjoint_json%load_from_string(buffer)
-       call json_get(C%params, 'case.fluid.initial_condition.type',&
-            string_val)
-    endif
+    json_key = json_key_fallback(C%params, 'case.adjoint.initial_condition', &
+         'case.fluid.initial_condition')
 
-
+    call json_get(C%params, json_key//'.type', string_val)
     if (trim(string_val) .ne. 'user') then
-       !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-       !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
-       !
-       ! passing adjoint_json
-       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
+       call set_adjoint_ic( &
+            this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
+            this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
+            string_val, C%params, json_key)
     else
-       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
+       call set_adjoint_ic( &
+            this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
+            this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
+            C%usr%fluid_user_ic, C%params, json_key)
     end if
 
     ! if (scalar) then

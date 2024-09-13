@@ -30,7 +30,7 @@
  ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  ! POSSIBILITY OF SUCH DAMAGE.
 
- ! Implements the `adjoint_t` type.
+ !> Implements the `steady_simcomp_t` type.
 module steady_simcomp
   use simulation_component, only: simulation_component_t
   use num_types, only: rp, dp
@@ -43,12 +43,14 @@ module steady_simcomp
   implicit none
   private
 
-  ! An empty user defined simulation component.
-  ! This is a simple example of a user-defined simulation component.
+  !> The `steady_simcomp_t` type is a simulation component that terminates a
+  !! simulation when the normed difference between the old and new fields is
+  !! below a certain tolerance. This allow us to compute steady-state solutions
+  !! without modifying the simulation loop.
   type, public, extends(simulation_component_t) :: steady_simcomp_t
      private
 
-     ! Fields
+     ! Old fields
      type(field_t) :: u_old, v_old, w_old, p_old, s_old
      real(kind=dp) :: tol
 
@@ -58,10 +60,10 @@ module steady_simcomp
      ! Constructor from json, wrapping the actual constructor.
      procedure, public, pass(this) :: init => steady_simcomp_init_from_json
      ! Actual constructor.
-     procedure, pass(this) :: init_from_attributes => &
+     procedure, public, pass(this) :: init_from_attributes => &
           steady_simcomp_init_from_attributes
      ! Destructor.
-     procedure, pass(this) :: free => steady_simcomp_free
+     procedure, public, pass(this) :: free => steady_simcomp_free
      ! Compute the steady_simcomp field.
      procedure, public, pass(this) :: compute_ => steady_simcomp_compute
   end type steady_simcomp_t
@@ -130,63 +132,63 @@ contains
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
 
+    ! A frozen field is not interesting to compute differences for.
+    if (this%case%fluid%freeze) return
+
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
     !
     ! Our goal is to freeze the simulation when the normed difference between
     ! the old and new fields is below a certain tolerance.
-    ! @todo: This should be refactored into a separate function.
 
-    if (.not. this%case%fluid%freeze) then
+    u => this%case%fluid%u
+    v => this%case%fluid%v
+    w => this%case%fluid%w
+    p => this%case%fluid%p
 
-       u => this%case%fluid%u
-       v => this%case%fluid%v
-       w => this%case%fluid%w
-       p => this%case%fluid%p
-
-       if (this%have_scalar) then
-          s => this%case%scalar%s
-       else
-          s => null()
-       end if
-
-       ! Compute the difference between the old and new fields
-       call field_sub2(this%u_old, u)
-       call field_sub2(this%v_old, v)
-       call field_sub2(this%w_old, w)
-       call field_sub2(this%p_old, p)
-       if (this%have_scalar) then
-          call field_sub2(this%s_old, s)
-       end if
-
-       ! Here we compute the squared difference between the old and new fields
-       ! and store the result in the `normed_diff` array.
-       normed_diff(1) = field_glsc2(this%u_old, this%u_old)
-       normed_diff(2) = field_glsc2(this%v_old, this%v_old)
-       normed_diff(3) = field_glsc2(this%w_old, this%w_old)
-       normed_diff(4) = field_glsc2(this%p_old, this%p_old)
-       if (this%have_scalar) then
-          normed_diff(5) = field_glsc2(this%s_old, this%s_old)
-       else
-          normed_diff(5) = 0.0_rp
-       end if
-
-       ! If the normed difference is below the tolerance, we consider the
-       ! simulation to have converged. Otherwise, we copy the new fields to the
-       ! old fields and continue the simulation.
-       if (maxval(normed_diff) .gt. this%tol) then
-          call field_copy(this%u_old, u)
-          call field_copy(this%v_old, v)
-          call field_copy(this%w_old, w)
-          call field_copy(this%p_old, p)
-          if (this%have_scalar) then
-             call field_copy(this%s_old, s)
-          end if
-
-       else
-          this%case%fluid%freeze = .true.
-       end if
+    if (this%have_scalar) then
+       s => this%case%scalar%s
+    else
+       s => null()
     end if
+
+    ! Compute the difference between the old and new fields
+    call field_sub2(this%u_old, u)
+    call field_sub2(this%v_old, v)
+    call field_sub2(this%w_old, w)
+    call field_sub2(this%p_old, p)
+    if (this%have_scalar) then
+       call field_sub2(this%s_old, s)
+    end if
+
+    ! Here we compute the squared difference between the old and new fields
+    ! and store the result in the `normed_diff` array.
+    normed_diff(1) = field_glsc2(this%u_old, this%u_old)
+    normed_diff(2) = field_glsc2(this%v_old, this%v_old)
+    normed_diff(3) = field_glsc2(this%w_old, this%w_old)
+    normed_diff(4) = field_glsc2(this%p_old, this%p_old)
+    if (this%have_scalar) then
+       normed_diff(5) = field_glsc2(this%s_old, this%s_old)
+    else
+       normed_diff(5) = 0.0_rp
+    end if
+
+    ! If the normed difference is below the tolerance, we consider the
+    ! simulation to have converged. Otherwise, we copy the new fields to the
+    ! old fields and continue the simulation.
+    if (maxval(normed_diff) .gt. this%tol) then
+       call field_copy(this%u_old, u)
+       call field_copy(this%v_old, v)
+       call field_copy(this%w_old, w)
+       call field_copy(this%p_old, p)
+       if (this%have_scalar) then
+          call field_copy(this%s_old, s)
+       end if
+
+    else
+       this%case%fluid%freeze = .true.
+    end if
+
 
   end subroutine steady_simcomp_compute
 

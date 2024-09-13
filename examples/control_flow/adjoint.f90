@@ -284,17 +284,17 @@ contains
     endif
 
 
-    if (trim(string_val) .ne. 'user') then
-       !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-       !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
-       !
-       ! passing adjoint_json
-       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
-    else
-       call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-            this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
-    end if
+    ! if (trim(string_val) .ne. 'user') then
+    !    !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+    !    !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
+    !    !
+    !    ! passing adjoint_json
+    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+    !         this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
+    ! else
+    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+    !         this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
+    ! end if
 
     ! if (scalar) then
     !    call json_get(C%params, 'case.scalar.initial_condition.type', string_val)

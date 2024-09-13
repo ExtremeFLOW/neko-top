@@ -33,6 +33,8 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 )
 
 # ============================================================================ #
