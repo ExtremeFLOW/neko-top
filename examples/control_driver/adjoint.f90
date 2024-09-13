@@ -177,6 +177,7 @@ contains
     type(json_core) :: core
     type(json_value), pointer :: ptr
     character(len=:), allocatable :: buffer
+    character(len=:), allocatable :: json_key
 
     !
     ! Setup fluid scheme

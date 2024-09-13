@@ -14,10 +14,17 @@ contains
     character(len=*), intent(in) :: fallback
     character(len=:), allocatable :: string
 
-    string = trim(adjustl(lookup))
-    if (.not. json%valid_path(string)) then
-       string = trim(adjustl(fallback))
+    logical :: lookup_valid, fallback_valid
+
+    lookup_valid = json%valid_path(lookup)
+    fallback_valid = json%valid_path(fallback)
+
+    if (.not. lookup_valid .and. fallback_valid) then
+       string = fallback
+    else
+       string = lookup
     end if
+
   end function json_key_fallback
 
 end module json_utils_ext
