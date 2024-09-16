@@ -41,7 +41,7 @@ contains
     character(len=*), intent(in) :: key
     type(json_file), intent(out) :: output
 
-    ! type(json_core) :: core
+    type(json_core) :: core
     type(json_value), pointer :: child
     ! character(len=:), allocatable :: buffer
     logical :: valid
@@ -49,51 +49,13 @@ contains
     logical :: status = .false.
     character(len=:), allocatable :: message
 
-    call json%get('case.fluid.initial_condition', child, valid)
-    ! call json%check_for_errors(status, message)
-    ! if (.not. status) then
-    !    call neko_error('Error in json core: '//trim(message))
-    ! end if
-
+    call json%get(key, child, valid)
     if (.not. valid) then
-       call neko_error('Parameter '//trim(key)//' missing from the case file')
+       call neko_error('Parameter "' // &
+            trim(key) // '" missing from the case file')
     end if
-
-    ! if (.not. associated(child)) then
-    !    call neko_error('Parameter '//trim(key)//' is not a valid pointer')
-    ! end if
-
-    ! call child%print_to_string(buffer)
-
-    ! ! call core%print_to_string(child, buffer)
-    ! call output%initialize()
-    ! call output%add(child)
-    ! call output%check_for_errors(status, message)
-    ! if (.not. status) then
-    !    call neko_error('Error in json file: '//trim(message))
-    ! end if
-
-    ! call output%print()
-
-    ! call neko_error('Error in json file: '//trim(buffer))
-
-
-
-    ! call json%get(key, value, valid)
-
-    ! call json%check_for_errors(status, message)
-
-    ! if (.not. status) then
-    !    call neko_error('Error in json file: '//trim(message))
-    ! end if
-
-    ! if (.not. valid) then
-    !    call neko_error('Parameter '//trim(key)//' missing from the case file')
-    ! end if
-
-
-
-    call neko_error('End of json_get_subdict')
+    call output%initialize()
+    call output%add(child)
 
   end subroutine json_get_subdict
 
