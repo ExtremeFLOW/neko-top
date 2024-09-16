@@ -60,7 +60,7 @@ module adjoint_ic
 contains
 
   !> Set initial flow condition (builtin)
-  subroutine set_adjoint_ic_int(u, v, w, p, coef, gs, type, params, root)
+  subroutine set_adjoint_ic_int(u, v, w, p, coef, gs, type, params)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -69,27 +69,29 @@ contains
     type(gs_t), intent(inout) :: gs
     character(len=*) :: type
     type(json_file), intent(inout) :: params
-    character(len=*), intent(in) :: root
     real(kind=rp) :: delta
     real(kind=rp), allocatable :: uinf(:)
     real(kind=rp), allocatable :: zone_value(:)
     character(len=:), allocatable :: blasius_approximation
     character(len=:), allocatable :: zone_name
 
-    if (trim(type) .eq. 'uniform') then
-       call json_get(params, root//'.value', uinf)
+    character(len=:), allocatable :: type_
+    call json_get(params, 'type', type_)
+
+    if (trim(type_) .eq. 'uniform') then
+       call json_get(params, 'value', uinf)
        call set_adjoint_ic_uniform(u, v, w, uinf)
-    else if (trim(type) .eq. 'blasius') then
-       call json_get(params, root//'.blasius.delta', delta)
-       call json_get(params, root//'.blasius.approximation', &
+    else if (trim(type_) .eq. 'blasius') then
+       call json_get(params, 'blasius.delta', delta)
+       call json_get(params, 'blasius.approximation', &
             blasius_approximation)
-       call json_get(params, root//'.blasius.freestream_velocity', uinf)
+       call json_get(params, 'blasius.freestream_velocity', uinf)
        call set_adjoint_ic_blasius(u, v, w, delta, uinf, blasius_approximation)
-    else if (trim(type) .eq. root//'.point_zone') then
-       call json_get(params, root//'.base_value', uinf)
-       call json_get(params, root//'.zone_name', &
+    else if (trim(type_) .eq. 'point_zone') then
+       call json_get(params, 'base_value', uinf)
+       call json_get(params, 'zone_name', &
             zone_name)
-       call json_get(params, root//'.zone_value', &
+       call json_get(params, 'zone_value', &
             zone_value)
        call set_adjoint_ic_point_zone(u, v, w, uinf, zone_name, zone_value)
     else
@@ -101,7 +103,7 @@ contains
   end subroutine set_adjoint_ic_int
 
   !> Set intial flow condition (user defined)
-  subroutine set_adjoint_ic_usr(u, v, w, p, coef, gs, usr_ic, params, root)
+  subroutine set_adjoint_ic_usr(u, v, w, p, coef, gs, usr_ic, params)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -110,7 +112,6 @@ contains
     type(gs_t), intent(inout) :: gs
     procedure(useric) :: usr_ic
     type(json_file), intent(inout) :: params
-    character(len=*), intent(in) :: root
 
     call usr_ic(u, v, w, p, params)
 

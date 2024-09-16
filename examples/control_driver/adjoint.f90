@@ -94,7 +94,7 @@ module adjoint_mod
   use material_properties, only : material_properties_t
   use adjoint_ic, only : set_adjoint_ic
   use json_utils, only : json_extract_item
-  use json_utils_ext, only: json_key_fallback
+  use json_utils_ext, only: json_key_fallback, json_get_subdict
   implicit none
   private
 
@@ -223,13 +223,15 @@ contains
     !
     ! Setup user defined conditions
     !
-    json_key = json_key_fallback(C%params, 'case.adjoint.boundary_types', &
-         'case.fluid.boundary_types')
+    ! json_key = json_key_fallback(C%params, 'case.adjoint.boundary_types', &
+    !      'case.fluid.boundary_types')
 
-    call json_get(C%params, json_key, string_val)
-    if (trim(string_val) .eq. 'user') then
-       call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
-    end if
+    ! call json_get(C%params, 'case.fluid.boundary_types', string_val)
+    ! write(*,*) 'string_val: ', string_val
+
+    ! if (trim(string_val) .eq. 'user') then
+    !    call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+    ! end if
 
 
     ! ! Setup user boundary conditions for the scalar.
@@ -251,16 +253,18 @@ contains
          'case.fluid.initial_condition')
 
     call json_get(C%params, json_key//'.type', string_val)
+    call json_get_subdict(C%params, json_key, ic_json)
+
     if (trim(string_val) .ne. 'user') then
        call set_adjoint_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
-            string_val, C%params, json_key)
+            string_val, ic_json)
     else
        call set_adjoint_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
-            C%usr%fluid_user_ic, C%params, json_key)
+            C%usr%fluid_user_ic, ic_json)
     end if
 
     ! if (scalar) then
