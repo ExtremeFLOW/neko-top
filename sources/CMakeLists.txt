@@ -23,6 +23,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_case.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_output.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90

@@ -30,7 +30,7 @@
  ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  ! POSSIBILITY OF SUCH DAMAGE.
 
- ! Implements the `adjoint_t` type.
+ ! Implements the `adjoint_case_t` type.
 module adjoint_case
   use num_types, only: rp, dp
   use json_module, only: json_file
