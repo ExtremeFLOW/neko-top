@@ -111,8 +111,6 @@ module adjoint_mod
      type(sampler_t) :: s
 
      logical :: have_scalar = .false.
-     logical :: converged = .false.
-     logical :: computed = .false.
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -179,32 +177,17 @@ contains
     !
     ! Setup fluid scheme
     !
-    ! HARRY
-    ! keep the schemes the same for SURE
     call json_get(C%params, 'case.fluid.scheme', string_val)
     call adjoint_scheme_factory(this%scheme, trim(string_val))
 
-    ! HARRY
-    ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(C%msh, lx, C%params, C%usr, C%material_properties)
-    ! this%scheme%chkp%tlag => C%tlag
-    ! this%scheme%chkp%dtlag => C%dtlag
-    select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
-       !  f%chkp%abx1 => f%abx1
-       !  f%chkp%abx2 => f%abx2
-       !  f%chkp%aby1 => f%aby1
-       !  f%chkp%aby2 => f%aby2
-       !  f%chkp%abz1 => f%abz1
-       !  f%chkp%abz2 => f%abz2
-    end select
 
-    ! !
-    ! ! Setup scalar scheme
-    ! !
-    ! ! @todo no scalar factory for now, probably not needed
+    !
+    ! Setup scalar scheme
+    !
+    ! @todo Scalar adjoint is not implemented yet
     ! if (C%params%valid_path('case.scalar')) then
     !    call json_get_or_default(C%params, 'case.scalar.enabled', scalar,&
     !                             .true.)
@@ -223,31 +206,21 @@ contains
     !
     ! Setup user defined conditions
     !
-    ! json_key = json_key_fallback(C%params, 'case.adjoint.boundary_types', &
-    !      'case.fluid.boundary_types')
-
-    ! call json_get(C%params, 'case.fluid.boundary_types', string_val)
-    ! write(*,*) 'string_val: ', string_val
-
-    ! if (trim(string_val) .eq. 'user') then
-    !    call this%scheme%set_usr_inflow(C%usr%fluid_user_if)
+    ! if (C%params%valid_path('case.fluid.inflow_condition')) then
+    !    call json_get(C%params, 'case.fluid.inflow_condition.type', &
+    !         string_val)
+    !    if (trim(string_val) .eq. 'user') then
+    !       call C%fluid%set_usr_inflow(C%usr%fluid_user_if)
+    !    end if
     ! end if
 
-
-    ! ! Setup user boundary conditions for the scalar.
+    ! Setup user boundary conditions for the scalar.
     ! if (scalar) then
     !    call C%scalar%set_user_bc(C%usr%scalar_user_bc)
     ! end if
 
     !
     ! Setup initial conditions
-    !
-    ! This should be unique from forward solution
-    ! HARRY
-    ! ------------------------------------------------------------
-    ! I want to give a subdictionary to IC's so we can different ICs
-    ! for different solvers,
-    ! (not hardcoded to fluid)
     !
     json_key = json_key_fallback(C%params, 'case.adjoint.initial_condition', &
          'case.fluid.initial_condition')
@@ -284,33 +257,6 @@ contains
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
-
-       ! baseflow is solution to forward problem
-       !  u_b => neko_field_registry%get_field('u')
-       !  v_b => neko_field_registry%get_field('v')
-       !  w_b => neko_field_registry%get_field('w')
-
-       !!
-       !! Setup initial baseflow
-       !!
-       !call json_get(C%params, 'case.fluid.baseflow.type', string_val)
-
-       !if (trim(string_val) .ne. 'user') then
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
-       !        string_val, C%params)
-       !else
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
-       !        C%usr%baseflow_user, C%params)
-       !end if
-
-
-
-       !  ! Tim what is this for?
-       !  call field_cfill(f%u_b, 0.0_rp)
-       !  call field_cfill(f%v_b, 0.0_rp)
-       !  call field_cfill(f%w_b, 0.0_rp)
-
-
     end select
 
     !
@@ -326,7 +272,7 @@ contains
     !
     ! Setup output precision of the field files
     !
-    call json_get_or_default(C%params, 'case.output_precision', string_val,&
+    call json_get_or_default(C%params, 'case.output_precision', string_val, &
          'single')
 
     if (trim(string_val) .eq. 'double') then
@@ -347,8 +293,6 @@ contains
             path = trim(output_directory))
     end if
 
-    ! HARRY
-    ! fuck the sampler we're changing this anyway
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
