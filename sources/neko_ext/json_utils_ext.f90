@@ -11,6 +11,9 @@ module json_utils_ext
 contains
 
   !> Create a json_string based on fallback logic.
+  !! If the lookup key is present in the json object, return it.
+  !! If the fallback key is present in the json object, return it.
+  !! Otherwise, return the lookup key.
   function json_key_fallback(json, lookup, fallback) result(string)
     type(json_file), intent(inout) :: json
     character(len=*), intent(in) :: lookup
@@ -38,6 +41,7 @@ contains
 
     nullify(child)
 
+    valid = .false.
     call json%get(key, child, valid)
     if (.not. valid) then
        call neko_error('Parameter "' // &
