@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint simulation driver
-module solve_adjoint_mod
+module simulation_adjoint
   use mpi_f08
   use case, only : case_t
   use num_types, only : rp, dp
@@ -284,6 +284,6 @@ contains
   end subroutine simulation_joblimit_chkp
 
 
-end module solve_adjoint_mod
+end module simulation_adjoint
 
 

@@ -99,8 +99,9 @@ module adjoint_case
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
 
-  ! An empty user defined simulation component.
-  ! This is a simple example of a user-defined simulation component.
+  !> Adjoint case type.
+  !! Todo: This should Ideally be a subclass of case_t, however, that is not yet
+  !! suppoerted by Neko.
   type :: adjoint_case_t
 
      class(adjoint_scheme_t), allocatable :: scheme

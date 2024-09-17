@@ -3,7 +3,7 @@ program usrneko
   use case, only: case_t
   use user, only: user_setup
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
-  use solve_adjoint_mod, only: solve_adjoint
+  use simulation_adjoint, only: solve_adjoint
   ! use topopt, only: topopt_init, topopt_finalize, topopt_t
 
   type(case_t) :: C
