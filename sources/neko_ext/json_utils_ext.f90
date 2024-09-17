@@ -16,18 +16,10 @@ contains
     character(len=*), intent(in) :: lookup
     character(len=*), intent(in) :: fallback
     character(len=:), allocatable :: string
-    type(json_value), pointer :: value
 
-    logical :: status
-
-    logical :: lookup_valid, fallback_valid
-    lookup_valid = .false.
-    fallback_valid = .false.
-
-    lookup_valid = lookup .in. json
-    fallback_valid = fallback .in. json
-
-    if (.not. lookup_valid .and. fallback_valid) then
+    if ((lookup .in. json)) then
+       string = lookup
+    else if (fallback .in. json) then
        string = fallback
     else
        string = lookup
@@ -41,21 +33,20 @@ contains
     character(len=*), intent(in) :: key
     type(json_file), intent(out) :: output
 
-    type(json_core) :: core
     type(json_value), pointer :: child
-    ! character(len=:), allocatable :: buffer
     logical :: valid
 
-    logical :: status = .false.
-    character(len=:), allocatable :: message
+    nullify(child)
 
     call json%get(key, child, valid)
     if (.not. valid) then
        call neko_error('Parameter "' // &
             trim(key) // '" missing from the case file')
     end if
+
     call output%initialize()
     call output%add(child)
+    nullify(child)
 
   end subroutine json_get_subdict
 
