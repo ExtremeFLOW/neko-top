@@ -31,7 +31,7 @@
  ! POSSIBILITY OF SUCH DAMAGE.
 
  ! Implements the `adjoint_t` type.
-module adjoint_mod
+module adjoint_case
   use num_types, only: rp, dp
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
@@ -97,10 +97,11 @@ module adjoint_mod
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   implicit none
   private
+  public :: adjoint_case_t, adjoint_init, adjoint_free
 
   ! An empty user defined simulation component.
   ! This is a simple example of a user-defined simulation component.
-  type, public :: adjoint_obj
+  type :: adjoint_case_t
 
      class(adjoint_scheme_t), allocatable :: scheme
      type(case_t), pointer :: case
@@ -112,22 +113,20 @@ module adjoint_mod
 
      logical :: have_scalar = .false.
 
-   contains
-     ! Constructor from json, wrapping the actual constructor.
-     procedure, pass(this) :: init => adjoint_init_from_json
-     ! Actual constructor.
-     procedure, pass(this) :: init_from_attributes => &
-          adjoint_init_from_attributes
-     ! Destructor.
-     procedure, pass(this) :: free => adjoint_free
-  end type adjoint_obj
+  end type adjoint_case_t
+
+  interface adjoint_init
+     module procedure adjoint_init_from_json, adjoint_init_from_attributes
+  end interface adjoint_init
 
 contains
 
   ! Constructor from json.
   subroutine adjoint_init_from_json(this, neko_case)
-    class(adjoint_obj), intent(inout) :: this
-    type(case_t), intent(inout) :: neko_case
+    class(adjoint_case_t), intent(inout) :: this
+    type(case_t), target, intent(inout) :: neko_case
+
+    this%case => neko_case
 
     ! Read the tolerance
     call json_get_or_default(neko_case%params, "tol", this%tol, 1.0e-6_rp)
@@ -137,29 +136,31 @@ contains
        this%have_scalar = .true.
     end if
 
-    call this%init_from_attributes(neko_case, this%tol)
+    call adjoint_case_init_common(this, neko_case)
 
   end subroutine adjoint_init_from_json
 
   ! Constructor from attributes
   subroutine adjoint_init_from_attributes(this, neko_case, tol)
-    class(adjoint_obj), intent(inout) :: this
+    class(adjoint_case_t), intent(inout) :: this
     class(case_t), intent(inout), target :: neko_case
-    real(kind=rp), intent(in), optional :: tol
+    real(kind=rp), intent(in) :: tol
 
     this%case => neko_case
-    if (present(tol)) then
-       this%tol = tol
-    else
-       this%tol = 1.0e-6_rp
+    this%tol = tol
+
+    ! Check if the scalar field is allocated
+    if (allocated(neko_case%scalar)) then
+       this%have_scalar = .true.
     end if
+
     call adjoint_case_init_common(this, neko_case)
 
   end subroutine adjoint_init_from_attributes
 
   !> Initialize a neko_case from its (loaded) params object
   subroutine adjoint_case_init_common(this, neko_case)
-    class(adjoint_obj), intent(inout) :: this
+    class(adjoint_case_t), intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     character(len=:), allocatable :: output_directory
     integer :: lx = 0
@@ -337,12 +338,13 @@ contains
 
   ! Destructor.
   subroutine adjoint_free(this)
-    class(adjoint_obj), intent(inout) :: this
+    class(adjoint_case_t), intent(inout) :: this
 
+    nullify(this%case)
     call this%scheme%free()
     call this%s%free()
 
   end subroutine adjoint_free
 
-end module adjoint_mod
+end module adjoint_case
 

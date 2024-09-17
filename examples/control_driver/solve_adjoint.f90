@@ -45,7 +45,7 @@ module solve_adjoint_mod
   use simcomp_executor, only : neko_simcomps
   use json_utils, only : json_get_or_default
   use time_step_controller, only : time_step_controller_t
-  use adjoint_mod, only : adjoint_obj
+  use adjoint_case, only : adjoint_case_t
   implicit none
   private
 
@@ -55,7 +55,7 @@ contains
 
   ! Compute the simcomp_test field.
   subroutine solve_adjoint(this)
-    type(adjoint_obj), intent(inout) :: this
+    type(adjoint_case_t), intent(inout) :: this
     real(kind=rp) :: t
     integer :: tstep
 
