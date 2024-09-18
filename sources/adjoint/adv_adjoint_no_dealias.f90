@@ -66,6 +66,15 @@ module adv_lin_no_dealias
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
+     !> Compute the adjoint passive scalar.
+     ! If one integrates by parts, this essentially switches sign and adds some
+     ! boundary terms.
+     ! We keep the differential operator on the test function
+     procedure, pass(this) :: compute_adjoint_scalar => compute_adjoint_scalar_advection_no_dealias
+     ! NOTE
+     ! This linearized advection term is the same as a normal advection term
+     ! so not sure what to do here...
+
      !> Constructor
      procedure, pass(this) :: init => init_no_dealias
      !> Destructor
@@ -181,23 +190,22 @@ contains
 
        ! \int \grad v . U_b ^ u
        ! with '^' an outer product
+       associate(w1 => tduxb, w2 => tdvxb, w3 => tdwxb, w4 => tduyb, w5 => tdvyb, w6 => tdwyb)
        call adjoint_weak_no_dealias_device(fx_d, vx_d, &
             vxb%x, vyb%x, vzb%x, &
             coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+            w1,w2,w3,w4,w5,w6)
 
        call adjoint_weak_no_dealias_device(fy_d, vy_d, &
             vxb%x, vyb%x, vzb%x, &
             coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+            w1,w2,w3,w4,w5,w6)
 
        call adjoint_weak_no_dealias_device(fz_d, vz_d, &
             vxb%x, vyb%x, vzb%x, &
             coef, Xh, n, &
-            tduxb, tdvxb, tdwxb, &
-            tduyb, tdvyb, tdwyb)
+            w1,w2,w3,w4,w5,w6)
+       end associate
 
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
@@ -230,23 +238,27 @@ contains
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
+
+          ! use these as work arrays
+          associate(w1 => duxb, w2 => dvxb, w3 => dwxb, w4 => duyb, w5 => dvyb, w6 => dwyb)
           call adjoint_weak_no_dealias_cpu( &
                & fx%x(:,:,:,e), vx%x(1,1,1,e), &
                & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               w1,w2,w3,w4,w5,w6)
 
           call adjoint_weak_no_dealias_cpu( &
                & fy%x(:,:,:,e), vy%x(1,1,1,e), &
                & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               w1,w2,w3,w4,w5,w6)
 
           call adjoint_weak_no_dealias_cpu( &
                & fz%x(:,:,:,e), vz%x(1,1,1,e), &
                & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               w1,w2,w3,w4,w5,w6)
+          end associate
        enddo
 
     end if
@@ -422,4 +434,62 @@ contains
     end if
 
   end subroutine linear_advection_no_dealias
+
+  !> Add the adjoint advection term for a scalar, i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
+  !! RHS.
+  !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
+  !! @param this The object.
+  !! @param vx The x component of velocity.
+  !! @param vy The y component of velocity.
+  !! @param vz The z component of velocity.
+  !! @param s The adjoint scalar.
+  !! @param fs The source term.
+  !! @param Xh The function space.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  !! @param n Typically the size of the mesh.
+  !! @param dt Current time-step, not required for this method.
+  subroutine compute_adjoint_scalar_advection_no_dealias(this, vxb, vyb, vzb, s, fs, Xh, &
+                                                 coef, n, dt)
+    class(adv_lin_no_dealias_t), intent(inout) :: this
+    type(field_t), intent(inout) :: vxb, vyb, vzb
+    type(field_t), intent(inout) :: s
+    type(field_t), intent(inout) :: fs
+    type(space_t), intent(inout) :: Xh
+    type(coef_t), intent(inout) :: coef
+    integer, intent(in) :: n
+    real(kind=rp), intent(in), optional :: dt
+    real(kind=rp), dimension(Xh%lxyz) :: w1,w2,w3,w4,w5,w6
+    integer :: e
+    type(field_t), pointer :: w1_d, w2_d, w3_d, w4_d, w5_d, w6_d
+    integer :: temp_indices(6)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call neko_scratch_registry%request_field(w1_d, temp_indices(1))
+       call neko_scratch_registry%request_field(w2_d, temp_indices(2))
+       call neko_scratch_registry%request_field(w3_d, temp_indices(3))
+       call neko_scratch_registry%request_field(w4_d, temp_indices(4))
+       call neko_scratch_registry%request_field(w5_d, temp_indices(5))
+       call neko_scratch_registry%request_field(w6_d, temp_indices(6))
+
+       call adjoint_weak_no_dealias_device(fs%x_d, s%x_d, &
+            vxb%x, vyb%x, vzb%x, &
+            coef, Xh, n, &
+            w1_d,w2_d,w3_d,w4_d,w5_d,w6_d)
+
+       call neko_scratch_registry%relinquish_field(temp_indices)
+
+    else
+    	do e = 1, coef%msh%nelv
+       ! \int \grad r . U_b  s
+          !-----------------------------
+    	call adjoint_weak_no_dealias_cpu( &
+               & fs%x(:,:,:,e), s%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & w1, w2, w3, w4, w5, w6)
+      enddo
+    end if
+
+  end subroutine compute_adjoint_scalar_advection_no_dealias
+
 end module adv_lin_no_dealias

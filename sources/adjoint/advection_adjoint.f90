@@ -53,8 +53,7 @@ module advection_adjoint
    contains
      procedure(compute_adv_lin), pass(this), deferred :: compute_linear
      procedure(compute_adv_lin), pass(this), deferred :: compute_adjoint
-! TODO
-!     procedure(compute_scalar_adv_lin), pass(this), deferred :: compute_scalar
+     procedure(compute_scalar_adv_lin), pass(this), deferred :: compute_adjoint_scalar
      procedure(advection_adjoint_free), pass(this), deferred :: free
   end type advection_adjoint_t
 
@@ -101,18 +100,21 @@ module advection_adjoint
      !! @param Xh The function space.
      !! @param coef The coefficients of the (Xh, mesh) pair.
      !! @param n Typically the size of the mesh.
-     subroutine compute_scalar_adv_lin(this, vx, vy, vz, s, fs, Xh, coef, n)
+     subroutine compute_scalar_adv_lin(this, vxb, vyb, vzb, s, fs, Xh, coef, n, dt)
        import :: advection_adjoint_t
        import :: coef_t
        import :: space_t
        import :: field_t
        import :: rp
        class(advection_adjoint_t), intent(inout) :: this
-       type(field_t), intent(inout) :: vx, vy, vz
+       type(field_t), intent(inout) :: vxb, vyb, vzb
        type(field_t), intent(inout) :: s
        type(field_t), intent(inout) :: fs
        type(space_t), intent(inout) :: Xh
        type(coef_t), intent(inout) :: coef
+       ! HARRY
+       ! I don't know when they switched the advetion term to include this :|
+       real(kind=rp), intent(in), optional :: dt
        integer, intent(in) :: n
      end subroutine compute_scalar_adv_lin
   end interface

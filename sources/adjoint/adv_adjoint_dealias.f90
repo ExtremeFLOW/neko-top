@@ -124,6 +124,14 @@ module adv_lin_dealias
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => compute_adjoint_advection_dealias
+     !> Compute the adjoint passive scalar.
+     ! If one integrates by parts, this essentially switches sign and adds some 
+     ! boundary terms. 
+     ! We keep the differential operator on the test function
+     procedure, pass(this) :: compute_adjoint_scalar => compute_adjoint_scalar_advection_dealias
+     ! NOTE
+     ! This linearized advection term is the same as a normal advection term
+     ! so not sure what to do here...
      !> Constructor
      procedure, pass(this) :: init => init_dealias
      !> Destructor
@@ -665,7 +673,88 @@ contains
          end do
       end if
     end associate
-
   end subroutine compute_linear_advection_dealias
+
+  !> Add the adjoint advection term for a scalar, i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
+  !! RHS.
+  !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
+  !! @param this The object.
+  !! @param vx The x component of velocity.
+  !! @param vy The y component of velocity.
+  !! @param vz The z component of velocity.
+  !! @param s The adjoint scalar.
+  !! @param fs The source term.
+  !! @param Xh The function space.
+  !! @param coef The coefficients of the (Xh, mesh) pair.
+  !! @param n Typically the size of the mesh.
+  !! @param dt Current time-step, not required for this method.
+  subroutine compute_adjoint_scalar_advection_dealias(this, vxb, vyb, vzb, s, fs, Xh, &
+                                              coef, n, dt)
+    class(adv_lin_dealias_t), intent(inout) :: this
+    type(field_t), intent(inout) :: vxb, vyb, vzb
+    type(field_t), intent(inout) :: s
+    type(field_t), intent(inout) :: fs
+    type(space_t), intent(inout) :: Xh
+    type(coef_t), intent(inout) :: coef
+    integer, intent(in) :: n
+    real(kind=rp), intent(in), optional :: dt
+
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: vx_GL, vy_GL, vz_GL, s_GL
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: work1, work2, work3
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: w1, w2, w3
+    real(kind=rp), dimension(this%Xh_GL%lxyz) :: f_GL
+    integer :: e, i, idx, nel, n_GL
+    real(kind=rp), dimension(this%Xh_GLL%lxyz) :: temp
+
+    nel = coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+
+    associate(c_GL => this%coef_GL)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+        !! TODO
+
+
+      else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
+        !! TODO
+
+      else
+         do e = 1, coef%msh%nelv
+            ! Map baseflow to GL
+            call this%GLL_to_GL%map(vx_GL, vxb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map(vy_GL, vyb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map(vz_GL, vzb%x(1,1,1,e), 1, this%Xh_GL)
+
+            ! Map passive scalar velocity to GL
+            call this%GLL_to_GL%map(s_GL, s%x(1,1,1,e), 1, this%Xh_GL)
+
+            do i = 1, this%Xh_GL%lxyz
+               work1(i) = s_GL(i)*vx_GL(i)
+               work2(i) = s_GL(i)*vy_GL(i)
+               work3(i) = s_GL(i)*vz_GL(i)
+            end do
+
+            ! D^T
+            call cdtp(w1, work1, c_GL%drdx, c_GL%dsdx, c_GL%dtdx, c_GL, e, e)
+            call cdtp(w2, work2, c_GL%drdy, c_GL%dsdy, c_GL%dtdy, c_GL, e, e)
+            call cdtp(w3, work3, c_GL%drdz, c_GL%dsdz, c_GL%dtdz, c_GL, e, e)
+
+            ! sum them
+            do i = 1, this%Xh_GL%lxyz
+               f_GL(i) = w1(i) + w2(i) + w3(i)
+            end do
+
+            ! map back to GLL
+            call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
+            call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
+
+         enddo
+
+      end if
+    end associate
+
+  end subroutine compute_adjoint_scalar_advection_dealias
+
+
+
 
 end module adv_lin_dealias
