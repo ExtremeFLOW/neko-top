@@ -7,14 +7,14 @@
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
 include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
 
-add_library(Neko-TOP STATIC)
+add_library(neko-top STATIC)
 
 # Add the local neko extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 
 # ============================================================================ #
 # Define the library sources and targets
-target_sources(Neko-TOP
+target_sources(neko-top
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
 
@@ -29,12 +29,12 @@ target_sources(Neko-TOP
 # ============================================================================ #
 # Specify compile options
 
-target_include_directories(Neko-TOP
+target_include_directories(neko-top
     PUBLIC
         ${CMAKE_Fortran_MODULE_DIRECTORY}
 )
 
-target_link_libraries(Neko-TOP
+target_link_libraries(neko-top
     BLAS::BLAS
     LAPACK::LAPACK
     jsonfortran-gnu::jsonfortran
@@ -42,11 +42,15 @@ target_link_libraries(Neko-TOP
 )
 
 if(MPI_FOUND)
-    target_link_libraries(Neko-TOP MPI::MPI_Fortran)
+    target_link_libraries(neko-top MPI::MPI_Fortran)
 endif()
 
 # ============================================================================ #
 # Specify installation instructions
 
-install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/ )
-install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY} DESTINATION ${CMAKE_CURRENT_SOURCE_DIR})
+install(TARGETS neko-top
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/
+)
+install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
+    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}
+)

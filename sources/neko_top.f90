@@ -49,8 +49,8 @@ contains
     logical :: converged = .false.
 
     call json_get_or_default(neko_case%params, &
-                             'case.topology_optimization.max_iter', &
-                             max_iter, 4)
+         'case.topology_optimization.max_iter', &
+         max_iter, 4)
 
     do iter = 1, max_iter
        call setup_iteration(neko_case, iter)
@@ -79,7 +79,7 @@ contains
     ! ---------------------------------------------------------------------- !
     ! Read the case file for options
     call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-                             temperature_enabled, .false.)
+         temperature_enabled, .false.)
 
     if (temperature_enabled) then
        call estimate_temperature(neko_case)
