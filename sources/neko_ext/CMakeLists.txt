@@ -15,4 +15,5 @@ target_sources(neko-top
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_ext.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/develop.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/scratch_vector.f90
 )
