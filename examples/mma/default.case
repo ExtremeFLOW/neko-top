@@ -14,8 +14,8 @@
                 "m": 2,
                 "a0_const": 1.0,
                 "a_const": 0,
-                "c_const": 1000.0,
-                "d_const": 1.0
+                "c_const": 100000.0,
+                "d_const": 1000.0
             }
         ],
         "numerics": {
