@@ -42,7 +42,7 @@ module scratch_vector
 
   type, public :: scratch_vector_t
      !> list of scratch vectors
-     type(vector_ptr_t), private, allocatable :: vectors(:)
+     type(vector_ptr_t), private, allocatable :: vectors(:,:)
      !> Tracks which vectors are used
      logical, private, allocatable :: inuse(:)
      !> number of registered vectors
@@ -96,13 +96,13 @@ contains
     this%vector_size = vector_size
 
     if (present(registry_size)) then
-       allocate (this%vectors(registry_size))
+       allocate (this%vectors(registry_size, 1))
        do i= 1, registry_size
-          allocate(this%vectors(i)%ptr)
+          allocate(this%vectors(i, 1)%ptr)
        end do
        allocate (this%inuse(registry_size))
     else
-       allocate (this%vectors(10))
+       allocate (this%vectors(10, 1))
        allocate (this%inuse(10))
     end if
 
@@ -124,8 +124,8 @@ contains
 
     if (allocated(this%vectors)) then
        do i=1, this%nvectors
-          call this%vectors(i)%ptr%free()
-          deallocate(this%vectors(i)%ptr)
+          call this%vectors(i, 1)%ptr%free()
+          deallocate(this%vectors(i, 1)%ptr)
        end do
 
        deallocate(this%vectors)
@@ -171,15 +171,15 @@ contains
 
   subroutine expand(this)
     class(scratch_vector_t), intent(inout) :: this
-    type(vector_ptr_t), allocatable :: temp(:)
+    type(vector_ptr_t), allocatable :: temp(:,:)
     logical, allocatable :: temp2(:)
     integer :: i
 
-    allocate(temp(this%get_size() + this%expansion_size))
-    temp(1:this%nvectors) = this%vectors(1:this%nvectors)
+    allocate(temp(this%get_size() + this%expansion_size, 1))
+    temp(1:this%nvectors, 1) = this%vectors(1:this%nvectors, 1)
 
     do i=this%nvectors +1, size(temp)
-       allocate(temp(i)%ptr)
+       allocate(temp(i, 1)%ptr)
     enddo
 
     call move_alloc(temp, this%vectors)
@@ -203,11 +203,11 @@ contains
       do index=1,this%get_size()
          if (.not. this%inuse(index)) then
 
-            if (.not. allocated(this%vectors(index)%ptr%x)) then
-               call this%vectors(index)%ptr%init(this%vector_size)
+            if (.not. allocated(this%vectors(index, 1)%ptr%x)) then
+               call this%vectors(index, 1)%ptr%init(this%vector_size)
                nvectors = nvectors + 1
             end if
-            f => this%vectors(index)%ptr
+            f => this%vectors(index, 1)%ptr
             this%inuse(index) = .true.
             this%nvectors_inuse = this%nvectors_inuse + 1
             return
@@ -219,8 +219,8 @@ contains
       nvectors = nvectors + 1
       nvectors_inuse = nvectors_inuse + 1
       this%inuse(nvectors) = .true.
-      call this%vectors(nvectors)%ptr%init(this%vector_size)
-      f => this%vectors(nvectors)%ptr
+      call this%vectors(nvectors, 1)%ptr%init(this%vector_size)
+      f => this%vectors(nvectors, 1)%ptr
 
     end associate
   end subroutine request_vector
