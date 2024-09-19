@@ -40,42 +40,49 @@ module mma
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
-  use mpi_f08, only: mpi_sum, MPI_Allreduce, &
-       MPI_Comm_size, MPI_Comm_rank, mpi_max, mpi_min, mpi_sum, &
+  use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
        mpi_integer
   implicit none
+  private
 
-  type :: mma_t
+  type, public :: mma_t
+     private
+
      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
      integer :: n, m, max_iter
      real(kind=rp), allocatable :: xold1(:), xold2(:), low(:), &
           upp(:), alpha(:), beta(:), a(:), c(:), d(:), xmax(:), xmin(:)
 
-     logical, private :: is_initialized = .false.
-     logical, private :: is_updated = .false.
+     logical :: is_initialized = .false.
+     logical :: is_updated = .false.
 
      ! Internal dummy variables for MMA
-     real(kind=rp), private, allocatable :: p0j(:), q0j(:)
-     real(kind=rp), private, allocatable :: pij(:,:), qij(:,:)
-     real(kind=rp), private, allocatable :: bi(:)
+     real(kind=rp), allocatable :: p0j(:), q0j(:)
+     real(kind=rp), allocatable :: pij(:,:), qij(:,:)
+     real(kind=rp), allocatable :: bi(:)
 
      !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-     real(kind=rp), private :: z, zeta
-     real(kind=rp), private, allocatable :: y(:), lambda(:), s(:), mu(:)
-     real(kind=rp), private, allocatable :: xsi(:), eta(:)
+     real(kind=rp) :: z, zeta
+     real(kind=rp), allocatable :: y(:), lambda(:), s(:), mu(:)
+     real(kind=rp), allocatable :: xsi(:), eta(:)
 
    contains
-     procedure, pass(this) :: init => mma_init
-     procedure, pass(this) :: free => mma_free
-     procedure, pass(this) :: update => mma_update
-     procedure, pass(this) :: KKT => mma_KKT
+     procedure, public, pass(this) :: init => mma_init
+     procedure, public, pass(this) :: free => mma_free
+     procedure, public, pass(this) :: update => mma_update
+     procedure, public, pass(this) :: KKT => mma_KKT
 
+     ! Getters for the MMA object
+     procedure, public, pass(this) :: get_n => mma_get_n
+     procedure, public, pass(this) :: get_m => mma_get_m
+     procedure, public, pass(this) :: get_residumax => mma_get_residumax
+     procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
 
      !Generates the sub problem--the MMA convex approximation
-     procedure, private, pass(this) :: mma_gensub
+     procedure, pass(this) :: mma_gensub
      !Solve the dual with an interior point method
-     procedure, private, pass(this) :: mma_subsolve_dpip
+     procedure, pass(this) :: mma_subsolve_dpip
 
   end type mma_t
 
@@ -218,11 +225,8 @@ contains
        write(stderr, *) "The MMA object is not initialized."
        write(stderr, *) "Please call MMA_obj.init() first and then ", &
             "call MMA_obj.update()."
-
        error stop
     end if
-
-    ! this%x = x
 
     ! generate a convex approximation of the problem
     call this%mma_gensub(iter, x, df0dx, fval, dfdx)
@@ -304,8 +308,6 @@ contains
 
     integer :: nglobal
 
-    call MPI_Comm_size(neko_comm, pe_size, ierr)
-    call MPI_Comm_rank(neko_comm, pe_rank, ierr)
     !intial value for the parameters in the subsolve based on
     !page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
     dummy_one = 1
@@ -759,6 +761,33 @@ contains
     this%is_updated = .false.
 
   end subroutine mma_free
+
+  ! ========================================================================== !
+  ! Getters and setters
+
+  pure function mma_get_n(this) result(n)
+    class(mma_t), intent(in) :: this
+    integer :: n
+    n = this%n
+  end function mma_get_n
+
+  pure function mma_get_m(this) result(m)
+    class(mma_t), intent(in) :: this
+    integer :: m
+    m = this%m
+  end function mma_get_m
+
+  pure function mma_get_residumax(this) result(residumax)
+    class(mma_t), intent(in) :: this
+    real(kind=rp) :: residumax
+    residumax = this%residumax
+  end function mma_get_residumax
+
+  pure function mma_get_residunorm(this) result(residunorm)
+    class(mma_t), intent(in) :: this
+    real(kind=rp) :: residunorm
+    residunorm = this%residunorm
+  end function mma_get_residunorm
 
 end module mma
 

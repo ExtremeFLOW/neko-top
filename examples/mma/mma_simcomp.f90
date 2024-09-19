@@ -131,7 +131,8 @@ contains
 
     ! initial design
     this%designx%x=1.0
-
+    this%xmax%x = 10.0_rp
+    this%xmin%x = 0.0_rp
     call this%mma%init(reshape(this%designx%x, [nloc]), &
          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
 
@@ -172,65 +173,64 @@ contains
     real(kind=rp), dimension(2,4) :: teststuff
 
     real(kind=rp) :: start_time, end_time
-    real(kind=rp), dimension(this%mma%n) :: x
+    real(kind=rp), dimension(this%mma%get_n()) :: x
 
-    real(kind=rp), dimension(this%mma%m) :: fval, fvalglobal
-    real(kind=rp), dimension(this%mma%m,this%mma%n) :: dfdx
+    real(kind=rp), dimension(this%mma%get_m()) :: fval, fvalglobal
+    real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
     real(kind=rp) :: f0val, f0valeps, f0valglobal
-    real(kind=rp), dimension(this%mma%n) :: df0dx
+    real(kind=rp), dimension(this%mma%get_n()) :: df0dx
     ! character(len=50) :: filename
-    real(kind=rp), dimension(this%mma%n,4) :: stuff
+    real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
     ! real(kind=rp), dimension(4320,4) :: all_stuff
     real(kind=rp), allocatable :: all_stuff(:,:)
     integer, allocatable :: nloc_all(:)
 
     character(len=80) :: iFileName ! Filename to save the VTK data
-    this%mma%xmax = 10.0_rp
-    this%mma%xmin = 0.0_rp
+
     L=0_rp
 
 
     call cpu_time(start_time)
-    ! call write_field_to_vector(this%designx,x,this%mma%n)
-    x= reshape(this%designx%x, [this%mma%n])
-    call func1 (this, this%mma%n, this%mma%m, L, f0val, df0dx, fval , dfdx)
+    ! call write_field_to_vector(this%designx,x,this%mma%get_n())
+    x= reshape(this%designx%x, [this%mma%get_n()])
+    call func1 (this, this%mma%get_n(), this%mma%get_m(), L, f0val, df0dx, fval , dfdx)
 
     print *, 'iter=', 0,&
          '-------,f0val= ', f0val, ',   fval= ', fval
 
-    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%n])
-    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%n])
-    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%n])
-    stuff(:,4) = reshape(this%designx%x, [this%mma%n])
+    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
 
     call MPI_Comm_size(neko_comm, size, ierr)
     call MPI_Comm_rank(neko_comm, rank, ierr)
     allocate(recv_counts(size))
     allocate(displs(size))
-    call MPI_Allreduce(this%mma%n, nglobal, 1, &
+    call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     allocate(nloc_all(size))
     !!!!Use MPI_Allgather to gather the `nloc` from each process into `nloc_all`
-    call MPI_Allgather(this%mma%n, 1, MPI_INTEGER, nloc_all,&
+    call MPI_Allgather(this%mma%get_n(), 1, MPI_INTEGER, nloc_all,&
          1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
-    recv_counts = this%mma%n
+    recv_counts = this%mma%get_n()
     displs(1) = 0
     do i = 2, size
        displs(i) = displs(i-1) + nloc_all(i-1)
     end do
     allocate(all_stuff(nglobal,4))
     ! Gather data from all processes to the root process
-    call MPI_Gatherv(stuff(:,1), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,2), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,3), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,4), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
@@ -246,18 +246,18 @@ contains
        ! print *,"first"
        this%designx%x = reshape(x ,shape(this%designx%x))
 
-       call func1 (this, this%mma%n, this%mma%m, L, f0val, df0dx, fval , dfdx)
+       call func1 (this, this%mma%get_n(), this%mma%get_m(), L, f0val, df0dx, fval , dfdx)
        call this%mma%KKT(x,df0dx,fval,dfdx)
 
        if (rank == 0) then
           print *, 'iter=', iter,&
                '-------,f0val= ', f0val, ',   fval= ', fval(1), &
-               ',  KKTmax=', this%mma%residumax, ', KKTnorm2=', this%mma%residunorm
+               ',  KKTmax=', this%mma%get_residumax(), ', KKTnorm2=', this%mma%get_residunorm()
        end if
 
        ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
        ! if (this%mma%residumax .lt. this%tol) exit
-       if (this%mma%residumax .lt. 1.0e-3_rp) exit
+       if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
     end do
 
     ! print *, "f0val=", f0val, "fval=", fval
@@ -268,21 +268,21 @@ contains
     print *, "this%designx%x is updated"
 
 
-    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%n])
-    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%n])
-    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%n])
-    stuff(:,4) = reshape(this%designx%x, [this%mma%n])
+    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
 
-    call MPI_Gatherv(stuff(:,1), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,2), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,3), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,4), this%mma%n, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
@@ -376,7 +376,7 @@ contains
     ! f0val=0
     ! df0dx=0
     fval(1)=sum((x-coordx)**2)
-    ! fval(1)=sum(this%designx%x) - this%mma%n*L
+    ! fval(1)=sum(this%designx%x) - this%mma%get_n()*L
     Globalf0val=0_rp
     call MPI_Allreduce(fval(1), Globalf0val, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -399,7 +399,7 @@ contains
     ! ! df0dx=0
 
     ! fval(1)=sum(this%designx%x)/nglobal
-    ! ! fval(1)=sum(this%designx%x) - this%mma%n*L
+    ! ! fval(1)=sum(this%designx%x) - this%mma%get_n()*L
     ! Globalf0val=0_rp
     ! call MPI_Allreduce(fval(1), Globalf0val, 1, &
     !   mpi_real_precision, mpi_sum, neko_comm, ierr)
