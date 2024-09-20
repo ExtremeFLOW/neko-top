@@ -59,6 +59,7 @@ module mma
 
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
+     character(len=:), allocatable :: backend
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -76,8 +77,12 @@ module mma
      procedure, public, pass(this) :: init_json => mma_init_json
 
      procedure, public, pass(this) :: free => mma_free
-     procedure, public, pass(this) :: update => mma_update
      procedure, public, pass(this) :: KKT => mma_KKT
+
+     !> Interface for updating the MMA
+     generic, public :: update => mma_update_cpu, mma_update_vector
+     procedure, pass(this) :: mma_update_cpu
+     procedure, pass(this) :: mma_update_vector
 
      ! Getters for the MMA object
      procedure, public, pass(this) :: get_n => mma_get_n
@@ -85,10 +90,13 @@ module mma
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
 
-     !Generates the sub problem--the MMA convex approximation
-     procedure, pass(this) :: mma_gensub
-     !Solve the dual with an interior point method
-     procedure, pass(this) :: mma_subsolve_dpip
+     !> Interface for generating the approximation sub problem
+     generic :: gensub => mma_gensub_cpu
+     procedure, pass(this) :: mma_gensub_cpu
+
+     !> Interface for solving the dual with an interior point method
+     generic :: subsolve => mma_subsolve_dpip_cpu
+     procedure, pass(this) :: mma_subsolve_dpip_cpu
 
   end type mma_t
 
@@ -154,6 +162,7 @@ contains
 
     integer :: max_iter
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
+    character(len=:), allocatable :: backend
 
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
@@ -168,15 +177,17 @@ contains
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
+    call json_get_or_default(json, 'mma.backend', backend, 'cpu')
+
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parsed parameters
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr)
+         max_iter, epsimin, asyinit, asyincr, asydecr, backend)
 
   end subroutine mma_init_json
 
   subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr)
+       max_iter, epsimin, asyinit, asyincr, asydecr, backend)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -204,6 +215,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    character(len=:), allocatable, intent(in), optional :: backend
 
     call this%free()
 
@@ -271,26 +283,27 @@ contains
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
 
+    if (.not. present(backend)) this%backend = 'cpu'
+
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
     if (present(epsimin)) this%epsimin = epsimin
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
+    if (present(backend)) this%backend = backend
 
     !the object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_attributes
 
-  subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
+  subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Update the design variable x by solving the convex    !
     ! approximation of the problem.                         !
     !                                                       !
     ! This subroutine is called in each iteration of the    !
     ! optimization loop                                     !
-    !                                                       !
-    ! Todo: This should be overloaded for different input   !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
@@ -305,14 +318,42 @@ contains
     end if
 
     ! generate a convex approximation of the problem
-    call this%mma_gensub(iter, x, df0dx, fval, dfdx)
+    call this%gensub(iter, x, df0dx, fval, dfdx)
 
     !solve the approximation problem using interior point method
-    call this%mma_subsolve_dpip(x)
+    call this%subsolve(x)
 
     this%is_updated = .true.
-  end subroutine mma_update
+  end subroutine mma_update_cpu
 
+  subroutine mma_update_vector(this, iter, x, df0dx, fval, dfdx)
+    ! ----------------------------------------------------- !
+    ! Update the design variable x by solving the convex    !
+    ! approximation of the problem.                         !
+    !                                                       !
+    ! This subroutine is called in each iteration of the    !
+    ! optimization loop                                     !
+    ! ----------------------------------------------------- !
+    class(mma_t), intent(inout) :: this
+    integer, intent(in) :: iter
+    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(in) :: df0dx
+    type(vector_t), intent(in) :: fval
+    type(matrix_t), intent(in) :: dfdx
+
+    if (.not. this%is_initialized) then
+       write(stderr, *) "The MMA object is not initialized."
+       error stop
+    end if
+
+    if (this%backend == 'cpu') then
+       call this%mma_update_cpu(iter, x%x, df0dx%x, fval%x, dfdx%x)
+    else
+       write(stderr, *) "Device not supported for MMA."
+       error stop
+    end if
+
+  end subroutine mma_update_vector
 
   subroutine mma_KKT(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -389,53 +430,6 @@ contains
     this%is_updated = .false.
 
   end subroutine mma_free
-
-  ! ========================================================================== !
-  ! Private subroutines
-
-  subroutine mma_gensub(this, iter, x, df0dx, fval, dfdx)
-    ! ----------------------------------------------------- !
-    ! Generate the approximation sub problem by computing   !
-    ! the lower and upper asymtotes and the other necessary !
-    ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
-    ! ----------------------------------------------------- !
-    class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-    integer, intent(in) :: iter
-
-    if (NEKO_BCKND_DEVICE .eq. 0) then
-       call mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
-    else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
-    end if
-
-  end subroutine mma_gensub
-
-  subroutine mma_subsolve_dpip(this, designx)
-    ! ------------------------------------------------------- !
-    ! Dual-primal interior point method using Newton's step   !
-    ! to solve MMA sub problem.                               !
-    ! A Backtracking Line Search approach is used to compute  !
-    ! the step size; starting with the full Newton's step     !
-    ! (delta = 1) and deviding by 2 until we have a step size !
-    ! that leads to a feasible point while ensuring a         !
-    ! decrease in the residue.                                !
-    ! ------------------------------------------------------- !
-    class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(inout) :: designx
-
-    if (NEKO_BCKND_DEVICE .eq. 0) then
-       call mma_subsolve_dpip_cpu(this, designx)
-    else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
-    end if
-
-  end subroutine mma_subsolve_dpip
 
   ! ========================================================================== !
   ! Getters and setters
