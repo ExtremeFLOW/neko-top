@@ -9,9 +9,9 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-    real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
     real(kind=rp), dimension(this%m) :: globaltmp_m
@@ -597,9 +597,9 @@ contains
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
 
-    real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     real(kind=rp) :: rez, rezeta
     real(kind=rp), dimension(this%m) :: rey, relambda, remu, res

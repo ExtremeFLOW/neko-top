@@ -94,9 +94,9 @@ module mma
      module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
-       real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-       real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+       real(kind=rp), dimension(this%n), intent(in) :: df0dx
+       real(kind=rp), dimension(this%m), intent(in) :: fval
+       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
        integer, intent(in) :: iter
      end subroutine mma_gensub_cpu
 
@@ -110,9 +110,9 @@ module mma
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
-       real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-       real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+       real(kind=rp), dimension(this%m), intent(in) :: fval
+       real(kind=rp), dimension(this%n), intent(in) :: df0dx
+       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
   end interface
 
@@ -230,9 +230,9 @@ contains
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
     real(kind=rp), dimension(this%n), intent(inout) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-    real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     if (.not. this%is_initialized) then
        write(stderr, *) "The MMA object is not initialized."
@@ -271,9 +271,9 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     if (.not. this%is_initialized) then
        write(stderr, *) "The MMA object is not initialized."
@@ -333,9 +333,9 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx(:)
-    real(kind=rp), dimension(this%m), intent(in) :: fval(:)
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx(:,:)
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     integer, intent(in) :: iter
 
     if (NEKO_BCKND_DEVICE .eq. 0) then
