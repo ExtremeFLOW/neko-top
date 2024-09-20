@@ -37,6 +37,8 @@ module mma
   use num_types, only: rp
   use comm, only: neko_comm, mpi_real_precision, pe_rank, pe_size
   use neko_config, only: NEKO_BCKND_DEVICE
+  use vector, only: vector_t
+  use matrix, only: matrix_t
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -51,21 +53,20 @@ module mma
      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
      integer :: n, m, max_iter
-     real(kind=rp), allocatable :: xold1(:), xold2(:), low(:), &
-          upp(:), alpha(:), beta(:), a(:), c(:), d(:), xmax(:), xmin(:)
+     type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
 
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
 
      ! Internal dummy variables for MMA
-     real(kind=rp), allocatable :: p0j(:), q0j(:)
-     real(kind=rp), allocatable :: pij(:,:), qij(:,:)
-     real(kind=rp), allocatable :: bi(:)
+     type(vector_t) :: p0j, q0j
+     type(matrix_t) :: pij, qij
+     type(vector_t) :: bi
 
      !---nesessary for KKT check after updating df0dx, fval, dfdx --------
      real(kind=rp) :: z, zeta
-     real(kind=rp), allocatable :: y(:), lambda(:), s(:), mu(:)
-     real(kind=rp), allocatable :: xsi(:), eta(:)
+     type(vector_t) :: y, lambda, s, mu
+     type(vector_t) :: xsi, eta
 
    contains
      procedure, public, pass(this) :: init => mma_init
@@ -152,36 +153,36 @@ contains
 
     ! allocate(this%x(n))
     ! this%x = x
-    allocate(this%xold1(n))
-    allocate(this%xold2(n))
-    this%xold1 = x
-    this%xold2 = x
+    call this%xold1%init(n)
+    call this%xold2%init(n)
+    this%xold1%x = x
+    this%xold2%x = x
 
-    allocate(this%alpha(n))
-    allocate(this%beta(n))
+    call this%alpha%init(n)
+    call this%beta%init(n)
 
-    allocate(this%a(m))
-    allocate(this%c(m))
-    allocate(this%d(m))
-    allocate(this%low(n))
-    allocate(this%upp(n))
-    allocate(this%xmax(n))
-    allocate(this%xmin(n))
+    call this%a%init(m)
+    call this%c%init(m)
+    call this%d%init(m)
+    call this%low%init(n)
+    call this%upp%init(n)
+    call this%xmax%init(n)
+    call this%xmin%init(n)
 
     !internal dummy variables for MMA
-    allocate(this%p0j(n))
-    allocate(this%q0j(n))
-    allocate(this%pij(m,n))
-    allocate(this%qij(m,n))
-    allocate(this%bi(m))
+    call this%p0j%init(n)
+    call this%q0j%init(n)
+    call this%pij%init(m,n)
+    call this%qij%init(m,n)
+    call this%bi%init(m)
 
     !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-    allocate(this%y(m))
-    allocate(this%lambda(m))
-    allocate(this%s(m))
-    allocate(this%mu(m))
-    allocate(this%xsi(n))
-    allocate(this%eta(n))
+    call this%y%init(m)
+    call this%lambda%init(m)
+    call this%s%init(m)
+    call this%mu%init(m)
+    call this%xsi%init(n)
+    call this%eta%init(n)
 
 
     ! this%epsimin =  1.0e-10_rp
@@ -191,18 +192,18 @@ contains
     this%max_iter = 100
 
     this%a0 = a0
-    this%a = a
-    this%c = c
-    this%d = d
+    this%a%x = a
+    this%c%x = c
+    this%d%x = d
     !setting the bounds for the design variable based on the problem
-    this%xmax = xmax
-    this%xmin = xmin
+    this%xmax%x = xmax
+    this%xmin%x = xmin
 
 
 
 
-    this%low(:) = minval(x)
-    this%upp(:) = maxval(x)
+    this%low%x(:) = minval(x)
+    this%upp%x(:) = maxval(x)
 
     !following parameters are set based on eq.3.8:--------
     this%asyinit = 0.5_rp !
@@ -294,28 +295,31 @@ contains
 
     class(mma_t), intent(inout) :: this
 
-    if (allocated(this%xold1)) deallocate(this%xold1)
-    if (allocated(this%xold2)) deallocate(this%xold2)
-    if (allocated(this%low)) deallocate(this%low)
-    if (allocated(this%upp)) deallocate(this%upp)
-    if (allocated(this%alpha)) deallocate(this%alpha)
-    if (allocated(this%beta)) deallocate(this%beta)
-    if (allocated(this%a)) deallocate(this%a)
-    if (allocated(this%c)) deallocate(this%c)
-    if (allocated(this%d)) deallocate(this%d)
-    if (allocated(this%xmax)) deallocate(this%xmax)
-    if (allocated(this%xmin)) deallocate(this%xmin)
-    if (allocated(this%p0j)) deallocate(this%p0j)
-    if (allocated(this%q0j)) deallocate(this%q0j)
-    if (allocated(this%pij)) deallocate(this%pij)
-    if (allocated(this%qij)) deallocate(this%qij)
-    if (allocated(this%bi)) deallocate(this%bi)
-    if (allocated(this%y)) deallocate(this%y)
-    if (allocated(this%lambda)) deallocate(this%lambda)
-    if (allocated(this%s)) deallocate(this%s)
-    if (allocated(this%mu)) deallocate(this%mu)
-    if (allocated(this%xsi)) deallocate(this%xsi)
-    if (allocated(this%eta)) deallocate(this%eta)
+    ! Deallocate the internal vectors
+    call this%xold1%free()
+    call this%xold2%free()
+    call this%alpha%free()
+    call this%beta%free()
+    call this%a%free()
+    call this%c%free()
+    call this%d%free()
+    call this%low%free()
+    call this%upp%free()
+    call this%xmax%free()
+    call this%xmin%free()
+    call this%p0j%free()
+    call this%q0j%free()
+    call this%bi%free()
+    call this%y%free()
+    call this%lambda%free()
+    call this%s%free()
+    call this%mu%free()
+    call this%xsi%free()
+    call this%eta%free()
+
+    ! Deallocate the internal dummy matrices
+    call this%pij%free()
+    call this%qij%free()
 
     this%is_initialized = .false.
     this%is_updated = .false.
