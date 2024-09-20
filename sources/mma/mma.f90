@@ -39,6 +39,8 @@ module mma
   use neko_config, only: NEKO_BCKND_DEVICE
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use json_module, only: json_file
+  use json_utils, only: json_get_or_default
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -69,7 +71,10 @@ module mma
      type(vector_t) :: xsi, eta
 
    contains
-     procedure, public, pass(this) :: init => mma_init
+     !> Interface for initializing the MMA object
+     procedure, public, pass(this) :: init => mma_init_attributes
+     procedure, public, pass(this) :: init_json => mma_init_json
+
      procedure, public, pass(this) :: free => mma_free
      procedure, public, pass(this) :: update => mma_update
      procedure, public, pass(this) :: KKT => mma_KKT
@@ -119,7 +124,7 @@ module mma
 
 contains
 
-  subroutine mma_init(this, x, n, m, a0, a, c, d, xmin, xmax)
+  subroutine mma_init_json(this, x, n, m, a0, a, c, d, xmin, xmax, json)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -142,9 +147,63 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    real(kind=rp), dimension(n) :: xmax, xmin
-    real(kind=rp), dimension(m) :: a, c, d
-    real(kind=rp) :: a0
+    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
+    real(kind=rp), intent(in), dimension(m) :: a, c, d
+    real(kind=rp), intent(in) :: a0
+    type(json_file), intent(inout) :: json
+
+    integer :: max_iter
+    real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
+
+    ! ------------------------------------------------------------------------ !
+    ! Assign defaults if nothing is parsed
+
+    ! based on the Cpp Code by Niels
+    call json_get_or_default(json, 'mma.epsimin', epsimin, &
+         1.0e-9_rp * sqrt(real(m + n, rp)))
+    call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
+
+    ! Following parameters are set based on eq.3.8:--------
+    call json_get_or_default(json, 'mma.asyinit', asyinit, 0.5_rp)
+    call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
+    call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
+
+    ! ------------------------------------------------------------------------ !
+    ! Initialize the MMA object with the parsed parameters
+    call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
+         max_iter, epsimin, asyinit, asyincr, asydecr)
+
+  end subroutine mma_init_json
+
+  subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
+       max_iter, epsimin, asyinit, asyincr, asydecr)
+    ! ----------------------------------------------------- !
+    ! Initializing the mma object and all the parameters    !
+    ! required for MMA method. (a_i, c_i, d_i, ...)         !
+    ! x: the design varaibles(DV), n: number of DV,         !
+    ! m: number of constraints                              !
+    !                                                       !
+    ! Note that residumax & residunorm of the KKT conditions!
+    ! are initialized with 10^5. This is done to avoid      !
+    ! unnecessary extera computation of KKT norms for the   !
+    ! initial design.                                       !
+    ! ----------------------------------------------------- !
+
+    class(mma_t), intent(inout) :: this
+    integer, intent(in) :: n, m
+    real(kind=rp), intent(in), dimension(n) :: x
+    ! -------------------------------------------------------------------!
+    !      Internal parameters for MMA                                   !
+    !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
+    !    subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m             !
+    !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
+    !                z >= 0,   y_i >= 0,         i = 1,...,m             !
+    ! -------------------------------------------------------------------!
+    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
+    real(kind=rp), intent(in), dimension(m) :: a, c, d
+    real(kind=rp), intent(in) :: a0
+    integer, intent(in), optional :: max_iter
+    real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
 
     call this%free()
 
@@ -184,39 +243,44 @@ contains
     call this%xsi%init(n)
     call this%eta%init(n)
 
-
-    ! this%epsimin =  1.0e-10_rp
-    ! based on the Cpp Code by Neils
-    this%epsimin = 1.0e-9_rp * sqrt(1.0*m + 1.0*n)
-
-    this%max_iter = 100
-
     this%a0 = a0
     this%a%x = a
     this%c%x = c
     this%d%x = d
+
     !setting the bounds for the design variable based on the problem
     this%xmax%x = xmax
     this%xmin%x = xmin
 
-
-
-
     this%low%x(:) = minval(x)
     this%upp%x(:) = maxval(x)
 
-    !following parameters are set based on eq.3.8:--------
-    this%asyinit = 0.5_rp !
-    this%asyincr = 1.2_rp ! 1.1
-    this%asydecr = 0.7_rp !0.65
-
     !setting KKT norms to a large number for the initial design
-    this%residumax = 10**5_rp
-    this%residunorm = 10**5_rp
+    this%residumax = huge(0.0_rp)
+    this%residunorm = huge(0.0_rp)
+
+    ! ------------------------------------------------------------------------ !
+    ! Assign defaults if nothing is parsed
+
+    ! based on the Cpp Code by Niels
+    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
+    if (.not. present(max_iter)) this%max_iter = 100
+
+    ! Following parameters are set based on eq.3.8:--------
+    if (.not. present(asyinit)) this%asyinit = 0.5_rp
+    if (.not. present(asyincr)) this%asyincr = 1.2_rp
+    if (.not. present(asydecr)) this%asydecr = 0.7_rp
+
+    ! Assign values from inputs when present
+    if (present(max_iter)) this%max_iter = max_iter
+    if (present(epsimin)) this%epsimin = epsimin
+    if (present(asyinit)) this%asyinit = asyinit
+    if (present(asyincr)) this%asyincr = asyincr
+    if (present(asydecr)) this%asydecr = asydecr
 
     !the object is correctly initialized
     this%is_initialized = .true.
-  end subroutine mma_init
+  end subroutine mma_init_attributes
 
   subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
