@@ -1,60 +1,58 @@
 submodule (mma) mma_vector
 
 contains
-  module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
+  module subroutine mma_gensub_vector(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
     ! the lower and upper asymtotes and the other necessary !
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    type(vector_t), intent(in) :: x
+    type(vector_t), intent(in) :: df0dx
+    type(vector_t), intent(in) :: fval
+    type(matrix_t), intent(in) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
-    real(kind=rp), dimension(this%m) :: globaltmp_m
+    type(vector_t) :: globaltmp_m
+    call globaltmp_m%init(this%m)
 
     if (iter .lt. 3) then
-       do j = 1, this%n
-          this%low%x(j) = x(j) - this%asyinit * (this%xmax%x(j) - &
-               this%xmin%x(j))
-          this%upp%x(j) = x(j) + this%asyinit * (this%xmax%x(j) - &
-               this%xmin%x(j))
-       end do
+       this%low = x - this%asyinit * (this%xmax - this%xmin)
+       this%upp = x + this%asyinit * (this%xmax - this%xmin)
     else
        !Move asymptotes low and upp
+       ! Todo: Port to vectorized operations
        do j = 1, this%n
-          if ((x(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
+          if ((x%x(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
                .lt. 0) then
-             this%low%x(j) = x(j) - &
+             this%low%x(j) = x%x(j) - &
                   this%asydecr * (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + &
+             this%upp%x(j) = x%x(j) + &
                   this%asydecr * (this%upp%x(j) - this%xold1%x(j))
 
-          else if ((x(j) - this%xold1%x(j))* &
+          else if ((x%x(j) - this%xold1%x(j))* &
                (this%xold1%x(j) - this%xold2%x(j)) .gt. 0) then
-             this%low%x(j) = x(j) - &
+             this%low%x(j) = x%x(j) - &
                   this%asyincr * (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + &
+             this%upp%x(j) = x%x(j) + &
                   this%asyincr * (this%upp%x(j) - this%xold1%x(j))
           else
-             this%low%x(j) = x(j) - (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + (this%upp%x(j) - this%xold1%x(j))
+             this%low%x(j) = x%x(j) - (this%xold1%x(j) - this%low%x(j))
+             this%upp%x(j) = x%x(j) + (this%upp%x(j) - this%xold1%x(j))
           end if
 
           ! setting a minimum and maximum for the low and upp
           ! asymptotes (eq3.9)
           this%low%x(j) = max(this%low%x(j), &
-               x(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
+               x%x(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
           this%low%x(j) = min(this%low%x(j), &
-               x(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               x%x(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
 
           this%upp%x(j) = min(this%upp%x(j), &
-               x(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
+               x%x(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
           this%upp%x(j) = max(this%upp%x(j), &
-               x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               x%x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
        end do
     end if
     ! we can move alpha and beta out of the following loop if needed as:
@@ -62,6 +60,7 @@ contains
     !     0.1*(this%x- this%low), this%x - 0.5*(this%xmax - this%xmin))
     ! this%beta = min(this%xmax, this%upp -  &
     !     0.1*(this%upp - this%x), this%x + 0.5*(this%xmax - this%xmin))
+    ! Todo: Port to vectorized operations
     do j = 1, this%n
        ! set the the bounds and coefficients for the approximation
        ! the move bounds (alpha and beta )are slightly more restrictive
@@ -70,48 +69,49 @@ contains
        ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
        ! eq (2.8) and (2.9)
        this%alpha%x(j) = max(this%xmin%x(j), this%low%x(j) + &
-            0.1*(x(j)- this%low%x(j)), &
-            x(j) - 0.5*(this%xmax%x(j) - this%xmin%x(j)))
+            0.1*(x%x(j)- this%low%x(j)), &
+            x%x(j) - 0.5*(this%xmax%x(j) - this%xmin%x(j)))
        this%beta%x(j) = min(this%xmax%x(j), this%upp%x(j) - &
-            0.1*(this%upp%x(j) - x(j)), &
-            x(j) + 0.5*(this%xmax%x(j) - this%xmin%x(j)))
+            0.1*(this%upp%x(j) - x%x(j)), &
+            x%x(j) + 0.5*(this%xmax%x(j) - this%xmin%x(j)))
 
        !Calculate p0j, q0j, pij, qij
        !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
-       this%p0j%x(j) = (this%upp%x(j) - x(j))**2 * &
-            (1.001*max(df0dx(j),0.0) + &
-            0.001*max(-df0dx(j),0.0) + &
+       this%p0j%x(j) = (this%upp%x(j) - x%x(j))**2 * &
+            (1.001*max(df0dx%x(j),0.0) + &
+            0.001*max(-df0dx%x(j),0.0) + &
             (0.00001/(max(0.00001, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
-       this%q0j%x(j) = (x(j) - this%low%x(j))**2 * &
-            (0.001*max(df0dx(j),0.0) + &
-            1.001*max(-df0dx(j),0.0) + &
+       this%q0j%x(j) = (x%x(j) - this%low%x(j))**2 * &
+            (0.001*max(df0dx%x(j),0.0) + &
+            1.001*max(-df0dx%x(j),0.0) + &
             (0.00001/(max(0.00001, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        do i = 1, this%m
-          this%pij%x(i,j) = (this%upp%x(j) - x(j))**2 * &
-               (1.001*max(dfdx(i,j),0.0) + &
-               0.001*max(-dfdx(i,j),0.0) + &
+          this%pij%x(i,j) = (this%upp%x(j) - x%x(j))**2 * &
+               (1.001*max(dfdx%x(i,j),0.0) + &
+               0.001*max(-dfdx%x(i,j),0.0) + &
                (0.00001/(max(0.00001, &
                (this%xmax%x(j) - this%xmin%x(j))))))
-          this%qij%x(i,j) = (x(j) - this%low%x(j))**2 * &
-               (0.001*max(dfdx(i, j), 0.0) + &
-               1.001*max(-dfdx(i, j), 0.0) + &
+          this%qij%x(i,j) = (x%x(j) - this%low%x(j))**2 * &
+               (0.001*max(dfdx%x(i, j), 0.0) + &
+               1.001*max(-dfdx%x(i, j), 0.0) + &
                (0.00001/(max(0.00001, &
                (this%xmax%x(j) - this%xmin%x(j))))))
        end do
     end do
 
     !computing bi as defined in page 5
+    ! Todo: Port to vectorized operations
     this%bi%x = 0_rp
     do i = 1, this%m
        !MPI: here this%n is the global n
        do j = 1, this%n
           this%bi%x(i) = this%bi%x(i) + &
-               this%pij%x(i,j) / (this%upp%x(j) - x(j)) + &
-               this%qij%x(i,j) / (x(j) - this%low%x(j))
+               this%pij%x(i,j) / (this%upp%x(j) - x%x(j)) + &
+               this%qij%x(i,j) / (x%x(j) - this%low%x(j))
        end do
     end do
 
@@ -125,7 +125,7 @@ contains
     ! do i = 1, this%m
     !     !MPI: here this%n is the global n
     !     do j = 1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
+    !         this%bi(i) = this%bi(i) + &
     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
     !         longbi(i) = longbi(i) + &
@@ -140,7 +140,7 @@ contains
     ! this%bi%x = 0_rp
     ! do i = 1, this%m
     !     do j = 1, ierr
-    !         this%bi%x(i) = this%bi%x(i) + &
+    !         this%bi(i) = this%bi(i) + &
     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
     !         longbi(i) = longbi(i) + &
@@ -152,11 +152,11 @@ contains
     ! print *, "longbi =  ", longbi, "first batch(1-ierr)"
     ! longbiglobal = longbi
     ! longbi = 0.0
-    ! globaltmp_m = this%bi
+    ! globaltmp_m%x = this%bi
     ! this%bi%x = 0_rp
     ! do i = 1, this%m
     !     do j = ierr+1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
+    !         this%bi(i) = this%bi(i) + &
     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
     !         longbi(i) = longbi(i) + &
@@ -172,14 +172,14 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    globaltmp_m = 0.0_rp
-    call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
+    globaltmp_m%x = 0.0_rp
+    call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%bi%x = globaltmp_m - fval
+    this%bi%x = globaltmp_m%x - fval%x
 
-  end subroutine mma_gensub_cpu
+  end subroutine mma_gensub_vector
 
-  subroutine mma_subsolve_dpip_cpu(this, designx)
+  subroutine mma_subsolve_dpip_vector(this, designx)
     ! ------------------------------------------------------- !
     ! Dual-primal interior point method using Newton's step   !
     ! to solve MMA sub problem.                               !
@@ -190,7 +190,7 @@ contains
     ! decrease in the residue.                                !
     ! ------------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(inout) :: designx
+    type(vector_t), intent(inout) :: designx
     !Note that there is a local dummy "x" in this subroutine, thus, we call
     !the current design "designx" instead of just "x"
     integer :: i, j, k, iter, ggdumiter, itto, ierr
@@ -272,7 +272,7 @@ contains
 
        ! relambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:))) + &
        !         matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-       !         this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
+       !         this%a%x(:)*z - y(:) + s(:) - this%bi(:)
        relambda = 0.0_rp
        do i = 1, this%m
           do j = 1, this%n !this n is global
@@ -361,7 +361,7 @@ contains
           ! delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
           ! dellambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:)))+&
           !     matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-          !     this%a%x(:)*z - y(:) - this%bi%x(:) + epsi/lambda(:)
+          !     this%a%x(:)*z - y(:) - this%bi(:) + epsi/lambda(:)
 
           do ggdumiter = 1, this%m
              GG(ggdumiter, :) = this%pij%x(ggdumiter,:)/ &
@@ -501,7 +501,7 @@ contains
              ! relambda(:) = matmul(this%pij%x(:,:),1.0/&
              !         (this%upp%x(:) - x(:))) + matmul(this%qij%x(:,:), &
              !         1.0/(x(:) - this%low%x(:))) - this%a%x(:)*z - &
-             !         y(:) + s(:) - this%bi%x(:)
+             !         y(:) + s(:) - this%bi(:)
              relambda = 0.0_rp
              do i = 1, this%m
                 do j = 1, this%n !this n is global
@@ -559,8 +559,8 @@ contains
 
     ! Save the new design
     this%xold2 = this%xold1
-    this%xold1%x = designx
-    designx = x
+    this%xold1 = designx
+    designx%x = x
 
     !update the parameters of the MMA object nesessary to compute KKT residu
     this%y%x = y
@@ -572,9 +572,9 @@ contains
     this%mu%x = mu
     this%s%x = s
 
-  end subroutine mma_subsolve_dpip_cpu
+  end subroutine mma_subsolve_dpip_vector
 
-  subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+  subroutine mma_KKT_vector(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! design x and set the max and norm values of the       !
@@ -595,11 +595,11 @@ contains
     ! using the new x values.                               !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: x
+    type(vector_t), intent(in) :: fval
+    type(vector_t), intent(in) :: df0dx
+    type(matrix_t), intent(in) :: dfdx
 
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     real(kind=rp) :: rez, rezeta
     real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
@@ -610,14 +610,14 @@ contains
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
 
-    rex(:) = df0dx + matmul(transpose(dfdx), this%lambda%x(:)) - this%xsi%x(:) + &
+    rex(:) = df0dx%x + matmul(transpose(dfdx%x), this%lambda%x) - this%xsi%x(:) + &
          this%eta%x(:)
     rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - this%mu%x(:)
     rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
 
-    relambda(:) = fval - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
-    rexsi(:) = this%xsi%x(:)*(x(:) - this%xmin%x(:))
-    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x(:))
+    relambda(:) = fval%x - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
+    rexsi(:) = this%xsi%x(:)*(x%x(:) - this%xmin%x(:))
+    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x%x(:))
     remu(:) = this%mu%x(:)*this%y%x(:)
     rezeta = this%zeta*this%z
     res(:) = this%lambda%x(:)*this%s%x(:)
@@ -634,5 +634,5 @@ contains
 
     this%residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
 
-  end subroutine mma_KKT_cpu
+  end subroutine mma_KKT_vector
 end submodule mma_vector
