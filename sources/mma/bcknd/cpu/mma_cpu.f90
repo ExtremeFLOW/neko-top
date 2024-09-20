@@ -557,7 +557,11 @@ contains
 
     end do
 
+    ! Save the new design
+    this%xold2 = this%xold1
+    this%xold1 = designx
     designx = x
+
     !update the parameters of the MMA object nesessary to compute KKT residu
     this%y = y
     this%z = z
@@ -605,14 +609,6 @@ contains
     real(kind=rp), dimension(4*this%m+2) :: residu_small
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
-
-    if (.not.(this%is_initialized .and. this%is_updated)) then
-       write(stderr, *) &
-            'The MMA object is either not initialized or not updated.'
-       write(stderr, *) &
-            'call mmaobj%init and mmaobj%update and then mmaobj%KKT.'
-       error stop
-    end if
 
     rex(:) = df0dx + matmul(transpose(dfdx), this%lambda) - this%xsi(:) + &
          this%eta(:)
