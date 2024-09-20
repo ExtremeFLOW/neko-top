@@ -15,6 +15,7 @@ contains
     integer, intent(in) :: iter
     integer :: i, j, ierr
     type(vector_t) :: globaltmp_m
+
     call globaltmp_m%init(this%m)
 
     if (iter .lt. 3) then
@@ -57,9 +58,9 @@ contains
     end if
     ! we can move alpha and beta out of the following loop if needed as:
     ! this%alpha = max(this%xmin, this%low + &
-    !     0.1*(this%x- this%low), this%x - 0.5*(this%xmax - this%xmin))
+    !     0.1*(this%x- this%low), this- 0.5*(this%xmax - this%xmin))
     ! this%beta = min(this%xmax, this%upp -  &
-    !     0.1*(this%upp - this%x), this%x + 0.5*(this%xmax - this%xmin))
+    !     0.1*(this%upp - this), this+ 0.5*(this%xmax - this%xmin))
     ! Todo: Port to vectorized operations
     do j = 1, this%n
        ! set the the bounds and coefficients for the approximation
@@ -105,7 +106,7 @@ contains
 
     !computing bi as defined in page 5
     ! Todo: Port to vectorized operations
-    this%bi%x = 0_rp
+    this%bi = 0.0_rp
     do i = 1, this%m
        !MPI: here this%n is the global n
        do j = 1, this%n
@@ -120,7 +121,7 @@ contains
     !!!!Showing that for double precision, bi will be different when!!!!!!!!
     !!!!!!!!!!!computed in parallel compare to sequential!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! this%bi%x = 0_rp
+    ! this%bi= 0_rp
     ! longbi = 0.0
     ! do i = 1, this%m
     !     !MPI: here this%n is the global n
@@ -137,7 +138,7 @@ contains
     ! print *, "longbi =  ", longbi
     ! ierr = 2160
     ! longbi = 0.0
-    ! this%bi%x = 0_rp
+    ! this%bi= 0_rp
     ! do i = 1, this%m
     !     do j = 1, ierr
     !         this%bi(i) = this%bi(i) + &
@@ -152,8 +153,8 @@ contains
     ! print *, "longbi =  ", longbi, "first batch(1-ierr)"
     ! longbiglobal = longbi
     ! longbi = 0.0
-    ! globaltmp_m%x = this%bi
-    ! this%bi%x = 0_rp
+    ! globaltmp_m= this%bi
+    ! this%bi= 0_rp
     ! do i = 1, this%m
     !     do j = ierr+1, this%n
     !         this%bi(i) = this%bi(i) + &
@@ -172,10 +173,10 @@ contains
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 
-    globaltmp_m%x = 0.0_rp
-    call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, &
+    globaltmp_m = 0.0_rp
+    call MPI_Allreduce(this%bi, globaltmp_m, this%m, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%bi%x = globaltmp_m%x - fval%x
+    this%bi= globaltmp_m - fval
 
   end subroutine mma_gensub_vector
 
@@ -198,24 +199,24 @@ contains
          z, zeta, rez, rezeta, &
          delz, dz, dzeta, &
          steg, dummy_one, zold, zetaold, newresidu
-    real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
+    type(vector_t) :: y, lambda, s, mu, &
          rey, relambda, remu, res, &
          dely, dellambda, &
          dy, dlambda, ds, dmu, &
          yold, lambdaold, sold, muold, &
          globaltmp_m
-    real(kind=rp), dimension(this%n) :: x, xsi, eta, &
+    type(vector_t) :: x, xsi, eta, &
          rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, &
          xold, xsiold, etaold
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
-    real(kind=rp), dimension(2*this%n+4*this%m+2) :: xx, dxx
+    type(vector_t) :: residu
+    type(vector_t) :: residu_small
+    type(vector_t) :: xx, dxx
 
-    real(kind=rp), dimension(this%m, this%n) :: GG
-    real(kind=rp), dimension(this%m+1) :: bb
-    real(kind=rp), dimension(this%m+1, this%m+1) :: AA
-    real(kind=rp), dimension(this%m, this%m) :: globaltmp_mm
+    type(vector_t) :: bb
+    type(matrix_t) :: GG
+    type(matrix_t) :: AA
+    type(matrix_t) :: globaltmp_mm
 
     ! using DGESV( N, NRHS, A, LDA, IPIV, B, LDB, INFO ) in lapack to solve
     ! the linear system which needs the following parameters
@@ -226,29 +227,75 @@ contains
 
     integer :: nglobal
 
+    call y%init(this%m)
+    call lambda%init(this%m)
+    call s%init(this%m)
+    call mu%init(this%m)
+    call rey%init(this%m)
+    call relambda%init(this%m)
+    call remu%init(this%m)
+    call res%init(this%m)
+    call dely%init(this%m)
+    call dellambda%init(this%m)
+    call dy%init(this%m)
+    call dlambda%init(this%m)
+    call ds%init(this%m)
+    call dmu%init(this%m)
+    call yold%init(this%m)
+    call lambdaold%init(this%m)
+    call sold%init(this%m)
+    call muold%init(this%m)
+    call globaltmp_m%init(this%m)
+
+    call x%init(this%n)
+    call xsi%init(this%n)
+    call eta%init(this%n)
+    call rex%init(this%n)
+    call rexsi%init(this%n)
+    call reeta%init(this%n)
+    call delx%init(this%n)
+    call diagx%init(this%n)
+    call dx%init(this%n)
+    call dxsi%init(this%n)
+    call deta%init(this%n)
+    call xold%init(this%n)
+    call xsiold%init(this%n)
+    call etaold%init(this%n)
+
+    call residu%init(3*this%n+4*this%m+2)
+    call residu_small%init(4*this%m+2)
+    call xx%init(2*this%n+4*this%m+2)
+    call dxx%init(2*this%n+4*this%m+2)
+
+    call bb%init(this%m+1)
+
+    call GG%init(this%m, this%n)
+    call AA%init(this%m+1, this%m+1)
+    call globaltmp_mm%init(this%m, this%m)
+
     ! intial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
     dummy_one = 1
     epsi = 1 !100
-    x(:) = 0.5*(this%alpha%x(:)+this%beta%x(:))
-    y(:) = 1
-    z = 1
-    zeta = 1
-    lambda(:) = 1
-    s(:) = 1
-    xsi(:) = max(1.0, 1.0/(x(:) - this%alpha%x(:)))
-    eta(:) = max(1.0, 1.0/(this%beta%x(:) - x(:)))
-    mu(:) = max(1.0, 0.5*this%c%x(:))
+    x = 0.5_rp * (this%alpha + this%beta)
+    y = 1.0_rp
+    z = 1.0_rp
+    zeta = 1.0_rp
+    lambda = 1.0_rp
+    s = 1.0_rp
+    xsi = max(1.0_rp, 1.0_rp / (x - this%alpha))
+    eta = max(1.0_rp, 1.0_rp / (this%beta - x))
+    mu = max(1.0_rp, 0.5_rp * this%c)
 
     do while (epsi .gt. 0.9*this%epsimin)
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
-       rex(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-            lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-            (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-            lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-            xsi(:) + eta(:)
+       rex = ((this%p0j + matmul(transpose(this%pij), &
+            lambda))/(this%upp - x)**2 - &
+            (this%q0j + matmul(transpose(this%qij), &
+            lambda))/(x - this%low)**2 ) - &
+            xsi + eta
 
        call MPI_Allreduce(this%n, nglobal, 1, &
             MPI_INTEGER, mpi_sum, neko_comm, ierr)
@@ -267,12 +314,12 @@ contains
        ! end do
 
 
-       rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
-       rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
+       rey = this%c + this%d*y - lambda - mu
+       rez = this%a0 - zeta - dot_product(lambda, this%a)
 
-       ! relambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:))) + &
-       !         matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-       !         this%a%x(:)*z - y(:) + s(:) - this%bi(:)
+       ! relambda = matmul(this%pij,1.0/(this%upp - x)) + &
+       !         matmul(this%qij, 1.0/(x - this%low)) - &
+       !         this%a*z - y + s - this%bi
        relambda = 0.0_rp
        do i = 1, this%m
           do j = 1, this%n !this n is global
@@ -287,14 +334,14 @@ contains
        globaltmp_m = 0.0_rp
        call MPI_Allreduce(relambda, globaltmp_m, this%m, &
             mpi_real_precision, mpi_sum, neko_comm, ierr)
-       relambda = globaltmp_m - this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
+       relambda = globaltmp_m - this%a*z - y + s - this%bi
 
 
-       rexsi(:) = xsi(:)*(x(:) - this%alpha%x(:)) - epsi
-       reeta(:) = eta(:)*(this%beta%x(:) - x(:)) - epsi
-       remu(:) = mu(:)*y(:) - epsi
+       rexsi = xsi*(x - this%alpha) - epsi
+       reeta = eta*(this%beta - x) - epsi
+       remu = mu*y - epsi
        rezeta = zeta*z - epsi
-       res(:) = lambda(:)*s(:) - epsi
+       res = lambda*s - epsi
 
        residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
        residumax = 0_rp
@@ -320,7 +367,7 @@ contains
           !Check the condition
           if (residumax .lt. epsi) exit
 
-          delx = 0_rp
+          delx = 0.0_rp
           do j = 1, this%n
              do i = 1, this%m
                 delx(j) = delx(j) + this%pij%x(i,j) * &
@@ -332,10 +379,10 @@ contains
                   - epsi/(x(j) - this%alpha%x(j)) &
                   + epsi/(this%beta%x(j) - x(j))
           end do
-          dely = this%c%x + this%d%x*y - lambda - epsi/y
-          delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
+          dely = this%c+ this%d*y - lambda - epsi/y
+          delz = this%a0 - dot_product(lambda, this%a) - epsi/z
 
-          dellambda(:) = 0.0_rp
+          dellambda = 0.0_rp
           do i = 1, this%m
              do j = 1, this%n !this n is global
                 ! Accumulate sums for dellambda (the term gi(x))
@@ -349,38 +396,38 @@ contains
           call MPI_Allreduce(dellambda, globaltmp_m, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-          dellambda = globaltmp_m - this%a%x*z - y - this%bi%x + epsi/lambda
+          dellambda = globaltmp_m - this%a*z - y - this%bi + epsi / lambda
 
-          ! delx(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-          !     lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-          !     (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-          !     lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-          !     epsi/(x(:) - this%alpha%x(:)) + epsi/(this%beta%x(:) - x(:))
+          ! delx = ((this%p0j + matmul(transpose(this%pij), &
+          !     lambda))/(this%upp - x)**2 - &
+          !     (this%q0j + matmul(transpose(this%qij), &
+          !     lambda))/(x - this%low)**2 ) - &
+          !     epsi/(x - this%alpha) + epsi/(this%beta - x)
 
-          ! dely(:) =  this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - epsi/y(:)
-          ! delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
-          ! dellambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:)))+&
-          !     matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-          !     this%a%x(:)*z - y(:) - this%bi(:) + epsi/lambda(:)
+          ! dely =  this%c + this%d*y - lambda - epsi/y
+          ! delz = this%a0 - dot_product(lambda, this%a) - epsi/z
+          ! dellambda = matmul(this%pij,1.0/(this%upp - x))+&
+          !     matmul(this%qij, 1.0/(x - this%low)) - &
+          !     this%a*z - y - this%bi + epsi/lambda
 
           do ggdumiter = 1, this%m
              GG(ggdumiter, :) = this%pij%x(ggdumiter,:)/ &
-                  (this%upp%x(:) - x(:))**2 - &
-                  this%qij%x(ggdumiter,:)/(x(:) - this%low%x(:))**2
+                  (this%upp - x)**2 - &
+                  this%qij%x(ggdumiter,:)/(x - this%low)**2
           end do
 
-          diagx(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-               lambda(:)))/(this%upp%x(:) - x(:))**3 + &
-               (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-               lambda(:)))/(x(:) - this%low%x(:))**3 )
-          diagx(:) = 2*diagx(:) + xsi(:)/(x(:) - this%alpha%x(:)) + &
-               eta(:)/(this%beta%x(:)- x(:))
+          diagx = ((this%p0j + matmul(transpose(this%pij), &
+               lambda))/(this%upp - x)**3 + &
+               (this%q0j + matmul(transpose(this%qij), &
+               lambda))/(x - this%low)**3 )
+          diagx = 2*diagx + xsi/(x - this%alpha) + &
+               eta/(this%beta- x)
 
 
           !Here we only consider the case m<n in the matlab code
           !assembling the right hand side matrix based on eq(5.20)
-          ! bb = [dellambda + dely(:)/(this%d%x(:) + &
-          !         (mu(:)/y(:))) - matmul(GG,delx/diagx), delz ]
+          ! bb = [dellambda + dely/(this%d + &
+          !         (mu/y)) - matmul(GG,delx/diagx), delz ]
           !!!!!!!!!!!!!!for MPI computation of bb!!!!!!!!!!!!!!!!!!!!!!!!!
           bb = 0.0_rp
           do i = 1, this%m
@@ -393,7 +440,7 @@ contains
                mpi_real_precision, mpi_sum, neko_comm, ierr)
           bb(1:this%m) = globaltmp_m
 
-          bb(1:this%m) = dellambda + dely/(this%d%x + (mu/y)) - bb(1:this%m)
+          bb(1:this%m) = dellambda + dely/(this%d+ (mu/y)) - bb(1:this%m)
           bb(this%m +1) = delz
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           ! !assembling the coefficients matrix AA based on eq(5.20)
@@ -401,7 +448,7 @@ contains
           ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
           ! !update diag(AA)
           ! AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
-          !     mma_diag(s(:)/lambda(:) + 1.0/(this%d%x(:) + (mu(:)/y(:))))
+          !     mma_diag(s/lambda + 1.0/(this%d + (mu/y)))
 
           AA = 0.0_rp
           !Direct computation of the matrix multiplication
@@ -426,8 +473,8 @@ contains
                   1.0_rp / (this%d%x(i) + mu(i) / y(i)))
           end do
 
-          AA(1:this%m, this%m+1) = this%a%x(:)
-          AA(this%m+1, 1:this%m) = this%a%x(:)
+          AA(1:this%m, this%m+1) = this%a
+          AA(this%m+1, 1:this%m) = this%a
           AA(this%m+1, this%m+1) = -zeta/z
 
 
@@ -444,20 +491,20 @@ contains
           dlambda = bb(1:this%m)
           dz = bb(this%m + 1)
           ! based on eq(5.19)
-          dx = -delx/diagx - matmul(transpose(GG), dlambda)/diagx
+          dx = -delx / diagx - matmul(transpose(GG), dlambda)/diagx
 
-          dy = (-dely+dlambda)/(this%d%x(:) + (mu(:)/y(:)))
-          dxsi = -xsi + (epsi-dx*xsi(:))/(x(:) - this%alpha%x(:))
-          deta = -eta + (epsi+dx*eta(:))/(this%beta%x(:) - x(:))
-          dmu = -mu + (epsi-mu*dy(:))/y(:)
+          dy = (-dely + dlambda) / (this%d + (mu / y))
+          dxsi = -xsi + (epsi - dx*xsi) / (x - this%alpha)
+          deta = -eta + (epsi + dx*eta) / (this%beta - x)
+          dmu = -mu + (epsi - mu*dy) / y
           dzeta = -zeta + (epsi-zeta*dz)/z
-          ds = -s + (epsi-dlambda*s(:))/lambda(:)
+          ds = -s + (epsi - dlambda*s) / lambda
 
           !2*this%n+4*this%m+2
           dxx = [dy, dz, dlambda, dxsi, deta, dmu, dzeta, ds]
           xx = [y, z, lambda, xsi, eta, mu, zeta, s]
           steg = maxval([dummy_one, -1.01*dxx/xx, -1.01*dx/ &
-               (x(:) - this%alpha%x(:)), 1.01*dx/(this%beta%x(:) - x(:))])
+               (x - this%alpha), 1.01 * dx / (this%beta - x)])
           steg = 1.0/steg
 
           call MPI_Allreduce(steg, steg, 1, &
@@ -491,17 +538,17 @@ contains
              s = sold + steg*ds
              !recompute the newresidu to see if this stepsize improves
              !the residue
-             rex(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-                  lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-                  (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-                  lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-                  xsi(:) + eta(:)
-             rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
-             rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
-             ! relambda(:) = matmul(this%pij%x(:,:),1.0/&
-             !         (this%upp%x(:) - x(:))) + matmul(this%qij%x(:,:), &
-             !         1.0/(x(:) - this%low%x(:))) - this%a%x(:)*z - &
-             !         y(:) + s(:) - this%bi(:)
+             rex = ((this%p0j + matmul(transpose(this%pij), &
+                  lambda))/(this%upp - x)**2 - &
+                  (this%q0j + matmul(transpose(this%qij), &
+                  lambda))/(x - this%low)**2 ) - &
+                  xsi + eta
+             rey = this%c + this%d*y - lambda - mu
+             rez = this%a0 - zeta - dot_product(lambda, this%a)
+             ! relambda = matmul(this%pij,1.0/&
+             !         (this%upp - x)) + matmul(this%qij, &
+             !         1.0/(x - this%low)) - this%a*z - &
+             !         y + s - this%bi
              relambda = 0.0_rp
              do i = 1, this%m
                 do j = 1, this%n !this n is global
@@ -517,13 +564,13 @@ contains
              relambda = globaltmp_m
 
 
-             relambda = relambda - this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
+             relambda = relambda - this%a*z - y + s - this%bi
 
-             rexsi(:) = xsi(:)*(x(:) - this%alpha%x(:)) - epsi
-             reeta(:) = eta(:)*(this%beta%x(:) - x(:)) - epsi
-             remu(:) = mu(:)*y(:) - epsi
+             rexsi = xsi*(x - this%alpha) - epsi
+             reeta = eta*(this%beta - x) - epsi
+             remu = mu*y - epsi
              rezeta = zeta*z - epsi
-             res(:) = lambda(:)*s(:) - epsi
+             res = lambda*s - epsi
 
              residu = [rex, rey, rez, relambda, &
                   rexsi, reeta, remu, rezeta, res]
@@ -560,17 +607,17 @@ contains
     ! Save the new design
     this%xold2 = this%xold1
     this%xold1 = designx
-    designx%x = x
+    designx= x
 
     !update the parameters of the MMA object nesessary to compute KKT residu
-    this%y%x = y
+    this%y= y
     this%z = z
-    this%lambda%x = lambda
+    this%lambda= lambda
     this%zeta = zeta
-    this%xsi%x = xsi
-    this%eta%x = eta
-    this%mu%x = mu
-    this%s%x = s
+    this%xsi= xsi
+    this%eta= eta
+    this%mu= mu
+    this%s= s
 
   end subroutine mma_subsolve_dpip_vector
 
@@ -602,25 +649,38 @@ contains
 
 
     real(kind=rp) :: rez, rezeta
-    real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
-    real(kind=rp), dimension(this%n) :: rex, rexsi, reeta
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
+    type(vector_t) :: rey, relambda, remu, res
+    type(vector_t) :: rex, rexsi, reeta
+    type(vector_t) :: residu
 
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
+    type(vector_t) :: residu_small
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
 
-    rex(:) = df0dx%x + matmul(transpose(dfdx%x), this%lambda%x) - this%xsi%x(:) + &
-         this%eta%x(:)
-    rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - this%mu%x(:)
-    rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
+    call rey%init(this%m)
+    call relambda%init(this%m)
+    call remu%init(this%m)
+    call res%init(this%m)
 
-    relambda(:) = fval%x - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
-    rexsi(:) = this%xsi%x(:)*(x%x(:) - this%xmin%x(:))
-    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x%x(:))
-    remu(:) = this%mu%x(:)*this%y%x(:)
+    call rex%init(this%n)
+    call rexsi%init(this%n)
+    call reeta%init(this%n)
+
+    call residu%init(3*this%n+4*this%m+2)
+    call residu_small%init(4*this%m+2)
+
+
+    rex = df0dx+ matmul(transpose(dfdx), this%lambda) - this%xsi + &
+         this%eta
+    rey = this%c + this%d*this%y - this%lambda - this%mu
+    rez = this%a0 - this%zeta - dot_product(this%lambda, this%a)
+
+    relambda = fval- this%a*this%z - this%y + this%s
+    rexsi = this%xsi*(x - this%xmin)
+    reeta = this%eta*(this%xmax - x)
+    remu = this%mu*this%y
     rezeta = this%zeta*this%z
-    res(:) = this%lambda%x(:)*this%s%x(:)
+    res = this%lambda*this%s
 
     residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
 
