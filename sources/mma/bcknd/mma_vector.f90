@@ -79,27 +79,27 @@ contains
        !Calculate p0j, q0j, pij, qij
        !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
        this%p0j%x(j) = (this%upp%x(j) - x%x(j))**2 * &
-            (1.001*max(df0dx%x(j),0.0) + &
-            0.001*max(-df0dx%x(j),0.0) + &
-            (0.00001/(max(0.00001, &
+            (1.001_rp*max(df0dx%x(j), 0.0_rp) + &
+            0.001_rp*max(-df0dx%x(j), 0.0_rp) + &
+            (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        this%q0j%x(j) = (x%x(j) - this%low%x(j))**2 * &
-            (0.001*max(df0dx%x(j),0.0) + &
-            1.001*max(-df0dx%x(j),0.0) + &
-            (0.00001/(max(0.00001, &
+            (0.001_rp*max(df0dx%x(j),0.0_rp) + &
+            1.001_rp*max(-df0dx%x(j),0.0_rp) + &
+            (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        do i = 1, this%m
           this%pij%x(i,j) = (this%upp%x(j) - x%x(j))**2 * &
-               (1.001*max(dfdx%x(i,j),0.0) + &
-               0.001*max(-dfdx%x(i,j),0.0) + &
-               (0.00001/(max(0.00001, &
+               (1.001_rp*max(dfdx%x(i, j), 0.0_rp) + &
+               0.001_rp*max(-dfdx%x(i, j), 0.0_rp) + &
+               (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
           this%qij%x(i,j) = (x%x(j) - this%low%x(j))**2 * &
-               (0.001*max(dfdx%x(i, j), 0.0) + &
-               1.001*max(-dfdx%x(i, j), 0.0) + &
-               (0.00001/(max(0.00001, &
+               (0.001_rp*max(dfdx%x(i, j), 0.0_rp) + &
+               1.001_rp*max(-dfdx%x(i, j), 0.0_rp) + &
+               (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
        end do
     end do
