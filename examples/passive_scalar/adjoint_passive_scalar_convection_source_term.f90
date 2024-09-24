@@ -50,6 +50,10 @@ module adjoint_passive_scalar_source_term
   ! TIM,
   ! I saw you made an "adjoint source term" perhaps this should be derived 
   ! from that...
+  ! in any case, I don't know how to name this term, but when you have a passive
+  ! scalar you get an extra term in the adjoint velocity equation, which comes
+  ! from the convective term in the passive scalar equation.
+  ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: adjoint_passive_scalar_source_term_t
    contains
      !> The common constructor using a JSON object.

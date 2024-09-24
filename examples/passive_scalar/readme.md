@@ -28,4 +28,6 @@ TODO:
 
 	- The JSON stuff isn't finished
 	- The adjoint BCs aren't finished
+	- We need to look into non-dimensionalization etc more carefully, to make sure everything is consistent with the standard passive scalar. 
+	  (I think it is... but I would like to double check)
 
