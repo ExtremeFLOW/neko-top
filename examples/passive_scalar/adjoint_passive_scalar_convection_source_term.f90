@@ -37,6 +37,7 @@ module adjoint_passive_scalar_source_term
   use field_list, only : field_list_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
+  use scratch_registry, only: neko_scratch_registry
   use json_module, only : json_file
   use json_utils, only: json_get, json_get_or_default
   use source_term, only : source_term_t
@@ -52,7 +53,7 @@ module adjoint_passive_scalar_source_term
   type, public, extends(source_term_t) :: adjoint_passive_scalar_source_term_t
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => adjoint_passive_scalar_source_term_init
+     procedure, pass(this) :: init => adjoint_passive_scalar_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_compenents => &
        adjoint_passive_scalar_source_term_init_from_components
@@ -138,6 +139,9 @@ contains
 	 call field_addcol3(fu,s,dsdx)
 	 call field_addcol3(fv,s,dsdy)
 	 call field_addcol3(fw,s,dsdz)
+
+	 ! free the scratch
+	 call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine adjoint_passive_scalar_source_term_compute
 
 end module adjoint_passive_scalar_source_term
