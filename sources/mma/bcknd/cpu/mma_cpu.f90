@@ -1,4 +1,8 @@
 submodule (mma) mma_cpu
+  use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
+       MPI_Allreduce
+  use utils, only: neko_error
+  use comm, only: neko_comm, mpi_real_precision
 
 contains
   module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
