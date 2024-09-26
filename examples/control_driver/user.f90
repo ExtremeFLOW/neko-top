@@ -21,7 +21,7 @@ contains
   subroutine user_setup(user)
     type(user_t), intent(inout) :: user
     user%init_user_simcomp => user_simcomp
-    user%fluid_user_f_vector => adjoint_forcing
+    !user%fluid_user_f_vector => adjoint_forcing
   end subroutine user_setup
 
   subroutine user_simcomp(params)

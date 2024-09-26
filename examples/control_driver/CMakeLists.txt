@@ -5,6 +5,9 @@ set(EXTRA_SOURCES
     user.f90
     # topopt.f90
     simulation_adjoint.f90
+    simple_brinkman_source_term.f90
+    new_design.f90
+    adjoint_minimum_dissipation_source_term.f90
 )
 
 build_example(${DRIVER_TYPE})
