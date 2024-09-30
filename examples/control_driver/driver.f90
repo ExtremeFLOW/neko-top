@@ -12,6 +12,8 @@ program usrneko
   use new_design, only: new_design_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use adjoint_minimum_dissipation_source_term, only: adjoint_minimum_dissipation_source_term_t
+  use objective_function, only: objective_function_t
+  use minimum_dissipation_objective_function, only: minimum_dissipation_objective_function_t
 
 
   ! use topopt, only: topopt_init, topopt_finalize, topopt_t
@@ -35,17 +37,20 @@ program usrneko
   ! use derived type after!
   type(simple_brinkman_source_term_t) :: forward_brinkman
   type(simple_brinkman_source_term_t) :: adjoint_brinkman
-  ! in the future this source term will be owned by the objective function
-  type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
+
+
   ! 
   ! And an objective type will also be necessary that contains
-  ! type(objective_function_t) :: objective_function
+  ! TODO
+  ! in the future we need a factory or so that generates these.
+  ! for now, I'm picking a specific one
+  type(minimum_dissipation_objective_function_t) :: objective_function
 
   ! - how the objective function is computed
   ! - the adjoint forcing
   ! - possibly also boundary condition modifications
+  ! - a way to compute sensistivity to coeficcients, ie dF/d\chi in our case
   !
-  ! The overarching "problem" will also need a way to compute the sensitivity, so I guess this would be a proceedure 
   ! (again I will hard code it)
   ! it would require 
   ! - the design (to compute chain rules for filter's etc)
@@ -68,7 +73,23 @@ program usrneko
 
   ! init the objective function 
   ! - somehow append a user_check 
-  ! - init and adjoint source term
+  ! TODO:
+  ! Tim, I loved what you did with with the source term handler. I'm hoping when you get a chance you can do something
+  ! similar with simulation components?
+  ! as in, this kind of post processing isn't just one function, but a list of post processing modules that can be appended
+  ! to a simulation (and then of course, we could append others to our adjoint!)
+  !
+  ! The thing is, because right now we're doing steady calculations, so the computations of:
+  ! - The objective function:	performed at the end of the steady run
+  ! - The sensitivity:			performed at the end of the adjoint run
+  !
+  ! but when we move to unsteady calculations we'll have: 
+  ! - The objective function:	accumulated DURING the forward run
+  ! - The sensitivity:			accumulated DURING the adjoint run
+  !
+  ! So they'll have to be simcomps that get appended to C and adj.
+  ! I trust you can whip that up lickity split!
+
 
 
 
@@ -96,24 +117,43 @@ program usrneko
   ! append brinkman source term based on design
   call adj%scheme%source_term%add(adjoint_brinkman)
 
-  ! append a source term based on objective function
-  ! init the simple brinkman term for the adjoint
-  	call adjoint_forcing%init_from_components(adj%scheme%f_adj_x, adj%scheme%f_adj_y, adj%scheme%f_adj_z, &
-  																C%fluid%u, C%fluid%v, C%fluid%w, &
-  																adj%scheme%c_Xh)
-  ! append brinkman source term based on design
-  call adj%scheme%source_term%add(adjoint_forcing)
+  !! append a source term based on objective function
+  call objective_function%init(C%fluid,adj%scheme)
+
+  !! init the simple brinkman term for the adjoint
+  !	call adjoint_forcing%init_from_components(adj%scheme%f_adj_x, adj%scheme%f_adj_y, adj%scheme%f_adj_z, &
+  !																C%fluid%u, C%fluid%v, C%fluid%w, &
+  !																adj%scheme%c_Xh)
+  !! append brinkman source term based on design
+  !call adj%scheme%source_term%add(adjoint_forcing)
 
 !--------------------------------------------------------------------------------------------------------------------
 
 
   call neko_solve(C)
+  ! TODO
+  ! In the future, the objective_function_t will potentially include simulation components so that we can 
+  ! accumulate the objective function during the run...
+  ! here, we just compute it on the last step
+  call objective_function%compute(C%fluid)
+  print *, 'OBJECTIVE FUNCTION',  objective_function%objective_function_value
+
 
   ! TODO
   ! the steady simcomp only works for the forward, we either hardcode another one, or we have a forward adjoint flag
   ! or probably the smartest thing to do would be to accept a list of fields in the registry that will be checked...
   ! anyhow, I don't like the termination condition based on simulation time anyway...
   call solve_adjoint(adj)
+
+  ! again, in the future, the objective_function_t will potentially include simulation components so that we can 
+  ! accumulate the sensitivity during the run...
+  ! here, we just compute it on the last step
+  call objective_function%compute_sensitivity(C%fluid, adj%scheme)
+  ! it would be nice to visualize this
+
+  ! do the adjoint mapping
+  call design%map_backward(objective_function%sensitivity_to_coefficient)
+
 
 
   call adjoint_free(adj)

@@ -8,6 +8,8 @@ set(EXTRA_SOURCES
     simple_brinkman_source_term.f90
     new_design.f90
     adjoint_minimum_dissipation_source_term.f90
+    objective_function.f90
+    minimum_dissipation_objective_function.f90
 )
 
 build_example(${DRIVER_TYPE})

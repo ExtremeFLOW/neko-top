@@ -103,12 +103,71 @@ module new_design
   type :: new_design_t
    !> the unfilitered design
   	type(field_t), public :: design_indicator
-   !> the mapped coefficient (Brinkman term)
-   ! NOTE Tim, you're going to have to jump in here later... because right now we only have the brinkman term
-   ! in the future we may map to other coeeficients for other equations... in which case this should be 
-   ! a field list somehow
-  	type(field_t), public :: brinkman_amplitude
 
+   !> the mapped coefficient (Brinkman term)
+   ! TODO
+   ! NOTE: Tim, right now we only have the brinkman term
+   ! in the future we may map to other coeeficients for other equations... in which case this should be 
+   ! a field list 
+   ! 
+   ! or as I describe below, we also have multiple constraints,
+   ! so a list-of-lists may be the correct way forward
+  	type(field_t), public :: brinkman_amplitude
+	
+	! NOTE:
+	! again, we have to be so clear with nomenclature.
+	! If we have an objective function F.
+	! I also like to use \rho to describe the design_indicator
+	!
+	! and let's say, for completness, we're doing conjugate heat transfer, so we have to map
+	! to 3 coefficients, \chi, C and \kappa.
+	!
+	! then we will perform 3 mapping,
+	! \rho -> \chi
+	! \rho -> C
+	! \rho -> \kappa
+	!
+	! Then during the forward/adjoint looping there will be an additional object, the "objective_function" object
+	! that will be responsible for computing the sensitivity of the objective function with respect to the coefficients
+	! ie,
+	! dF/d\chi, dF/dC and dF/d\kappa
+	!
+	! What I'm calling "sensitivity" here, is the sensitivity with respect to the design indicator
+	! so dF/d\rho
+	! 
+	! so the proceedure "map_backwards" will take in the field list dF/d\chi, dF/dC and dF/d\kappa and chain rule it's way back to
+	! dF/d\rho
+	! and store it here          v 
+  	type(field_t), public :: sensitivity
+  	! HOWEVER !
+  	! What is a bit confusing to me... is how we'll deal with constraints.
+  	!
+  	! Because in principle we could have constraints C1, C2, C3 etc
+  	! Implying we also want dC1/d\rho, dC2/d\rho etc
+  	! So this "sensitivity" should also be a list...
+  	!
+  	! So I bet you'll have a nice abstract way of constructing this in the future, but I think a sort of list-of-lists would be nice.
+  	!
+  	! For F:
+  	! \rho -> \tild{\rho} -> \chi
+  	! \rho -> \tild{\rho} -> C
+  	! \rho -> \tild{\rho} -> \kappa
+  	!
+  	! For C1:
+  	! \rho -> \tild{\rho}  (eg for a volume constraint or so)
+  	!
+  	! For C2:
+  	! \rho -> \tild{\rho}  (for something else)
+  	!
+  	! etc..
+  	!
+  	! So now we have multiple instances of the "objective" type, each for F, C1, C2 etc
+  	! each of them can pass their dF\d_coefficents to the design and we continue from there.
+  	!
+  	! perhaps even the "objective" type is defined as a list of objectives. 
+
+
+  	!
 	! TODO
   	! you also had lots of masks etc that was a nice idea, but we'll cross that bridge later
 
@@ -149,6 +208,7 @@ contains
 	! init the fields
 	call this%design_indicator%init(dm_Xh, "design_indicator")
    call this%brinkman_amplitude%init(dm_Xh, "brinkman_amplitude")
+   call this%sensitivity%init(dm_Xh, "sensitivity")
 
    ! TODO
    ! this is where we steal basically everything in brinkman_source_term regarding loading initial fields
@@ -188,12 +248,25 @@ contains
 
 	endsubroutine new_design_map_forward
 
-	subroutine new_design_map_backward(this)
+	subroutine new_design_map_backward(this, df_dchi)
 	class(new_design_t), target, intent(inout) :: this
+  	type(field_t), intent(in) :: df_dchi
+  	real(kind=rp) :: k_0, k_1, q
+  	integer :: n, i 
 	! TODO
 	! again..
 	! so this would be:
 	! call mapper%backward(fld_out, fld_in)
+	!
+	! again I'm hardcoding this
+  	q = 1.0_rp
+  	k_0 = 0.0_rp
+  	k_1 = 10.0_rp
+  	n = this%design_indicator%dof%size()
+  	do i = 1, n
+  	  this%sensitivity%x(i,1,1,1) = q*(q+1)*(k_0 - k_1)/(q + df_dchi%x(i,1,1,1))
+  	enddo
+
 
 	endsubroutine new_design_map_backward
 

@@ -97,10 +97,12 @@ module objective_function
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   use dofmap, only : dofmap_t
   use filters, only: permeability_field
+  use source_term, only: source_term_t
+  use adjoint_scheme, only: adjoint_scheme_t
   implicit none
   private
 
-  type :: objective_function_t
+  type, abstract, public :: objective_function_t
    ! > objective function value
    real(kind=rp), public :: objective_function_value
    ! it may also be nice to have a list of the objective function value to append to instead?
@@ -113,11 +115,38 @@ module objective_function
    ! we could either use point zone or define an array of logicals the same size as the field
    ! I think the second option is better
    ! for now we'll use the whole field
-  	type(field_t), public :: objective_location
-  	!> the forcing term entering the adjoint equation
-  	class(source_term_t), public :: adjoint_forcing
+  	! type(field_t), public :: objective_location
 
-	contains:
+  	!> the forcing term entering the adjoint equation
+  	class(source_term_t), public, allocatable :: adjoint_forcing
+  	! TODO
+  	! This is a bit strange,
+  	! In my mind, an objective and a constraint are derrived from the same type
+  	! and we would have separate instances depending on the problem
+  	!
+  	! not all would need an adjoint forcing... eg a volume constraint.
+  	! So this might be excessive..
+  	!
+  	! TIM, if you can do this more neatly that would be great...
+  	! So we have an objective_function class
+  	! and then two derrived types,
+  	! (1) things that involve fluid/passive scalars, ie typical objective function
+  	! (2) things that only require the design, eg, volume constraints
+  	!
+  	! I'm also not so sure about the future, if it is necassarily a single "adjoint_forcing".
+  	! It could maybe be forcing terms in both the velocity and passive scalar equations. Not sure yet.
+  	! In princpal... it could also be strange BC's.
+  	!
+  	! but I guess this all depends on the type of objective function, so it makes sense to derive more
+  	! types.
+
+
+  	! this is a field that holds the sensitivity to the coefficient.
+  	! (again, we only have one for the Brinkman term, but in principle this should be a field list
+  	! so this would hold dF/d\chi
+  	type(field_t), public :: sensitivity_to_coefficient
+
+	contains
 	!> init (will make this legit at some point)
 	procedure, pass(this) :: init_base => objective_function_init_base
 	procedure, pass(this) :: free_base => objective_function_free_base
@@ -128,6 +157,8 @@ module objective_function
 	! this will REALLY need to be modified in the future...
 	! in a steady case, we just need to compute it on the last step
 	! in an unsteady case this will be a time integral
+	! so for now it's a proceedure.
+	! But it the future it may be a simulation component that will be appended to the fluid.
 	!
 	! TODO
 	! this will need to be deffered in some way 
@@ -135,82 +166,71 @@ module objective_function
 	! based on the objective we have, we  
 	procedure(objective_function_compute), pass(this), deferred :: compute  
 	! TODO
-	! maybe it would have been smarter to have a "coeficient" type, which is just a scalar field
-	! and set of mappings going from design_indicator -> coeficient and their corresponding chain rules
-	! maybe also some information about what equation they live in...
+	procedure(sensitivity_compute), pass(this), deferred :: compute_sensitivity 
+	! TODO
 
+	procedure(objective_function_init), pass(this), deferred :: init  
 	!> Destructor 
 	procedure(objective_function_free), pass(this), deferred :: free 
 	! TODO
 	end type objective_function_t
 
 	abstract interface
-		subroutine objective_function_compute 
+	subroutine objective_function_init(this, fluid, adjoint)
+	import objective_function_t, fluid_scheme_t, adjoint_scheme_t
+	class(objective_function_t), intent(inout) :: this
+	! these ones are inout because we may need to append source terms etc
+	class(fluid_scheme_t), intent(inout) :: fluid
+	class(adjoint_scheme_t), intent(inout) :: adjoint
+	end subroutine objective_function_init
+	end interface
 
-	public :: objective_function_t
+	abstract interface
+	subroutine objective_function_compute(this, fluid)
+	import objective_function_t, fluid_scheme_t
+	class(objective_function_t), intent(inout) :: this
+	class(fluid_scheme_t), intent(in) :: fluid
+	end subroutine objective_function_compute
+	end interface
 
-contains
+	abstract interface
+	subroutine sensitivity_compute(this, fluid, adjoint)
+	import objective_function_t, fluid_scheme_t, adjoint_scheme_t
+	class(objective_function_t), intent(inout) :: this
+	class(fluid_scheme_t), intent(in) :: fluid
+	class(adjoint_scheme_t), intent(in) :: adjoint
+	end subroutine sensitivity_compute
+	end interface
 
-	subroutine objective_function_init(this, dm_Xh)
+	abstract interface
+	subroutine objective_function_free(this)
+	import objective_function_t
+	class(objective_function_t), intent(inout) :: this
+	end subroutine objective_function_free
+	end interface
+
+	contains
+
+
+	subroutine objective_function_init_base(this, dm_Xh)
 	class(objective_function_t), target, intent(inout) :: this
 	type(dofmap_t) :: dm_Xh    !< Dofmap associated with \f$ X_h \f$
-	integer :: n, i
-	! init the fields
-	call this%design_indicator%init(dm_Xh, "design_indicator")
-   call this%brinkman_amplitude%init(dm_Xh, "brinkman_amplitude")
+	! not sure what we need here yet
 
-   ! TODO
-   ! this is where we steal basically everything in brinkman_source_term regarding loading initial fields
-   ! for now, make it a cylinder by hand
-   this%design_indicator = 0.0_rp
-   this%brinkman_amplitude = 0.0_rp
-
-   n = this%design_indicator%dof%size()
-   do i = 1, n
-     if(((this%design_indicator%dof%x(i,1,1,1) - 1.0_rp)**2 + (this%design_indicator%dof%y(i,1,1,1) - 0.5_rp)**2).lt.0.1_rp) then
-     	 this%design_indicator%x(i,1,1,1) = 1.0_rp
-     endif
-   enddo
-
+	! initialize sensitivity field
 	! TODO
-	! we would also need to make a mapping type that reads in parameters etc about filtering and mapping
-	! ie, 
-	! call mapper%init(this woud be from JSON)
-
-	! and then we would map for the first one
-	call this%map_forward()
+	! Think about field lists in the future!
+	call this%sensitivity_to_coefficient%init(dm_Xh, "design_indicator")
 
 
-	endsubroutine objective_function_init
+	endsubroutine objective_function_init_base
 	
 
-	subroutine objective_function_map_forward(this)
+
+	subroutine objective_function_free_base(this)
 	class(objective_function_t), target, intent(inout) :: this
+	! not sure what we need here yet
 
-	! TODO
-	! this should be somehow deffered so we can pick different mappings!!!
-	! so this would be:
-	! call mapper%forward(fld_out, fld_in)
-	call permeability_field(this%brinkman_amplitude, this%design_indicator, &
-         & 0.0_rp, 10.0_rp, 1.0_rp)
-
-
-	endsubroutine objective_function_map_forward
-
-	subroutine objective_function_map_backward(this)
-	class(objective_function_t), target, intent(inout) :: this
-	! TODO
-	! again..
-	! so this would be:
-	! call mapper%backward(fld_out, fld_in)
-
-	endsubroutine objective_function_map_backward
-
-	subroutine objective_function_free(this)
-	class(objective_function_t), target, intent(inout) :: this
-	call this%brinkman_amplitude%free()
-	call this%design_indicator%free()
-
-	endsubroutine objective_function_free
+	endsubroutine objective_function_free_base
 end module objective_function
 
