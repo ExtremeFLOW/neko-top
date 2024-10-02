@@ -44,8 +44,7 @@ module mma
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
-  use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
-       mpi_integer
+
   implicit none
   private
 
@@ -77,12 +76,16 @@ module mma
      procedure, public, pass(this) :: init_json => mma_init_json
 
      procedure, public, pass(this) :: free => mma_free
-     procedure, public, pass(this) :: KKT => mma_KKT
 
      !> Interface for updating the MMA
      generic, public :: update => mma_update_cpu, mma_update_vector
      procedure, pass(this) :: mma_update_cpu
      procedure, pass(this) :: mma_update_vector
+
+     !> Interface for computing the KKT condition
+     generic, public :: KKT => mma_KKT_array, mma_KKT_vector
+     procedure, pass(this) :: mma_KKT_array
+     procedure, pass(this) :: mma_KKT_vector
 
      ! Getters for the MMA object
      procedure, public, pass(this) :: get_n => mma_get_n
@@ -121,13 +124,43 @@ module mma
      end subroutine mma_subsolve_dpip_cpu
 
      !> Compute the KKT condition for a given design x on the CPU.
-     module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+     module subroutine mma_KKT_compute_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
        real(kind=rp), dimension(this%m), intent(in) :: fval
        real(kind=rp), dimension(this%n), intent(in) :: df0dx
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-     end subroutine mma_KKT_cpu
+     end subroutine mma_KKT_compute_cpu
+  end interface
+
+  ! ========================================================================== !
+  ! Interface for the Vector backend
+
+  interface
+     !> Generate the approximation sub problem on the Vector backend.
+     module subroutine mma_gensub_vector(this, iter, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx
+       type(vector_t), intent(in) :: fval
+       type(matrix_t), intent(in) :: dfdx
+       integer, intent(in) :: iter
+     end subroutine mma_gensub_vector
+
+     !> Solve the dual with an interior point method on the Vector backend.
+     module subroutine mma_subsolve_dpip_vector(this, designx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(inout) :: designx
+     end subroutine mma_subsolve_dpip_vector
+
+     !> Compute the KKT condition for a given design x on the Vector backend.
+     module subroutine mma_KKT_compute_vector(this, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: fval
+       type(vector_t), intent(in) :: df0dx
+       type(matrix_t), intent(in) :: dfdx
+     end subroutine mma_KKT_compute_vector
   end interface
 
 contains
@@ -355,7 +388,7 @@ contains
 
   end subroutine mma_update_vector
 
-  subroutine mma_KKT(this, x, df0dx, fval, dfdx)
+  subroutine mma_KKT_array(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! design x and set the max and norm values of the       !
@@ -387,13 +420,53 @@ contains
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 0) then
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       call mma_KKT_compute_cpu(this, x, df0dx, fval, dfdx)
     else
        write(stderr, *) "Device not supported for MMA."
        error stop
     end if
 
-  end subroutine mma_KKT
+  end subroutine mma_KKT_array
+
+  subroutine mma_KKT_vector(this, x, df0dx, fval, dfdx)
+    ! ----------------------------------------------------- !
+    ! Compute the KKT condition right hand side for a given !
+    ! design x and set the max and norm values of the       !
+    ! residue of KKT system to this%residumax and           !
+    ! this%residunorm.                                      !
+    !                                                       !
+    ! The left hand sides of the KKT conditions are computed!
+    ! for the following nonlinear programming problem:      !
+    ! Minimize  f_0(x) + a_0*z +                            !
+    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
+    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
+    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
+    !                                                       !
+    !                                                       !
+    ! Note that before calling this function, the function  !
+    ! values (f0val, fval, dfdx, ...) should be updated     !
+    ! using the new x values.                               !
+    ! ----------------------------------------------------- !
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(in) :: x
+    type(vector_t), intent(in) :: fval
+    type(vector_t), intent(in) :: df0dx
+    type(matrix_t), intent(in) :: dfdx
+
+    if (.not. this%is_initialized) then
+       write(stderr, *) "The MMA object is not initialized."
+       error stop
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 0) then
+       call mma_KKT_compute_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
+    else
+       write(stderr, *) "Device not supported for MMA."
+       error stop
+    end if
+
+  end subroutine mma_KKT_vector
 
   !> Deallocate the MMA object.
   subroutine mma_free(this)

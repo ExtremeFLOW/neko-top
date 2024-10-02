@@ -675,7 +675,7 @@ contains
 
   end subroutine mma_subsolve_dpip_vector
 
-  subroutine mma_KKT_vector(this, x, df0dx, fval, dfdx)
+  subroutine mma_KKT_compute_vector(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! design x and set the max and norm values of the       !
@@ -781,5 +781,5 @@ contains
             re_xstuff_squ_global)
     end if
 
-  end subroutine mma_KKT_vector
+  end subroutine mma_KKT_compute_vector
 end submodule mma_vector

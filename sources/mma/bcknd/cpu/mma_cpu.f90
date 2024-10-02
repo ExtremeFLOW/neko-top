@@ -1,5 +1,8 @@
 submodule (mma) mma_cpu
 
+  use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
+       mpi_integer
+
 contains
   module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -574,7 +577,7 @@ contains
 
   end subroutine mma_subsolve_dpip_cpu
 
-  subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+  subroutine mma_KKT_compute_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! design x and set the max and norm values of the       !
@@ -634,5 +637,5 @@ contains
 
     this%residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
 
-  end subroutine mma_KKT_cpu
+  end subroutine mma_KKT_compute_cpu
 end submodule mma_cpu
