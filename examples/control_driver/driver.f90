@@ -256,6 +256,9 @@ program usrneko
   ! In the future, the objective_function_t will potentially include simulation components so that we can 
   ! accumulate the objective function during the run...
   ! here, we just compute it on the last step
+  ! TODO
+  ! We would presumable have a list that holds all of objective functions and constraints, such that this would be a
+  ! objectives%compute()
   call objective_function%compute(design, C%fluid)
   call volume_constraint%compute(design, C%fluid)
   print *, 'OBJECTIVE FUNCTION',  objective_function%objective_function_value
@@ -278,6 +281,10 @@ program usrneko
   ! pointers pointing to what we're reffering to. 
   ! So then compute would take in t and t-step.
   ! this would probably be smarter than passing the whole thing down!!!
+  ! TODO
+  ! We would presumable have a list that holds all of objective functions and constraints, such that this would be a
+  ! objectives%compute_sensitivity()
+  ! and it would cycled through the list.
   call objective_function%compute_sensitivity(design, C%fluid, adj%scheme)
   call volume_constraint%compute_sensitivity(design, C%fluid, adj%scheme)
   ! it would be nice to visualize this
@@ -317,6 +324,11 @@ program usrneko
 
 	! TODO
 	! do a KKT check and do a propper convergence check..
+	call design%optimizer%kkt(x, df0dx, fval, dfdx)
+
+	! TODO
+	! on the MMA side, we need residunorm public
+	print *, 'KKT', design%optimizer%residunorm
 
 	end associate
 
