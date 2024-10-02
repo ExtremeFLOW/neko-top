@@ -94,12 +94,14 @@ module mma
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
 
      !> Interface for generating the approximation sub problem
-     generic :: gensub => mma_gensub_cpu
+     generic :: gensub => mma_gensub_cpu, mma_gensub_vector
      procedure, pass(this) :: mma_gensub_cpu
+     procedure, pass(this) :: mma_gensub_vector
 
      !> Interface for solving the dual with an interior point method
-     generic :: subsolve => mma_subsolve_dpip_cpu
+     generic :: subsolve => mma_subsolve_dpip_cpu, mma_subsolve_dpip_vector
      procedure, pass(this) :: mma_subsolve_dpip_cpu
+     procedure, pass(this) :: mma_subsolve_dpip_vector
 
   end type mma_t
 
@@ -248,7 +250,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), allocatable, intent(in), optional :: backend
+    character(len=*), intent(in), optional :: backend
 
     call this%free()
 
@@ -381,6 +383,10 @@ contains
 
     if (this%backend == 'cpu') then
        call this%mma_update_cpu(iter, x%x, df0dx%x, fval%x, dfdx%x)
+    else if (this%backend == 'vector') then
+       call this%gensub(iter, x, df0dx, fval, dfdx)
+       call this%subsolve(x%x)
+       this%is_updated = .true.
     else
        write(stderr, *) "Device not supported for MMA."
        error stop
