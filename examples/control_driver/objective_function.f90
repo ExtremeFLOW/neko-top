@@ -99,6 +99,7 @@ module objective_function
   use filters, only: permeability_field
   use source_term, only: source_term_t
   use adjoint_scheme, only: adjoint_scheme_t
+  use new_design, only: new_design_t
   implicit none
   private
 
@@ -117,8 +118,12 @@ module objective_function
    ! for now we'll use the whole field
   	! type(field_t), public :: objective_location
 
+	! NOTE!
+	! this is how I had it first, but really, with the source term adding functionality we don't even need this
+	! we just need the pass the adjoint with inout intent and stack in the relevent source terms
   	!> the forcing term entering the adjoint equation
-  	class(source_term_t), public, allocatable :: adjoint_forcing
+  	! class(source_term_t), public, allocatable :: adjoint_forcing
+
   	! TODO
   	! This is a bit strange,
   	! In my mind, an objective and a constraint are derrived from the same type
@@ -176,29 +181,32 @@ module objective_function
 	end type objective_function_t
 
 	abstract interface
-	subroutine objective_function_init(this, fluid, adjoint)
-	import objective_function_t, fluid_scheme_t, adjoint_scheme_t
+	subroutine objective_function_init(this, design, fluid, adjoint)
+	import objective_function_t, fluid_scheme_t, adjoint_scheme_t, new_design_t
 	class(objective_function_t), intent(inout) :: this
 	! these ones are inout because we may need to append source terms etc
 	class(fluid_scheme_t), intent(inout) :: fluid
 	class(adjoint_scheme_t), intent(inout) :: adjoint
+	class(new_design_t), intent(inout) :: design
 	end subroutine objective_function_init
 	end interface
 
 	abstract interface
-	subroutine objective_function_compute(this, fluid)
-	import objective_function_t, fluid_scheme_t
+	subroutine objective_function_compute(this, design, fluid)
+	import objective_function_t, fluid_scheme_t, new_design_t
 	class(objective_function_t), intent(inout) :: this
 	class(fluid_scheme_t), intent(in) :: fluid
+	class(new_design_t), intent(inout) :: design
 	end subroutine objective_function_compute
 	end interface
 
 	abstract interface
-	subroutine sensitivity_compute(this, fluid, adjoint)
-	import objective_function_t, fluid_scheme_t, adjoint_scheme_t
+	subroutine sensitivity_compute(this, design, fluid, adjoint)
+	import objective_function_t, fluid_scheme_t, adjoint_scheme_t, new_design_t
 	class(objective_function_t), intent(inout) :: this
 	class(fluid_scheme_t), intent(in) :: fluid
 	class(adjoint_scheme_t), intent(in) :: adjoint
+	class(new_design_t), intent(inout) :: design
 	end subroutine sensitivity_compute
 	end interface
 

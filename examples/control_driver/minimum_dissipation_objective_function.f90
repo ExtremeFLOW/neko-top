@@ -32,9 +32,33 @@
 !
 !> Implements the `minimum_dissipation_objective_function_t` type.
 !
+! I promise I'll write this document properly in the future...
 !
+! But the Borval Peterson (I think) paper had an objective function
+! that had 2 terms, dissipation and this term they claimed represented
+! out of plane stresses.
+! I never really understood that extra term, I also don't think it
+! applies to 3D cases, but everyone includes it anyway.
+!
+! It appears to me to be basically a heuristic penality that targets
+! non-binary designs
+!
+! so let's call
+! 
+! F = \int |\nabla u|^2  + K \int \chi \u^2
+!
+!      | dissipation |     |"lube term"|
+!
+! I say "lube term" because they said it came from lubrication theory...
+! Anyway, we can change all this later (especially the names!)
+
 ! If the objective function \int |\nabla u|^2,
 ! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+!
+! for the lube term, the adjoint forcing is \chi u
+!
+! This has always annoyed me... because now I see one objective and one constraint
+! 
 module minimum_dissipation_objective_function
   use num_types, only : rp
   use field_list, only : field_list_t
@@ -46,7 +70,7 @@ module minimum_dissipation_objective_function
   use utils, only : neko_error
   use field, only: field_t
   use new_design, only: new_design_t
-  use field_math, only: field_col3, field_addcol3
+  use field_math, only: field_col3, field_addcol3, field_cmult, 	field_add2s2
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
@@ -66,6 +90,8 @@ module minimum_dissipation_objective_function
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
+  use new_design, only: new_design_t
+  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   implicit none
   private
 
@@ -73,6 +99,15 @@ module minimum_dissipation_objective_function
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source.
   type, public, extends(objective_function_t) :: minimum_dissipation_objective_function_t
+    real(kind=rp) :: K, dissipation, lube_value
+    logical :: if_lube
+
+    ! TODO
+    ! this is just for testing!
+    ! actually rescaling the adjoint is a bit more involved, and we have to be careful of the brinkman term
+    ! this scaling would be scaling the OBJECTIVE function!
+    real(kind=rp) :: obj_scale
+    !! in principle.. the adjoint is linear... so we can always scale by 
    
    contains
      !> The common constructor using a JSON object.
@@ -90,20 +125,20 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
-  subroutine minimum_dissipation_objective_function_init(this, fluid, adjoint)
+  subroutine minimum_dissipation_objective_function_init(this, design, fluid, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(inout) :: fluid
     class(adjoint_scheme_t), intent(inout) :: adjoint
-    ! TODO
-    ! I'm actually a bit confused here..
-    ! either we do something like this:
-    ! initialize the adjoint source term
-    ! allocate(adjoint_minimum_dissipation_source_term_t :: this%adjoint_forcing)
-    !
-    ! Or it seems we can just create a specific adjoint forcing and append it...
-    ! this way we can init from components
-    ! so maybe we don't need to store the adjoint forcing in the objective function type
+	 class(new_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
+    type(adjoint_lube_source_term_t) :: lube_term
+
+    ! here we would read from the JSON (or have something passed in) about the lube term
+    this%if_lube= .true.
+    this%K = 1.0_rp
+    this%obj_scale = 1.0_rp
+    !this%obj_scale = 0.00000001_rp
+
 
     call this%init_base(fluid%dm_Xh)
 
@@ -111,10 +146,24 @@ contains
     ! append a source term based on objective function
   	 ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components(adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, &
-                                                fluid%u, fluid%v, fluid%w, &
+                                                fluid%u, fluid%v, fluid%w, this%obj_scale, &
                                                 adjoint%c_Xh)
   ! append adjoint forcing term based on objective function
   call adjoint%source_term%add_source_term(adjoint_forcing)
+
+
+  ! if we have the lube term we need to initialize and append that too
+  if(this%if_lube) then
+  	 ! TODO
+  	 ! make this allocatable and only allocate it if needed!
+  	 ! or is that allready what's happening? Tim, y/n?
+  	 call lube_term%init_from_components(adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, design, &
+  	 															this%k*this%obj_scale, &
+                                                fluid%u, fluid%v, fluid%w, &
+                                                adjoint%c_Xh)
+  ! append adjoint forcing term based on objective function
+  call adjoint%source_term%add_source_term(lube_term)
+  endif
 
 
 
@@ -130,9 +179,10 @@ contains
     call this%free_base()
   end subroutine minimum_dissipation_objective_function_free
 
-  subroutine minimum_dissipation_objective_function_compute(this, fluid)
+  subroutine minimum_dissipation_objective_function_compute(this, design, fluid)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
+	 class(new_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field 
@@ -167,7 +217,24 @@ contains
 
     ! integrate the field
     n = wo1%size()
-    this%objective_function_value = glsc2(objective_field%x,fluid%C_Xh%b, n)
+    this%dissipation = glsc2(objective_field%x,fluid%C_Xh%b, n)
+
+    if(this%if_lube) then
+    	! it's becoming so stupid to pass the whole fluid and adjoint and design through
+    	! I feel like every objective function should have internal pointers to
+    	! u,v,w and u_adj, v_adj, w_adj and perhaps the design 
+    	! (the whole design, so we get all the coeffients)
+    	call field_col3(objective_field,fluid%u, design%brinkman_amplitude)
+    	call field_addcol3(objective_field,fluid%v, design%brinkman_amplitude)
+    	call field_addcol3(objective_field,fluid%w, design%brinkman_amplitude)
+    	this%lube_value = glsc2(objective_field%x,fluid%C_Xh%b, n)
+    	this%objective_function_value = this%dissipation + this%K*this%lube_value
+    else
+    	this%objective_function_value = this%dissipation
+    endif
+
+    ! scale everything
+    this%objective_function_value = this%objective_function_value*this%obj_scale
 
     !TODO
     ! GPUS
@@ -176,16 +243,43 @@ contains
 
   end subroutine minimum_dissipation_objective_function_compute
 
-  subroutine minimum_dissipation_objective_function_compute_sensitivity(this, fluid, adjoint)
+  subroutine minimum_dissipation_objective_function_compute_sensitivity(this, design, fluid, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
+	 class(new_design_t), intent(inout) :: design
     class(fluid_scheme_t), intent(in) :: fluid
     class(adjoint_scheme_t), intent(in) :: adjoint
+    type(field_t), pointer :: lube_contribution
+    integer :: temp_indices(1)
 
 
     ! here it should just be an inner product between the forward and adjoint
     call field_col3(this%sensitivity_to_coefficient, fluid%u, adjoint%u_adj)
     call field_addcol3(this%sensitivity_to_coefficient, fluid%v, adjoint%v_adj)
     call field_addcol3(this%sensitivity_to_coefficient, fluid%w, adjoint%w_adj)
+    ! but negative
+    call field_cmult(this%sensitivity_to_coefficient, -1.0_rp) 
+
+    ! if we have the lube term we also get an extra term in the sensitivity
+    ! K*u^2 
+    ! TODO
+    ! omfg be so careful with non-dimensionalization etc
+    ! I bet this is scaled a smidge wrong (ie, track if it's 1/2 or not etc)
+    ! do this later
+
+    if(this%if_lube) then
+    call neko_scratch_registry%request_field(lube_contribution, temp_indices(1))
+    call field_col3(lube_contribution,fluid%u,fluid%u)
+    call field_addcol3(lube_contribution,fluid%v,fluid%v)
+    call field_addcol3(lube_contribution,fluid%w,fluid%w)
+    ! fuck be careful with these scalaing!
+    call field_add2s2(this%sensitivity_to_coefficient, lube_contribution, this%K*this%obj_scale)
+    call neko_scratch_registry%relinquish_field(temp_indices)
+    endif
+
+	 ! I don't actually think you scale the sensitivity...
+	 ! because the adjoint field is already scaled
+    !call field_cmult(this%sensitivity_to_coefficient, this%obj_scale)
+
 
   end subroutine minimum_dissipation_objective_function_compute_sensitivity
 

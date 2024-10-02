@@ -97,6 +97,8 @@ module new_design
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   use dofmap, only : dofmap_t
   use filters, only: permeability_field
+  use mma, only: mma_t
+  use fld_file_output, only : fld_file_output_t
   implicit none
   private
 
@@ -139,6 +141,8 @@ module new_design
 	! dF/d\rho
 	! and store it here          v 
   	type(field_t), public :: sensitivity
+  	! have a field list here
+  	! type(filed_list_t), public :: constraint_sensitivity
   	! HOWEVER !
   	! What is a bit confusing to me... is how we'll deal with constraints.
   	!
@@ -174,6 +178,13 @@ module new_design
   	! TODO
   	! you also had logicals for convergence etc, I feel they should live in "problem"
 
+	! here it's just MMA
+	! maybe we could have it in a factory
+  	type(mma_t), public :: optimizer
+
+  	! afield writer would be nice too
+  	type(fld_file_output_t), private :: output
+
 
 	contains
 	!> init (will make this legit at some point)
@@ -188,6 +199,9 @@ module new_design
 	! maybe it would have been smarter to have a "coeficient" type, which is just a scalar field
 	! and set of mappings going from design_indicator -> coeficient and their corresponding chain rules
 	! maybe also some information about what equation they live in...
+
+	! a sampler being called from outside would be nice
+	procedure, pass(this) :: sample => new_design_sample
 
 	!> Destructor 
 	procedure, pass(this) :: free => new_design_free
@@ -218,7 +232,8 @@ contains
 
    n = this%design_indicator%dof%size()
    do i = 1, n
-     if(((this%design_indicator%dof%x(i,1,1,1) - 1.0_rp)**2 + (this%design_indicator%dof%y(i,1,1,1) - 0.5_rp)**2).lt.0.1_rp) then
+     if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + (this%design_indicator%dof%y(i,1,1,1) &
+     	 - 0.5_rp)**2).lt.0.1_rp) then
      	 this%design_indicator%x(i,1,1,1) = 1.0_rp
      endif
    enddo
@@ -232,6 +247,20 @@ contains
 	call this%map_forward()
 
 
+	! a field writer would be nice to output
+	! - design indicator (\rho)
+	! - mapped design (\chi)
+	! - sensitivity (dF/d\chi)
+	! TODO
+	! do this properly with JSON
+	! TODO
+	! obviously when we do the mappings properly, to many coeficients, we'll also have to modify this
+	call this%output%init(sp,'design',3)
+	call this%output%fields%assign(1, this%design_indicator)
+	call this%output%fields%assign(2, this%brinkman_amplitude)
+	call this%output%fields%assign(3, this%sensitivity)
+
+
 	endsubroutine new_design_init
 	
 
@@ -243,7 +272,7 @@ contains
 	! so this would be:
 	! call mapper%forward(fld_out, fld_in)
 	call permeability_field(this%brinkman_amplitude, this%design_indicator, &
-         & 0.0_rp, 10.0_rp, 1.0_rp)
+         & 0.0_rp, 100.0_rp, 1.0_rp)
 
 
 	endsubroutine new_design_map_forward
@@ -252,6 +281,7 @@ contains
 	class(new_design_t), target, intent(inout) :: this
   	type(field_t), intent(in) :: df_dchi
   	real(kind=rp) :: k_0, k_1, q
+  	real(kind=rp) :: dchi_drho
   	integer :: n, i 
 	! TODO
 	! again..
@@ -261,10 +291,16 @@ contains
 	! again I'm hardcoding this
   	q = 1.0_rp
   	k_0 = 0.0_rp
-  	k_1 = 10.0_rp
+  	k_1 = 100.0_rp
   	n = this%design_indicator%dof%size()
+
+  	! this is just chain rule for now,
+  	! but if the filters get more complicated we need to chain rull back further...
+  	! ie, the design_indicator here could be \tild{\rho}
+  	! and then we have to chain rule back
   	do i = 1, n
-  	  this%sensitivity%x(i,1,1,1) = q*(q+1)*(k_0 - k_1)/(q + df_dchi%x(i,1,1,1))
+  	  dchi_drho = q*(q+1)*(k_1 - k_0)/((q + this%design_indicator%x(i,1,1,1))**2)
+  	  this%sensitivity%x(i,1,1,1) = df_dchi%x(i,1,1,1) * dchi_drho
   	enddo
 
 
@@ -276,5 +312,13 @@ contains
 	call this%design_indicator%free()
 
 	endsubroutine new_design_free
+
+	subroutine new_design_sample(this,t)
+	class(new_design_t), target, intent(inout) :: this
+	real(kind=rp), intent(in) :: t
+
+	call this%output%sample(t)
+
+	endsubroutine new_design_sample
 end module new_design
 

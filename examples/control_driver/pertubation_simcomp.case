@@ -4,10 +4,10 @@
     {
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
-        "output_at_end": true,
+        "output_at_end": false,
         "output_boundary": false,
-        "end_time": 5.0,
-        "timestep": 1e-2,
+        "end_time": 1.0,
+        "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -17,7 +17,7 @@
             "initial_condition": {
                 "type": "uniform",
                 "value": [
-                    0.0, 1.0, 0.0
+                    0.0, 0.0, 0.0
                 ]
             },
         },
@@ -50,27 +50,10 @@
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
-            "boundary_types": [ "v", "o", "sym", "sym" ],
+            "boundary_types": [ "v", "v", "sym", "sym" ],
             "output_control": "tsteps",
-            "output_value": 50,
+            "output_value": 50000000,
         },
-        "point_zones": [
-            {
-                "name": "cylinder",
-                "geometry": "cylinder",
-                "start": [
-                    1.0,
-                    0.5,
-                    0.0
-                ],
-                "end": [
-                    1.0,
-                    0.5,
-                    1.0
-                ],
-                "radius": 0.1
-            }
-        ],
         "simulation_components": [
             {
                 "type": "steady",

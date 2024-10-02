@@ -10,6 +10,8 @@ set(EXTRA_SOURCES
     adjoint_minimum_dissipation_source_term.f90
     objective_function.f90
     minimum_dissipation_objective_function.f90
+    volume_constraint.f90
+    adjoint_lube_source_term.f90
 )
 
 build_example(${DRIVER_TYPE})
