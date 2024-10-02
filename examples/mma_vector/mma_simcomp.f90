@@ -136,7 +136,7 @@ contains
     this%xmax%x = 10.0_rp
     this%xmin%x = 0.0_rp
     call this%mma%init(reshape(this%designx%x, [nloc]), &
-         nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
+         nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x, backend = "vector")
 
     ! Get the rank of the current process
     ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
