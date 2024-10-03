@@ -67,17 +67,17 @@ module adjoint_lube_source_term
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source.
   type, public, extends(source_term_t) :: adjoint_lube_source_term_t
-   
-   ! again, for a mask this is silly... we can fix this later in the week
-   type(field_t), pointer :: u,v,w,chi, mask
-   real(kind=rp) :: K
+
+     ! again, for a mask this is silly... we can fix this later in the week
+     type(field_t), pointer :: u,v,w,chi, mask
+     real(kind=rp) :: K
 
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => adjoint_lube_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       adjoint_lube_source_term_init_from_components
+          adjoint_lube_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => adjoint_lube_source_term_free
      !> Computes the source term and adds the result to `fields`.
@@ -107,8 +107,9 @@ contains
   !> The constructor from type components.
   ! NOTE!
   ! u,v,w reffer to the primal, not the adjoint
-  subroutine adjoint_lube_source_term_init_from_components(this, f_x, f_y, f_z, design, K, &	
-                                                    u, v, w, coef)
+  subroutine adjoint_lube_source_term_init_from_components(this, &
+       f_x, f_y, f_z, design, K, &
+       u, v, w, coef)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -117,13 +118,14 @@ contains
     real(kind=rp) :: end_time
     type(new_design_t), intent(in), target :: design
     real(kind=rp) :: K
-    type(field_t), intent(in), target :: u, v, w 
+    type(field_t), intent(in), target :: u, v, w
     ! TODo
     ! do masks later
     !type(field_t), intent(in), target :: mask
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this... but I'm just going to set a super big number...
+    ! Tim you're going to hate this...
+    ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
 
@@ -140,7 +142,7 @@ contains
 
     call this%init_base(fields, coef, start_time, end_time)
 
-	 ! Real stuff
+    ! Real stuff
 
     ! point everything in the correct places
     ! NOTE!!!
@@ -186,16 +188,16 @@ contains
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
 
-	 ! BE SO CAREFUL HERE
-	 ! It make look the same as the Brinkman term, but it's assumed that
-	 ! this source term acts on the adjoint, and the u,v,w here come from
-	 ! the primal
-	 call neko_scratch_registry%request_field(work, temp_indices(1))
-	 call field_copy(work, this%chi)
-	 ! the scaling is a bit fucked right now
+    ! BE SO CAREFUL HERE
+    ! It make look the same as the Brinkman term, but it's assumed that
+    ! this source term acts on the adjoint, and the u,v,w here come from
+    ! the primal
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call field_copy(work, this%chi)
+    ! the scaling is a bit fucked right now
     ! right now, it's not 1/2 \chi u^2
     ! so we need to multiply by 2 here
-	 call field_cmult(work, this%K*2.0_rp)
+    call field_cmult(work, this%K*2.0_rp)
     call field_addcol3(fu, this%u, work)
     call field_addcol3(fv, this%v, work)
     call field_addcol3(fw, this%w, work)

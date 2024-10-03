@@ -66,22 +66,26 @@ module adjoint_minimum_dissipation_source_term
   !> A constant source term.
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source.
-  type, public, extends(source_term_t) :: adjoint_minimum_dissipation_source_term_t
-   
-   ! again, for a mask this is silly... we can fix this later in the week
-   type(field_t), pointer :: u,v,w, mask
-   real(kind=rp) :: obj_scale
+  type, public, extends(source_term_t) :: &
+       adjoint_minimum_dissipation_source_term_t
+
+     ! again, for a mask this is silly... we can fix this later in the week
+     type(field_t), pointer :: u,v,w, mask
+     real(kind=rp) :: obj_scale
 
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => adjoint_minimum_dissipation_source_term_init_from_json
+     procedure, pass(this) :: init => &
+          adjoint_minimum_dissipation_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       adjoint_minimum_dissipation_source_term_init_from_components
+          adjoint_minimum_dissipation_source_term_init_from_components
      !> Destructor.
-     procedure, pass(this) :: free => adjoint_minimum_dissipation_source_term_free
+     procedure, pass(this) :: free => &
+          adjoint_minimum_dissipation_source_term_free
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute_ => adjoint_minimum_dissipation_source_term_compute
+     procedure, pass(this) :: compute_ => &
+          adjoint_minimum_dissipation_source_term_compute
   end type adjoint_minimum_dissipation_source_term_t
 
 contains
@@ -89,7 +93,8 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
-  subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, json, fields, coef)
+  subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, &
+       json, fields, coef)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
@@ -107,8 +112,9 @@ contains
   !> The constructor from type components.
   ! NOTE!
   ! u,v,w reffer to the primal, not the adjoint
-  subroutine adjoint_minimum_dissipation_source_term_init_from_components(this, f_x, f_y, f_z, &	
-                                                    u, v, w, obj_scale, coef)
+  subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
+       f_x, f_y, f_z, &
+       u, v, w, obj_scale, coef)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -116,13 +122,14 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
-    type(field_t), intent(in), target :: u, v, w 
+    type(field_t), intent(in), target :: u, v, w
     ! TODo
     ! do masks later
     !type(field_t), intent(in), target :: mask
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this... but I'm just going to set a super big number...
+    ! Tim you're going to hate this...
+    ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
 
@@ -139,7 +146,7 @@ contains
 
     call this%init_base(fields, coef, start_time, end_time)
 
-	 ! Real stuff
+    ! Real stuff
 
     ! point everything in the correct places
     ! NOTE!!!
@@ -206,10 +213,12 @@ contains
     call neko_scratch_registry%request_field(t1 , temp_indices(7))
     call neko_scratch_registry%request_field(t2 , temp_indices(8))
 
+    ! TODO
     ! ok we're computing gradients at every timestep... which is stupid...
     ! BUT
     ! if this was unsteady we would have to do this.
 
+    ! TODO
     ! this is cheating a little bit...
     ! in strong form, \nabla u . \nabla v => - v . \nabla^2 u + bdry
     !
@@ -219,9 +228,10 @@ contains
     ! and suffer the double derivative :/
     !
     ! in fact, we'll go even quicker and use
-    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u )) and assume divergence free u
+    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u ))
+    ! and assume divergence free u
 
-    ! => - \nabla ^2 u =  curl ( curl (u )) 
+    ! => - \nabla ^2 u =  curl ( curl (u ))
 
     call curl(wo1, wo2, wo3, u, v, w, t1, t2, this%coef)
     call curl(wo4, wo5, wo6, wo1, wo2, wo3, t1, t2, this%coef)

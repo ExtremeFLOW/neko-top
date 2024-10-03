@@ -44,7 +44,8 @@ module new_design
   use adjoint_pnpn, only: adjoint_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, field_glsc3
+  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
+       field_glsc3
   use field_math, only: field_add2
   use math, only: glsc2, glsc3
   use device_math, only: device_glsc2
@@ -102,222 +103,242 @@ module new_design
   private
 
   type :: new_design_t
-   !> the unfilitered design
-  	type(field_t), public :: design_indicator
+     !> the unfilitered design
+     type(field_t), public :: design_indicator
 
-   !> the mapped coefficient (Brinkman term)
-   ! TODO
-   ! NOTE: Tim, right now we only have the brinkman term
-   ! in the future we may map to other coeeficients for other equations... in which case this should be 
-   ! a field list 
-   ! 
-   ! or as I describe below, we also have multiple constraints,
-   ! so a list-of-lists may be the correct way forward
-  	type(field_t), public :: brinkman_amplitude
-	
-	! NOTE:
-	! again, we have to be so clear with nomenclature.
-	! If we have an objective function F.
-	! I also like to use \rho to describe the design_indicator
-	!
-	! and let's say, for completness, we're doing conjugate heat transfer, so we have to map
-	! to 3 coefficients, \chi, C and \kappa.
-	!
-	! then we will perform 3 mapping,
-	! \rho -> \chi
-	! \rho -> C
-	! \rho -> \kappa
-	!
-	! Then during the forward/adjoint looping there will be an additional object, the "objective_function" object
-	! that will be responsible for computing the sensitivity of the objective function with respect to the coefficients
-	! ie,
-	! dF/d\chi, dF/dC and dF/d\kappa
-	!
-	! What I'm calling "sensitivity" here, is the sensitivity with respect to the design indicator
-	! so dF/d\rho
-	! 
-	! so the proceedure "map_backwards" will take in the field list dF/d\chi, dF/dC and dF/d\kappa and chain rule it's way back to
-	! dF/d\rho
-	! and store it here          v 
-  	type(field_t), public :: sensitivity
-  	! have a field list here
-  	! type(filed_list_t), public :: constraint_sensitivity
-  	! HOWEVER !
-  	! What is a bit confusing to me... is how we'll deal with constraints.
-  	!
-  	! Because in principle we could have constraints C1, C2, C3 etc
-  	! Implying we also want dC1/d\rho, dC2/d\rho etc
-  	! So this "sensitivity" should also be a list...
-  	!
-  	! So I bet you'll have a nice abstract way of constructing this in the future, but I think a sort of list-of-lists would be nice.
-  	!
-  	! For F:
-  	! \rho -> \tild{\rho} -> \chi
-  	! \rho -> \tild{\rho} -> C
-  	! \rho -> \tild{\rho} -> \kappa
-  	!
-  	! For C1:
-  	! \rho -> \tild{\rho}  (eg for a volume constraint or so)
-  	!
-  	! For C2:
-  	! \rho -> \tild{\rho}  (for something else)
-  	!
-  	! etc..
-  	!
-  	! So now we have multiple instances of the "objective" type, each for F, C1, C2 etc
-  	! each of them can pass their dF\d_coefficents to the design and we continue from there.
-  	!
-  	! perhaps even the "objective" type is defined as a list of objectives. 
+     !> the mapped coefficient (Brinkman term)
+     ! TODO
+     ! NOTE: Tim, right now we only have the brinkman term
+     ! in the future we may map to other coeeficients for other equations...
+     ! in which case this should be a field list
+     !
+     ! or as I describe below, we also have multiple constraints,
+     ! so a list-of-lists may be the correct way forward
+     type(field_t), public :: brinkman_amplitude
 
-
-  	!
-	! TODO
-  	! you also had lots of masks etc that was a nice idea, but we'll cross that bridge later
-
-  	! TODO
-  	! you also had logicals for convergence etc, I feel they should live in "problem"
-
-	! here it's just MMA
-	! maybe we could have it in a factory
-  	type(mma_t), public :: optimizer
-
-  	! afield writer would be nice too
-  	type(fld_file_output_t), private :: output
+     ! NOTE:
+     ! again, we have to be so clear with nomenclature.
+     ! If we have an objective function F.
+     ! I also like to use \rho to describe the design_indicator
+     !
+     ! and let's say, for completness, we're doing conjugate heat transfer,
+     ! so we have to map
+     ! to 3 coefficients, \chi, C and \kappa.
+     !
+     ! then we will perform 3 mapping,
+     ! \rho -> \chi
+     ! \rho -> C
+     ! \rho -> \kappa
+     !
+     ! Then during the forward/adjoint looping there will be an additional object,
+     ! the "objective_function" object that will be responsible for computing the
+     ! sensitivity of the objective function with respect to the coefficients
+     ! ie,
+     ! dF/d\chi, dF/dC and dF/d\kappa
+     !
+     ! What I'm calling "sensitivity" here, is the sensitivity with respect to
+     ! the design indicator
+     ! so dF/d\rho
+     !
+     ! so the proceedure "map_backwards" will take in the field list
+     ! dF/d\chi, dF/dC and dF/d\kappa
+     !and chain rule it's way back to
+     ! dF/d\rho
+     ! and store it here          v
+     type(field_t), public :: sensitivity
+     ! have a field list here
+     ! type(filed_list_t), public :: constraint_sensitivity
+     ! HOWEVER !
+     ! What is a bit confusing to me... is how we'll deal with constraints.
+     !
+     ! Because in principle we could have constraints C1, C2, C3 etc
+     ! Implying we also want dC1/d\rho, dC2/d\rho etc
+     ! So this "sensitivity" should also be a list...
+     !
+     ! So I bet you'll have a nice abstract way of constructing this in the future
+     ! but I think a sort of list-of-lists would be nice.
+     !
+     ! For F:
+     ! \rho -> \tild{\rho} -> \chi
+     ! \rho -> \tild{\rho} -> C
+     ! \rho -> \tild{\rho} -> \kappa
+     !
+     ! For C1:
+     ! \rho -> \tild{\rho}  (eg for a volume constraint or so)
+     !
+     ! For C2:
+     ! \rho -> \tild{\rho}  (for something else)
+     !
+     ! etc..
+     !
+     ! So now we have multiple instances of the "objective" type,
+     ! each for F, C1, C2 etc
+     ! each of them can pass their dF\d_coefficents to the design
+     ! and we continue from there.
+     !
+     ! perhaps even the "objective" type is defined as a list of objectives.
 
 
-	contains
-	!> init (will make this legit at some point)
-	procedure, pass(this) :: init => new_design_init
-	!> map (this will include everything from mapping design_indicator -> filtering -> chi
-	! and ultimately handle mapping different coeficients!
-	procedure, pass(this) :: map_forward => new_design_map_forward
-	!> this will contain chain rule for going backwards d_design_indicator <- d_filtering <- d_chi
-	! and ultimately handle mapping different coeficients!
-	procedure, pass(this) :: map_backward => new_design_map_backward
-	! TODO
-	! maybe it would have been smarter to have a "coeficient" type, which is just a scalar field
-	! and set of mappings going from design_indicator -> coeficient and their corresponding chain rules
-	! maybe also some information about what equation they live in...
+     !
+     ! TODO
+     ! you also had lots of masks etc that was a nice idea,
+     ! but we'll cross that bridge later
 
-	! a sampler being called from outside would be nice
-	procedure, pass(this) :: sample => new_design_sample
+     ! TODO
+     ! you also had logicals for convergence etc,
+     ! I feel they should live in "problem"
 
-	!> Destructor 
-	procedure, pass(this) :: free => new_design_free
-	! TODO
-	! I'm not sure who owns the optimizer... but it would make sense to have it in here so you provide it
-	! with dF/d_design_indicator and it updates itself.
-	! procedure, pass(this) :: update => new_design_update
-	end type new_design_t
+     ! here it's just MMA
+     ! maybe we could have it in a factory
+     type(mma_t), public :: optimizer
 
-	public :: new_design_t
+     ! afield writer would be nice too
+     type(fld_file_output_t), private :: output
+
+
+   contains
+     !> init (will make this legit at some point)
+     procedure, pass(this) :: init => new_design_init
+     !> map (this will include everything from mapping
+     ! design_indicator -> filtering -> chi
+     ! and ultimately handle mapping different coeficients!
+     procedure, pass(this) :: map_forward => new_design_map_forward
+     !> this will contain chain rule for going backwards
+     ! d_design_indicator <- d_filtering <- d_chi
+     ! and ultimately handle mapping different coeficients!
+     procedure, pass(this) :: map_backward => new_design_map_backward
+     ! TODO
+     ! maybe it would have been smarter to have a "coeficient" type,
+     ! which is just a scalar field and set of mappings going from
+     ! design_indicator -> coeficient and their corresponding chain rules
+     ! maybe also some information about what equation they live in...
+
+     ! a sampler being called from outside would be nice
+     procedure, pass(this) :: sample => new_design_sample
+
+     !> Destructor
+     procedure, pass(this) :: free => new_design_free
+     ! TODO
+     ! I'm not sure who owns the optimizer...
+     ! but it would make sense to have it in here so you provide it
+     ! with dF/d_design_indicator and it updates itself.
+     ! procedure, pass(this) :: update => new_design_update
+  end type new_design_t
+
+  public :: new_design_t
 
 contains
 
-	subroutine new_design_init(this, dm_Xh)
-	class(new_design_t), target, intent(inout) :: this
-	type(dofmap_t) :: dm_Xh    !< Dofmap associated with \f$ X_h \f$
-	integer :: n, i
-	! init the fields
-	call this%design_indicator%init(dm_Xh, "design_indicator")
-   call this%brinkman_amplitude%init(dm_Xh, "brinkman_amplitude")
-   call this%sensitivity%init(dm_Xh, "sensitivity")
+  subroutine new_design_init(this, dm_Xh)
+    class(new_design_t), target, intent(inout) :: this
+    type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
+    integer :: n, i
+    ! init the fields
+    call this%design_indicator%init(dm_Xh, "design_indicator")
+    call this%brinkman_amplitude%init(dm_Xh, "brinkman_amplitude")
+    call this%sensitivity%init(dm_Xh, "sensitivity")
 
-   ! TODO
-   ! this is where we steal basically everything in brinkman_source_term regarding loading initial fields
-   ! for now, make it a cylinder by hand
-   this%design_indicator = 0.0_rp
-   this%brinkman_amplitude = 0.0_rp
+    ! TODO
+    ! this is where we steal basically everything in
+    ! brinkman_source_term regarding loading initial fields
+    ! for now, make it a cylinder by hand
+    this%design_indicator = 0.0_rp
+    this%brinkman_amplitude = 0.0_rp
 
-   n = this%design_indicator%dof%size()
-   do i = 1, n
-     if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + (this%design_indicator%dof%y(i,1,1,1) &
-     	 - 0.5_rp)**2).lt.0.1_rp) then
-     	 this%design_indicator%x(i,1,1,1) = 1.0_rp
-     endif
-   enddo
+    n = this%design_indicator%dof%size()
+    do i = 1, n
+       if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
+            (this%design_indicator%dof%y(i,1,1,1) &
+            - 0.5_rp)**2).lt.0.1_rp) then
+          this%design_indicator%x(i,1,1,1) = 1.0_rp
+       endif
+    enddo
 
-	! TODO
-	! we would also need to make a mapping type that reads in parameters etc about filtering and mapping
-	! ie, 
-	! call mapper%init(this woud be from JSON)
+    ! TODO
+    ! we would also need to make a mapping type that reads in
+    ! parameters etc about filtering and mapping
+    ! ie,
+    ! call mapper%init(this woud be from JSON)
 
-	! and then we would map for the first one
-	call this%map_forward()
-
-
-	! a field writer would be nice to output
-	! - design indicator (\rho)
-	! - mapped design (\chi)
-	! - sensitivity (dF/d\chi)
-	! TODO
-	! do this properly with JSON
-	! TODO
-	! obviously when we do the mappings properly, to many coeficients, we'll also have to modify this
-	call this%output%init(sp,'design',3)
-	call this%output%fields%assign(1, this%design_indicator)
-	call this%output%fields%assign(2, this%brinkman_amplitude)
-	call this%output%fields%assign(3, this%sensitivity)
+    ! and then we would map for the first one
+    call this%map_forward()
 
 
-	endsubroutine new_design_init
-	
-
-	subroutine new_design_map_forward(this)
-	class(new_design_t), target, intent(inout) :: this
-
-	! TODO
-	! this should be somehow deffered so we can pick different mappings!!!
-	! so this would be:
-	! call mapper%forward(fld_out, fld_in)
-	call permeability_field(this%brinkman_amplitude, this%design_indicator, &
-         & 0.0_rp, 100.0_rp, 1.0_rp)
-
-
-	endsubroutine new_design_map_forward
-
-	subroutine new_design_map_backward(this, df_dchi)
-	class(new_design_t), target, intent(inout) :: this
-  	type(field_t), intent(in) :: df_dchi
-  	real(kind=rp) :: k_0, k_1, q
-  	real(kind=rp) :: dchi_drho
-  	integer :: n, i 
-	! TODO
-	! again..
-	! so this would be:
-	! call mapper%backward(fld_out, fld_in)
-	!
-	! again I'm hardcoding this
-  	q = 1.0_rp
-  	k_0 = 0.0_rp
-  	k_1 = 100.0_rp
-  	n = this%design_indicator%dof%size()
-
-  	! this is just chain rule for now,
-  	! but if the filters get more complicated we need to chain rull back further...
-  	! ie, the design_indicator here could be \tild{\rho}
-  	! and then we have to chain rule back
-  	do i = 1, n
-  	  dchi_drho = q*(q+1)*(k_1 - k_0)/((q + this%design_indicator%x(i,1,1,1))**2)
-  	  this%sensitivity%x(i,1,1,1) = df_dchi%x(i,1,1,1) * dchi_drho
-  	enddo
+    ! a field writer would be nice to output
+    ! - design indicator (\rho)
+    ! - mapped design (\chi)
+    ! - sensitivity (dF/d\chi)
+    ! TODO
+    ! do this properly with JSON
+    ! TODO
+    ! obviously when we do the mappings properly, to many coeficients,
+    ! we'll also have to modify this
+    call this%output%init(sp,'design',3)
+    call this%output%fields%assign(1, this%design_indicator)
+    call this%output%fields%assign(2, this%brinkman_amplitude)
+    call this%output%fields%assign(3, this%sensitivity)
 
 
-	endsubroutine new_design_map_backward
+  end subroutine new_design_init
 
-	subroutine new_design_free(this)
-	class(new_design_t), target, intent(inout) :: this
-	call this%brinkman_amplitude%free()
-	call this%design_indicator%free()
 
-	endsubroutine new_design_free
+  subroutine new_design_map_forward(this)
+    class(new_design_t), target, intent(inout) :: this
 
-	subroutine new_design_sample(this,t)
-	class(new_design_t), target, intent(inout) :: this
-	real(kind=rp), intent(in) :: t
+    ! TODO
+    ! this should be somehow deffered so we can pick different mappings!!!
+    ! so this would be:
+    ! call mapper%forward(fld_out, fld_in)
+    call permeability_field(this%brinkman_amplitude, this%design_indicator, &
+    & 0.0_rp, 100.0_rp, 1.0_rp)
 
-	call this%output%sample(t)
 
-	endsubroutine new_design_sample
+  end subroutine new_design_map_forward
+
+  subroutine new_design_map_backward(this, df_dchi)
+    class(new_design_t), target, intent(inout) :: this
+    type(field_t), intent(in) :: df_dchi
+    real(kind=rp) :: k_0, k_1, q
+    real(kind=rp) :: dchi_drho
+    integer :: n, i
+    ! TODO
+    ! again..
+    ! so this would be:
+    ! call mapper%backward(fld_out, fld_in)
+    !
+    ! again I'm hardcoding this
+    q = 1.0_rp
+    k_0 = 0.0_rp
+    k_1 = 100.0_rp
+    n = this%design_indicator%dof%size()
+
+    ! this is just chain rule for now,
+    ! but if the filters get more complicated we need to chain rull back 
+    ! further...
+    ! ie, the design_indicator here could be \tild{\rho}
+    ! and then we have to chain rule back
+    do i = 1, n
+       dchi_drho = q*(q+1)*(k_1 - k_0)/ &
+       ((q + this%design_indicator%x(i,1,1,1))**2)
+
+       this%sensitivity%x(i,1,1,1) = df_dchi%x(i,1,1,1) * dchi_drho
+    enddo
+
+
+  end subroutine new_design_map_backward
+
+  subroutine new_design_free(this)
+    class(new_design_t), target, intent(inout) :: this
+    call this%brinkman_amplitude%free()
+    call this%design_indicator%free()
+
+  end subroutine new_design_free
+
+  subroutine new_design_sample(this,t)
+    class(new_design_t), target, intent(inout) :: this
+    real(kind=rp), intent(in) :: t
+
+    call this%output%sample(t)
+
+  end subroutine new_design_sample
 end module new_design
-

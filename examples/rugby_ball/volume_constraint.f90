@@ -60,7 +60,8 @@ module volume_constraint
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, only : adjoint_minimum_dissipation_source_term_t
+  use adjoint_minimum_dissipation_source_term, &
+  only : adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -75,19 +76,19 @@ module volume_constraint
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source.
   type, public, extends(objective_function_t) :: volume_constraint_t
-  
-  ! whether it is minimum or maximum volume
-  ! call min = 0, 	ie V > V_min  		=>		 -V + V_max < 0
-  ! call max = 1, 	ie V < V_max  		=>		  V - V_max < 0
-  ! TODO
-  ! this can be done smarter with parameters
-  	 logical :: min_max
-  	 ! maximum volume prescribed
-  	 real(kind=rp) :: v_max
-  	 ! current volume
-  	 real(kind=rp) :: volume
 
-   
+     ! whether it is minimum or maximum volume
+     ! call min = 0, 	ie V > V_min  		=>		 -V + V_max < 0
+     ! call max = 1, 	ie V < V_max  		=>		  V - V_max < 0
+     ! TODO
+     ! this can be done smarter with parameters
+     logical :: min_max
+     ! maximum volume prescribed
+     real(kind=rp) :: v_max
+     ! current volume
+     real(kind=rp) :: volume
+
+
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => volume_constraint_init
@@ -96,7 +97,8 @@ module volume_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute => volume_constraint_compute
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute_sensitivity => volume_constraint_compute_sensitivity
+     procedure, pass(this) :: compute_sensitivity => &
+     volume_constraint_compute_sensitivity
   end type volume_constraint_t
 
 contains
@@ -108,33 +110,33 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(fluid_scheme_t), intent(inout) :: fluid
     class(adjoint_scheme_t), intent(inout) :: adjoint
-	 class(new_design_t), intent(inout) :: design
+    class(new_design_t), intent(inout) :: design
 
-	 ! TODO
-	 ! I don't think there's much to init here
-	 ! maybe we should include a fmax in here,
-	 ! ie, if we want f_i(x) < f_i_max 
-	 ! with the MMA notation, this is 
-	 ! f_i(x) - a_i*z - y_i <= f_i_max,
+    ! TODO
+    ! I don't think there's much to init here
+    ! maybe we should include a fmax in here,
+    ! ie, if we want f_i(x) < f_i_max
+    ! with the MMA notation, this is
+    ! f_i(x) - a_i*z - y_i <= f_i_max,
 
-	 ! f_i(x) - a_i*z - y_i - f_i_max <= 0,
+    ! f_i(x) - a_i*z - y_i - f_i_max <= 0,
 
-	 ! so we compute
-	 ! f_i(x) - f_i_max
+    ! so we compute
+    ! f_i(x) - f_i_max
 
-	 ! when we compute the value of the constraint
-	 !
-	 ! But I actually think it's better to include the mins and max's
-	 ! in MMA it's self.
-	 !
-	 ! anyway...
-	 ! here we hard code for now
-	 this%min_max = .false.
-	 this%v_max = 0.2
+    ! when we compute the value of the constraint
+    !
+    ! But I actually think it's better to include the mins and max's
+    ! in MMA it's self.
+    !
+    ! anyway...
+    ! here we hard code for now
+    this%min_max = .false.
+    this%v_max = 0.2
 
 
 
-	 call this%init_base(fluid%dm_Xh)
+    call this%init_base(fluid%dm_Xh)
 
   end subroutine volume_constraint_init
 
@@ -149,36 +151,37 @@ contains
   subroutine volume_constraint_compute(this, design, fluid)
     class(volume_constraint_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
-	 class(new_design_t), intent(inout) :: design
+    class(new_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
-    type(field_t), pointer :: objective_field 
+    type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
     integer n
 
     ! Again, we don't really need to take design and fluid in here...
     n = design%design_indicator%size()
     ! TODO
-    ! in the future we should be using the mapped design varaible corresponding to this 
-    ! constraint!!!
-    this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n) 
+    ! in the future we should be using the mapped design varaible 
+    !corresponding to this constraint!!!
+    this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n)
 
     ! NOTE
     ! TODO
-    ! the definition of the "volume" can get a little tricky once we start introducing 
-    ! masks for the optimization domain, because then we should calculate the volume of the optimization
-    ! domain and take a ratio that way.
-    ! point is, a design should have an internal parameter of the volume of the design domain,
+    ! the definition of the "volume" can get a little tricky once we start 
+    ! introducing masks for the optimization domain, because then we should 
+    ! calculate the volume of the optimization domain and take a ratio that way.
+    ! point is, a design should have an internal parameter of the volume of 
+    ! the design domain,
     ! and we should us THAT volume for computing the volume percentage
     this%volume = this%volume/fluid%c_xh%volume
 
     ! then we need to check min or max
     if(this%min_max) then
-    	! max volume
-    	this%objective_function_value = this%volume - this%v_max
+       ! max volume
+       this%objective_function_value = this%volume - this%v_max
     else
-    	! min volume
-    	this%objective_function_value = -this%volume + this%v_max
+       ! min volume
+       this%objective_function_value = -this%volume + this%v_max
     endif
 
 
@@ -190,19 +193,19 @@ contains
 
   subroutine volume_constraint_compute_sensitivity(this, design, fluid, adjoint)
     class(volume_constraint_t), intent(inout) :: this
-	 class(new_design_t), intent(inout) :: design
+    class(new_design_t), intent(inout) :: design
     class(fluid_scheme_t), intent(in) :: fluid
     class(adjoint_scheme_t), intent(in) :: adjoint
 
 
-	 call field_rone(this%sensitivity_to_coefficient)
-	 call field_cmult(this%sensitivity_to_coefficient, 1.0_rp/fluid%c_xh%volume)
+    call field_rone(this%sensitivity_to_coefficient)
+    call field_cmult(this%sensitivity_to_coefficient, 1.0_rp/fluid%c_xh%volume)
 
-	 if(this%min_max) then
-      ! max volume
+    if(this%min_max) then
+       ! max volume
     else
-      ! min volume
-      call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
+       ! min volume
+       call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
     endif
 
 
