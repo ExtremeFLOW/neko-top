@@ -83,7 +83,7 @@ jobs:
     name: Linting
     needs:
       - prepare
-    uses: ExtremeFLOW/Neko/.github/workflows/check_lint.yml@develop
+    uses: ./.github/workflows/check_lint.yml
 
   check_formatting:
     name: Formatting
