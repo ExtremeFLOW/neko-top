@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data/debugging_pipe.nmsh",
+        "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
         "end_time": 1e-5,

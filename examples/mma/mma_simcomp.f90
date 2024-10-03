@@ -84,6 +84,8 @@ contains
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
 
+    call this%init_base(json, case)
+
     call this%tmp%init(case%msh, case%fluid%Xh, "tmp")
     call this%designx%init(case%msh, case%fluid%Xh, "designx")
     call this%xmax%init(case%msh, case%fluid%Xh, "xmax")
@@ -98,7 +100,6 @@ contains
     call json_get_or_default(json, "d_const", this%d_const, 1.0_rp)
 
     call this%init_from_attributes()
-    call this%init_base(json, case)
   end subroutine simcomp_test_init_from_json
 
   ! Actual constructor.
