@@ -59,8 +59,6 @@ jobs:
     name: Prepare the environment
     runs-on: ubuntu-latest
     outputs:
-      flint-global-minimum: ${{ steps.store.outputs.flint-global-minimum }}
-      flint-changed-minimum: ${{ steps.store.outputs.flint-changed-minimum }}
       pfunit-version: ${{ steps.store.outputs.pfunit-version }}
       json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
       neko-version: ${{ steps.store.outputs.neko-version }}
@@ -77,8 +75,6 @@ jobs:
       - name: Store environment variables
         id: store
         run: |
-          echo "flint-global-minimum=$FLINT_GLOBAL_MINIMUM" >> $GITHUB_OUTPUT
-          echo "flint-changed-minimum=$FLINT_CHANGED_FILES_MINIMUM" >> $GITHUB_OUTPUT
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
           echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
