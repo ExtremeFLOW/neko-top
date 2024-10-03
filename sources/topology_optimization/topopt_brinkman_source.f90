@@ -128,7 +128,7 @@ contains
     ! Allocate the permeability and indicator field
 
     if (neko_field_registry%field_exists('brinkman_indicator') &
-        .or. neko_field_registry%field_exists('brinkman')) then
+         .or. neko_field_registry%field_exists('brinkman')) then
        call neko_error('Brinkman field already exists.')
     end if
 
@@ -178,12 +178,12 @@ contains
     ! Compute the permeability field
 
     call permeability_field(this%brinkman, this%indicator, &
-      & brinkman_limits(1), brinkman_limits(2), brinkman_penalty)
+    & brinkman_limits(1), brinkman_limits(2), brinkman_penalty)
 
     ! Copy the permeability field to the device
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(this%brinkman%x, this%brinkman%x_d, &
-                          this%brinkman%dof%size(), HOST_TO_DEVICE, .true.)
+            this%brinkman%dof%size(), HOST_TO_DEVICE, .true.)
     end if
 
   end subroutine brinkman_source_term_init_from_json
@@ -290,11 +290,11 @@ contains
        call json_get(json, 'mesh_transform.box_min', box_min)
        call json_get(json, 'mesh_transform.box_max', box_max)
        call json_get_or_default(json, 'mesh_transform.keep_aspect_ratio', &
-                                keep_aspect_ratio, .true.)
+            keep_aspect_ratio, .true.)
 
        if (size(box_min) .ne. 3 .or. size(box_max) .ne. 3) then
           call neko_error('Case file: mesh_transform. &
-            &box_min and box_max must be 3 element arrays of reals')
+          &box_min and box_max must be 3 element arrays of reals')
        end if
 
        call target_box%init(box_min, box_max)
@@ -310,7 +310,7 @@ contains
 
        do idx_p = 1, boundary_mesh%mpts
           boundary_mesh%points(idx_p)%x = &
-            scaling * boundary_mesh%points(idx_p)%x + translation
+               scaling * boundary_mesh%points(idx_p)%x + translation
        end do
 
       case default

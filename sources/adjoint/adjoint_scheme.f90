@@ -75,7 +75,7 @@ module adjoint_scheme
   use json_module, only : json_file, json_core, json_value
   use scratch_registry, only : scratch_registry_t
   use user_intf, only : user_t, dummy_user_material_properties, &
-                        user_material_properties
+       user_material_properties
   use utils, only : neko_warning, neko_error
   use field_series
   use time_step_controller
@@ -250,7 +250,7 @@ contains
 
   !> Initialize common data for the current scheme
   subroutine adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
-      kspv_init)
+       kspv_init)
     implicit none
     class(adjoint_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
@@ -1167,16 +1167,16 @@ contains
     integer :: n
 
     if (this%variable_material_properties) then
-      nut => neko_field_registry%get_field(this%nut_field_name)
-      n = nut%size()
+       nut => neko_field_registry%get_field(this%nut_field_name)
+       n = nut%size()
 
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_cfill(this%mu_field%x_d, this%mu, n)
-         call device_add2s2(this%mu_field%x_d, nut%x_d, this%rho, n)
-      else
-         call cfill(this%mu_field%x, this%mu, n)
-         call add2s2(this%mu_field%x, nut%x, this%rho, n)
-      end if
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_cfill(this%mu_field%x_d, this%mu, n)
+          call device_add2s2(this%mu_field%x_d, nut%x_d, this%rho, n)
+       else
+          call cfill(this%mu_field%x, this%mu, n)
+          call add2s2(this%mu_field%x, nut%x, this%rho, n)
+       end if
     end if
 
   end subroutine adjoint_scheme_update_material_properties
@@ -1190,7 +1190,7 @@ contains
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
-    procedure(user_material_properties),  pointer :: dummy_mp_ptr
+    procedure(user_material_properties), pointer :: dummy_mp_ptr
     logical :: nondimensional
     real(kind=rp) :: dummy_lambda, dummy_cp
 
@@ -1210,7 +1210,7 @@ contains
     else
        ! Incorrect user input
        if (params%valid_path('case.fluid.Re') .and. &
-           (params%valid_path('case.fluid.mu') .or. &
+            (params%valid_path('case.fluid.mu') .or. &
             params%valid_path('case.fluid.rho'))) then
           call neko_error("To set the material properties for the fluid,&
           & either provide Re OR mu and rho in the case file.")
@@ -1229,7 +1229,7 @@ contains
           call json_get(params, 'case.fluid.Re', this%mu)
           write(log_buf, '(A)') 'Read non-dimensional material properties'
           call neko_log%message(log_buf)
-          write(log_buf, '(A,ES13.6)') 'Re         :',  this%mu
+          write(log_buf, '(A,ES13.6)') 'Re         :', this%mu
           call neko_log%message(log_buf)
 
           ! Set rho to 1 since the setup is non-dimensional.

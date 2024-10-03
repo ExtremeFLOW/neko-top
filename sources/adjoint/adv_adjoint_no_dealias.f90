@@ -213,40 +213,40 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duxb(i) + &
-                  & vy%x(i,1,1,e)*dvxb(i) + &
-                  & vz%x(i,1,1,e)*dwxb(i) )
+             & vx%x(i,1,1,e)*duxb(i) + &
+             & vy%x(i,1,1,e)*dvxb(i) + &
+             & vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duyb(i) + &
-                  & vy%x(i,1,1,e)*dvyb(i) + &
-                  & vz%x(i,1,1,e)*dwyb(i))
+             & vx%x(i,1,1,e)*duyb(i) + &
+             & vy%x(i,1,1,e)*dvyb(i) + &
+             & vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duzb(i) + &
-                  & vy%x(i,1,1,e)*dvzb(i) + &
-                  & vz%x(i,1,1,e)*dwzb(i))
+             & vx%x(i,1,1,e)*duzb(i) + &
+             & vy%x(i,1,1,e)*dvzb(i) + &
+             & vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
           call adjoint_weak_no_dealias_cpu( &
-               & fx%x(:,:,:,e), vx%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+          & fx%x(:,:,:,e), vx%x(1,1,1,e), &
+          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+          & e, coef, Xh, Xh%lxyz, &
+          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-               & fy%x(:,:,:,e), vy%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+          & fy%x(:,:,:,e), vy%x(1,1,1,e), &
+          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+          & e, coef, Xh, Xh%lxyz, &
+          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-               & fz%x(:,:,:,e), vz%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+          & fz%x(:,:,:,e), vz%x(1,1,1,e), &
+          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+          & e, coef, Xh, Xh%lxyz, &
+          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
        enddo
 
     end if
