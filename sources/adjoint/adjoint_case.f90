@@ -91,7 +91,6 @@ module adjoint_case
   use json_utils, only : json_get, json_get_or_default
   use scratch_registry, only : scratch_registry_t, neko_scratch_registry
   use point_zone_registry, only: neko_point_zone_registry
-  use material_properties, only : material_properties_t
   use adjoint_ic, only : set_adjoint_ic
   use json_utils, only : json_extract_item
   use json_utils_ext, only: json_key_fallback, json_get_subdict
@@ -179,7 +178,6 @@ contains
     ! extra things for json
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
-
     !
     ! Setup fluid scheme
     !
@@ -189,7 +187,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
-         neko_case%material_properties)
+         neko_case%ext_bdf)
 
     !
     ! Setup scalar scheme

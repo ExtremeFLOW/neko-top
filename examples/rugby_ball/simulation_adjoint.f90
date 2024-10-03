@@ -150,10 +150,10 @@ contains
 
        ! Update material properties
        call this%case%usr%material_properties(t_adj, tstep_adj, &
-            this%case%material_properties%rho, &
-            this%case%material_properties%mu, &
-            this%case%material_properties%cp, &
-            this%case%material_properties%lambda, &
+            this%scheme%rho, &
+            this%scheme%mu, &
+            this%case%scalar%cp, &
+            this%case%scalar%lambda, &
             this%case%params)
 
        call neko_log%end_section()

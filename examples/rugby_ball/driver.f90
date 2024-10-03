@@ -272,7 +272,7 @@ program usrneko
 ! call problem%solve()
 !##############################################################################
   optimization_iteration = 1
-  do while (optimization_iteration.lt.100)
+  do while (optimization_iteration .lt. 100)
 
 
      call neko_solve(C)
@@ -397,7 +397,7 @@ program usrneko
      call field_rzero(adj%scheme%w_adj)
 
 
-  enddo
+  end do
 !##############################################################################
 
 

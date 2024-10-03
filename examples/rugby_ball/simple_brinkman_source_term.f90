@@ -50,16 +50,17 @@ module simple_brinkman_source_term
   !! The strength is specified with the `values` keyword, which should be an
   !! array, with a value for each component of the source.
   type, public, extends(source_term_t) :: simple_brinkman_source_term_t
-   ! We have a source term of the form $\chi u$
-   !> the fields corresponding to \chi, u, v and w
-   type(field_t), pointer :: chi, u, v, w
+     ! We have a source term of the form $\chi u$
+     !> the fields corresponding to \chi, u, v and w
+     type(field_t), pointer :: chi, u, v, w
 
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => simple_brinkman_source_term_init_from_json
+     procedure, pass(this) :: init => &
+          simple_brinkman_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       simple_brinkman_source_term_init_from_components
+          simple_brinkman_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => simple_brinkman_source_term_free
      !> Computes the source term and adds the result to `fields`.
@@ -71,7 +72,8 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
-  subroutine simple_brinkman_source_term_init_from_json(this, json, fields, coef)
+  subroutine simple_brinkman_source_term_init_from_json(this, json, fields, &
+       coef)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
@@ -92,8 +94,8 @@ contains
   !! @param coef The SEM coeffs.
   !! @param start_time When to start adding the source term.
   !! @param end_time When to stop adding the source term.
-  subroutine simple_brinkman_source_term_init_from_components(this, f_x, f_y, f_z, design, u, v, w, &
-                                                    coef)
+  subroutine simple_brinkman_source_term_init_from_components(this, &
+       f_x, f_y, f_z, design, u, v, w, coef)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -104,7 +106,8 @@ contains
     type(new_design_t), intent(in), target :: design
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this... but I'm just going to set a super big number...
+    ! Tim you're going to hate this...
+    ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
 
@@ -121,7 +124,7 @@ contains
 
     call this%init_base(fields, coef, start_time, end_time)
 
-	 ! Real stuff
+    ! Real stuff
 
     ! point everything in the correct places
     this%u => u
@@ -151,7 +154,7 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     type(field_t), pointer :: fu, fv, fw
-    integer ::  n
+    integer :: n
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)

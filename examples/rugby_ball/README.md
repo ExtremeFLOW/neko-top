@@ -79,6 +79,12 @@ You can see everything is hardcoded and we need to include a bunch of JSON stuff
 ### ALL the GPU backends!
 This can come at the end...
 
+### Adjoint solver
+There is still ALOT to do on the adjoint solver regarding the treatment of BCs etc! Don't forget to come back to this!
+
+Also, this point should NEVER be removed from the readme, as there are frequent updates in the `fluid_scheme.f90`, `fluid_pnpn.f90` etc, and these changes 
+should be reflected in `adjoint_scheme.f90` and `adjoint_pnpn.f90` etc.
+
 ## Todo (in general):
 - There are a ton more minor comments written throughout the source code here, so I'm sure some have been missed in this `readme.md`
 - Double check all non-dimensionalization and scalings

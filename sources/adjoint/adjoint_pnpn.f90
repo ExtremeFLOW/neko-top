@@ -56,7 +56,6 @@ module adjoint_pnpn
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
-  use material_properties, only : material_properties_t
   use advection_adjoint_fctry, only : advection_adjoint_factory
   use ax_product, only : ax_t
   use field, only : field_t
@@ -178,13 +177,13 @@ module adjoint_pnpn
 
 contains
 
-  subroutine adjoint_pnpn_init(this, msh, lx, params, user, material_properties)
+  subroutine adjoint_pnpn_init(this, msh, lx, params, user, time_scheme)
     class(adjoint_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(inout) :: lx
     type(json_file), target, intent(inout) :: params
     type(user_t), intent(in) :: user
-    type(material_properties_t), target, intent(inout) :: material_properties
+    type(time_scheme_controller_t), target, intent(in) :: time_scheme
     character(len=20), parameter :: scheme = 'Perturbation (Pn/Pn)'
     type(file_t) :: field_file, out_file
     type(fld_file_data_t) :: field_data
@@ -198,8 +197,7 @@ contains
     call this%free()
 
     ! Initialize base class
-    call this%scheme_init(msh, lx, params, .true., .true., scheme, user, &
-         material_properties)
+    call this%scheme_init(msh, lx, params, .true., .true., scheme, user)
 
     if (this%variable_material_properties .eqv. .true.) then
        ! Setup backend dependent Ax routines
