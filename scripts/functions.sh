@@ -63,6 +63,7 @@ function prepare {
     JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
         -exec test -f '{}'/libjsonfortran.so \; -print)
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export PATH="$NEKO_DIR/bin:$PATH"
 
     # Run preparation if it exists
     if [ -f "prepare.sh" ]; then
@@ -83,7 +84,7 @@ function prepare {
     # ------------------------------------------------------------------------ #
     # Find the Neko executable
 
-    if [ -f neko ]; then
+    if [ -f ./neko ]; then
         neko=$(realpath ./neko)
     elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
         printf "=%.0s" {1..80} && printf "\n"
