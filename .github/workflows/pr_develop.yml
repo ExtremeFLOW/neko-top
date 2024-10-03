@@ -26,9 +26,6 @@
 
 name: Develop PR Checks
 on:
-  push:
-    branches:
-      - ci/*
   pull_request:
     branches: [develop]
     types:
