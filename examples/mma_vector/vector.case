@@ -1,0 +1,82 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": true,
+        "end_time": 1e-5,
+        "timestep": 1e-5,
+        "simulation_components": [
+            {
+                "type": "mma",
+                "is_user": true,
+                "tol": 1e-6,
+                "m": 2,
+                "a0_const": 1.0,
+                "a_const": 0,
+                "c_const": 100000.0,
+                "d_const": 1000.0,
+                "backend": "vector"
+            }
+        ],
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 2,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 100.0,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "inflow_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-7,
+                "max_iterations": 800
+            },
+            "output_control": "nsamples",
+            "output_value": 250,
+            "boundary_types": [
+                "v",
+                "o",
+                "w",
+                "w",
+                "w",
+                "w"
+            ]
+        },
+        "scalar": {
+            "enabled": true,
+            "Pe": 1000.0,
+            "boundary_types": [
+                "d=0",
+                "d=1"
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            }
+        }
+    }
+}

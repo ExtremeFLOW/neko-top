@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data/debugging_pipe.nmsh",
+        "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
         "end_time": 1e-5,
@@ -15,7 +15,8 @@
                 "a0_const": 1.0,
                 "a_const": 0,
                 "c_const": 100000.0,
-                "d_const": 1000.0
+                "d_const": 1000.0,
+                "backend": "device"
             }
         ],
         "numerics": {
@@ -57,7 +58,6 @@
             "output_control": "nsamples",
             "output_value": 250,
             "boundary_types": [
-                "v",
                 "v",
                 "o",
                 "w",
