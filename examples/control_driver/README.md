@@ -83,4 +83,7 @@ You can see everything is hardcoded and we need to include a bunch of JSON stuff
 - Restart correctly (or maybe not! in steady calculations it can often be faster if your initial condition is the final condition from the previous iteration)
 - Nothing is freed correctly
 - Particularly regarding steady calculations, there's no reason to recalculate the adjoint forcing each time, it will always be the same.
- 
+- Obviously have MMA based ok KKT not number of itereations 
+- Having our own sampler (the one here is hardcoded, but as we introduce new eqns and coeffients it will be different)
+- Update the `design_t` to include all the cool features Tim put in for initializing a design... instead of this hard coded circle 
+- We have RAMP currently implemented, but we should also include SIMP, linear etc
