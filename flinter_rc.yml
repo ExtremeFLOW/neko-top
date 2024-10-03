@@ -46,7 +46,7 @@ regexp-rules:
 
   trailing-white-spaces:
     message: Trailing white-spaces
-    regexp: ([ ]+|\t+)\n
+    regexp: ( +|\t+)$
     replacement: ""
     active: true
     include-comments: true
