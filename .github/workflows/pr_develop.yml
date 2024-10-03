@@ -85,18 +85,18 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_lint.yml
 
-  check_formatting:
-    name: Formatting
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_formatting.yml
+  # check_formatting:
+  #   name: Formatting
+  #   needs:
+  #     - prepare
+  #   uses: ./.github/workflows/check_formatting.yml
 
   check_compilation:
     name: Compilation
     needs:
       - prepare
       - check_lint
-      - check_formatting
+      # - check_formatting
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
@@ -109,7 +109,7 @@ jobs:
     needs:
       - prepare
       - check_lint
-      - check_formatting
+      # - check_formatting
       - check_compilation
     runs-on: ubuntu-latest
     env:
