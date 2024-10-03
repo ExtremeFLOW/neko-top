@@ -26,6 +26,9 @@
 
 name: Develop PR Checks
 on:
+  push:
+    branches:
+      - ci/*
   pull_request:
     branches: [develop]
     types:
@@ -41,8 +44,6 @@ on:
 # will store them in a file that the other jobs can read.
 
 env:
-  FLINT_GLOBAL_MINIMUM: ${{ vars.FLINT_GLOBAL_MINIMUM || 99.0 }}
-  FLINT_CHANGED_FILES_MINIMUM: 10.0
   PFUNIT_VERSION: v4.4.2
   JSON_FORTRAN_VERSION: 8.3.0
   NEKO_VERSION: develop
@@ -90,9 +91,6 @@ jobs:
     needs:
       - prepare
     uses: ./.github/workflows/check_lint.yml
-    with:
-      global-minimum-score: ${{ needs.prepare.outputs.flint-global-minimum }}
-      changed-files-minimum-score: ${{ needs.prepare.outputs.flint-changed-minimum }}
 
   check_formatting:
     name: Formatting
