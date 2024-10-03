@@ -106,3 +106,74 @@ __global__ void sum_reductions_final(T* __restrict__ input, int size) {
     if (tid < 32) warpReduce(sdata, tid);
     if (tid == 0) input[blockIdx.x] = sdata[0];
 }
+
+
+
+template< typename T>
+__inline__ __device__ T reduce_warp(T val) {
+	val += __shfl_down_sync(0xffffffff, val, 16);
+	val += __shfl_down_sync(0xffffffff, val, 8);
+	val += __shfl_down_sync(0xffffffff, val, 4);
+	val += __shfl_down_sync(0xffffffff, val, 2);
+	val += __shfl_down_sync(0xffffffff, val, 1);
+	return val;
+}
+
+template <typename T>
+__global__ void reduce_kernel(T* bufred, const int n) {
+
+	T sum = 0;
+	const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	const int str = blockDim.x * gridDim.x;
+	for (int i = idx; i < n; i += str)
+	{
+		sum += bufred[i];
+	}
+
+	__shared__ T shared[32];
+	unsigned int lane = threadIdx.x % warpSize;
+	unsigned int wid = threadIdx.x / warpSize;
+
+	sum = reduce_warp<T>(sum);
+	if (lane == 0)
+		shared[wid] = sum;
+	__syncthreads();
+
+	sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+	if (wid == 0)
+		sum = reduce_warp<T>(sum);
+
+	if (threadIdx.x == 0)
+		bufred[blockIdx.x] = sum;
+}
+
+
+template< typename T >
+__global__ void mmasum_kernel(const T* a, T* buf_h, const int n, const int k) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    const unsigned int lane = threadIdx.x % warpSize;
+    const unsigned int wid = threadIdx.x / warpSize;
+
+    __shared__ T shared[32];
+    T sum = 0;
+    for (int i = idx; i < n; i += str)
+    {
+        sum += a[i + k * n];
+    }
+
+    sum = reduce_warp<T>(sum);
+    if (lane == 0)
+        shared[wid] = sum;
+    __syncthreads();
+
+    sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+    if (wid == 0)
+        sum = reduce_warp<T>(sum);
+
+    if (threadIdx.x == 0)
+        buf_h[blockIdx.x] = sum;
+
+}
