@@ -76,6 +76,9 @@ We have most of the adjoint passive scalars written on a different branch, but w
 ### ALL the JSON stuff
 You can see everything is hardcoded and we need to include a bunch of JSON stuff. This can be done after we discuss the neko-top case file.
 
+### ALL the GPU backends!
+This can come at the end...
+
 ## Todo (in general):
 - There are a ton more minor comments written throughout the source code here, so I'm sure some have been missed in this `readme.md`
 - Double check all non-dimensionalization and scalings
@@ -87,3 +90,4 @@ You can see everything is hardcoded and we need to include a bunch of JSON stuff
 - Having our own sampler (the one here is hardcoded, but as we introduce new eqns and coeffients it will be different)
 - Update the `design_t` to include all the cool features Tim put in for initializing a design... instead of this hard coded circle 
 - We have RAMP currently implemented, but we should also include SIMP, linear etc
+- Format everything to `Neko` coding standard
