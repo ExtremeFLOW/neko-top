@@ -51,7 +51,7 @@ regexp-rules:
     active: true
     include-comments: true
 
-  tabulation-instead-of-two-spaces:
+  tabulation-instead-of-spaces:
     message: Should use 2 spaces instead of tabulation
     regexp: \t
     replacement: "  "
