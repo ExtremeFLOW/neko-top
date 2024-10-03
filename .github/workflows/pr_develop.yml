@@ -1,5 +1,30 @@
-name: Develop PR Checks
+# File: pr_develop.yml
+# Date: 2024-08-13
+# ---------------------------------------------------------------------------- #
+# Workflow Overview
+# ---------------------------------------------------------------------------- #
+# This file contains the workflow that checks PRs for the develop branch. It
+# checks for linting, formatting, and compilation. The workflow is triggered
+# when a PR is opened, synchronized, reopened, or ready for review.
 
+# The workflow is split into multiple jobs:
+# - Prepare: Checks if the PR is a draft and stores global environment variables.
+# - Linting: Lints the PR for any changes.
+# - Formatting: Formats the PR for any changes.
+# - Compilation: Compiles the PR for any changes.
+# - Complete: Checks if all previous jobs passed.
+
+# The jobs are run in a sequence, where the Prepare job is run first. The Linting,
+# Formatting, and Compilation jobs run in parallel, and the Complete job runs last.
+
+# The workflow uses the following environment variables:
+# - FLINT_GLOBAL_MINIMUM: The minimum global linting score.
+# - FLINT_CHANGED_FILES_MINIMUM: The minimum linting score for changed files.
+# - PFUNIT_VERSION: The version of pFUnit to use.
+# - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
+# - NEKO_VERSION: The version of Neko to use.
+
+name: Develop PR Checks
 on:
   pull_request:
     branches: [develop]
@@ -9,48 +34,112 @@ on:
       - reopened
       - ready_for_review
 
-jobs:
-  is_draft:
-    if: github.event.pull_request.draft == true
+# ---------------------------------------------------------------------------- #
+# Define the global environment variables, these control versioning and other
+# useful settings in a unified way. Due to limitations in the GitHub Actions
+# environment, we cannot pass these as inputs to the jobs, so the prepare job
+# will store them in a file that the other jobs can read.
 
-    name: Check if PR is a draft
+env:
+  PFUNIT_VERSION: v4.4.2
+  JSON_FORTRAN_VERSION: 8.3.0
+  NEKO_VERSION: develop
+
+# ---------------------------------------------------------------------------- #
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. We do not wish to waste time on old runs if a
+# newer one is available.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare the environment
     runs-on: ubuntu-latest
+    outputs:
+      pfunit-version: ${{ steps.store.outputs.pfunit-version }}
+      json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
+      neko-version: ${{ steps.store.outputs.neko-version }}
+
     steps:
       - name: Check if PR is a draft
-        run: echo "This PR is a draft"
+        shell: bash
+        run: |
+          if [ "${{ github.event.pull_request.draft }}" == "true" ]; then
+            echo "PR is a draft" >&2
+            exit 1
+          fi
+
+      - name: Store environment variables
+        id: store
+        run: |
+          echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
+          echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
+
+  check_lint:
+    name: Linting
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_lint.yml
 
   check_formatting:
     name: Formatting
-    if: github.event.pull_request.draft != true
+    needs:
+      - prepare
     uses: ./.github/workflows/check_formatting.yml
 
   check_compilation:
     name: Compilation
-    if: github.event.pull_request.draft != true
+    needs:
+      - prepare
+      - check_lint
+      - check_formatting
     uses: ./.github/workflows/check_neko-top.yml
     with:
-      neko-version: "develop"
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
 
   check_complete:
+    if: ${{ always() }}
     name: Develop PR Ready
-    if: github.event.pull_request.draft != true && ${{ always() }}
     needs:
+      - prepare
+      - check_lint
       - check_formatting
       - check_compilation
-
     runs-on: ubuntu-latest
     env:
-      check_formatting: ${{ needs.check_formatting.result }}
-      check_compilation: ${{ needs.check_compilation.result }}
+      draft_status: ${{ needs.prepare.result }}
+      flint_status: ${{ needs.check_lint.result }}
+      compile_status: ${{ needs.check_compilation.result }}
 
     steps:
       - name: All checks passed
         run: |
-          if [ "$check_formatting" != "success" ]; then
-            echo "Formatting check failed"
-            exit 1
-          elif [ "$check_compilation" != "success" ]; then
-            echo "Compilation check failed"
+          success=true
+          fail=()
+          if [ "$draft_status" != "success" ]; then
+            fail+=("\t- Draft check: $draft_status")
+            success=false
+          fi
+          if [ "$flint_status" != "success" ]; then
+            fail+=("\t- Linting check: $flint_status")
+            success=false
+          fi
+          if [ "$compile_status" != "success" ]; then
+            fail+=("\t- Compilation check: $compile_status")
+            success=false
+          fi
+
+          if [ "$success" == false ]; then
+            >&2 echo "The following checks failed:"
+            for i in "${fail[@]}"; do
+              >&2 printf "$i\n"
+            done
             exit 1
           fi
           echo "All checks passed"
