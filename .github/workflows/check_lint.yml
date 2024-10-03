@@ -47,7 +47,7 @@ jobs:
 
       - name: Lint repository
         id: lint
-        uses: ./.github/actions/flint
+        uses: ExtremeFLOW/Neko/.github/actions/flint@develop
         with:
           directory: sources/
           depth: 10
