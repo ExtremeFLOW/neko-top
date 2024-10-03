@@ -72,7 +72,8 @@ module mma
 
    contains
      !> Interface for initializing the MMA object
-     procedure, public, pass(this) :: init => mma_init_attributes
+     generic, public :: init => init_attributes, init_json
+     procedure, public, pass(this) :: init_attributes => mma_init_attributes
      procedure, public, pass(this) :: init_json => mma_init_json
 
      procedure, public, pass(this) :: free => mma_free
@@ -382,7 +383,9 @@ contains
     end if
 
     if (this%backend == 'cpu') then
-       call this%mma_update_cpu(iter, x%x, df0dx%x, fval%x, dfdx%x)
+       call this%gensub(iter, x%x, df0dx%x, fval%x, dfdx%x)
+       call this%subsolve(x%x)
+       this%is_updated = .true.
     else if (this%backend == 'vector') then
        call this%gensub(iter, x, df0dx, fval, dfdx)
        call this%subsolve(x%x)

@@ -86,6 +86,8 @@ contains
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
 
+    call this%init_base(json, case)
+
     call this%tmp%init(case%msh, case%fluid%Xh, "tmp")
     call this%designx%init(case%msh, case%fluid%Xh, "designx")
     call this%xmax%init(case%msh, case%fluid%Xh, "xmax")
@@ -100,7 +102,6 @@ contains
     call json_get_or_default(json, "d_const", this%d_const, 1.0_rp)
 
     call this%init_from_attributes()
-    call this%init_base(json, case)
   end subroutine simcomp_test_init_from_json
 
   ! Actual constructor.
@@ -132,11 +133,11 @@ contains
     ! print *, "nglobal=", nglobal
 
     ! initial design
-    this%designx%x=1.0
+    this%designx%x = 1.0_rp
     this%xmax%x = 10.0_rp
     this%xmin%x = 0.0_rp
-    call this%mma%init(reshape(this%designx%x, [nloc]), &
-         nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x, backend = "vector")
+    call this%mma%init_json(reshape(this%designx%x, [nloc]), &
+         nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x, this%case%params)
 
     ! Get the rank of the current process
     ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
