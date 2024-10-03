@@ -21,7 +21,7 @@ jobs:
 
       - name: Run flint
         id: lint
-        uses: ExtremeFLOW/Neko/.github/actions/flint@develop
+        uses: ./.github/actions/flint
         with:
           directory: sources/
           depth: 10
@@ -47,7 +47,7 @@ jobs:
 
       - name: Lint repository
         id: lint
-        uses: ExtremeFLOW/Neko/.github/actions/flint@develop
+        uses: ./.github/actions/flint
         with:
           directory: sources/
           depth: 10
