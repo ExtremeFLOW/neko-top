@@ -29,4 +29,12 @@ void mma_gensub_gpu(void* x, void*  xold1, void* xold2, void* df0dx, void* dfdx,
     }
     cudaFree(temp);
     cudaFree(temp_sum);
+	////global communication ?
+	/*
+	globaltmp_m = 0.0_rp
+    call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+    this%bi%x = globaltmp_m - fval
+	*/
+
 }
