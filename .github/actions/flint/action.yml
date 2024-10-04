@@ -73,28 +73,3 @@ runs:
           echo "Score=$score"
           echo "score=$score" >> $GITHUB_OUTPUT
         fi
-
-    - name: Lint the files
-      shell: bash
-      id: lint-files
-      run: |
-        touch flint-report.txt
-        # If more than one directory is specified, then loop through them.
-        for entry in ${{ inputs.path }}; do
-          if [ -f "$entry" ]; then
-              # Skip non-fortran files
-              if [[ ${entry: -4} != ".f90" && ${entry: -4} != ".F90" ]]; then
-                continue
-              fi
-
-              rm -f flint.txt
-              flint lint -r ${{ inputs.rc-file }} $entry > flint.txt
-              if [ ! -s flint.txt ]; then
-                flint stats -r ${{ inputs.rc-file }} $entry > flint.txt
-              fi
-
-              printf "%.s-" {1..80} && printf "\n"
-              printf "Linting improvements for \n\t$entry\n\n"
-              cat flint.txt | tee -a flint-report.txt
-          fi
-        done
