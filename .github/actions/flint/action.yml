@@ -3,7 +3,12 @@ description: |
   This action executes the Flint linter on the specified directory.
 
 inputs:
-  directory:
+  command:
+    description: "The command to run."
+    required: true
+    default: "score"
+
+  path:
     description: "The directory to lint."
     required: true
     default: "."
@@ -41,7 +46,10 @@ runs:
       shell: bash
       id: lint
       run: |
-        flint score ${{ inputs.directory }} -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
+        # If more than one directory is specified, then loop through them.
+        for dir in ${{ inputs.directory }}; do
+          flint score $dir -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
+        done
         score=$(awk '$1==0{print $3}' flint.txt)
 
         if [ -z "$score" ]; then
