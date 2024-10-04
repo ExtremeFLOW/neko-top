@@ -65,7 +65,7 @@ module adjoint_scheme
   use bc, only: bc_t, bc_list_t, bc_list_init, bc_list_add, bc_list_free, &
        bc_list_apply_scalar, bc_list_apply_vector
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBL_LEN, NEKO_MSH_MAX_ZLBLS
-  use math, only: cfill
+  use math, only: cfill, add2s2
   use device_math, only: device_cfill, device_add2s2
   use time_scheme_controller, only: time_scheme_controller_t
   ! use mathops, only:
