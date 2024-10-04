@@ -44,7 +44,7 @@ runs:
         # If more than one directory is specified, then loop through them.
         score=0
         num=0
-        for entry in ${{ inputs.path }}; do
+        for entry in "${{ inputs.path }}""; do
           if [ -d "$entry" ]; then
             echo "Scoring $entry"
             flint score $entry -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
@@ -79,7 +79,7 @@ runs:
       run: |
         touch flint-report.txt
         # If more than one directory is specified, then loop through them.
-        for entry in ${{ inputs.path }}; do
+        for entry in "${{ inputs.path }}""; do
           if [ -f "$entry" ]; then
               # Skip non-fortran files
               if [[ ${entry: -4} != ".f90" && ${entry: -4} != ".F90" ]]; then
