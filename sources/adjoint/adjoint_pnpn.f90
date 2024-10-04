@@ -113,7 +113,7 @@ module adjoint_pnpn
      type(dirichlet_t) :: bc_field_dirichlet_u !< Dirichlet condition vel. res.
      type(dirichlet_t) :: bc_field_dirichlet_v !< Dirichlet condition vel. res.
      type(dirichlet_t) :: bc_field_dirichlet_w !< Dirichlet condition vel. res.
-     type(non_normal_t) :: bc_vel_res_non_normal !< Dirichlet condition vel. res.
+     type(non_normal_t) :: bc_vel_res_non_normal !< Dirichlet condition vel. res
      type(bc_list_t) :: bclst_vel_res
      type(bc_list_t) :: bclst_du
      type(bc_list_t) :: bclst_dv
@@ -147,7 +147,7 @@ module adjoint_pnpn
      ! ======================================================================= !
      ! Addressable attributes
 
-     real(kind=rp) :: norm_scaling !< Constant for the norm of the velocity field.
+     real(kind=rp) :: norm_scaling !< Constant for the norm of the velocity.
      real(kind=rp) :: norm_target !< Target norm for the velocity field.
      real(kind=rp) :: norm_tolerance !< Tolerance for when to rescale the flow.
 
@@ -265,7 +265,8 @@ contains
     call this%bc_prs_surface%mark_zone(msh%inlet)
     call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
          'v', this%bc_labels)
-    !This impacts the rhs of the pressure, need to check what is correct to add here
+    ! This impacts the rhs of the pressure, need to check what is correct to
+    ! add here
     call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
          'd_vel_u', this%bc_labels)
     call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
@@ -363,7 +364,7 @@ contains
     if (this%variable_material_properties .and. &
          this%vel_projection_dim .gt. 0) then
        call neko_error("Velocity projection not available for full stress &
-       &formulation")
+            &formulation")
     end if
 
 
@@ -492,7 +493,8 @@ contains
        call this%gs_Xh%op(this%wlag%lf(i), GS_OP_ADD)
     end do
 
-    !! If we would decide to only restart from lagged fields instead of asving abx1, aby1 etc.
+    !! If we would decide to only restart from lagged fields instead of asving
+    ! abx1, aby1 etc.
     !! Observe that one also needs to recompute the focing at the old time steps
     !u_temp = this%ulag%lf(2)
     !v_temp = this%vlag%lf(2)
@@ -502,9 +504,11 @@ contains
     !
     !! Pre-multiply the source terms with the mass matrix.
     !if (NEKO_BCKND_DEVICE .eq. 1) then
-    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d, this%c_Xh%B_d, this%msh%gdim, n)
+    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d,
+    ! this%c_Xh%B_d, this%msh%gdim, n)
     !else
-    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B, this%msh%gdim, n)
+    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B,
+    ! this%msh%gdim, n)
     !end if
 
     !! Add the advection operators to the right-hand-side.
@@ -522,16 +526,20 @@ contains
 
     !! Pre-multiply the source terms with the mass matrix.
     !if (NEKO_BCKND_DEVICE .eq. 1) then
-    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d, this%c_Xh%B_d, this%msh%gdim, n)
+    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d,
+    ! this%c_Xh%B_d, this%msh%gdim, n)
     !else
-    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B, this%msh%gdim, n)
+    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B,
+    ! this%msh%gdim, n)
     !end if
 
     !! Pre-multiply the source terms with the mass matrix.
     !if (NEKO_BCKND_DEVICE .eq. 1) then
-    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d, this%c_Xh%B_d, this%msh%gdim, n)
+    !   call device_opcolv(this%f_adj_x%x_d, this%f_adj_y%x_d, this%f_adj_z%x_d,
+    ! this%c_Xh%B_d, this%msh%gdim, n)
     !else
-    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B, this%msh%gdim, n)
+    !   call opcolv(this%f_adj_x%x, this%f_adj_y%x, this%f_adj_z%x, this%c_Xh%B,
+    ! this%msh%gdim, n)
     !end if
 
     !call this%adv%compute(u_temp, v_temp, w_temp, &
@@ -635,7 +643,8 @@ contains
     n = this%dm_Xh%size()
 
     call profiler_start_region('Fluid', 1)
-    associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, p => this%p_adj, &
+    associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
+         p => this%p_adj, &
          du => this%du, dv => this%dv, dw => this%dw, dp => this%dp, &
          u_b => this%u_b, v_b => this%v_b, w_b => this%w_b, &
          u_res => this%u_res, v_res => this%v_res, w_res => this%w_res, &
@@ -729,7 +738,8 @@ contains
       call this%pc_prs%update()
       call profiler_start_region('Pressure solve', 3)
       ksp_results(1) = &
-           this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, this%bclst_dp, gs_Xh)
+           this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, this%bclst_dp, &
+           gs_Xh)
 
       call profiler_end_region
 
@@ -756,7 +766,8 @@ contains
            u_res%x, v_res%x, w_res%x, dm_Xh%size(),&
            t, tstep)
 
-      !We should implement a bc that takes three field_bcs and implements vector_apply
+      !We should implement a bc that takes three field_bcs and implements
+      ! vector_apply
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call this%bc_field_dirichlet_u%apply_scalar_dev(u_res%x_d, t, tstep)
          call this%bc_field_dirichlet_v%apply_scalar_dev(v_res%x_d, t, tstep)
@@ -846,9 +857,12 @@ contains
 
     ! Scale the right hand sides
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cmult(fluid_data%f_adj_x%x_d, scale, fluid_data%f_adj_x%size())
-       call device_cmult(fluid_data%f_adj_y%x_d, scale, fluid_data%f_adj_y%size())
-       call device_cmult(fluid_data%f_adj_z%x_d, scale, fluid_data%f_adj_z%size())
+       call device_cmult(fluid_data%f_adj_x%x_d, scale, &
+            fluid_data%f_adj_x%size())
+       call device_cmult(fluid_data%f_adj_y%x_d, scale, &
+            fluid_data%f_adj_y%size())
+       call device_cmult(fluid_data%f_adj_z%x_d, scale, &
+            fluid_data%f_adj_z%size())
        ! HARRY
        ! maybe the abx's too
        call device_cmult(fluid_data%abx1%x_d, scale, fluid_data%abx1%size())
@@ -976,10 +990,12 @@ contains
     n = this%c_Xh%dof%size()
     if (tstep .eq. 1) then
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          norm_l2_base = device_norm(this%u_adj%x_d, this%v_adj%x_d, this%w_adj%x_d, &
+          norm_l2_base = device_norm(this%u_adj%x_d, this%v_adj%x_d, &
+               this%w_adj%x_d, &
                this%c_Xh%B_d, this%c_Xh%volume, n)
        else
-          norm_l2_base = this%norm_scaling * norm(this%u_adj%x, this%v_adj%x, this%w_adj%x, &
+          norm_l2_base = this%norm_scaling * norm(this%u_adj%x, this%v_adj%x, &
+               this%w_adj%x, &
                this%c_Xh%B, this%c_Xh%volume, n)
        end if
        if (this%norm_target .lt. 0.0_rp) then
@@ -1015,20 +1031,20 @@ contains
     end if
 
     ! Log the results
-    !call neko_log%section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    !call neko_log%section('Power Iterations', lvl = NEKO_LOG_DEBUG)
     call neko_log%section('Power Iterations')
 
     write (log_message, '(A7,E20.14)') 'Norm: ', norm_l2
-    call neko_log%message(log_message, lvl=NEKO_LOG_DEBUG)
+    call neko_log%message(log_message, lvl = NEKO_LOG_DEBUG)
     write (log_message, '(A7,E20.14)') 'Scaling: ', scaling_factor
-    call neko_log%message(log_message, lvl=NEKO_LOG_DEBUG)
+    call neko_log%message(log_message, lvl = NEKO_LOG_DEBUG)
 
     ! Save to file
     call data_line%init(2)
     data_line%x = [norm_l2, scaling_factor]
     call this%file_output%write(data_line, t)
 
-    !call neko_log%end_section('Power Iterations', lvl=NEKO_LOG_DEBUG)
+    !call neko_log%end_section('Power Iterations', lvl = NEKO_LOG_DEBUG)
     call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
 

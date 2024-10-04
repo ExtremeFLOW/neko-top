@@ -5,14 +5,14 @@ module user
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
+  use num_types, only: rp
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use math, only: rzero, copy, chsign
   use device_math, only: device_copy, device_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   implicit none
 
 contains
@@ -83,7 +83,8 @@ contains
     ! and suffer the double derivative :/
     !
     ! in fact, we'll go even quicker and use
-    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u )) and assume divergence free u
+    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u )) and assume divergence
+    ! free u
 
     call curl(wo1, wo2, wo3, u, v, w, t1, t2, f%coef)
     call curl(wo4, wo5, wo6, wo1, wo2, wo3, t1, t2, f%coef)

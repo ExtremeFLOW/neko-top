@@ -32,20 +32,20 @@
 !
 !> Adjoint simulation driver
 module simulation_adjoint
-  use mpi_f08
-  use case, only : case_t
-  use num_types, only : rp, dp
-  use time_scheme_controller, only : time_scheme_controller_t
-  use file, only : file_t
-  use logger, only : LOG_SIZE, neko_log
-  use jobctrl, only : jobctrl_time_limit
-  use field, only : field_t
-  use profiler, only : profiler_start, profiler_stop, &
+  use mpi_f08, only: MPI_WTIME
+  use case, only: case_t
+  use num_types, only: rp, dp
+  use time_scheme_controller, only: time_scheme_controller_t
+  use file, only: file_t
+  use logger, only: LOG_SIZE, neko_log
+  use jobctrl, only: jobctrl_time_limit
+  use field, only: field_t
+  use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
-  use simcomp_executor, only : neko_simcomps
-  use json_utils, only : json_get_or_default
-  use time_step_controller, only : time_step_controller_t
-  use adjoint_case, only : adjoint_case_t
+  use simcomp_executor, only: neko_simcomps
+  use json_utils, only: json_get_or_default
+  use time_step_controller, only: time_step_controller_t
+  use adjoint_case, only: adjoint_case_t
   implicit none
   private
 
@@ -83,14 +83,15 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
+    write(log_buf, '(A, E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
+         this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf,'(A, E15.7)') 'dt :  ', this%case%dt
+       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%dt
        call neko_log%message(log_buf)
     else
-       write(log_buf,'(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
+       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
        call neko_log%message(log_buf)
     end if
 
@@ -100,8 +101,10 @@ contains
     call this%s%sample(t_adj, tstep_adj)
 
     ! HARRY
-    ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
+    ! ok this I guess this is techincally where we set the initial condition
+    ! of adjoint yeh?
+    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, &
+         this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -119,12 +122,14 @@ contains
        call neko_log%message(log_buf)
        call neko_log%begin()
 
-       !  write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
+       ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
+       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
+            this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Adjoint fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
+       call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
+            this%case%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
             'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -135,7 +140,8 @@ contains
        if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
+          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+               this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -243,14 +249,13 @@ contains
     end do
 
     call C%fluid%restart(C%dtlag, C%tlag)
-    if (allocated(C%scalar)) call C%scalar%restart( C%dtlag, C%tlag)
+    if (allocated(C%scalar)) call C%scalar%restart(C%dtlag, C%tlag)
 
     t = C%fluid%chkp%restart_time()
     call neko_log%section('Restarting from checkpoint')
-    write(log_buf,'(A,A)') 'File :   ', &
-         trim(restart_file)
+    write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
     call neko_log%message(log_buf)
-    write(log_buf,'(A,E15.7)') 'Time : ', t
+    write(log_buf, '(A,E15.7)') 'Time : ', t
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
