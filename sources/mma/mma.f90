@@ -35,7 +35,6 @@ module mma
 
   ! Inclusions from Neko
   use num_types, only: rp
-  use comm, only: neko_comm, mpi_real_precision, pe_rank, pe_size
   use neko_config, only: NEKO_BCKND_DEVICE
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -44,7 +43,6 @@ module mma
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
-
   implicit none
   private
 

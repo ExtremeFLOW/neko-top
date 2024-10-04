@@ -1,4 +1,8 @@
 submodule (mma) mma_cpu
+  use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
+       MPI_Allreduce
+  use utils, only: neko_error
+  use comm, only: neko_comm, mpi_real_precision
 
   use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
        mpi_integer
