@@ -3,11 +3,6 @@ description: |
   This action executes the Flint linter on the specified directory.
 
 inputs:
-  command:
-    description: "The command to run."
-    required: true
-    default: "score"
-
   path:
     description: "The directory to lint."
     required: true
@@ -47,15 +42,29 @@ runs:
       id: lint
       run: |
         # If more than one directory is specified, then loop through them.
+        score=0
+        num=0
         for entry in ${{ inputs.path }}; do
-          echo "Linting $entry"
-          flint score $entry -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
+          if [ -d "$entry" ]; then
+            echo "Scoring $entry"
+            flint score $entry -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
+
+            # Extract the score from the flint.txt file.
+            s=$(awk '$1==0{print $3}' flint.txt)
+
+            # Update the running score.
+            score=$(echo "$score + $s" | bc)
+            num=$((num + 1))
+          fi
         done
-        score=$(awk '$1==0{print $3}' flint.txt)
+
+        # Calculate the average score.
+        score=$(echo "scale=2; $score / $num" | bc)
 
         if [ -z "$score" ]; then
           echo "No score found, check flint.txt"
           exit 1
         fi
+
         echo "Score=$score"
         echo "score=$score" >> $GITHUB_OUTPUT
