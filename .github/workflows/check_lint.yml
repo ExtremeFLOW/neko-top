@@ -178,7 +178,8 @@ jobs:
                 report=$(flint stats -r flinter_rc.yml $file)
               fi
 
-              printf "%.s-" {1..80} && printf "\n" | tee -a linter-report.txt
+              printf "%.s-" {1..80} | tee -a linter-report.txt
+              printf "\n" | tee -a linter-report.txt
               printf "Linting improvements for \n\t$file\n\n" | tee -a linter-report.txt
               echo "$report" | tee -a linter-report.txt
             done
