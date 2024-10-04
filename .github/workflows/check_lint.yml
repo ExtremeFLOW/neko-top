@@ -93,10 +93,10 @@ jobs:
           # Check if any changes have been made to the Fortran files.
           git fetch --unshallow origin develop
           changes=($(git diff --name-only --diff-filter=d origin/develop))
-          fortran-changed=false
+          fortran_changed=false
           for file in ${changes[@]}; do
             if [[ ${file: -4} == ".f90" || ${file: -4} == ".F90" ]]; then
-              fortran-changed=true
+              fortran_changed=true
             fi
           done
 
