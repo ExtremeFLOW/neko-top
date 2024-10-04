@@ -91,6 +91,7 @@ jobs:
           fi
 
           # Check if any changes have been made to the Fortran files.
+          git fetch --unshallow origin develop
           changes=($(git diff --name-only --diff-filter=d origin/develop))
           fortran-changed=false
           for file in ${changes[@]}; do
