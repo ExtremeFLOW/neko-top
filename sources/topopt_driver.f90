@@ -12,6 +12,6 @@ program nekotop
 
   call neko_top_init(neko_case)
   call neko_top_solve(neko_case)
-  call neko_top_finalize(neko_case,hellp)
+  call neko_top_finalize(neko_case)
 
 end program nekotop
