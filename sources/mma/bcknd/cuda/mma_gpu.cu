@@ -20,7 +20,7 @@ void mma_gensub_gpu(void* x, void* xold1, void* xold2, void* df0dx, void* dfdx, 
 
 		mmareduce_kernel<real> << <1, 1024, 0 >> > (temp_sum, nb);
 
-		cudaMemcpy((real*)bi + num2, temp_sum + num2, sizeof(real), cudaMemcpyDeviceToDevice);
+		cudaMemcpy(bi + num2, temp_sum, sizeof(real), cudaMemcpyDeviceToDevice);
 	}
 	cudaFree(temp);
 	cudaFree(temp_sum);
