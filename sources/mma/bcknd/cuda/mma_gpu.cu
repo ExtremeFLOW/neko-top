@@ -18,8 +18,6 @@ void mma_gensub_gpu(void* x, void* xold1, void* xold2, void* df0dx, void* dfdx, 
     cudaMalloc(&temp, num1 * num2 * sizeof(real));
     cudaMalloc(&temp_sum, num1 * sizeof(real));
 
-    real* bi_global = new real[num2];
-    real* bi_cpu = new real[num2];
 
     BoundCalculation_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)x, (real*)xold1, (real*)xold2,
         (real*)df0dx, (real*)dfdx, (real*)xlow, (real*)xupp, (real*)xmin, (real*)xmax,
@@ -32,14 +30,11 @@ void mma_gensub_gpu(void* x, void* xold1, void* xold2, void* df0dx, void* dfdx, 
         mmasum_kernel <real> << <nb, 1024 >> > (temp, temp_sum, num1, i);
 
         mmareduce_kernel<real> << <1, 1024, 0 >> > (temp_sum, nb);
+        cudaMemcpy(bi_d+i, temp_sum, sizeof(real), cudaMemcpyDeviceToDevice);
 
-        cudaStreamSynchronize(stream);
-        device_mpi_allreduce(temp_sum, bi_global, 1, sizeof(real), DEVICE_MPI_SUM);
-        bi_cpu[i] = bi_global[0];
     }
     cudaFree(temp);
     cudaFree(temp_sum);
-    cudaMemcpy(bi_d, bi_cpu, num2 * sizeof(real), cudaMemcpyHostToDevice);
 }
 
 void cuda_max(void * x,void * alpha,void * beta, void * xsi,void * eta,void * mu,void * c, int * n) {
@@ -78,3 +73,28 @@ void cuda_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int*
 
 
 
+void cuda_relambda(void* relambda,  void* x,  void* xupp,  void* xlow,
+     void* pij,  void* qij,  int* n,  int* m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    real* temp;
+    real* temp_sum;
+    real* relambda_d = (real*)relambda;
+    cudaMalloc(&temp, (*n) * (*m) * sizeof(real));
+    cudaMalloc(&temp_sum, (*n) * sizeof(real));
+    relambda_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > (temp, (real*)x, (real*)xupp, (real*)xlow,
+        (real*)pij, (real*)qij, *n, *m);
+    for (int i = 0; i < (*m); i++) {
+        int nb = ((*n) + 2048 - 1) / 2048;
+        mmasum_kernel <real> << <nb, 1024 >> > (temp, temp_sum, (*n), i);
+
+        mmareduce_kernel<real> << <1, 1024, 0 >> > (temp_sum, nb);
+
+        cudaMemcpy(relambda_d + i, temp_sum, sizeof(real), cudaMemcpyDeviceToDevice);
+
+    }
+    cudaFree(temp);
+    cudaFree(temp_sum);
+    //CUDA_CHECK(cudaGetLastError());
+    
+}
