@@ -9,8 +9,8 @@ on:
       - ci/*
 
 jobs:
-  lint-develop:
-    name: "Lint develop branch"
+  score-develop:
+    name: "Score develop branch"
     runs-on: ubuntu-20.04
     outputs:
       score: ${{ steps.save-score.outputs.score }}
@@ -36,8 +36,8 @@ jobs:
           echo "Develop score=${{ steps.lint.outputs.score }}"
           echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
 
-  lint-current:
-    name: "Lint current branch"
+  score-current:
+    name: "Score current branch"
     runs-on: ubuntu-20.04
     outputs:
       score: ${{ steps.save-score.outputs.score }}
@@ -66,8 +66,8 @@ jobs:
     name: "Check scores"
     runs-on: ubuntu-20.04
     needs:
-      - lint-develop
-      - lint-current
+      - score-develop
+      - score-current
 
     steps:
       - name: Checkout
@@ -78,8 +78,8 @@ jobs:
       - name: Check the scores
         id: check-score
         env:
-          develop_score: ${{ needs.lint-develop.outputs.score }}
-          current_score: ${{ needs.lint-current.outputs.score }}
+          develop_score: ${{ needs.score-develop.outputs.score }}
+          current_score: ${{ needs.score-current.outputs.score }}
         run: |
           if [ -z "$develop_score" ]; then
             echo "Develop score not set: '$develop_score'" >&2
@@ -111,12 +111,9 @@ jobs:
             exit 2
           fi
 
-  lint-changed-files:
-    name: "Lint changed files"
+  lint-changes:
+    name: "Lint changes"
     runs-on: ubuntu-20.04
-    needs:
-      - lint-develop
-      - lint-current
 
     steps:
       - name: Checkout
@@ -148,7 +145,7 @@ jobs:
           echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
 
       - name: Lint changed files
-        id: lint-changed-files
+        id: lint-changes
         env:
           changed_files: ${{ steps.get-changed-files.outputs.changed-files }}
         run: |
@@ -179,9 +176,9 @@ jobs:
           echo "failed-files=${failed_files[@]}" >> $GITHUB_OUTPUT
 
       - name: Print possible improvements
-        if: ${{ steps.lint-changed-files.outputs.failed-files != '' }}
+        if: ${{ steps.lint-changes.outputs.failed-files != '' }}
         env:
-          failed_files: ${{ steps.lint-changed-files.outputs.failed-files }}
+          failed_files: ${{ steps.lint-changes.outputs.failed-files }}
         run: |
           printf "Files that can be improved:\n" | tee linter-report.txt
           for file in ${failed_files[@]}; do
@@ -213,7 +210,8 @@ jobs:
     name: "Create linting badge"
     runs-on: ubuntu-20.04
     needs:
-      - lint-current
+      - check-scores
+      - score-current
 
     steps:
       - name: Checkout
@@ -227,7 +225,7 @@ jobs:
 
       - name: Create badge
         env:
-            score: ${{ needs.lint-current.outputs.score }}
+            score: ${{ needs.score-current.outputs.score }}
         run: |
             mkdir -p doc/media
             anybadge -l Flint -o --file=doc/media/lint-badge.svg -v $score 9.0=red 9.9=yellow 10=green
