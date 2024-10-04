@@ -60,23 +60,25 @@ runs:
 
         if [ $num -eq 0 ]; then
           echo "No directories found to score."
-
-          # Calculate the average score.
-          score=$(echo "scale=2; $score / $num" | bc)
-
-          if [ -z "$score" ]; then
-            echo "No score found, check flint.txt"
-            exit 1
-          fi
-
-          echo "Score=$score"
-          echo "score=$score" >> $GITHUB_OUTPUT
+          exit 1
         fi
+
+        # Calculate the average score.
+        score=$(echo "scale=2; $score / $num" | bc)
+
+        if [ -z "$score" ]; then
+          echo "No score found, check flint.txt"
+          exit 1
+        fi
+
+        echo "Score=$score"
+        echo "score=$score" >> $GITHUB_OUTPUT
 
     - name: Lint the files
       shell: bash
       id: lint-files
       run: |
+        touch flint-report.txt
         # If more than one directory is specified, then loop through them.
         for entry in ${{ inputs.path }}; do
           if [ -f "$entry" ]; then
@@ -88,6 +90,6 @@ runs:
 
               printf "%.s-" {1..80} && printf "\n"
               printf "Linting improvements for \n\t$entry\n\n"
-              cat flint.txt
+              cat flint.txt | tee -a flint-report.txt
           fi
         done
