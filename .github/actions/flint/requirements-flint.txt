@@ -1,3 +1,2 @@
 nobvisual
 flinter
-pkg_resources
