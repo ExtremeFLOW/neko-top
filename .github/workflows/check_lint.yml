@@ -16,7 +16,7 @@ jobs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
-      - name: Checkout
+      - name: Checkout develop branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -43,7 +43,7 @@ jobs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
-      - name: Checkout
+      - name: Checkout current branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -70,7 +70,7 @@ jobs:
       - score-current
 
     steps:
-      - name: Checkout
+      - name: Checkout current branch
         uses: actions/checkout@v4
 
       # Check if the current branch has a lower score than the develop branch.
@@ -114,6 +114,9 @@ jobs:
   lint-changes:
     name: "Lint changes"
     runs-on: ubuntu-20.04
+    needs:
+      - score-current
+      - score-develop
 
     steps:
       - name: Checkout
