@@ -88,6 +88,20 @@ jobs:
             exit 1
           fi
 
+          # Check if any changes have been made to the Fortran files.
+          changes=($(git diff --name-only --diff-filter=d origin/develop))
+          fortran-changed=false
+          for file in ${changes[@]}; do
+            if [[ ${file: -4} == ".f90" || ${file: -4} == ".F90" ]]; then
+              fortran-changed=true
+            fi
+          done
+
+          if [ "$fortran-changed" = false ]; then
+            echo "No changes detected in Fortran files."
+            exit 0
+          fi
+
           if (($(echo "$current_score < $develop_score" | bc -l))); then
             echo "Linting failed, the score is lower than the develop branch."
             echo "Please improve linting by applying suggestions."
