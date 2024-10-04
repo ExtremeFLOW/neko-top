@@ -111,6 +111,9 @@ jobs:
             exit 2
           fi
 
+
+  # Run the flint linter on the changed fortran files and provide suggestions
+  # for improvements. The suggestions are saved in a linter-report.txt file.
   lint-changes:
     name: "Lint changes"
     runs-on: ubuntu-20.04
