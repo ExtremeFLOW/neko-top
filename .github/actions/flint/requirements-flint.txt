@@ -1,3 +1,2 @@
 flinter
 nobvisual
-setuptools
