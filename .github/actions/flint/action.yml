@@ -81,6 +81,11 @@ runs:
         # If more than one directory is specified, then loop through them.
         for entry in ${{ inputs.path }}; do
           if [ -f "$entry" ]; then
+              # Skip non-fortran files
+              if [[ ${entry: -4} != ".f90" && ${entry: -4} != ".F90" ]]; then
+                continue
+              fi
+
               rm -f flint.txt
               flint lint -r ${{ inputs.rc-file }} $entry > flint.txt
               if [ ! -s flint.txt ]; then
