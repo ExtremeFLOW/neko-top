@@ -4,6 +4,10 @@ name: Linting
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/*
+
 
 jobs:
   lint-develop:
