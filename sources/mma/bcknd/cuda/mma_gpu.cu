@@ -50,8 +50,7 @@ void cuda_max(void * x,void * alpha,void * beta, void * xsi,void * eta,void * mu
 	max_kernel<real><<<nblcks, nthrds, 0,(cudaStream_t) glb_cmd_queue>>>((real *) x, (real *) alpha, (real *) beta,
 		(real *) xsi, (real *) eta, (real *) mu,
 		(real *) c, *n);
-	CUDA_CHECK(cudaGetLastError());
-
+	//CUDA_CHECK(cudaGetLastError());
 }
 
 void cuda_rex(void* rex, void* x, void* xlow, void* xupp, void* pij, void* p0j,
@@ -65,4 +64,17 @@ void cuda_rex(void* rex, void* x, void* xlow, void* xupp, void* pij, void* p0j,
 	CUDA_CHECK(cudaGetLastError());
 
 }
+
+
+
+void cuda_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int* n)
+{
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    rey_calculation_kernel<real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)rey, (real*)c, (real*)d, (real*)y,
+        (real*)lambda, (real*)mu, * n);
+    //CUDA_CHECK(cudaGetLastError());
+}
+
+
 
