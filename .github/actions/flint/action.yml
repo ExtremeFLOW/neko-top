@@ -60,19 +60,18 @@ runs:
 
         if [ $num -eq 0 ]; then
           echo "No directories found to score."
-          exit 1
+        else
+          # Calculate the average score.
+          score=$(echo "scale=2; $score / $num" | bc)
+
+          if [ -z "$score" ]; then
+            echo "No score found, check flint.txt"
+            exit 1
+          fi
+
+          echo "Score=$score"
+          echo "score=$score" >> $GITHUB_OUTPUT
         fi
-
-        # Calculate the average score.
-        score=$(echo "scale=2; $score / $num" | bc)
-
-        if [ -z "$score" ]; then
-          echo "No score found, check flint.txt"
-          exit 1
-        fi
-
-        echo "Score=$score"
-        echo "score=$score" >> $GITHUB_OUTPUT
 
     - name: Lint the files
       shell: bash
