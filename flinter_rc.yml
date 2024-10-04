@@ -46,12 +46,12 @@ regexp-rules:
 
   trailing-white-spaces:
     message: Trailing white-spaces
-    regexp: ([ ]+|\t+)\n
+    regexp: \S( +|\t+)$
     replacement: ""
     active: true
     include-comments: true
 
-  tabulation-instead-of-two-spaces:
+  tabulation-instead-of-spaces:
     message: Should use 2 spaces instead of tabulation
     regexp: \t
     replacement: "  "
@@ -108,13 +108,13 @@ regexp-rules:
 
   not-recommended-bare-end:
     message: Bare end statement not recommended
-    regexp: \s^end$
+    regexp: ^\s*end$
     replacement: null
     active: true
 
   not-recommended-bare-stop:
     message: Bare stop statement not recommended
-    regexp: \s^stop$
+    regexp: ^\s*stop$
     replacement: null
     active: true
 
@@ -126,13 +126,13 @@ regexp-rules:
 
   not-recommended-use-goto:
     message: goto is hard to maintain, prone to spaghetti code.
-    regexp: ^goto.*$
+    regexp: ^\s*goto.*$
     replacement: null
     active: true
 
   not-recommended-use-pause:
     message: pause is discouraged.
-    regexp: ^pause.*$
+    regexp: ^\s*pause.*$
     replacement: null
     active: true
 
@@ -186,7 +186,7 @@ regexp-rules:
 
   missing-space-before-parenthesis:
     message: Missing space before parenthesis
-    regexp: (\b{structs}\b)\(
+    regexp: (?<=\s)({structs})(?=\()
     replacement: \1 (
     active: true
 

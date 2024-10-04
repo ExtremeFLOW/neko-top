@@ -3,7 +3,7 @@ description: |
   This action executes the Flint linter on the specified directory.
 
 inputs:
-  directory:
+  path:
     description: "The directory to lint."
     required: true
     default: "."
@@ -20,8 +20,8 @@ inputs:
 
 outputs:
   score:
-    description: "The score of the linting."
-    value: ${{ steps.lint.outputs.score }}
+    description: "The score of the repository linted."
+    value: ${{ steps.score-repository.outputs.score }}
 
 runs:
   using: composite
@@ -37,16 +37,39 @@ runs:
       shell: bash
       run: pip install -r ${{ github.action_path }}/requirements-flint.txt
 
-    - name: Lint the repository
+    - name: Score the repository
       shell: bash
-      id: lint
+      id: score-repository
       run: |
-        flint score ${{ inputs.directory }} -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
-        score=$(awk '$1==0{print $3}' flint.txt)
+        # If more than one directory is specified, then loop through them.
+        score=0
+        num=0
+        for entry in ${{ inputs.path }}; do
+          if [ -d "$entry" ]; then
+            echo "Scoring $entry"
+            echo "flint score $(realpath $entry) -d ${{ inputs.depth }} -r $(realpath ${{ inputs.rc-file }})"
+            flint score $(realpath $entry) -d ${{ inputs.depth }} -r $(realpath ${{ inputs.rc-file }}) | tee flint.txt
 
-        if [ -z "$score" ]; then
-          echo "No score found, check flint.txt"
-          exit 1
+            # Extract the score from the flint.txt file.
+            s=$(awk '$1==0{print $3}' flint.txt)
+
+            # Update the running score.
+            score=$(echo "$score + $s" | bc)
+            num=$((num + 1))
+          fi
+        done
+
+        if [ $num -eq 0 ]; then
+          echo "No directories found to score."
+        else
+          # Calculate the average score.
+          score=$(echo "scale=2; $score / $num" | bc)
+
+          if [ -z "$score" ]; then
+            echo "No score found, check flint.txt"
+            exit 1
+          fi
+
+          echo "Score=$score"
+          echo "score=$score" >> $GITHUB_OUTPUT
         fi
-        echo "Score=$score"
-        echo "score=$score" >> $GITHUB_OUTPUT

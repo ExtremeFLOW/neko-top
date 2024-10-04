@@ -4,16 +4,19 @@ name: Linting
 on:
   workflow_call:
   workflow_dispatch:
+  push:
+    branches:
+      - ci/*
 
 jobs:
-  lint-develop:
-    name: "Lint develop branch"
+  score-develop:
+    name: "Score develop branch"
     runs-on: ubuntu-20.04
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
-      - name: Checkout
+      - name: Checkout develop branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -23,7 +26,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          directory: sources/
+          path: sources/
           depth: 10
           rc-file: flinter_rc.yml
 
@@ -33,14 +36,14 @@ jobs:
           echo "Develop score=${{ steps.lint.outputs.score }}"
           echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
 
-  lint-current:
-    name: "Lint current branch"
+  score-current:
+    name: "Score current branch"
     runs-on: ubuntu-20.04
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
     steps:
-      - name: Checkout
+      - name: Checkout current branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
@@ -49,7 +52,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          directory: sources/
+          path: sources/ examples/ tests/
           depth: 10
           rc-file: flinter_rc.yml
 
@@ -59,22 +62,24 @@ jobs:
           echo "Current score=${{ steps.lint.outputs.score }}"
           echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
 
-  lint-changed-files:
-    name: "Lint changed files"
+  check-scores:
+    name: "Check scores"
     runs-on: ubuntu-20.04
     needs:
-      - lint-develop
-      - lint-current
+      - score-develop
+      - score-current
 
     steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+
       # Check if the current branch has a lower score than the develop branch.
-      # If it does, we will lint the changed files.
-      # If it doesn't, we will skip the linting.
+      # If the score is lower, the linting has failed and we require improvements.
       - name: Check the scores
         id: check-score
         env:
-          develop_score: ${{ needs.lint-develop.outputs.score }}
-          current_score: ${{ needs.lint-current.outputs.score }}
+          develop_score: ${{ needs.score-develop.outputs.score }}
+          current_score: ${{ needs.score-current.outputs.score }}
         run: |
           if [ -z "$develop_score" ]; then
             echo "Develop score not set: '$develop_score'" >&2
@@ -85,14 +90,38 @@ jobs:
             exit 1
           fi
 
-          if (($(echo "$current_score < $develop_score" | bc -l))); then
-            echo "Current score is lower than develop score, linting changed files."
-            echo "degraded=true" >> $GITHUB_OUTPUT
-          else
-            echo "Current score is higher than develop score, skipping linting."
-            echo "degraded=false" >> $GITHUB_OUTPUT
+          # Check if any changes have been made to the Fortran files.
+          git fetch --unshallow origin develop
+          changes=($(git diff --name-only --diff-filter=d origin/develop))
+          fortran_changed=false
+          for file in ${changes[@]}; do
+            if [[ ${file: -4} == ".f90" || ${file: -4} == ".F90" ]]; then
+              fortran_changed=true
+            fi
+          done
+
+          if [ "$fortran_changed" == "false" ]; then
+            echo "No changes detected in Fortran files."
+            exit 0
           fi
 
+          if (($(echo "$current_score < $develop_score" | bc -l))); then
+            echo "Linting failed, the score is lower than the develop branch."
+            echo "Please improve linting by applying suggestions."
+            exit 2
+          fi
+
+
+  # Run the flint linter on the changed fortran files and provide suggestions
+  # for improvements. The suggestions are saved in a linter-report.txt file.
+  lint-changes:
+    name: "Lint changes"
+    runs-on: ubuntu-20.04
+    needs:
+      - score-current
+      - score-develop
+
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
@@ -122,7 +151,7 @@ jobs:
           echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
 
       - name: Lint changed files
-        id: lint-changed-files
+        id: lint-changes
         env:
           changed_files: ${{ steps.get-changed-files.outputs.changed-files }}
         run: |
@@ -153,41 +182,42 @@ jobs:
           echo "failed-files=${failed_files[@]}" >> $GITHUB_OUTPUT
 
       - name: Print possible improvements
-        if: ${{ steps.lint-changed-files.outputs.failed-files != '' }}
+        if: ${{ steps.lint-changes.outputs.failed-files != '' }}
         env:
-          failed_files: ${{ steps.lint-changed-files.outputs.failed-files }}
-          degraded: ${{ steps.check-score.outputs.degraded }}
+          failed_files: ${{ steps.lint-changes.outputs.failed-files }}
         run: |
-          printf "Files that can be improved:\n"
+          printf "Files that can be improved:\n" | tee linter-report.txt
           for file in ${failed_files[@]}; do
-            printf "\t- $file\n"
+            printf "\t- $file\n" | tee -a linter-report.txt
           done
 
           if [ ${#failed_files[@]} -gt 0 ]; then
             for file in ${failed_files[@]}; do
-              printf "%.s-" {1..80} && printf "\n"
-              printf "Linting improvements for \n\t$file\n\n"
-
               report=$(flint lint -r flinter_rc.yml $file)
               if [ -z "$report" ]; then
                 report=$(flint stats -r flinter_rc.yml $file)
               fi
-              echo "$report"
-            done
 
-            if [ "$degraded" == "true" ]; then
-              echo "Linting failed, and the score is lower than the develop branch."
-              echo "Please improve linting by applying above suggestions."
-              exit 2
-            fi
+              printf "%.s-" {1..80} | tee -a linter-report.txt
+              printf "\n" | tee -a linter-report.txt
+              printf "Linting improvements for \n\t$file\n\n" | tee -a linter-report.txt
+              echo "$report" | tee -a linter-report.txt
+            done
           fi
+
+      - name: Save linter report
+        uses: actions/upload-artifact@v4
+        with:
+          name: linter-report
+          path: linter-report.txt
 
   # Create a badge for the flint score
   create-badge-lint:
     name: "Create linting badge"
     runs-on: ubuntu-20.04
     needs:
-      - lint-current
+      - check-scores
+      - score-current
 
     steps:
       - name: Checkout
@@ -201,7 +231,7 @@ jobs:
 
       - name: Create badge
         env:
-            score: ${{ needs.lint-current.outputs.score }}
+            score: ${{ needs.score-current.outputs.score }}
         run: |
             mkdir -p doc/media
             anybadge -l Flint -o --file=doc/media/lint-badge.svg -v $score 9.0=red 9.9=yellow 10=green
