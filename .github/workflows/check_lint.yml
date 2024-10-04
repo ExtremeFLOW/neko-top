@@ -124,46 +124,10 @@ jobs:
 
           echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
 
-      - name: Lint changed files
-        id: lint-changed-files
-        env:
-          changed_files: ${{ steps.get-changed-files.outputs.changed-files }}
-        run: |
-          if [ -z "$changed_files" ]; then
-            echo "No fortran files changed"
-            exit 0
-          fi
-
-          failed_files=()
-          printf "Linting files:\n"
-          for file in $changed_files; do
-
-            # If the file is not a Fortran file, skip it.
-            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
-              continue
-            fi
-
-            printf "\t- $file"
-            score=$(flint score -r flinter_rc.yml $(realpath $file) 2> /dev/null |
-                  grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
-            printf ": $score\n"
-
-            if (($(echo "$score < 10" | bc -l))); then
-                failed_files+=($file)
-            fi
-          done
-
-          echo "failed-files=${failed_files[@]}" >> $GITHUB_OUTPUT
-
-          printf "Files that can be improved:\n"
-          for file in ${failed_files[@]}; do
-            printf "\t- $file\n"
-          done
-
       - name: Report possible improvements
         uses: ./.github/actions/flint
         with:
-          path: ${{ steps.lint-changed-files.outputs.failed-files }}
+          path: ${{ steps.get-changed-files.outputs.failed-files }}
           rc-file: flinter_rc.yml
 
   # Create a badge for the flint score
