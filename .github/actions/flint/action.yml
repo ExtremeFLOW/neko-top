@@ -47,8 +47,8 @@ runs:
         for entry in ${{ inputs.path }}; do
           if [ -d "$entry" ]; then
             echo "Scoring $entry"
-            echo "flint score $(realpath $entry) -d ${{ inputs.depth }} -r ${{ inputs.rc-file }}"
-            flint score $(realpath $entry) -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
+            echo "flint score $(realpath $entry) -d ${{ inputs.depth }} -r $(realpath ${{ inputs.rc-file }})"
+            flint score $(realpath $entry) -d ${{ inputs.depth }} -r $(realpath ${{ inputs.rc-file }}) | tee flint.txt
 
             # Extract the score from the flint.txt file.
             s=$(awk '$1==0{print $3}' flint.txt)
