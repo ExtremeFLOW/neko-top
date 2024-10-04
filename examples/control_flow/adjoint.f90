@@ -91,7 +91,6 @@ module simcomp_example
   use json_utils, only : json_get, json_get_or_default
   use scratch_registry, only : scratch_registry_t, neko_scratch_registry
   use point_zone_registry, only: neko_point_zone_registry
-  use material_properties, only : material_properties_t
   implicit none
   private
 
@@ -202,7 +201,7 @@ contains
     ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
-    call this%scheme%init(C%msh, lx, C%params, C%usr, C%material_properties)
+    call this%scheme%init(C%msh, lx, C%params, C%usr, C%ext_bdf)
     ! this%scheme%chkp%tlag => C%tlag
     ! this%scheme%chkp%dtlag => C%dtlag
     select type (f => this%scheme)
@@ -624,10 +623,11 @@ contains
        call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties
-       call this%case%usr%material_properties(t_adj, tstep_adj, this%case%material_properties%rho,&
-            this%case%material_properties%mu, &
-            this%case%material_properties%cp, &
-            this%case%material_properties%lambda, &
+       call this%case%usr%material_properties(t_adj, tstep_adj, &
+            this%scheme%rho, &
+            this%scheme%mu, &
+            this%case%scalar%cp, &
+            this%case%scalar%lambda, &
             this%case%params)
 
        call neko_log%end_section()
