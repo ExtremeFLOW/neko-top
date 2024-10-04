@@ -127,7 +127,7 @@ jobs:
       - name: Report possible improvements
         uses: ./.github/actions/flint
         with:
-          path: ${{ steps.get-changed-files.outputs.failed-files }}
+          path: ${{ steps.get-changed-files.outputs.changed-files }}
           rc-file: flinter_rc.yml
 
   # Create a badge for the flint score
