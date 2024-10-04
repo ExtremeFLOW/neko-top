@@ -20,8 +20,8 @@ inputs:
 
 outputs:
   score:
-    description: "The score of the linting."
-    value: ${{ steps.lint.outputs.score }}
+    description: "The score of the repository linted."
+    value: ${{ steps.score-repository.outputs.score }}
 
 runs:
   using: composite
@@ -37,9 +37,9 @@ runs:
       shell: bash
       run: pip install -r ${{ github.action_path }}/requirements-flint.txt
 
-    - name: Lint the repository
+    - name: Score the repository
       shell: bash
-      id: lint
+      id: score-repository
       run: |
         # If more than one directory is specified, then loop through them.
         score=0
@@ -58,13 +58,36 @@ runs:
           fi
         done
 
-        # Calculate the average score.
-        score=$(echo "scale=2; $score / $num" | bc)
+        if [ $num -eq 0 ]; then
+          echo "No directories found to score."
 
-        if [ -z "$score" ]; then
-          echo "No score found, check flint.txt"
-          exit 1
+          # Calculate the average score.
+          score=$(echo "scale=2; $score / $num" | bc)
+
+          if [ -z "$score" ]; then
+            echo "No score found, check flint.txt"
+            exit 1
+          fi
+
+          echo "Score=$score"
+          echo "score=$score" >> $GITHUB_OUTPUT
         fi
 
-        echo "Score=$score"
-        echo "score=$score" >> $GITHUB_OUTPUT
+    - name: Lint the files
+      shell: bash
+      id: lint-files
+      run: |
+        # If more than one directory is specified, then loop through them.
+        for entry in ${{ inputs.path }}; do
+          if [ -f "$entry" ]; then
+              rm -f flint.txt
+              flint lint -r ${{ inputs.rc-file }} $entry > flint.txt
+              if [ ! -s flint.txt ]; then
+                flint stats -r ${{ inputs.rc-file }} $entry > flint.txt
+              fi
+
+              printf "%.s-" {1..80} && printf "\n"
+              printf "Linting improvements for \n\t$entry\n\n"
+              cat flint.txt
+          fi
+        done

@@ -62,8 +62,8 @@ jobs:
           echo "Current score=${{ steps.lint.outputs.score }}"
           echo "score=${{ steps.lint.outputs.score }}" >> $GITHUB_OUTPUT
 
-  lint-changed-files:
-    name: "Lint changed files"
+  check-scores:
+    name: "Check scores"
     runs-on: ubuntu-20.04
     needs:
       - lint-develop
@@ -89,23 +89,23 @@ jobs:
           fi
 
           if (($(echo "$current_score < $develop_score" | bc -l))); then
-            echo "Current score is lower than develop score, linting changed files."
-            echo "degraded=true" >> $GITHUB_OUTPUT
-          else
-            echo "Current score is higher than develop score, skipping linting."
-            echo "degraded=false" >> $GITHUB_OUTPUT
+            echo "Linting failed, the score is lower than the develop branch."
+            echo "Please improve linting by applying suggestions."
+            exit 2
           fi
 
+  lint-changed-files:
+    name: "Lint changed files"
+    runs-on: ubuntu-20.04
+    needs:
+      - lint-develop
+      - lint-current
+
+    steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
-
-      - name: Setup env.
-        run: |
-          sudo apt-get update
-          sudo apt-get install -yq bc python3-dev python3-pip python3-tk
-          pip install flinter nobvisual
 
         # Get a list of the changed files and store them for later use.
       - name: Get changed files
@@ -155,35 +155,16 @@ jobs:
 
           echo "failed-files=${failed_files[@]}" >> $GITHUB_OUTPUT
 
-      - name: Print possible improvements
-        if: ${{ steps.lint-changed-files.outputs.failed-files != '' }}
-        env:
-          failed_files: ${{ steps.lint-changed-files.outputs.failed-files }}
-          degraded: ${{ steps.check-score.outputs.degraded }}
-        run: |
           printf "Files that can be improved:\n"
           for file in ${failed_files[@]}; do
             printf "\t- $file\n"
           done
 
-          if [ ${#failed_files[@]} -gt 0 ]; then
-            for file in ${failed_files[@]}; do
-              printf "%.s-" {1..80} && printf "\n"
-              printf "Linting improvements for \n\t$file\n\n"
-
-              report=$(flint lint -r flinter_rc.yml $file)
-              if [ -z "$report" ]; then
-                report=$(flint stats -r flinter_rc.yml $file)
-              fi
-              echo "$report"
-            done
-
-            if [ "$degraded" == "true" ]; then
-              echo "Linting failed, and the score is lower than the develop branch."
-              echo "Please improve linting by applying above suggestions."
-              exit 2
-            fi
-          fi
+      - name: Report possible improvements
+        uses: ./.github/actions/flint
+        with:
+          path: ${{ steps.lint-changed-files.outputs.failed-files }}
+          rc-file: flinter_rc.yml
 
   # Create a badge for the flint score
   create-badge-lint:
