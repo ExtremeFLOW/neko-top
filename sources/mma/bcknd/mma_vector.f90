@@ -1,5 +1,6 @@
 submodule (mma) mma_vector
   use math, only: glsc2
+  use comm, only: neko_comm, mpi_real_precision
 
   use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
        mpi_integer
