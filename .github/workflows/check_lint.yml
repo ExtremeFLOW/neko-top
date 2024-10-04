@@ -23,7 +23,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          directory: sources/
+          directory: sources/ examples/ tests/
           depth: 10
           rc-file: flinter_rc.yml
 
