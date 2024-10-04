@@ -4,9 +4,6 @@ name: Linting
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    branches:
-      - ci/*
 
 jobs:
   score-develop:
@@ -26,7 +23,7 @@ jobs:
         id: lint
         uses: ./.github/actions/flint
         with:
-          path: sources/
+          path: sources/ examples/ tests/
           depth: 10
           rc-file: flinter_rc.yml
 
