@@ -1,5 +1,6 @@
 submodule (mma) mma_vector
-  use math, only: glsc2
+  use math, only: glsc2, glsum
+  use device_math, only: device_glsum
   use comm, only: neko_comm, mpi_real_precision
 
   use mpi_f08, only: mpi_sum, MPI_Allreduce, mpi_max, mpi_min, mpi_sum, &
@@ -23,12 +24,8 @@ contains
     call globaltmp_m%init(this%m)
 
     if (iter .lt. 3) then
-       do j = 1, this%n
-          this%low%x(j) = x%x(j) - this%asyinit * (this%xmax%x(j) - &
-               this%xmin%x(j))
-          this%upp%x(j) = x%x(j) + this%asyinit * (this%xmax%x(j) - &
-               this%xmin%x(j))
-       end do
+       this%low = x - this%asyinit * (this%xmax - this%xmin)
+       this%upp = x + this%asyinit * (this%xmax - this%xmin)
     else
        !Move asymptotes low and upp
        do j = 1, this%n
@@ -63,6 +60,7 @@ contains
                x%x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
        end do
     end if
+
     ! we can move alpha and beta out of the following loop if needed as:
     ! this%alpha = max(this%xmin, this%low + &
     !     0.1_rp*(this%x- this%low), this - 0.5_rp*(this%xmax - this%xmin))
@@ -111,9 +109,10 @@ contains
     end do
 
     !computing bi as defined in page 5
+    !MPI: here this%n is the global n
+
     this%bi = 0.0_rp
     do i = 1, this%m
-       !MPI: here this%n is the global n
        do j = 1, this%n
           this%bi%x(i) = this%bi%x(i) + &
                this%pij%x(i,j) / (this%upp%x(j) - x%x(j)) + &
@@ -121,66 +120,11 @@ contains
        end do
     end do
 
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!Showing that for double precision, bi will be different when!!!!!!!!
-    !!!!!!!!!!!computed in parallel compare to sequential!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! this%bi = 0.0_rp
-    ! longbi = 0.0
-    ! do i = 1, this%m
-    !     !MPI: here this%n is the global n
-    !     do j = 1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "this%n = ", this%n
-    ! print *, "longbi =  ", longbi
-    ! ierr = 2160
-    ! longbi = 0.0
-    ! this%bi = 0.0_rp
-    ! do i = 1, this%m
-    !     do j = 1, ierr
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "first batch(1-ierr)"
-    ! print *, "longbi =  ", longbi, "first batch(1-ierr)"
-    ! longbiglobal = longbi
-    ! longbi = 0.0
-    ! globaltmp_m = this%bi
-    ! this%bi = 0.0_rp
-    ! do i = 1, this%m
-    !     do j = ierr+1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x%x(j)) + &
-    !                     this%qij%x(i,j)/(x%x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "second batch(ierr+1:end)"
-    ! print *, "longbi =  ", longbi, "second batch(ierr+1:end)"
-    ! print *, "bi =  ", this%bi+globaltmp_m, "first + second"
-    ! print *, "longbi =  ", longbi+longbiglobal, "first + second"
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-    globaltmp_m = 0.0_rp
-    call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, &
-         mpi_real_precision, mpi_sum, neko_comm, ierr)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       globaltmp_m = device_glsum(this%bi%x_d, this%m)
+    else
+       globaltmp_m = glsum(this%bi%x, this%m)
+    end if
     this%bi = globaltmp_m - fval
 
     call globaltmp_m%free()
