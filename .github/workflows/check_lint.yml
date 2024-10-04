@@ -107,6 +107,12 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Setup env.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -yq bc python3-dev python3-pip python3-tk
+          pip install flinter nobvisual
+
         # Get a list of the changed files and store them for later use.
       - name: Get changed files
         id: get-changed-files
