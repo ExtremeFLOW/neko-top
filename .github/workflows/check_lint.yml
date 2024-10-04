@@ -70,6 +70,9 @@ jobs:
       - lint-current
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       # Check if the current branch has a lower score than the develop branch.
       # If it does, we will lint the changed files.
       # If it doesn't, we will skip the linting.
@@ -89,7 +92,7 @@ jobs:
           fi
 
           # Check if any changes have been made to the Fortran files.
-          changes=($(git diff --name-only --diff-filter=d origin/develop))
+          changes=($(git diff --name-only --diff-filter=d origin/develop HEAD))
           fortran-changed=false
           for file in ${changes[@]}; do
             if [[ ${file: -4} == ".f90" || ${file: -4} == ".F90" ]]; then
