@@ -48,6 +48,7 @@ runs:
       run: |
         # If more than one directory is specified, then loop through them.
         for dir in ${{ inputs.directory }}; do
+          echo "Linting $dir"
           flint score $dir -d ${{ inputs.depth }} -r ${{ inputs.rc-file }} | tee flint.txt
         done
         score=$(awk '$1==0{print $3}' flint.txt)
