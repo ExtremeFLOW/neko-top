@@ -100,7 +100,7 @@ jobs:
             fi
           done
 
-          if [ "$fortran-changed" = false ]; then
+          if [ "$fortran_changed" == "false" ]; then
             echo "No changes detected in Fortran files."
             exit 0
           fi
