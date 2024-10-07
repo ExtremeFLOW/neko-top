@@ -44,7 +44,7 @@ ALL=false
 CLEAN=false
 NEKO=false
 DELETE=false
-SUBMIT=""
+CLUSTER=""
 DRY=false
 
 # List possible options
@@ -58,13 +58,13 @@ eval set -- "$PARSED"
 # Loop through the options and set the variables
 while true; do
     case "$1" in
-    "-a" | "--all") ALL=true && shift ;;         # Run all examples available
-    "-c" | "--clean") CLEAN=true && shift ;;     # Clean logs
-    "-h" | "--help") help && exit ;;             # Print help
-    "-n" | "--neko") NEKO=true && shift ;;       # Look for example in neko
-    "-d" | "--delete") DELETE=true && shift ;;   # Delete previous runs
-    "-s" | "--submit") SUBMIT="$2" && shift 2 ;; # Submit to the queue
-    "--dry-run") DRY=true && shift ;;            # Dry run
+    "-a" | "--all") ALL=true && shift ;;          # Run all examples available
+    "-c" | "--clean") CLEAN=true && shift ;;      # Clean logs
+    "-h" | "--help") help && exit ;;              # Print help
+    "-n" | "--neko") NEKO=true && shift ;;        # Look for example in neko
+    "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
+    "-s" | "--submit") CLUSTER="$2" && shift 2 ;; # Submit to the queue
+    "--dry-run") DRY=true && shift ;;             # Dry run
 
     # End of options
     "--") shift && break ;;
@@ -90,8 +90,8 @@ export DPATH="$MAIN_DIR/data"        # Official data
 export DLPATH="$MAIN_DIR/data_local" # Local data
 
 # Define the job script folder
-if [ -z $SUBMIT ]; then
-    export HPATH="$MAIN_DIR/scripts/jobscripts/$SUBMIT" # Submission settings
+if [ -z $CLUSTER ]; then
+    export HPATH="$MAIN_DIR/scripts/jobscripts/$CLUSTER" # Submission settings
 else
     export HPATH="$MAIN_DIR/scripts/jobscripts" # Submission settings
 fi
@@ -238,7 +238,7 @@ function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
     source $SPATH/functions.sh
-    run $1 >output.log 2>error.err
+    run $1 1>output.log 2>error.err
     cd $CURRENT_DIR
 }
 
@@ -256,21 +256,21 @@ function Submit() {
         printf >&2 "\e[1;31mInvalid setting file:\e[m\n"
         printf >&2 "$HPATH/${case%.*}.sh\n"
         printf >&2 "\tNo setting file found for the case.\n"
-        return
+        exit 1
     fi
     cp -f $setting $log/job_script.sh
 
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
-    if [ $SUBMIT == "DTU"]; then
+    if [ $CLUSTER == "DTU"]; then
         export BSUB_QUIET=Y
         bsub -J $1 -env "all" <job_script.sh
 
-    elif [ $SUBMIT == "M5"]; then
+    elif [ $CLUSTER == "M5"]; then
         if [ -z "$M5_ACCOUNT" ]; then
             printf >&2 "No account specified for Marenostrum5.\n"
             printf >&2 "Please set the M5_ACCOUNT variable in the environment.\n"
-            return
+            exit 1
         fi
         sbatch -A $M5_ACCOUNT -J $1 job_script.sh
 
@@ -278,7 +278,7 @@ function Submit() {
         printf >&2 "No or invalid cluster specified for submission.\n"
         printf >&2 "\t- DTU for the DTU cluster.\n"
         printf >&2 "\t- M5 for the Marenostrum5 cluster.\n"
-        return
+        exit 1
     fi
 
     printf '\t%-12s %-s\n' "Submitted:" "$1"
@@ -323,7 +323,7 @@ for case in ${example_list[@]}; do
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
-        [ ! -z "$SUBMIT" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
+        [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
     fi
@@ -360,11 +360,7 @@ for case in ${example_list[@]}; do
     printf 'Ready' >$log/output.log
 
     QUEUE="$QUEUE $example"
-    if [ ! -z "$SUBMIT" ]; then
-        Submit $example
-    else
-        printf '\t%-12s %-s\n' "Queued:" "$example"
-    fi
+    [ -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
 done
 
 # Done with the setup
@@ -372,7 +368,7 @@ done
 # Move to the directory submit or run the code and return
 
 # If we are just doing a dry-run, we exit here
-if [ "$DRY" = true ]; then
+if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
     exit 0
 fi
@@ -382,14 +378,14 @@ for example in $QUEUE; do
     # Move to the log folder and submit the job
     if [ $INTERRUPTED == 1 ]; then
         continue
-    elif [ ! -z "$SUBMIT" ]; then
+    elif [ ! -z "$CLUSTER" ]; then
         Submit $example
     else
         Run $example
     fi
 done
 
-if [ -z "$SUBMIT" ]; then
+if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
 fi
 
