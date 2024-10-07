@@ -14,11 +14,12 @@
 # --  Technical Options
 
 # Queue name
-#SBATCH --qos=gp_debug
+#SBATCH --qos=acc_debug
 
 # Ask for n cores placed on R host.
 #SBATCH --ntasks 1
-#SBATCH --cpus-per-task 1
+#SBATCH --cpus-per-task 20
+#SBATCH --gres=gpu:1
 
 # Time specifications (hh:mm)
 #SBATCH --time 00-00:10:00 # 10 minutes
@@ -39,18 +40,13 @@
 
 set -e
 
-if [[ -z "$LSB_JOBNAME" && (($# > 0)) ]]; then
+if [[ -z "$SLURM_JOB_NAME" && (($# > 0)) ]]; then
     example=$1
-elif [ ! -z "$LSB_JOBNAME" ]; then
-    example=$LSB_JOBNAME
+elif [ ! -z "$SLURM_JOB_NAME" ]; then
+    example=$SLURM_JOB_NAME
 else
     printf "ERROR: No example supplied" >&2
     exit 1
-fi
-
-# Load the required modules
-if [ ! -z $(which module) ]; then
-    module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
 fi
 
 source functions.sh

@@ -48,8 +48,8 @@ CLUSTER=""
 DRY=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit,dry-run
-OPT="a,c,h,n,s,d"
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run
+OPT="a,c,h,n,s:,d"
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -90,7 +90,7 @@ export DPATH="$MAIN_DIR/data"        # Official data
 export DLPATH="$MAIN_DIR/data_local" # Local data
 
 # Define the job script folder
-if [ -z $CLUSTER ]; then
+if [ ! -z "$CLUSTER" ]; then
     export HPATH="$MAIN_DIR/scripts/jobscripts/$CLUSTER" # Submission settings
 else
     export HPATH="$MAIN_DIR/scripts/jobscripts" # Submission settings
@@ -262,17 +262,17 @@ function Submit() {
 
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
-    if [ $CLUSTER == "DTU"]; then
+    if [ $CLUSTER == "DTU" ]; then
         export BSUB_QUIET=Y
         bsub -J $1 -env "all" <job_script.sh
 
-    elif [ $CLUSTER == "M5"]; then
+    elif [ $CLUSTER == "M5" ]; then
         if [ -z "$M5_ACCOUNT" ]; then
             printf >&2 "No account specified for Marenostrum5.\n"
             printf >&2 "Please set the M5_ACCOUNT variable in the environment.\n"
             exit 1
         fi
-        sbatch -A $M5_ACCOUNT -J $1 job_script.sh
+        sbatch -A $M5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.err
 
     else
         printf >&2 "No or invalid cluster specified for submission.\n"
