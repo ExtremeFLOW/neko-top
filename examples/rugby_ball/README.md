@@ -2,7 +2,72 @@
 
 Here we follow the classic "rugby ball" example by [Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426)
 
+Here we introduce the following new classes:
 
+
+## `design_variable`
+This could be any design variable in the optimization problem. eg :
+- coefficients
+- splines
+- levelsets
+- etc
+
+Currently,
+we only consider topology optimization and hence we just a type `topopt_design`.
+
+Hopefully, this can be a derived type of the more abstract `design_variable`.
+
+### `topopt_design`
+This contains the design field $\rho$ as well as the following key proceedures
+- `map_forward` maps the design varaible to coeffients (currently only the 
+Brinkman amplitude $\rho \mapsto \chi $)
+
+In the future, this should also contain filters $\rho \mapsto \tilde{\rho}
+\mapsto \chi$
+
+- `map_backwards` uses chain rule to map the sensitivity of the coefficents
+to the sensitivity to the design variable $\frac{\partial F}{\partial \chi}
+ \mapsto \frac{\partial F}{\partial \rho}$
+
+## `optimizer`
+Currently we only consider MMA and topology optimization.
+
+## `problem`
+This contains a way to evaluate an optimization problem, ie, all objective
+functions and constraints. Currently, we only
+use gradient descent algorithms using first order gradient information, so
+the key proceedures are
+- `init` to initialize the type of optimization problem
+- `compute` this is to evalute all objective functions $F$ and constraints $C_i$ 
+- `compute_sensitivity` this is to evalute all the sensitivities
+$\frac{\partial F}{\partial \rho}$, \frac{\partial C_1}{\partial \rho},
+\frac{\partial C_2}{\partial \rho} etc.
+- in princple only the `compute` is required. (eg, gradient free algorithms) or
+more may be required (eg, `compute_hessian`)
+
+Within a `problem` we also contain fluid and adjoint schemes as well as instance
+ of the following classes.
+
+Currently we have only implemented a steady topologogy optimization case.
+
+
+
+### `objective_function`
+this could be either an objective function or a constraint.
+The key proceedures are
+- `init` allowing various source terms to be appended to the adjoint.
+- `compute` to compute the objective/constraint function value.
+- `compute_sensitivity` to compute the sensitivity of the objective/constraint
+with respect to the design.
+- `free` to free.
+
+Here we have made 2 derived types,
+
+`minimum_dissipation_objective function` for objectives
+$F = \int_Omega |\nabla \mathbf{u}|^2 d\Omega + K \int_Omega \chi |u|^2 d\Omega$
+
+`volume_constraint` for constraints either $V < V_{max}$ or $V > V_{min}$ where
+$V = \int_\Omega_O \tilde{\rho} d \Omega $.
 
 This is example is primarily used to summarize the list of remaining tasks.
 
@@ -97,3 +162,6 @@ should be reflected in `adjoint_scheme.f90` and `adjoint_pnpn.f90` etc.
 - Update the `design_t` to include all the cool features Tim put in for initializing a design... instead of this hard coded circle 
 - We have RAMP currently implemented, but we should also include SIMP, linear etc
 - Format everything to `Neko` coding standard
+- there are ***MANY*** times that I've used `type` instead of `class`, particularly 
+regarding the `topopt_design_t`. I suppose these could also be calculated differently
+if we have different `design_variable_t` coming. This will need some untangling.

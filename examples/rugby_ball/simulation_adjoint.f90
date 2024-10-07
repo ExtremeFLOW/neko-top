@@ -96,7 +96,9 @@ contains
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
-    call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+    ! TODO, this was removed from `simulation.f90`
+    ! follow up on statistics...
+    ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
     call this%s%sample(t_adj, tstep_adj)
 
     ! HARRY
@@ -144,8 +146,10 @@ contains
        end if
 
        call neko_log%section('Postprocessing')
+       ! TODO
+       ! adjoint simulation components
 
-       call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+       ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
        call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties

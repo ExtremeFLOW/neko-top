@@ -33,8 +33,15 @@
 !> Implements the `adjoint_lube_source_term_t` type.
 !
 !
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+! I know this is a stupid naming convention...
+! The `lube` aspect came from a paper that attributed this term to out of plane
+! stresses based on lubrication theory.
+!
+! I preffer to think of it as a constraint that penalizes non-binary designs
+!
+! The term is $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$
+!
+! the corresponding adjoint forcing is $K \chi \mathbf{u}$
 module adjoint_lube_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
@@ -45,7 +52,7 @@ module adjoint_lube_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use new_design, only: new_design_t
+  use topopt_design, only: topopt_design_t
   use field_math, only: field_subcol3, field_addcol3, field_copy, field_cmult
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
@@ -63,13 +70,18 @@ module adjoint_lube_source_term
   implicit none
   private
 
-  !> A constant source term.
-  !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !> A adjoint source term corresponding to an objective of
+  ! $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$.
   type, public, extends(source_term_t) :: adjoint_lube_source_term_t
 
-     ! again, for a mask this is silly... we can fix this later in the week
-     type(field_t), pointer :: u,v,w,chi, mask
+     !> $u,v,w$ corresponding to the baseflow
+     type(field_t), pointer :: u,v,w
+     !> $\chi$ the Brinkman amplitude
+     type(field_t), pointer :: chi
+     ! TODO
+     ! as mask
+     ! type(field_t), pointer :: chi
+     !> a scale for this term
      real(kind=rp) :: K
 
    contains
@@ -105,8 +117,11 @@ contains
   end subroutine adjoint_lube_source_term_init_from_json
 
   !> The constructor from type components.
-  ! NOTE!
-  ! u,v,w reffer to the primal, not the adjoint
+  !! @param f_x, f_y, f_z the RHS of the adjoint
+  !! @param design the design
+  !! @param K a scale
+  !! @param u, v, w the velocity fields of the primal
+  ! $u,v,w$ reffer to the primal, not the adjoint
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
        u, v, w, coef)
@@ -116,7 +131,7 @@ contains
     type(coef_t) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    type(new_design_t), intent(in), target :: design
+    type(topopt_design_t), intent(in), target :: design
     real(kind=rp) :: K
     type(field_t), intent(in), target :: u, v, w
     ! TODo
@@ -124,7 +139,6 @@ contains
     !type(field_t), intent(in), target :: mask
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this...
     ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
@@ -138,11 +152,7 @@ contains
     call fields%assign(2, f_y)
     call fields%assign(3, f_z)
 
-
-
     call this%init_base(fields, coef, start_time, end_time)
-
-    ! Real stuff
 
     ! point everything in the correct places
     ! NOTE!!!
@@ -156,10 +166,6 @@ contains
 
     ! TODO
     !this%mask => mask
-
-
-
-
 
   end subroutine adjoint_lube_source_term_init_from_components
 
@@ -182,8 +188,6 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-
-
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
@@ -194,16 +198,15 @@ contains
     ! the primal
     call neko_scratch_registry%request_field(work, temp_indices(1))
     call field_copy(work, this%chi)
-    ! the scaling is a bit fucked right now
-    ! right now, it's not 1/2 \chi u^2
-    ! so we need to multiply by 2 here
-    call field_cmult(work, this%K*2.0_rp)
+
+    ! scale by K
+    call field_cmult(work, this%K)
+
+    ! multiple and add the RHS
     call field_addcol3(fu, this%u, work)
     call field_addcol3(fv, this%v, work)
     call field_addcol3(fw, this%w, work)
     call neko_scratch_registry%relinquish_field(temp_indices)
-
-
 
   end subroutine adjoint_lube_source_term_compute
 

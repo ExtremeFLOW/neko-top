@@ -31,21 +31,19 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `volume_constraint_t` type.
-!
-!
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+! $V = \frac{1}{|\Omega_O|}\int_{\Omega_O} \tilde{\rho} d\Omega$
+! Either
+! $V < V_\text{max}$
+! $V > V_\text{min}$
 module volume_constraint
   use num_types, only : rp
   use field_list, only : field_list_t
-  use json_module, only : json_file
   use json_utils, only: json_get, json_get_or_default
   use source_term, only : source_term_t
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use new_design, only: new_design_t
   use field_math, only: field_col3, field_addcol3
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
@@ -61,31 +59,30 @@ module volume_constraint
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, &
-  only : adjoint_minimum_dissipation_source_term_t
+       only : adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
-  use new_design, only: new_design_t
   use field_math, only: field_rone, field_cmult
+  use topopt_design, only: topopt_design_t
   implicit none
   private
 
-  !> A constant source term.
-  !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !> A constraint on the volume of the design.
   type, public, extends(objective_function_t) :: volume_constraint_t
 
-     ! whether it is minimum or maximum volume
+     !> whether it is minimum or maximum volume
      ! call min = 0, 	ie V > V_min  		=>		 -V + V_max < 0
      ! call max = 1, 	ie V < V_max  		=>		  V - V_max < 0
      ! TODO
      ! this can be done smarter with parameters
      logical :: min_max
+     !> Maximum (or minimum) volume
      ! maximum volume prescribed
      real(kind=rp) :: v_max
-     ! current volume
+     !> current volume
      real(kind=rp) :: volume
 
 
@@ -98,19 +95,19 @@ module volume_constraint
      procedure, pass(this) :: compute => volume_constraint_compute
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute_sensitivity => &
-     volume_constraint_compute_sensitivity
+          volume_constraint_compute_sensitivity
   end type volume_constraint_t
 
 contains
   !> The common constructor using a JSON object.
-  !! @param json The JSON object for the source.
-  !! @param fields A list of fields for adding the source values.
-  !! @param coef The SEM coeffs.
+  !! @param design the design
+  !! @param fluid the fluid scheme
+  !! @param adjoint the adjoint scheme
   subroutine volume_constraint_init(this, design, fluid, adjoint)
     class(volume_constraint_t), intent(inout) :: this
     class(fluid_scheme_t), intent(inout) :: fluid
     class(adjoint_scheme_t), intent(inout) :: adjoint
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
 
     ! TODO
     ! I don't think there's much to init here
@@ -134,8 +131,6 @@ contains
     this%min_max = .false.
     this%v_max = 0.2
 
-
-
     call this%init_base(fluid%dm_Xh)
 
   end subroutine volume_constraint_init
@@ -148,10 +143,13 @@ contains
     call this%free_base()
   end subroutine volume_constraint_free
 
+  !> The computation of the constraint.
+  !! @param design the design
+  !! @param fluid the fluid scheme
   subroutine volume_constraint_compute(this, design, fluid)
     class(volume_constraint_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
@@ -161,16 +159,16 @@ contains
     ! Again, we don't really need to take design and fluid in here...
     n = design%design_indicator%size()
     ! TODO
-    ! in the future we should be using the mapped design varaible 
+    ! in the future we should be using the mapped design varaible
     !corresponding to this constraint!!!
     this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n)
 
     ! NOTE
     ! TODO
-    ! the definition of the "volume" can get a little tricky once we start 
-    ! introducing masks for the optimization domain, because then we should 
+    ! the definition of the "volume" can get a little tricky once we start
+    ! introducing masks for the optimization domain, because then we should
     ! calculate the volume of the optimization domain and take a ratio that way.
-    ! point is, a design should have an internal parameter of the volume of 
+    ! point is, a design should have an internal parameter of the volume of
     ! the design domain,
     ! and we should us THAT volume for computing the volume percentage
     this%volume = this%volume/fluid%c_xh%volume
@@ -191,12 +189,15 @@ contains
 
   end subroutine volume_constraint_compute
 
+  !> The computation of the sensitivity.
+  !! @param design the design
+  !! @param fluid the fluid scheme
+  !! @param adjoint the adjoint scheme
   subroutine volume_constraint_compute_sensitivity(this, design, fluid, adjoint)
     class(volume_constraint_t), intent(inout) :: this
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
     class(fluid_scheme_t), intent(in) :: fluid
     class(adjoint_scheme_t), intent(in) :: adjoint
-
 
     call field_rone(this%sensitivity_to_coefficient)
     call field_cmult(this%sensitivity_to_coefficient, 1.0_rp/fluid%c_xh%volume)
@@ -207,8 +208,6 @@ contains
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
     endif
-
-
 
   end subroutine volume_constraint_compute_sensitivity
 

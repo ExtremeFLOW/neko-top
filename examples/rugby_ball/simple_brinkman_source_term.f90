@@ -31,6 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `simple_brinkman_source_term_t` type.
+! a term in the form $\chi \mathbf{u}$
 module simple_brinkman_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
@@ -41,16 +42,14 @@ module simple_brinkman_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use new_design, only: new_design_t
+  use topopt_design, only: topopt_design_t
   use field_math, only: field_subcol3
   implicit none
   private
 
-  !> A constant source term.
-  !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !> A simple Brinkman source term.
+  ! We have a source term of the form $\chi \mathbf{u}$
   type, public, extends(source_term_t) :: simple_brinkman_source_term_t
-     ! We have a source term of the form $\chi u$
      !> the fields corresponding to \chi, u, v and w
      type(field_t), pointer :: chi, u, v, w
 
@@ -89,11 +88,10 @@ contains
   end subroutine simple_brinkman_source_term_init_from_json
 
   !> The constructor from type components.
-  !! @param fields A list of fields for adding the source values.
-  !! @param values The array of values, one for each field.
+  !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint)
+  !! @param design the design
+  !! @param u, v, w the velocity field (either primal or adjoint)
   !! @param coef The SEM coeffs.
-  !! @param start_time When to start adding the source term.
-  !! @param end_time When to stop adding the source term.
   subroutine simple_brinkman_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, u, v, w, coef)
     class(simple_brinkman_source_term_t), intent(inout) :: this
@@ -103,10 +101,9 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
-    type(new_design_t), intent(in), target :: design
+    type(topopt_design_t), intent(in), target :: design
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this...
     ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
@@ -120,11 +117,7 @@ contains
     call fields%assign(2, f_y)
     call fields%assign(3, f_z)
 
-
-
     call this%init_base(fields, coef, start_time, end_time)
-
-    ! Real stuff
 
     ! point everything in the correct places
     this%u => u
@@ -132,10 +125,6 @@ contains
     this%w => w
     ! and get chi out of the design
     this%chi => design%brinkman_amplitude
-
-
-
-
 
   end subroutine simple_brinkman_source_term_init_from_components
 
@@ -163,7 +152,6 @@ contains
     call field_subcol3(fu, this%u, this%chi)
     call field_subcol3(fv, this%v, this%chi)
     call field_subcol3(fw, this%w, this%chi)
-
 
   end subroutine simple_brinkman_source_term_compute
 

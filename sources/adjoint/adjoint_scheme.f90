@@ -952,23 +952,25 @@ contains
     !
     call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
-    !
-    ! Setup mean flow fields if requested
-    !
-    ! HARRY
-    ! damn this one is confusing again because it belongs to case not fluid
-    ! I could envision a time we would want to calculate the statistics for the
-    ! forward and adjoint separately
-    ! I bet we're going to get killed in the field registry here :/
-    if (this%params%valid_path('case.statistics')) then
-       call json_get_or_default(this%params, 'case.statistics.enabled',&
-            logical_val, .true.)
-       if (logical_val) then
-          call this%mean%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-          call this%stats%init(this%c_Xh, this%mean%u, &
-               this%mean%v, this%mean%w, this%mean%p)
-       end if
-    end if
+	 !TODO
+	 ! this has changed with the new statistics
+!    !
+!    ! Setup mean flow fields if requested
+!    !
+!    ! HARRY
+!    ! damn this one is confusing again because it belongs to case not fluid
+!    ! I could envision a time we would want to calculate the statistics for the
+!    ! forward and adjoint separately
+!    ! I bet we're going to get killed in the field registry here :/
+!    if (this%params%valid_path('case.statistics')) then
+!       call json_get_or_default(this%params, 'case.statistics.enabled',&
+!            logical_val, .true.)
+!       if (logical_val) then
+!          call this%mean%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+!          call this%stats%init(this%c_Xh, this%mean%u, &
+!               this%mean%v, this%mean%w, this%mean%p)
+!       end if
+!    end if
 
   end subroutine adjoint_scheme_validate
 

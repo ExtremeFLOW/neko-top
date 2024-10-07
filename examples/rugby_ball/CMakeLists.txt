@@ -6,12 +6,16 @@ set(EXTRA_SOURCES
     # topopt.f90
     simulation_adjoint.f90
     simple_brinkman_source_term.f90
-    new_design.f90
     adjoint_minimum_dissipation_source_term.f90
     objective_function.f90
     minimum_dissipation_objective_function.f90
     volume_constraint.f90
     adjoint_lube_source_term.f90
+    design_variable.f90
+    topopt_design.f90
+    problem.f90
+    steady_state_problem.f90
+
 )
 
 build_example(${DRIVER_TYPE})

@@ -99,12 +99,12 @@ module objective_function
   use filters, only: permeability_field
   use source_term, only: source_term_t
   use adjoint_scheme, only: adjoint_scheme_t
-  use new_design, only: new_design_t
+  use topopt_design, only: topopt_design_t
   implicit none
   private
 
   type, abstract, public :: objective_function_t
-     ! > objective function value
+     !> objective function value
      real(kind=rp), public :: objective_function_value
      ! it may also be nice to have a list of the objective function value
      ! to append to instead?
@@ -150,12 +150,12 @@ module objective_function
      type(field_t), public :: sensitivity_to_coefficient
 
    contains
-     !> init (will make this legit at some point)
+     !> init
      procedure, pass(this) :: init_base => objective_function_init_base
      procedure, pass(this) :: free_base => objective_function_free_base
 
 
-     !> this will compute the objective function
+     !> Compute the objective function
      ! note for TIM,
      ! this will REALLY need to be modified in the future...
      ! in a steady case, we just need to compute it on the last step
@@ -171,44 +171,48 @@ module objective_function
      ! based on the objective we have, we
      procedure(objective_function_compute), pass(this), deferred :: compute
 
+     !> Compute the sensitivity
+     ! again, right now this is just a procedure, but for unsteady cases this
+     ! may require simulation components for time integrals.
      procedure(sensitivity_compute), pass(this), &
           deferred :: compute_sensitivity
 
      procedure(objective_function_init), pass(this), deferred :: init
      !> Destructor
      procedure(objective_function_free), pass(this), deferred :: free
-     ! TODO
   end type objective_function_t
 
   abstract interface
      subroutine objective_function_init(this, design, fluid, adjoint)
        import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
-            new_design_t
+            topopt_design_t
        class(objective_function_t), intent(inout) :: this
        ! these ones are inout because we may need to append source terms etc
        class(fluid_scheme_t), intent(inout) :: fluid
        class(adjoint_scheme_t), intent(inout) :: adjoint
-       class(new_design_t), intent(inout) :: design
+       ! TODO
+       ! these should all be `class(design_variable)` in the future
+       type(topopt_design_t), intent(inout) :: design
      end subroutine objective_function_init
   end interface
 
   abstract interface
      subroutine objective_function_compute(this, design, fluid)
-       import objective_function_t, fluid_scheme_t, new_design_t
+       import objective_function_t, fluid_scheme_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
        class(fluid_scheme_t), intent(in) :: fluid
-       class(new_design_t), intent(inout) :: design
+       type(topopt_design_t), intent(inout) :: design
      end subroutine objective_function_compute
   end interface
 
   abstract interface
      subroutine sensitivity_compute(this, design, fluid, adjoint)
        import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
-            new_design_t
+            topopt_design_t
        class(objective_function_t), intent(inout) :: this
        class(fluid_scheme_t), intent(in) :: fluid
        class(adjoint_scheme_t), intent(in) :: adjoint
-       class(new_design_t), intent(inout) :: design
+       type(topopt_design_t), intent(inout) :: design
      end subroutine sensitivity_compute
   end interface
 

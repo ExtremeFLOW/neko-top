@@ -33,8 +33,9 @@
 !> Implements the `adjoint_minimum_dissipation_source_term_t` type.
 !
 !
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+! If the objective function $\int |\nabla u|^2$,
+! the corresponding adjoint forcing is $ \int \nabla v \cdot \nabla u $ in weak
+! form.
 module adjoint_minimum_dissipation_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
@@ -45,7 +46,6 @@ module adjoint_minimum_dissipation_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use new_design, only: new_design_t
   use field_math, only: field_subcol3, field_add2, field_add2s2
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
@@ -63,14 +63,17 @@ module adjoint_minimum_dissipation_source_term
   implicit none
   private
 
-  !> A constant source term.
-  !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !> An adjoint source term for objectives of minimum dissipation
+  ! $\int \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
        adjoint_minimum_dissipation_source_term_t
 
      ! again, for a mask this is silly... we can fix this later in the week
-     type(field_t), pointer :: u,v,w, mask
+     !> u,v,w of the primal
+     type(field_t), pointer :: u,v,w
+     ! todo
+     ! a mask
+     ! type(field_t), pointer :: mask
      real(kind=rp) :: obj_scale
 
    contains
@@ -110,7 +113,9 @@ contains
   end subroutine adjoint_minimum_dissipation_source_term_init_from_json
 
   !> The constructor from type components.
-  ! NOTE!
+  !! @param f_x, f_y, f_z the RHS of the adjoint equations
+  !! @param u, v, w the flow fields of the primal
+  !! @obj_scale a scaling factor
   ! u,v,w reffer to the primal, not the adjoint
   subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
@@ -128,7 +133,6 @@ contains
     !type(field_t), intent(in), target :: mask
 
     ! I wish you didn't need a start time and end time...
-    ! Tim you're going to hate this...
     ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
@@ -142,15 +146,9 @@ contains
     call fields%assign(2, f_y)
     call fields%assign(3, f_z)
 
-
-
     call this%init_base(fields, coef, start_time, end_time)
 
-    ! Real stuff
-
     ! point everything in the correct places
-    ! NOTE!!!
-    ! this is the primal!
     this%u => u
     this%v => v
     this%w => w
@@ -159,11 +157,6 @@ contains
 
     ! TODO
     !this%mask => mask
-
-
-
-
-
   end subroutine adjoint_minimum_dissipation_source_term_init_from_components
 
   !> Destructor.

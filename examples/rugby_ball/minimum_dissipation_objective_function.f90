@@ -70,7 +70,7 @@ module minimum_dissipation_objective_function
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use new_design, only: new_design_t
+  use topopt_design, only: topopt_design_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
@@ -92,14 +92,14 @@ module minimum_dissipation_objective_function
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
-  use new_design, only: new_design_t
+  use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   implicit none
   private
 
-  !> A constant source term.
-  !! The strength is specified with the `values` keyword, which should be an
-  !! array, with a value for each component of the source.
+  !> An objective function corresponding to minimum dissipation
+  ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
+  ! |\mathbf{u}|^2 d \Omega $
   type, public, extends(objective_function_t) :: &
        minimum_dissipation_objective_function_t
      real(kind=rp) :: K, dissipation, lube_value
@@ -109,9 +109,8 @@ module minimum_dissipation_objective_function
      ! this is just for testing!
      ! actually rescaling the adjoint is a bit more involved,
      ! and we have to be careful of the brinkman term
-     ! this scaling would be scaling the OBJECTIVE function!
+     !> A scaling factor
      real(kind=rp) :: obj_scale
-     !! in principle.. the adjoint is linear... so we can always scale by
 
    contains
      !> The common constructor using a JSON object.
@@ -120,25 +119,25 @@ module minimum_dissipation_objective_function
      !> Destructor.
      procedure, pass(this) :: free => &
           minimum_dissipation_objective_function_free
-     !> Computes the source term and adds the result to `fields`.
+     !> Computes the value of the objective function.
      procedure, pass(this) :: compute => &
           minimum_dissipation_objective_function_compute
-     !> Computes the source term and adds the result to `fields`.
+     !> Computes the sensitivity with respect to the coefficent $\chi$.
      procedure, pass(this) :: compute_sensitivity => &
           minimum_dissipation_objective_function_compute_sensitivity
   end type minimum_dissipation_objective_function_t
 
 contains
   !> The common constructor using a JSON object.
-  !! @param json The JSON object for the source.
-  !! @param fields A list of fields for adding the source values.
-  !! @param coef The SEM coeffs.
+  !! @param design the design.
+  !! @param fluid the fluid scheme.
+  !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_objective_function_init(this, &
        design, fluid, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(inout) :: fluid
     class(adjoint_scheme_t), intent(inout) :: adjoint
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
 
@@ -153,7 +152,7 @@ contains
     call this%init_base(fluid%dm_Xh)
 
     ! you will need to init this!
-    ! append a source term based on objective function
+    ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
          adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, &
@@ -177,8 +176,6 @@ contains
        call adjoint%source_term%add_source_term(lube_term)
     endif
 
-
-
   end subroutine minimum_dissipation_objective_function_init
 
 
@@ -191,17 +188,19 @@ contains
     call this%free_base()
   end subroutine minimum_dissipation_objective_function_free
 
+  !> Compute the objective function.
+  !! @param design the design.
+  !! @param fluid the fluid scheme.
+  !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_objective_function_compute(this, design, fluid)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
     integer n
-
-
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
@@ -241,7 +240,8 @@ contains
        call field_addcol3(objective_field,fluid%v, design%brinkman_amplitude)
        call field_addcol3(objective_field,fluid%w, design%brinkman_amplitude)
        this%lube_value = glsc2(objective_field%x,fluid%C_Xh%b, n)
-       this%objective_function_value = this%dissipation + this%K*this%lube_value
+       this%objective_function_value = this%dissipation &
+            + 0.5*this%K*this%lube_value
     else
        this%objective_function_value = this%dissipation
     endif
@@ -256,10 +256,14 @@ contains
 
   end subroutine minimum_dissipation_objective_function_compute
 
+  !> compute the sensitivity of the objective function with respect to $\chi$
+  !! @param design the design.
+  !! @param fluid the fluid scheme.
+  !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_objective_function_compute_sensitivity(this, &
        design, fluid, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
-    class(new_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(inout) :: design
     class(fluid_scheme_t), intent(in) :: fluid
     class(adjoint_scheme_t), intent(in) :: adjoint
     type(field_t), pointer :: lube_contribution
