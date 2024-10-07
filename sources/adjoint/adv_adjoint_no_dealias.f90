@@ -5,17 +5,17 @@
 ! modification, are permitted provided that the following conditions
 ! are met:
 !
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
+!  * Redistributions of source code must retain the above copyright
+!   notice, this list of conditions and the following disclaimer.
 !
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
+!  * Redistributions in binary form must reproduce the above
+!   copyright notice, this list of conditions and the following
+!   disclaimer in the documentation and/or other materials provided
+!   with the distribution.
 !
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
+!  * Neither the name of the authors nor the names of its
+!   contributors may be used to endorse or promote products derived
+!   from this software without specific prior written permission.
 !
 ! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 ! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
@@ -30,7 +30,8 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Subroutines to add perturbed advection terms to the RHS of a transport equation.
+!> Subroutines to add perturbed advection terms to the RHS of a transport
+!! equation.
 module adv_lin_no_dealias
   use advection_adjoint, only: advection_adjoint_t
   use num_types, only: rp
@@ -44,7 +45,8 @@ module adv_lin_no_dealias
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
   use interpolation, only: interpolator_t
-  use device_math
+  use device_math, only: device_vdot3, device_sub2, device_add4, &
+       device_col3, device_subcol3, device_rzero
   use device, only: device_free, device_map, device_memcpy, device_get_ptr, &
        HOST_TO_DEVICE
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, &
@@ -63,7 +65,8 @@ module adv_lin_no_dealias
      procedure, pass(this) :: compute_linear => linear_advection_no_dealias
      !> Add the adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
-     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
+     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$
+     !! , to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
      !> Constructor
@@ -102,7 +105,7 @@ contains
 
   !> Add the adjoint advection term for the fluid in weak form, i.e.
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
-  !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
+  !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$, to
   !! the RHS.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
@@ -116,7 +119,8 @@ contains
   !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
-  subroutine adjoint_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
+  subroutine adjoint_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, &
+       fy, fz, Xh, coef, n)
     implicit none
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(space_t), intent(inout) :: Xh
@@ -137,7 +141,8 @@ contains
     integer :: e, i, idx, idxx
 
 
-    type(field_t), pointer :: tduxb, tdvxb, tdwxb, tduyb, tdvyb, tdwyb, tduzb, tdvzb, tdwzb
+    type(field_t), pointer :: tduxb, tdvxb, tdwxb, tduyb, tdvyb, tdwyb, tduzb, &
+         tdvzb, tdwzb
     integer :: temp_indices(9)
 
 
@@ -213,48 +218,49 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-             & vx%x(i,1,1,e)*duxb(i) + &
-             & vy%x(i,1,1,e)*dvxb(i) + &
-             & vz%x(i,1,1,e)*dwxb(i) )
+                  & vx%x(i,1,1,e)*duxb(i) + &
+                  & vy%x(i,1,1,e)*dvxb(i) + &
+                  & vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-             & vx%x(i,1,1,e)*duyb(i) + &
-             & vy%x(i,1,1,e)*dvyb(i) + &
-             & vz%x(i,1,1,e)*dwyb(i))
+                  & vx%x(i,1,1,e)*duyb(i) + &
+                  & vy%x(i,1,1,e)*dvyb(i) + &
+                  & vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-             & vx%x(i,1,1,e)*duzb(i) + &
-             & vy%x(i,1,1,e)*dvzb(i) + &
-             & vz%x(i,1,1,e)*dwzb(i))
+                  & vx%x(i,1,1,e)*duzb(i) + &
+                  & vy%x(i,1,1,e)*dvzb(i) + &
+                  & vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
           call adjoint_weak_no_dealias_cpu( &
-          & fx%x(:,:,:,e), vx%x(1,1,1,e), &
-          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-          & e, coef, Xh, Xh%lxyz, &
-          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               & fx%x(:,:,:,e), vx%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-          & fy%x(:,:,:,e), vy%x(1,1,1,e), &
-          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-          & e, coef, Xh, Xh%lxyz, &
-          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               & fy%x(:,:,:,e), vy%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-          & fz%x(:,:,:,e), vz%x(1,1,1,e), &
-          & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-          & e, coef, Xh, Xh%lxyz, &
-          & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
-       enddo
+               & fz%x(:,:,:,e), vz%x(1,1,1,e), &
+               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               & e, coef, Xh, Xh%lxyz, &
+               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+       end do
 
     end if
 
   end subroutine adjoint_advection_no_dealias
 
   !> Compute a single component of
-  !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$, to
+  !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$
+  !! , to
   !! the RHS on device.
   !! @param f_d The i'th component of this term.
   !! @param u_i_d The i'th component of adjoint velocity.
@@ -264,8 +270,8 @@ contains
   !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
-  subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, n, &
-       work1, work2, work3, w1, w2, w3)
+  subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, &
+       n, work1, work2, work3, w1, w2, w3)
     implicit none
     type(c_ptr), intent(inout) :: f_d
     type(c_ptr), intent(in) :: u_i_d
@@ -303,7 +309,8 @@ contains
   end subroutine adjoint_weak_no_dealias_device
 
   !> Compute a single component of
-  !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$, to
+  !! \f$ \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega |_i \f$
+  !! , to
   !! the RHS on CPU.
   !! @param f The i'th component of this term.
   !! @param u_i The i'th component of adjoint velocity.
@@ -313,7 +320,8 @@ contains
   !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
-  subroutine adjoint_weak_no_dealias_cpu(f, u_i, ub, vb, wb, e, coef, Xh, n, work1, work2, work3, w1, w2, w3)
+  subroutine adjoint_weak_no_dealias_cpu(f, u_i, ub, vb, wb, e, coef, Xh, n, &
+       work1, work2, work3, w1, w2, w3)
     implicit none
     integer, intent(in) :: e, n
     integer :: i
@@ -360,7 +368,8 @@ contains
   !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
-  subroutine linear_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
+  subroutine linear_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, &
+       fy, fz, Xh, coef, n)
     implicit none
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(space_t), intent(inout) :: Xh

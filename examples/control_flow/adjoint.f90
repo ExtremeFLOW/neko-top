@@ -284,19 +284,24 @@ contains
 
 
     ! if (trim(string_val) .ne. 'user') then
-    !    !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+    !    !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    ! this%scheme%w_adj, this%scheme%p_adj, &
     !    !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
     !    !
     !    ! passing adjoint_json
-    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
+    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    ! this%scheme%w_adj, this%scheme%p_adj, &
     !         this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     ! else
-    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, this%scheme%p_adj, &
-    !         this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, adjoint_json)
+    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, i&
+    ! this%scheme%w_adj, this%scheme%p_adj, &
+    !         this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, &
+    ! adjoint_json)
     ! end if
 
     ! if (scalar) then
-    !    call json_get(C%params, 'case.scalar.initial_condition.type', string_val)
+    !    call json_get(C%params, 'case.scalar.initial_condition.type', &
+    ! string_val)
     !    if (trim(string_val) .ne. 'user') then
     !       call set_scalar_ic(C%scalar%s, &
     !         C%scalar%c_Xh, C%scalar%gs_Xh, string_val, C%params)
@@ -563,12 +568,13 @@ contains
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
-    call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
     call this%s%sample(t_adj, tstep_adj)
 
     ! HARRY
-    ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
+    ! ok this I guess this is techincally where we set the initial condition 
+    ! of adjoint yeh?
+    call this%case%usr%user_init_modules(t_adj,  &
+    this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -595,10 +601,12 @@ contains
 
        write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
+       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
+       this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
+       call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
+       this%case%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
             'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -609,7 +617,8 @@ contains
        if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
+          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -619,7 +628,7 @@ contains
 
        call neko_log%section('Postprocessing')
 
-       call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+       ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
        call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties

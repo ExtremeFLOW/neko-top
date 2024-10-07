@@ -11,7 +11,6 @@ set(EXTRA_SOURCES
     minimum_dissipation_objective_function.f90
     volume_constraint.f90
     adjoint_lube_source_term.f90
-    design_variable.f90
     topopt_design.f90
     problem.f90
     steady_state_problem.f90

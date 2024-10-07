@@ -36,15 +36,6 @@ module advection_adjoint
   use space, only : space_t
   use field, only : field_t
   use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
-       NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
-  use operators, only : opgrad, conv1, cdtp
-  use interpolation, only : interpolator_t
-  use device_math
-  use device, only : device_free, device_map, device_get_ptr, device_memcpy, &
-       HOST_TO_DEVICE
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR, &
-       c_associated
   implicit none
   private
 

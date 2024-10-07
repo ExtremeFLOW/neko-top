@@ -32,54 +32,56 @@
 !
 !> Fluid formulations
 module adjoint_scheme
-  use gather_scatter
-  use mean_sqr_flow, only : mean_sqr_flow_t
-  use neko_config
-  use checkpoint, only : chkp_t
-  use mean_flow, only : mean_flow_t
-  use num_types
-  use comm
+  use gather_scatter, only: gs_t
+  use mean_sqr_flow, only: mean_sqr_flow_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use checkpoint, only: chkp_t
+  use mean_flow, only: mean_flow_t
+  use num_types, only: rp
+  use comm, only: NEKO_COMM
   use adjoint_source_term, only: adjoint_source_term_t
-  use field_list, only : field_list_t
-  use field, only : field_t
-  use space
-  use dofmap, only : dofmap_t
-  use krylov, only : ksp_t, krylov_solver_factory, krylov_solver_destroy
+  use field_list, only: field_list_t
+  use field, only: field_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use krylov, only: ksp_t, krylov_solver_factory, krylov_solver_destroy
   use coefs, only: coef_t
-  use wall, only : no_slip_wall_t
-  use inflow, only : inflow_t
-  use usr_inflow, only : usr_inflow_t, usr_inflow_eval
-  use blasius, only : blasius_t
-  use dirichlet, only : dirichlet_t
-  use dong_outflow, only : dong_outflow_t
-  use symmetry, only : symmetry_t
-  use non_normal, only : non_normal_t
-  use field_dirichlet, only : field_dirichlet_t, field_dirichlet_update
+  use wall, only: no_slip_wall_t
+  use inflow, only: inflow_t
+  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
+  use blasius, only: blasius_t
+  use dirichlet, only: dirichlet_t
+  use dong_outflow, only: dong_outflow_t
+  use symmetry, only: symmetry_t
+  use non_normal, only: non_normal_t
+  use field_dirichlet, only: field_dirichlet_t, field_dirichlet_update
   use field_dirichlet_vector, only: field_dirichlet_vector_t
-  use jacobi, only : jacobi_t
-  use sx_jacobi, only : sx_jacobi_t
-  use device_jacobi, only : device_jacobi_t
-  use hsmg, only : hsmg_t
-  use precon, only : pc_t, precon_factory, precon_destroy
-  use fluid_stats, only : fluid_stats_t
-  use bc
-  use mesh
-  use math
-  use device_math, only : device_cfill, device_add2s2
-  use time_scheme_controller, only : time_scheme_controller_t
-  use mathops
-  use operators, only : cfl
-  use logger
-  use field_registry
-  use json_utils, only : json_get, json_get_or_default
-  use json_module, only : json_file, json_core, json_value
-  use scratch_registry, only : scratch_registry_t
-  use user_intf, only : user_t, dummy_user_material_properties, &
+  use jacobi, only: jacobi_t
+  use sx_jacobi, only: sx_jacobi_t
+  use device_jacobi, only: device_jacobi_t
+  use hsmg, only: hsmg_t
+  use precon, only: pc_t, precon_factory, precon_destroy
+  use fluid_stats, only: fluid_stats_t
+  use bc, only: bc_t, bc_list_t, bc_list_init, bc_list_add, bc_list_free, &
+       bc_list_apply_scalar, bc_list_apply_vector
+  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBL_LEN, NEKO_MSH_MAX_ZLBLS
+  use math, only: cfill, add2s2
+  use device_math, only: device_cfill, device_add2s2
+  use time_scheme_controller, only: time_scheme_controller_t
+  ! use mathops, only:
+  use operators, only: cfl
+  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
+  use field_registry, only: neko_field_registry
+  use json_utils, only: json_get, json_get_or_default
+  use json_module, only: json_file, json_core, json_value
+  use scratch_registry, only: scratch_registry_t
+  use user_intf, only: user_t, dummy_user_material_properties, &
        user_material_properties
-  use utils, only : neko_warning, neko_error
-  use field_series
-  use time_step_controller
-  use field_math, only : field_cfill
+  use utils, only: neko_warning, neko_error
+  use field_series, only: field_series_t
+  use time_step_controller, only: time_step_controller_t
+  use field_math, only: field_cfill
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, MPI_ALLREDUCE
 
   use json_utils_ext, only: json_key_fallback
   implicit none
@@ -87,15 +89,24 @@ module adjoint_scheme
 
   !> Base type of all fluid formulations
   type, abstract, public :: adjoint_scheme_t
-     type(field_t), pointer :: u_adj => null() !< x-component of Velocity
-     type(field_t), pointer :: v_adj => null() !< y-component of Velocity
-     type(field_t), pointer :: w_adj => null() !< z-component of Velocity
-     type(field_t), pointer :: p_adj => null() !< Pressure
-     type(field_series_t) :: ulag, vlag, wlag !< fluid field (lag)
-     type(space_t) :: Xh !< Function space \f$ X_h \f$
-     type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
-     type(gs_t) :: gs_Xh !< Gather-scatter associated with \f$ X_h \f$
-     type(coef_t) :: c_Xh !< Coefficients associated with \f$ X_h \f$
+     !> x-component of Velocity
+     type(field_t), pointer :: u_adj => null()
+     !> y-component of Velocity
+     type(field_t), pointer :: v_adj => null()
+     !> z-component of Velocity
+     type(field_t), pointer :: w_adj => null()
+     !> Pressure
+     type(field_t), pointer :: p_adj => null()
+     !> fluid field (lag)
+     type(field_series_t) :: ulag, vlag, wlag
+     !> Function space \f$ X_h \f$
+     type(space_t) :: Xh
+     !> Dofmap associated with \f$ X_h \f$
+     type(dofmap_t) :: dm_Xh
+     !> Gather-scatter associated with \f$ X_h \f$
+     type(gs_t) :: gs_Xh
+     !> Coefficients associated with \f$ X_h \f$
+     type(coef_t) :: c_Xh
      !> The source term for the momentum equation.
      type(adjoint_source_term_t) :: source_term
      !> X-component of the right-hand side.
@@ -104,34 +115,60 @@ module adjoint_scheme
      type(field_t), pointer :: f_adj_y => null()
      !> Z-component of the right-hand side.
      type(field_t), pointer :: f_adj_z => null()
-     class(ksp_t), allocatable :: ksp_vel !< Krylov solver for velocity
-     class(ksp_t), allocatable :: ksp_prs !< Krylov solver for pressure
-     class(pc_t), allocatable :: pc_vel !< Velocity Preconditioner
-     class(pc_t), allocatable :: pc_prs !< Velocity Preconditioner
-     integer :: vel_projection_dim !< Size of the projection space for ksp_vel
-     integer :: pr_projection_dim !< Size of the projection space for ksp_pr
-     integer :: vel_projection_activ_step !< Steps to activate projection for ksp_vel
-     integer :: pr_projection_activ_step !< Steps to activate projection for ksp_pr
-     type(no_slip_wall_t) :: bc_wall !< No-slip wall for velocity
-     class(bc_t), allocatable :: bc_inflow !< Dirichlet inflow for velocity
+     !> Krylov solver for velocity
+     class(ksp_t), allocatable :: ksp_vel
+     !> Krylov solver for pressure
+     class(ksp_t), allocatable :: ksp_prs
+     !> Velocity Preconditioner
+     class(pc_t), allocatable :: pc_vel
+     !> Velocity Preconditioner
+     class(pc_t), allocatable :: pc_prs
+     !> Size of the projection space for ksp_vel
+     integer :: vel_projection_dim
+     !> Size of the projection space for ksp_pr
+     integer :: pr_projection_dim
+     !> Steps to activate projection for ksp_vel
+     integer :: vel_projection_activ_step
+     !> Steps to activate projection for ksp_pr
+     integer :: pr_projection_activ_step
+     !> No-slip wall for velocity
+     type(no_slip_wall_t) :: bc_wall
+     !> Dirichlet inflow for velocity
+     class(bc_t), allocatable :: bc_inflow
 
      ! Attributes for field dirichlet BCs
-     type(field_dirichlet_vector_t) :: user_field_bc_vel !< User-computed Dirichlet velocity condition
-     type(field_dirichlet_t) :: user_field_bc_prs !< User-computed Dirichlet pressure condition
-     type(dirichlet_t) :: bc_prs !< Dirichlet pressure condition
-     type(dong_outflow_t) :: bc_dong !< Dong outflow condition
-     type(symmetry_t) :: bc_sym !< Symmetry plane for velocity
-     type(bc_list_t) :: bclst_vel !< List of velocity conditions
-     type(bc_list_t) :: bclst_prs !< List of pressure conditions
-     type(field_t) :: bdry !< Boundary markings
-     type(json_file), pointer :: params !< Parameters
-     type(mesh_t), pointer :: msh => null() !< Mesh
-     type(chkp_t) :: chkp !< Checkpoint
-     type(mean_flow_t) :: mean !< Mean flow field
-     type(fluid_stats_t) :: stats !< Fluid statistics
-     type(mean_sqr_flow_t) :: mean_sqr !< Mean squared flow field
-     logical :: forced_flow_rate = .false. !< Is the flow rate forced?
-     logical :: freeze = .false. !< Freeze velocity at initial condition?
+     !> User-computed Dirichlet velocity condition
+     type(field_dirichlet_vector_t) :: user_field_bc_vel
+     !> User-computed Dirichlet pressure condition
+     type(field_dirichlet_t) :: user_field_bc_prs
+     !> Dirichlet pressure condition
+     type(dirichlet_t) :: bc_prs
+     !> Dong outflow condition
+     type(dong_outflow_t) :: bc_dong
+     !> Symmetry plane for velocity
+     type(symmetry_t) :: bc_sym
+     !> List of velocity conditions
+     type(bc_list_t) :: bclst_vel
+     !> List of pressure conditions
+     type(bc_list_t) :: bclst_prs
+     !> Boundary markings
+     type(field_t) :: bdry
+     !> Parameters
+     type(json_file), pointer :: params
+     !> Mesh
+     type(mesh_t), pointer :: msh => null()
+     !> Checkpoint
+     type(chkp_t) :: chkp
+     !> Mean flow field
+     type(mean_flow_t) :: mean
+     !> Fluid statistics
+     type(fluid_stats_t) :: stats
+     !> Mean squared flow field
+     type(mean_sqr_flow_t) :: mean_sqr
+     !> Is the flow rate forced?
+     logical :: forced_flow_rate = .false.
+     !> Freeze velocity at initial condition?
+     logical :: freeze = .false.
      !> Dynamic viscosity
      real(kind=rp) :: mu
      !> The variable mu field
@@ -144,14 +181,16 @@ module adjoint_scheme
      real(kind=rp) :: rho
      !> The variable density field
      type(field_t) :: rho_field
-     type(scratch_registry_t) :: scratch !< Manager for temporary fields
+     !> Manager for temporary fields
+     type(scratch_registry_t) :: scratch
      !> Boundary condition labels (if any)
      character(len=NEKO_MSH_MAX_ZLBL_LEN), allocatable :: bc_labels(:)
    contains
      !> Constructor for the base type
      procedure, pass(this) :: adjoint_scheme_init_all
      procedure, pass(this) :: adjoint_scheme_init_common
-     generic :: scheme_init => adjoint_scheme_init_all, adjoint_scheme_init_common
+     generic :: scheme_init => adjoint_scheme_init_all, &
+          adjoint_scheme_init_common
      !> Destructor for the base type
      procedure, pass(this) :: scheme_free => adjoint_scheme_free
      !> Validate that all components are properly allocated
@@ -270,7 +309,8 @@ contains
 
 
     ! ! -------------------------------------------------------------------
-    ! ! A subdictionary which should be passed into "fluid" or "adjoint" source term
+    ! ! A subdictionary which should be passed into "fluid" or "adjoint" source
+    ! term
     ! type(json_file) :: fluid_json
     ! type(json_file) :: adjoint_json
     ! type(json_file) :: this_json
@@ -371,7 +411,8 @@ contains
     call json_get_or_default(params, json_key, this%freeze, .false.)
 
     ! TODO
-    ! This needs to be discussed... In pricipal, I think if the forward is forced to a
+    ! This needs to be discussed... In pricipal, I think if the forward is
+    ! forced to a
     ! certain flow rate, then the adjoint should be forced to zero flow rate,
     ! we had a derivation in
     ! https://www.sciencedirect.com/science/article/pii/S0045782522006764
@@ -428,13 +469,15 @@ contains
     ! in my mind, we can either
     ! 1) leave BC's to the user to prescribe in the adjoint,
     ! 2) or assume that all 'v' -> 'w' in the adjoint.
-    ! for now I'm opting for (2), so we'll read everything from fluid and make adjustments
+    ! for now I'm opting for (2), so we'll read everything from fluid and make
+    ! adjustments
     ! we may need to change this if we do a case with strange BC
     if (params%valid_path('case.adjoint.boundary_types')) then
        ! here we could give users a chance to prescribe something funky
        ! perhaps I should throw an error here
-       call neko_error('Currently BCs are handled based on the forward solution')
-    endif
+       call neko_error('Currently BCs are handled based on the &
+            &forward solution')
+    end if
 
     if (params%valid_path('case.fluid.boundary_types')) then
        call json_get(params, &
@@ -609,17 +652,21 @@ contains
     ! Initialize the source term
     ! TODO
     ! HARRY
-    ! Ok, this one I dislike the most... I think the CORRECT solution here is to modify
+    ! Ok, this one I dislike the most... I think the CORRECT solution here is to
+    ! modify
     ! the fluid_source_term.f90 so that case.fluid is not hardcoded
-    ! whoever coded it originally is probably much smarter than me and has their reasons
+    ! whoever coded it originally is probably much smarter than me and has their
+    ! reasons
     !
     ! I would envision somehow merging fluid_source_term and scalar_source_term
-    ! (maybe they're different because because it's a vector forcing vs a scalar forcing,
+    ! (maybe they're different because because it's a vector forcing vs a scalar
+    ! forcing,
     ! but still...
     !
     ! this is my attempt...
     ! params replaced by adjoint_json
-    !call this%source_term%init(params, this%f_adj_x, this%f_adj_y, this%f_adj_z, this%c_Xh,&
+    !call this%source_term%init(params, this%f_adj_x, this%f_adj_y, &
+    ! this%f_adj_z, this%c_Xh,&
     !     user)
 
     call this%source_term%init(this%f_adj_x, this%f_adj_y, this%f_adj_z, &
@@ -631,8 +678,9 @@ contains
     call this%set_bc_type_output(params)
 
     ! HARRY
-    ! -----------------------------------------------------------------------------
-    ! ok here is a chance that we can maybe steal the krylov solvers from the forward??
+    ! --------------------------------------------------------------------------
+    ! ok here is a chance that we can maybe steal the krylov solvers from the
+    ! forward??
     !
     ! something along the lines of
     !
@@ -641,7 +689,7 @@ contains
     ! 	this%pc_vel => case%fluid%ksp_vel
     ! else
     !  initialize everything
-    ! endif
+    ! end if
     !
     ! but I don't know how we can steal the krylov solvers out of the forward,
     ! so for now we'll just initialize two of them...
@@ -699,8 +747,8 @@ contains
   end subroutine adjoint_scheme_init_common
 
   !> Initialize all components of the current scheme
-  subroutine adjoint_scheme_init_all(this, msh, lx, params, kspv_init, kspp_init,&
-       scheme, user)
+  subroutine adjoint_scheme_init_all(this, msh, lx, params, kspv_init, &
+       kspp_init, scheme, user)
     implicit none
     class(adjoint_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
@@ -952,25 +1000,23 @@ contains
     !
     call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
-	 !TODO
-	 ! this has changed with the new statistics
-!    !
-!    ! Setup mean flow fields if requested
-!    !
-!    ! HARRY
-!    ! damn this one is confusing again because it belongs to case not fluid
-!    ! I could envision a time we would want to calculate the statistics for the
-!    ! forward and adjoint separately
-!    ! I bet we're going to get killed in the field registry here :/
-!    if (this%params%valid_path('case.statistics')) then
-!       call json_get_or_default(this%params, 'case.statistics.enabled',&
-!            logical_val, .true.)
-!       if (logical_val) then
-!          call this%mean%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-!          call this%stats%init(this%c_Xh, this%mean%u, &
-!               this%mean%v, this%mean%w, this%mean%p)
-!       end if
-!    end if
+    !
+    ! Setup mean flow fields if requested
+    !
+    ! HARRY
+    ! damn this one is confusing again because it belongs to case not fluid
+    ! I could envision a time we would want to calculate the statistics for the
+    ! forward and adjoint separately
+    ! I bet we're going to get killed in the field registry here :/
+    ! if (this%params%valid_path('case.statistics')) then
+    !    call json_get_or_default(this%params, 'case.statistics.enabled',&
+    !         logical_val, .true.)
+    !    if (logical_val) then
+    !       call this%mean%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    !       call this%stats%init(this%c_Xh, this%mean%u, &
+    !            this%mean%v, this%mean%w, this%mean%p)
+    !    end if
+    ! end if
 
   end subroutine adjoint_scheme_validate
 
@@ -1205,7 +1251,7 @@ contains
     if (.not. associated(user%material_properties, dummy_mp_ptr)) then
 
        write(log_buf, '(A)') "Material properties must be set in the user&
-       & file!"
+            & file!"
        call neko_log%message(log_buf)
        call user%material_properties(0.0_rp, 0, this%rho, this%mu, &
             dummy_cp, dummy_lambda, params)
@@ -1215,16 +1261,16 @@ contains
             (params%valid_path('case.fluid.mu') .or. &
             params%valid_path('case.fluid.rho'))) then
           call neko_error("To set the material properties for the fluid,&
-          & either provide Re OR mu and rho in the case file.")
+               & either provide Re OR mu and rho in the case file.")
 
           ! Non-dimensional case
        else if (params%valid_path('case.fluid.Re')) then
 
           write(log_buf, '(A)') 'Non-dimensional fluid material properties &
-          & input.'
+               & input.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'Density will be set to 1, dynamic viscosity to&
-          & 1/Re.'
+               & 1/Re.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Re into mu for further manipulation.
