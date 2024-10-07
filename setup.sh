@@ -86,11 +86,11 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 # ============================================================================ #
 # Install dependencies (See scripts/dependencies.sh for details)
 
-check_system_dependencies           # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000 $NEK5000_DIR           # Re-defines the NEK5000_DIR variable.
-find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
-find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
+check_system_dependencies                      # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
+find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
+[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #

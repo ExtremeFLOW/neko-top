@@ -237,7 +237,8 @@ fi
 function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
-    ./job_script.sh $1 >output.log 2>error.err
+    source $SPATH/functions.sh
+    run $1 >output.log 2>error.err
     cd $CURRENT_DIR
 }
 
@@ -257,6 +258,7 @@ function Submit() {
         printf >&2 "\tNo setting file found for the case.\n"
         return
     fi
+    cp -f $setting $log/job_script.sh
 
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
@@ -282,6 +284,8 @@ function Submit() {
     printf '\t%-12s %-s\n' "Submitted:" "$1"
     cd $CURRENT_DIR
 }
+
+# Definition of a interrupt handler
 INTERRUPTED=0
 function handler() {
     if [ "$MAIN_DIR" != "$(pwd)" ]; then
@@ -319,7 +323,7 @@ for case in ${example_list[@]}; do
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
-        [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
+        [ ! -z "$SUBMIT" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
     fi
@@ -346,7 +350,6 @@ for case in ${example_list[@]}; do
     done
 
     # Copy the job script to the log folder
-    cp -f $setting $log/job_script.sh
     cp -f $SPATH/functions.sh $log/functions.sh
 
     # Assign links to the data folders
@@ -357,7 +360,7 @@ for case in ${example_list[@]}; do
     printf 'Ready' >$log/output.log
 
     QUEUE="$QUEUE $example"
-    if [ $SUBMIT ]; then
+    if [ ! -z "$SUBMIT" ]; then
         Submit $example
     else
         printf '\t%-12s %-s\n' "Queued:" "$example"
@@ -379,14 +382,14 @@ for example in $QUEUE; do
     # Move to the log folder and submit the job
     if [ $INTERRUPTED == 1 ]; then
         continue
-    elif [ "$(which bsub)" ]; then
+    elif [ ! -z "$SUBMIT" ]; then
         Submit $example
     else
         Run $example
     fi
 done
 
-if [ ! "$(which bsub)" ]; then
+if [ -z "$SUBMIT" ]; then
     $MAIN_DIR/status.sh
 fi
 
