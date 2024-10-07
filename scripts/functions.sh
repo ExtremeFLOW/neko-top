@@ -34,7 +34,7 @@ function cleanup {
     if [ -s "error.err" ]; then
         printf "ERROR: An error occured during execution. " >&2
         printf "See error.err for details.\n" >&2
-        exit 1
+        return 1
     else
         printf "=%.0s" {1..80} && printf "\n"
         printf "Example concluded.\n"
@@ -51,9 +51,12 @@ function cleanup {
 }
 
 function prepare {
+    set +e
 
     # ------------------------------------------------------------------------ #
     # Ensure the environment is set up
+
+    [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
 
     [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
     if [ -z "$JSON_FORTRAN_DIR" ]; then
@@ -70,12 +73,12 @@ function prepare {
         printf "=%.0s" {1..80} && printf "\n"
         printf "Preparing example.\n\n"
 
-        { time ./prepare.sh; } 2>&1
+        { time ./prepare.sh 2>error.err; } 2>&1
 
         if [ -s "error.err" ]; then
             printf "\nERROR: An error occured during preparation. " >&2
             printf "See error.err for details.\n" >&2
-            exit 1
+            return 1
         else
             printf "\nPreparation concluded.\n"
         fi
@@ -97,7 +100,7 @@ function prepare {
 
     if [ ! -f "$neko" ]; then
         printf "ERROR: Neko executable not found." >&2
-        exit 1
+        return 1
     fi
     export neko
 }
@@ -106,6 +109,7 @@ function prepare {
 # Define the run function
 
 function run {
+    set -e
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
@@ -124,7 +128,7 @@ function run {
     casefile=$(find . -name "*.case")
     if [ -z "$casefile" ]; then
         printf "ERROR: No case file found.\n" >&2
-        exit 1
+        return 1
     fi
 
     if [ -f "run.sh" ]; then
@@ -137,15 +141,13 @@ function run {
         casename=$(basename -- ${casefile%.*})
         printf "See $casename.log for the status output.\n"
 
-        {
-            time $(mpirun --pernode $neko $casefile 1>$casename.log 2>error.err)
-        } 2>&1
+        $neko $casefile 1>$casename.log 2>error.err
     fi
 
     if [ -s "error.err" ]; then
         printf "\nERROR: An error occured during execution. " >&2
         printf "See error.err for details.\n" >&2
-        exit 1
+        return 1
     else
         printf "\nNeko execution concluded.\n"
     fi
