@@ -48,7 +48,7 @@ if [ ${#tests[@]} -eq 0 ]; then
 fi
 
 # If we are running in LSF-10 mode, print the running jobs.
-if [ "$(which bsub)" ]; then
+if [ $(which bjobs 2>/dev/null) ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
     bjobs -ro -noheader "time_left:8 job_name"
 fi
