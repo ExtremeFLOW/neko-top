@@ -23,10 +23,10 @@ function help() {
     printf "\e[4mOptions:\e[0m\n"
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
     printf "  -%-1s, --%-10s %-60s\n" "c" "clean" "Clean artifacts from previous runs."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previously completed runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
-    printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to the queue."
+    printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
