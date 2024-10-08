@@ -128,9 +128,9 @@ contains
 
 	 ! $df/dx_in = df/dx_out * dx_out/dx_in $
 
-	 ! $dx_out/dx_in = (f_max - f_min) * x_in
+	 ! $dx_out/dx_in = (f_max - f_min) 
 
-    call field_col3(dF_dX_in, dF_dX_out, X_in)
+    call field_copy(dF_dX_in, dF_dX_out)
     call field_cmult(dF_dX_in, this%f_max - this%f_min)
 
   end subroutine linear_mapping_apply_backward

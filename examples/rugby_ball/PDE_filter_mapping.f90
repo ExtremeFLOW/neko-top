@@ -236,20 +236,12 @@ contains
     type(field_t), intent(inout) ::  X_out
     integer :: n, i
     type(field_t), pointer ::  RHS 
-    integer :: temp_indices
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
+    integer :: temp_indices(1)
 
     n = this%coef%dof%size()
-
-    
-    ! TODO
-    ! you should be using the scratch registry!!!
-    ! but for some reason i segfault here if I try
-    !call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    call neko_field_registry%add_field(this%coef%dof, 'RHS')
-    RHS => neko_field_registry%get_field('RHS')
-
+    call neko_scratch_registry%request_field(RHS, temp_indices(1))
 
     ! set up Helmholtz operators and RHS
     do i = 1, n
@@ -290,9 +282,8 @@ contains
     call neko_log%message(log_buf)
 
 
-	 ! TODO
 	 ! You should relinguish if you get the scratch registry to work!
-    !call neko_scratch_registry%relinquish_field(temp_indices)
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
 
 
@@ -313,21 +304,13 @@ contains
     type(field_t), intent(inout) ::  df_dX_in
     integer :: n, i
     type(field_t), pointer ::  RHS 
-    integer :: temp_indices
+    integer :: temp_indices(1)
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
 
     n = this%coef%dof%size()
 
-    
-    ! TODO
-    ! you should be using the scratch registry!!!
-    ! but for some reason i segfault here if I try
-    !call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    ! THIS REALLY NEEDS TO BE FIXED
-    call neko_field_registry%add_field(this%coef%dof, 'RHS_adj')
-    RHS => neko_field_registry%get_field('RHS_adj')
-
+    call neko_scratch_registry%request_field(RHS, temp_indices(1))
 
     ! set up Helmholtz operators and RHS
     do i = 1, n
@@ -376,12 +359,8 @@ contains
          this%ksp_results%res_start, this%ksp_results%res_final
     call neko_log%message(log_buf)
 
-
-
-
-	 ! TODO
 	 ! You should relinguish if you get the scratch registry to work!
-    !call neko_scratch_registry%relinquish_field(temp_indices)
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
 
 
