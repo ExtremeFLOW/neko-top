@@ -22,7 +22,7 @@
 #SBATCH --gres=gpu:2
 
 # Time specifications (hh:mm)
-#SBATCH --time 00-00:01:00 # 10 minutes
+#SBATCH --time 00-00:10:00
 
 # -- Notification options
 
