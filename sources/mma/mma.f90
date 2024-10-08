@@ -50,8 +50,7 @@ module mma
      private
 
      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
-          residumax
-     real(kind=rp) :: residunorm
+          residumax, residunorm
      integer :: n, m, max_iter
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
 
