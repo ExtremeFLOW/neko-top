@@ -82,8 +82,7 @@ module mma
 
      !> Interface for updating the MMA
      generic, public :: update => mma_update_cpu, mma_update_vector
-     ! for debugging I'm making this public
-     procedure, public, pass(this) :: mma_update_cpu
+     procedure, pass(this) :: mma_update_cpu
      procedure, pass(this) :: mma_update_vector
 
      ! Getters for the MMA object

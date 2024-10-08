@@ -25,6 +25,7 @@ program usrneko
   use steady_state_problem, only : steady_state_problem_t
   use mma, only: mma_t
   use neko_ext, only: reset
+  use math, only: copy
 
 
   !> a problem type
@@ -40,6 +41,7 @@ program usrneko
   integer :: temp_indices(3)
   integer :: n, optimization_iteration
   real(kind=rp), dimension(1) :: fval
+  real(kind=rp), allocatable :: x_switch(:)
 
 
 
@@ -125,8 +127,25 @@ program usrneko
 
        call problem%sample(real(optimization_iteration,rp))
 
+       !call optimizer%mma_update_cpu( &
+       !     optimization_iteration, x, df0dx, fval, dfdx)
+
+       ! TODO
+       ! this is a really dumb way of handling the reshaping..
+       if( .not. allocated(x_switch)) then
+       allocate(x_switch(optimizer%get_n()))
+       end if
+
+       x_switch = reshape(x,[optimizer%get_n()])
+
        call optimizer%mma_update_cpu( &
-            optimization_iteration, x, df0dx, fval, dfdx)
+            optimization_iteration, &
+            x_switch, &
+            reshape(df0dx,[optimizer%get_n()]), &
+            fval, &
+            reshape(dfdx,[optimizer%get_m(), optimizer%get_n()]))
+
+		 call copy(x,x_switch,optimizer%get_n())
 
        ! TODO
        ! do a KKT check and do a propper convergence check..
@@ -161,6 +180,7 @@ program usrneko
   end do
 !------------------------------------------------------------------------------
 
+  deallocate(x_switch)
   call problem%free()
   call design%free()
   ! TODO
