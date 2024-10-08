@@ -14,7 +14,7 @@ module neko_ext
   ! Module interface
   ! ========================================================================= !
   private
-  public :: setup_iteration
+  public :: setup_iteration, reset
 
 contains
 
@@ -54,7 +54,9 @@ contains
     v => neko_case%fluid%v
     w => neko_case%fluid%w
     p => neko_case%fluid%p
-    s => neko_case%scalar%s
+    if(allocated(neko_case%scalar)) then
+       s => neko_case%scalar%s
+    end if
 
     ! ------------------------------------------------------------------------ !
     ! Reset the timing parameters
