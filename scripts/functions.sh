@@ -145,11 +145,14 @@ function run {
         } 2>&1
     else
         # Look for the number of cores to use
-        ncores=1
         if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
             ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
         elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
             ncores=$LSB_DJOB_NUMPROC
+        fi
+
+        if [ -z "$ncores" ]; then
+            ncores="1"
         fi
         { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.err); } 2>&1
     fi
