@@ -55,11 +55,6 @@ else
     exit 1
 fi
 
-# Load the required modules
-if [ ! -z $(which module) ]; then
-    module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
-fi
-
 source functions.sh
 run $example
 
