@@ -54,9 +54,44 @@ function prepare {
     set +e
 
     # ------------------------------------------------------------------------ #
-    # Ensure the environment is set up
+    # Report the Job environment if it exists
+
+    if [ ! -z "$SLURM_JOB_NAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "SLURM Job: %s\n" $SLURM_JOB_NAME
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Job ID: %s\n" $SLURM_JOB_ID
+        printf "Job Node: %s\n" $SLURM_JOB_NODELIST
+        printf "Job Partition: %s\n" $SLURM_JOB_PARTITION
+        printf "Job Account: %s\n" $SLURM_JOB_ACCOUNT
+        printf "Job Time: %s\n" $SLURM_JOB_TIME
+        printf "Job Memory: %s\n" $SLURM_JOB_MEMORY
+        printf "Job CPUs: %s\n" $SLURM_JOB_CPUS_PER_NODE
+        printf "Job GPUs: %s\n" $SLURM_JOB_GPUS
+        printf "Job QOS: %s\n" $SLURM_JOB_QOS
+        printf "Job Reservation: %s\n" $SLURM_JOB_RESERVATION
+        printf "Job Work Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output File: %s\n" $SLURM_JOB_NAME
+        printf "Job Error File: %s\n" $SLURM_JOB_NAME
+
+    elif [ ! -z "$LSB_JOBNAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "LSF10 Job: %s\n" $LSB_JOBNAME
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Job ID: %s\n" $LSB_JOBID
+        printf "Job CPUs: %s\n" $LSB_DJOB_NUMPROC
+
+    fi
 
     [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
+    if [ ! -z "$(which module 2>>/dev/null)" ]; then
+        printf "\nModules:\n"
+        module list 2>&1
+    fi
+
+    # ------------------------------------------------------------------------ #
+    # Ensure the environment is set up
 
     [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
     if [ -z "$JSON_FORTRAN_DIR" ]; then
@@ -68,10 +103,13 @@ function prepare {
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
     export PATH="$NEKO_DIR/bin:$PATH"
 
+    # ------------------------------------------------------------------------ #
     # Run preparation if it exists
+
     if [ -f "prepare.sh" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "Preparing example.\n\n"
+        printf "=%.0s" {1..80} && printf "\n"
 
         { time ./prepare.sh; } 2>&1
 
@@ -92,6 +130,8 @@ function prepare {
     elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "Building user Neko\n"
+        printf "=%.0s" {1..80} && printf "\n"
+
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
     else

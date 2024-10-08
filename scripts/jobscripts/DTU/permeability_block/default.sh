@@ -38,8 +38,8 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
-#BSUB -o output.log
-#BSUB -e error.err
+#BSUB -oo output.log
+#BSUB -eo error.err
 
 # ============================================================================ #
 # Determine if the script is run on the HPC or locally
