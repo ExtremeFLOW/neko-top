@@ -51,10 +51,7 @@ module mma
 
      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
           residumax
-     ! we need to have the KKT residual public
-     ! or alternatively, have KKT a function not a subroutine,
-     ! that return residunrom
-     real(kind=rp), public :: residunorm
+     real(kind=rp) :: residunorm
      integer :: n, m, max_iter
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
 
