@@ -1,12 +1,20 @@
 # This check is used to ensure documentation can be built from the main branch.
 name: Check Neko-TOP compilation and tests
 
+# This workflow is only defined here. It is triggered from other workflows.
 on:
-  # This workflow is only defined here. It is triggered from other workflows.
   workflow_call:
     inputs:
       neko-version:
         description: "The version of Neko to use."
+        required: true
+        type: string
+      pfunit-version:
+        description: "The version of pFUnit to use."
+        required: true
+        type: string
+      json-fortran-version:
+        description: "The version of json-fortran to use."
         required: true
         type: string
 
@@ -41,6 +49,8 @@ jobs:
       - name: Setup json-fortran
         id: setup-json-fortran
         uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
 
       - name: Setup neko
         id: setup-neko
@@ -52,6 +62,8 @@ jobs:
       - name: Setup pFUnit
         id: setup-pfunit
         uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ inputs.pfunit-version }}
 
       - name: Setup GSLib
         id: setup-gslib
