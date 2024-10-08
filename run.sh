@@ -245,39 +245,24 @@ function Run() {
 # Function for submitting the examples
 function Submit() {
 
-    # Find the setting file for the case recursively
-    setting=$HPATH/${case%.*}.sh
-    while [[ ! -f $setting && ! -z "$setting" ]]; do
-        setting=$(dirname ${setting%/default.sh})/default.sh
-    done
-    setting=$(realpath $setting)
-
-    if [ ! -f $setting ]; then
-        printf >&2 "\e[1;31mInvalid setting file:\e[m\n"
-        printf >&2 "$HPATH/${case%.*}.sh\n"
-        printf >&2 "\tNo setting file found for the case.\n"
-        exit 1
-    fi
-    cp -f $setting $log/job_script.sh
-
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
     if [ $CLUSTER == "DTU" ]; then
         export BSUB_QUIET=Y
         bsub -J $1 -env "all" <job_script.sh
 
-    elif [ $CLUSTER == "M5" ]; then
-        if [ -z "$M5_ACCOUNT" ]; then
+    elif [ $CLUSTER == "MN5" ]; then
+        if [ -z "$MN5_ACCOUNT" ]; then
             printf >&2 "No account specified for Marenostrum5.\n"
-            printf >&2 "Please set the M5_ACCOUNT variable in the environment.\n"
+            printf >&2 "Please set the MN5_ACCOUNT variable in the environment.\n"
             exit 1
         fi
-        sbatch -A $M5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.err
+        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.err
 
     else
         printf >&2 "No or invalid cluster specified for submission.\n"
         printf >&2 "\t- DTU for the DTU cluster.\n"
-        printf >&2 "\t- M5 for the Marenostrum5 cluster.\n"
+        printf >&2 "\t- MN5 for the Marenostrum5 cluster.\n"
         exit 1
     fi
 
@@ -315,7 +300,7 @@ for case in ${example_list[@]}; do
         example=$example/$case_name
     fi
 
-    log=$LPATH/$example && mkdir -p $log
+    export log=$LPATH/$example && mkdir -p $log
     [ "$CLEAN" = true ] && rm -fr $log/*
 
     # Setup the log folder
@@ -351,6 +336,25 @@ for case in ${example_list[@]}; do
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh
+
+    # If we are submitting to a cluster, look for the associated jobscript
+    if [ ! -z $CLUSTER ]; then
+        # Find the setting file for the case recursively
+        setting=$HPATH/${case%.*}.sh
+        while [[ ! -f $setting && ! -z "$setting" ]]; do
+            setting=$(dirname ${setting%/default.sh})/default.sh
+        done
+        setting=$(realpath $setting)
+
+        if [ ! -f $setting ]; then
+            printf >&2 "\e[1;31mInvalid setting file:\e[m\n"
+            printf >&2 "$HPATH/${case%.*}.sh\n"
+            printf >&2 "\tNo setting file found for the case.\n"
+            exit 1
+        else
+            cp -f $setting $log/job_script.sh
+        fi
+    fi
 
     # Assign links to the data folders
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi

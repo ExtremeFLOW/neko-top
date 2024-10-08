@@ -63,6 +63,9 @@ EXTERNAL_DIR="$MAIN_DIR/external"
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
 
+printf "=%.0s" {1..80} && printf "\n"
+printf "Preparing environment.\n\n"
+
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
     source $MAIN_DIR/prepare.env
@@ -85,6 +88,9 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 # Everything past this point should be general across all setups.
 # ============================================================================ #
 # Install dependencies (See scripts/dependencies.sh for details)
+
+printf "=%.0s" {1..80} && printf "\n"
+printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.

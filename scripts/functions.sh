@@ -125,23 +125,30 @@ function run {
     printf "=%.0s" {1..80} && printf "\n"
     printf "Executing Neko.\n\n"
 
-    casefile=$(find . -name "*.case")
-    if [ -z "$casefile" ]; then
+    casefile=($(find . -name "*.case"))
+    if [[ ${#casefile[@]} -eq 0 ]]; then
         printf "ERROR: No case file found.\n" >&2
         return 1
+    elif [[ ${#casefile[@]} -eq 1 ]]; then
+        casefile=${casefile[0]}
+        logfile=$(basename -- ${casefile%.*}).log
+    else
+        logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
     if [ -f "run.sh" ]; then
         export PATH="$NEKO_DIR/bin:$PATH"
 
-        logfile=$(basename -- $(dirname $(realpath $0)))
-
         { time ./run.sh 2>error.err; } 2>&1
-    else
-        casename=$(basename -- ${casefile%.*})
-        printf "See $casename.log for the status output.\n"
 
-        $neko $casefile 1>$casename.log 2>error.err
+    elif [ ! -z "$(which srun)" ]; then
+        printf "See $logfile for the status output.\n"
+
+        { time srun -n 1 $neko $casefile 1>$logfile 2>error.err; } 2>&1
+    else
+        printf "See $logfile for the status output.\n"
+
+        { time $neko $casefile 1>$logfile 2>error.err; } 2>&1
     fi
 
     if [ -s "error.err" ]; then
