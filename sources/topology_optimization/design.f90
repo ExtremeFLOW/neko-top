@@ -5,16 +5,30 @@
 
 module design_module
 
-  use num_types, only: rp
   use case, only: case_t
   use fluid_user_source_term, only: fluid_user_source_term_t
+  ! use fluid_source_term, only: fluid_source_term_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
+  use num_types, only: rp
   use point_zone, only: point_zone_t
-
+  use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use logger, only: neko_log
+  use point_zone_registry, only: neko_point_zone_registry
+  use json_utils, only: json_get, json_get_or_default
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: col3, rzero, col2, cmult, invcol1, cadd, add2, cfill
+  use device_math, only: device_col3, device_rzero, device_col2, device_cmult, &
+       device_invcol1, device_cadd, device_add2, device_cfill
+  use math_ext, only: cadd_mask, col3_mask
+  use device_math_ext, only: device_cadd_mask, device_col3_mask
+  use simulation_component, only: simulation_component_t
+  use json_module, only: json_file
+  use utils, only: neko_error
   use, intrinsic :: iso_c_binding, only: c_ptr, c_null_ptr
-
+  ! use topopt_brinkman_source_term, only: topopt_brinkman_source_term_t
   implicit none
+
 
   ! ========================================================================= !
   ! Module interface
@@ -42,14 +56,15 @@ module design_module
 
   !> @brief The topology type, which is used to describe the designs in
   !! topology optimization
-  type :: design_t
+  type, extends(simulation_component_t) :: design_t
 
+     ! the design field, and brinkman amplitude stay public
      !> @brief array describing the topology.
-     class(field_t), private, pointer :: design_field
+     class(field_t), public, pointer :: chi
+     !> @brief array describing the topology.
+     class(field_t), public, pointer :: design_field
      !> @brief Pointer to the design domain.
      class(point_zone_t), private, pointer :: design_domain => null()
-     !> @brief Pointer to the neko case.
-     class(case_t), private, pointer :: neko_case => null()
 
      ! Limits of the permeability.
      real(kind=rp), private :: perm_0, perm_1, perm_penalty
@@ -57,16 +72,27 @@ module design_module
      !> Size parameters
      integer :: total_size, design_size
 
+     !> Logical indicating if the design has converged
+     logical :: converged = .false.
+     !> Indication if the design has changed
+     logical :: design_changed = .false.
+
    contains
 
      !> @brief Initialize the topology
-     procedure, public, pass(this) :: init => init_design
+     procedure, pass(this) :: init => init_design
 
      !> @brief Free the topology
-     procedure, public, pass(this) :: free => free_design
+     procedure, pass(this) :: free => free_design
+
+     !> @brief Update resistance based on the design
+     procedure, pass(this) :: preprocess_ => update_permeability
+
+     !> @brief Update the design.
+     procedure, pass(this) :: compute_ => update_design
 
      !> @brief Update the topology
-     procedure, public, pass(this) :: update => update_design
+     procedure, pass(this) :: update => update_design
   end type design_t
 
 contains
@@ -80,37 +106,27 @@ contains
   !> @param[inout] this The topology
   !> @param[in] neko_case The neko case
   !> @param[in] resolution The resolution of the topology
-  subroutine init_design(this, neko_case)
-    use neko_config, only: NEKO_BCKND_DEVICE
-    use device, only: device_map, device_memcpy, HOST_TO_DEVICE
-    use math, only: rzero
-    use logger, only: neko_log
-    use device_math, only: device_rzero
-    use point_zone_registry, only: neko_point_zone_registry
-    use json_utils, only: json_get, json_get_or_default
-    implicit none
-
-    ! Subroutine arguments
+  subroutine init_design(this, json, case)
     class(design_t), intent(inout) :: this
-    type(case_t), intent(inout), target :: neko_case
+    type(json_file), intent(inout) :: json
+    class(case_t), intent(inout), target :: case
 
-    ! Local variables
-    real(kind=rp) :: reynolds
+    ! type(fluid_source_term_t), allocatable :: brinkman_source_term
 
-    ! Save the neko case object.
-    this%neko_case => neko_case
+    ! Base initialization
+    call this%free()
+    call this%init_base(json, case)
 
     ! ---------------------------------------------------------------------- !
     ! Assign local variables
     ! ---------------------------------------------------------------------- !
 
-    call json_get_or_default(this%neko_case%params, "topopt.perm_penalty", &
+    call json_get_or_default(json, "topopt.perm_penalty", &
          this%perm_penalty, 1.0_rp)
-    call json_get_or_default(this%neko_case%params, "topopt.perm_0", &
+    call json_get_or_default(json, "topopt.perm_0", &
          this%perm_0, 1000.0_rp)
-    call json_get_or_default(this%neko_case%params, "topopt.perm_1", &
+    call json_get_or_default(json, "topopt.perm_1", &
          this%perm_1, 0.0_rp)
-    call json_get(this%neko_case%params, 'case.fluid.Re', reynolds)
 
     ! ---------------------------------------------------------------------- !
     ! Set the design domain
@@ -125,6 +141,7 @@ contains
 
     design_domain_mask => this%design_domain%mask
     design_domain_mask_d = this%design_domain%mask_d
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_log%warning("We assume that NEKO is using the old design " // &
             "domain masks. Please check the status of PR " // &
@@ -143,12 +160,12 @@ contains
     ! ---------------------------------------------------------------------- !
 
     if (.not. neko_field_registry%field_exists("design")) then
-       call neko_field_registry%add_field(this%neko_case%fluid%dm_Xh, "design")
+       call neko_field_registry%add_field(case%fluid%dm_Xh, "design")
     end if
 
     this%design_field => neko_field_registry%get_field_by_name("design")
 
-    call this%neko_case%f_out%fluid%append(this%design_field)
+    call case%f_out%fluid%append(this%design_field)
 
     ! Initialize the design
     call rzero(this%design_field%x, this%design_field%dof%size())
@@ -160,6 +177,9 @@ contains
     ! Initialize the resistance array
     ! ---------------------------------------------------------------------- !
 
+    ! allocate(brinkman_source_term)
+
+
     this%total_size = this%design_field%dof%size()
     this%design_size = this%design_domain%size
 
@@ -170,6 +190,17 @@ contains
        call device_map(resistance, resistance_d, this%total_size)
     end if
 
+
+
+    ! ---------------------------------------------------------------------- !
+    ! Assign the resistance function to be the source term
+    ! ---------------------------------------------------------------------- !
+
+    if (associated(this%case%usr%fluid_user_f_vector)) then
+       nullify(this%case%usr%fluid_user_f_vector)
+    end if
+    this%case%usr%fluid_user_f_vector => topopt_permeability_force
+
   end subroutine init_design
 
   !> @brief Free the topology
@@ -179,8 +210,10 @@ contains
 
     class(design_t), intent(inout) :: this
 
-    deallocate (resistance)
+    if (allocated(resistance)) deallocate(resistance)
     call device_free(resistance_d)
+    nullify(this%design_field)
+    nullify(this%design_domain)
 
   end subroutine free_design
 
@@ -188,17 +221,10 @@ contains
   !!
   !! @todo This is currently just a dummy function. We need to implement
   !!       the actual topology optimization algorithm here.
-  subroutine update_design(this, converged)
-    use neko_config, only: NEKO_BCKND_DEVICE
-    use math, only: cadd
-    use math_ext, only: cadd_mask
-    use device_math_ext, only: device_cadd_mask
-    use device_math, only: device_cadd
-    use device, only: device_memcpy
-    implicit none
-
+  subroutine update_design(this, t, tstep)
     class(design_t), intent(inout) :: this
-    logical, intent(out) :: converged
+    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: tstep
     real(kind=rp) :: max_norm
 
     ! ---------------------------------------------------------------------- !
@@ -225,13 +251,7 @@ contains
     ! ---------------------------------------------------------------------- !
 
     max_norm = 1.0_rp
-    converged = max_norm < 0.01_rp
-
-    ! ---------------------------------------------------------------------- !
-    ! Finish the update by updating the permeability field
-    ! ---------------------------------------------------------------------- !
-
-    call update_permeability(this)
+    this%converged = max_norm < 0.01_rp
 
   end subroutine update_design
 
@@ -244,16 +264,6 @@ contains
   !! @param[inout] f The force term
   !! @param[in] t The current time
   subroutine topopt_permeability_force(f, t)
-    use neko_config, only: NEKO_BCKND_DEVICE
-    use math, only: col3
-    use math_ext, only: col3_mask
-    use device_math, only: device_col3
-    use device_math_ext, only: device_col3_mask
-    use field, only: field_t
-    use field_registry, only: neko_field_registry
-
-    implicit none
-
     class(fluid_user_source_term_t), intent(inout) :: f
     real(kind=rp), intent(in) :: t
     type(field_t), pointer :: u, v, w
@@ -303,22 +313,15 @@ contains
   !! parameter.
   !!
   !! @param[in] neko_case The neko case
-  subroutine update_permeability(this)
-    use neko_config, only: NEKO_BCKND_DEVICE
-    use math, only: col2, cmult, invcol1, cadd, add2, cfill
-    use device_math, only: device_col2, device_cmult, device_invcol1, &
-         device_cadd, device_add2, device_cfill
-
-    implicit none
-
-    ! Arguments
-    type(design_t), intent(inout) :: this
+  subroutine update_permeability(this, t, tstep)
+    class(design_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: tstep
 
     ! Local variables
     real(kind=rp) :: constant
 
-    constant = (this%perm_0 - this%perm_1) &
-         * (this%perm_penalty + 1.0_rp)
+    constant = (this%perm_0 - this%perm_1) * (this%perm_penalty + 1.0_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_cfill(resistance_d, this%perm_penalty, this%total_size)
