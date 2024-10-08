@@ -32,8 +32,8 @@ function cleanup {
         -exec mv -t $results {} +
 
     if [ -s "error.err" ]; then
-        printf "ERROR: An error occured during execution. " >&2
-        printf "See error.err for details.\n" >&2
+        printf "ERROR: An error occured during execution.\n"
+        printf "See error.err for details.\n"
         return 1
     else
         printf "=%.0s" {1..80} && printf "\n"
@@ -73,11 +73,11 @@ function prepare {
         printf "=%.0s" {1..80} && printf "\n"
         printf "Preparing example.\n\n"
 
-        { time ./prepare.sh 2>error.err; } 2>&1
+        { time ./prepare.sh; } 2>&1
 
         if [ -s "error.err" ]; then
-            printf "\nERROR: An error occured during preparation. " >&2
-            printf "See error.err for details.\n" >&2
+            printf "\nERROR: An error occured during preparation.\n"
+            printf "See error.err for details.\n"
             return 1
         else
             printf "\nPreparation concluded.\n"
@@ -89,7 +89,7 @@ function prepare {
 
     if [ -f ./neko ]; then
         neko=$(realpath ./neko)
-    elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
+    elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "Building user Neko\n"
         $NEKO_DIR/bin/makeneko *.f90
@@ -99,7 +99,7 @@ function prepare {
     fi
 
     if [ ! -f "$neko" ]; then
-        printf "ERROR: Neko executable not found." >&2
+        printf "ERROR: Neko executable not found."
         return 1
     fi
     export neko
@@ -127,7 +127,7 @@ function run {
 
     casefile=($(find . -name "*.case"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
-        printf "ERROR: No case file found.\n" >&2
+        printf "ERROR: No case file found.\n"
         return 1
     elif [[ ${#casefile[@]} -eq 1 ]]; then
         casefile=${casefile[0]}
@@ -138,18 +138,25 @@ function run {
     printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        { time ./run.sh 1>$logfile 2>error.err; } 2>&1
+        { time ./run.sh 1>$logfile; } 2>&1
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
-            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.err
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile
         } 2>&1
     else
-        { time mpirun -n 2 $neko $casefile 1>$logfile 2>error.err; } 2>&1
+        # Look for the number of cores to use
+        ncores=1
+        if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+            ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
+        elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
+            ncores=$LSB_DJOB_NUMPROC
+        fi
+        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.err); } 2>&1
     fi
 
     if [ -s "error.err" ]; then
-        printf "\nERROR: An error occured during execution. " >&2
-        printf "See error.err for details.\n" >&2
+        printf "\nERROR: An error occured during execution.\n"
+        printf "See error.err for details.\n"
         return 1
     else
         printf "\nNeko execution concluded.\n"
