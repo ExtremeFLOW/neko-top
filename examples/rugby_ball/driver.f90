@@ -50,7 +50,7 @@ program usrneko
   call problem%init_base()
 
   ! init the design
-  call design%init(problem%C%fluid%dm_Xh)
+  call design%init(problem%C%params, problem%C%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)

@@ -14,6 +14,9 @@ set(EXTRA_SOURCES
     topopt_design.f90
     problem.f90
     steady_state_problem.f90
+    mapping.f90
+    PDE_filter_mapping.f90
+    linear_mapping.f90
 
 )
 
