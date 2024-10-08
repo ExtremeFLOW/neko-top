@@ -135,20 +135,16 @@ function run {
     else
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
+    printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        export PATH="$NEKO_DIR/bin:$PATH"
-
-        { time ./run.sh 2>error.err; } 2>&1
-
-    elif [ ! -z "$(which srun)" ]; then
-        printf "See $logfile for the status output.\n"
-
-        { time srun -n 1 $neko $casefile 1>$logfile 2>error.err; } 2>&1
+        { time ./run.sh 1>$logfile 2>error.err; } 2>&1
+    elif [ ! -z "$SLURM_JOB_NAME" ]; then
+        {
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.err
+        } 2>&1
     else
-        printf "See $logfile for the status output.\n"
-
-        { time $neko $casefile 1>$logfile 2>error.err; } 2>&1
+        { time mpirun -n 2 $neko $casefile 1>$logfile 2>error.err; } 2>&1
     fi
 
     if [ -s "error.err" ]; then
