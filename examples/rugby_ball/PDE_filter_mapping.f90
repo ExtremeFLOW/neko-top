@@ -303,7 +303,7 @@ contains
     type(field_t), intent(in) ::  df_dX_out
     type(field_t), intent(inout) ::  df_dX_in
     integer :: n, i
-    type(field_t), pointer ::  RHS 
+    type(field_t), pointer ::  RHS
     integer :: temp_indices(1)
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
@@ -344,7 +344,21 @@ contains
     call profiler_end_region
 
     ! This is also different, now we divide by X_in
-    call field_invcol2(dF_dX_in, X_in)
+    ! TODO
+    ! talk to Niels about this!!!
+    ! I'm worried we get some divisions by zero if we divide here??
+    ! After some research:
+    ! https://github.com/yuloveyet/TopOpt/blob/master/top82_PDE.txt
+    ! it looks like they have:
+    ! dc(:) = (TF'*(LF'\(LF\(TF*(dc(:).*xPhys(:))))))./max(1e-3,xPhys(:));
+    !
+    ! ie, divide by max(1e-3,xPhys(:)).
+    ! 
+    ! Check with the DTU boys in the next meeting.
+    do i = 1, n
+    	  dF_dX_in%x(i,1,1,1) = dF_dX_in%x(i,1,1,1)/max(X_in%x(i,1,1,1),0.001_rp)
+    end do
+    !call field_invcol2(dF_dX_in, X_in)
 
     ! update preconditioner (needed?)
     call this%pc_filt%update()

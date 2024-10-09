@@ -129,7 +129,7 @@ contains
     ! anyway...
     ! here we hard code for now
     this%min_max = .false.
-    this%v_max = 0.2
+    this%v_max = 0.1
 
     call this%init_base(fluid%dm_Xh)
 
@@ -200,13 +200,15 @@ contains
     class(adjoint_scheme_t), intent(in) :: adjoint
 
     call field_rone(this%sensitivity_to_coefficient)
-    call field_cmult(this%sensitivity_to_coefficient, 1.0_rp/fluid%c_xh%volume)
 
     if(this%min_max) then
        ! max volume
+       call field_cmult(this%sensitivity_to_coefficient, &
+       1.0_rp/fluid%c_xh%volume)
     else
        ! min volume
-       call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
+       call field_cmult(this%sensitivity_to_coefficient, &
+       -1.0_rp/fluid%c_xh%volume)
     endif
 
   end subroutine volume_constraint_compute_sensitivity

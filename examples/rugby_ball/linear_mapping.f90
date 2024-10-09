@@ -77,7 +77,7 @@ contains
 
     ! do the JSON stuff later
     this%f_min = 0.0_rp
-    this%f_max = 100.0_rp
+    this%f_max = 1000.0_rp
 
     call this%init_base(json, coef)
     call linear_mapping_init_from_attributes(this, coef)
@@ -102,8 +102,8 @@ contains
   end subroutine linear_mapping_free
 
   !> Apply the mapping
-  !! @param F_out mapped field
-  !! @param F_in unmapped field
+  !! @param X_out mapped field
+  !! @param X_in unmapped field
   subroutine linear_mapping_apply(this, X_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) ::  X_in
@@ -117,9 +117,10 @@ contains
   end subroutine linear_mapping_apply
 
 
-  !> Apply the filter
-  !! @param F_out sensitivity wrt to the unmapped field
-  !! @param F_in sensitivity wrt to the mapped field
+  !> Apply the  chain rule
+  !! @param X_in unmapped field
+  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
+  !! @param dF_dX_out is the sensitivity with respect to the filtered design
   subroutine linear_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) ::  X_in
