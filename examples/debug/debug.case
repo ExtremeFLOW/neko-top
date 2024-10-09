@@ -1,7 +1,8 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data/debugging_pipe.nmsh",
+        "mesh_file": "data/debugging_pipe.nmsh", // Run.sh path to mesh
+        // "mesh_file": "../../data_local/debugging_pipe.nmsh", // Local path to mesh
         "output_directory": "fields",
         "output_at_end": true,
         "output_boundary": true,
@@ -82,19 +83,12 @@
                 ]
             }
         ],
-    },
-    "topology_optimization": {
-        "sensitivity_analysis": {
-            "type": "sensitivity",
-            "compute_control": "tsteps",
-            "compute_value": 5
-        },
-
-        "components": [
-            {
-                "type": "design",
-                "is_user": true
+        "topology_optimization": {
+            "sensitivity_analysis": {
+                "type": "sensitivity",
+                "compute_control": "tsteps",
+                "compute_value": 5
             }
-        ]
-    },
+        }
+    }
 }

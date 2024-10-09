@@ -58,7 +58,7 @@
             "label": "Setup",
             "command": "${workspaceFolder}/setup.sh",
             "args": [
-                "--device",
+                "--devic",
                 "CUDA"
             ],
             "group": "build",

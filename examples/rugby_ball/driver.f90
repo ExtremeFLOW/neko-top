@@ -156,7 +156,7 @@ program usrneko
 
        ! TODO
        ! on the MMA side, we need residunorm public
-       print *, 'KKT', optimizer%residunorm
+       print *, 'KKT', optimizer%get_residunorm()
 
      end associate
 
