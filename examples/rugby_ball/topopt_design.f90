@@ -100,6 +100,7 @@ module topopt_design
   use mma, only: mma_t
   use fld_file_output, only : fld_file_output_t
   use linear_mapping, only: linear_mapping_t
+  use RAMP_mapping, only: RAMP_mapping_t
   use PDE_filter, only: PDE_filter_t
   !use design_variable, only: design_variable_t
   implicit none
@@ -188,7 +189,7 @@ module topopt_design
 
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
-     type(linear_mapping_t) :: mapping
+     type(RAMP_mapping_t) :: mapping
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 

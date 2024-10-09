@@ -17,7 +17,7 @@ set(EXTRA_SOURCES
     mapping.f90
     PDE_filter_mapping.f90
     linear_mapping.f90
-
+    RAMP_mapping.f90
 )
 
 build_example(${DRIVER_TYPE})
