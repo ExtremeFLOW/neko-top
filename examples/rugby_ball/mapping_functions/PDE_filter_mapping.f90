@@ -354,7 +354,8 @@ contains
     !
     ! ie, divide by max(1e-3,xPhys(:)).
     ! 
-    ! Check with the DTU boys in the next meeting.
+    ! I'm pretty sure this is correct by double check with the DTU boys in the
+    ! next meeting.
     do i = 1, n
     	  dF_dX_in%x(i,1,1,1) = dF_dX_in%x(i,1,1,1)/max(X_in%x(i,1,1,1),0.001_rp)
     end do
@@ -375,6 +376,9 @@ contains
 
 	 ! You should relinguish if you get the scratch registry to work!
     call neko_scratch_registry%relinquish_field(temp_indices)
+
+    ! TODO
+    ! all those loops mean it won't work for GPU !
 
 
 
