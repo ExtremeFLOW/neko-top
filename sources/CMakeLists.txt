@@ -40,6 +40,10 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/mma.f90
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cpu/mma_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_gpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_cuda.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_gpu.cu
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_gpu_kernel.h
 )
 
 # ============================================================================ #
@@ -48,6 +52,7 @@ target_sources(neko-top
 target_include_directories(neko-top
     PUBLIC
         ${CMAKE_Fortran_MODULE_DIRECTORY}
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda
 )
 
 target_link_libraries(neko-top
