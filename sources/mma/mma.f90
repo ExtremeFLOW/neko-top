@@ -127,6 +127,38 @@ module mma
      end subroutine mma_KKT_cpu
   end interface
 
+  ! ========================================================================== !
+  ! Interface for the GPU backend
+
+  interface
+     !> Generate the approximation sub problem on the GPU.
+     module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx
+       type(vector_t), intent(in) :: fval
+       type(matrix_t), intent(in) :: dfdx
+       integer, intent(in) :: iter
+     end subroutine mma_gensub_gpu
+
+     !> Solve the dual with an interior point method on the GPU.
+     module subroutine mma_subsolve_dpip_gpu(this, designx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(inout) :: designx
+     end subroutine mma_subsolve_dpip_gpu
+
+     !> Compute the KKT condition for a given design x on the GPU.
+     module subroutine mma_KKT_gpu(this, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx
+       type(vector_t), intent(in) :: fval
+       type(matrix_t), intent(in) :: dfdx
+     end subroutine mma_KKT_gpu
+  end interface
+
+  ! ========================================================================== !
+
 contains
 
   subroutine mma_init_json(this, x, n, m, a0, a, c, d, xmin, xmax, json)
@@ -345,6 +377,9 @@ contains
 
     if (this%backend == 'cpu') then
        call this%mma_update_cpu(iter, x%x, df0dx%x, fval%x, dfdx%x)
+    else if (this%backend == 'gpu') then
+       call mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
+       call mma_subsolve_dpip_gpu(this, x)
     else
        write(stderr, *) "Device not supported for MMA."
        error stop

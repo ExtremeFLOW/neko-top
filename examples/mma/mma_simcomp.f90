@@ -174,12 +174,9 @@ contains
     real(kind=rp), dimension(2,4) :: teststuff
 
     real(kind=rp) :: start_time, end_time
-    real(kind=rp), dimension(this%mma%get_n()) :: x
 
-    real(kind=rp), dimension(this%mma%get_m()) :: fval, fvalglobal
-    real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
+    real(kind=rp), dimension(this%mma%get_m()) :: fvalglobal
     real(kind=rp) :: f0val, f0valeps, f0valglobal
-    real(kind=rp), dimension(this%mma%get_n()) :: df0dx
     ! character(len=50) :: filename
     real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
     ! real(kind=rp), dimension(4320,4) :: all_stuff
@@ -187,6 +184,16 @@ contains
     integer, allocatable :: nloc_all(:)
 
     character(len=80) :: iFileName ! Filename to save the VTK data
+
+    type(vector_t) :: x
+    type(vector_t) :: df0dx
+    type(vector_t) :: fval
+    type(matrix_t) :: dfdx
+
+    call x%init(this%mma%get_n())
+    call fval%init(this%mma%get_m())
+    call df0dx%init(this%mma%get_n())
+    call dfdx%init(this%mma%get_m(), this%mma%get_n())
 
     L=0_rp
 
