@@ -58,8 +58,11 @@ module design_module
   !! topology optimization
   type, extends(simulation_component_t) :: design_t
 
+     ! the design field, and brinkman amplitude stay public
      !> @brief array describing the topology.
-     class(field_t), private, pointer :: design_field
+     class(field_t), public, pointer :: chi
+     !> @brief array describing the topology.
+     class(field_t), public, pointer :: design_field
      !> @brief Pointer to the design domain.
      class(point_zone_t), private, pointer :: design_domain => null()
 

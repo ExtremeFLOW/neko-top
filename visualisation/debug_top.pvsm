@@ -39420,7 +39420,7 @@
         <Domain name="array_list" id="15651.CellArrayStatus.array_list"/>
       </Property>
       <Property name="FileName" id="15651.FileName" number_of_elements="1">
-        <Element index="0" value="../logs/debug/fields/topopt_00001_0.nek5000"/>
+        <Element index="0" value="../examples/debug/fields/topopt_00001_0.nek5000"/>
         <Domain name="files" id="15651.FileName.files"/>
       </Property>
       <Property name="MaterialInfo" id="15651.MaterialInfo"/>
@@ -39539,7 +39539,7 @@
         <Domain name="array_list" id="15902.CellArrayStatus.array_list"/>
       </Property>
       <Property name="FileName" id="15902.FileName" number_of_elements="1">
-        <Element index="0" value="../logs/debug/fields/topopt_00002_0.nek5000"/>
+        <Element index="0" value="../examples/debug/fields/topopt_00002_0.nek5000"/>
         <Domain name="files" id="15902.FileName.files"/>
       </Property>
       <Property name="MaterialInfo" id="15902.MaterialInfo"/>
@@ -39658,7 +39658,7 @@
         <Domain name="array_list" id="16153.CellArrayStatus.array_list"/>
       </Property>
       <Property name="FileName" id="16153.FileName" number_of_elements="1">
-        <Element index="0" value="../logs/debug/fields/topopt_00003_0.nek5000"/>
+        <Element index="0" value="../examples/debug/fields/topopt_00003_0.nek5000"/>
         <Domain name="files" id="16153.FileName.files"/>
       </Property>
       <Property name="MaterialInfo" id="16153.MaterialInfo"/>
@@ -39777,7 +39777,7 @@
         <Domain name="array_list" id="15400.CellArrayStatus.array_list"/>
       </Property>
       <Property name="FileName" id="15400.FileName" number_of_elements="1">
-        <Element index="0" value="../logs/debug/fields/topopt_00004_0.nek5000"/>
+        <Element index="0" value="../examples/debug/fields/topopt_00004_0.nek5000"/>
         <Domain name="files" id="15400.FileName.files"/>
       </Property>
       <Property name="MaterialInfo" id="15400.MaterialInfo"/>

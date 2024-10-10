@@ -43,7 +43,7 @@ module adv_lin_dealias
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only : opgrad, conv1, cdtp
   use interpolation, only : interpolator_t
-  use device_math
+  use device_math, only : device_vdot3, device_sub2, device_col3, device_add4
   use device, only : device_free, device_map, device_get_ptr, device_memcpy, &
        HOST_TO_DEVICE
   use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR, &
@@ -118,17 +118,21 @@ module adv_lin_dealias
      !> Add the linearized advection term for the fluid, i.e.
      !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
      !! the RHS.
-     procedure, pass(this) :: compute_linear => compute_linear_advection_dealias
+     procedure, pass(this) :: compute_linear => &
+     compute_linear_advection_dealias
      !> Add the adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
-     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
+     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$,
+     !! to
      !! the RHS.
-     procedure, pass(this) :: compute_adjoint => compute_adjoint_advection_dealias
+     procedure, pass(this) :: compute_adjoint => &
+     compute_adjoint_advection_dealias
      !> Compute the adjoint passive scalar.
      ! If one integrates by parts, this essentially switches sign and adds some 
      ! boundary terms. 
      ! We keep the differential operator on the test function
-     procedure, pass(this) :: compute_adjoint_scalar => compute_adjoint_scalar_advection_dealias
+     procedure, pass(this) :: compute_adjoint_scalar => &
+     compute_adjoint_scalar_advection_dealias
      ! NOTE
      ! This linearized advection term is the same as a normal advection term
      ! so not sure what to do here...
@@ -241,7 +245,8 @@ contains
   !! @param Xh The function space.
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
-  subroutine compute_adjoint_advection_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
+  subroutine compute_adjoint_advection_dealias(this, vx, vy, vz, vxb, vyb, &
+       vzb, fx, fy, fz, Xh, coef, n)
     !! HARRY added vxb etc for baseflow
     implicit none
     class(adv_lin_dealias_t), intent(inout) :: this
@@ -462,7 +467,7 @@ contains
             call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
             call sub2(fz%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
 
-         enddo
+         end do
 
 
       end if
@@ -675,7 +680,8 @@ contains
     end associate
   end subroutine compute_linear_advection_dealias
 
-  !> Add the adjoint advection term for a scalar, i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
+  !> Add the adjoint advection term for a scalar, 
+  !! i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
   !! RHS.
   !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
   !! @param this The object.
@@ -688,8 +694,8 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   !! @param dt Current time-step, not required for this method.
-  subroutine compute_adjoint_scalar_advection_dealias(this, vxb, vyb, vzb, s, fs, Xh, &
-                                              coef, n, dt)
+  subroutine compute_adjoint_scalar_advection_dealias(this, vxb, vyb, vzb, s, &
+  fs, Xh, coef, n, dt)
     class(adv_lin_dealias_t), intent(inout) :: this
     type(field_t), intent(inout) :: vxb, vyb, vzb
     type(field_t), intent(inout) :: s
