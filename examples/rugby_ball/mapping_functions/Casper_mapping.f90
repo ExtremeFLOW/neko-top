@@ -31,8 +31,8 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !
-!> A RAMP mapping of coefficients
-module RAMP_mapping
+!> A Casper mapping of coefficients
+module Casper_mapping
   use num_types, only : rp
   use field_math
   use mapping, only: mapping_t
@@ -44,21 +44,23 @@ module RAMP_mapping
     implicit none
   private
 
-	!> A RAMP mapping of coefficients 
-	!! This is the standard RAMP described in
-	!! https://doi.org/10.1007/s001580100129
+	!> A Casper mapping of coefficients 
+	!! Let's ask Casper for the real name of this mapping function...
+	!! but it was the one used in
+	!! https://doi.org/10.1002/fld.1964
 	!!
+	!! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$ 
 	!!
-	!! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$ 
+	!! It seems very similar to RAMP but with the convexity the other way
 	!!
-	!!
-	!!  |        .
-	!!  |        . 
-	!!  |       .
-	!!  |     .. 
-	!!  |  ...
+	!!  |       ...
+	!!  |    .. 
+	!!  |  .
+	!!  | . 
+	!!  |.
 	!!  |_________
-  type, public, extends(mapping_t) :: RAMP_mapping_t
+
+  type, public, extends(mapping_t) :: Casper_mapping_t
   !> minimum value
   real(kind=rp) :: f_min
   !> maximum value
@@ -70,23 +72,23 @@ module RAMP_mapping
 
    contains
      !> Constructor from json.
-     procedure, pass(this) :: init => RAMP_mapping_init_from_json
+     procedure, pass(this) :: init => Casper_mapping_init_from_json
      !> Actual constructor.
      procedure, pass(this) :: init_from_attributes => &
-          RAMP_mapping_init_from_attributes
+          Casper_mapping_init_from_attributes
      !> Destructor.
-     procedure, pass(this) :: free => RAMP_mapping_free
+     procedure, pass(this) :: free => Casper_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward => RAMP_mapping_apply
+     procedure, pass(this) :: apply_forward => Casper_mapping_apply
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward => RAMP_mapping_apply_backward
-  end type RAMP_mapping_t
+     procedure, pass(this) :: apply_backward => Casper_mapping_apply_backward
+  end type Casper_mapping_t
 
 contains
 
   !> Constructor from json.
-  subroutine RAMP_mapping_init_from_json(this, json, coef)
-    class(RAMP_mapping_t), intent(inout) :: this
+  subroutine Casper_mapping_init_from_json(this, json, coef)
+    class(Casper_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
 
@@ -96,73 +98,81 @@ contains
     this%q = 1.0_rp
 
     call this%init_base(json, coef)
-    call RAMP_mapping_init_from_attributes(this, coef)
+    call Casper_mapping_init_from_attributes(this, coef)
    
-  end subroutine RAMP_mapping_init_from_json
+  end subroutine Casper_mapping_init_from_json
 
   !> Actual constructor.
-  subroutine RAMP_mapping_init_from_attributes(this, coef)
-    class(RAMP_mapping_t), intent(inout) :: this
+  subroutine Casper_mapping_init_from_attributes(this, coef)
+    class(Casper_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
 
     ! there's actually nothing to do here.
 
-  end subroutine RAMP_mapping_init_from_attributes
+  end subroutine Casper_mapping_init_from_attributes
 
   !> Destructor.
-  subroutine RAMP_mapping_free(this)
-    class(RAMP_mapping_t), intent(inout) :: this
+  subroutine Casper_mapping_free(this)
+    class(Casper_mapping_t), intent(inout) :: this
 
     call this%free_base()
 
-  end subroutine RAMP_mapping_free
+  end subroutine Casper_mapping_free
 
   !> Apply the mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
-  subroutine RAMP_mapping_apply(this, X_out, X_in)
-    class(RAMP_mapping_t), intent(inout) :: this
+  subroutine Casper_mapping_apply(this, X_out, X_in)
+    class(Casper_mapping_t), intent(inout) :: this
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
-    integer :: n, i
 
-	 ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) ) 
+	 ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q) 
 
 	 ! TODO
-	 ! We could either use field math... or write GPU backends...
-	 ! or assume this will always be CPU. 
+	 ! Here we should make a descision, either use field_math for everything
+	 ! or write individual backends.
+	 !
+	 ! I'm pro-field_math simply because these functions don't get executed too
+	 ! often...
+	 !
+	 ! However! If we do descide to write backends for them, I (Harry) call
+	 ! shotgun writing them, because they look easy and would be a good 
+	 ! introduction to writing a kernel from scratch.
+    call field_copy(X_out,X_in)
+    call field_cadd(X_out, this%q)
+    call field_invcol1(X_out)
+    call field_cmult(X_out, (this%f_max - this%f_min) * (this%q + 1.0_rp) )
+    call field_col2(X_out, X_in)
+    call field_cadd(X_out, this%f_min)
 
-	 n = X_in%dof%size()
-	 do i = 1, n
-	    X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
-	    X_in%x(i,1,1,1) / (1.0_rp + this%q * (1.0_rp - X_in%x(i,1,1,1) ) )
-	 enddo
-
-  end subroutine RAMP_mapping_apply
+  end subroutine Casper_mapping_apply
 
 
   !> Apply the  chain rule
   !! @param X_in unmapped field
   !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
   !! @param dF_dX_out is the sensitivity with respect to the filtered design
-  subroutine RAMP_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
-    class(RAMP_mapping_t), intent(inout) :: this
+  subroutine Casper_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
+    class(Casper_mapping_t), intent(inout) :: this
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(in) ::  dF_dX_out
     type(field_t), intent(inout) ::  dF_dX_in
-    integer :: n, i
 
 	 ! df/dx_in = df/dx_out * dx_out/dx_in 
 
-	 ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2 
+	 ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2 
 
-	 n = X_in%dof%size()
-	 do i = 1, n
-	    dF_dX_in%x(i,1,1,1) = (this%f_max - this%f_min) * (this%q + 1.0_rp) / &
-	    ((1.0_rp - this%q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-	    dF_dX_out%x(i,1,1,1)
-	 enddo
+    call field_copy(dF_dX_in, X_in)
+    call field_cadd(dF_dX_in, this%q)
+    call field_invcol1(dF_dX_in)
+    call field_col2(dF_dX_in, dF_dX_in)
+    call field_cmult(dF_dX_in, (this%f_max - this%f_min)*(this%q + 1.0_rp))
+    call field_col2(dF_dX_in, dF_dX_out)
 
-  end subroutine RAMP_mapping_apply_backward
+    ! hmmmmmm.... maybe I'm a getting a little anti-field_math hahahaha
+    ! That's really inefficient and reads poorly.
 
-end module RAMP_mapping
+  end subroutine Casper_mapping_apply_backward
+
+end module Casper_mapping

@@ -59,7 +59,7 @@ module PDE_filter
     use logger, only : neko_log, LOG_SIZE
     use mapping, only: mapping_t
     use scratch_registry, only: neko_scratch_registry
-    use field_math, only: field_col2, field_invcol2
+    use field_math, only: field_col2, field_invcol2, field_copy
 
 
   use coefs, only: coef_t
@@ -73,6 +73,7 @@ module PDE_filter
     use field_registry, only : neko_field_registry
     use logger, only : neko_log, LOG_SIZE
     use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+    use neko_config, only : NEKO_BCKND_DEVICE
 
     ! extra ones
       use dofmap, only :  dofmap_t
@@ -135,6 +136,10 @@ module PDE_filter
      ! TALK TO NIELS, I think this is correct...
      ! but it's not exactly "chain ruling back"
      ! it's filtering the sensitivity
+
+     ! UPDATE:
+     ! After an email with this, we should be using the chain rule, 
+     ! not a sensitivity filter 
      procedure, pass(this) :: apply_backward => PDE_filter_apply_backward
   end type PDE_filter_t
 
@@ -244,15 +249,28 @@ contains
     call neko_scratch_registry%request_field(RHS, temp_indices(1))
 
     ! set up Helmholtz operators and RHS
-    do i = 1, n
-       ! h1 is already negative in its definition
-       this%coef%h1(i,1,1,1) = this%r**2
-       ! ax_helm includes the mass matrix in h2
-       this%coef%h2(i,1,1,1) = 1.0_rp
-       ! mass matrix should be included here
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+    	 ! TODO
+    	 ! I think this is correct but I've never tested it
+    	 call device_cfill(this%coef%h1_d, this%r**2, n)
+    	 call device_cfill(this%coef%h2_d, 1.0_rp, n)
+    	 call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d,  n)
+    else
+       do i = 1, n
+          ! h1 is already negative in its definition
+          this%coef%h1(i,1,1,1) = this%r**2
+          ! ax_helm includes the mass matrix in h2
+          this%coef%h2(i,1,1,1) = 1.0_rp
+          ! mass matrix should be included here
        RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
-    end do
+       end do
+    end if
     this%coef%ifh2 = .true.
+
+    ! This is a good idea from Niels' email!
+    ! copy the unfiltered design as an initial guess for the filtered design
+    ! to improved convergence
+    call field_copy(X_out, X_in)
 
 
 	 ! gather scatter
@@ -297,6 +315,16 @@ contains
   ! this really confuses me!
   ! it's not really a chain rule back, it's just a filtering of the sensitivity
   ! ?
+  !
+  ! Update:
+  ! After an email exchange with Niels:
+  ! We DON'T want to be filtering the sensitivity, this IS just the chain rule.
+  ! So to the best of my knowledge, we're just applying the same filter
+  ! on the sensitivity field.
+  !
+  ! Niels did mention the order of the RHS assembly should be reversed however.
+  ! I'm not exactly sure how this applies to us, but it should be brought up
+  ! in the next group meeting.
   subroutine PDE_filter_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) ::  X_in
@@ -313,21 +341,26 @@ contains
     call neko_scratch_registry%request_field(RHS, temp_indices(1))
 
     ! set up Helmholtz operators and RHS
-    do i = 1, n
-       ! h1 is already negative in its definition
-       ! TODO
-       ! in the paper it doesn't actually state that this has to be negative
-       ! but I think it's implied...
-       this%coef%h1(i,1,1,1) = this%r**2
-       ! ax_helm includes the mass matrix in h2
-       this%coef%h2(i,1,1,1) = 1.0_rp
-       ! mass matrix should be included here
-       ! This is slightly different, 
-       ! equation (28) first premultiplies by the sensitivity
-       RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1) * &
-       dF_dX_out%x(i,1,1,1)
-    end do
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+    	 ! TODO
+    	 ! I think this is correct but I've never tested it
+    	 call device_cfill(this%coef%h1_d, this%r**2, n)
+    	 call device_cfill(this%coef%h2_d, 1.0_rp, n)
+    	 call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)
+    else
+       do i = 1, n
+          ! h1 is already negative in its definition
+          this%coef%h1(i,1,1,1) = this%r**2
+          ! ax_helm includes the mass matrix in h2
+          this%coef%h2(i,1,1,1) = 1.0_rp
+          ! mass matrix should be included here
+          RHS%x(i,1,1,1) = dF_dX_out%x(i,1,1,1) * this%coef%B(i,1,1,1)
+       end do
+    end if
     this%coef%ifh2 = .true.
+
+    ! Same trick as before
+    call field_copy(dF_dX_in, dF_dX_out)
 
     ! set BCs
     call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
@@ -342,24 +375,6 @@ contains
          this%bclst_filt, this%coef%gs_h)
 
     call profiler_end_region
-
-    ! This is also different, now we divide by X_in
-    ! TODO
-    ! talk to Niels about this!!!
-    ! I'm worried we get some divisions by zero if we divide here??
-    ! After some research:
-    ! https://github.com/yuloveyet/TopOpt/blob/master/top82_PDE.txt
-    ! it looks like they have:
-    ! dc(:) = (TF'*(LF'\(LF\(TF*(dc(:).*xPhys(:))))))./max(1e-3,xPhys(:));
-    !
-    ! ie, divide by max(1e-3,xPhys(:)).
-    ! 
-    ! I'm pretty sure this is correct by double check with the DTU boys in the
-    ! next meeting.
-    do i = 1, n
-    	  dF_dX_in%x(i,1,1,1) = dF_dX_in%x(i,1,1,1)/max(X_in%x(i,1,1,1),0.001_rp)
-    end do
-    !call field_invcol2(dF_dX_in, X_in)
 
     ! update preconditioner (needed?)
     call this%pc_filt%update()
@@ -376,11 +391,6 @@ contains
 
 	 ! You should relinguish if you get the scratch registry to work!
     call neko_scratch_registry%relinquish_field(temp_indices)
-
-    ! TODO
-    ! all those loops mean it won't work for GPU !
-
-
 
   end subroutine PDE_filter_apply_backward
 

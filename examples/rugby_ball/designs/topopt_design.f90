@@ -101,6 +101,7 @@ module topopt_design
   use fld_file_output, only : fld_file_output_t
   use linear_mapping, only: linear_mapping_t
   use RAMP_mapping, only: RAMP_mapping_t
+  use Casper_mapping, only: Casper_mapping_t
   use PDE_filter, only: PDE_filter_t
   !use design_variable, only: design_variable_t
   implicit none
@@ -139,9 +140,10 @@ module topopt_design
      ! \rho -> C
      ! \rho -> \kappa
      !
-     ! Then during the forward/adjoint looping there will be an additional object,
-     ! the "objective_function" object that will be responsible for computing the
-     ! sensitivity of the objective function with respect to the coefficients
+     ! Then during the forward/adjoint looping there will be an additional 
+     ! object, the "objective_function" object that will be responsible for 
+     ! computing the sensitivity of the objective function with respect to the 
+     ! coefficients
      ! ie,
      ! dF/d\chi, dF/dC and dF/d\kappa
      !
@@ -164,8 +166,8 @@ module topopt_design
      ! Implying we also want dC1/d\rho, dC2/d\rho etc
      ! So this "sensitivity" should also be a list...
      !
-     ! So I bet you'll have a nice abstract way of constructing this in the future
-     ! but I think a sort of list-of-lists would be nice.
+     ! So I bet you'll have a nice abstract way of constructing this in the 
+     ! future but I think a sort of list-of-lists would be nice.
      !
      ! For F:
      ! \rho -> \tild{\rho} -> \chi
@@ -189,7 +191,7 @@ module topopt_design
 
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
-     type(RAMP_mapping_t) :: mapping
+     type(Casper_mapping_t) :: mapping
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
@@ -305,9 +307,11 @@ contains
     ! so this would be:
     ! call mapper%forward(fld_out, fld_in)
 
-    call this%filter%apply_forward(this%filtered_design, this%design_indicator)
+    call this%filter%apply_forward(this%filtered_design, &
+    this%design_indicator)
 
-    call this%mapping%apply_forward(this%brinkman_amplitude, this%filtered_design)
+    call this%mapping%apply_forward(this%brinkman_amplitude, &
+    this%filtered_design)
 
 
   end subroutine topopt_design_map_forward
