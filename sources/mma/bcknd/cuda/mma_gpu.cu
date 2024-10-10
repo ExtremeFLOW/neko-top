@@ -330,7 +330,7 @@ void cuda_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int*
 
 
 
-
+/////a_d=b_d*c_d-d
 void cuda_sub2cons(void * a,void * b,void * c, real *d, int * n) {
 
     const dim3 nthrds(1024, 1, 1);
@@ -421,3 +421,58 @@ void cuda_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
         (real*)eta, (real*)lambda, *n, *m);
     //CUDA_CHECK(cudaGetLastError());
 }
+
+
+//////a_d=max(b,c*d_d)
+void cuda_maxcons(void* a, real* b, real* c, void* d, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    maxcons_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)a, *b, *c, (real*)d, *n);
+    //CUDA_CHECK(cudaGetLastError());
+}
+
+
+real cuda_lcsum(void *a, int *n) {
+   real* temp;
+   real* temp_cpu = new real[1];
+   cudaMalloc(&temp, (*n) * sizeof(real));
+   int nb = ((*n) + 2048 - 1) / 2048;
+   glsum_kernel <real> << <nb, 1024 >> > ((real*)a,  temp, (*n));
+   mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
+    //CUDA_CHECK(cudaGetLastError());
+   cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
+   cudaFree(temp);
+   return temp_cpu[0];
+}
+
+real cuda_lcsc2(void *a, void*b, int *n) {
+   real* temp;
+   real* temp_cpu = new real[1];
+   cudaMalloc(&temp, (*n) * sizeof(real));
+   int nb = ((*n) + 2048 - 1) / 2048;
+   glsc2_kernel <real> << <nb, 1024 >> > ((real*)a, (real*)b, temp, (*n));
+   mmareduce_kernel<real> << <1, 1024, 0 >> > (temp, nb);
+    //CUDA_CHECK(cudaGetLastError());
+   cudaMemcpy(temp_cpu, temp, sizeof(real), cudaMemcpyDeviceToHost);
+   cudaFree(temp);
+   return temp_cpu[0];
+}
+
+
+void cuda_mpisum(void *a, int *n) {
+    real* temp=(real*)a;
+ #ifdef HAVE_DEVICE_MPI
+    cudaStreamSynchronize(stream);
+    device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
+ #endif
+}
+  
+ void cuda_add2inv2(void* a, void *b, real* c, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    add2inv2_kernel <real> << <nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >> > ((real*)a, (real*) b, *c, *n);
+    //CUDA_CHECK(cudaGetLastError());
+}
+
+
+

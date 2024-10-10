@@ -173,5 +173,48 @@ module cuda_mma_math
        type(c_ptr), value :: rex_d,  df0dx_d,  dfdx_d, xsi_d, eta_d, lambda_d,
        integer(c_int) :: n,m
      end subroutine cuda_sub2
-  end interface
+
+
+     subroutine cuda_maxcons(a_d,b,c, d_d, n) &
+          bind(c, name = 'cuda_maxcons')
+          use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+          import c_rp       
+          type(c_ptr), value :: a_d,d_d
+          real(c_rp) :: b,c
+          integer(c_int) :: n
+     end subroutine cuda_maxcons
+
+
+     subroutine cuda_lcsum(a_d, n) &
+          bind(c, name = 'cuda_lcsum')
+          use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+          type(c_ptr), value :: a_d
+          integer(c_int) :: n
+     end subroutine cuda_lcsum
+
+     subroutine  cuda_lcsc2(a_d, b_d, n)  &
+          bind(c, name = 'cuda_lcsum')
+          use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+          type(c_ptr), value :: a_d, b_d
+          integer(c_int) :: n
+     end subroutine cuda_lcsum
+
+     subroutine cuda_mpisum(a_d, n)  &
+          bind(c, name = 'cuda_mpisum')
+          use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+          type(c_ptr), value :: a_d
+          integer(c_int) :: n
+     end subroutine cuda_mpisum
+
+     subroutine cuda_add2inv2(a_d, b_d, c, n)  &
+          bind(c, name = 'cuda_add2inv2')
+          use, intrinsic :: iso_c_binding, only: c_int, c_ptr
+          import c_rp       
+          type(c_ptr), value :: a_d, b_d
+          integer(c_int) :: n
+          real(c_rp) :: c
+     end subroutine cuda_add2inv2
+
+
+     end interface
 end module cuda_math

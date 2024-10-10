@@ -611,3 +611,108 @@ __global__ void kkt_rex_kernel(T* __restrict__ rex, const T* __restrict__ df0dx,
 		}
 	}
 }
+
+
+
+
+
+
+
+template <typename T>
+__global__ void maxcons_kernel(T* __restrict__ a, const T b, const T c, const T* __restrict__ d, const int n) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tj < n) {
+		a[tj] = max(b, c * d[tj]);
+	}
+}
+
+
+
+
+
+///////////////////////////////////
+//////defined 
+ template< typename T >
+ __global__ void glsum_kernel(const T * a,
+                              T * buf_h,
+                              const int n) {
+  
+   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+   const int str = blockDim.x * gridDim.x;
+  
+   const unsigned int lane = threadIdx.x % warpSize;
+   const unsigned int wid = threadIdx.x / warpSize;
+   
+   __shared__ T shared[32];
+   T sum = 0;    
+   for (int i = idx; i<n ; i += str) 
+   {
+     sum += a[i];
+   }
+  
+   sum = reduce_warp<T>(sum);
+   if (lane == 0)
+     shared[wid] = sum;
+   __syncthreads();
+  
+   sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+   if (wid == 0)
+     sum = reduce_warp<T>(sum);
+  
+   if (threadIdx.x == 0)
+     buf_h[blockIdx.x] = sum;
+   
+ }
+  template< typename T >
+__global__ void glsc2_kernel(const T * a,
+                              const T * b,
+                              T * buf_h,
+                              const int n) {
+  
+   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+   const int str = blockDim.x * gridDim.x;
+  
+   const unsigned int lane = threadIdx.x % warpSize;
+   const unsigned int wid = threadIdx.x / warpSize;
+   
+   __shared__ T shared[32];  
+   T sum = 0.0;
+   for (int i = idx; i < n; i+= str) {
+     sum += a[i] * b[i];
+   }
+  
+   sum = reduce_warp<T>(sum);
+   if (lane == 0)
+     shared[wid] = sum;
+   __syncthreads();
+  
+   sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+   if (wid == 0)
+     sum = reduce_warp<T>(sum);
+  
+   if (threadIdx.x == 0)
+     buf_h[blockIdx.x] = sum;
+   
+ }
+
+
+
+
+template <typename T>
+__global__ void sub2cons_kernel(T* __restrict__ a, const T* __restrict__ b, const T* __restrict__ c,
+	const T d, const int n) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tj < n) {
+		a[tj] = b[tj]*c[tj]-d;
+	}
+}
+
+
+template <typename T>
+__global__ void add2inv2_kernel(T* __restrict__ a, const T* __restrict__ b, const T c, const int n) {
+	int tj = blockIdx.x * blockDim.x + threadIdx.x;
+	if (tj < n) {
+		a[tj] = a[tj]+c/b[tj];
+	}
+}
+
