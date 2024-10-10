@@ -65,11 +65,12 @@ with respect to the design.
 Here we have made 2 derived types,
 
 `minimum_dissipation_objective function` for objectives
-$F = \int_\Omega |\nabla \mathbf{u}|^2 d\Omega 
-+ K \int_\Omega \chi |u|^2 d\Omega$
+$F = \int_\Omega |\nabla \mathbf{u}|^2 d\Omega + K \int_\Omega \chi |u|^2 d\Omega$
 
 `volume_constraint` for constraints either $V < V_{max}$ or $V > V_{min}$ where
-$V = \int_\Omega_O \tilde{\rho} d \Omega $.
+$V = \int_\Omega \tilde{\rho} d \Omega $.
+
+Note, it should be over $\Omega_O$ after masks are included.
 
 This is example is primarily used to summarize the list of remaining tasks.
 
