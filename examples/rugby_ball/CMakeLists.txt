@@ -3,7 +3,6 @@ set(DRIVER_TYPE "custom")
 set(DRIVER_SOURCE driver.f90)
 set(EXTRA_SOURCES
     user.f90
-    # topopt.f90
     simulation_adjoint.f90
     source_terms/simple_brinkman_source_term.f90
     source_terms/adjoint_lube_source_term.f90
