@@ -31,13 +31,23 @@ adjoint velocity equation. The term looks like $\nabla \phi \phi^\dagger$.
 Then for this case specifically we need
 - `enhanced_mixing_objective_function`
 - `pressure_drop_constraint`
-- `adjoint_enhanced_mixing_scalar_source_term` (this enters the adjoint
+- `adjoint_enhanced_mixing_scalar_bc` (this enters the adjoint
 passive scalar equation.)
 - `adjoint_pressure_drop_BC` This enters the adjoint velocity equation to 
 account for the pressure drop constraint.
 
 The adjoint BCs are, at the time of writing, very poorly handled, so 
-implementing that last one is going to be hard.
+implementing those last two is going to be hard.
+
+Often times one can replace an objective on a BC with a volume integral, 
+ie, instead of of evaluated the "mixedness" on the outlet surface, measure
+the mixedness in a volume downsteam close to the outlet.
+This turns the surface integral (and subsequent adjoint BCs) into a 
+volume integral (and subseqent adjoint source terms) which may be easier to
+work with.
+
+Hence, for testing, until we fix the handing of the adjoint BCs, I've 
+implemented a `adjoint_enhanced_mixing_scalar_source_term` instead.
 
 > I also feel the design needs to enter the passive scalar 
 > equation. Probably not in the difusive term, but I think it should show up
