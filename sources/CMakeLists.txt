@@ -37,6 +37,7 @@ target_sources(neko-top
 
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 

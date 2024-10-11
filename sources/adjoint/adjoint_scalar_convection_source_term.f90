@@ -44,7 +44,7 @@ module adjoint_scalar_convection_source_term
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
-  use field_math, only: field_addcol3
+  use field_math, only: field_subcol3
   use operators, only: opgrad
   implicit none
   private
@@ -182,9 +182,10 @@ contains
     call opgrad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
     ! TODO
     ! double check if add or subtract
-    call field_addcol3(fu,this%s_adj,dsdx)
-    call field_addcol3(fv,this%s_adj,dsdy)
-    call field_addcol3(fw,this%s_adj,dsdz)
+    ! I THINK it's negative!!
+    call field_subcol3(fu,this%s_adj,dsdx)
+    call field_subcol3(fv,this%s_adj,dsdy)
+    call field_subcol3(fw,this%s_adj,dsdz)
     
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)

@@ -96,6 +96,8 @@ module adjoint_case
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use adjoint_scalar_convection_source_term, only: &
+  adjoint_scalar_convection_source_term_t
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   implicit none
   private
@@ -119,6 +121,9 @@ module adjoint_case
      ! I don't know why this is the pnpn type, and not the scheme...
      ! but that's how it is in neko
      type(adjoint_scalar_pnpn_t), allocatable :: scalar
+     ! this is the extra term for adjoint convection
+     type(adjoint_scalar_convection_source_term_t), allocatable :: &
+     adjoint_convection_term
      type(case_t), pointer :: case
 
      ! Fields
@@ -249,6 +254,40 @@ contains
         ! this%scheme%chkp%abs1 => this%scalar%abx1
         ! this%scheme%chkp%abs2 => this%scalar%abx2
         ! this%scheme%chkp%slag => this%scalar%slag
+
+        ! TODO HUGE HUGE TODO
+        ! So if we have a passive scalar we also get a source term entering
+        ! the adjoint velocity equation which arises when you linearize the
+        ! the convective term in passive scalar equation.
+        !
+        ! $\phi^\dagger \nabla \phi$
+        ! 
+        ! I'm SOOOOO worried I have the sign the wrong way around.
+        ! We really have to write the adjoint derivation nicely.
+        !
+        ! for now I'm assuming in our adjoint derivation we ADD all the 
+        ! equations together.
+        ! - So it starts as being positive on the LHS
+        ! - if we treat this term as a source term it goes on the RHS, so now
+        !   it's negative on the RHS.
+        !
+        ! I checked through Casper's adjoint equations and the first term
+        ! after the = sign of eq (14) looks like the term I'm talking about.
+        ! And his is negative too.
+        ! So I THINK this is correct, but we need to double check.
+
+        ! and it should be appended to the adjoint velocity
+
+        ! allocate it
+        allocate(this%adjoint_convection_term)
+        ! initialize it
+        call this%adjoint_convection_term%init_from_components( &
+             this%scheme%f_adj_x, this%scheme%f_adj_y, &
+             this%scheme%f_adj_z, &
+             neko_case%scalar%s, &
+             this%scalar%s_adj, this%scheme%c_Xh)
+        ! append it to the adjoint velocity equation
+        call this%scheme%source_term%add(this%adjoint_convection_term)
      end if
 
     ! TODO

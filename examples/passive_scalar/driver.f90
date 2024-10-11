@@ -26,8 +26,8 @@ program usrneko
   use mma, only: mma_t
   use neko_ext, only: reset
   use math, only: copy, cmult
-  use adjoint_scalar_convection_source_term, only: &
-  adjoint_scalar_convection_source_term_t
+  use adjoint_mixing_scalar_source_term, only: &
+  adjoint_mixing_scalar_source_term_t
 
 
   !> a problem type
@@ -52,7 +52,8 @@ program usrneko
   type(adjoint_case_t) :: adj
   ! the brinkman source terms
   type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
-  type(adjoint_scalar_convection_source_term_t) :: adjoint_convection
+  ! A term for the objective function
+  type(adjoint_mixing_scalar_source_term_t) :: obj_source
 
 
   ! init the problem (base)
@@ -93,20 +94,17 @@ program usrneko
     ! append brinkman source term based on design
     call adj%scheme%source_term%add(adjoint_brinkman)
 
-    ! It's a bit strange call a term in an equation a `source_term`
-    ! But I guess it is.
-    ! and it should be appended to the adjoint velocity
-    call adjoint_convection%init_from_components( & 
-         adj%scheme%f_adj_x, adj%scheme%f_adj_y, &
-         adj%scheme%f_adj_z, &
-         C%scalar%s, &
-         adj%scalar%s_adj, adj%scheme%c_Xh)
-
 
 
 
 
     ! NOW here is where we would initialize our new objective functions!
+    call obj_source%init_from_components( & 
+         adj%scalar%f_Xh, & 
+         C%scalar%s, &
+         adj%scheme%c_Xh)
+    ! append brinkman source term based on design
+    call adj%scalar%source_term%add(obj_source)
 
 
 
