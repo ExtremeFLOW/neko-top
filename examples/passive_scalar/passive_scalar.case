@@ -2,12 +2,12 @@
     "version": 1.0,
     "case":
     {
-        "mesh_file": "data_local/control_flow/ext_cyl.nmsh",
+        "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
         "output_boundary": false,
-        "end_time": 100.0,
-        "timestep": 1e-2,
+        "end_time": 10.0,
+        "timestep": 1e-3,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -23,25 +23,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
-            "source_terms": [
-                {
-                    "type": "brinkman",
-                    "objects": [
-                        {
-                            "type": "point_zone",
-                            "name": "cylinder"
-                        }
-                    ],
-                    "brinkman": {
-                        "limits": [
-                            0.0,
-                            1500.0
-                        ],
-                        "penalty": 1.0
-                    }
-                }
-            ],
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -68,40 +50,24 @@
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
-            "boundary_types": [ "w", "v", "o" ],
+            "boundary_types": [ "v", "o", "w", "w", "w", "w" ],
             "output_control": "tsteps",
             "output_value": 50,
         },
-        "point_zones": [
-            {
-                "name": "cylinder",
-                "geometry": "cylinder",
-                "start": [
-                    1.0,
-                    0.0,
-                    0.5
-                ],
-                "end": [
-                    1.0,
-                    1.0,
-                    0.5
-                ],
-                "radius": 0.1
+        "scalar": {
+            "enabled": true,
+            "Pe": 100.0,
+            "boundary_types": [
+                "user",
+                "o",
+                "sym",
+                "sym",
+                "sym",
+                "sym"
+            ],
+            "initial_condition": {
+                "type": "user"
             }
-        ],
-        "simulation_components": [
-            {
-                "type": "adjoint",
-                "is_user": true,
-                "tol": 1e-0,
-                "compute_control": "tsteps",
-                "compute_value": 1,
-            },
-            // {
-            //     "type": "field_writer",
-            //     "fields": [ "u_adj", "v_adj", "w_adj", "p_adj" ],
-            //     "output_filename": "adjoint"
-            // }
-        ]
+        }
     }
 }

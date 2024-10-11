@@ -22,7 +22,7 @@ So for the passive scalar we need
 - `adjoint_scalar_pnpn`
 - update `adv_adjoint_dealias.f90`
 - update `adv_adjoint_no_dealias.f90`
-- `adjoint_passive_scalar_convection_source_term`?
+- `adjoint_scalar_convection_source_term`?
 
 That last one I don't know a good name for, but it's the term arising from
 linearizing the adjoint passive scalar convective term which then enters the
@@ -31,7 +31,7 @@ adjoint velocity equation. The term looks like $\nabla \phi \phi^\dagger$.
 Then for this case specifically we need
 - `enhanced_mixing_objective_function`
 - `pressure_drop_constraint`
-- `adjoint_enhanced_mixing_passive_scalar_source_term` (this enters the adjoint
+- `adjoint_enhanced_mixing_scalar_source_term` (this enters the adjoint
 passive scalar equation.)
 - `adjoint_pressure_drop_BC` This enters the adjoint velocity equation to 
 account for the pressure drop constraint.
@@ -58,7 +58,7 @@ Which means we'll go:
 - step adjoint scalar backward
 - step adjoint fluid backward
 
-So this means the `adjoint_passive_scalar_convection_source_term` is evaluated 
+So this means the `adjoint_scalar_convection_source_term` is evaluated 
 explicitly but on the correct timestep because we've stepped the scalar 
 backwards before the adjoint fluid. So this is nice and I don't think
 `Nek5000` did this (I could be wrong, I should double check)
@@ -70,8 +70,9 @@ But they still require testing.
 
 TODO:
 - obviously testing... but we don't really have a good case to test yet
-- When I did my derivation (I'll write it up neatly at some point...) 
-
+When I did my derivation (I'll write it up neatly at some point...) 
+- Double check with Casper what the BC's are, it looks like he keeps drawing
+parabolic profiles, is there a periodic or symetric directions?
 
 - The JSON stuff isn't finished
 - The adjoint BCs aren't finished

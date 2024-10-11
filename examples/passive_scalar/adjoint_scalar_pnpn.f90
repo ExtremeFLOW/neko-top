@@ -69,7 +69,6 @@ module adjoint_scalar_pnpn
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
   use user_intf, only : user_t
-  use material_properties, only : material_properties_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use time_step_controller, only : time_step_controller_t
   use scratch_registry, only: neko_scratch_registry
@@ -144,25 +143,23 @@ contains
   !! @param params The case parameter file in json.
   !! @param user Type with user-defined procedures.
   subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, user, &
-                              material_properties, ulag, vlag, wlag, &
-                              time_scheme)
+       ulag, vlag, wlag, time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     type(coef_t), target, intent(inout) :: coef
     type(gs_t), target, intent(inout) :: gs
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
-    type(material_properties_t), intent(inout) :: material_properties
     type(field_series_t), target, intent(in) :: ulag, vlag, wlag
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
+    real(kind=rp), intent(in) :: rho
     integer :: i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
 
     call this%free()
 
     ! Initiliaze base type.
-    call this%scheme_init(msh, coef, gs, params, scheme, user, &
-                          material_properties)
+    call this%scheme_init(msh, coef, gs, params, scheme, user, rho)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -201,6 +198,12 @@ contains
     ! TODO
     ! maybe read the BCs from scalar and make adjustments?
     ! ie, 'v' -> 'w'
+    ! but I think in general the BCs for the passive scalar will be neuman
+    ! specifically for the mixer, I think the BCs will be
+    ! diriclet on the inflow -> 'w'
+    ! symetry on the remaining walls? is the $ \nabla \cdot \mathbf{n} = 0 $
+    ! and I think these stay symetry in the adjoint.
+    ! so it's only the diriclet conditions to worry about 
     call this%bc_res%init_base(this%c_Xh)
     do i = 1, this%n_dir_bcs
        call this%bc_res%mark_facets(this%dir_bcs(i)%marked_facet)
@@ -234,6 +237,8 @@ contains
     ! Initialize advection factory
     ! man I don't know why all this stuff changed...
     ! but I guess it's the oifs stuff?
+    ! TODO
+    ! we're behind neko by a few PRs it would seem...
     ! 
     !call advection_adjoint_factory(this%adv, params, this%c_Xh, &
     !                       ulag, vlag, wlag, this%chkp%dtlag, &
