@@ -19,13 +19,13 @@ program usrneko
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
   use num_types, only : rp, sp, dp, qp
-  use field_math, only: field_rzero, field_rone
+  use field_math, only: field_rzero, field_rone, field_cmult
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
   use steady_state_problem, only : steady_state_problem_t
   use mma, only: mma_t
   use neko_ext, only: reset
-  use math, only: copy
+  use math, only: copy, cmult
 
 
   !> a problem type
@@ -50,7 +50,7 @@ program usrneko
   call problem%init_base()
 
   ! init the design
-  call design%init(problem%C%fluid%dm_Xh)
+  call design%init(problem%C%params, problem%C%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)
@@ -77,7 +77,7 @@ program usrneko
   ! obviously do this properly in the future...
   n = design%design_indicator%size()
   call optimizer%init_json(design%design_indicator%x, n, &
-       1, 0.0_rp, (/0.0_rp/), (/10.0_rp/), (/1.0_rp/), wo1%x, wo2%x, problem%C%params)
+       1, 0.0_rp, (/0.0_rp/), (/100.0_rp/), (/0.0_rp/), wo1%x, wo2%x, problem%C%params)
   !m, a0         a_i          c_i           d_i
   ! -------------------------------------------------------------------!
   !      Internal parameters for MMA                                   !
@@ -122,6 +122,9 @@ program usrneko
        ! they're within a reasonable range unfortunately this takes a bit of
        ! trial and error, but we should include a subroutine that
        ! allows us to rescale
+       ! call cmult(df0dx,0.01_rp,n)
+       call cmult(dfdx,100.0_rp,n)
+       fval(1) = fval(1)*100.0_rp
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
 
