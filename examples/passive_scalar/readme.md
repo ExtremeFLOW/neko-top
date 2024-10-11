@@ -10,7 +10,7 @@ min $\int_{\Gamma_{out}} (\phi - \bar{\phi})^2 d\Gamma$
 
 s.t. $\Delta P \leq \beta \Delta P_{ref}$
 
-They set $P_out = 0$ implying $\Delta P = \int_{\Gamma_{in}p d \Gamma}$
+They set $P_{out} = 0$ implying $\Delta P = \int_{\Gamma_{in}}p d \Gamma$
 
 So there workflow involves:
 - Solve the steady forward problem (velocity and passive scalar)
@@ -30,6 +30,7 @@ adjoint velocity equation. The term looks like $\nabla \phi \phi^\dagger$.
 
 Then for this case specifically we need
 - `enhanced_mixing_objective_function`
+- `pressure_drop_constraint`
 - `adjoint_enhanced_mixing_passive_scalar_source_term` (this enters the adjoint
 passive scalar equation.)
 - `adjoint_pressure_drop_BC` This enters the adjoint velocity equation to 
@@ -68,13 +69,13 @@ I've added the adjoint convective term in
 But they still require testing.
 
 TODO:
-	- obviously testing... but we don't really have a good case to test yet
-	- When I did my derivation (I'll write it up neatly at some point...) 
+- obviously testing... but we don't really have a good case to test yet
+- When I did my derivation (I'll write it up neatly at some point...) 
 
 
-	- The JSON stuff isn't finished
-	- The adjoint BCs aren't finished
-	- We need to look into non-dimensionalization etc more carefully, 
-	to make sure everything is consistent with the standard passive scalar. 
-	  (I think it is... but I would like to double check)
+- The JSON stuff isn't finished
+- The adjoint BCs aren't finished
+- We need to look into non-dimensionalization etc more carefully, 
+to make sure everything is consistent with the standard passive scalar. 
+  (I think it is... but I would like to double check)
 
