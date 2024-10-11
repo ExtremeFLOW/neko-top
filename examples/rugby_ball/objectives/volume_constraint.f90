@@ -129,7 +129,7 @@ contains
     ! anyway...
     ! here we hard code for now
     this%min_max = .false.
-    this%v_max = 0.1
+    this%v_max = 0.2
 
     call this%init_base(fluid%dm_Xh)
 
