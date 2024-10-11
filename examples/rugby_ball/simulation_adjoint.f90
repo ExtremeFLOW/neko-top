@@ -102,8 +102,10 @@ contains
     call this%s%sample(t_adj, tstep_adj)
 
     ! HARRY
-    ! ok this I guess this is techincally where we set the initial condition of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
+    ! ok this I guess this is techincally where we set the initial condition 
+    ! of adjoint yeh?
+    call this%case%usr%user_init_modules(t_adj, &
+    this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -123,27 +125,31 @@ contains
 
        !  write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, this%case%tlag, this%case%dtlag, tstep_adj)
+       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
+       this%case%tlag, this%case%dtlag, tstep_adj)
 
-       call neko_log%section('Adjoint fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
-       end_time = MPI_WTIME()
-       write(log_buf, '(A,E15.7,A,E15.7)') &
-            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-            end_time-start_time
-       call neko_log%end_section(log_buf)
-
-       ! Scalar step
+       ! For the adjoint we do the scalar step first
        if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, this%case%ext_bdf, dt_controller)
+          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
                end_time-start_time
           call neko_log%end_section(log_buf)
        end if
+
+       call neko_log%section('Adjoint fluid')
+       call this%scheme%step(t_adj, tstep_adj, this%case%dt, & 
+       this%case%ext_bdf, dt_controller)
+       end_time = MPI_WTIME()
+       write(log_buf, '(A,E15.7,A,E15.7)') &
+            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+            end_time-start_time
+       call neko_log%end_section(log_buf)
+
 
        call neko_log%section('Postprocessing')
        ! TODO
