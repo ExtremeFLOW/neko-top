@@ -94,6 +94,9 @@ module adjoint_case
   use adjoint_ic, only: set_adjoint_ic
   use json_utils, only: json_extract_item
   use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
+  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -103,7 +106,19 @@ module adjoint_case
   !! suppoerted by Neko.
   type :: adjoint_case_t
 
+     ! TODO
+     ! I think it would be nicer if this was called `fluid` just like the 
+     ! forward.
+     !
+     ! so you're acessing forward%fluid
+     ! and also           adjoint%fluid
+     !
+     ! and same for the scalar.
+     ! I'll update this in a different PR
      class(adjoint_scheme_t), allocatable :: scheme
+     ! I don't know why this is the pnpn type, and not the scheme...
+     ! but that's how it is in neko
+     type(adjoint_scalar_pnpn_t), allocatable :: scalar
      type(case_t), pointer :: case
 
      ! Fields
@@ -150,6 +165,23 @@ contains
     this%tol = tol
 
     ! Check if the scalar field is allocated
+    ! TODO
+    ! Man this is tricky... I agree that in principle, if we have a passive 
+    ! scalar in the forward then we should have a passive scalar in the adjoint
+    !
+    ! But if you look closely in Caspers paper, they have an objective and a
+    ! pressure drop constraint.
+    !
+    ! And the adjoint for the pressure drop constraint doesn't involve the 
+    ! passive scalar.
+    !
+    ! I'm sure with enough thought we can figure out a smart way of handing
+    ! this. 
+    ! For now...
+    ! I think it's ok to assume passive scalar forward => passive scalar adjoint
+    !
+    ! But just putting this note here so we know to come back and discuss this
+    ! point.
     if (allocated(neko_case%scalar)) then
        this%have_scalar = .true.
     end if
@@ -192,26 +224,44 @@ contains
     !
     ! Setup scalar scheme
     !
-    ! @todo Scalar adjoint is not implemented yet
-    ! if (neko_case%params%valid_path('case.scalar')) then
-    !    call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-    ! scalar,                             .true.)
-    ! end if
+    ! TODO
+    ! Tims forward vs adjoint JSON
+     if (neko_case%params%valid_path('case.scalar')) then
+        call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
+     scalar,                             .true.)
+     end if
 
-    ! if (scalar) then
-    !    allocate(neko_case%scalar)
-    !    call neko_case%scalar%init(neko_case%msh, this%scheme%c_Xh, &
-    !         this%scheme%gs_Xh, neko_case%params, neko_case%usr,&
-    !         neko_case%material_properties)
-    !    call this%scheme%chkp%add_scalar(neko_case%scalar%s)
-    !    this%scheme%chkp%abs1 => neko_case%scalar%abx1
-    !    this%scheme%chkp%abs2 => neko_case%scalar%abx2
-    !    this%scheme%chkp%slag => neko_case%scalar%slag
-    ! end if
+     if (scalar) then
+        allocate(this%scalar)
+        ! TODO
+        ! this%scalar%chkp%tlag => this%tlag
+        ! this%scalar%chkp%dtlag => this%dtlag
+        !
+        ! I don't know what this is yet
+        call this%scalar%init(neko_case%msh, this%scheme%c_Xh, &
+             this%scheme%gs_Xh, neko_case%params, neko_case%usr,&
+             this%scheme%ulag, this%scheme%vlag, this%scheme%wlag, &
+             neko_case%ext_bdf, this%scheme%rho)
+        call this%scheme%chkp%add_scalar(this%scalar%s_adj)
 
+        ! TODO
+        ! we don't have checkpoints yet
+        ! this%scheme%chkp%abs1 => this%scalar%abx1
+        ! this%scheme%chkp%abs2 => this%scalar%abx2
+        ! this%scheme%chkp%slag => this%scalar%slag
+     end if
+
+    ! TODO
+    ! I don't really know how we should handle this...
+    ! I feel like, even if someone puts a strange BC it will be diriclette
+    ! so the adjoint will go to 'w'.
     !
-    ! Setup user defined conditions
-    !
+    ! What we really need is a robust way to set BCs based on objective 
+    ! functions, because that's when we're going to get weird unique BCs for
+    ! the adjoint.
+    ! !
+    ! !Setup user defined conditions
+    ! !
     ! if (neko_case%params%valid_path('case.fluid.inflow_condition')) then
     !    call json_get(neko_case%params, 'case.fluid.inflow_condition.type', &
     !         string_val)
@@ -246,19 +296,31 @@ contains
             neko_case%usr%fluid_user_ic, ic_json)
     end if
 
-    ! if (scalar) then
-    !    call json_get(neko_case%params, 'case.scalar.initial_condition.type', &
-    ! string_val)
-    !    if (trim(string_val) .ne. 'user') then
-    !       call set_scalar_ic(neko_case%scalar%s, &
-    !         neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, string_val, &
-    ! neko_case%params)
-    !    else
-    !       call set_scalar_ic(neko_case%scalar%s, &
-    !         neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-    ! neko_case%usr%scalar_user_ic, neko_case%params)
-    !    end if
-    ! end if
+    if (scalar) then
+       ! TODO
+       ! perhaps we should consider: 
+       ! `adjoint` -> `adjoint_fluid` in the casefile?
+       json_key = json_key_fallback(neko_case%params, &
+            'case.adjoint_scalar.initial_condition', &
+            'case.scalar.initial_condition')
+
+       call json_get(neko_case%params, json_key//'.type', string_val)
+       call json_get_subdict(neko_case%params, json_key, ic_json)
+       if (trim(string_val) .ne. 'user') then
+          call set_scalar_ic(this%scalar%s_adj, &
+            this%scalar%c_Xh, this%scalar%gs_Xh, string_val, ic_json)
+       else
+       	 ! TODO
+       	 ! this is wrong, it's point to the neko case.
+       	 ! I think we need to discus the case file before we can do user
+       	 ! defined stuff. 
+       	 ! But I guess we should ALSO have user functionality for the adjoint
+       	 !
+       !   call set_scalar_ic(this%scalar%s_adj, &
+       !     this%scalar%c_Xh, this%scalar%gs_Xh, &
+       !     neko_case%usr%scalar_user_ic, ic_json)
+       end if
+    end if
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
@@ -273,10 +335,10 @@ contains
     !
     call this%scheme%validate
 
-    ! if (scalar) then
-    !    call neko_case%scalar%slag%set(neko_case%scalar%s)
-    !    call neko_case%scalar%validate
-    ! end if
+    if (scalar) then
+       call this%scalar%slag%set(this%scalar%s_adj)
+       call this%scalar%validate
+    end if
 
     !
     ! Setup output precision of the field files

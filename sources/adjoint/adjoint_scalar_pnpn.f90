@@ -253,13 +253,13 @@ contains
     integer :: n
 
 
-    n = this%s%dof%size()
+    n = this%s_adj%dof%size()
 
-    call col2(this%s%x, this%c_Xh%mult, n)
+    call col2(this%s_adj%x, this%c_Xh%mult, n)
     call col2(this%slag%lf(1)%x, this%c_Xh%mult, n)
     call col2(this%slag%lf(2)%x, this%c_Xh%mult, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%s%x, this%s%x_d, &
+       call device_memcpy(this%s_adj%x, this%s_adj%x_d, &
                           n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%slag%lf(1)%x, this%slag%lf(1)%x_d, &
                           n, HOST_TO_DEVICE, sync = .false.)
@@ -273,7 +273,7 @@ contains
                           n, HOST_TO_DEVICE, sync = .false.)
     end if
 
-    call this%gs_Xh%op(this%s, GS_OP_ADD)
+    call this%gs_Xh%op(this%s_adj, GS_OP_ADD)
     call this%gs_Xh%op(this%slag%lf(1), GS_OP_ADD)
     call this%gs_Xh%op(this%slag%lf(2), GS_OP_ADD)
 
@@ -336,7 +336,7 @@ contains
     n = this%dm_Xh%size()
 
     call profiler_start_region('Scalar', 2)
-    associate(u => this%u, v => this%v, w => this%w, s => this%s, &
+    associate(u => this%u, v => this%v, w => this%w, s => this%s_adj, &
          cp => this%cp, rho => this%rho, &
          ds => this%ds, &
          s_res => this%s_res, &
@@ -352,7 +352,7 @@ contains
 
       if (neko_log%level_ .ge. NEKO_LOG_DEBUG) then
          write(log_buf, '(A,A,E15.7,A,E15.7,A,E15.7)') 'Scalar debug', &
-              ' l2norm s', glsc2(this%s%x, this%s%x, n), &
+              ' l2norm s', glsc2(this%s_adj%x, this%s_adj%x, n), &
               ' slag1', glsc2(this%slag%lf(1)%x, this%slag%lf(1)%x, n), &
               ' slag2', glsc2(this%slag%lf(2)%x, this%slag%lf(2)%x, n)
          call neko_log%message(log_buf)
@@ -415,7 +415,7 @@ contains
       call this%field_dir_bc%update(this%field_dir_bc%field_list, &
            this%field_dirichlet_bcs, this%c_Xh, t, tstep, "scalar")
       call bc_list_apply_scalar(this%bclst_dirichlet, &
-           this%s%x, this%dm_Xh%size())
+           this%s_adj%x, this%dm_Xh%size())
 
 
       ! Update material properties if necessary

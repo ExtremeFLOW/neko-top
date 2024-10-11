@@ -4,9 +4,8 @@ set(DRIVER_SOURCE driver.f90)
 set(EXTRA_SOURCES 
     adjoint_scalar_convection_source_term.f90 
     user.f90 
-    adjoint_scalar_scheme.f90 
-    adjoint_scalar_pnpn.f90
     ../rugby_ball/simulation_adjoint.f90
+    ../rugby_ball/source_terms/simple_brinkman_source_term.f90
     ../rugby_ball/source_terms/adjoint_lube_source_term.f90
     ../rugby_ball/source_terms/adjoint_minimum_dissipation_source_term.f90
     ../rugby_ball/objectives/objective_function.f90

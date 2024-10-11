@@ -44,6 +44,8 @@ module adjoint_scalar_convection_source_term
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
+  use field_math, only: field_addcol3
+  use operators, only: opgrad
   implicit none
   private
 
@@ -58,12 +60,14 @@ module adjoint_scalar_convection_source_term
   ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: &
   adjoint_scalar_convection_source_term_t
+     !> here we have s and s_adj
+     type(field_t), pointer :: s, s_adj
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
      adjoint_scalar_convection_source_term_init_from_json
      !> The constructor from type components.
-     procedure, pass(this) :: init_from_compenents => &
+     procedure, pass(this) :: init_from_components => &
        adjoint_scalar_convection_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => adjoint_scalar_convection_source_term_free
@@ -86,24 +90,56 @@ contains
     real(kind=rp), allocatable :: values(:)
     real(kind=rp) :: start_time, end_time
 
-    ! we really don't have to initialize anything here...
-    ! maybe we should check that we have a passive scalar?
+    ! this is a bit weird... because I don't think this should come from the 
+    ! JSON. 
+    ! Maybe we should think of all these source terms as only "appendable"
+    !
+    ! Because we'll never have the whole case here, so we'll never be able
+    ! init from components anyway...
+
 
   end subroutine adjoint_scalar_convection_source_term_init_from_json
 
-  subroutine adjoint_scalar_convection_source_term_init_from_components(this, &
-  fields, values, coef, start_time, end_time)
+
+  subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
+       f_x, f_y, f_z, &
+       s, s_adj, coef)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
-    class(field_list_t), intent(inout), target :: fields
-    real(kind=rp), intent(in) :: values(:)
+    type(field_t), pointer, intent(in) :: f_x, f_y, f_z
+    type(field_list_t) :: fields
     type(coef_t) :: coef
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
+    real(kind=rp) :: start_time
+    real(kind=rp) :: end_time
+    real(kind=rp) :: obj_scale
+    type(field_t), intent(in), target :: s, s_adj
+    ! TODo
+    ! do masks later
+    !type(field_t), intent(in), target :: mask
+
+    ! I wish you didn't need a start time and end time...
+    ! but I'm just going to set a super big number...
+    start_time = 0.0_rp
+    end_time = 100000000.0_rp
 
     call this%free()
-    call this%init_base(fields, coef, start_time, end_time)
-  end subroutine adjoint_scalar_convection_source_term_init_from_components
 
+    ! this is copying the fluid source term init
+    ! We package the fields for the source term to operate on in a field list.
+    call fields%init(3)
+    call fields%assign(1, f_x)
+    call fields%assign(2, f_y)
+    call fields%assign(3, f_z)
+
+    call this%init_base(fields, coef, start_time, end_time)
+
+    ! point everything in the correct places
+    this%s => s
+    this%s_adj => s_adj
+
+
+    ! TODO
+    !this%mask => mask
+  end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.
   subroutine adjoint_scalar_convection_source_term_free(this)
@@ -120,7 +156,7 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     integer :: n_fields, i, n
-    type(field_t), pointer :: s, s_adj, fu, fv, fw
+    type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz
 
@@ -134,8 +170,6 @@ contains
     fw => this%fields%get(3)
     
     
-    s => neko_field_registry%get_field('s')
-    s_adj => neko_field_registry%get_field('s_adj')
     
     ! we basically just need the term 
     ! $\nabla s s_adj$
@@ -143,12 +177,14 @@ contains
     ! be super careful with opgrad vs grad.
     ! I'm not sure which is correct here
     ! From memory they only differ by a jac_inv or a B or something like that
-    call opgrad(dsdx%x,dsdy%x,dsdz%x,s%x, this%coef)
+    ! TODO
+    ! I think this actually works on GPU but I haven't checked..
+    call opgrad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
     ! TODO
     ! double check if add or subtract
-    call field_addcol3(fu,s,dsdx)
-    call field_addcol3(fv,s,dsdy)
-    call field_addcol3(fw,s,dsdz)
+    call field_addcol3(fu,this%s_adj,dsdx)
+    call field_addcol3(fv,this%s_adj,dsdy)
+    call field_addcol3(fw,this%s_adj,dsdz)
     
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)

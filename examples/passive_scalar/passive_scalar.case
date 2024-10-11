@@ -6,8 +6,8 @@
         "output_checkpoints": false,
         "output_at_end": true,
         "output_boundary": false,
-        "end_time": 10.0,
-        "timestep": 1e-3,
+        "end_time": 5.0,
+        "timestep": 1e-4,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -51,12 +51,13 @@
                 "max_iterations": 800
             },
             "boundary_types": [ "v", "o", "w", "w", "w", "w" ],
-            "output_control": "tsteps",
-            "output_value": 50,
+            "output_control": "simulationtime",
+            "output_value": 0.50,
         },
         "scalar": {
             "enabled": true,
-            "Pe": 100.0,
+            // in the real case we'll be working with a much higher Peclet number
+            "Pe": 200.0,
             "boundary_types": [
                 "user",
                 "o",

@@ -53,7 +53,7 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    if(z.gt.1.0_rp) then
+    if(y.gt.1.0_rp) then
     	s = 1.0_rp
     else
     	s = 0.0_rp
@@ -68,7 +68,7 @@ contains
     real(kind=rp) :: rand, z                                                    
                                                                                 
     do i = 1, s%dof%size()                                                      
-    	if(s%dof%z(i,1,1,1).gt.1.0_rp) then
+    	if(s%dof%y(i,1,1,1).gt.1.0_rp) then
        s%x(i,1,1,1) = 1.0_rp                                       
       else
        s%x(i,1,1,1) = 0.0_rp                                       

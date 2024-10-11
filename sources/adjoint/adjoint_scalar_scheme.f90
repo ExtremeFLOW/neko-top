@@ -116,7 +116,7 @@ module adjoint_scalar_scheme
      !> z-component of Velocity
      type(field_t), pointer :: w
      !> The adjoint scalar.
-     type(field_t), pointer :: s
+     type(field_t), pointer :: s_adj
      !> Lag arrays, i.e. solutions at previous timesteps.
      type(field_series_t) :: slag
      !> Function space \f$ X_h \f$.
@@ -394,9 +394,9 @@ contains
     if (.not. neko_field_registry%field_exists('s_adj')) then
        call neko_field_registry%add_field(this%dm_Xh, 's_adj')
     end if
-    this%s => neko_field_registry%get_field('s_adj')
+    this%s_adj => neko_field_registry%get_field('s_adj')
 
-    call this%slag%init(this%s, 2)
+    call this%slag%init(this%s_adj, 2)
 
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh
@@ -560,7 +560,7 @@ contains
     if ( (.not. allocated(this%u%x)) .or. &
          (.not. allocated(this%v%x)) .or. &
          (.not. allocated(this%w%x)) .or. &
-         (.not. allocated(this%s%x))) then
+         (.not. allocated(this%s_adj%x))) then
        call neko_error('Fields are not allocated')
     end if
 

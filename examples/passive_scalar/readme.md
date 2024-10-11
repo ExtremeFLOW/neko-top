@@ -39,6 +39,18 @@ account for the pressure drop constraint.
 The adjoint BCs are, at the time of writing, very poorly handled, so 
 implementing that last one is going to be hard.
 
+> I also feel the design needs to enter the passive scalar 
+> equation. Probably not in the difusive term, but I think it should show up
+> in the convective term. ie, not
+>
+> $(\mathbf{u} \cdot \nabla ) \phi$
+>
+> but $C(\rho) (\mathbf{u} \cdot \nabla ) \phi$ such that $C(\rho) \in [0,1]$
+> 
+> I could be wrong... I mean... I suppose if the Brinkman term is doing its
+> job correctly we should have $\mathbf{u}= \mathbf{0}$ in the solid anyways..
+> So maybe it's ok.
+
 
 # Progress
 OK so far NOTHING has been tested aside from compilation
