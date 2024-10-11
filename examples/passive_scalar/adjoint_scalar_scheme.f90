@@ -35,7 +35,8 @@
 ! todo: module name
 ! HARRY
 ! NOTE
-! This seems really silly to make a brand new scheme just change the convective term
+! This seems really silly to make a brand new scheme just change the convective 
+! term.
 ! In the velocity it made sense because we needed different inputs, but here the
 ! convective term takes the exact same inputs, so really the only difference 
 ! would be in the factory...
@@ -44,17 +45,24 @@
 ! We still rely too heavily on registry, so we can't really have multiple 
 ! passive scalars.
 !
-! PS, an alternative to "scalars as simcomps" would be a "scalar list" so you could execute
-! multiple passive scalars... and then in the JSON you could name them all uniquely
+! PS, an alternative to "scalars as simcomps" would be a "scalar list" so you 
+! could execute multiple passive scalars... and then in the JSON you could name 
+! them all uniquely
 ! (or cycle through s1, s2, etc if nothing is specified.)
 !
-! But for now we're making essentially a copy of a scalar with the necessary changes.
+! But for now we're making essentially a copy of a scalar with the necessary 
+! changes.
 !
 ! Question for Tim:
-! Is is possible to somehow link adjoint_scalar_scheme.f90 to scalar_scheme.f90 in github?
-! so that if a change is made to scalar_scheme.f90 by someone else, it is somehow reflected
-! in adjoint_scalar_scheme.f90?
+! Is is possible to somehow link adjoint_scalar_scheme.f90 to scalar_scheme.f90 
+! in github?
+! so that if a change is made to scalar_scheme.f90 by someone else, it is 
+! somehow reflected in adjoint_scalar_scheme.f90?
 ! That would be cool
+!
+! This was brought up recently in a meeting, it appears the answer is no.
+! So the takehome here, is that we need to vigilantly monitor scalar_scheme
+! and scalar_pnpn such that the changes in neko are reflected in neko-top
 module adjoint_scalar_scheme
   use gather_scatter, only : gs_t
   use checkpoint, only : chkp_t
@@ -95,7 +103,8 @@ module adjoint_scalar_scheme
   use field_series, only : field_series_t
   use time_step_controller, only : time_step_controller_t
   ! steal some things from the OG passive scalar
-  use scalar_scheme, only: scalar_scheme_solver_factory, scalar_scheme_precon_factory
+  use scalar_scheme, only: scalar_scheme_solver_factory, &
+  scalar_scheme_precon_factory
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
@@ -191,13 +200,14 @@ module adjoint_scalar_scheme
      !> Solve for the current timestep.
      procedure(adjoint_scalar_scheme_step_intrf), pass(this), deferred :: step
      !> Restart from a checkpoint.
-     procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: restart
+     procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: &
+     restart
   end type adjoint_scalar_scheme_t
 
   !> Abstract interface to initialize a scalar formulation
   abstract interface
-     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, params, user, &
-          material_properties, &
+     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, params, &
+     user, material_properties, &
           ulag, vlag, wlag, time_scheme)
        import adjoint_scalar_scheme_t
        import json_file

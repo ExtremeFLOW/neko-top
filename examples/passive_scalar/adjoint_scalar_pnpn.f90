@@ -314,7 +314,8 @@ contains
 
   end subroutine adjoint_scalar_pnpn_free
 
-  subroutine adjoint_scalar_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
+  subroutine adjoint_scalar_pnpn_step(this, t, tstep, dt, ext_bdf, &
+  dt_controller)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
     real(kind=rp), intent(inout) :: t
     integer, intent(inout) :: tstep
@@ -381,9 +382,9 @@ contains
       else
          ! Add the advection operators to the right-hans-side.
          ! HARRY
-         ! see, even this line is exactly the same because we have the same inputs
-         ! we could have put the adjoint stuff convective term in with the same
-         ! factory as the forward one.
+         ! see, even this line is exactly the same because we have the same 
+         ! inputs we could have put the adjoint stuff convective term in with 
+         ! the same factory as the forward one.
          ! Anywways... 
          ! It's also maybe a good idea for us to be seperate from the main Neko
          call this%adv%compute_adjoint_scalar(u, v, w, s, f_Xh, &

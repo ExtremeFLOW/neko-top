@@ -47,24 +47,28 @@ module adjoint_passive_scalar_source_term
   implicit none
   private
 
-  ! TIM,
-  ! I saw you made an "adjoint source term" perhaps this should be derived 
-  ! from that...
-  ! in any case, I don't know how to name this term, but when you have a passive
+  ! I don't know how to name this term, but when you have a passive
   ! scalar you get an extra term in the adjoint velocity equation, which comes
   ! from the convective term in the passive scalar equation.
+  ! Maybe this should be called just `adjoint_passive_scalar_convection`? 
+  ! but it does come in a source term...
+
+  ! In any case,
+  ! it's a source term acting on the adjoint velocity equations, of the form:
   ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: adjoint_passive_scalar_source_term_t
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => adjoint_passive_scalar_source_term_init_from_json
+     procedure, pass(this) :: init => &
+     adjoint_passive_scalar_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_compenents => &
        adjoint_passive_scalar_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => adjoint_passive_scalar_source_term_free
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute_ => adjoint_passive_scalar_source_term_compute
+     procedure, pass(this) :: compute_ => &
+     adjoint_passive_scalar_source_term_compute
   end type adjoint_passive_scalar_source_term_t
 
 contains
@@ -72,7 +76,8 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
-  subroutine adjoint_passive_scalar_source_term_init_from_json(this, json, fields, coef)
+  subroutine adjoint_passive_scalar_source_term_init_from_json(this, &
+  json, fields, coef)
     class(adjoint_passive_scalar_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
@@ -85,8 +90,8 @@ contains
 
   end subroutine adjoint_passive_scalar_source_term_init_from_json
 
-  subroutine adjoint_passive_scalar_source_term_init_from_components(this, fields, values, &
-                                                    coef, start_time, end_time)
+  subroutine adjoint_passive_scalar_source_term_init_from_components(this, &
+  fields, values, coef, start_time, end_time)
     class(adjoint_passive_scalar_source_term_t), intent(inout) :: this
     class(field_list_t), intent(inout), target :: fields
     real(kind=rp), intent(in) :: values(:)
@@ -122,30 +127,30 @@ contains
     call neko_scratch_registry%request_field(dsdx, temp_indices(1))
     call neko_scratch_registry%request_field(dsdy, temp_indices(2))
     call neko_scratch_registry%request_field(dsdz, temp_indices(3))
-
+    
     fu => this%fields%get(1)
     fv => this%fields%get(2)
     fw => this%fields%get(3)
-
-
+    
+    
     s => neko_field_registry%get_field('s')
     s_adj => neko_field_registry%get_field('s_adj')
-
+    
     ! we basically just need the term 
-	 ! $\nabla s s_adj$
-	 ! TODO
-	 ! be super careful with opgrad vs grad.
-	 ! I'm not sure which is correct here
-	 ! I also feel like sure
-	 call opgrad(dsdx%x,dsdy%x,dsdz%x,s%x, this%coef)
-	 ! TODO
-	 ! double check if add or subtract
-	 call field_addcol3(fu,s,dsdx)
-	 call field_addcol3(fv,s,dsdy)
-	 call field_addcol3(fw,s,dsdz)
-
-	 ! free the scratch
-	 call neko_scratch_registry%relinquish_field(temp_indices)
+    ! $\nabla s s_adj$
+    ! TODO
+    ! be super careful with opgrad vs grad.
+    ! I'm not sure which is correct here
+    ! From memory they only differ by a jac_inv or a B or something like that
+    call opgrad(dsdx%x,dsdy%x,dsdz%x,s%x, this%coef)
+    ! TODO
+    ! double check if add or subtract
+    call field_addcol3(fu,s,dsdx)
+    call field_addcol3(fv,s,dsdy)
+    call field_addcol3(fw,s,dsdz)
+    
+    ! free the scratch
+    call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine adjoint_passive_scalar_source_term_compute
 
 end module adjoint_passive_scalar_source_term
