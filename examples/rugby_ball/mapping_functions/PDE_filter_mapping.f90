@@ -33,61 +33,51 @@
 !
 !> A PDE based filter 
 module PDE_filter
-! these were copied for lambda2
   use num_types, only : rp
   use json_module, only : json_file
   use field_registry, only : neko_field_registry
   use field, only : field_t
-  use operators, only : lambda2op
-
-! these are the ones I want
-    use json_utils, only: json_get, json_get_or_default, json_extract_item
-  	 use coefs, only: coef_t
-    use ax_product, only : ax_t, ax_helm_factory
-    use krylov, only : ksp_t, ksp_monitor_t, krylov_solver_factory, &
-    krylov_solver_destroy
-    use precon, only : pc_t, precon_factory, precon_destroy
-    use bc
-    !use bc, only : bc_list_t, bc_list_init, bc_list_apply_scalar
-    use neumann, only : neumann_t
-    use profiler, only : profiler_start_region, profiler_end_region
-    use gather_scatter, only : gs_t, GS_OP_ADD
-    use pnpn_residual, only: pnpn_prs_res_t
-    use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-    use fld_file_output
-    use field_registry, only : neko_field_registry
-    use logger, only : neko_log, LOG_SIZE
-    use mapping, only: mapping_t
-    use scratch_registry, only: neko_scratch_registry
-    use field_math, only: field_col2, field_invcol2, field_copy
-
-
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use coefs, only: coef_t
-    !use bc, only : bc_list_t, bc_list_init, bc_list_apply_scalar
-    use neumann, only : neumann_t
-    use profiler, only : profiler_start_region, profiler_end_region
-    use gather_scatter, only : gs_t, GS_OP_ADD
-    use pnpn_residual, only: pnpn_prs_res_t
-    use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-    use fld_file_output
-    use field_registry, only : neko_field_registry
-    use logger, only : neko_log, LOG_SIZE
-    use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-    use neko_config, only : NEKO_BCKND_DEVICE
-
-    ! extra ones
-      use dofmap, only :  dofmap_t
-        use jacobi, only : jacobi_t
+  use ax_product, only : ax_t, ax_helm_factory
+  use krylov, only : ksp_t, ksp_monitor_t, krylov_solver_factory, &
+  krylov_solver_destroy
+  use precon, only : pc_t, precon_factory, precon_destroy
+  use bc
+  use neumann, only : neumann_t
+  use profiler, only : profiler_start_region, profiler_end_region
+  use gather_scatter, only : gs_t, GS_OP_ADD
+  use pnpn_residual, only: pnpn_prs_res_t
+  use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
+  use fld_file_output
+  use field_registry, only : neko_field_registry
+  use logger, only : neko_log, LOG_SIZE
+  use mapping, only: mapping_t
+  use scratch_registry, only: neko_scratch_registry
+  use field_math, only: field_col2, field_invcol2, field_copy
+  use coefs, only: coef_t
+  use neumann, only : neumann_t
+  use profiler, only : profiler_start_region, profiler_end_region
+  use gather_scatter, only : gs_t, GS_OP_ADD
+  use pnpn_residual, only: pnpn_prs_res_t
+  use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
+  use fld_file_output
+  use field_registry, only : neko_field_registry
+  use logger, only : neko_log, LOG_SIZE
+  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use dofmap, only :  dofmap_t
+  use jacobi, only : jacobi_t
   use device_jacobi, only : device_jacobi_t
   use sx_jacobi, only : sx_jacobi_t
   use hsmg, only : hsmg_t
-      use utils, only : neko_error
-    implicit none
+  use utils, only : neko_error
+  implicit none
   private
 
-	!> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$, 
-	!! see Lazarov & O. Sigmund 2010,       
-	!! by solving an equation 
+  !> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$, 
+  !! see Lazarov & O. Sigmund 2010,       
+  !! by solving an equation 
   !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$ 
   type, public, extends(mapping_t) :: PDE_filter_t
     !> Ax
@@ -103,13 +93,10 @@ module PDE_filter
     !> Filter boundary conditions
     type(bc_list_t) :: bclst_filt
 
-
-
-
-	 ! Inputs from the user
+    ! Inputs from the user
     !> filter radius
     real(kind=rp)  :: r
-	 !> tolerance for PDE filter
+    !> tolerance for PDE filter
     real(kind=rp) :: abstol_filt
     !> max iterations for PDE filter 
     integer :: ksp_max_iter
@@ -154,10 +141,10 @@ contains
     real(kind=rp) :: tmp_real
 
 
-	! TODO
-	! I'll do the json stuff later...
-	 this%r = 0.01 
-	 this%abstol_filt = 0.0000000001_rp
+    ! TODO
+    ! I'll do the json stuff later...
+    this%r = 0.01 
+    this%abstol_filt = 0.0000000001_rp
     this%ksp_max_iter = 200
     this%ksp_solver = "gmres"
     this%precon_type_filt = "ident"
@@ -172,14 +159,14 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     integer :: n
-	 character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
-	 bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
+    character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
+    bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
 
 
 
     n = this%coef%dof%size()
 
-	 ! initialize the filter BCs
+    ! initialize the filter BCs
     call this%filter_bcs%init_base(this%coef)
 
     ! Create list with just Neumann bcs
@@ -272,8 +259,7 @@ contains
     ! to improved convergence
     call field_copy(X_out, X_in)
 
-
-	 ! gather scatter
+    ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
     ! set BCs
     call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
@@ -299,8 +285,6 @@ contains
          this%ksp_results%res_start, this%ksp_results%res_final
     call neko_log%message(log_buf)
 
-
-	 ! You should relinguish if you get the scratch registry to work!
     call neko_scratch_registry%relinquish_field(temp_indices)
 
 
@@ -365,7 +349,7 @@ contains
     ! set BCs
     call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
 
-	 ! gather scatter
+    ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
     ! Solve Helmholtz equation
@@ -389,7 +373,6 @@ contains
          this%ksp_results%res_start, this%ksp_results%res_final
     call neko_log%message(log_buf)
 
-	 ! You should relinguish if you get the scratch registry to work!
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine PDE_filter_apply_backward

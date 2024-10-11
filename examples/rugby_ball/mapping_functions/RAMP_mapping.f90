@@ -40,24 +40,24 @@ module RAMP_mapping
   use json_module, only : json_file
   use field_registry, only : neko_field_registry
   use field, only : field_t
-  	 use coefs, only: coef_t
-    implicit none
+  use coefs, only: coef_t
+  implicit none
   private
 
-	!> A RAMP mapping of coefficients 
-	!! This is the standard RAMP described in
-	!! https://doi.org/10.1007/s001580100129
-	!!
-	!!
-	!! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$ 
-	!!
-	!!
-	!!  |        .
-	!!  |        . 
-	!!  |       .
-	!!  |     .. 
-	!!  |  ...
-	!!  |_________
+  !> A RAMP mapping of coefficients 
+  !! This is the standard RAMP described in
+  !! https://doi.org/10.1007/s001580100129
+  !!
+  !!
+  !! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$ 
+  !!
+  !!
+  !!  |        .
+  !!  |        . 
+  !!  |       .
+  !!  |     .. 
+  !!  |  ...
+  !!  |_________
   type, public, extends(mapping_t) :: RAMP_mapping_t
   !> minimum value
   real(kind=rp) :: f_min
@@ -126,17 +126,17 @@ contains
     type(field_t), intent(inout) ::  X_out
     integer :: n, i
 
-	 ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) ) 
-
-	 ! TODO
-	 ! We could either use field math... or write GPU backends...
-	 ! or assume this will always be CPU. 
-
-	 n = X_in%dof%size()
-	 do i = 1, n
-	    X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
-	    X_in%x(i,1,1,1) / (1.0_rp + this%q * (1.0_rp - X_in%x(i,1,1,1) ) )
-	 enddo
+    ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) ) 
+    
+    ! TODO
+    ! We could either use field math... or write GPU backends...
+    ! or assume this will always be CPU. 
+    
+    n = X_in%dof%size()
+    do i = 1, n
+       X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
+       X_in%x(i,1,1,1) / (1.0_rp + this%q * (1.0_rp - X_in%x(i,1,1,1) ) )
+    enddo
 
   end subroutine RAMP_mapping_apply
 
@@ -152,16 +152,16 @@ contains
     type(field_t), intent(inout) ::  dF_dX_in
     integer :: n, i
 
-	 ! df/dx_in = df/dx_out * dx_out/dx_in 
-
-	 ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2 
-
-	 n = X_in%dof%size()
-	 do i = 1, n
-	    dF_dX_in%x(i,1,1,1) = (this%f_max - this%f_min) * (this%q + 1.0_rp) / &
-	    ((1.0_rp - this%q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-	    dF_dX_out%x(i,1,1,1)
-	 enddo
+    ! df/dx_in = df/dx_out * dx_out/dx_in 
+    
+    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2 
+    
+    n = X_in%dof%size()
+    do i = 1, n
+       dF_dX_in%x(i,1,1,1) = (this%f_max - this%f_min) * (this%q + 1.0_rp) / &
+       ((1.0_rp - this%q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
+       dF_dX_out%x(i,1,1,1)
+    enddo
 
   end subroutine RAMP_mapping_apply_backward
 

@@ -40,25 +40,25 @@ module Casper_mapping
   use json_module, only : json_file
   use field_registry, only : neko_field_registry
   use field, only : field_t
-  	 use coefs, only: coef_t
-    implicit none
+  use coefs, only: coef_t
+  implicit none
   private
 
-	!> A Casper mapping of coefficients 
-	!! Let's ask Casper for the real name of this mapping function...
-	!! but it was the one used in
-	!! https://doi.org/10.1002/fld.1964
-	!!
-	!! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$ 
-	!!
-	!! It seems very similar to RAMP but with the convexity the other way
-	!!
-	!!  |       ...
-	!!  |    .. 
-	!!  |  .
-	!!  | . 
-	!!  |.
-	!!  |_________
+  !> A Casper mapping of coefficients 
+  !! Let's ask Casper for the real name of this mapping function...
+  !! but it was the one used in
+  !! https://doi.org/10.1002/fld.1964
+  !!
+  !! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$ 
+  !!
+  !! It seems very similar to RAMP but with the convexity the other way
+  !!
+  !!  |       ...
+  !!  |    .. 
+  !!  |  .
+  !!  | . 
+  !!  |.
+  !!  |_________
 
   type, public, extends(mapping_t) :: Casper_mapping_t
   !> minimum value
@@ -127,18 +127,18 @@ contains
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
 
-	 ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q) 
-
-	 ! TODO
-	 ! Here we should make a descision, either use field_math for everything
-	 ! or write individual backends.
-	 !
-	 ! I'm pro-field_math simply because these functions don't get executed too
-	 ! often...
-	 !
-	 ! However! If we do descide to write backends for them, I (Harry) call
-	 ! shotgun writing them, because they look easy and would be a good 
-	 ! introduction to writing a kernel from scratch.
+    ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q) 
+    
+    ! TODO
+    ! Here we should make a descision, either use field_math for everything
+    ! or write individual backends.
+    !
+    ! I'm pro-field_math simply because these functions don't get executed too
+    ! often...
+    !
+    ! However! If we do descide to write backends for them, I (Harry) call
+    ! shotgun writing them, because they look easy and would be a good 
+    ! introduction to writing a kernel from scratch.
     call field_copy(X_out,X_in)
     call field_cadd(X_out, this%q)
     call field_invcol1(X_out)
@@ -159,9 +159,9 @@ contains
     type(field_t), intent(in) ::  dF_dX_out
     type(field_t), intent(inout) ::  dF_dX_in
 
-	 ! df/dx_in = df/dx_out * dx_out/dx_in 
-
-	 ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2 
+    ! df/dx_in = df/dx_out * dx_out/dx_in 
+    
+    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2 
 
     call field_copy(dF_dX_in, X_in)
     call field_cadd(dF_dX_in, this%q)

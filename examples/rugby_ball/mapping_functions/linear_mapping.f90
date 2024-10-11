@@ -40,11 +40,11 @@ module linear_mapping
   use json_module, only : json_file
   use field_registry, only : neko_field_registry
   use field, only : field_t
-  	 use coefs, only: coef_t
-    implicit none
+  use coefs, only: coef_t
+  implicit none
   private
 
-	!> A linear mapping of coefficients $f(x) = f_{min} + (f_{max} - f_{min}) x$ 
+  !> A linear mapping of coefficients $f(x) = f_{min} + (f_{max} - f_{min}) x$ 
   type, public, extends(mapping_t) :: linear_mapping_t
   !> minimum value
   real(kind=rp) :: f_min
@@ -109,7 +109,7 @@ contains
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
 
-	 ! x_out = f_min + (f_max - f_min) * x_in 
+    ! x_out = f_min + (f_max - f_min) * x_in 
     call field_copy(X_out,X_in)
     call field_cmult(X_out, this%f_max - this%f_min)
     call field_cadd(X_out, this%f_min)
@@ -127,9 +127,9 @@ contains
     type(field_t), intent(in) ::  dF_dX_out
     type(field_t), intent(inout) ::  dF_dX_in
 
-	 ! df/dx_in = df/dx_out * dx_out/dx_in 
-
-	 ! dx_out/dx_in = (f_max - f_min) 
+    ! df/dx_in = df/dx_out * dx_out/dx_in 
+    
+    ! dx_out/dx_in = (f_max - f_min) 
 
     call field_copy(dF_dX_in, dF_dX_out)
     call field_cmult(dF_dX_in, this%f_max - this%f_min)
