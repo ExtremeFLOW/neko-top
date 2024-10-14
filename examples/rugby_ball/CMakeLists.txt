@@ -18,7 +18,6 @@ set(EXTRA_SOURCES
     mapping_functions/PDE_filter_mapping.f90
     mapping_functions/linear_mapping.f90
     mapping_functions/RAMP_mapping.f90
-    mapping_functions/Casper_mapping.f90
 )
 
 build_example(${DRIVER_TYPE})

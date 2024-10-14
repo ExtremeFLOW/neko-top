@@ -74,11 +74,11 @@ module volume_constraint
   type, public, extends(objective_function_t) :: volume_constraint_t
 
      !> whether it is minimum or maximum volume
-     ! call min = 0, 	ie V > V_min  		=>		 -V + V_max < 0
-     ! call max = 1, 	ie V < V_max  		=>		  V - V_max < 0
+     ! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
+     ! is_max = .true. , 	ie V < V_max  		=>		  V - V_max < 0
      ! TODO
      ! this can be done smarter with parameters
-     logical :: min_max
+     logical :: is_max
      !> Maximum (or minimum) volume
      ! maximum volume prescribed
      real(kind=rp) :: v_max
@@ -128,7 +128,7 @@ contains
     !
     ! anyway...
     ! here we hard code for now
-    this%min_max = .false.
+    this%is_max = .false.
     this%v_max = 0.2
 
     call this%init_base(fluid%dm_Xh)
@@ -174,7 +174,7 @@ contains
     this%volume = this%volume/fluid%c_xh%volume
 
     ! then we need to check min or max
-    if(this%min_max) then
+    if(this%is_max) then
        ! max volume
        this%objective_function_value = this%volume - this%v_max
     else
@@ -201,7 +201,7 @@ contains
 
     call field_rone(this%sensitivity_to_coefficient)
 
-    if(this%min_max) then
+    if(this%is_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
        1.0_rp/fluid%c_xh%volume)
