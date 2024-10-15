@@ -94,6 +94,8 @@ module minimum_dissipation_objective_function
   use math, only : glsc2
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+  use case, only: case_t
+  use adjoint_case, only: adjoint_case_t
   implicit none
   private
 
@@ -130,13 +132,13 @@ module minimum_dissipation_objective_function
 contains
   !> The common constructor using a JSON object.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
+  !! @param primal the forward case.
+  !! @param adjoint the case.
   subroutine minimum_dissipation_objective_function_init(this, &
-       design, fluid, adjoint)
+       design, primal, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(inout) :: fluid
-    class(adjoint_scheme_t), intent(inout) :: adjoint
+    class(case_t), intent(inout) :: primal
+    class(adjoint_case_t), intent(inout) :: adjoint
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
@@ -149,17 +151,18 @@ contains
     !this%obj_scale = 0.00000001_rp
 
 
-    call this%init_base(fluid%dm_Xh)
+    call this%init_base(primal%fluid%dm_Xh)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
-         adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, &
-         fluid%u, fluid%v, fluid%w, this%obj_scale, &
-         adjoint%c_Xh)
+         adjoint%scheme%f_adj_x, adjoint%scheme%f_adj_y, &
+         adjoint%scheme%f_adj_z, &
+         primal%fluid%u, primal%fluid%v, primal%fluid%w, this%obj_scale, &
+         adjoint%scheme%c_Xh)
     ! append adjoint forcing term based on objective function
-    call adjoint%source_term%add_source_term(adjoint_forcing)
+    call adjoint%scheme%source_term%add_source_term(adjoint_forcing)
 
 
     ! if we have the lube term we need to initialize and append that too
@@ -168,12 +171,13 @@ contains
        ! make this allocatable and only allocate it if needed!
        ! or is that allready what's happening? Tim, y/n?
        call lube_term%init_from_components(&
-            adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, design, &
+            adjoint%scheme%f_adj_x, adjoint%scheme%f_adj_y, &
+            adjoint%scheme%f_adj_z, design, &
             this%k*this%obj_scale, &
-            fluid%u, fluid%v, fluid%w, &
-            adjoint%c_Xh)
+            primal%fluid%u, primal%fluid%v, primal%fluid%w, &
+            adjoint%scheme%c_Xh)
        ! append adjoint forcing term based on objective function
-       call adjoint%source_term%add_source_term(lube_term)
+       call adjoint%scheme%source_term%add_source_term(lube_term)
     endif
 
   end subroutine minimum_dissipation_objective_function_init
@@ -190,11 +194,11 @@ contains
 
   !> Compute the objective function.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_objective_function_compute(this, design, fluid)
+  !! @param primal the primal case.
+  !! @param adjoint the adjoint case.
+  subroutine minimum_dissipation_objective_function_compute(this, design, primal)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(in) :: fluid
+    class(case_t), intent(in) :: primal
     type(topopt_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
@@ -211,24 +215,24 @@ contains
     ! TODO
     ! we should be using masks etc
 
-    call grad(wo1%x, wo2%x, wo3%x, fluid%u%x, fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, primal%fluid%u%x, primal%fluid%C_Xh)
     call field_col3(objective_field,wo1,wo1)
     call field_addcol3(objective_field,wo2,wo2)
     call field_addcol3(objective_field,wo3,wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, fluid%v%x, fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, primal%fluid%v%x, primal%fluid%C_Xh)
     call field_addcol3(objective_field,wo1,wo1)
     call field_addcol3(objective_field,wo2,wo2)
     call field_addcol3(objective_field,wo3,wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, fluid%w%x, fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, primal%fluid%w%x, primal%fluid%C_Xh)
     call field_addcol3(objective_field,wo1,wo1)
     call field_addcol3(objective_field,wo2,wo2)
     call field_addcol3(objective_field,wo3,wo3)
 
     ! integrate the field
     n = wo1%size()
-    this%dissipation = glsc2(objective_field%x,fluid%C_Xh%b, n)
+    this%dissipation = glsc2(objective_field%x,primal%fluid%C_Xh%b, n)
 
     if(this%if_lube) then
        ! it's becoming so stupid to pass the whole fluid and adjoint and
@@ -236,10 +240,13 @@ contains
        ! I feel like every objective function should have internal pointers to
        ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
        ! (the whole design, so we get all the coeffients)
-       call field_col3(objective_field,fluid%u, design%brinkman_amplitude)
-       call field_addcol3(objective_field,fluid%v, design%brinkman_amplitude)
-       call field_addcol3(objective_field,fluid%w, design%brinkman_amplitude)
-       this%lube_value = glsc2(objective_field%x,fluid%C_Xh%b, n)
+       call field_col3(objective_field, primal%fluid%u, &
+       design%brinkman_amplitude)
+       call field_addcol3(objective_field, primal%fluid%v, &
+       design%brinkman_amplitude)
+       call field_addcol3(objective_field, primal%fluid%w, &
+       design%brinkman_amplitude)
+       this%lube_value = glsc2(objective_field%x,primal%fluid%C_Xh%b, n)
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value
     else
@@ -258,22 +265,25 @@ contains
 
   !> compute the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
+  !! @param primal the forward case.
+  !! @param adjoint the adjoint case.
   subroutine minimum_dissipation_objective_function_compute_sensitivity(this, &
-       design, fluid, adjoint)
+       design, primal, adjoint)
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
-    class(fluid_scheme_t), intent(in) :: fluid
-    class(adjoint_scheme_t), intent(in) :: adjoint
+    class(case_t), intent(in) :: primal
+    class(adjoint_case_t), intent(in) :: adjoint
     type(field_t), pointer :: lube_contribution
     integer :: temp_indices(1)
 
 
     ! here it should just be an inner product between the forward and adjoint
-    call field_col3(this%sensitivity_to_coefficient, fluid%u, adjoint%u_adj)
-    call field_addcol3(this%sensitivity_to_coefficient, fluid%v, adjoint%v_adj)
-    call field_addcol3(this%sensitivity_to_coefficient, fluid%w, adjoint%w_adj)
+    call field_col3(this%sensitivity_to_coefficient, primal%fluid%u, &
+    adjoint%scheme%u_adj)
+    call field_addcol3(this%sensitivity_to_coefficient, primal%fluid%v, &
+    adjoint%scheme%v_adj)
+    call field_addcol3(this%sensitivity_to_coefficient, primal%fluid%w, &
+    adjoint%scheme%w_adj)
     ! but negative
     call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
 
@@ -285,10 +295,11 @@ contains
     ! do this later
 
     if(this%if_lube) then
-       call neko_scratch_registry%request_field(lube_contribution, temp_indices(1))
-       call field_col3(lube_contribution,fluid%u,fluid%u)
-       call field_addcol3(lube_contribution,fluid%v,fluid%v)
-       call field_addcol3(lube_contribution,fluid%w,fluid%w)
+       call neko_scratch_registry%request_field(lube_contribution, &
+       temp_indices(1))
+       call field_col3(lube_contribution,primal%fluid%u, primal%fluid%u)
+       call field_addcol3(lube_contribution,primal%fluid%v, primal%fluid%v)
+       call field_addcol3(lube_contribution,primal%fluid%w, primal%fluid%w)
        ! fuck be careful with these scalaing!
        call field_add2s2(this%sensitivity_to_coefficient, lube_contribution, &
             this%K*this%obj_scale)

@@ -100,6 +100,8 @@ module objective_function
   use source_term, only: source_term_t
   use adjoint_scheme, only: adjoint_scheme_t
   use topopt_design, only: topopt_design_t
+  use case, only: case_t
+  use adjoint_case, only: adjoint_case_t
   implicit none
   private
 
@@ -183,13 +185,16 @@ module objective_function
   end type objective_function_t
 
   abstract interface
-     subroutine objective_function_init(this, design, fluid, adjoint)
-       import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
+     subroutine objective_function_init(this, design, primal, adjoint)
+       import objective_function_t, case_t, adjoint_case_t, &
             topopt_design_t
        class(objective_function_t), intent(inout) :: this
        ! these ones are inout because we may need to append source terms etc
-       class(fluid_scheme_t), intent(inout) :: fluid
-       class(adjoint_scheme_t), intent(inout) :: adjoint
+       ! TODO
+       ! At first I thought we could just pass the fluid, but if we have 
+       ! passive scalars it's better to pass the whole case down.
+       class(case_t), intent(inout) :: primal
+       class(adjoint_case_t), intent(inout) :: adjoint
        ! TODO
        ! these should all be `class(design_variable)` in the future
        type(topopt_design_t), intent(inout) :: design
@@ -197,21 +202,21 @@ module objective_function
   end interface
 
   abstract interface
-     subroutine objective_function_compute(this, design, fluid)
-       import objective_function_t, fluid_scheme_t, topopt_design_t
+     subroutine objective_function_compute(this, design, primal)
+       import objective_function_t, case_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
-       class(fluid_scheme_t), intent(in) :: fluid
+       class(case_t), intent(in) :: primal
        type(topopt_design_t), intent(inout) :: design
      end subroutine objective_function_compute
   end interface
 
   abstract interface
-     subroutine sensitivity_compute(this, design, fluid, adjoint)
-       import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
+     subroutine sensitivity_compute(this, design, primal, adjoint)
+       import objective_function_t, case_t, adjoint_case_t, &
             topopt_design_t
        class(objective_function_t), intent(inout) :: this
-       class(fluid_scheme_t), intent(in) :: fluid
-       class(adjoint_scheme_t), intent(in) :: adjoint
+       class(case_t), intent(in) :: primal
+       class(adjoint_case_t), intent(in) :: adjoint
        type(topopt_design_t), intent(inout) :: design
      end subroutine sensitivity_compute
   end interface

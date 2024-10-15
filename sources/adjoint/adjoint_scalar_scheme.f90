@@ -181,6 +181,9 @@ module adjoint_scalar_scheme
      logical :: variable_material_properties = .false.
      !> Boundary condition labels (if any)
      character(len=NEKO_MSH_MAX_ZLBL_LEN), allocatable :: bc_labels(:)
+     !> ok I'm including a proceedure that forces all user BC's (which will be
+     !! dirichlet in the primal) to become 'w' in the adjoint.
+     procedure(usr_scalar_bc_eval) :: force_user_bc_w => adjoint_force_user_bc_w
    contains
      !> Constructor for the base type.
      procedure, pass(this) :: scheme_init => adjoint_scalar_scheme_init
@@ -653,13 +656,48 @@ contains
 
   !> Initialize a user defined scalar bc
   !! @param usr_eval User specified boundary condition for scalar field
-  subroutine adjoint_scalar_scheme_set_user_bc(this, usr_eval)
+  subroutine adjoint_scalar_scheme_set_user_bc(this)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
-    procedure(usr_scalar_bc_eval) :: usr_eval
+    !procedure(usr_scalar_bc_eval) :: usr_eval
 
-    call this%user_bc%set_eval(usr_eval)
+    ! TODO
+    ! perhaps this is really short sighted, but a user BC will always be 
+    ! dirichlet in the forward, so we can assume it's going to be 'w' in the
+    ! adjoint.
+    !
+    ! of course the exception here is if we have objective functions as 
+    ! surface intergrals, then we get weird BC's for the adjoint on those 
+    ! surfaces...
+    !
+    ! So right now we apply the same as the forward, which is WRONG.
+    !
+    ! I think we need an `adjoint_scalar_bc_eval`
+    !
+    ! In fact, having a copy of `user_intf` where we can get all the adjoint
+    ! user stuff is likely the best foot forward.
+    call this%user_bc%set_eval(this%force_user_bc_w)
 
   end subroutine adjoint_scalar_scheme_set_user_bc
+
+  subroutine adjoint_force_user_bc_w(s, x, y, z, nx, ny, nz, &                    
+                                   ix, iy, iz, ie, t, tstep)                    
+       real(kind=rp), intent(inout) :: s                                        
+       real(kind=rp), intent(in) :: x                                           
+       real(kind=rp), intent(in) :: y                                           
+       real(kind=rp), intent(in) :: z                                           
+       real(kind=rp), intent(in) :: nx                                          
+       real(kind=rp), intent(in) :: ny                                          
+       real(kind=rp), intent(in) :: nz                                          
+       integer, intent(in) :: ix                                                
+       integer, intent(in) :: iy                                                
+       integer, intent(in) :: iz                                                
+       integer, intent(in) :: ie                                                
+       real(kind=rp), intent(in) :: t                                           
+       integer, intent(in) :: tstep                                             
+
+       s = 0.0_rp
+   end subroutine adjoint_force_user_bc_w
+
 
   !> Update the values of `lambda_field` if necessary.
   subroutine adjoint_scalar_scheme_update_material_properties(this)

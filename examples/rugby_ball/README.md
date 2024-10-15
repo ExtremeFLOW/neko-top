@@ -200,6 +200,11 @@ Also, this point should NEVER be removed from the readme, as there are frequent
 updates in the `fluid_scheme.f90`, `fluid_pnpn.f90` etc, and these changes 
 should be reflected in `adjoint_scheme.f90` and `adjoint_pnpn.f90` etc.
 
+### A big copy of `src/common/user_intf.f90` but for the adjoint
+This will basically give us all the same user functionality for the adjoint
+as we have for the primal. In particular, BCs come to mind (check the passive 
+scalar) but also ICs etc would be good.
+
 ## Todo (in general):
 - There are a ton more minor comments written throughout the source code here, 
 so I'm sure some have been missed in this `readme.md`

@@ -110,22 +110,27 @@ contains
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
 
-    if (has_scalar) then
-       call json_get(neko_case%params, &
-            'case.scalar.initial_condition.type', string_val)
+    print *, 'has scalar?', has_scalar
 
-       if (trim(string_val) .ne. 'user') then
-          call set_scalar_ic(s, &
-               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-               string_val, &
-               neko_case%params)
-       else
-          call set_scalar_ic(s, &
-               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-               neko_case%usr%scalar_user_ic, &
-               neko_case%params)
-       end if
-    end if
+    ! TODO
+    ! come back and fix this!!
+    !if (has_scalar) then
+    !   call json_get(neko_case%params, &
+    !        'case.scalar.initial_condition.type', string_val)
+    !print *, 'in here'
+
+    !   if (trim(string_val) .ne. 'user') then
+    !      call set_scalar_ic(s, &
+    !           neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
+    !           string_val, &
+    !           neko_case%params)
+    !   else
+    !      call set_scalar_ic(s, &
+    !           neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
+    !           neko_case%usr%scalar_user_ic, &
+    !           neko_case%params)
+    !   end if
+    !end if
 
   end subroutine reset
 

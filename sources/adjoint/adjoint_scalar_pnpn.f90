@@ -375,16 +375,6 @@ contains
       ! Apply Neumann boundary conditions
       call bc_list_apply_scalar(this%bclst_neumann, this%f_Xh%x, dm_Xh%size())
 
-      if (oifs) then
-         ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_adjoint_scalar(u, v, w, s, this%advs, &
-                                   Xh, this%c_Xh, dm_Xh%size())
-
-         call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-                                     ext_bdf%advection_coeffs, n)
-
-         call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
-      else
          ! Add the advection operators to the right-hans-side.
          ! HARRY
          ! see, even this line is exactly the same because we have the same 
@@ -405,7 +395,6 @@ contains
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_scalar(slag, f_Xh%x, s, c_Xh%B, rho, dt, &
               ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
-      end if
 
       call slag%update()
 
@@ -426,7 +415,9 @@ contains
       call res%compute(Ax, s,  s_res, f_Xh, c_Xh, msh, Xh, lambda_field, &
            rho*cp, ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
 
+
       call gs_Xh%op(s_res, GS_OP_ADD)
+
 
       ! Apply a 0-valued Dirichlet boundary conditions on the ds.
       call bc_list_apply_scalar(this%bclst_ds, s_res%x, dm_Xh%size())

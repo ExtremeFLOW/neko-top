@@ -234,9 +234,9 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call this%objective_function%init(design, this%C%fluid, this%adj%scheme)
+    call this%objective_function%init(design, this%C, this%adj)
     ! volume constraint
-    call this%volume_constraint%init(design, this%C%fluid, this%adj%scheme)
+    call this%volume_constraint%init(design, this%C, this%adj)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -309,8 +309,8 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%compute(this%design, this%C%fluid)
-    call this%volume_constraint%compute(this%design, this%C%fluid)
+    call this%objective_function%compute(this%design, this%C)
+    call this%volume_constraint%compute(this%design, this%C)
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
@@ -353,9 +353,9 @@ contains
     ! objectives%compute_sensitivity()
     ! and it would cycled through the list.
     call this%objective_function%compute_sensitivity(&
-         this%design, this%C%fluid, this%adj%scheme)
+         this%design, this%C, this%adj)
     call this%volume_constraint%compute_sensitivity(&
-         this%design, this%C%fluid, this%adj%scheme)
+         this%design, this%C, this%adj)
     ! it would be nice to visualize this
 
     ! do the adjoint mapping

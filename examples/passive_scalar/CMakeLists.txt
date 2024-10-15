@@ -3,6 +3,7 @@ set(DRIVER_TYPE "custom")
 set(DRIVER_SOURCE driver.f90)
 set(EXTRA_SOURCES 
     adjoint_mixing_scalar_source_term.f90 
+    scalar_mixing_objective_function.f90
     user.f90 
     ../rugby_ball/simulation_adjoint.f90
     ../rugby_ball/source_terms/simple_brinkman_source_term.f90

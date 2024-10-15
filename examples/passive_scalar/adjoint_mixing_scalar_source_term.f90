@@ -44,7 +44,8 @@ module adjoint_mixing_scalar_source_term
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
-  use field_math, only: field_addcol3, field_add2, field_cadd
+  use field_math, only: field_addcol3, field_add2, field_cadd, field_col2, &
+  field_add2s2, field_copy
   use operators, only: opgrad
   implicit none
   private
@@ -64,6 +65,8 @@ module adjoint_mixing_scalar_source_term
   adjoint_mixing_scalar_source_term_t
      !> here we have s (coming from the primal)
      type(field_t), pointer :: s
+     !> A scalaing factor
+     real(kind=rp) :: obj_scale
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -97,7 +100,7 @@ contains
 
 
   subroutine adjoint_mixing_scalar_source_term_init_from_components(this,&
-       f_s, s, coef)
+       f_s, s, obj_scale, coef)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
     type(field_list_t) :: fields
@@ -126,6 +129,9 @@ contains
 
     ! point everything in the correct places
     this%s => s
+    this%obj_scale = obj_scale
+
+    print *, "source term initialized"
 
 
     ! TODO
@@ -161,11 +167,11 @@ contains
     ! TODO
     ! Masks
 
-    call field_add2(fs,this%s)
+    call field_add2s2(fs,this%s, this%obj_scale)
 
     ! TODO
     ! I'm just subtracting 0.5, but it should be the average
-    call field_cadd(fs, -0.5_rp)
+    call field_cadd(fs, -0.5_rp*this%obj_scale)
     
   end subroutine adjoint_mixing_scalar_source_term_compute
 

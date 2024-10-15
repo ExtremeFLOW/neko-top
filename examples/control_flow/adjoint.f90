@@ -87,6 +87,7 @@ module simcomp_example
   use jobctrl, only : jobctrl_set_time_limit
   use user_intf, only : user_t
   use scalar_pnpn, only : scalar_pnpn_t
+  use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use json_module, only : json_file, json_core, json_value
   use json_utils, only : json_get, json_get_or_default
   use scratch_registry, only : scratch_registry_t, neko_scratch_registry
@@ -99,6 +100,7 @@ module simcomp_example
   type, public, extends(simulation_component_t) :: adjoint_t
 
      class(adjoint_scheme_t), allocatable :: scheme
+     type(adjoint_scalar_pnpn_t), allocatable :: scalar
 
      ! Fields
      type(field_t) :: u_old, v_old, w_old, p_old, s_old
@@ -153,7 +155,7 @@ contains
     ! Check if the scalar field is allocated
     if (allocated(case%scalar)) then
        this%have_scalar = .true.
-       this%s_old = case%scalar%s
+       this%s_old = this%scalar%s_adj
        call field_cfill(this%s_old, 0.0_rp)
     end if
 
@@ -373,7 +375,7 @@ contains
     !
     call this%s%init(C%end_time)
     if (scalar) then
-       this%f_out = adjoint_output_t(precision, this%scheme, C%scalar, &
+       this%f_out = adjoint_output_t(precision, this%scheme, this%scalar, &
             path = trim(output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &

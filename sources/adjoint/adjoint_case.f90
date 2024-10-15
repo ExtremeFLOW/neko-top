@@ -298,21 +298,21 @@ contains
     ! What we really need is a robust way to set BCs based on objective 
     ! functions, because that's when we're going to get weird unique BCs for
     ! the adjoint.
-    ! !
-    ! !Setup user defined conditions
-    ! !
-    ! if (neko_case%params%valid_path('case.fluid.inflow_condition')) then
-    !    call json_get(neko_case%params, 'case.fluid.inflow_condition.type', &
-    !         string_val)
-    !    if (trim(string_val) .eq. 'user') then
-    !       call neko_case%fluid%set_usr_inflow(neko_case%usr%fluid_user_if)
-    !    end if
-    ! end if
+    !
+    !Setup user defined conditions
+    !
+    if (neko_case%params%valid_path('case.fluid.inflow_condition')) then
+       call json_get(neko_case%params, 'case.fluid.inflow_condition.type', &
+            string_val)
+       if (trim(string_val) .eq. 'user') then
+          call this%scheme%set_usr_inflow(neko_case%usr%fluid_user_if)
+       end if
+    end if
 
     ! Setup user boundary conditions for the scalar.
-    ! if (scalar) then
-    !    call neko_case%scalar%set_user_bc(neko_case%usr%scalar_user_bc)
-    ! end if
+    if (scalar) then
+       call this%scalar%set_user_bc(neko_case%usr%scalar_user_bc)
+    end if
 
     !
     ! Setup initial conditions
@@ -396,7 +396,7 @@ contains
     !
     call this%s%init(neko_case%end_time)
     if (scalar) then
-       this%f_out = adjoint_output_t(precision, this%scheme, neko_case%scalar, &
+       this%f_out = adjoint_output_t(precision, this%scheme, this%scalar, &
             path = trim(output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &

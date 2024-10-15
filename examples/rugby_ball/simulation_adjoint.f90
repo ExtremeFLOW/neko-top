@@ -129,10 +129,10 @@ contains
        this%case%tlag, this%case%dtlag, tstep_adj)
 
        ! For the adjoint we do the scalar step first
-       if (allocated(this%case%scalar)) then
+       if (allocated(this%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          call this%scalar%step(t_adj, tstep_adj, this%case%dt, &
           this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &

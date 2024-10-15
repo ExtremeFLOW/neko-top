@@ -101,4 +101,5 @@ parabolic profiles, is there a periodic or symetric directions?
 - We need to look into non-dimensionalization etc more carefully, 
 to make sure everything is consistent with the standard passive scalar. 
   (I think it is... but I would like to double check)
+- boundary conditions (especially user) are not handled well for the adjoint!
 

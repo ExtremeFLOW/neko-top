@@ -67,6 +67,8 @@ module volume_constraint
   use math, only : glsc2
   use field_math, only: field_rone, field_cmult
   use topopt_design, only: topopt_design_t
+  use case, only: case_t
+  use adjoint_case, only: adjoint_case_t
   implicit none
   private
 
@@ -101,12 +103,12 @@ module volume_constraint
 contains
   !> The common constructor using a JSON object.
   !! @param design the design
-  !! @param fluid the fluid scheme
-  !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_init(this, design, fluid, adjoint)
+  !! @param primal the forward case
+  !! @param adjoint the adjoint case
+  subroutine volume_constraint_init(this, design, primal, adjoint)
     class(volume_constraint_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(inout) :: fluid
-    class(adjoint_scheme_t), intent(inout) :: adjoint
+    class(case_t), intent(inout) :: primal
+    class(adjoint_case_t), intent(inout) :: adjoint
     type(topopt_design_t), intent(inout) :: design
 
     ! TODO
@@ -131,7 +133,7 @@ contains
     this%min_max = .false.
     this%v_max = 0.2
 
-    call this%init_base(fluid%dm_Xh)
+    call this%init_base(primal%fluid%dm_Xh)
 
   end subroutine volume_constraint_init
 
@@ -145,10 +147,10 @@ contains
 
   !> The computation of the constraint.
   !! @param design the design
-  !! @param fluid the fluid scheme
-  subroutine volume_constraint_compute(this, design, fluid)
+  !! @param primal the forward case
+  subroutine volume_constraint_compute(this, design, primal)
     class(volume_constraint_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(in) :: fluid
+    class(case_t), intent(in) :: primal
     type(topopt_design_t), intent(inout) :: design
     integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
@@ -161,7 +163,7 @@ contains
     ! TODO
     ! in the future we should be using the mapped design varaible
     !corresponding to this constraint!!!
-    this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n)
+    this%volume = glsc2(design%design_indicator%x, primal%fluid%c_xh%B, n)
 
     ! NOTE
     ! TODO
@@ -171,7 +173,7 @@ contains
     ! point is, a design should have an internal parameter of the volume of
     ! the design domain,
     ! and we should us THAT volume for computing the volume percentage
-    this%volume = this%volume/fluid%c_xh%volume
+    this%volume = this%volume/primal%fluid%c_xh%volume
 
     ! then we need to check min or max
     if(this%min_max) then
@@ -191,24 +193,24 @@ contains
 
   !> The computation of the sensitivity.
   !! @param design the design
-  !! @param fluid the fluid scheme
-  !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_compute_sensitivity(this, design, fluid, adjoint)
+  !! @param primal the foward case
+  !! @param adjoint the adjoint case
+  subroutine volume_constraint_compute_sensitivity(this, design, primal, adjoint)
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
-    class(fluid_scheme_t), intent(in) :: fluid
-    class(adjoint_scheme_t), intent(in) :: adjoint
+    class(case_t), intent(in) :: primal
+    class(adjoint_case_t), intent(in) :: adjoint
 
     call field_rone(this%sensitivity_to_coefficient)
 
     if(this%min_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       1.0_rp/fluid%c_xh%volume)
+       1.0_rp/primal%fluid%c_xh%volume)
     else
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       -1.0_rp/fluid%c_xh%volume)
+       -1.0_rp/primal%fluid%c_xh%volume)
     endif
 
   end subroutine volume_constraint_compute_sensitivity

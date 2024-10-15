@@ -28,6 +28,8 @@ program usrneko
   use math, only: copy, cmult
   use adjoint_mixing_scalar_source_term, only: &
   adjoint_mixing_scalar_source_term_t
+  use scalar_mixing_objective_function, only: &
+  scalar_mixing_objective_function_t
 
 
   !> a problem type
@@ -40,7 +42,7 @@ program usrneko
   ! these are some things needed for MMA/ work arrays (all these will become
   ! redundant when we do this properly)
   type(field_t), pointer :: wo1, wo2, wo3
-  integer :: temp_indices(3)
+  integer :: temp_indices(2)
   integer :: n, optimization_iteration
   real(kind=rp), dimension(1) :: fval
   real(kind=rp), allocatable :: x_switch(:)
@@ -52,8 +54,8 @@ program usrneko
   type(adjoint_case_t) :: adj
   ! the brinkman source terms
   type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
-  ! A term for the objective function
-  type(adjoint_mixing_scalar_source_term_t) :: obj_source
+  ! the objective function
+  type(scalar_mixing_objective_function_t) :: objective
 
 
   ! init the problem (base)
@@ -99,21 +101,124 @@ program usrneko
 
 
     ! NOW here is where we would initialize our new objective functions!
-    call obj_source%init_from_components( & 
-         adj%scalar%f_Xh, & 
-         C%scalar%s, &
-         adj%scheme%c_Xh)
-    ! append brinkman source term based on design
-    call adj%scalar%source_term%add(obj_source)
+    print *, "about to append the objective"
+    call objective%init(design, C, adj)
+    print *, "done"
+
+    print *, "check apended one", allocated(adj%scalar%source_term%source_terms), &   
+    size(adj%scalar%source_term%source_terms)
+
+  ! here we hard code MMA
+  ! Then we need to tell MMA how many constraints we need etc
+  ! work arrays for xmin and xmax
+  call neko_scratch_registry%request_field(wo1, temp_indices(1))
+  call neko_scratch_registry%request_field(wo2, temp_indices(2))
+  call field_rzero(wo1)
+  call field_rone (wo2)
+  ! obviously do this properly in the future...
+  n = design%design_indicator%size()
+  call optimizer%init_json(design%design_indicator%x, n, &
+       0, 0.0_rp, (/0.0_rp/), (/100.0_rp/), (/0.0_rp/), wo1%x, wo2%x, C%params)
+  !m, a0         a_i          c_i           d_i
+  ! -------------------------------------------------------------------!
+  !      Internal parameters for MMA                                   !
+  !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
+  !    subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m             !
+  !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
+  !                z >= 0,   y_i >= 0,         i = 1,...,m             !
+  ! -------------------------------------------------------------------!
+
+  call neko_scratch_registry%relinquish_field(temp_indices)
 
 
+
+  optimization_iteration = 1
+  do while (optimization_iteration .lt. 100)
 
 !     call problem%compute()
 !!------------------------------------------------------------------------------
+    print *, "check apended two", allocated(adj%scalar%source_term%source_terms), &   
+    size(adj%scalar%source_term%source_terms)
       call neko_solve(C)
+      call objective%compute(design,C)
+      print *,'OBJECTIVE', objective%objective_function_value
+    print *, "check apended three", allocated(adj%scalar%source_term%source_terms), &   
+    size(adj%scalar%source_term%source_terms)
 
 !     call problem%compute_sensitivity()
 !!------------------------------------------------------------------------------
 		call solve_adjoint(adj)
+
+    call objective%compute_sensitivity(&
+         design, C, adj)
+
+    ! do the adjoint mapping
+    call design%map_backward(&
+         objective%sensitivity_to_coefficient)
+     fval(1) = problem%volume_constraint%objective_function_value
+
+     call design%sample(real(optimization_iteration,kind=rp))
+
+     associate(x => design%design_indicator%x, &
+          df0dx=>design%sensitivity%x, &
+          dfdx => design%sensitivity%x)
+       ! TODO
+       ! this is a really dumb way of handling the reshaping..
+       if( .not. allocated(x_switch)) then
+       allocate(x_switch(optimizer%get_n()))
+       end if
+
+       x_switch = reshape(x,[optimizer%get_n()])
+
+       call cmult(dfdx,100.0_rp,n)
+       fval(1) = fval(1)*100.0_rp
+       ! (and also prints out some norms to make the trial and error and
+       ! bit easier)
+
+       call optimizer%mma_update_cpu( &
+            optimization_iteration, &
+            x_switch, &
+            reshape(df0dx,[optimizer%get_n()]), &
+            fval, &
+            reshape(dfdx,[optimizer%get_m(), optimizer%get_n()]))
+
+		 call copy(x,x_switch,optimizer%get_n())
+
+       ! TODO
+       ! do a KKT check and do a propper convergence check..
+       call optimizer%kkt(x, df0dx, fval, dfdx)
+
+       ! TODO
+       ! on the MMA side, we need residunorm public
+       print *, 'KKT', optimizer%get_residunorm()
+
+     end associate
+
+     ! TODO
+     ! instead of writing the objective function etc to the log file,
+     ! we should come up with our own "optimization log" file, that writes out
+     ! iterations, KKT, objective function values etc
+
+     optimization_iteration = optimization_iteration + 1
+     call design%map_forward()
+
+     call reset(C)
+     ! TODO
+     ! reset for the adjoint
+     call field_rzero(adj%scheme%u_adj)
+     call field_rzero(adj%scheme%v_adj)
+     call field_rzero(adj%scheme%w_adj)
+
+     ! don't forget to unfreeze the fluid!
+     C%fluid%freeze = .false.
+
+
+
+  end do
+
+
+  deallocate(x_switch)
+  call design%free()
+  call optimizer%free()
 
 end program usrneko
