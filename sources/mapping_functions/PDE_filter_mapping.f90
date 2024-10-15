@@ -236,11 +236,11 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-    	 ! TODO
-    	 ! I think this is correct but I've never tested it
+       ! TODO
+       ! I think this is correct but I've never tested it
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
-       call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d,  n)
+       call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
@@ -248,7 +248,7 @@ contains
           ! ax_helm includes the mass matrix in h2
           this%coef%h2(i,1,1,1) = 1.0_rp
           ! mass matrix should be included here
-       RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
+          RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
        end do
     end if
     this%coef%ifh2 = .true.
@@ -325,8 +325,13 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
+<<<<<<< HEAD
     	 ! TODO
     	 ! I think this is correct but I've never tested it
+=======
+       ! TODO
+       ! I think this is correct but I've never tested it
+>>>>>>> origin/feature/PDE_filters
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
        call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)

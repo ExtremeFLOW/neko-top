@@ -44,7 +44,7 @@ module mapping
   !> Base abstract class for mapping.
   type, abstract, public :: mapping_t
   	  !> Coefficients for the SEM.
-     type(coef_t), pointer :: coef => null() 
+     type(coef_t), pointer :: coef => null()
  
    contains
      !> Constructor for the mapping_t class.
@@ -92,24 +92,24 @@ module mapping
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
        type(field_t), intent(in) ::  X_in
-    	 type(field_t), intent(inout) ::  X_out
+       type(field_t), intent(inout) ::  X_out
      end subroutine mapping_apply
   end interface
 
   abstract interface
      !> The application of the mapping backward with chain rule).
-     !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto 
+     !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
      !! \frac{\partial F}{\partial \rho}$
      !! @param X_in The original input field ($\rho$)
-     !! @param dF_dX_out, sensitivity wrt to the mapped field 
+     !! @param dF_dX_out, sensitivity wrt to the mapped field
      !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
-     !! @param dF_dX_in, sensitivity wrt to the unmapped field 
+     !! @param dF_dX_in, sensitivity wrt to the unmapped field
      !! ($\frac{\partial F}{\partial \rho}$)
      subroutine mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
        type(field_t), intent(in) ::  dF_dX_out
-    	 type(field_t), intent(in) ::  X_in
+       type(field_t), intent(in) ::  X_in
        type(field_t), intent(inout) ::  dF_dX_in
      end subroutine mapping_apply_backward
   end interface

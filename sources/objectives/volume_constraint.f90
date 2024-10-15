@@ -58,8 +58,6 @@ module volume_constraint
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, &
-       only : adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -174,13 +172,13 @@ contains
     this%volume = this%volume/fluid%c_xh%volume
 
     ! then we need to check min or max
-    if(this%is_max) then
+    if (this%is_max) then
        ! max volume
        this%objective_function_value = this%volume - this%v_max
     else
        ! min volume
        this%objective_function_value = -this%volume + this%v_max
-    endif
+    end if
 
 
     ! TODo
@@ -201,15 +199,15 @@ contains
 
     call field_rone(this%sensitivity_to_coefficient)
 
-    if(this%is_max) then
+    if (this%is_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       1.0_rp/fluid%c_xh%volume)
+            1.0_rp / fluid%c_xh%volume)
     else
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       -1.0_rp/fluid%c_xh%volume)
-    endif
+            -1.0_rp / fluid%c_xh%volume)
+    end if
 
   end subroutine volume_constraint_compute_sensitivity
 

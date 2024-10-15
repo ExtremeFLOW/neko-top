@@ -167,10 +167,10 @@ contains
 
     if (this%convex_up .eqv. .true.) then
        call convex_up_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-       this%q, dF_dX_in, dF_dX_out, X_in)
+            this%q, dF_dX_in, dF_dX_out, X_in)
     else
        call convex_down_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-       this%q, dF_dX_in, dF_dX_out, X_in)
+            this%q, dF_dX_in, dF_dX_out, X_in)
     end if
 
     ! TODO
