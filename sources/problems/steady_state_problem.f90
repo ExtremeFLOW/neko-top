@@ -111,6 +111,9 @@ module steady_state_problem
      ! - sensitivity (dF/d\rho and dC/d\rho)
      type(fld_file_output_t) :: output
 
+     !> a steady simulation component to append to the forward
+     type(steady_simcomp_t) :: steady_comp
+
    contains
      !> The common constructor using a JSON object.
      ! TODO
@@ -138,15 +141,13 @@ contains
   !> The constructor for the base problem.
   subroutine steady_state_problem_init_base(this)
     class(steady_state_problem_t), intent(inout) :: this
+    type(json_file) :: simcomp_settings
 
-    call user_setup(this%C%usr)
-    ! TODO
-    ! TIIIIIMMMM!
-    ! I couldn't compile this without the `user.f90` defined inside the example
-    ! folder,
-    ! So I've just appended the user setup to the bottom of this.
-    ! I'm worried I've now broken some user defined functions !
-    ! make sure user_setup is called elsewhere
+    ! append a steady state simcomp
+    this%C%usr%init_user_simcomp => steady_state_simcomp
+    ! call user_setup(this%C%usr)
+
+
     ! initialize the primal
     call neko_init(this%C)
     ! initialize the adjoint
@@ -390,16 +391,7 @@ contains
 
   end subroutine steady_state_problem_sample
 
-  ! Register user-defined functions (see user_intf.f90)
-  ! TODO
-  ! Tim I just yanked this out of the user.f90 because otherwise it couldn't
-  ! compile.
-  subroutine user_setup(user)
-    type(user_t), intent(inout) :: user
-    user%init_user_simcomp => user_simcomp
-  end subroutine user_setup
-
-  subroutine user_simcomp(params)
+  subroutine steady_state_simcomp(params)
     type(json_file), intent(inout) :: params
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
@@ -410,5 +402,5 @@ contains
 
     call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
 
-  end subroutine user_simcomp
+  end subroutine steady_state_simcomp
 end module steady_state_problem
