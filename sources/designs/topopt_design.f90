@@ -139,9 +139,9 @@ module topopt_design
      ! \rho -> C
      ! \rho -> \kappa
      !
-     ! Then during the forward/adjoint looping there will be an additional 
-     ! object, the "objective_function" object that will be responsible for 
-     ! computing the sensitivity of the objective function with respect to the 
+     ! Then during the forward/adjoint looping there will be an additional
+     ! object, the "objective_function" object that will be responsible for
+     ! computing the sensitivity of the objective function with respect to the
      ! coefficients
      ! ie,
      ! dF/d\chi, dF/dC and dF/d\kappa
@@ -165,7 +165,7 @@ module topopt_design
      ! Implying we also want dC1/d\rho, dC2/d\rho etc
      ! So this "sensitivity" should also be a list...
      !
-     ! So I bet you'll have a nice abstract way of constructing this in the 
+     ! So I bet you'll have a nice abstract way of constructing this in the
      ! future but I think a sort of list-of-lists would be nice.
      !
      ! For F:
@@ -262,10 +262,10 @@ contains
     do i = 1, n
        if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
             (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2).lt.0.25_rp) then
+            - 0.5_rp)**2) .lt. 0.25_rp) then
           this%design_indicator%x(i,1,1,1) = 1.0_rp
-       endif
-    enddo
+       end if
+    end do
 
     ! TODO
     ! we would also need to make a mapping type that reads in
@@ -288,7 +288,7 @@ contains
     ! TODO
     ! obviously when we do the mappings properly, to many coeficients,
     ! we'll also have to modify this
-    call this%output%init(sp,'design',3)
+    call this%output%init(sp, 'design', 3)
     call this%output%fields%assign(1, this%design_indicator)
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)

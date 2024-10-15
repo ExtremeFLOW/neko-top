@@ -34,7 +34,6 @@
 !> A RAMP mapping of coefficients
 module RAMP_mapping
   use num_types, only : rp
-  use field_math
   use mapping, only: mapping_t
   use num_types, only : rp
   use json_module, only : json_file
@@ -44,31 +43,31 @@ module RAMP_mapping
   implicit none
   private
 
-  !> A RAMP mapping of coefficients 
+  !> A RAMP mapping of coefficients
   !! This is the standard RAMP described in
   !! https://doi.org/10.1007/s001580100129
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$ 
+  !! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$
   !!
   !!
   !!  |        .
-  !!  |        . 
+  !!  |        .
   !!  |       .
-  !!  |     .. 
+  !!  |     ..
   !!  |  ...
   !!  |_________
   !!
   !! or a convex up equivelent used by Borrvall & Peterson
   !! https://doi.org/10.1002/fld.1964
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$ 
+  !! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$
   !!
   !! It seems very similar to RAMP but with the convexity the other way
   !!
   !!  |       ...
-  !!  |    .. 
+  !!  |    ..
   !!  |  .
-  !!  | . 
+  !!  | .
   !!  |.
   !!  |_________
   
@@ -142,7 +141,7 @@ contains
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
 
-    if(this%convex_up .eqv. .true.) then
+    if (this%convex_up .eqv. .true.) then
        call convex_up_RAMP_mapping_apply(this%f_min, this%f_max, &
        this%q, X_out, X_in)
     else
@@ -166,7 +165,7 @@ contains
     type(field_t), intent(in) ::  dF_dX_out
     type(field_t), intent(inout) ::  dF_dX_in
 
-    if(this%convex_up .eqv. .true.) then
+    if (this%convex_up .eqv. .true.) then
        call convex_up_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
        this%q, dF_dX_in, dF_dX_out, X_in)
     else
@@ -188,13 +187,13 @@ contains
     type(field_t), intent(inout) ::  X_out
     integer :: n, i
 
-    ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) ) 
+    ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) )
     
     n = X_in%dof%size()
     do i = 1, n
        X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
        X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
-    enddo
+    end do
 
   end subroutine convex_down_RAMP_mapping_apply
 
@@ -211,16 +210,16 @@ contains
     type(field_t), intent(inout) ::  dF_dX_in
     integer :: n, i
 
-    ! df/dx_in = df/dx_out * dx_out/dx_in 
+    ! df/dx_in = df/dx_out * dx_out/dx_in
     
-    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2 
+    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2
     
     n = X_in%dof%size()
     do i = 1, n
        dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
        ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
        dF_dX_out%x(i,1,1,1)
-    enddo
+    end do
 
   end subroutine convex_down_RAMP_mapping_apply_backward
 
@@ -233,12 +232,12 @@ contains
     type(field_t), intent(inout) ::  X_out
     integer :: n, i
 
-    ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q) 
+    ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q)
     n = X_in%dof%size()
     do i = 1, n
        X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
        X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q) 
-    enddo
+    end do
     
 
   end subroutine convex_up_RAMP_mapping_apply
@@ -256,16 +255,16 @@ contains
     type(field_t), intent(inout) ::  dF_dX_in
     integer :: n, i
 
-    ! df/dx_in = df/dx_out * dx_out/dx_in 
+    ! df/dx_in = df/dx_out * dx_out/dx_in
     
-    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2 
+    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (q + x)**2
 
     n = X_in%dof%size()
     do i = 1, n
        dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
        ( (X_in%x(i,1,1,1) + q)**2) * &
        dF_dX_out%x(i,1,1,1)
-    enddo
+    end do
 
   end subroutine convex_up_RAMP_mapping_apply_backward
 end module RAMP_mapping

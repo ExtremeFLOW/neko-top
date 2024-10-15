@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !
-!> A PDE based filter 
+!> A PDE based filter
 module PDE_filter
   use num_types, only : rp
   use json_module, only : json_file
@@ -43,13 +43,13 @@ module PDE_filter
   use krylov, only : ksp_t, ksp_monitor_t, krylov_solver_factory, &
   krylov_solver_destroy
   use precon, only : pc_t, precon_factory, precon_destroy
-  use bc
+  use bc, only: bc_list_add, bc_list_t, bc_list_apply_scalar, bc_list_init, &
+  bc_list_free
   use neumann, only : neumann_t
   use profiler, only : profiler_start_region, profiler_end_region
   use gather_scatter, only : gs_t, GS_OP_ADD
   use pnpn_residual, only: pnpn_prs_res_t
   use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use fld_file_output
   use field_registry, only : neko_field_registry
   use logger, only : neko_log, LOG_SIZE
   use mapping, only: mapping_t
@@ -61,7 +61,6 @@ module PDE_filter
   use gather_scatter, only : gs_t, GS_OP_ADD
   use pnpn_residual, only: pnpn_prs_res_t
   use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use fld_file_output
   use field_registry, only : neko_field_registry
   use logger, only : neko_log, LOG_SIZE
   use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
@@ -75,10 +74,10 @@ module PDE_filter
   implicit none
   private
 
-  !> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$, 
-  !! see Lazarov & O. Sigmund 2010,       
-  !! by solving an equation 
-  !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$ 
+  !> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$,
+  !! see Lazarov & O. Sigmund 2010,
+  !! by solving an equation
+  !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
   type, public, extends(mapping_t) :: PDE_filter_t
     !> Ax
      class(ax_t), allocatable :: Ax
@@ -98,7 +97,7 @@ module PDE_filter
     real(kind=rp)  :: r
     !> tolerance for PDE filter
     real(kind=rp) :: abstol_filt
-    !> max iterations for PDE filter 
+    !> max iterations for PDE filter
     integer :: ksp_max_iter
     !> method for solving PDE
     character(len=:), allocatable :: ksp_solver
@@ -125,8 +124,8 @@ module PDE_filter
      ! it's filtering the sensitivity
 
      ! UPDATE:
-     ! After an email with this, we should be using the chain rule, 
-     ! not a sensitivity filter 
+     ! After an email with Niels, we should be using the chain rule,
+     ! not a sensitivity filter
      procedure, pass(this) :: apply_backward => PDE_filter_apply_backward
   end type PDE_filter_t
 
@@ -143,7 +142,7 @@ contains
 
     ! TODO
     ! I'll do the json stuff later...
-    this%r = 0.01 
+    this%r = 0.01
     this%abstol_filt = 0.0000000001_rp
     this%ksp_max_iter = 200
     this%ksp_solver = "gmres"
@@ -175,7 +174,7 @@ contains
     call bc_list_init(this%bclst_filt)
 
     ! Mark ALL the BCs as Neumann, regardless of what's prescribed
-	 bc_labels_all_neuman = 'o'
+    bc_labels_all_neuman = 'o'
     call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
                         'o', bc_labels_all_neuman)
 
@@ -227,7 +226,7 @@ contains
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
     integer :: n, i
-    type(field_t), pointer ::  RHS 
+    type(field_t), pointer ::  RHS
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(1)
@@ -239,9 +238,9 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
     	 ! TODO
     	 ! I think this is correct but I've never tested it
-    	 call device_cfill(this%coef%h1_d, this%r**2, n)
-    	 call device_cfill(this%coef%h2_d, 1.0_rp, n)
-    	 call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d,  n)
+       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h2_d, 1.0_rp, n)
+       call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d,  n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
@@ -328,9 +327,9 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
     	 ! TODO
     	 ! I think this is correct but I've never tested it
-    	 call device_cfill(this%coef%h1_d, this%r**2, n)
-    	 call device_cfill(this%coef%h2_d, 1.0_rp, n)
-    	 call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)
+       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h2_d, 1.0_rp, n)
+       call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
@@ -390,14 +389,14 @@ contains
 
     call precon_factory(pc, pctype)
 
-    select type(pcp => pc)
-    type is(jacobi_t)
+    select type (pcp => pc)
+    type is (jacobi_t)
        call pcp%init(coef, dof, gs)
     type is (sx_jacobi_t)
        call pcp%init(coef, dof, gs)
     type is (device_jacobi_t)
        call pcp%init(coef, dof, gs)
-    type is(hsmg_t)
+    type is (hsmg_t)
        if (len_trim(pctype) .gt. 4) then
           if (index(pctype, '+') .eq. 5) then
              call pcp%init(dof%msh, dof%Xh, coef, dof, gs, &
