@@ -249,7 +249,7 @@ contains
           ! ax_helm includes the mass matrix in h2
           this%coef%h2(i,1,1,1) = 1.0_rp
           ! mass matrix should be included here
-       RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
+          RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
        end do
     end if
     this%coef%ifh2 = .true.
