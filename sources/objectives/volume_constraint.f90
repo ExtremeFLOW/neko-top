@@ -174,7 +174,7 @@ contains
     this%volume = this%volume/fluid%c_xh%volume
 
     ! then we need to check min or max
-    if(this%is_max) then
+    if (this%is_max) then
        ! max volume
        this%objective_function_value = this%volume - this%v_max
     else
