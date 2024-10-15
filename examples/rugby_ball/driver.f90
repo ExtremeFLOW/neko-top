@@ -73,7 +73,7 @@ program usrneko
   n = design%design_indicator%size()
   call optimizer%init_json(design%design_indicator%x, n, &
   !    m, a0         a_i          c_i           d_i
-       1, 0.0_rp, (/0.0_rp/), (/100.0_rp/), (/0.0_rp/), wo1%x, wo2%x, &
+       1, 0.0_rp, [0.0_rp], [100.0_rp], [0.0_rp], wo1%x, wo2%x, &
        problem%C%params)
   ! -------------------------------------------------------------------!
   !      Internal parameters for MMA                                   !
