@@ -67,7 +67,6 @@ module steady_state_problem
   use problem, only: problem_t
   use neko, only: neko_init, neko_solve, neko_finalize
   use case, only: case_t
-  use user, only: user_setup
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
   use source_term, only: source_term_t
@@ -85,6 +84,7 @@ module steady_state_problem
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
   use topopt_design, only: topopt_design_t
+  use user_intf, only : user_t
   implicit none
   private
 
@@ -144,6 +144,13 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
 
     call user_setup(this%C%usr)
+    ! TODO
+    ! TIIIIIMMMM!
+    ! I couldn't compile this without the `user.f90` defined inside the example
+    ! folder,
+    ! So I've just appended the user setup to the bottom of this.
+    ! I'm worried I've now broken some user defined functions !
+    ! make sure user_setup is called elsewhere
     ! initialize the primal
     call neko_init(this%C)
     ! initialize the adjoint
@@ -386,4 +393,26 @@ contains
     call this%output%sample(t)
 
   end subroutine steady_state_problem_sample
+
+  ! Register user-defined functions (see user_intf.f90)
+  ! TODO
+  ! Tim I just yanked this out of the user.f90 because otherwise it couldn't
+  ! compile.
+  subroutine user_setup(user)
+    type(user_t), intent(inout) :: user
+    user%init_user_simcomp => user_simcomp
+  end subroutine user_setup
+
+  subroutine user_simcomp(params)
+    type(json_file), intent(inout) :: params
+    type(steady_simcomp_t), allocatable :: steady_comp
+    type(json_file) :: simcomp_settings
+
+    ! Allocate a simulation component
+    allocate(steady_comp)
+    simcomp_settings = simulation_component_user_settings("steady", params)
+
+    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
+
+  end subroutine user_simcomp
 end module steady_state_problem
