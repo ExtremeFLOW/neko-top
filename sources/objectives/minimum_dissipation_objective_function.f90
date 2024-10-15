@@ -85,8 +85,8 @@ module minimum_dissipation_objective_function
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, &
-       only : adjoint_minimum_dissipation_source_term_t
+  use adjoint_minimum_dissipation_source_term, only: &
+  adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -143,7 +143,7 @@ contains
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
-    this%if_lube= .true.
+    this%if_lube = .true.
     this%K = 1.0_rp
     this%obj_scale = 1.0_rp
     !this%obj_scale = 0.00000001_rp
@@ -163,7 +163,7 @@ contains
 
 
     ! if we have the lube term we need to initialize and append that too
-    if(this%if_lube) then
+    if (this%if_lube) then
        ! TODO
        ! make this allocatable and only allocate it if needed!
        ! or is that allready what's happening? Tim, y/n?
@@ -174,7 +174,7 @@ contains
             adjoint%c_Xh)
        ! append adjoint forcing term based on objective function
        call adjoint%source_term%add_source_term(lube_term)
-    endif
+    end if
 
   end subroutine minimum_dissipation_objective_function_init
 
@@ -212,39 +212,39 @@ contains
     ! we should be using masks etc
 
     call grad(wo1%x, wo2%x, wo3%x, fluid%u%x, fluid%C_Xh)
-    call field_col3(objective_field,wo1,wo1)
-    call field_addcol3(objective_field,wo2,wo2)
-    call field_addcol3(objective_field,wo3,wo3)
+    call field_col3(objective_field, wo1, wo1)
+    call field_addcol3(objective_field, wo2, wo2)
+    call field_addcol3(objective_field, wo3, wo3)
 
     call grad(wo1%x, wo2%x, wo3%x, fluid%v%x, fluid%C_Xh)
-    call field_addcol3(objective_field,wo1,wo1)
-    call field_addcol3(objective_field,wo2,wo2)
-    call field_addcol3(objective_field,wo3,wo3)
+    call field_addcol3(objective_field, wo1, wo1)
+    call field_addcol3(objective_field, wo2, wo2)
+    call field_addcol3(objective_field, wo3, wo3)
 
     call grad(wo1%x, wo2%x, wo3%x, fluid%w%x, fluid%C_Xh)
-    call field_addcol3(objective_field,wo1,wo1)
-    call field_addcol3(objective_field,wo2,wo2)
-    call field_addcol3(objective_field,wo3,wo3)
+    call field_addcol3(objective_field, wo1, wo1)
+    call field_addcol3(objective_field, wo2, wo2)
+    call field_addcol3(objective_field, wo3, wo3)
 
     ! integrate the field
     n = wo1%size()
-    this%dissipation = glsc2(objective_field%x,fluid%C_Xh%b, n)
+    this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
 
-    if(this%if_lube) then
+    if (this%if_lube) then
        ! it's becoming so stupid to pass the whole fluid and adjoint and
        ! design through
        ! I feel like every objective function should have internal pointers to
        ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
        ! (the whole design, so we get all the coeffients)
-       call field_col3(objective_field,fluid%u, design%brinkman_amplitude)
-       call field_addcol3(objective_field,fluid%v, design%brinkman_amplitude)
-       call field_addcol3(objective_field,fluid%w, design%brinkman_amplitude)
-       this%lube_value = glsc2(objective_field%x,fluid%C_Xh%b, n)
+       call field_col3(objective_field, fluid%u, design%brinkman_amplitude)
+       call field_addcol3(objective_field, fluid%v, design%brinkman_amplitude)
+       call field_addcol3(objective_field, fluid%w, design%brinkman_amplitude)
+       this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value
     else
        this%objective_function_value = this%dissipation
-    endif
+    end if
 
     ! scale everything
     this%objective_function_value = this%objective_function_value*this%obj_scale
@@ -284,16 +284,17 @@ contains
     ! I bet this is scaled a smidge wrong (ie, track if it's 1/2 or not etc)
     ! do this later
 
-    if(this%if_lube) then
-       call neko_scratch_registry%request_field(lube_contribution, temp_indices(1))
-       call field_col3(lube_contribution,fluid%u,fluid%u)
-       call field_addcol3(lube_contribution,fluid%v,fluid%v)
-       call field_addcol3(lube_contribution,fluid%w,fluid%w)
+    if (this%if_lube) then
+       call neko_scratch_registry%request_field(lube_contribution, &
+       temp_indices(1))
+       call field_col3(lube_contribution, fluid%u, fluid%u)
+       call field_addcol3(lube_contribution, fluid%v, fluid%v)
+       call field_addcol3(lube_contribution, fluid%w, fluid%w)
        ! fuck be careful with these scalaing!
        call field_add2s2(this%sensitivity_to_coefficient, lube_contribution, &
             this%K*this%obj_scale)
        call neko_scratch_registry%relinquish_field(temp_indices)
-    endif
+    end if
 
     ! I don't actually think you scale the sensitivity...
     ! because the adjoint field is already scaled

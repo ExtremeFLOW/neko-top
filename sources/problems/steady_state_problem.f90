@@ -56,8 +56,6 @@ module steady_state_problem
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, &
-       only : adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -67,17 +65,14 @@ module steady_state_problem
   use problem, only: problem_t
   use neko, only: neko_init, neko_solve, neko_finalize
   use case, only: case_t
-  use user, only: user_setup
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
   use source_term, only: source_term_t
   use source_term_handler, only: source_term_handler_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use adjoint_minimum_dissipation_source_term, &
-       only: adjoint_minimum_dissipation_source_term_t
   use objective_function, only: objective_function_t
-  use minimum_dissipation_objective_function, &
-       only: minimum_dissipation_objective_function_t
+  use minimum_dissipation_objective_function, only: &
+  minimum_dissipation_objective_function_t
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
   use num_types, only : rp, sp, dp, qp
@@ -85,6 +80,7 @@ module steady_state_problem
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
   use topopt_design, only: topopt_design_t
+  use user_intf, only : user_t
   implicit none
   private
 
@@ -115,6 +111,9 @@ module steady_state_problem
      ! - sensitivity (dF/d\rho and dC/d\rho)
      type(fld_file_output_t) :: output
 
+     !> a steady simulation component to append to the forward
+     type(steady_simcomp_t) :: steady_comp
+
    contains
      !> The common constructor using a JSON object.
      ! TODO
@@ -142,8 +141,13 @@ contains
   !> The constructor for the base problem.
   subroutine steady_state_problem_init_base(this)
     class(steady_state_problem_t), intent(inout) :: this
+    type(json_file) :: simcomp_settings
 
-    call user_setup(this%C%usr)
+    ! append a steady state simcomp
+    this%C%usr%init_user_simcomp => steady_state_simcomp
+    ! call user_setup(this%C%usr)
+
+
     ! initialize the primal
     call neko_init(this%C)
     ! initialize the adjoint
@@ -162,7 +166,7 @@ contains
   ! but in the future we may add other types of `design_variable_t`
   subroutine steady_state_problem_init_design_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
-    type(topopt_design_t),target, intent(inout) :: design
+    type(topopt_design_t), target, intent(inout) :: design
 
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
@@ -251,7 +255,7 @@ contains
     ! - sensitivity (dF/d\chi and dC/d\chi)    11, 12            s6,s7
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
-    call this%output%init(sp,'optimization',13)
+    call this%output%init(sp, 'optimization', 13)
     call this%output%fields%assign(1, this%C%fluid%p)
     call this%output%fields%assign(2, this%C%fluid%u)
     call this%output%fields%assign(3, this%C%fluid%v)
@@ -386,4 +390,17 @@ contains
     call this%output%sample(t)
 
   end subroutine steady_state_problem_sample
+
+  subroutine steady_state_simcomp(params)
+    type(json_file), intent(inout) :: params
+    type(steady_simcomp_t), allocatable :: steady_comp
+    type(json_file) :: simcomp_settings
+
+    ! Allocate a simulation component
+    allocate(steady_comp)
+    simcomp_settings = simulation_component_user_settings("steady", params)
+
+    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
+
+  end subroutine steady_state_simcomp
 end module steady_state_problem

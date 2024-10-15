@@ -1,7 +1,6 @@
 program usrneko
   use neko, only: neko_init, neko_solve, neko_finalize
   use case, only: case_t
-  use user, only: user_setup
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
 
@@ -11,21 +10,17 @@ program usrneko
   use source_term_handler, only: source_term_handler_t
   use topopt_design, only: topopt_design_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use adjoint_minimum_dissipation_source_term, &
-       only: adjoint_minimum_dissipation_source_term_t
   use objective_function, only: objective_function_t
-  use minimum_dissipation_objective_function, &
-       only: minimum_dissipation_objective_function_t
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
   use num_types, only : rp, sp, dp, qp
-  use field_math, only: field_rzero, field_rone
+  use field_math, only: field_rzero, field_rone, field_cmult
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
   use steady_state_problem, only : steady_state_problem_t
   use mma, only: mma_t
   use neko_ext, only: reset
-  use math, only: copy
+  use math, only: copy, cmult
 
 
   !> a problem type
@@ -50,7 +45,7 @@ program usrneko
   call problem%init_base()
 
   ! init the design
-  call design%init(problem%C%fluid%dm_Xh)
+  call design%init(problem%C%params, problem%C%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)
@@ -77,8 +72,9 @@ program usrneko
   ! obviously do this properly in the future...
   n = design%design_indicator%size()
   call optimizer%init_json(design%design_indicator%x, n, &
-       1, 0.0_rp, (/0.0_rp/), (/10.0_rp/), (/1.0_rp/), wo1%x, wo2%x, problem%C%params)
-  !m, a0         a_i          c_i           d_i
+  !    m, a0         a_i          c_i           d_i
+       1, 0.0_rp, [0.0_rp], [100.0_rp], [0.0_rp], wo1%x, wo2%x, &
+       problem%C%params)
   ! -------------------------------------------------------------------!
   !      Internal parameters for MMA                                   !
   !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -108,7 +104,7 @@ program usrneko
 
      fval(1) = problem%volume_constraint%objective_function_value
      associate(x => design%design_indicator%x, &
-          df0dx=>design%sensitivity%x, &
+          df0dx => design%sensitivity%x, &
           dfdx => problem%volume_constraint%sensitivity_to_coefficient%x)
        ! TODO
        ! reshape everything and use the propper "update"
@@ -122,17 +118,20 @@ program usrneko
        ! they're within a reasonable range unfortunately this takes a bit of
        ! trial and error, but we should include a subroutine that
        ! allows us to rescale
+       ! call cmult(df0dx,0.01_rp,n)
+       call cmult(dfdx, 100.0_rp, n)
+       fval(1) = fval(1)*100.0_rp
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
 
-       call problem%sample(real(optimization_iteration,rp))
+       call problem%sample(real(optimization_iteration, rp))
 
        !call optimizer%mma_update_cpu( &
        !     optimization_iteration, x, df0dx, fval, dfdx)
 
        ! TODO
        ! this is a really dumb way of handling the reshaping..
-       if( .not. allocated(x_switch)) then
+       if ( .not. allocated(x_switch) ) then
        allocate(x_switch(optimizer%get_n()))
        end if
 
@@ -145,7 +144,7 @@ program usrneko
             fval, &
             reshape(dfdx,[optimizer%get_m(), optimizer%get_n()]))
 
-		 call copy(x,x_switch,optimizer%get_n())
+       call copy(x, x_switch, optimizer%get_n())
 
        ! TODO
        ! do a KKT check and do a propper convergence check..
