@@ -201,7 +201,7 @@ contains
 
     call field_rone(this%sensitivity_to_coefficient)
 
-    if(this%is_max) then
+    if (this%is_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
        1.0_rp/fluid%c_xh%volume)
