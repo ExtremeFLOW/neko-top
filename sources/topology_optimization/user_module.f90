@@ -25,7 +25,7 @@ module topology_optimization_user_module
   implicit none
 
   private
-  public :: setup_topology_optimization_user_case
+  public :: neko_user_init
 
 contains
 
@@ -37,57 +37,14 @@ contains
   !! @todo We use a hacky way to run the physics and adjoint physics. This
   !! should be replaced with a more robust way to run the physics and adjoint
   !! physics.
-  subroutine setup_topology_optimization_user_case(neko_case)
-
-    implicit none
-
+  subroutine neko_user_init(neko_case)
     type(case_t), intent(inout) :: neko_case
-
-    ! General initialization and finalization
-    neko_case%usr%user_init_modules => init_topopt_computation
-    neko_case%usr%user_finalize_modules => finalize_topopt_computation
 
     ! Set the properties for the fluid
     neko_case%usr%material_properties => set_material_properties
-    neko_case%usr%fluid_user_f_vector => topopt_permeability_force
     neko_case%usr%scalar_user_ic => scalar_z_split_ic
 
-    ! Hack: Kinda hacky way to run the physics and adjoint physics
-    neko_case%usr%user_check => topopt_computation
-
-  end subroutine setup_topology_optimization_user_case
-
-  !> Initialize the topology optimization computation
-  subroutine init_topopt_computation(t, u, v, w, p, coef, params)
-    real(kind=rp) :: t
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
-    type(coef_t), intent(inout) :: coef
-    type(json_file), intent(inout) :: params
-
-  end subroutine init_topopt_computation
-
-  !> Finalize the topology optimization computation
-  subroutine finalize_topopt_computation(t, params)
-    real(kind=rp) :: t
-    type(json_file), intent(inout) :: params
-
-  end subroutine finalize_topopt_computation
-
-  !> Run the topology optimization computation
-  subroutine topopt_computation(t, tstep, u, v, w, p, coef, params)
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
-    type(coef_t), intent(inout) :: coef
-    type(json_file), intent(inout) :: params
-
-  end subroutine topopt_computation
+  end subroutine neko_user_init
 
   !> Initialize the material properties, unfortunately required from Neko.
   subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
