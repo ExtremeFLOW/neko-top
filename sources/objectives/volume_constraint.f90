@@ -204,7 +204,7 @@ contains
     if (this%is_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       1.0_rp/fluid%c_xh%volume)
+            1.0_rp / fluid%c_xh%volume)
     else
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, &
