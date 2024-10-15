@@ -325,13 +325,8 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-<<<<<<< HEAD
-    	 ! TODO
-    	 ! I think this is correct but I've never tested it
-=======
        ! TODO
        ! I think this is correct but I've never tested it
->>>>>>> origin/feature/PDE_filters
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
        call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)

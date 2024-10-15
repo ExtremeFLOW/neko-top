@@ -131,7 +131,7 @@ program usrneko
 
        ! TODO
        ! this is a really dumb way of handling the reshaping..
-       if( .not. allocated(x_switch) ) then
+       if ( .not. allocated(x_switch) ) then
        allocate(x_switch(optimizer%get_n()))
        end if
 

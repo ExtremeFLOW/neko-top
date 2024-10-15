@@ -109,8 +109,8 @@ contains
     type(field_t), intent(in) ::  X_in
     type(field_t), intent(inout) ::  X_out
 
-    ! x_out = f_min + (f_max - f_min) * x_in 
-    call field_copy(X_out,X_in)
+    ! x_out = f_min + (f_max - f_min) * x_in
+    call field_copy(X_out, X_in)
     call field_cmult(X_out, this%f_max - this%f_min)
     call field_cadd(X_out, this%f_min)
 

@@ -78,7 +78,7 @@ module RAMP_mapping
   real(kind=rp) :: f_max
   !> penalty parameter
   real(kind=rp) :: q
-  !> Convexity of the mapping (with lower being the standard RAMP and 
+  !> Convexity of the mapping (with lower being the standard RAMP and
   !! upper being that used by Borrvall & Peterson)
   logical :: convex_up
 
@@ -236,7 +236,7 @@ contains
     n = X_in%dof%size()
     do i = 1, n
        X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-       X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q) 
+       X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
     end do
     
 
