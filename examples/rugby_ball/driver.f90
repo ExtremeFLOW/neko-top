@@ -133,7 +133,7 @@ program usrneko
        ! TODO
        ! this is a really dumb way of handling the reshaping..
        if( .not. allocated(x_switch)) then
-       allocate(x_switch(optimizer%get_n()))
+          allocate(x_switch(optimizer%get_n()))
        end if
 
        x_switch = reshape(x,[optimizer%get_n()])
@@ -145,11 +145,15 @@ program usrneko
             fval, &
             reshape(dfdx,[optimizer%get_m(), optimizer%get_n()]))
 
-		 call copy(x,x_switch,optimizer%get_n())
+       call copy(x,x_switch,optimizer%get_n())
 
        ! TODO
        ! do a KKT check and do a propper convergence check..
-       call optimizer%kkt(x, df0dx, fval, dfdx)
+       call optimizer%kkt(&
+            reshape(x, [optimizer%get_n()]), &
+            reshape(df0dx,[optimizer%get_n()]), &
+            reshape(fval, [optimizer%get_m()]), &
+            reshape(dfdx,[optimizer%get_m(), optimizer%get_n()]))
 
        ! TODO
        ! on the MMA side, we need residunorm public
