@@ -209,7 +209,7 @@ contains
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, &
             -1.0_rp / fluid%c_xh%volume)
-    endif
+    end if
 
   end subroutine volume_constraint_compute_sensitivity
 
