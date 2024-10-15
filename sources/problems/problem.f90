@@ -52,7 +52,7 @@ module problem
        ! we also only have the `topopt_design_t` but this should take the more
        ! abstract `design_variable_t` and initialize differently according to
        ! the type entering here.
-       type(topopt_design_t),target, intent(inout) :: design
+       type(topopt_design_t), target, intent(inout) :: design
 
        ! This is confusing to me..
        ! The `problem` and the `design` seem very coupled in my mind.
