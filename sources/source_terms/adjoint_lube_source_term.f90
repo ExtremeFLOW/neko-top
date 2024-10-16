@@ -67,6 +67,8 @@ module adjoint_lube_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
   use scratch_registry, only : neko_scratch_registry
+  use mask_ops, only: mask_exterior_const
+  use point_zone, only: point_zone_t
   implicit none
   private
 
@@ -78,11 +80,12 @@ module adjoint_lube_source_term
      type(field_t), pointer :: u,v,w
      !> $\chi$ the Brinkman amplitude
      type(field_t), pointer :: chi
-     ! TODO
-     ! as mask
-     ! type(field_t), pointer :: chi
      !> a scale for this term
      real(kind=rp) :: K
+     !> A mask for where the source term is evaluated
+     class(point_zone_t), pointer :: mask
+     !> containing a mask?
+     logical :: if_mask
 
    contains
      !> The common constructor using a JSON object.
@@ -124,7 +127,9 @@ contains
   ! $u,v,w$ reffer to the primal, not the adjoint
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
-       u, v, w, coef)
+       u, v, w, &
+       mask, if_mask, &
+       coef)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -132,11 +137,10 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(topopt_design_t), intent(in), target :: design
+    class(point_zone_t), intent(in), target :: mask
+    logical :: if_mask
     real(kind=rp) :: K
     type(field_t), intent(in), target :: u, v, w
-    ! TODo
-    ! do masks later
-    !type(field_t), intent(in), target :: mask
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -164,8 +168,10 @@ contains
     this%chi => design%brinkman_amplitude
     this%K = K
 
-    ! TODO
-    !this%mask => mask
+    this%if_mask = if_mask
+    if (this%if_mask) then
+       this%mask => mask
+    end if
 
   end subroutine adjoint_lube_source_term_init_from_components
 
@@ -201,6 +207,11 @@ contains
 
     ! scale by K
     call field_cmult(work, this%K)
+
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
+    end if
 
     ! multiple and add the RHS
     call field_addcol3(fu, this%u, work)

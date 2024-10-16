@@ -100,6 +100,7 @@ module objective_function
   use source_term, only: source_term_t
   use adjoint_scheme, only: adjoint_scheme_t
   use topopt_design, only: topopt_design_t
+  use point_zone, only: point_zone_t
   implicit none
   private
 
@@ -111,12 +112,9 @@ module objective_function
      !real(kind=rp), public :: objective_function_value(:)
 
      !> A mask for where the objective function is evaluated
-     ! TODO
-     ! note for TIM
-     ! a field is a bit excessive here...
-     ! we could either use point zone or define an array of logicals
-     ! the same size as the field
-     ! I think the second option is better
+     class(point_zone_t), pointer :: mask
+     !> containing a mask?
+     logical :: if_mask
 
      ! TODO
      ! This is a bit strange,
@@ -148,6 +146,7 @@ module objective_function
 
      ! so this would hold dF/d\chi
      type(field_t), public :: sensitivity_to_coefficient
+
 
    contains
      !> init
@@ -226,9 +225,11 @@ module objective_function
 contains
 
 
-  subroutine objective_function_init_base(this, dm_Xh)
+  subroutine objective_function_init_base(this, dm_Xh, if_mask, mask_name)
     class(objective_function_t), target, intent(inout) :: this
     type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
+    character(len=*), intent(in), optional :: mask_name
+    logical, intent(in) :: if_mask
     ! not sure what we need here yet
 
     ! initialize sensitivity field
@@ -236,6 +237,11 @@ contains
     ! Think about field lists in the future!
     call this%sensitivity_to_coefficient%init(dm_Xh, "design_indicator")
 
+    this%if_mask = if_mask
+    if (this%if_mask) then
+       this%mask => &
+       neko_point_zone_registry%get_point_zone(mask_name)
+    end if
 
   end subroutine objective_function_init_base
 
