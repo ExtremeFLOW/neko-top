@@ -23,9 +23,10 @@ function help() {
     printf "\e[4mOptions:\e[0m\n"
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
     printf "  -%-1s, --%-10s %-60s\n" "c" "clean" "Clean artifacts from previous runs."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previously completed runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
+    printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
@@ -36,26 +37,6 @@ function help() {
 if [ $# -lt 1 ]; then help; fi
 
 # ============================================================================ #
-# Define environment
-export MAIN_DIR=$(dirname $(realpath $0))
-CURRENT_DIR=$(pwd)
-
-# Define all needed folders relative to the project folder. (without trailing /)
-export EPATH="$MAIN_DIR/examples"                 # Examples scripts
-export RPATH="$MAIN_DIR/results"                  # Result export location
-export LPATH="$MAIN_DIR/logs"                     # Logging locations
-export SPATH="$MAIN_DIR/scripts/"                 # Scripts folder
-export HPATH="$MAIN_DIR/scripts/jobscripts/LSF10" # Submission settings
-export DPATH="$MAIN_DIR/data"                     # Official data
-export DLPATH="$MAIN_DIR/data_local"              # Local data
-
-if [ -f "$MAIN_DIR/prepare.env" ]; then
-    source $MAIN_DIR/prepare.env
-fi
-[ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
-export NEKO_DIR=$(realpath $NEKO_DIR)
-
-# ============================================================================ #
 # User defined inputs.
 
 # Assign default values to the options
@@ -63,11 +44,12 @@ ALL=false
 CLEAN=false
 NEKO=false
 DELETE=false
+CLUSTER=""
 DRY=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,dry-run
-OPT="a,c,h,n,d"
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run
+OPT="a,c,h,n,s:,d"
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -76,17 +58,46 @@ eval set -- "$PARSED"
 # Loop through the options and set the variables
 while true; do
     case "$1" in
-    "-a" | "--all") ALL=true && shift ;;       # Run all examples available
-    "-c" | "--clean") CLEAN=true && shift ;;   # Clean logs
-    "-h" | "--help") help && exit ;;           # Print help
-    "-n" | "--neko") NEKO=true && shift ;;     # Look for example in neko
-    "-d" | "--delete") DELETE=true && shift ;; # Delete previous runs
-    "--dry-run") DRY=true && shift ;;          # Dry run
+    "-a" | "--all") ALL=true && shift ;;          # Run all examples available
+    "-c" | "--clean") CLEAN=true && shift ;;      # Clean logs
+    "-h" | "--help") help && exit ;;              # Print help
+    "-n" | "--neko") NEKO=true && shift ;;        # Look for example in neko
+    "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
+    "-s" | "--submit") CLUSTER="$2" && shift 2 ;; # Submit to the queue
+    "--dry-run") DRY=true && shift ;;             # Dry run
 
     # End of options
     "--") shift && break ;;
     esac
 done
+
+# ============================================================================ #
+# Define environment
+export MAIN_DIR=$(dirname $(realpath $0))
+CURRENT_DIR=$(pwd)
+
+# Execute the preparation script if it exists
+if [ -f "$MAIN_DIR/prepare.env" ]; then
+    source $MAIN_DIR/prepare.env
+fi
+
+# Define all needed folders relative to the project folder. (without trailing /)
+export EPATH="$MAIN_DIR/examples"    # Examples scripts
+export RPATH="$MAIN_DIR/results"     # Result export location
+export LPATH="$MAIN_DIR/logs"        # Logging locations
+export SPATH="$MAIN_DIR/scripts/"    # Scripts folder
+export DPATH="$MAIN_DIR/data"        # Official data
+export DLPATH="$MAIN_DIR/data_local" # Local data
+
+# Define the job script folder
+if [ ! -z "$CLUSTER" ]; then
+    export HPATH="$MAIN_DIR/scripts/jobscripts/$CLUSTER" # Submission settings
+else
+    export HPATH="$MAIN_DIR/scripts/jobscripts" # Submission settings
+fi
+
+[ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
+export NEKO_DIR=$(realpath $NEKO_DIR)
 
 if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
@@ -226,18 +237,40 @@ fi
 function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
-    ./job_script.sh $1 >output.log 2>error.err
+    source $SPATH/functions.sh
+    run $1 1>output.log 2>error.err
     cd $CURRENT_DIR
 }
 
 # Function for submitting the examples
 function Submit() {
+
+    # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
-    export BSUB_QUIET=Y
-    bsub -J $1 -env "all" <job_script.sh
+    if [ $CLUSTER == "DTU" ]; then
+        export BSUB_QUIET=Y
+        bsub -J $1 -env "all" <job_script.sh
+
+    elif [ $CLUSTER == "MN5" ]; then
+        if [ -z "$MN5_ACCOUNT" ]; then
+            printf >&2 "No account specified for Marenostrum5.\n"
+            printf >&2 "Please set the MN5_ACCOUNT variable in the environment.\n"
+            exit 1
+        fi
+        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.err
+
+    else
+        printf >&2 "No or invalid cluster specified for submission.\n"
+        printf >&2 "\t- DTU for the DTU cluster.\n"
+        printf >&2 "\t- MN5 for the Marenostrum5 cluster.\n"
+        exit 1
+    fi
+
     printf '\t%-12s %-s\n' "Submitted:" "$1"
     cd $CURRENT_DIR
 }
+
+# Definition of a interrupt handler
 INTERRUPTED=0
 function handler() {
     if [ "$MAIN_DIR" != "$(pwd)" ]; then
@@ -267,7 +300,7 @@ for case in ${example_list[@]}; do
         example=$example/$case_name
     fi
 
-    log=$LPATH/$example && mkdir -p $log
+    export log=$LPATH/$example && mkdir -p $log
     [ "$CLEAN" = true ] && rm -fr $log/*
 
     # Setup the log folder
@@ -275,7 +308,7 @@ for case in ${example_list[@]}; do
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.err && touch $log/error.err
 
-        [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
+        [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
     fi
@@ -283,13 +316,6 @@ for case in ${example_list[@]}; do
     # Remove old output and error files
     find $log -type f -name "*.log" -or -name "error.err" -delete
     touch $log/output.log $log/error.err
-
-    # Find the setting file for the case recursively
-    setting=$HPATH/${case%.*}.sh
-    while [[ ! -f $setting && ! -z "$setting" ]]; do
-        setting=$(dirname ${setting%/default.sh})/default.sh
-    done
-    setting=$(realpath $setting)
 
     # Copy the case files to the log folder
     if [ ${case: -3} == ".sh" ]; then
@@ -309,8 +335,26 @@ for case in ${example_list[@]}; do
     done
 
     # Copy the job script to the log folder
-    cp -f $setting $log/job_script.sh
     cp -f $SPATH/functions.sh $log/functions.sh
+
+    # If we are submitting to a cluster, look for the associated jobscript
+    if [ ! -z $CLUSTER ]; then
+        # Find the setting file for the case recursively
+        setting=$HPATH/${case%.*}.sh
+        while [[ ! -f $setting && ! -z "$setting" ]]; do
+            setting=$(dirname ${setting%/default.sh})/default.sh
+        done
+        setting=$(realpath $setting)
+
+        if [ ! -f $setting ]; then
+            printf >&2 "\e[1;31mInvalid setting file:\e[m\n"
+            printf >&2 "$HPATH/${case%.*}.sh\n"
+            printf >&2 "\tNo setting file found for the case.\n"
+            exit 1
+        else
+            cp -f $setting $log/job_script.sh
+        fi
+    fi
 
     # Assign links to the data folders
     if [ -d "$DPATH" ]; then ln -fs $DPATH $log; fi
@@ -320,7 +364,7 @@ for case in ${example_list[@]}; do
     printf 'Ready' >$log/output.log
 
     QUEUE="$QUEUE $example"
-    [ -z "$(which bsub)" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
+    [ -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
 done
 
 # Done with the setup
@@ -328,7 +372,7 @@ done
 # Move to the directory submit or run the code and return
 
 # If we are just doing a dry-run, we exit here
-if [ "$DRY" = true ]; then
+if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
     exit 0
 fi
@@ -338,14 +382,14 @@ for example in $QUEUE; do
     # Move to the log folder and submit the job
     if [ $INTERRUPTED == 1 ]; then
         continue
-    elif [ "$(which bsub)" ]; then
+    elif [ ! -z "$CLUSTER" ]; then
         Submit $example
     else
         Run $example
     fi
 done
 
-if [ ! "$(which bsub)" ]; then
+if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
 fi
 
