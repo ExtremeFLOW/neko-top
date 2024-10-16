@@ -95,7 +95,7 @@ program usrneko
   do while (optimization_iteration .lt. 100)
 
      ! compute objective function
-     call problem%compute()
+     call problem%compute(design)
 
      ! in this case it's MMA so we need gradient information
      call problem%compute_sensitivity()
@@ -124,7 +124,7 @@ program usrneko
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
 
-       call problem%sample(real(optimization_iteration, rp))
+       call problem%write(real(optimization_iteration, rp))
 
        !call optimizer%mma_update_cpu( &
        !     optimization_iteration, x, df0dx, fval, dfdx)
@@ -132,7 +132,7 @@ program usrneko
        ! TODO
        ! this is a really dumb way of handling the reshaping..
        if ( .not. allocated(x_switch) ) then
-       allocate(x_switch(optimizer%get_n()))
+          allocate(x_switch(optimizer%get_n()))
        end if
 
        x_switch = reshape(x,[optimizer%get_n()])

@@ -102,12 +102,12 @@ module topopt_design
   use linear_mapping, only: linear_mapping_t
   use RAMP_mapping, only: RAMP_mapping_t
   use PDE_filter, only: PDE_filter_t
-  !use design_variable, only: design_variable_t
+  use design, only: design_t
   implicit none
   private
 
   !> A topology optimization design variable
-  type, public :: topopt_design_t
+  type, extends(design_t), public :: topopt_design_t
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
@@ -191,6 +191,7 @@ module topopt_design
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
      type(RAMP_mapping_t) :: mapping
+
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
@@ -307,10 +308,10 @@ contains
     ! call mapper%forward(fld_out, fld_in)
 
     call this%filter%apply_forward(this%filtered_design, &
-    this%design_indicator)
+         this%design_indicator)
 
     call this%mapping%apply_forward(this%brinkman_amplitude, &
-    this%filtered_design)
+         this%filtered_design)
 
 
   end subroutine topopt_design_map_forward
@@ -326,13 +327,13 @@ contains
     ! so this would be:
     ! call mapper%backward(fld_out, fld_in)
     call neko_scratch_registry%request_field(dF_dfiltered_design, &
-    temp_indices(1))
+         temp_indices(1))
 
     call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
-    this%filtered_design)
+         this%filtered_design)
 
     call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
-    this%filtered_design)
+         this%filtered_design)
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
