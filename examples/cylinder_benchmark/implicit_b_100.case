@@ -1,0 +1,138 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "data_local/cylinder_benchmark/high_brink_cyl.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": true,
+        "end_time": 200.0,
+        "timestep": 1e-3,
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 5,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 200,
+            "initial_condition": {
+                "type": "user"
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-9,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 8,
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "output_control": "simulationtime",
+            "output_value": 0.1,
+            "boundary_types": [
+                "v",
+                "o",
+                "",
+                "",
+                "",
+                ""
+            ],
+            "source_terms": [
+                {
+                    "type": "brinkman",
+                    "objects": [
+                        {
+                            "type": "point_zone",
+                            "name": "cylinder"
+                        }
+                    ],
+                    "brinkman": {
+                        "limits": [
+                            0.0,
+                            100.0
+                        ],
+                        "penalty": 1.0,
+                        "implicit": true
+                    }
+                }
+            ]
+        },
+        "simulation_components": [
+            {
+                "type": "probes",
+                "output_file": "inflection.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.0 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
+                        "radius": 0.55,
+                        "amount": 100
+                    }
+                ]
+            },
+            {
+                "type": "probes",
+                "output_file": "backdraft.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "line",
+                        "start": [ 0.5, 0.0, 0.0 ],
+                        "end": [ 5.0, 0.0, 0.0 ],
+                        "amount": 30
+                    }
+                ]
+            },
+            {
+                "type": "probes",
+                "output_file": "leakage.csv",
+                "fields": [
+                    "u",
+                    "v"
+                ],
+                "compute_control": "simulationtime",
+                "compute_value": 0.1,
+                "points": [
+                    {
+                        "type": "point_zone",
+                        "name": "cylinder"
+                    }
+                ]
+            }
+        ],
+        "point_zones": [
+            {
+                "name": "cylinder",
+                "geometry": "cylinder",
+                "start": [
+                    0.0,
+                    0.0,
+                    0.0
+                ],
+                "end": [
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "radius": 0.5
+            }
+        ]
+    }
+}
