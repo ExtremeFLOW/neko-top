@@ -98,6 +98,7 @@ module adjoint_case
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use adjoint_scalar_convection_source_term, only: &
   adjoint_scalar_convection_source_term_t
+  use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   implicit none
   private
@@ -132,6 +133,10 @@ module adjoint_case
      type(sampler_t) :: s
 
      logical :: have_scalar = .false.
+
+     ! this is to force 'w' on user_bcs
+     procedure(usr_scalar_bc_eval), nopass, pointer :: force_user_bc_w => &
+     adjoint_force_user_bc_w
 
   end type adjoint_case_t
 
@@ -311,7 +316,13 @@ contains
 
     ! Setup user boundary conditions for the scalar.
     if (scalar) then
-       call this%scalar%set_user_bc(neko_case%usr%scalar_user_bc)
+       ! TODO
+       ! this is not very clear what's going on, in the standard scalar you
+       ! would call:
+       ! call this%scalar%set_user_bc(neko_case%usr%scalar_user_bc)
+       ! Here, we've defined (the last subroutine) essentially a user_bc but
+       ! it always forces to zero.
+       call this%scalar%set_user_bc(this%force_user_bc_w)
     end if
 
     !
@@ -451,5 +462,23 @@ contains
 
   end subroutine adjoint_free
 
+  subroutine adjoint_force_user_bc_w(s, x, y, z, nx, ny, nz, &                    
+                                   ix, iy, iz, ie, t, tstep)                    
+       real(kind=rp), intent(inout) :: s                                        
+       real(kind=rp), intent(in) :: x                                           
+       real(kind=rp), intent(in) :: y                                           
+       real(kind=rp), intent(in) :: z                                           
+       real(kind=rp), intent(in) :: nx                                          
+       real(kind=rp), intent(in) :: ny                                          
+       real(kind=rp), intent(in) :: nz                                          
+       integer, intent(in) :: ix                                                
+       integer, intent(in) :: iy                                                
+       integer, intent(in) :: iz                                                
+       integer, intent(in) :: ie                                                
+       real(kind=rp), intent(in) :: t                                           
+       integer, intent(in) :: tstep                                             
+
+       s = 0.0_rp
+   end subroutine adjoint_force_user_bc_w
 end module adjoint_case
 

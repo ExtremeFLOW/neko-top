@@ -101,7 +101,6 @@ module topopt_design
   use fld_file_output, only : fld_file_output_t
   use linear_mapping, only: linear_mapping_t
   use RAMP_mapping, only: RAMP_mapping_t
-  use Casper_mapping, only: Casper_mapping_t
   use PDE_filter, only: PDE_filter_t
   !use design_variable, only: design_variable_t
   implicit none
@@ -140,9 +139,9 @@ module topopt_design
      ! \rho -> C
      ! \rho -> \kappa
      !
-     ! Then during the forward/adjoint looping there will be an additional 
-     ! object, the "objective_function" object that will be responsible for 
-     ! computing the sensitivity of the objective function with respect to the 
+     ! Then during the forward/adjoint looping there will be an additional
+     ! object, the "objective_function" object that will be responsible for
+     ! computing the sensitivity of the objective function with respect to the
      ! coefficients
      ! ie,
      ! dF/d\chi, dF/dC and dF/d\kappa
@@ -166,7 +165,7 @@ module topopt_design
      ! Implying we also want dC1/d\rho, dC2/d\rho etc
      ! So this "sensitivity" should also be a list...
      !
-     ! So I bet you'll have a nice abstract way of constructing this in the 
+     ! So I bet you'll have a nice abstract way of constructing this in the
      ! future but I think a sort of list-of-lists would be nice.
      !
      ! For F:
@@ -191,7 +190,7 @@ module topopt_design
 
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
-     type(Casper_mapping_t) :: mapping
+     type(RAMP_mapping_t) :: mapping
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
@@ -261,12 +260,12 @@ contains
 
     n = this%design_indicator%dof%size()
     do i = 1, n
-       if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
+       if (sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
             (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2).lt.0.25_rp) then
+            - 0.5_rp)**2) .lt. 0.25_rp) then
           this%design_indicator%x(i,1,1,1) = 1.0_rp
-       endif
-    enddo
+       end if
+    end do
 
     ! TODO
     ! we would also need to make a mapping type that reads in
@@ -289,7 +288,7 @@ contains
     ! TODO
     ! obviously when we do the mappings properly, to many coeficients,
     ! we'll also have to modify this
-    call this%output%init(sp,'design',3)
+    call this%output%init(sp, 'design', 3)
     call this%output%fields%assign(1, this%design_indicator)
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)

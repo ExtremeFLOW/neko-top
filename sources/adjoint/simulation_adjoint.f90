@@ -127,6 +127,18 @@ contains
        call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
             this%case%tlag, this%case%dtlag, tstep_adj)
 
+       ! For the adjoint we do the scalar step first
+       if (allocated(this%scalar)) then
+          start_time = MPI_WTIME()
+          call neko_log%section('Scalar')
+          call this%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          this%case%ext_bdf, dt_controller)
+          end_time = MPI_WTIME()
+          write(log_buf, '(A,E15.7,A,E15.7)') &
+               'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+               end_time-start_time
+          call neko_log%end_section(log_buf)
+       end if
        call neko_log%section('Adjoint fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
             this%case%ext_bdf, dt_controller)
@@ -136,27 +148,18 @@ contains
             end_time-start_time
        call neko_log%end_section(log_buf)
 
-       ! Scalar step
-       if (allocated(this%case%scalar)) then
-          start_time = MPI_WTIME()
-          call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
-               this%case%ext_bdf, dt_controller)
-          end_time = MPI_WTIME()
-          write(log_buf, '(A,E15.7,A,E15.7)') &
-               'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-               end_time-start_time
-          call neko_log%end_section(log_buf)
-       end if
 
        call neko_log%section('Postprocessing')
+       ! TODO
+       ! adjoint simulation components
 
        !  call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
        call this%s%sample(t_adj, tstep_adj)
 
        ! Update material properties
-       call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
-            this%case%fluid%mu, &
+       call this%case%usr%material_properties(t_adj, tstep_adj, &
+            this%scheme%rho, &
+            this%scheme%mu, &
             this%case%scalar%cp, &
             this%case%scalar%lambda, &
             this%case%params)
