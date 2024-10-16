@@ -125,6 +125,33 @@ module mma
        real(kind=rp), dimension(this%n), intent(in) :: df0dx
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
+
+
+
+       !> Generate the approximation sub problem on the CPU.
+     module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx
+       type(vector_t), intent(in) :: fval
+       type(matrix_t), intent(in) :: dfdx
+       integer, intent(in) :: iter
+     end subroutine mma_gensub_gpu
+
+     !> Solve the dual with an interior point method on the CPU.
+     module subroutine mma_subsolve_dpip_gpu(this, designx)
+        class(mma_t), intent(inout) :: this
+        type(vector_t), intent(in) :: designx
+     end subroutine mma_subsolve_dpip_gpu
+
+     !> Compute the KKT condition for a given design x on the CPU.
+     module subroutine mma_KKT_gpu(this, x, df0dx, fval, dfdx)
+        class(mma_t), intent(inout) :: this
+        type(vector_t), intent(in) :: x
+        type(vector_t), intent(in) :: fval
+        type(vector_t), intent(in) :: df0dx
+        type(matrix_t), intent(in) :: dfdx
+     end subroutine mma_KKT_gpu
   end interface
 
 contains
