@@ -136,10 +136,6 @@ contains
     this%v_max = 0.2
 
     ! Now we can extract the mask/if_mask from the design
-
-    ! TODO
-    ! will I segfault if we have no mask?
-    ! I think I will... test this
     n = design%design_indicator%size()
     if (design%if_mask) then
        ! init the base

@@ -197,10 +197,6 @@ module topopt_design
      type(field_t) :: filtered_design
 
 
-     !
-     ! TODO
-     ! you also had lots of masks etc that was a nice idea,
-     ! but we'll cross that bridge later
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain

@@ -105,9 +105,11 @@ program usrneko
      ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
      ! the only design variables entering MMA are those within the mask.
      ! This way you get the correct N etc.
-     call mask_exterior_const(&
-     problem%volume_constraint%sensitivity_to_coefficient, &
-     design%optimization_domain, 0.0_rp)
+     if (design%if_mask) then
+        call mask_exterior_const(&
+        problem%volume_constraint%sensitivity_to_coefficient, &
+        design%optimization_domain, 0.0_rp)
+     end if
 
      ! now we have the optimizer act on the design field.
 
