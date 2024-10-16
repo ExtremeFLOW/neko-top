@@ -68,7 +68,7 @@ module adjoint_pnpn
   use time_step_controller, only : time_step_controller_t
   use gather_scatter, only : gs_t, GS_OP_ADD
   use neko_config, only : NEKO_BCKND_DEVICE
-  use math, only : col2, add2, copy, glsc2, vdot3, cmult
+  use math, only : col2, add2, copy, glsc2, vdot3, cmult, vlsc3
   use mathops, only : opadd2cm, opcolv
   use bc, only: bc_list_t, bc_list_init, bc_list_add, bc_list_free, &
        bc_list_apply_scalar, bc_list_apply_vector
@@ -79,9 +79,12 @@ module adjoint_pnpn
   use field_registry, only : neko_field_registry
   use operators, only : curl
   use fld_file_output, only : fld_file_output_t
-  use comm, only : pe_rank
+  use comm, only : pe_rank, MPI_REAL_PRECISION
   use vector, only : vector_t
   use, intrinsic :: iso_c_binding, only : c_ptr
+  use mpi_f08, only : MPI_SUM, MPI_COMM_WORLD, &
+       MPI_IN_PLACE, mpi_allreduce
+
   implicit none
   private
 
@@ -922,15 +925,10 @@ contains
   end subroutine rescale_fluid
 
   function norm(x, y, z, B, volume, n)
-    use mpi_f08, only : MPI_SUM, MPI_COMM_WORLD, &
-         MPI_IN_PLACE, mpi_allreduce
-    use comm, only : MPI_REAL_PRECISION
-    use math, only : vlsc3
-
+    integer, intent(in) :: n
     real(kind=rp), dimension(n), intent(in) :: x, y, z
     real(kind=rp), dimension(n), intent(in) :: B
     real(kind=rp), intent(in) :: volume
-    integer, intent(in) :: n
 
     real(kind=rp) :: norm
 
