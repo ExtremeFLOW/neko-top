@@ -84,6 +84,8 @@ module scalar_mixing_objective_function
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
   implicit none
   private
 
@@ -127,24 +129,29 @@ contains
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
+    character(len=:), allocatable :: objective_location_zone_name
+    logical :: if_mask
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
     this%obj_scale = 1.0_rp
 
 
-    call this%init_base(primal%fluid%dm_Xh)
+    ! mask would also be read from JSON... I'm hard coding
+    if_mask = .true.
+    objective_location_zone_name = "objective_location"
+    call this%init_base(primal%fluid%dm_Xh, if_mask, &
+    objective_location_zone_name)
 
     ! the adjoint source term is applied to the scalar
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
          adjoint%scalar%f_Xh, primal%scalar%s, & 
-         this%obj_scale, adjoint%scheme%c_Xh)
+         this%obj_scale, &
+         this%mask, this%if_mask, &
+         adjoint%scheme%c_Xh)
     ! append adjoint forcing term based on objective function
-    print *, "apending"
     call adjoint%scalar%source_term%add_source_term(adjoint_forcing)
-    print *, "apended", allocated(adjoint%scalar%source_term%source_terms), &
-    size(adjoint%scalar%source_term%source_terms)
 
   end subroutine scalar_mixing_objective_function_init
 
@@ -187,6 +194,10 @@ contains
     call field_cadd(wo1, -average_upstream)
     ! square it
     call field_col2(wo1,wo1)
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(wo1, this%mask, 0.0_rp)
+    end if
     ! integrate
     this%objective_function_value = glsc2(wo1%x,primal%fluid%C_Xh%b, n)
     ! TODO

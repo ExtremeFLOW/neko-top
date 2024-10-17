@@ -21,6 +21,7 @@ program usrneko
   use mma, only: mma_t
   use neko_ext, only: reset
   use math, only: copy, cmult
+  use mask_ops, only: mask_exterior_const
 
 
   !> a problem type
@@ -100,6 +101,16 @@ program usrneko
      ! in this case it's MMA so we need gradient information
      call problem%compute_sensitivity()
 
+     ! TODO
+     ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
+     ! the only design variables entering MMA are those within the mask.
+     ! This way you get the correct N etc.
+     if (design%if_mask) then
+        call mask_exterior_const(&
+        problem%volume_constraint%sensitivity_to_coefficient, &
+        design%optimization_domain, 0.0_rp)
+     end if
+
      ! now we have the optimizer act on the design field.
 
      fval(1) = problem%volume_constraint%objective_function_value
@@ -112,6 +123,7 @@ program usrneko
        ! TODO
        ! I'm CERTAIN the mass matrix comes in here, but I need to sit down
        ! with a pen and paper
+
 
        ! TODO
        ! for heuristic reasons, it's important to rescale the dfdx etc so

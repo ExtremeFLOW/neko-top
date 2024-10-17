@@ -96,6 +96,8 @@ module minimum_dissipation_objective_function
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
   implicit none
   private
 
@@ -142,6 +144,8 @@ contains
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
+    character(len=:), allocatable :: objective_location_zone_name
+    logical :: if_mask
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
@@ -151,7 +155,11 @@ contains
     !this%obj_scale = 0.00000001_rp
 
 
-    call this%init_base(primal%fluid%dm_Xh)
+    ! mask would also be read from JSON... I'm hard coding
+    if_mask = .false.
+    objective_location_zone_name = "objective_location"
+
+    call this%init_base(primal%fluid%dm_Xh, if_mask, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
@@ -160,6 +168,7 @@ contains
          adjoint%scheme%f_adj_x, adjoint%scheme%f_adj_y, &
          adjoint%scheme%f_adj_z, &
          primal%fluid%u, primal%fluid%v, primal%fluid%w, this%obj_scale, &
+         this%mask, this%if_mask, &
          adjoint%scheme%c_Xh)
     ! append adjoint forcing term based on objective function
     call adjoint%scheme%source_term%add_source_term(adjoint_forcing)
@@ -175,6 +184,7 @@ contains
             adjoint%scheme%f_adj_z, design, &
             this%k*this%obj_scale, &
             primal%fluid%u, primal%fluid%v, primal%fluid%w, &
+            this%mask, this%if_mask, &
             adjoint%scheme%c_Xh)
        ! append adjoint forcing term based on objective function
        call adjoint%scheme%source_term%add_source_term(lube_term)
@@ -212,9 +222,6 @@ contains
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
 
     ! compute the objective function.
-    ! TODO
-    ! we should be using masks etc
-
     call grad(wo1%x, wo2%x, wo3%x, primal%fluid%u%x, primal%fluid%C_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
@@ -229,6 +236,10 @@ contains
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
+
+    if (this%if_mask) then
+       call mask_exterior_const(objective_field, this%mask, 0.0_rp)
+    end if
 
     ! integrate the field
     n = wo1%size()
@@ -246,6 +257,9 @@ contains
        design%brinkman_amplitude)
        call field_addcol3(objective_field, primal%fluid%w, &
        design%brinkman_amplitude)
+       if (this%if_mask) then
+          call mask_exterior_const(objective_field, this%mask, 0.0_rp)
+       end if
        this%lube_value = glsc2(objective_field%x, primal%fluid%C_Xh%b, n)
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value

@@ -67,6 +67,7 @@ module volume_constraint
   use topopt_design, only: topopt_design_t
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t
+  use mask_ops, only: masked_glsc2, mask_exterior_const
   implicit none
   private
 
@@ -84,6 +85,8 @@ module volume_constraint
      real(kind=rp) :: v_max
      !> current volume
      real(kind=rp) :: volume
+     !> volume of the optimization domain
+     real(kind=rp) :: volume_domain
 
 
    contains
@@ -108,6 +111,9 @@ contains
     class(case_t), intent(inout) :: primal
     class(adjoint_case_t), intent(inout) :: adjoint
     type(topopt_design_t), intent(inout) :: design
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    integer :: n
 
     ! TODO
     ! I don't think there's much to init here
@@ -131,7 +137,30 @@ contains
     this%is_max = .false.
     this%v_max = 0.2
 
-    call this%init_base(primal%fluid%dm_Xh)
+    ! Now we can extract the mask/if_mask from the design
+    n = design%design_indicator%size()
+    if (design%if_mask) then
+       ! init the base
+       call this%init_base(primal%fluid%dm_Xh, design%if_mask, &
+       design%optimization_domain%name)
+
+       ! calculate the volume of the optimization domain
+       call neko_scratch_registry%request_field(work , temp_indices(1))
+       call field_rone(work)
+       if (neko_bcknd_device .eq. 1) then
+          call neko_error('GPU not supported volume constraint')
+       else
+          this%volume_domain = masked_glsc2(work%x, primal%fluid%c_xh%B, &
+          this%mask, n)
+       end if
+       call neko_scratch_registry%relinquish_field(temp_indices)
+    else
+       ! init the base
+       call this%init_base(primal%fluid%dm_Xh, design%if_mask)
+
+       ! point to the volume of the domain
+       this%volume_domain = primal%fluid%c_xh%volume
+    end if
 
   end subroutine volume_constraint_init
 
@@ -151,27 +180,28 @@ contains
     class(case_t), intent(in) :: primal
     type(topopt_design_t), intent(inout) :: design
     integer :: i
-    type(field_t), pointer :: wo1, wo2, wo3
-    type(field_t), pointer :: objective_field
-    integer :: temp_indices(4)
     integer n
 
-    ! Again, we don't really need to take design and fluid in here...
     n = design%design_indicator%size()
     ! TODO
     ! in the future we should be using the mapped design varaible
     !corresponding to this constraint!!!
-    this%volume = glsc2(design%design_indicator%x, primal%fluid%c_xh%B, n)
+    if (design%if_mask) then
+       if (neko_bcknd_device .eq. 1) then
+          call neko_error('GPU not supported volume constraint')
+       else
+          this%volume = masked_glsc2(design%design_indicator%x, &
+          primal%fluid%c_xh%B, this%mask, n)
+       end if
+    else
+       if (neko_bcknd_device .eq. 1) then
+          call neko_error('GPU not supported volume constraint')
+       else
+          this%volume = glsc2(design%design_indicator%x, primal%fluid%c_xh%B, n)
+       end if
+    end if
 
-    ! NOTE
-    ! TODO
-    ! the definition of the "volume" can get a little tricky once we start
-    ! introducing masks for the optimization domain, because then we should
-    ! calculate the volume of the optimization domain and take a ratio that way.
-    ! point is, a design should have an internal parameter of the volume of
-    ! the design domain,
-    ! and we should us THAT volume for computing the volume percentage
-    this%volume = this%volume/primal%fluid%c_xh%volume
+    this%volume = this%volume/this%volume_domain
 
     ! then we need to check min or max
     if (this%is_max) then
@@ -204,11 +234,11 @@ contains
     if (this%is_max) then
        ! max volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       1.0_rp/primal%fluid%c_xh%volume)
+            1.0_rp / this%volume_domain)
     else
        ! min volume
        call field_cmult(this%sensitivity_to_coefficient, &
-       -1.0_rp/primal%fluid%c_xh%volume)
+            -1.0_rp / this%volume_domain)
     end if
 
   end subroutine volume_constraint_compute_sensitivity

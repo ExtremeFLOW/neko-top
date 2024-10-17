@@ -47,6 +47,8 @@ module adjoint_mixing_scalar_source_term
   use field_math, only: field_addcol3, field_add2, field_cadd, field_col2, &
   field_add2s2, field_copy
   use operators, only: opgrad
+  use mask_ops, only: mask_exterior_const
+  use point_zone, only: point_zone_t
   implicit none
   private
 
@@ -67,6 +69,10 @@ module adjoint_mixing_scalar_source_term
      type(field_t), pointer :: s
      !> A scalaing factor
      real(kind=rp) :: obj_scale
+     !> A mask for where the source term is evaluated
+     class(point_zone_t), pointer :: mask
+     !> containing a mask?
+     logical :: if_mask
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -100,7 +106,7 @@ contains
 
 
   subroutine adjoint_mixing_scalar_source_term_init_from_components(this,&
-       f_s, s, obj_scale, coef)
+       f_s, s, obj_scale, mask, if_mask, coef)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
     type(field_list_t) :: fields
@@ -109,9 +115,8 @@ contains
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: s
-    ! TODo
-    ! do masks later
-    !type(field_t), intent(in), target :: mask
+    class(point_zone_t), intent(in), target :: mask
+    logical :: if_mask
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -133,9 +138,11 @@ contains
 
     print *, "source term initialized"
 
+    this%if_mask = if_mask
+    if (this%if_mask) then
+       this%mask => mask
+    end if
 
-    ! TODO
-    !this%mask => mask
   end subroutine adjoint_mixing_scalar_source_term_init_from_components
 
   !> Destructor.
@@ -154,10 +161,21 @@ contains
     integer, intent(in) :: tstep
     integer :: n_fields, i, n
     type(field_t), pointer :: fs
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
 
     
     fs => this%fields%get(1)
 
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call field_copy(work, this%s)
+    ! TODO
+    ! I'm just subtracting 0.5, but it should be the average
+    call field_cadd(work, -0.5_rp)
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
+    end if
     ! TODO
     ! double check if add or subtract
 
@@ -167,11 +185,9 @@ contains
     ! TODO
     ! Masks
 
-    call field_add2s2(fs,this%s, this%obj_scale)
+    call field_add2s2(fs,work, this%obj_scale)
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
-    ! TODO
-    ! I'm just subtracting 0.5, but it should be the average
-    call field_cadd(fs, -0.5_rp*this%obj_scale)
     
   end subroutine adjoint_mixing_scalar_source_term_compute
 

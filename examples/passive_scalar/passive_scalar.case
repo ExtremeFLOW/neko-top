@@ -69,6 +69,40 @@
             "initial_condition": {
                 "type": "user"
             }
-        }
+        },
+     "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    1.0,
+                    3.0,
+                ],
+                "y_bounds": [
+                    -1.0,
+                     3.0,
+                ],
+                "z_bounds": [
+                    -1.0,
+                     3.0,
+                ],
+           },
+            {
+                "name": "objective_location",
+                "geometry": "box",
+                "x_bounds": [
+                    3.0,
+                    5.0,
+                ],
+                "y_bounds": [
+                    -1.0,
+                     3.0,
+                ],
+                "z_bounds": [
+                    -1.0,
+                     3.0,
+                ],
+           },
+                 ]
     }
 }
