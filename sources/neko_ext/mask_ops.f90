@@ -69,7 +69,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_error('GPU not supported for masks yet') 
     else
-    	do i = 1, mask%size
+       do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
        end do
     end if
@@ -102,7 +102,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_error('GPU not supported for masks yet') 
     else
-    	do i = 1, mask%size
+       do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
        end do
     end if
