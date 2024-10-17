@@ -74,42 +74,42 @@ contains
        ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
        ! eq (2.8) and (2.9)
        this%alpha%x(j) = max(this%xmin%x(j), this%low%x(j) + &
-            0.1*(x(j)- this%low%x(j)), &
-            x(j) - 0.5*(this%xmax%x(j) - this%xmin%x(j)))
+            0.1_rp*(x(j)- this%low%x(j)), &
+            x(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
        this%beta%x(j) = min(this%xmax%x(j), this%upp%x(j) - &
             0.1*(this%upp%x(j) - x(j)), &
-            x(j) + 0.5*(this%xmax%x(j) - this%xmin%x(j)))
+            x(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
 
        !Calculate p0j, q0j, pij, qij
        !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
        this%p0j%x(j) = (this%upp%x(j) - x(j))**2 * &
-            (1.001*max(df0dx(j),0.0) + &
-            0.001*max(-df0dx(j),0.0) + &
-            (0.00001/(max(0.00001, &
+            (1.001_rp*max(df0dx(j),0.0_rp) + &
+            0.001_rp*max(-df0dx(j),0.0_rp) + &
+            (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        this%q0j%x(j) = (x(j) - this%low%x(j))**2 * &
-            (0.001*max(df0dx(j),0.0) + &
-            1.001*max(-df0dx(j),0.0) + &
-            (0.00001/(max(0.00001, &
+            (0.001_rp*max(df0dx(j),0.0_rp) + &
+            1.001_rp*max(-df0dx(j),0.0_rp) + &
+            (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        do i = 1, this%m
           this%pij%x(i,j) = (this%upp%x(j) - x(j))**2 * &
-               (1.001*max(dfdx(i,j),0.0) + &
-               0.001*max(-dfdx(i,j),0.0) + &
-               (0.00001/(max(0.00001, &
+               (1.001_rp*max(dfdx(i,j),0.0_rp) + &
+               0.001_rp*max(-dfdx(i,j),0.0_rp) + &
+               (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
           this%qij%x(i,j) = (x(j) - this%low%x(j))**2 * &
-               (0.001*max(dfdx(i, j), 0.0) + &
-               1.001*max(-dfdx(i, j), 0.0) + &
-               (0.00001/(max(0.00001, &
+               (0.001_rp*max(dfdx(i, j), 0.0_rp) + &
+               1.001_rp*max(-dfdx(i, j), 0.0_rp) + &
+               (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
        end do
     end do
 
     !computing bi as defined in page 5
-    this%bi%x = 0_rp
+    this%bi%x = 0.0_rp
     do i = 1, this%m
        !MPI: here this%n is the global n
        do j = 1, this%n
@@ -124,7 +124,7 @@ contains
     !!!!Showing that for double precision, bi will be different when!!!!!!!!
     !!!!!!!!!!!computed in parallel compare to sequential!!!!!!!!!!!!!!!!!!!
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! this%bi%x = 0_rp
+    ! this%bi%x = 0.0_rp
     ! longbi = 0.0
     ! do i = 1, this%m
     !     !MPI: here this%n is the global n
@@ -141,7 +141,7 @@ contains
     ! print *, "longbi =  ", longbi
     ! ierr = 2160
     ! longbi = 0.0
-    ! this%bi%x = 0_rp
+    ! this%bi%x = 0.0
     ! do i = 1, this%m
     !     do j = 1, ierr
     !         this%bi%x(i) = this%bi%x(i) + &
@@ -157,7 +157,7 @@ contains
     ! longbiglobal = longbi
     ! longbi = 0.0
     ! globaltmp_m = this%bi
-    ! this%bi%x = 0_rp
+    ! this%bi%x = 0.0
     ! do i = 1, this%m
     !     do j = ierr+1, this%n
     !         this%bi%x(i) = this%bi%x(i) + &
@@ -232,17 +232,17 @@ contains
 
     ! intial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
-    dummy_one = 1
-    epsi = 1 !100
-    x(:) = 0.5*(this%alpha%x(:)+this%beta%x(:))
-    y(:) = 1
-    z = 1
-    zeta = 1
-    lambda(:) = 1
-    s(:) = 1
-    xsi(:) = max(1.0, 1.0/(x(:) - this%alpha%x(:)))
-    eta(:) = max(1.0, 1.0/(this%beta%x(:) - x(:)))
-    mu(:) = max(1.0, 0.5*this%c%x(:))
+    dummy_one = 1.0_rp
+    epsi = 1.0_rp !100
+    x(:) = 0.5_rp*(this%alpha%x(:)+this%beta%x(:))
+    y(:) = 1.0_rp
+    z = 1.0_rp
+    zeta = 1.0_rp
+    lambda(:) = 1.0_rp
+    s(:) = 1.0_rp
+    xsi(:) = max(1.0_rp, 1.0_rp/(x(:) - this%alpha%x(:)))
+    eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
+    mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
 
     do while (epsi .gt. 0.9*this%epsimin)
        ! calculating residuals based on
@@ -301,12 +301,12 @@ contains
        res(:) = lambda(:)*s(:) - epsi
 
        residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-       residumax = 0_rp
+       residumax = 0.0_rp
 
        call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
             mpi_real_precision, mpi_max, neko_comm, ierr)
 
-       re_xstuff_squ_global = 0_rp
+       re_xstuff_squ_global = 0.0_rp
        call MPI_Allreduce(norm2(rex)**2+norm2(rexsi)**2+norm2(reeta)**2,&
             re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum,&
             neko_comm, ierr)
@@ -324,7 +324,7 @@ contains
           !Check the condition
           if (residumax .lt. epsi) exit
 
-          delx = 0_rp
+          delx = 0.0_rp
           do j = 1, this%n
              do i = 1, this%m
                 delx(j) = delx(j) + this%pij%x(i,j) * &
@@ -377,7 +377,7 @@ contains
                lambda(:)))/(this%upp%x(:) - x(:))**3 + &
                (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
                lambda(:)))/(x(:) - this%low%x(:))**3 )
-          diagx(:) = 2*diagx(:) + xsi(:)/(x(:) - this%alpha%x(:)) + &
+          diagx(:) = 2.0_rp*diagx(:) + xsi(:)/(x(:) - this%alpha%x(:)) + &
                eta(:)/(this%beta%x(:)- x(:))
 
 
@@ -462,7 +462,7 @@ contains
           xx = [y, z, lambda, xsi, eta, mu, zeta, s]
           steg = maxval([dummy_one, -1.01*dxx/xx, -1.01*dx/ &
                (x(:) - this%alpha%x(:)), 1.01*dx/(this%beta%x(:) - x(:))])
-          steg = 1.0/steg
+          steg = 1.0_rp/steg
 
           call MPI_Allreduce(steg, steg, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
@@ -479,7 +479,7 @@ contains
 
           !The innermost loop to determine the suitable step length
           !using the Backtracking Line Search approach
-          newresidu = 2*residunorm
+          newresidu = 2.0_rp*residunorm
           itto = 0
           do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
              itto = itto + 1
@@ -532,7 +532,7 @@ contains
              residu = [rex, rey, rez, relambda, &
                   rexsi, reeta, remu, rezeta, res]
 
-             re_xstuff_squ_global = 0_rp
+             re_xstuff_squ_global = 0.0_rp
              call MPI_Allreduce(norm2(rex)**2 + &
                   norm2(rexsi)**2+norm2(reeta)**2, re_xstuff_squ_global, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -541,11 +541,11 @@ contains
              newresidu = sqrt(norm2(residu_small)**2 + &
                   re_xstuff_squ_global)
 
-             steg = steg/2
+             steg = steg/2.0_rp
           end do
 
           residunorm = newresidu
-          residumax = 0_rp
+          residumax = 0.0_rp
           call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
 
@@ -557,7 +557,7 @@ contains
           !     "steg = ", steg, "residunorm = ",residunorm, &
           !       "residumax = ",residumax
        end do
-       epsi = 0.1*epsi
+       epsi = 0.1_rp*epsi
 
     end do
 

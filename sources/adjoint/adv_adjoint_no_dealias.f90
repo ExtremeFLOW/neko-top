@@ -286,7 +286,7 @@ contains
   !! @param n Typically the size of the mesh.
   subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, &
        n, work1, work2, work3, w1, w2, w3)
-    implicit none
+    integer, intent(in) :: n
     type(c_ptr), intent(inout) :: f_d
     type(c_ptr), intent(in) :: u_i_d
     real(kind=rp), intent(inout), dimension(n) :: ub, vb, wb
@@ -294,7 +294,6 @@ contains
     type(field_t), intent(inout) :: work1, work2, work3
     type(space_t), intent(inout) :: Xh
     type(coef_t), intent(inout) :: coef
-    integer, intent(in) :: n
     type(c_ptr) :: ub_d, vb_d, wb_d
     type(c_ptr) :: work1_d, work2_d, work3_d, w1_d, w2_d, w3_d
     integer :: i
