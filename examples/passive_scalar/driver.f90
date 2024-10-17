@@ -102,11 +102,8 @@ program usrneko
 
 
     ! NOW here is where we would initialize our new objective functions!
-    print *, "about to append the objective"
     call objective%init(design, C, adj)
-    print *, "done"
 
-    print *, "check apended one", allocated(adj%scalar%source_term%source_terms), &   
     size(adj%scalar%source_term%source_terms)
 
     ! init the sampler
@@ -171,12 +168,10 @@ program usrneko
 
 !     call problem%compute()
 !!------------------------------------------------------------------------------
-    print *, "check apended two", allocated(adj%scalar%source_term%source_terms), &   
     size(adj%scalar%source_term%source_terms)
       call neko_solve(C)
       call objective%compute(design,C)
       print *,'OBJECTIVE', objective%objective_function_value
-    print *, "check apended three", allocated(adj%scalar%source_term%source_terms), &   
     size(adj%scalar%source_term%source_terms)
 
 !     call problem%compute_sensitivity()
