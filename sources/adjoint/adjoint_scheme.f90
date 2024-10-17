@@ -340,7 +340,7 @@ contains
        call this%Xh%init(GLL, lx, lx, lx)
     end if
 
-    ! call this%dm_Xh%init(msh, this%Xh)
+    call this%dm_Xh%init(msh, this%Xh)
 
     call this%gs_Xh%init(this%dm_Xh)
 

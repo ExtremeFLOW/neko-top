@@ -54,9 +54,9 @@ contains
     integer, intent(in) :: tstep
 
     if(y.gt.1.0_rp) then
-    	s = 1.0_rp
+      s = 1.0_rp
     else
-    	s = 0.0_rp
+      s = 0.0_rp
     end if
   end subroutine scalar_bc
 
@@ -68,7 +68,7 @@ contains
     real(kind=rp) :: rand, z                                                    
                                                                                 
     do i = 1, s%dof%size()                                                      
-    	if(s%dof%y(i,1,1,1).gt.1.0_rp) then
+       if(s%dof%y(i,1,1,1).gt.1.0_rp) then
        s%x(i,1,1,1) = 1.0_rp                                       
       else
        s%x(i,1,1,1) = 0.0_rp                                       

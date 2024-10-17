@@ -490,10 +490,10 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
 
     else
-    	do e = 1, coef%msh%nelv
+      do e = 1, coef%msh%nelv
        ! \int \grad r . U_b  s
           !-----------------------------
-    	call adjoint_weak_no_dealias_cpu( &
+       call adjoint_weak_no_dealias_cpu( &
                & fs%x(:,:,:,e), s%x(1,1,1,e), &
                & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                & e, coef, Xh, Xh%lxyz, &
