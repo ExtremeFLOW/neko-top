@@ -58,6 +58,7 @@ program usrneko
   type(scalar_mixing_objective_function_t) :: objective
 
 
+  type(fld_file_output_t) :: output
   ! init the problem (base)
  !call problem%init_base()
 !!------------------------------------------------------------------------------
@@ -108,6 +109,39 @@ program usrneko
     print *, "check apended one", allocated(adj%scalar%source_term%source_terms), &   
     size(adj%scalar%source_term%source_terms)
 
+    ! init the sampler
+    !---------------------------------------------------------
+    ! TODO
+    ! obviously when we do the mappings properly, to many coeficients, we'll
+    ! also have to modify this
+    ! for now:
+    ! - forward (p,u,v,w)                      1,2,3,4           p,vx,vy,vz
+    ! - design (\rho)                          5                 temperature
+    ! - adjoint (u,v,w,p)                      6,7,8,9           s1,s2,s3,s4
+    ! - mapped (\chi)                          10                s5
+    ! - sensitivity (dF/d\chi and dC/d\chi)    11, 12            s6,s7
+    ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
+
+    call output%init(sp, 'optimization', 14)
+    call output%fields%assign(1, C%fluid%p)
+    call output%fields%assign(2, C%fluid%u)
+    call output%fields%assign(3, C%fluid%v)
+    call output%fields%assign(4, C%fluid%w)
+    ! I don't know why these ones need assign_to_field?
+    call output%fields%assign_to_field(5, design%design_indicator)
+    call output%fields%assign(6, adj%scheme%u_adj)
+    call output%fields%assign(7, adj%scheme%v_adj)
+    call output%fields%assign(8, adj%scheme%w_adj)
+    call output%fields%assign(9, adj%scheme%p_adj)
+    call output%fields%assign_to_field(10, design%brinkman_amplitude)
+    call output%fields%assign_to_field(11, &
+         objective%sensitivity_to_coefficient)
+    call output%fields%assign_to_field(12, design%sensitivity)
+    call output%fields%assign(13, C%scalar%s)
+    call output%fields%assign(14, adj%scalar%s_adj)
+
+
+
   ! here we hard code MMA
   ! Then we need to tell MMA how many constraints we need etc
   ! work arrays for xmin and xmax
@@ -157,7 +191,8 @@ program usrneko
          objective%sensitivity_to_coefficient)
      fval(1) = problem%volume_constraint%objective_function_value
 
-     call design%sample(real(optimization_iteration,kind=rp))
+     !call design%sample(real(optimization_iteration,kind=rp))
+    call output%sample(real(optimization_iteration,kind=rp))
 
      associate(x => design%design_indicator%x, &
           df0dx=>design%sensitivity%x, &
