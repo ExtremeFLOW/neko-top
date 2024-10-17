@@ -62,6 +62,25 @@
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
-        ]
+        ],
+     "point_zones": [
+            {
+                "name": "optimization_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    0.2,
+                    0.8,
+                ],
+                "y_bounds": [
+                    0.2,
+                    0.8,
+                ],
+                "z_bounds": [
+                    -1.0,
+                     1.0,
+                ],
+           }
+                 ]
+
     }
 }

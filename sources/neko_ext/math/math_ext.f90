@@ -1,5 +1,6 @@
 module math_ext
-  use num_types, only: rp
+  use num_types, only: rp, xp
+  use comm
   implicit none
 
 contains
@@ -93,4 +94,24 @@ contains
 
   end subroutine sub3_mask
 
+  !> @brief Weighted inner product 
+  !! \f$ a^T b \f$ for indices in the mask
+  function glsc2_mask(a, b, size, mask, mask_size)
+    integer, intent(in) :: size, mask_size
+    real(kind=rp), dimension(size), intent(in) :: a
+    real(kind=rp), dimension(size), intent(in) :: b
+    integer, dimension(mask_size), intent(in) :: mask
+    real(kind=rp) :: glsc2_mask
+    real(kind=xp) :: tmp
+    integer :: i, ierr
+
+    tmp = 0.0_xp
+    do i = 1, mask_size
+       tmp = tmp + a(mask(i)) * b(mask(i))
+    end do
+
+    call MPI_Allreduce(MPI_IN_PLACE, tmp, 1, &
+         MPI_EXTRA_PRECISION, MPI_SUM, NEKO_COMM, ierr)
+    glsc2_mask = tmp
+  end function glsc2_mask
 end module math_ext

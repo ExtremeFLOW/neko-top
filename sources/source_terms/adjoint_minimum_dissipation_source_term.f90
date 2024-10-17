@@ -60,6 +60,8 @@ module adjoint_minimum_dissipation_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
   use scratch_registry, only : neko_scratch_registry
+  use mask_ops, only: mask_exterior_const
+  use point_zone, only: point_zone_t
   implicit none
   private
 
@@ -67,14 +69,14 @@ module adjoint_minimum_dissipation_source_term
   ! $\int \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
        adjoint_minimum_dissipation_source_term_t
-
-     ! again, for a mask this is silly... we can fix this later in the week
      !> u,v,w of the primal
      type(field_t), pointer :: u,v,w
-     ! todo
-     ! a mask
-     ! type(field_t), pointer :: mask
+     !> a scale for the source term
      real(kind=rp) :: obj_scale
+     !> A mask for where the source term is evaluated
+     class(point_zone_t), pointer :: mask
+     !> containing a mask?
+     logical :: if_mask
 
    contains
      !> The common constructor using a JSON object.
@@ -119,7 +121,9 @@ contains
   ! u,v,w reffer to the primal, not the adjoint
   subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
-       u, v, w, obj_scale, coef)
+       u, v, w, obj_scale, &
+       mask, if_mask, &
+       coef)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -128,9 +132,8 @@ contains
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
-    ! TODo
-    ! do masks later
-    !type(field_t), intent(in), target :: mask
+    class(point_zone_t), intent(in), target :: mask
+    logical :: if_mask
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -155,8 +158,11 @@ contains
 
     this%obj_scale = obj_scale
 
-    ! TODO
-    !this%mask => mask
+    this%if_mask = if_mask
+    if (this%if_mask) then
+       this%mask => mask
+    end if
+
   end subroutine adjoint_minimum_dissipation_source_term_init_from_components
 
   !> Destructor.
@@ -228,6 +234,13 @@ contains
 
     call curl(wo1, wo2, wo3, u, v, w, t1, t2, this%coef)
     call curl(wo4, wo5, wo6, wo1, wo2, wo3, t1, t2, this%coef)
+
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(wo4, this%mask, 0.0_rp)
+       call mask_exterior_const(wo5, this%mask, 0.0_rp)
+       call mask_exterior_const(wo6, this%mask, 0.0_rp)
+    end if
 
     call field_add2s2(fu, wo4, this%obj_scale)
     call field_add2s2(fv, wo5, this%obj_scale)

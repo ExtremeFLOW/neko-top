@@ -123,7 +123,7 @@ objective functions and constraints that we require a fluid simulation.
 This level of abstraction/objected oriented thinking is beyond me, but I'm 
 sure we'll require some refactoring to make this right.
 
-### Masks
+### Masks :white_check_mark:
 This one is rather simple, just including masks on objective functions and 
 masks on the optimization domain. We could then compute volume based on the 
 optimization domain, not the computation domain.
@@ -133,7 +133,7 @@ suggested Tim. In `Nek5000` we filled up arrays the size of the mesh with
 booleans. That's rather light, and we could still use all the point zone 
 functionality to initialize these masks.
 
-### incorporate the PDE filters
+### incorporate the PDE filters :white_check_mark:
 We already have a branch in Neko where we did the PDE filters. Either we PR 
 that in neko, so it can be used with the standard Brinkman term there, or we 
 just migrate everything to neko-top. 
