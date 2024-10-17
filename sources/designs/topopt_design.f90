@@ -393,12 +393,9 @@ contains
     this%filtered_design)
 
     ! TODO
-    ! oh oh... I don't know what to do here...
-    ! I'm just following the vibe of "everything in the adjoint happens in
-    ! reverse". So I'm masking at the end.
-    ! This could be wrong, talk to the big dogs.
+    ! DELETE THIS LATER
     !
-    ! Also, depending on how Abbas writes the interface for the optimization
+    ! When Abbas writes the interface for the optimization
     ! module this may be a moot point, because we would only really collect
     ! the sensitivity of the design variables inside the mask.
     !

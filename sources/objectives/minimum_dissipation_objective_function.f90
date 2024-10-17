@@ -96,6 +96,7 @@ module minimum_dissipation_objective_function
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
+  use math_ext, only: glsc2_mask
   implicit none
   private
 
@@ -233,13 +234,14 @@ contains
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    if (this%if_mask) then
-       call mask_exterior_const(objective_field, this%mask, 0.0_rp)
-    end if
-
     ! integrate the field
     n = wo1%size()
-    this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+    if (this%if_mask) then
+       this%dissipation = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+       n, this%mask%mask, this%mask%size)
+    else
+       this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+    end if
 
     if (this%if_lube) then
        ! it's becoming so stupid to pass the whole fluid and adjoint and
@@ -251,9 +253,11 @@ contains
        call field_addcol3(objective_field, fluid%v, design%brinkman_amplitude)
        call field_addcol3(objective_field, fluid%w, design%brinkman_amplitude)
        if (this%if_mask) then
-          call mask_exterior_const(objective_field, this%mask, 0.0_rp)
+          this%lube_value = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+          n, this%mask%mask, this%mask%size)
+       else
+          this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
        end if
-       this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value
     else

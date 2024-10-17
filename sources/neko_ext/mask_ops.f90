@@ -31,14 +31,6 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Some common Masking operations we may need
-!! TODO
-!! I know I got outvoted on defining a mask as a field of booleans...
-!! You were right, `point_zones` are convenient, but I don't like that the
-!! `invert` is defined on initialization (maybe I'm misunderstanding)
-!! So we can chose either the interior or the exterior at the beginning.
-!!
-!! There's probably a smarter way of doing this, but if you want to zero the
-!! interior vs the exterior, one will involve some awkward memory shifting.
 module mask_ops
   use field, only: field_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -47,11 +39,12 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only : neko_scratch_registry
   use field_math, only: field_cfill, field_copy
-  use comm
+  use math, only: masked_copy
+  use device_math, only: device_masked_copy
   implicit none
 
   private
-  public :: mask_exterior_const, mask_interior_const, masked_glsc2 
+  public :: mask_exterior_const, mask_exterior_fld
 
 contains
 
@@ -59,8 +52,6 @@ contains
   !! @param[in,out] fld The field being masked
   !! @param[in,out] The mask being applied.
   !! @param[in] The value to be filled
-  !! NOTE! we always assume the incoming point zone describes the interior of
-  !! the mask, ie, `invert = .false.`
   subroutine mask_exterior_const(fld, mask, const)
     type(field_t), intent(inout) :: fld
     class(point_zone_t), intent(inout) :: mask
@@ -76,9 +67,9 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet')
+       call neko_error('GPU not supported for masks yet') 
     else
-       do i = 1, mask%size
+    	do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
        end do
     end if
@@ -90,47 +81,36 @@ contains
 
   end subroutine mask_exterior_const
 
-  !> @brief Force everything inside the mask to be a constant value
+  !> @brief Force everything outside the mask to be a background field
   !! @param[in,out] fld The field being masked
   !! @param[in,out] The mask being applied.
-  !! @param[in] The value to be filled
-  !! NOTE! we always assume the incoming point zone describes the interior of
-  !! the mask, ie, `invert = .false.`
-  subroutine mask_interior_const(fld, mask, const)
+  !! @param[in] The background field
+  subroutine mask_exterior_fld(fld, mask, background)
     type(field_t), intent(inout) :: fld
     class(point_zone_t), intent(inout) :: mask
-    real(kind=rp), intent(in) :: const
+    type(field_t), intent(inout) :: background
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
     integer :: i
+
+    call neko_scratch_registry%request_field(work , temp_indices(1))
+
+    ! fill background fld
+    call field_copy(work, background)
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet')
+       call neko_error('GPU not supported for masks yet') 
     else
-       do i = 1, mask%size
-          fld%x(mask%mask(i), 1, 1, 1) = const 
+    	do i = 1, mask%size
+          work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
        end do
     end if
 
-  end subroutine mask_interior_const
+    ! copy over
+    call field_copy(fld, work)
 
-  !> Weighted inner product \f$ a^T b \f$ masked
-  !! we probably don't need the n as an input..
-  function masked_glsc2(a, b, mask, n)
-    integer, intent(in) :: n
-    real(kind=rp), dimension(n), intent(in) :: a
-    real(kind=rp), dimension(n), intent(in) :: b
-    class(point_zone_t), intent(inout) :: mask
-    real(kind=rp) :: masked_glsc2
-    real(kind=xp) :: tmp
-    integer :: i, ierr
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
-    tmp = 0.0_xp
-    do i = 1, mask%size
-       tmp = tmp + a(mask%mask(i)) * b(mask%mask(i))
-    end do
-
-    call MPI_Allreduce(MPI_IN_PLACE, tmp, 1, &
-         MPI_EXTRA_PRECISION, MPI_SUM, NEKO_COMM, ierr)
-    masked_glsc2 = tmp
-  end function masked_glsc2
+  end subroutine mask_exterior_fld
 end module mask_ops
