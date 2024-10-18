@@ -35,20 +35,17 @@
 module adv_lin_no_dealias
   use advection_adjoint, only: advection_adjoint_t
   use num_types, only: rp
-  use math, only: vdot3, sub2, subcol3, rzero
-  use utils, only: neko_error
-  use space, only: space_t, GL
+  use math, only: subcol3, rzero
+  use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
   use scratch_registry, only : neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
-  use interpolation, only: interpolator_t
   use device_math, only: device_vdot3, device_sub2, device_add4, &
        device_col3, device_subcol3, device_rzero
-  use device, only: device_free, device_map, device_memcpy, device_get_ptr, &
-       HOST_TO_DEVICE
+  use device, only: device_free, device_map, device_get_ptr
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, &
        c_associated
   implicit none
@@ -272,7 +269,7 @@ contains
   !! @param n Typically the size of the mesh.
   subroutine adjoint_weak_no_dealias_device(f_d, u_i_d, ub, vb, wb, coef, Xh, &
        n, work1, work2, work3, w1, w2, w3)
-    implicit none
+    integer, intent(in) :: n
     type(c_ptr), intent(inout) :: f_d
     type(c_ptr), intent(in) :: u_i_d
     real(kind=rp), intent(inout), dimension(n) :: ub, vb, wb
@@ -280,7 +277,6 @@ contains
     type(field_t), intent(inout) :: work1, work2, work3
     type(space_t), intent(inout) :: Xh
     type(coef_t), intent(inout) :: coef
-    integer, intent(in) :: n
     type(c_ptr) :: ub_d, vb_d, wb_d
     type(c_ptr) :: work1_d, work2_d, work3_d, w1_d, w2_d, w3_d
     integer :: i

@@ -33,19 +33,18 @@
 !
 !> Mappings to be applied to a scalar field
 module mapping
-  use num_types, only : rp
-  use json_module, only : json_file
-  use coefs, only : coef_t
-  use json_utils, only : json_get_or_default, json_get
+  use num_types, only: rp
+  use json_module, only: json_file
+  use coefs, only: coef_t
   use field, only: field_t
   implicit none
   private
 
   !> Base abstract class for mapping.
   type, abstract, public :: mapping_t
-  	  !> Coefficients for the SEM.
+     !> Coefficients for the SEM.
      type(coef_t), pointer :: coef => null()
- 
+
    contains
      !> Constructor for the mapping_t class.
      procedure, pass(this) :: init_base => mapping_init_base
@@ -91,8 +90,8 @@ module mapping
      subroutine mapping_apply(this, X_out, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
-       type(field_t), intent(in) ::  X_in
-       type(field_t), intent(inout) ::  X_out
+       type(field_t), intent(in) :: X_in
+       type(field_t), intent(inout) :: X_out
      end subroutine mapping_apply
   end interface
 
@@ -108,9 +107,9 @@ module mapping
      subroutine mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
-       type(field_t), intent(in) ::  dF_dX_out
-       type(field_t), intent(in) ::  X_in
-       type(field_t), intent(inout) ::  dF_dX_in
+       type(field_t), intent(in) :: dF_dX_out
+       type(field_t), intent(in) :: X_in
+       type(field_t), intent(inout) :: dF_dX_in
      end subroutine mapping_apply_backward
   end interface
 contains
@@ -120,10 +119,6 @@ contains
     class(mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout), target :: coef
-    character(len=:), allocatable :: compute_control, output_control
-    real(kind=rp) :: compute_value, output_value
-    integer :: order
-
 
     this%coef => coef
 

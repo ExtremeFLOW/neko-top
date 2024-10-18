@@ -1,7 +1,6 @@
 module problem
-!use design_variable, only: design_variable_t
+  use num_types, only: rp
   use topopt_design, only: topopt_design_t
-  use num_types, only : rp, sp, dp
 
   implicit none
   private

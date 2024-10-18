@@ -8,6 +8,14 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
+  use json_utils, only: json_get, json_get_or_default
+  use num_types, only: rp
+  use simcomp_executor, only: neko_simcomps
+  use flow_ic, only: set_flow_ic
+  use scalar_ic, only: set_scalar_ic
+  use field, only: field_t
+  use chkp_output, only: chkp_output_t
+  use output_controller, only : output_controller_t
   implicit none
 
   ! ========================================================================= !
@@ -31,14 +39,6 @@ contains
   !>
   !> @param[inout] C Case data structure.
   subroutine reset(neko_case)
-    use json_utils, only: json_get, json_get_or_default
-    use num_types, only: rp
-    use simcomp_executor, only: neko_simcomps
-    use flow_ic, only: set_flow_ic
-    use scalar_ic, only: set_scalar_ic
-    use field, only: field_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
     integer :: i
@@ -54,7 +54,7 @@ contains
     v => neko_case%fluid%v
     w => neko_case%fluid%w
     p => neko_case%fluid%p
-    if(allocated(neko_case%scalar)) then
+    if (allocated(neko_case%scalar)) then
        s => neko_case%scalar%s
     end if
 
@@ -70,7 +70,7 @@ contains
     end do
 
     ! Reset the time step counter
-    call neko_case%s%set_counter(t)
+    call neko_case%output_controller%set_counter(t)
 
     ! Restart the fields
     call neko_case%fluid%restart(neko_case%dtlag, neko_case%tlag)
@@ -138,13 +138,6 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[in] iter Iteration number.
   subroutine setup_iteration(neko_case, iter)
-    use case, only: case_t
-    use num_types, only: rp
-    use chkp_output, only: chkp_output_t
-    use json_utils, only: json_get_or_default
-    use sampler, only: sampler_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     integer, intent(in) :: iter
 
@@ -164,7 +157,7 @@ contains
     neko_case%f_out%output_t%file_%file_type%fname = trim(file_name)
     neko_case%f_out%output_t%file_%file_type%counter = 0
     neko_case%f_out%output_t%file_%file_type%start_counter = 0
-    call neko_case%s%sample(0.0_rp, 0, .true.)
+    call neko_case%output_controller%execute(0.0_rp, 0, .true.)
 
   end subroutine setup_iteration
 

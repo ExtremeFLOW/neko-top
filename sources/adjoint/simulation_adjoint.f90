@@ -42,7 +42,6 @@ module simulation_adjoint
   use field, only: field_t
   use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
-  use simcomp_executor, only: neko_simcomps
   use json_utils, only: json_get_or_default
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
@@ -83,7 +82,7 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf, '(A, E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
+    write(log_buf, '(A,E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
          this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
@@ -98,7 +97,7 @@ contains
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
     ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-    call this%s%sample(t_adj, tstep_adj)
+    call this%output_controller%execute(t_adj, tstep_adj)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
@@ -152,7 +151,7 @@ contains
        call neko_log%section('Postprocessing')
 
        !  call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-       call this%s%sample(t_adj, tstep_adj)
+       call this%output_controller%execute(t_adj, tstep_adj)
 
        ! Update material properties
        call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
@@ -170,7 +169,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%s%sample(t_adj, tstep_adj, output_at_end)
+    call this%output_controller%execute(t_adj, tstep_adj, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
@@ -259,7 +258,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call C%s%set_counter(t)
+    call C%output_controller%set_counter(t)
   end subroutine simulation_restart
 
 !> Write a checkpoint at joblimit
