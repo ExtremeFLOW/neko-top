@@ -42,7 +42,6 @@ module simulation_adjoint
   use field, only: field_t
   use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
-  use simcomp_executor, only: neko_simcomps
   use json_utils, only: json_get_or_default
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t

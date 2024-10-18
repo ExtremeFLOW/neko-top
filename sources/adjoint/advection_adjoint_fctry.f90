@@ -34,13 +34,11 @@
 module advection_adjoint_fctry
   use num_types, only : rp
   use coefs, only : coef_t
-  use json_utils, only : json_get, json_get_or_default
+  use json_utils, only : json_get
   use json_module, only : json_file
 
   ! Advection and derivatives
   use advection_adjoint, only : advection_adjoint_t
-  use adv_dealias, only : adv_dealias_t
-  use adv_no_dealias, only : adv_no_dealias_t
   use adv_lin_dealias, only : adv_lin_dealias_t
   use adv_lin_no_dealias, only : adv_lin_no_dealias_t
 
@@ -69,7 +67,7 @@ contains
     if (.not. found) then
        call json_get(json, 'case.numerics.polynomial_order', order)
        ! Note, assumes odd polynomial order
-       lxd = 3.0_rp / 2.0_rp * (order + 1)
+       lxd = 3 * (order + 1) / 2
     end if
 
     ! Free allocatables if necessary
@@ -89,7 +87,7 @@ contains
        if (lxd .gt. 0) then
           call adv%init(lxd, coef)
        else
-          call adv%init(coef%Xh%lx * 3/2, coef)
+          call adv%init(coef%Xh%lx * 3 / 2, coef)
        end if
       type is (adv_lin_no_dealias_t)
        call adv%init(coef)
