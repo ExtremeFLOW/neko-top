@@ -8,6 +8,14 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
+  use json_utils, only: json_get, json_get_or_default
+  use num_types, only: rp
+  use simcomp_executor, only: neko_simcomps
+  use flow_ic, only: set_flow_ic
+  use scalar_ic, only: set_scalar_ic
+  use field, only: field_t
+  use chkp_output, only: chkp_output_t
+  use output_controller, only : output_controller_t
   implicit none
 
   ! ========================================================================= !
@@ -31,14 +39,6 @@ contains
   !>
   !> @param[inout] C Case data structure.
   subroutine reset(neko_case)
-    use json_utils, only: json_get, json_get_or_default
-    use num_types, only: rp
-    use simcomp_executor, only: neko_simcomps
-    use flow_ic, only: set_flow_ic
-    use scalar_ic, only: set_scalar_ic
-    use field, only: field_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
     integer :: i
@@ -138,13 +138,6 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[in] iter Iteration number.
   subroutine setup_iteration(neko_case, iter)
-    use case, only: case_t
-    use num_types, only: rp
-    use chkp_output, only: chkp_output_t
-    use json_utils, only: json_get_or_default
-    use output_controller, only : output_controller_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     integer, intent(in) :: iter
 
