@@ -82,7 +82,7 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf, '(A, E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
+    write(log_buf, '(A,E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
          this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)

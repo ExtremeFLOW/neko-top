@@ -54,7 +54,7 @@ contains
     v => neko_case%fluid%v
     w => neko_case%fluid%w
     p => neko_case%fluid%p
-    if(allocated(neko_case%scalar)) then
+    if (allocated(neko_case%scalar)) then
        s => neko_case%scalar%s
     end if
 
