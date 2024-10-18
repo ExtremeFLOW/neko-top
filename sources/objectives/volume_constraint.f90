@@ -150,7 +150,7 @@ contains
           call neko_error('GPU not supported volume constraint')
        else
           this%volume_domain = glsc2_mask(work%x, fluid%c_xh%B, &
-          n, this%mask%mask, this%mask%size)
+               n, this%mask%mask, this%mask%size)
        end if
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
