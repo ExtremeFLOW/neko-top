@@ -32,57 +32,52 @@
 !
 !> Linearized Navier Stokes solver based on Pn/Pn formulation.
 module adjoint_pnpn
-  use num_types, only : rp, dp
-  use krylov, only : ksp_monitor_t
-  use pnpn_residual, only : pnpn_prs_res_factory, pnpn_vel_res_factory
-  use pnpn_residual, only : pnpn_prs_res_stress_factory, &
+  use num_types, only: rp, dp
+  use krylov, only: ksp_monitor_t
+  use pnpn_residual, only: pnpn_prs_res_factory, pnpn_vel_res_factory
+  use pnpn_residual, only: pnpn_prs_res_stress_factory, &
        pnpn_vel_res_stress_factory
-  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t
-  use ax_product, only : ax_helm_factory
-  use rhs_maker, only : rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
+  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t
+  use ax_product, only: ax_helm_factory
+  use rhs_maker, only: rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry
-  use rhs_maker, only : rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t
-  use fluid_volflow, only : fluid_volflow_t
-  use adjoint_scheme, only : adjoint_scheme_t
-  use field_series, only : field_series_t
-  use device_math, only : device_add2, device_col2, device_cmult
-  use device_mathops, only : device_opcolv, device_opadd2cm
-  use fluid_aux, only : fluid_step_info
-  use time_scheme_controller, only : time_scheme_controller_t
-  use projection, only : projection_t
-  use device, only : device_memcpy, HOST_TO_DEVICE
-  use logger, only : neko_log, NEKO_LOG_DEBUG
-  use advection_adjoint, only : advection_adjoint_t
-  use profiler, only : profiler_start_region, profiler_end_region
-  use json_utils, only : json_get, json_get_or_default
-  use json_module, only : json_file
-  use advection_adjoint_fctry, only : advection_adjoint_factory
-  use ax_product, only : ax_t
-  use field, only : field_t
-  use dirichlet, only : dirichlet_t
-  use facet_normal, only : facet_normal_t
-  use non_normal, only : non_normal_t
-  use mesh, only : mesh_t
-  use user_intf, only : user_t
-  use coefs, only : coef_t
-  use time_step_controller, only : time_step_controller_t
-  use gather_scatter, only : gs_t, GS_OP_ADD
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use math, only : col2, add2, copy, glsc2, vdot3, cmult, vlsc3
-  use mathops, only : opadd2cm, opcolv
+  use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t
+  use fluid_volflow, only: fluid_volflow_t
+  use adjoint_scheme, only: adjoint_scheme_t
+  use math, only: col2, cmult, vlsc3
+  use device_math, only: device_cmult
+  use device_mathops, only: device_opcolv, device_opadd2cm
+  use fluid_aux, only: fluid_step_info
+  use time_scheme_controller, only: time_scheme_controller_t
+  use projection, only: projection_t
+  use device, only: device_memcpy, HOST_TO_DEVICE
+  use logger, only: neko_log, NEKO_LOG_DEBUG
+  use advection_adjoint, only: advection_adjoint_t
+  use profiler, only: profiler_start_region, profiler_end_region
+  use json_utils, only: json_get_or_default
+  use json_module, only: json_file
+  use advection_adjoint_fctry, only: advection_adjoint_factory
+  use ax_product, only: ax_t
+  use field, only: field_t
+  use dirichlet, only: dirichlet_t
+  use facet_normal, only: facet_normal_t
+  use non_normal, only: non_normal_t
+  use mesh, only: mesh_t
+  use user_intf, only: user_t
+  use time_step_controller, only: time_step_controller_t
+  use gather_scatter, only: gs_t, GS_OP_ADD
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use mathops, only: opadd2cm, opcolv
   use bc, only: bc_list_t, bc_list_init, bc_list_add, bc_list_free, &
        bc_list_apply_scalar, bc_list_apply_vector
-  use utils, only : neko_error
-  use field_math, only : field_add2
-  use flow_ic, only : set_flow_ic
-  use file, only : file_t, file_free, fld_file_data_t
-  use field_registry, only : neko_field_registry
-  use operators, only : curl
-  use fld_file_output, only : fld_file_output_t
-  use comm, only : pe_rank, MPI_REAL_PRECISION
-  use vector, only : vector_t
-  use, intrinsic :: iso_c_binding, only : c_ptr
-  use mpi_f08, only : MPI_SUM, MPI_COMM_WORLD, &
+  use utils, only: neko_error
+  use field_math, only: field_add2
+  use file, only: file_t, fld_file_data_t
+  use field_registry, only: neko_field_registry
+  use comm, only: MPI_REAL_PRECISION
+  use vector, only: vector_t
+  use, intrinsic :: iso_c_binding, only: c_ptr
+  use mpi_f08, only: MPI_SUM, MPI_COMM_WORLD, &
        MPI_IN_PLACE, mpi_allreduce
 
   implicit none
@@ -836,7 +831,7 @@ contains
   end subroutine adjoint_pnpn_step
 
   subroutine rescale_fluid(fluid_data, scale)
-    use neko_config, only : NEKO_BCKND_DEVICE
+    use neko_config, only: NEKO_BCKND_DEVICE
     implicit none
 
     !> Fluid data
@@ -941,10 +936,10 @@ contains
   end function norm
 
   function device_norm(x_d, y_d, z_d, B_d, volume, n)
-    use neko_config, only : NEKO_BCKND_DEVICE
-    use device_math, only : device_vlsc3
-    use comm, only : MPI_REAL_PRECISION
-    use mpi_f08, only : MPI_SUM, MPI_COMM_WORLD, &
+    use neko_config, only: NEKO_BCKND_DEVICE
+    use device_math, only: device_vlsc3
+    use comm, only: MPI_REAL_PRECISION
+    use mpi_f08, only: MPI_SUM, MPI_COMM_WORLD, &
          MPI_IN_PLACE, mpi_allreduce
 
     implicit none

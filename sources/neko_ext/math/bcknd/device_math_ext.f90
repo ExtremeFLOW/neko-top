@@ -31,7 +31,6 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 module device_math_ext
-  use comm
   use utils, only : neko_error
   use num_types, only : rp, c_rp
   use, intrinsic :: iso_c_binding
@@ -43,7 +42,7 @@ module device_math_ext
 
   interface
      subroutine cuda_cadd_mask(a_d, c, size, mask_d, mask_size) &
-          bind(c, name='cuda_cadd_mask')
+          bind(c, name = 'cuda_cadd_mask')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: a_d
@@ -55,7 +54,7 @@ module device_math_ext
   end interface
   interface
      subroutine cuda_invcol1_mask(a_d, size, mask_d, mask_size) &
-          bind(c, name='cuda_invcol1_mask')
+          bind(c, name = 'cuda_invcol1_mask')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: a_d
@@ -66,7 +65,7 @@ module device_math_ext
   end interface
   interface
      subroutine cuda_col2_mask(a_d, b_d, size, mask_d, mask_size) &
-          bind(c, name='cuda_col2_mask')
+          bind(c, name = 'cuda_col2_mask')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: a_d
@@ -78,7 +77,7 @@ module device_math_ext
   end interface
   interface
      subroutine cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
-          bind(c, name='cuda_col3_mask')
+          bind(c, name = 'cuda_col3_mask')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: a_d
@@ -91,7 +90,7 @@ module device_math_ext
   end interface
   interface
      subroutine cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
-          bind(c, name='cuda_sub3_mask')
+          bind(c, name = 'cuda_sub3_mask')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: a_d
