@@ -316,7 +316,7 @@ contains
     ! if we mask first then filter, at least all the boundaries will be smooth.
     if (this%if_mask) then
        call mask_exterior_const(this%design_indicator, &
-       this%optimization_domain, 0.0_rp)
+            this%optimization_domain, 0.0_rp)
     end if
 
     ! TODO
