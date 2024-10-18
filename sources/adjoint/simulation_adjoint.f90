@@ -98,7 +98,7 @@ contains
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
     ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-    call this%s%sample(t_adj, tstep_adj)
+    call this%output_controller%execute(t_adj, tstep_adj)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
@@ -154,7 +154,7 @@ contains
        ! adjoint simulation components
 
        !  call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-       call this%s%sample(t_adj, tstep_adj)
+       call this%output_controller%execute(t_adj, tstep_adj)
 
        ! Update material properties
        call this%case%usr%material_properties(t_adj, tstep_adj, &
@@ -173,7 +173,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%s%sample(t_adj, tstep_adj, output_at_end)
+    call this%output_controller%execute(t_adj, tstep_adj, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
@@ -262,7 +262,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call C%s%set_counter(t)
+    call C%output_controller%set_counter(t)
   end subroutine simulation_restart
 
 !> Write a checkpoint at joblimit

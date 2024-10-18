@@ -73,7 +73,7 @@ module adjoint_case
   use mesh_field, only: mesh_fld_t, mesh_field_init, mesh_field_free
   use parmetis, only: parmetis_partmeshkway
   use redist, only: redist_mesh
-  use sampler, only: sampler_t
+  use output_controller, only: output_controller_t
   use flow_ic, only: set_flow_ic
   use scalar_ic, only: set_scalar_ic
   use field, only: field_t
@@ -130,7 +130,7 @@ module adjoint_case
      ! Fields
      real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
-     type(sampler_t) :: s
+     type(output_controller_t) :: output_controller
 
      logical :: have_scalar = .false.
 
@@ -403,9 +403,9 @@ contains
     end if
 
     !
-    ! Setup sampler
+    ! Setup output_controller
     !
-    call this%s%init(neko_case%end_time)
+    call this%output_controller%init(neko_case%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, this%scalar, &
             path = trim(output_directory))
@@ -420,15 +420,15 @@ contains
     if (trim(string_val) .eq. 'org') then
        ! yes, it should be real_val below for type compatibility
        call json_get(neko_case%params, 'case.nsamples', real_val)
-       call this%s%add(this%f_out, real_val, 'nsamples')
+       call this%output_controller%add(this%f_out, real_val, 'nsamples')
     else if (trim(string_val) .eq. 'never') then
        ! Fix a dummy 0.0 output_value
        call json_get_or_default(neko_case%params, 'case.fluid.output_value', &
             real_val, 0.0_rp)
-       call this%s%add(this%f_out, 0.0_rp, string_val)
+       call this%output_controller%add(this%f_out, 0.0_rp, string_val)
     else
        call json_get(neko_case%params, 'case.fluid.output_value', real_val)
-       call this%s%add(this%f_out, real_val, string_val)
+       call this%output_controller%add(this%f_out, real_val, string_val)
     end if
 
     ! !
@@ -447,7 +447,7 @@ contains
     !    call json_get_or_default(neko_case%params, 'case.checkpoint_value', &
     ! real_val,&
     !         1e10_rp)
-    !   !  call this%s%add(neko_case%f_chkp, real_val, string_val)
+    !   !  call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
     ! end if
 
   end subroutine adjoint_case_init_common
@@ -458,7 +458,7 @@ contains
 
     nullify(this%case)
     call this%scheme%free()
-    call this%s%free()
+    call this%output_controller%free()
 
   end subroutine adjoint_free
 

@@ -70,7 +70,7 @@ contains
     end do
 
     ! Reset the time step counter
-    call neko_case%s%set_counter(t)
+    call neko_case%output_controller%set_counter(t)
 
     ! Restart the fields
     call neko_case%fluid%restart(neko_case%dtlag, neko_case%tlag)
@@ -147,7 +147,7 @@ contains
     use num_types, only: rp
     use chkp_output, only: chkp_output_t
     use json_utils, only: json_get_or_default
-    use sampler, only: sampler_t
+    use output_controller, only : output_controller_t
     implicit none
 
     type(case_t), intent(inout) :: neko_case
@@ -169,7 +169,7 @@ contains
     neko_case%f_out%output_t%file_%file_type%fname = trim(file_name)
     neko_case%f_out%output_t%file_%file_type%counter = 0
     neko_case%f_out%output_t%file_%file_type%start_counter = 0
-    call neko_case%s%sample(0.0_rp, 0, .true.)
+    call neko_case%output_controller%execute(0.0_rp, 0, .true.)
 
   end subroutine setup_iteration
 
