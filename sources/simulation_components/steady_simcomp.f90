@@ -38,7 +38,6 @@ module steady_simcomp
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use case, only: case_t
-  use coefs, only: coef_t
   use field_math, only: field_sub2, field_glsc2, field_copy
   implicit none
   private
