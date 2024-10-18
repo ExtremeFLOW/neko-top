@@ -404,7 +404,7 @@ contains
     ! test something in the passive scalar.
     if (this%if_mask) then
        call mask_exterior_const(this%sensitivity, this%optimization_domain, &
-       0.0_rp)
+            0.0_rp)
     end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)
