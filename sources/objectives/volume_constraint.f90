@@ -148,10 +148,6 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
     type(topopt_design_t), intent(inout) :: design
-    integer :: i
-    type(field_t), pointer :: wo1, wo2, wo3
-    type(field_t), pointer :: objective_field
-    integer :: temp_indices(4)
     integer n
 
     ! Again, we don't really need to take design and fluid in here...
