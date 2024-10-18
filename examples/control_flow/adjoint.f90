@@ -72,7 +72,7 @@ module simcomp_example
   use mesh_field, only : mesh_fld_t, mesh_field_init, mesh_field_free
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
-  use sampler, only : sampler_t
+  use output_controller, only : output_controller_t
   use adjoint_ic, only : set_adjoint_ic
   use scalar_ic, only : set_scalar_ic
   use field, only : field_t
@@ -105,7 +105,7 @@ module simcomp_example
      type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
      real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
-     type(sampler_t) :: s
+     type(output_controller_t) :: s
 
      logical :: have_scalar = .false.
      logical :: converged = .false.
@@ -369,7 +369,7 @@ contains
     end if
 
     !
-    ! Setup sampler
+    ! Setup output_controller_t
     !
     call this%s%init(C%end_time)
     if (scalar) then
@@ -381,7 +381,8 @@ contains
     end if
 
     ! HARRY
-    ! fuck the sampler we're changing this anyway
+    ! We should be using our own output_controller_t, 
+    ! not the one used internally by neko.
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 
@@ -566,9 +567,9 @@ contains
        call neko_log%message(log_buf)
     end if
 
-    !> Call stats, samplers and user-init before time loop
+    !> Call stats, output_controller_ts and user-init before time loop
     call neko_log%section('Postprocessing')
-    call this%s%sample(t_adj, tstep_adj)
+    call this%s%execute(t_adj, tstep_adj)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition 
@@ -629,7 +630,7 @@ contains
        call neko_log%section('Postprocessing')
 
        ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
-       call this%s%sample(t_adj, tstep_adj)
+       call this%s%execute(t_adj, tstep_adj)
 
        ! Update material properties
        call this%case%usr%material_properties(t_adj, tstep_adj, &
@@ -648,7 +649,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%s%sample(t_adj, tstep_adj, output_at_end)
+    call this%s%execute(t_adj, tstep_adj, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
@@ -739,7 +740,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call C%s%set_counter(t)
+    call C%output_controller%set_counter(t)
   end subroutine simulation_restart
 
   !> Write a checkpoint at joblimit
