@@ -99,6 +99,9 @@ module topopt_design
   use filters, only: permeability_field
   use mma, only: mma_t
   use fld_file_output, only : fld_file_output_t
+  use linear_mapping, only: linear_mapping_t
+  use RAMP_mapping, only: RAMP_mapping_t
+  use PDE_filter, only: PDE_filter_t
   !use design_variable, only: design_variable_t
   implicit none
   private
@@ -136,9 +139,10 @@ module topopt_design
      ! \rho -> C
      ! \rho -> \kappa
      !
-     ! Then during the forward/adjoint looping there will be an additional object,
-     ! the "objective_function" object that will be responsible for computing the
-     ! sensitivity of the objective function with respect to the coefficients
+     ! Then during the forward/adjoint looping there will be an additional
+     ! object, the "objective_function" object that will be responsible for
+     ! computing the sensitivity of the objective function with respect to the
+     ! coefficients
      ! ie,
      ! dF/d\chi, dF/dC and dF/d\kappa
      !
@@ -161,8 +165,8 @@ module topopt_design
      ! Implying we also want dC1/d\rho, dC2/d\rho etc
      ! So this "sensitivity" should also be a list...
      !
-     ! So I bet you'll have a nice abstract way of constructing this in the future
-     ! but I think a sort of list-of-lists would be nice.
+     ! So I bet you'll have a nice abstract way of constructing this in the
+     ! future but I think a sort of list-of-lists would be nice.
      !
      ! For F:
      ! \rho -> \tild{\rho} -> \chi
@@ -183,6 +187,12 @@ module topopt_design
      ! and we continue from there.
      !
      ! perhaps even the "objective" type is defined as a list of objectives.
+
+     ! Let's say way have a chain of two mappings
+     type(PDE_filter_t) :: filter
+     type(RAMP_mapping_t) :: mapping
+     ! and we need to hold onto a field for the chain of mappings
+     type(field_t) :: filtered_design
 
 
      !
@@ -230,14 +240,16 @@ module topopt_design
 
 contains
 
-  subroutine topopt_design_init(this, dm_Xh)
+  subroutine topopt_design_init(this, json, coef)
     class(topopt_design_t), target, intent(inout) :: this
-    type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
+    type(json_file), intent(inout) :: json
+    type(coef_t), intent(inout) :: coef
     integer :: n, i
     ! init the fields
-    call this%design_indicator%init(dm_Xh, "design_indicator")
-    call this%brinkman_amplitude%init(dm_Xh, "brinkman_amplitude")
-    call this%sensitivity%init(dm_Xh, "sensitivity")
+    call this%design_indicator%init(coef%dof, "design_indicator")
+    call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
+    call this%sensitivity%init(coef%dof, "sensitivity")
+    call this%filtered_design%init(coef%dof, "filtered_design")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -248,18 +260,20 @@ contains
 
     n = this%design_indicator%dof%size()
     do i = 1, n
-       if(sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
+       if (sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
             (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2).lt.0.1_rp) then
+            - 0.5_rp)**2) .lt. 0.25_rp) then
           this%design_indicator%x(i,1,1,1) = 1.0_rp
-       endif
-    enddo
+       end if
+    end do
 
     ! TODO
     ! we would also need to make a mapping type that reads in
     ! parameters etc about filtering and mapping
     ! ie,
     ! call mapper%init(this woud be from JSON)
+    call this%filter%init(json, coef)
+    call this%mapping%init(json, coef)
 
     ! and then we would map for the first one
     call this%map_forward()
@@ -274,7 +288,7 @@ contains
     ! TODO
     ! obviously when we do the mappings properly, to many coeficients,
     ! we'll also have to modify this
-    call this%output%init(sp,'design',3)
+    call this%output%init(sp, 'design', 3)
     call this%output%fields%assign(1, this%design_indicator)
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)
@@ -286,12 +300,17 @@ contains
   subroutine topopt_design_map_forward(this)
     class(topopt_design_t), target, intent(inout) :: this
 
+
     ! TODO
     ! this should be somehow deffered so we can pick different mappings!!!
     ! so this would be:
     ! call mapper%forward(fld_out, fld_in)
-    call permeability_field(this%brinkman_amplitude, this%design_indicator, &
-    & 0.0_rp, 100.0_rp, 1.0_rp)
+
+    call this%filter%apply_forward(this%filtered_design, &
+    this%design_indicator)
+
+    call this%mapping%apply_forward(this%brinkman_amplitude, &
+    this%filtered_design)
 
 
   end subroutine topopt_design_map_forward
@@ -299,32 +318,23 @@ contains
   subroutine topopt_design_map_backward(this, df_dchi)
     class(topopt_design_t), target, intent(inout) :: this
     type(field_t), intent(in) :: df_dchi
-    real(kind=rp) :: k_0, k_1, q
-    real(kind=rp) :: dchi_drho
-    integer :: n, i
+    type(field_t), pointer :: dF_dfiltered_design
+    integer :: temp_indices(1)
+
     ! TODO
     ! again..
     ! so this would be:
     ! call mapper%backward(fld_out, fld_in)
-    !
-    ! again I'm hardcoding this
-    q = 1.0_rp
-    k_0 = 0.0_rp
-    k_1 = 100.0_rp
-    n = this%design_indicator%dof%size()
+    call neko_scratch_registry%request_field(dF_dfiltered_design, &
+    temp_indices(1))
 
-    ! this is just chain rule for now,
-    ! but if the filters get more complicated we need to chain rull back
-    ! further...
-    ! ie, the design_indicator here could be \tild{\rho}
-    ! and then we have to chain rule back
-    do i = 1, n
-       dchi_drho = q*(q+1)*(k_1 - k_0)/ &
-            ((q + this%design_indicator%x(i,1,1,1))**2)
+    call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
+    this%filtered_design)
 
-       this%sensitivity%x(i,1,1,1) = df_dchi%x(i,1,1,1) * dchi_drho
-    enddo
+    call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
+    this%filtered_design)
 
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine topopt_design_map_backward
 
