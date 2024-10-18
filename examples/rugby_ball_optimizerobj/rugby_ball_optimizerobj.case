@@ -1,0 +1,67 @@
+{
+    "version": 1.0,
+    "case":
+    {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": false,
+        "end_time": 0.1,
+        "timestep": 1e-4,
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 5,
+            "dealias": false
+        },
+        "adjoint": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
+            },
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 2,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
+            },
+            "inflow_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0, 0.0, 0.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 800
+            },
+            "boundary_types": [ "v", "v", "sym", "sym" ],
+            "output_control": "tsteps",
+            "output_value": 50000000,
+        },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "is_user": true,
+                "tol": 1e-2,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ]
+    }
+}

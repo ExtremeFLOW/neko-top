@@ -17,7 +17,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 target_sources(neko-top
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
-
+	${CMAKE_CURRENT_SOURCE_DIR}/optimizer.f90
+	
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
@@ -57,6 +58,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/mma.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/mma_optimizer.f90
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cpu/mma_cpu.f90
 )
