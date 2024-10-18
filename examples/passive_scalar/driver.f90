@@ -199,6 +199,7 @@ program usrneko
 
        call cmult(dfdx,100.0_rp,n)
        fval(1) = fval(1)*100.0_rp
+       call cmult(df0dx, 0.1_rp, n)
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
 

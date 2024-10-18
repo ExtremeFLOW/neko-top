@@ -45,7 +45,7 @@ module adjoint_scalar_convection_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field_math, only: field_subcol3
-  use operators, only: opgrad
+  use operators, only: opgrad, grad
   implicit none
   private
 
@@ -177,9 +177,12 @@ contains
     ! be super careful with opgrad vs grad.
     ! I'm not sure which is correct here
     ! From memory they only differ by a jac_inv or a B or something like that
+    ! Update: I'm pretty confident grad is correct here. But I'm leaving the
+    ! todo just in case
+
     ! TODO
     ! I think this actually works on GPU but I haven't checked..
-    call opgrad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
+    call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
     ! TODO
     ! double check if add or subtract
     ! I THINK it's negative!!
