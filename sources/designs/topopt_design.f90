@@ -390,7 +390,7 @@ contains
     this%filtered_design)
 
     call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
-    this%filtered_design)
+         this%filtered_design)
 
     ! TODO
     ! DELETE THIS LATER
