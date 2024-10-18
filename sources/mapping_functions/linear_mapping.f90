@@ -33,25 +33,22 @@
 !
 !> A linear mapping of coefficients
 module linear_mapping
-  use num_types, only : rp
+  use num_types, only: rp
   use field_math, only: field_copy, field_cmult, field_cadd
   use mapping, only: mapping_t
-  use num_types, only : rp
-  use json_module, only : json_file
-  use field_registry, only : neko_field_registry
-  use field, only : field_t
+  use num_types, only: rp
+  use json_module, only: json_file
+  use field, only: field_t
   use coefs, only: coef_t
   implicit none
   private
 
   !> A linear mapping of coefficients $f(x) = f_{min} + (f_{max} - f_{min}) x$
   type, public, extends(mapping_t) :: linear_mapping_t
-  !> minimum value
-  real(kind=rp) :: f_min
-  !> maximum value
-  real(kind=rp) :: f_max
-
-
+     !> minimum value
+     real(kind=rp) :: f_min
+     !> maximum value
+     real(kind=rp) :: f_max
 
    contains
      !> Constructor from json.
@@ -81,7 +78,7 @@ contains
 
     call this%init_base(json, coef)
     call linear_mapping_init_from_attributes(this, coef)
-   
+
   end subroutine linear_mapping_init_from_json
 
   !> Actual constructor.
@@ -106,8 +103,8 @@ contains
   !! @param X_in unmapped field
   subroutine linear_mapping_apply(this, X_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
-    type(field_t), intent(in) ::  X_in
-    type(field_t), intent(inout) ::  X_out
+    type(field_t), intent(in) :: X_in
+    type(field_t), intent(inout) :: X_out
 
     ! x_out = f_min + (f_max - f_min) * x_in
     call field_copy(X_out, X_in)
@@ -123,12 +120,12 @@ contains
   !! @param dF_dX_out is the sensitivity with respect to the filtered design
   subroutine linear_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
-    type(field_t), intent(in) ::  X_in
-    type(field_t), intent(in) ::  dF_dX_out
-    type(field_t), intent(inout) ::  dF_dX_in
+    type(field_t), intent(in) :: X_in
+    type(field_t), intent(in) :: dF_dX_out
+    type(field_t), intent(inout) :: dF_dX_in
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
-    
+
     ! dx_out/dx_in = (f_max - f_min)
 
     call field_copy(dF_dX_in, dF_dX_out)
