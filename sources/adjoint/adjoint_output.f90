@@ -37,7 +37,7 @@ module adjoint_output
   use scalar_scheme, only : scalar_scheme_t
   use field_list, only : field_list_t
   use neko_config, only : NEKO_BCKND_DEVICE
-  use device
+  use device, only : device_memcpy, DEVICE_TO_HOST
   use output, only : output_t
   implicit none
   private
