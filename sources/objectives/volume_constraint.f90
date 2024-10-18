@@ -65,7 +65,7 @@ module volume_constraint
   use math, only : glsc2
   use field_math, only: field_rone, field_cmult
   use topopt_design, only: topopt_design_t
-  use mask_ops, only:  mask_exterior_const
+  use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
   implicit none
   private
