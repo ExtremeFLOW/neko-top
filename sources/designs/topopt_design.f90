@@ -73,7 +73,6 @@ module topopt_design
   use mesh_field, only : mesh_fld_t, mesh_field_init, mesh_field_free
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
-  use sampler, only : sampler_t
   use flow_ic, only : set_flow_ic
   use scalar_ic, only : set_scalar_ic
   use field, only : field_t
