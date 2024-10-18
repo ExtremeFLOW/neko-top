@@ -190,7 +190,7 @@ contains
           call neko_error('GPU not supported volume constraint')
        else
           this%volume = glsc2_mask(design%design_indicator%x, fluid%c_xh%B, &
-          n, this%mask%mask, this%mask%size)
+               n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
