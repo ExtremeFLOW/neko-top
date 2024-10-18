@@ -254,7 +254,7 @@ contains
        call field_addcol3(objective_field, fluid%w, design%brinkman_amplitude)
        if (this%if_mask) then
           this%lube_value = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
-          n, this%mask%mask, this%mask%size)
+               n, this%mask%mask, this%mask%size)
        else
           this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
        end if
