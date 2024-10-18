@@ -238,7 +238,7 @@ contains
     n = wo1%size()
     if (this%if_mask) then
        this%dissipation = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
-       n, this%mask%mask, this%mask%size)
+            n, this%mask%mask, this%mask%size)
     else
        this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
     end if
