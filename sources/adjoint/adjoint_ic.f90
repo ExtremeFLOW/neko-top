@@ -167,7 +167,12 @@ contains
     v = uinf(2)
     w = uinf(3)
     n = u%dof%size()
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_cfill(u%x_d, uinf(1), n)
+       call device_cfill(v%x_d, uinf(2), n)
+       call device_cfill(w%x_d, uinf(3), n)
+    else
        call cfill(u%x, uinf(1), n)
        call cfill(v%x, uinf(2), n)
        call cfill(w%x, uinf(3), n)
@@ -202,21 +207,21 @@ contains
        call neko_error('Invalid Blasius approximation')
     end select
 
-    if ((uinf(1) .gt. 0.0_rp) .and. (uinf(2) .eq. 0.0_rp) &
-         .and. (uinf(3) .eq. 0.0_rp)) then
+    if ((uinf(1) .gt. 0.0_rp) .and. (uinf(2) .le. 0.0_rp) &
+         .and. (uinf(3) .le. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = bla(u%dof%z(i,1,1,1), delta, uinf(1))
           v%x(i,1,1,1) = 0.0_rp
           w%x(i,1,1,1) = 0.0_rp
        end do
-    else if ((uinf(1) .eq. 0.0_rp) .and. (uinf(2) .gt. 0.0_rp) &
-         .and. (uinf(3) .eq. 0.0_rp)) then
+    else if ((uinf(1) .le. 0.0_rp) .and. (uinf(2) .gt. 0.0_rp) &
+         .and. (uinf(3) .le. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = 0.0_rp
           v%x(i,1,1,1) = bla(u%dof%x(i,1,1,1), delta, uinf(2))
           w%x(i,1,1,1) = 0.0_rp
        end do
-    else if ((uinf(1) .eq. 0.0_rp) .and. (uinf(2) .eq. 0.0_rp) &
+    else if ((uinf(1) .le. 0.0_rp) .and. (uinf(2) .le. 0.0_rp) &
          .and. (uinf(3) .gt. 0.0_rp)) then
        do i = 1, u%dof%size()
           u%x(i,1,1,1) = 0.0_rp
@@ -254,10 +259,19 @@ contains
 
     zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
 
-    call cfill_mask(u%x, zone_value(1), size, zone%mask, zone%size)
-    call cfill_mask(v%x, zone_value(2), size, zone%mask, zone%size)
-    call cfill_mask(w%x, zone_value(3), size, zone%mask, zone%size)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_cfill_mask(u%x_d, zone_value(1), size, &
+            zone%mask_d, zone%size)
+       call device_cfill_mask(v%x_d, zone_value(2), size, &
+            zone%mask_d, zone%size)
+       call device_cfill_mask(w%x_d, zone_value(3), size, &
+            zone%mask_d, zone%size)
+    else
+       call cfill_mask(u%x, zone_value(1), size, zone%mask, zone%size)
+       call cfill_mask(v%x, zone_value(2), size, zone%mask, zone%size)
+       call cfill_mask(w%x, zone_value(3), size, zone%mask, zone%size)
 
+    end if
   end subroutine set_adjoint_ic_point_zone
 
 end module adjoint_ic
