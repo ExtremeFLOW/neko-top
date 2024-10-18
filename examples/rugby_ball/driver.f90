@@ -105,6 +105,10 @@ program usrneko
      ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
      ! the only design variables entering MMA are those within the mask.
      ! This way you get the correct N etc.
+
+     ! Look into the `masked_red_copy` function that Martin implemented.
+     ! That function will copy from one array to another, but the target 
+     ! only have the size of the mask, not the full size.
      if (design%if_mask) then
         call mask_exterior_const(&
         problem%volume_constraint%sensitivity_to_coefficient, &
