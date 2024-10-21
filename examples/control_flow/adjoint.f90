@@ -445,7 +445,7 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    real(kind=rp), dimension(5) :: normed_diff
+    real(kind=rp), dimension(1) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
 
     real(kind=rp) :: t_adj, cfl
