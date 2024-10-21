@@ -41,6 +41,7 @@ module topopt_design
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
+  use design, only: design_t
 
   implicit none
   private

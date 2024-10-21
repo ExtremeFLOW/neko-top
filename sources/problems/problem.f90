@@ -1,6 +1,42 @@
+!> @file problem.f90
+!! @Copyright (c) 2023, The Neko Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.module problem
+
+!>
 module problem
   use num_types, only: rp
-  use topopt_design, only: topopt_design_t
+  use fld_file_output, only: fld_file_output_t
+  use design, only: design_t
+  use utils, only: neko_error
 
   implicit none
   private
@@ -12,24 +48,11 @@ module problem
   ! Right now, all that is required in base class is to init and
   ! evaluate the problem.
   type, abstract, public :: problem_t
+     private
 
-     !> pointer to the design
-     ! TODO
-     ! should be abstract!
-     ! class(design_variable_t), pointer :: design
-     !  type(topopt_design_t), pointer :: design
-
-     !> a sampler
-     ! Fuck the internal samplers, they don't make sense in this context,
-     ! we should have our own.
-     ! - design (\rho)
-     ! - mapped (\chi)
-     ! - forward (u,v,w,p)
-     ! - adjoint (u,v,w,p)
-     ! - sensitivity to coefficients (dF/d\chi and dC/d\chi)
-     ! (maybe this is redundant... but I want it for debugging)
-     ! - sensitivity (dF/d\rho and dC/d\rho)
-     type(fld_file_output_t) :: output
+     !> An output sampler for the problem. This should probably be an output
+     !! controller at some point intead.
+     type(fld_file_output_t), public :: output
 
    contains
 
@@ -37,11 +60,22 @@ module problem
      ! Interfaces
 
      !> Constructor for physics of the problem
-     procedure(problem_init_base), pass(this), deferred :: init_base
+     procedure(problem_init), pass(this), public, deferred :: init
      !> Additional constructor specific to a design
-     procedure(problem_init_design), pass(this), deferred :: init_design
+     procedure(problem_init_design), pass(this), public, deferred :: init_design
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
+
+
+     !> Evaluate the optimization problem.
+     !! This is the main function that evaluates the problem. It should be
+     !! implemented in the derived classes.
+     procedure(problem_compute), pass(this), public, deferred :: compute
+
+     !> Constructor for the base class
+     procedure, pass(this) :: init_base => problem_init_base
+     !> Destructor for the base class
+     procedure, pass(this) :: free_base => problem_free_base
 
      ! ----------------------------------------------------------------------- !
      ! Actual methods
@@ -49,34 +83,32 @@ module problem
      !> Sample the problem
      procedure, pass(this), public :: write => problem_write
 
-     !> Evaluate the optimization problem.
-     procedure, pass(this), public, non_overridable :: compute => &
-          problem_compute
-
-     ! ----------------------------------------------------------------------- !
-     ! Dummy methods for unimplemented design types
-
-     !> Dummy pointer, ensuring safe exit if design type not defined
-     procedure, pass(this), public :: compute_topopt => dummy_compute_topopt
 
   end type problem_t
 
+  ! -------------------------------------------------------------------------- !
+  ! Interfaces for the derived types
+
   abstract interface
-     !> Constructor for physics of the problem
-     subroutine problem_init_base(this)
+     !> Constructor for physics of the problem.
+     !! This is the main constructor for a problem. This should be defined in
+     !! the derived types to initialize the problem. This is based on the
+     !! abstract design type, We suggest that a swticth statement is used to
+     !! initialize the problem based on the design type.
+     subroutine problem_init(this)
        import problem_t
        class(problem_t), intent(inout) :: this
-     end subroutine problem_init_base
+     end subroutine problem_init
 
      !> Additional constructor based on a design
      subroutine problem_init_design(this, design)
-       import problem_t, topopt_design_t
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        ! class(design_variable_t), intent(in) :: design
        ! we also only have the `topopt_design_t` but this should take the more
        ! abstract `design_variable_t` and initialize differently according to
        ! the type entering here.
-       type(topopt_design_t), target, intent(inout) :: design
+       class(design_t), target, intent(inout) :: design
 
        ! This is confusing to me..
        ! The `problem` and the `design` seem very coupled in my mind.
@@ -105,36 +137,37 @@ module problem
        !
      end subroutine problem_init_design
 
+
+     !> Compute the problem
+     subroutine problem_compute(this, design)
+       import problem_t
+       import design_t
+
+       class(problem_t), intent(inout) :: this
+       class(design_t), intent(inout) :: design
+
+     end subroutine problem_compute
+
      !> Destructor
      subroutine problem_free(this)
        import problem_t
        class(problem_t), intent(inout) :: this
-       ! TODO
      end subroutine problem_free
-
-     !> Compute
-     subroutine problem_compute_topopt(this)
-       import problem_t
-       import topopt_design_t
-       class(problem_t), intent(inout) :: this
-     end subroutine problem_compute_topopt
   end interface
 
 contains
 
-  !> Compute
-  subroutine problem_compute(this, design)
+  ! -------------------------------------------------------------------------- !
+  ! Base class methods
+
+  !> Constructor for the base class
+  subroutine problem_init_base(this)
     class(problem_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
+  end subroutine problem_init_base
 
-    select type(design)
-      type is(topopt_design_t)
-       call this%compute_topopt(design)
-      class default
-       call neko_error("Design type not supported.")
-    end select
-
-  end subroutine problem_compute
+  subroutine problem_free_base(this)
+    class(problem_t), intent(inout) :: this
+  end subroutine problem_free_base
 
   !> Sample the fields/design.
   subroutine problem_write(this, t)
@@ -144,10 +177,4 @@ contains
     call this%output%sample(t)
   end subroutine problem_write
 
-  !> Dummy compute function
-  subroutine dummy_compute_topopt(this, design)
-    class(problem_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
-    call neko_error("problem_compute_topopt not implemented.")
-  end subroutine dummy_compute_topopt
 end module problem

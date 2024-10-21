@@ -42,10 +42,7 @@ program usrneko
 
 
   ! init the problem (base)
-  call problem%init_base()
-
-  ! init the design
-  call design%init(problem%C%params, problem%C%fluid%c_Xh)
+  call problem%init()
 
   ! init the problem, with the design
   call problem%init_design(design)
@@ -98,7 +95,7 @@ program usrneko
      call problem%compute(design)
 
      ! in this case it's MMA so we need gradient information
-     call problem%compute_sensitivity()
+     call problem%compute_sensitivity(design)
 
      ! now we have the optimizer act on the design field.
 
