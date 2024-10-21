@@ -39,6 +39,7 @@ module steady_state_problem
   use simulation_adjoint, only: solve_adjoint
   use neko, only: neko_init, neko_finalize, neko_solve
   use case, only: case_t
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
   use minimum_dissipation_objective_function, only: &
@@ -63,24 +64,14 @@ module steady_state_problem
      !> and adjoint case
      type(adjoint_case_t), public :: adj
 
+     type(topopt_design_t), pointer :: design
+
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
      type(minimum_dissipation_objective_function_t) :: objective_function
      type(volume_constraint_t) :: volume_constraint
-
-     !> a sampler
-     ! Fuck the internal samplers, they don't make sense in this context,
-     ! we should have our own.
-     ! - design (\rho)
-     ! - mapped (\chi)
-     ! - forward (u,v,w,p)
-     ! - adjoint (u,v,w,p)
-     ! - sensitivity to coefficients (dF/d\chi and dC/d\chi)
-     ! (maybe this is redundant... but I want it for debugging)
-     ! - sensitivity (dF/d\rho and dC/d\rho)
-     type(fld_file_output_t) :: output
 
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
@@ -89,30 +80,37 @@ module steady_state_problem
      !> The common constructor using a JSON object.
      ! TODO
      ! we need to sort out the case file
-     procedure, pass(this) :: init_base => steady_state_problem_init_base
-     procedure, pass(this) :: init_design => &
+     procedure, pass(this) :: init => steady_state_problem_init
+
+     !> Constructor of a generic design problem.
+     procedure, pass(this) :: init_design => steady_state_problem_init_design
+     procedure, pass(this) :: init_design_topopt => &
           steady_state_problem_init_design_topopt
      ! but we could point to more depending on what design comes in
      !> Destructor.
      procedure, pass(this) :: free => steady_state_problem_free
+
+     !> Generic compute function.
+     procedure, pass(this) :: compute => steady_state_problem_compute
+
      !> Computes the value of the objective and all constraints.
      !> ie, a forward simulation
-     procedure, pass(this) :: compute => steady_state_problem_compute
+     procedure, pass(this) :: compute_topopt => &
+          steady_state_problem_compute_topopt
      !> Computes the first order gradient of the objective function and
      ! all the constraints, and stores them in the design.
      procedure, pass(this) :: compute_sensitivity => &
           steady_state_problem_compute_sensitivity_topopt
      ! but we could point to more depending on what design is coming in
-     ! > samples the desired fields
-     procedure, pass(this) :: sample => &
-          steady_state_problem_sample
   end type steady_state_problem_t
 
 contains
   !> The constructor for the base problem.
-  subroutine steady_state_problem_init_base(this)
+  subroutine steady_state_problem_init(this)
     class(steady_state_problem_t), intent(inout) :: this
     type(json_file) :: simcomp_settings
+
+    call this%init_base()
 
     ! append a steady state simcomp
     this%C%usr%init_user_simcomp => steady_state_simcomp
@@ -130,7 +128,23 @@ contains
     ! initialize them yet! As they may depend on the design.
 
 
-  end subroutine steady_state_problem_init_base
+  end subroutine steady_state_problem_init
+
+  !> The constructor of a generic design problem.
+  !! @params this: The problem to initialize.
+  !! @params design: The design to initialize the problem with.
+  subroutine steady_state_problem_init_design(this, design)
+    class(steady_state_problem_t), intent(inout) :: this
+    class(design_t), target, intent(inout) :: design
+
+    select type(design)
+      type is(topopt_design_t)
+       call this%init_design_topopt(design)
+      class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_init_design
 
   !> The constructor if a `topopt_design_t` is passed
   ! again, this is the only type of design we have so far...
@@ -143,6 +157,9 @@ contains
 
     ! Point the design to your own design
     this%design => design
+
+    ! init the design
+    call this%design%init(this%C%params, this%C%fluid%c_Xh)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -177,7 +194,7 @@ contains
 
 
     ! init the objective function
-!---------------------------------------------------------
+    !---------------------------------------------------------
     ! - somehow append a user_check
     ! TODO:
     ! Tim, I loved what you did with with the source term handler. I'm hoping
@@ -226,6 +243,7 @@ contains
     ! - sensitivity (dF/d\chi and dC/d\chi)    11, 12            s6,s7
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
+    ! Allocate the output type
     call this%output%init(sp, 'optimization', 13)
     call this%output%fields%assign(1, this%C%fluid%p)
     call this%output%fields%assign(2, this%C%fluid%u)
@@ -270,9 +288,24 @@ contains
 
   end subroutine steady_state_problem_free
 
-  !> Here we compute all the objectives and constraints
-  subroutine steady_state_problem_compute(this)
+  !> The computation of the objective function and constraints.
+  subroutine steady_state_problem_compute(this, design)
     class(steady_state_problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    select type (design)
+      type is (topopt_design_t)
+       call this%compute_topopt(design)
+      class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_compute
+
+  !> Here we compute all the objectives and constraints
+  subroutine steady_state_problem_compute_topopt(this, design)
+    class(steady_state_problem_t), intent(inout) :: this
+    type(topopt_design_t), intent(inout) :: design
 
     call neko_solve(this%C)
     ! TODO
@@ -304,11 +337,12 @@ contains
 
 
 
-  end subroutine steady_state_problem_compute
+  end subroutine steady_state_problem_compute_topopt
 
   !> The computation of the sensitivity if we have a `topopt_design_t`.
-  subroutine steady_state_problem_compute_sensitivity_topopt(this)
+  subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
+    type(topopt_design_t), intent(inout) :: design
     call solve_adjoint(this%adj)
 
     ! again, in the future, the objective_function_t will potentially include
@@ -353,14 +387,6 @@ contains
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
 
-  !> Sample the fields/design.
-  subroutine steady_state_problem_sample(this,t)
-    class(steady_state_problem_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-
-    call this%output%sample(t)
-
-  end subroutine steady_state_problem_sample
 
   subroutine steady_state_simcomp(params)
     type(json_file), intent(inout) :: params
