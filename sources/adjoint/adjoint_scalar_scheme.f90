@@ -319,7 +319,17 @@ contains
 
        !> Check if user bc on this zone
        if (bc_label(1:4) .eq. 'user') then
-          call this%user_bc%mark_zone(zones(i))
+          ! TODO
+          ! COME BACK TO THIS
+          ! but I feel like... even if it's user, we should be Neuman on this
+          ! BC...
+          ! call this%user_bc%mark_zone(zones(i))
+          this%n_neumann_bcs = this%n_neumann_bcs + 1
+          call this%neumann_bcs(this%n_neumann_bcs)%init_base(this%c_Xh)
+          call this%neumann_bcs(this%n_neumann_bcs)%mark_zone(zones(i))
+          ! read(bc_label(3:), *) flux
+          flux = 0.0_rp
+          call this%neumann_bcs(this%n_neumann_bcs)%finalize_neumann(flux)
        end if
 
     end do
@@ -680,6 +690,15 @@ contains
     !
     ! Maybe return to this after speaking to Timofey
     call this%user_bc%set_eval(usr_eval)
+
+    ! TODO
+    ! I'm not even sure that 'v' -> 'w' is true for the passive scalar...
+    ! I'll talk to Martin, but right now I think it's a Robin condition.
+
+    ! - ds/dn * s_adj + s * ds_adj/dn = 0
+
+    ! So in fact, dirichlet zero is really bad. If anything, Neuman will do a 
+    ! better job of setting something close to this condition.
 
   end subroutine adjoint_scalar_scheme_set_user_bc
 
