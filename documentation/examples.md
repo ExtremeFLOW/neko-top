@@ -27,16 +27,39 @@ file with the specifications to Neko. The run script will copy the contents of
 the example folder to a temporary folder and execute the example from there.
 
 The contents of `example/EXAMPLE_NAME` will be copied to a temporary
-`log/EXAMPLE_NAME` along with a job_script. This job_script can be user defined
-by
-adding a bash file in the Scripts folder. If no specific file is found, the
-default is used. If the user wish to execute one of the Neko examples, then the
+`log/EXAMPLE_NAME`. If the user wish to execute one of the Neko examples, then the
 `run.sh` script can be invoked with the name of the example as an argument along
 the switch `-n` or `--neko`.
 
 ```sh
 ./run.sh --neko tgv
 ```
+
+### Submission of jobs to a cluster.
+
+Currently the `run.sh` script supports submission of jobs to a cluster using the
+`-s` or `--submit` switch. The script will submit the job to the cluster using a
+batch script associated with the desired cluster. The batch script is located in
+the folder `scripts/jobscripts` under a folder associated with the cluster name.
+
+The script will copy the contents of the example folder to a temporary folder as
+is done when running the example locally. The job will be submitted to the
+cluster and the output will be stored in the `results` folder after completed
+execution.
+
+```sh
+./run.sh --submit MN5 --neko tgv
+```
+
+Currently the following clusters are supported:
+
+- MN5: The MareNostrum 5 cluster at BSC. (Utilizes the SLURM scheduler)
+- DTU: The local cluster at the Technical University of Denmark. (Utilizes the
+  LSF10 scheduler)
+
+Unsupported clusters will result in an error message, but, we recommend to
+execute the `run.sh` script with the `--dry-run` switch to organize the job
+files. Then one can manually submit the job to the cluster.
 
 ## Adding examples
 
@@ -55,10 +78,17 @@ are required:
 
 ## Case files and meshes.
 
-When running an example a link is made to the local data folder if it exists.
+When running an example a link is made to the folders `data` and `data_local`
+both sitting at the root of Neko-TOP. The `data` folder contain some official
+meshes used in the predefined examples. The `data_local` allow the user to save
+meshes to a folder accessible to all examples to reduce need for redundancy.
 This folder can include anything needed by the examples to run. In general it is
 used for local copies of meshes which can be accessed by all examples to avoid
 redundancy and copying massive folders around.
+
+Additionally, we avoid copying meshes contained in the examples by creating a
+link to any `.nmsh` files contained in the example folder. This is done to avoid
+copying large meshes around and to allow for easy access to the meshes.
 
 ## Advanced example setups
 

@@ -23,7 +23,7 @@ MAIN_DIR=$(dirname $(realpath $0))
 RPATH=$MAIN_DIR/$RPATH
 LPATH=$MAIN_DIR/$LPATH
 
-if [[ ! -d $RPATH && ! -d $LPATH ]]; then exit 0; fi
+[ ! -d $LPATH ] && exit 0
 
 # ============================================================================ #
 # Keywords
@@ -48,9 +48,12 @@ if [ ${#tests[@]} -eq 0 ]; then
 fi
 
 # If we are running in LSF-10 mode, print the running jobs.
-if [ "$(which bsub)" ]; then
+if [ $(which bjobs 2>/dev/null) ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
     bjobs -ro -noheader "time_left:8 job_name"
+elif [ $(which squeue 2>/dev/null) ]; then
+    printf "\n\e[4mRunning jobs.\e[m\n"
+    squeue -ro "%.8L %j" -u $USER
 fi
 
 printf "\n\e[4mTest status.\e[m\n"
@@ -64,12 +67,17 @@ done
 
 for test in ${tests[@]}; do
     if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
-        file=$(find $LPATH/$test -type f -name "*.case")
-        file+=" $LPATH/$test/output.log"
+        file=($(find $LPATH/$test -type f -name "*.case"))
+
+        # If more than one file exists
+        if [[ ${#file[@]} -gt 2 ]]; then
+            file+=" $LPATH/$test/output.log"
+        fi
+
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
             printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
         else
-            for f in $file; do
+            for f in ${file[@]}; do
                 logfile=${f%.*}.log
 
                 if [ ! -f $logfile ]; then
@@ -81,14 +89,15 @@ for test in ${tests[@]}; do
                 else
                     stat="Running:"
                     progress=$(
-                        grep 't = ' "${f%.*}.log" |        # Get all timestamps
+                        tail -n 100 "${f%.*}.log" |        # Get the last 1000 lines
+                            grep 't = ' "${f%.*}.log" |    # Get all timestamps
                             tail -n 1 |                    # Get the last line
                             sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                             xargs                          # Trim whitespace
                     )
                 fi
                 printf '\t\e[1;33m%-12s\e[m' "$stat"
-                if [ "$stat" == "Running:" ]; then
+                if [[ "$stat" == "Running:" && ! -z "$progress" ]]; then
                     printf ' [%7s]' "$progress"
                 fi
                 if [ $(basename $f) = "output.log" ]; then
