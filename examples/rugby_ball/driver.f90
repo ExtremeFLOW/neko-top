@@ -148,7 +148,7 @@ program usrneko
 
        ! TODO
        ! do a KKT check and do a propper convergence check..
-       call optimizer%kkt(x, df0dx, fval, dfdx)
+       call optimizer%mma_KKT_cpu(x, df0dx, fval, dfdx)
 
        ! TODO
        ! on the MMA side, we need residunorm public

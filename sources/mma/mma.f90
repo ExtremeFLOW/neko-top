@@ -74,7 +74,11 @@ module mma
      procedure, public, pass(this) :: init_json => mma_init_json
 
      procedure, public, pass(this) :: free => mma_free
-     procedure, public, pass(this) :: KKT => mma_KKT
+     
+     !> Interface for mma_KKT
+     generic, public :: KKT => mma_KKT_cpu, mma_KKT_gpu
+     procedure, pass(this) :: mma_KKT_cpu
+     procedure, pass(this) :: mma_KKT_gpu
 
      !> Interface for updating the MMA
      generic, public :: update => mma_update_cpu, mma_update_vector
@@ -88,12 +92,14 @@ module mma
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
 
      !> Interface for generating the approximation sub problem
-     generic :: gensub => mma_gensub_cpu
+     generic :: gensub => mma_gensub_cpu, mma_gensub_gpu
      procedure, pass(this) :: mma_gensub_cpu
+     procedure, pass(this) :: mma_gensub_gpu
 
      !> Interface for solving the dual with an interior point method
-     generic :: subsolve => mma_subsolve_dpip_cpu
+     generic :: subsolve => mma_subsolve_dpip_cpu, mma_subsolve_dpip_gpu
      procedure, pass(this) :: mma_subsolve_dpip_cpu
+     procedure, pass(this) :: mma_subsolve_dpip_gpu
 
   end type mma_t
 
@@ -125,6 +131,33 @@ module mma
        real(kind=rp), dimension(this%n), intent(in) :: df0dx
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
+     
+  ! ========================================================================== !
+  ! Interface for the GPU backend
+         !> Generate the approximation sub problem on the GPU.
+     module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       type(vector_t), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx
+       type(vector_t), intent(in) :: fval
+       type(matrix_t), intent(in) :: dfdx
+       integer, intent(in) :: iter
+     end subroutine mma_gensub_gpu
+
+     !> Solve the dual with an interior point method on the CPU.
+     module subroutine mma_subsolve_dpip_gpu(this, designx)
+        class(mma_t), intent(inout) :: this
+        type(vector_t), intent(in) :: designx
+     end subroutine mma_subsolve_dpip_gpu
+
+     !> Compute the KKT condition for a given design x on the CPU.
+     module subroutine mma_KKT_gpu(this, x, df0dx, fval, dfdx)
+        class(mma_t), intent(inout) :: this
+        type(vector_t), intent(in) :: x
+        type(vector_t), intent(in) :: fval
+        type(vector_t), intent(in) :: df0dx
+        type(matrix_t), intent(in) :: dfdx
+     end subroutine mma_KKT_gpu
   end interface
 
 contains
@@ -346,52 +379,15 @@ contains
     if (this%backend == 'cpu') then
        call this%mma_update_cpu(iter, x%x, df0dx%x, fval%x, dfdx%x)
     else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
+        print *, "we are in gpu in mma.f90"
+        call this%mma_gensub_gpu(iter, x, df0dx, fval, dfdx)
+       !write(stderr, *) "Device not supported for MMA."
+       !error stop
     end if
 
   end subroutine mma_update_vector
 
-  subroutine mma_KKT(this, x, df0dx, fval, dfdx)
-    ! ----------------------------------------------------- !
-    ! Compute the KKT condition right hand side for a given !
-    ! design x and set the max and norm values of the       !
-    ! residue of KKT system to this%residumax and           !
-    ! this%residunorm.                                      !
-    !                                                       !
-    ! The left hand sides of the KKT conditions are computed!
-    ! for the following nonlinear programming problem:      !
-    ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
-    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
-    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
-    !                                                       !
-    !                                                       !
-    ! Note that before calling this function, the function  !
-    ! values (f0val, fval, dfdx, ...) should be updated     !
-    ! using the new x values.                               !
-    ! ----------------------------------------------------- !
-    class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-
-    if (.not. this%is_initialized) then
-       write(stderr, *) "The MMA object is not initialized."
-       error stop
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 0) then
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
-    else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
-    end if
-
-  end subroutine mma_KKT
-
+  
   !> Deallocate the MMA object.
   subroutine mma_free(this)
 
