@@ -25,7 +25,7 @@ function help() {
 }
 
 # Assign default values to the options
-DEVICE_TYPE="CUDA"
+DEVICE_TYPE="OFF"
 CLEAN=false
 QUIET=false
 TEST=false
