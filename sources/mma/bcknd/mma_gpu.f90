@@ -3,6 +3,9 @@ use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
 MPI_Allreduce
 use utils, only: neko_error
 use comm, only: neko_comm, mpi_real_precision
+use device_math
+use cuda_mma_math, only: mma_gensub1_gpu
+
 
 contains
 subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
@@ -22,24 +25,24 @@ subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
     type(vector_t) :: globaltmp_m
     real(kind=rp) :: cons
 
-    print *, "I am in mma_gpu.f90"
-    ! call globaltmp_m%init(this%m)
-    ! if (iter .lt. 3) then
-        ! call device_add3s2(this%low%x_d,this%xmax%x_d,this%xmin%x_d,-this%asyinit,this%asyinit,this%n)
-        ! call device_add2(this%low%x_d,x%x_d,this%n)
+    
+    call globaltmp_m%init(this%m)
+    if (iter .lt. 3) then
+        call device_add3s2(this%low%x_d,this%xmax%x_d,this%xmin%x_d,-this%asyinit,this%asyinit,this%n)
+        call device_add2(this%low%x_d,x%x_d,this%n)
 
-        ! call device_add3s2( this%upp%x_d,this%xmax%x_d,this%xmin%x_d,this%asyinit,- this%asyinit,this%n)
-        ! call device_add2(this%upp%x_d,x%x_d,this%n)
-        ! call mma_gensub1_gpu(this%low%x_d, this%upp%x_d,x%x_d, this%xmin%x_d, this%xmax%x_d, this%asyinit, this%n)
+        call device_add3s2( this%upp%x_d,this%xmax%x_d,this%xmin%x_d,this%asyinit,- this%asyinit,this%n)
+        call device_add2(this%upp%x_d,x%x_d,this%n)
+        call mma_gensub1_gpu(this%low%x_d, this%upp%x_d,x%x_d, this%xmin%x_d, this%xmax%x_d, this%asyinit, this%n)
     ! else
       ! call mma_gensub2_gpu(this%low%x_d, this%upp%x_d, x%x_d, this%xold1%x_d, this%xold2%x_d,this%xmin%x_d, this%xmax%x_d, &
         ! this%asydecr, this%asyincr, this%n)
-  ! end if
+    end if
   ! call mma_gensub3_gpu(x%x_d, df0dx%x_d, dfdx%x_d,this%low%x_d, this%upp%x_d, this%xmin%x_d, this%xmax%x_d,this%alpha%x_d, &
     ! this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m) 
   ! call mma_gensub4_gpu(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m, this%bi%x_d)
 
-
+    print *, "I am in mma_gpu.f90"
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   !!!!!cpu gpu transfer part
   ! globaltmp_m%x=0.0_rp

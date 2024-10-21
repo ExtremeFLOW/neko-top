@@ -60,6 +60,10 @@ target_sources(neko-top
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cpu/mma_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_gpu.f90
+        
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/cuda_mma_math.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_gpu.cu
+        ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/cuda/mma_gpu_kernel.h
 )
 
 # ============================================================================ #
