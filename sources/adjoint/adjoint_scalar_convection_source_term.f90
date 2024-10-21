@@ -46,6 +46,7 @@ module adjoint_scalar_convection_source_term
   use utils, only : neko_error
   use field_math, only: field_subcol3
   use operators, only: opgrad, grad
+  use math, only: invcol2
   implicit none
   private
 
@@ -173,16 +174,31 @@ contains
     
     ! we basically just need the term 
     ! $\nabla s s_adj$
+
     ! TODO
     ! be super careful with opgrad vs grad.
     ! I'm not sure which is correct here
     ! From memory they only differ by a jac_inv or a B or something like that
+    ! If we implemented this like the convective term, not as a source term
+    ! (this is still a possibility) we would likely be using opgrad...
     ! Update: I'm pretty confident grad is correct here. But I'm leaving the
     ! todo just in case
 
     ! TODO
     ! I think this actually works on GPU but I haven't checked..
     call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
+    ! TODO
+    ! or not??? I feel like the passive scalar is somehow treated differently.
+    n = dsdx%size()
+    call invcol2(dsdx%x, this%coef%B, n)
+    call invcol2(dsdy%x, this%coef%B, n)
+    call invcol2(dsdz%x, this%coef%B, n)
+
+    ! TODO
+    ! So in principal, the derivatives could have kinks now.
+    ! I don't think a gsop will remedy this (or even whether it's a good idea)
+    ! But I want to leave this todo as a reminder.
+
     ! TODO
     ! double check if add or subtract
     ! I THINK it's negative!!

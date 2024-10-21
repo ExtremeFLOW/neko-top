@@ -49,6 +49,7 @@ module adjoint_mixing_scalar_source_term
   use operators, only: opgrad
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
+  use math, only: col2, invcol2
   implicit none
   private
 
@@ -176,6 +177,13 @@ contains
     if (this%if_mask) then
        call mask_exterior_const(work, this%mask, 0.0_rp)
     end if
+
+    ! TODO
+    ! This is a pretty HUGE todo...
+    ! mass matrix included in the scalar source term??
+    ! Has anyone tried a passive scalar with a source term?
+    n = work%size()
+    call invcol2(work%x, this%coef%B, n)
     ! TODO
     ! double check if add or subtract
 
@@ -185,7 +193,8 @@ contains
     ! TODO
     ! Masks
 
-    call field_add2s2(fs,work, this%obj_scale)
+    ! don't forget the factor of 2
+    call field_add2s2(fs,work, this%obj_scale * 2.0_rp)
     call neko_scratch_registry%relinquish_field(temp_indices)
 
     
