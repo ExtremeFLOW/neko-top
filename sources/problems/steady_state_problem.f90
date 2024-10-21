@@ -63,24 +63,14 @@ module steady_state_problem
      !> and adjoint case
      type(adjoint_case_t), public :: adj
 
+     type(topopt_design_t), pointer :: design
+
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
      type(minimum_dissipation_objective_function_t) :: objective_function
      type(volume_constraint_t) :: volume_constraint
-
-     !> a sampler
-     ! Fuck the internal samplers, they don't make sense in this context,
-     ! we should have our own.
-     ! - design (\rho)
-     ! - mapped (\chi)
-     ! - forward (u,v,w,p)
-     ! - adjoint (u,v,w,p)
-     ! - sensitivity to coefficients (dF/d\chi and dC/d\chi)
-     ! (maybe this is redundant... but I want it for debugging)
-     ! - sensitivity (dF/d\rho and dC/d\rho)
-     type(fld_file_output_t) :: output
 
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
@@ -97,15 +87,12 @@ module steady_state_problem
      procedure, pass(this) :: free => steady_state_problem_free
      !> Computes the value of the objective and all constraints.
      !> ie, a forward simulation
-     procedure, pass(this) :: compute => steady_state_problem_compute
+     procedure, pass(this) :: compute_topopt => steady_state_problem_compute
      !> Computes the first order gradient of the objective function and
      ! all the constraints, and stores them in the design.
      procedure, pass(this) :: compute_sensitivity => &
           steady_state_problem_compute_sensitivity_topopt
      ! but we could point to more depending on what design is coming in
-     ! > samples the desired fields
-     procedure, pass(this) :: sample => &
-          steady_state_problem_sample
   end type steady_state_problem_t
 
 contains
@@ -271,8 +258,9 @@ contains
   end subroutine steady_state_problem_free
 
   !> Here we compute all the objectives and constraints
-  subroutine steady_state_problem_compute(this)
+  subroutine steady_state_problem_compute(this, design)
     class(steady_state_problem_t), intent(inout) :: this
+    type(topopt_design_t), intent(in) :: design
 
     call neko_solve(this%C)
     ! TODO
@@ -353,14 +341,6 @@ contains
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
 
-  !> Sample the fields/design.
-  subroutine steady_state_problem_sample(this,t)
-    class(steady_state_problem_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-
-    call this%output%sample(t)
-
-  end subroutine steady_state_problem_sample
 
   subroutine steady_state_simcomp(params)
     type(json_file), intent(inout) :: params

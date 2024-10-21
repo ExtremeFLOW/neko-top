@@ -12,38 +12,63 @@ module problem
   ! Right now, all that is required in base class is to init and
   ! evaluate the problem.
   type, abstract, public :: problem_t
+
      !> pointer to the design
      ! TODO
      ! should be abstract!
      ! class(design_variable_t), pointer :: design
-     type(topopt_design_t), pointer :: design
+     !  type(topopt_design_t), pointer :: design
+
+     !> a sampler
+     ! Fuck the internal samplers, they don't make sense in this context,
+     ! we should have our own.
+     ! - design (\rho)
+     ! - mapped (\chi)
+     ! - forward (u,v,w,p)
+     ! - adjoint (u,v,w,p)
+     ! - sensitivity to coefficients (dF/d\chi and dC/d\chi)
+     ! (maybe this is redundant... but I want it for debugging)
+     ! - sensitivity (dF/d\rho and dC/d\rho)
+     type(fld_file_output_t) :: output
 
    contains
+
+     ! ----------------------------------------------------------------------- !
+     ! Interfaces
+
      !> Constructor for physics of the problem
      procedure(problem_init_base), pass(this), deferred :: init_base
      !> Additional constructor specific to a design
      procedure(problem_init_design), pass(this), deferred :: init_design
      !> Destructor.
-     procedure(problem_free), pass(this), deferred :: free
-     !> Evaluate the optimization problem.
-     procedure(problem_compute), pass(this), deferred :: compute
+     procedure(problem_free), pass(this), deferred, public :: free
+
+     ! ----------------------------------------------------------------------- !
+     ! Actual methods
+
      !> Sample the problem
-     procedure(problem_sample), pass(this), deferred :: sample
+     procedure, pass(this), public :: write => problem_write
+
+     !> Evaluate the optimization problem.
+     procedure, pass(this), public, non_overridable :: compute => &
+          problem_compute
+
+     ! ----------------------------------------------------------------------- !
+     ! Dummy methods for unimplemented design types
+
+     !> Dummy pointer, ensuring safe exit if design type not defined
+     procedure, pass(this), public :: compute_topopt => dummy_compute_topopt
 
   end type problem_t
 
-  !> Constructor for physics of the problem
   abstract interface
+     !> Constructor for physics of the problem
      subroutine problem_init_base(this)
        import problem_t
        class(problem_t), intent(inout) :: this
-
-
      end subroutine problem_init_base
-  end interface
 
-  !> Additional constructor based on a design
-  abstract interface
+     !> Additional constructor based on a design
      subroutine problem_init_design(this, design)
        import problem_t, topopt_design_t
        class(problem_t), intent(inout) :: this
@@ -79,33 +104,50 @@ module problem
        ! - Then coming here and intializing the impact of the design on the fluid
        !
      end subroutine problem_init_design
-  end interface
 
-  !> Destructor
-  abstract interface
+     !> Destructor
      subroutine problem_free(this)
        import problem_t
        class(problem_t), intent(inout) :: this
        ! TODO
      end subroutine problem_free
+
+     !> Compute
+     subroutine problem_compute_topopt(this)
+       import problem_t
+       import topopt_design_t
+       class(problem_t), intent(inout) :: this
+     end subroutine problem_compute_topopt
   end interface
+
+contains
 
   !> Compute
-  abstract interface
-     subroutine problem_compute(this)
-       import problem_t
-       class(problem_t), intent(inout) :: this
+  subroutine problem_compute(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
 
-     end subroutine problem_compute
-  end interface
+    select type(design)
+      type is(topopt_design_t)
+       call this%compute_topopt(design)
+      class default
+       call neko_error("Design type not supported.")
+    end select
 
-  !> Sample
-  abstract interface
-     subroutine problem_sample(this, t)
-       import problem_t, rp
-       class(problem_t), intent(inout) :: this
-       real(kind=rp), intent(in) :: t
+  end subroutine problem_compute
 
-     end subroutine problem_sample
-  end interface
+  !> Sample the fields/design.
+  subroutine problem_write(this, t)
+    class(problem_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: t
+
+    call this%output%sample(t)
+  end subroutine problem_write
+
+  !> Dummy compute function
+  subroutine dummy_compute_topopt(this, design)
+    class(problem_t), intent(inout) :: this
+    type(topopt_design_t), intent(in) :: design
+    call neko_error("problem_compute_topopt not implemented.")
+  end subroutine dummy_compute_topopt
 end module problem

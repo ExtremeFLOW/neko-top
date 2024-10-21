@@ -46,7 +46,7 @@ module topopt_design
   private
 
   !> A topology optimization design variable
-  type, public :: topopt_design_t
+  type, extends(design_t), public :: topopt_design_t
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
@@ -130,6 +130,7 @@ module topopt_design
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
      type(RAMP_mapping_t) :: mapping
+
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
