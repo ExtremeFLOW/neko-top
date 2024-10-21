@@ -41,6 +41,9 @@ module topopt_design
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
+  use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
 
   implicit none
   private
@@ -134,10 +137,10 @@ module topopt_design
      type(field_t) :: filtered_design
 
 
-     !
-     ! TODO
-     ! you also had lots of masks etc that was a nice idea,
-     ! but we'll cross that bridge later
+     !> A mask indicating the optimization domain
+     class(point_zone_t), pointer :: optimization_domain
+     !> A logical if we're restricting the optimization domain
+     logical :: if_mask
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -183,6 +186,7 @@ contains
     class(topopt_design_t), target, intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
+    character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
     ! init the fields
     call this%design_indicator%init(coef%dof, "design_indicator")
@@ -205,6 +209,55 @@ contains
           this%design_indicator%x(i,1,1,1) = 1.0_rp
        end if
     end do
+
+    ! TODO, of course when we move all of Tim's stuff for initialization of
+    ! the initial design field we'll be reading things properly from the JSON.
+    ! call json_get(json, 'name', optimization_domain_zone_name)
+    ! Right now, I'm hardcoding the name of the point zone.
+    this%if_mask = .true.
+    optimization_domain_zone_name = "optimization_domain"
+
+    ! Initialize the mask
+    if (this%if_mask) then
+       this%optimization_domain => &
+            neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
+    end if
+
+
+
+
+    ! TODO
+    ! Regarding masks and filters, 
+    ! I suppose there are two ways of thinking about it:
+    ! 1) Mask first, then filter
+    ! 2) filter first, then mask
+    !
+    ! Each one can be used to achieve different results, and when we do complex
+    ! non-linear filter cascades the choice here has implications for exactly
+    ! how we define "minimum size control".
+    !
+    ! On top of this, I've only ever used spatial convolution filters before,
+    ! not PDE based filters.
+    ! With these filters you need to think of how your domain is "padded" when
+    ! you move the kernel over the boundary. Again, you can achieve different
+    ! effects depending on the choice of padding.
+    ! I don't really know if there's a similar implication for PDE based
+    ! based filters, I bet there is. (We should ask Niels and Casper) I bet it
+    ! means we need to consider the boundary of the mask as the boundary we
+    ! enforce to be Nuemann, not the boundary of the computational domain.
+    ! That sounds REALLY hard to implement...I hope it doesn't come down to
+    ! that.
+    !
+    ! We can always change this decision later, but I'm going with (1)
+    ! mask first, then filter.
+    ! The reason being, one of the purposes of the filtering is to avoid sharp
+    ! interfaces, if we filter first then mask there's a chance we have a sharp
+    ! interface on the boundary of the optimization domain.
+    ! if we mask first then filter, at least all the boundaries will be smooth.
+    if (this%if_mask) then
+       call mask_exterior_const(this%design_indicator, &
+            this%optimization_domain, 0.0_rp)
+    end if
 
     ! TODO
     ! we would also need to make a mapping type that reads in
@@ -240,6 +293,12 @@ contains
     class(topopt_design_t), target, intent(inout) :: this
 
 
+    ! TODO, see previous todo about mask first, then mapping
+    if (this%if_mask) then
+       call mask_exterior_const(this%design_indicator, &
+       this%optimization_domain, 0.0_rp)
+    end if
+
     ! TODO
     ! this should be somehow deffered so we can pick different mappings!!!
     ! so this would be:
@@ -273,6 +332,21 @@ contains
     call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
          this%filtered_design)
 
+    ! TODO
+    ! DELETE THIS LATER
+    !
+    ! When Abbas writes the interface for the optimization
+    ! module this may be a moot point, because we would only really collect
+    ! the sensitivity of the design variables inside the mask.
+    !
+    ! Note for Abbas,
+    ! I'm NOT doing this because I'm too lazy and I just need masks so I can
+    ! test something in the passive scalar.
+    if (this%if_mask) then
+       call mask_exterior_const(this%sensitivity, this%optimization_domain, &
+            0.0_rp)
+    end if
+
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine topopt_design_map_backward
@@ -291,4 +365,5 @@ contains
     call this%output%sample(t)
 
   end subroutine topopt_design_sample
+
 end module topopt_design
