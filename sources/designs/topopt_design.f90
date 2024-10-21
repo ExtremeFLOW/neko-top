@@ -41,6 +41,9 @@ module topopt_design
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
+  use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
 
   implicit none
   private

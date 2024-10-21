@@ -38,6 +38,8 @@ module objective_function
   use adjoint_scheme, only: adjoint_scheme_t
   use topopt_design, only: topopt_design_t
   use dofmap, only: dofmap_t
+  use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
   implicit none
   private
 
