@@ -38,8 +38,8 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
-#BSUB -o output.log
-#BSUB -e error.err
+#BSUB -oo output.log
+#BSUB -eo error.err
 
 # ============================================================================ #
 # Determine if the script is run on the HPC or locally
@@ -53,11 +53,6 @@ elif [ ! -z "$LSB_JOBNAME" ]; then
 else
     printf "ERROR: No example supplied" >&2
     exit 1
-fi
-
-# Load the required modules
-if [ ! -z $(which module) ]; then
-    module --silent load mpi/4.1.4-gcc-12.2.0-binutils-2.39 openblas/0.3.23 cuda/12.2
 fi
 
 source functions.sh
