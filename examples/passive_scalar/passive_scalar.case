@@ -52,7 +52,7 @@
             },
             "boundary_types": [ "v", "o", "w", "w", "w", "w" ],
             "output_control": "simulationtime",
-            "output_value": 0.50,
+            "output_value": 0.5,
         },
         "scalar": {
             "enabled": true,

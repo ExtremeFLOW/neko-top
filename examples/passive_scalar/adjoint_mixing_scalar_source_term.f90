@@ -45,7 +45,7 @@ module adjoint_mixing_scalar_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field_math, only: field_addcol3, field_add2, field_cadd, field_col2, &
-  field_add2s2, field_copy
+  field_add2s2, field_copy, field_cfill
   use operators, only: opgrad
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
@@ -179,19 +179,10 @@ contains
     end if
 
     ! TODO
-    ! This is a pretty HUGE todo...
-    ! mass matrix included in the scalar source term??
-    ! Has anyone tried a passive scalar with a source term?
-    n = work%size()
-    call invcol2(work%x, this%coef%B, n)
-    ! TODO
     ! double check if add or subtract
 
     ! TODO
     ! Normalize
-
-    ! TODO
-    ! Masks
 
     ! don't forget the factor of 2
     call field_add2s2(fs,work, this%obj_scale * 2.0_rp)

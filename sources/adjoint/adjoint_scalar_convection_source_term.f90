@@ -187,12 +187,6 @@ contains
     ! TODO
     ! I think this actually works on GPU but I haven't checked..
     call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
-    ! TODO
-    ! or not??? I feel like the passive scalar is somehow treated differently.
-    n = dsdx%size()
-    call invcol2(dsdx%x, this%coef%B, n)
-    call invcol2(dsdy%x, this%coef%B, n)
-    call invcol2(dsdz%x, this%coef%B, n)
 
     ! TODO
     ! So in principal, the derivatives could have kinks now.
