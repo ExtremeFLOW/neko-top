@@ -108,7 +108,7 @@ contains
 
     real(kind=rp), allocatable ::a(:), c(:), d(:)
     real(kind=rp) :: a0
-    integer :: nloc, nglobal, ierr, rank
+    integer :: nloc
 
 
     allocate(a(this%m))
@@ -169,24 +169,21 @@ contains
 
     real(kind=rp) :: L
 
-    integer :: iter, i, j, k, e, counter, ierr, rank, size, nglobal
+    integer :: iter, i, ierr, rank, size, nglobal
     integer, allocatable :: recv_counts(:), displs(:)
-    real(kind=rp), dimension(2,4) :: teststuff
 
     real(kind=rp) :: start_time, end_time
     real(kind=rp), dimension(this%mma%get_n()) :: x
 
-    real(kind=rp), dimension(this%mma%get_m()) :: fval, fvalglobal
+    real(kind=rp), dimension(this%mma%get_m()) :: fval
     real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
-    real(kind=rp) :: f0val, f0valeps, f0valglobal
+    real(kind=rp) :: f0val
     real(kind=rp), dimension(this%mma%get_n()) :: df0dx
     ! character(len=50) :: filename
     real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
     ! real(kind=rp), dimension(4320,4) :: all_stuff
     real(kind=rp), allocatable :: all_stuff(:,:)
     integer, allocatable :: nloc_all(:)
-
-    character(len=80) :: iFileName ! Filename to save the VTK data
 
     L=0_rp
 
@@ -356,8 +353,8 @@ contains
     real(kind=rp), dimension(m), intent(inout) :: fval
     real(kind=rp), dimension(m,n), intent(inout) :: dfdx
 
-    real(kind=rp), dimension(n) :: x, coordx, coordy, coordz
-    integer :: i,j,k,e, counter, ierr, nglobal
+    real(kind=rp), dimension(n) :: x, coordx
+    integer :: ierr, nglobal
     real(kind=rp) :: Globalf0val
 
 

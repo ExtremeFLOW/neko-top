@@ -134,7 +134,6 @@ contains
     real(kind=rp), dimension(Xh%lxyz) :: duyb, dvyb, dwyb
     real(kind=rp), dimension(Xh%lxyz) :: duzb, dvzb, dwzb
     ! temporary arrays
-    real(kind=rp), dimension(Xh%lxyz) :: tfx, tfy, tfz
     integer :: e, i, idx, idxx
 
 
@@ -279,7 +278,6 @@ contains
     type(coef_t), intent(inout) :: coef
     type(c_ptr) :: ub_d, vb_d, wb_d
     type(c_ptr) :: work1_d, work2_d, work3_d, w1_d, w2_d, w3_d
-    integer :: i
 
     work1_d = work1%x_d
     work2_d = work2%x_d

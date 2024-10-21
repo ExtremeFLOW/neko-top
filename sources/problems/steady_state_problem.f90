@@ -112,7 +112,6 @@ contains
   !> The constructor for the base problem.
   subroutine steady_state_problem_init_base(this)
     class(steady_state_problem_t), intent(inout) :: this
-    type(json_file) :: simcomp_settings
 
     ! append a steady state simcomp
     this%C%usr%init_user_simcomp => steady_state_simcomp
