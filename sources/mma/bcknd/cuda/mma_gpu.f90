@@ -5,7 +5,7 @@ use utils, only: neko_error
 use comm, only: neko_comm, mpi_real_precision
 
 contains
-module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
+subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
     ! the lower and upper asymtotes and the other necessary !
@@ -52,7 +52,7 @@ module subroutine mma_gensub_gpu(this, iter, x, df0dx, fval, dfdx)
 
   call cuda_mpisum(this%bi%x_d, this%m)
   call device_sub(this%bi%x_d, fval%x_d, this%m)
-end subroutine mma_gensub_cpu
+end subroutine mma_gensub_gpu
 
 subroutine mma_subsolve_dpip_gpu(this, designx)
     ! ------------------------------------------------------- !
@@ -549,9 +549,9 @@ this%lambda%x = lambda%x
 this%mu%x = mu%x
 this%s%x = s%x
 
-end subroutine mma_subsolve_dpip_cpu
+end subroutine mma_subsolve_dpip_gpu
 
-subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+subroutine mma_KKT_gpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! design x and set the max and norm values of the       !
@@ -658,5 +658,5 @@ subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
         this%residunorm = sqrt(cuda_norm(rey%x_d,this%m)+norm2(rez)**2+cuda_norm(relambda%x_d,this%m)+cuda_norm(remu%x_d,this%m)&
            +norm2(rezeta)**2+cuda_norm(res%x_d,this%m + re_xstuff_squ_global)
 
-       end subroutine mma_KKT_cpu
-       end submodule mma_cpu
+       end subroutine mma_KKT_gpu
+       end submodule mma_gpu
