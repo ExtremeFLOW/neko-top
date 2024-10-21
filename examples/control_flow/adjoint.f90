@@ -44,7 +44,8 @@ module simcomp_example
   use adjoint_pnpn, only: adjoint_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, field_glsc3
+  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
+       field_glsc3
   use field_math, only: field_add2
   use math, only: glsc2, glsc3
   use device_math, only: device_glsc2
@@ -219,7 +220,8 @@ contains
 
     ! if (scalar) then
     !    allocate(C%scalar)
-    !    call C%scalar%init(C%msh, this%scheme%c_Xh, this%scheme%gs_Xh, C%params, C%usr,&
+    !    call C%scalar%init(C%msh, this%scheme%c_Xh, this%scheme%gs_Xh, &
+    !                       C%params, C%usr,&
     !                       C%material_properties)
     !    call this%scheme%chkp%add_scalar(C%scalar%s)
     !    this%scheme%chkp%abs1 => C%scalar%abx1
@@ -274,7 +276,7 @@ contains
        call adjoint_json%load_from_string(buffer)
        call json_get(C%params, 'case.fluid.initial_condition.type',&
             string_val)
-    endif
+    end if
 
 
     ! if (trim(string_val) .ne. 'user') then
@@ -323,10 +325,12 @@ contains
        !call json_get(C%params, 'case.fluid.baseflow.type', string_val)
 
        !if (trim(string_val) .ne. 'user') then
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, &
+       ! this%scheme%gs_Xh, &
        !        string_val, C%params)
        !else
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, &
+       ! this%scheme%gs_Xh, &
        !        C%usr%baseflow_user, C%params)
        !end if
 
@@ -402,7 +406,7 @@ contains
     ! if (logical_val) then
     !    call json_get_or_default(C%params, 'case.checkpoint_format', &
     !         string_val, "chkp")
-    !   !   C%f_chkp = chkp_output_t(this%scheme%chkp, path = output_directory, &
+    !      C%f_chkp = chkp_output_t(this%scheme%chkp, path = output_directory, &
     !         ! fmt = trim(string_val))
     !    call json_get_or_default(C%params, 'case.checkpoint_control', &
     !         string_val, "simulationtime")
@@ -547,14 +551,15 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
+    write(log_buf, '(A,E15.7,A,E15.7,A)') &
+         'T  : [', 0d0, ',', this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf,'(A, E15.7)') 'dt :  ', this%case%dt
+       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%dt
        call neko_log%message(log_buf)
     else
-       write(log_buf,'(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
+       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
        call neko_log%message(log_buf)
     end if
 
@@ -724,10 +729,10 @@ contains
 
   !   t = C%fluid%chkp%restart_time()
   !   call neko_log%section('Restarting from checkpoint')
-  !   write(log_buf,'(A,A)') 'File :   ', &
+  !   write(log_buf, '(A,A)') 'File :   ', &
   !        trim(restart_file)
   !   call neko_log%message(log_buf)
-  !   write(log_buf,'(A,E15.7)') 'Time : ', t
+  !   write(log_buf, '(A,E15.7)') 'Time : ', t
   !   call neko_log%message(log_buf)
   !   call neko_log%end_section()
 
