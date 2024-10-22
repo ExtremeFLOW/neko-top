@@ -1,11 +1,11 @@
 name: Deploy documentation to Pages
 
-# Runs on pull requests targeting the main branch and when the pull request is
+# Runs on pull requests targeting the develop branch and when the pull request is
 # closed. This allows us to build the documentation and deploy it to GitHub
 # Pages when the pull request is merged.
 on:
   pull_request_target:
-    branches: ["main"]
+    branches: ["develop"]
     types: [closed]
 
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: develop
 
       - name: Setup system cached
         uses: awalsh128/cache-apt-pkgs-action@latest
