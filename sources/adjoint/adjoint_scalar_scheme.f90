@@ -301,6 +301,13 @@ contains
 !          if (bc_exists) then
 !             call this%dir_bcs(j)%mark_zone(zones(i))
 !          else
+          ! TODO
+          ! I actually think for the passive scalar it goes:
+          ! 'v' -> 'o'
+          !
+          ! Basically everthing goes Neumann...
+          ! But I could be wrong.
+          ! Come back to this.
           this%n_dir_bcs = this%n_dir_bcs + 1
           call this%dir_bcs(this%n_dir_bcs)%init_base(this%c_Xh)
           call this%dir_bcs(this%n_dir_bcs)%mark_zone(zones(i))
