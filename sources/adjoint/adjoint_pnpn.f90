@@ -183,12 +183,8 @@ contains
     type(user_t), intent(in) :: user
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
     character(len=20), parameter :: scheme = 'Perturbation (Pn/Pn)'
-    type(file_t) :: field_file, out_file
-    type(fld_file_data_t) :: field_data
-    integer :: n
 
     ! Temporary field pointers
-    real(kind=rp) :: norm_l2_base
     character(len=:), allocatable :: file_name
     character(len=256) :: header_line
 
@@ -936,7 +932,6 @@ contains
   end function norm
 
   function device_norm(x_d, y_d, z_d, B_d, volume, n)
-    use neko_config, only: NEKO_BCKND_DEVICE
     use device_math, only: device_vlsc3
     use comm, only: MPI_REAL_PRECISION
     use mpi_f08, only: MPI_SUM, MPI_COMM_WORLD, &
@@ -974,8 +969,6 @@ contains
     ! Local variables
     real(kind=rp) :: scaling_factor
     real(kind=rp) :: norm_l2, norm_l2_base
-    real(kind=rp) :: lambda
-    real(kind=rp) :: dt
     character(len=256) :: log_message
     type(vector_t) :: data_line
     integer :: n

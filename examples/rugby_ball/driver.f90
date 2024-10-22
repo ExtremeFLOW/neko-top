@@ -13,7 +13,7 @@ program usrneko
   use objective_function, only: objective_function_t
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
-  use num_types, only : rp, sp, dp, qp
+  use num_types, only : rp
   use field_math, only: field_rzero, field_rone, field_cmult
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
@@ -33,7 +33,7 @@ program usrneko
 
   ! these are some things needed for MMA/ work arrays (all these will become
   ! redundant when we do this properly)
-  type(field_t), pointer :: wo1, wo2, wo3
+  type(field_t), pointer :: wo1, wo2
   integer :: temp_indices(3)
   integer :: n, optimization_iteration
   real(kind=rp), dimension(1) :: fval
@@ -107,12 +107,12 @@ program usrneko
      ! This way you get the correct N etc.
 
      ! Look into the `masked_red_copy` function that Martin implemented.
-     ! That function will copy from one array to another, but the target 
+     ! That function will copy from one array to another, but the target
      ! only have the size of the mask, not the full size.
      if (design%if_mask) then
         call mask_exterior_const(&
-        problem%volume_constraint%sensitivity_to_coefficient, &
-        design%optimization_domain, 0.0_rp)
+             problem%volume_constraint%sensitivity_to_coefficient, &
+             design%optimization_domain, 0.0_rp)
      end if
 
      ! now we have the optimizer act on the design field.
@@ -148,7 +148,7 @@ program usrneko
        ! TODO
        ! this is a really dumb way of handling the reshaping..
        if ( .not. allocated(x_switch) ) then
-       allocate(x_switch(optimizer%get_n()))
+          allocate(x_switch(optimizer%get_n()))
        end if
 
        x_switch = reshape(x,[optimizer%get_n()])

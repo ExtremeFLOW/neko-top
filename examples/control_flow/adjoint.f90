@@ -44,7 +44,8 @@ module simcomp_example
   use adjoint_pnpn, only: adjoint_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, field_glsc3
+  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
+       field_glsc3
   use field_math, only: field_add2
   use math, only: glsc2, glsc3
   use device_math, only: device_glsc2
@@ -169,17 +170,11 @@ contains
   subroutine adjoint_case_init_common(this, C)
     class(adjoint_t), intent(inout) :: this
     type(case_t), target, intent(inout) :: C
-    character(len=:), allocatable :: output_directory
     integer :: lx = 0
     logical :: scalar = .false.
-    type(file_t) :: msh_file, bdry_file, part_file
-    logical :: found, logical_val
-    integer :: integer_val
+    logical :: found
     real(kind=rp) :: real_val
     character(len=:), allocatable :: string_val
-    real(kind=rp) :: stats_start_time, stats_output_val
-    integer :: stats_sampling_interval
-    integer :: output_dir_len
     integer :: precision
     type(field_t), pointer :: u_b, v_b, w_b
     ! HARRY
@@ -225,7 +220,8 @@ contains
 
     ! if (scalar) then
     !    allocate(C%scalar)
-    !    call C%scalar%init(C%msh, this%scheme%c_Xh, this%scheme%gs_Xh, C%params, C%usr,&
+    !    call C%scalar%init(C%msh, this%scheme%c_Xh, this%scheme%gs_Xh, &
+    !                       C%params, C%usr,&
     !                       C%material_properties)
     !    call this%scheme%chkp%add_scalar(C%scalar%s)
     !    this%scheme%chkp%abs1 => C%scalar%abx1
@@ -280,7 +276,7 @@ contains
        call adjoint_json%load_from_string(buffer)
        call json_get(C%params, 'case.fluid.initial_condition.type',&
             string_val)
-    endif
+    end if
 
 
     ! if (trim(string_val) .ne. 'user') then
@@ -329,10 +325,12 @@ contains
        !call json_get(C%params, 'case.fluid.baseflow.type', string_val)
 
        !if (trim(string_val) .ne. 'user') then
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, &
+       ! this%scheme%gs_Xh, &
        !        string_val, C%params)
        !else
-       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, this%scheme%gs_Xh, &
+       !   call set_baseflow(u_b, v_b, w_b, this%scheme%c_Xh, &
+       ! this%scheme%gs_Xh, &
        !        C%usr%baseflow_user, C%params)
        !end if
 
@@ -374,14 +372,14 @@ contains
     call this%s%init(C%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, C%scalar, &
-            path = trim(output_directory))
+            path = trim(C%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &
-            path = trim(output_directory))
+            path = trim(C%output_directory))
     end if
 
     ! HARRY
-    ! We should be using our own output_controller_t, 
+    ! We should be using our own output_controller_t,
     ! not the one used internally by neko.
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
@@ -408,7 +406,7 @@ contains
     ! if (logical_val) then
     !    call json_get_or_default(C%params, 'case.checkpoint_format', &
     !         string_val, "chkp")
-    !   !   C%f_chkp = chkp_output_t(this%scheme%chkp, path = output_directory, &
+    !      C%f_chkp = chkp_output_t(this%scheme%chkp, path = output_directory, &
     !         ! fmt = trim(string_val))
     !    call json_get_or_default(C%params, 'case.checkpoint_control', &
     !         string_val, "simulationtime")
@@ -447,20 +445,17 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    real(kind=rp), dimension(5) :: normed_diff
+    real(kind=rp), dimension(1) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
-    character(len=256) :: msg
 
     real(kind=rp) :: t_adj, cfl
     real(kind=dp) :: start_time_org, start_time, end_time
     character(len=LOG_SIZE) :: log_buf
     integer :: tstep_adj
-    character(len=:), allocatable :: restart_file
-    logical :: output_at_end, found
+    logical :: output_at_end
     ! for variable_tsteping
     real(kind=rp) :: cfl_avrg = 0.0_rp
     type(time_step_controller_t) :: dt_controller
-    integer :: idx
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
@@ -556,14 +551,15 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf,'(A, E15.7,A,E15.7,A)') 'T  : [', 0d0,',',this%case%end_time,')'
+    write(log_buf, '(A,E15.7,A,E15.7,A)') &
+         'T  : [', 0d0, ',', this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf,'(A, E15.7)') 'dt :  ', this%case%dt
+       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%dt
        call neko_log%message(log_buf)
     else
-       write(log_buf,'(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
+       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
        call neko_log%message(log_buf)
     end if
 
@@ -572,10 +568,10 @@ contains
     call this%s%execute(t_adj, tstep_adj)
 
     ! HARRY
-    ! ok this I guess this is techincally where we set the initial condition 
+    ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj,  &
-    this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
+    call this%case%usr%user_init_modules(t_adj, &
+         this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj,&
          this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
@@ -603,11 +599,11 @@ contains
        write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
        call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
-       this%case%tlag, this%case%dtlag, tstep_adj)
+            this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
-       this%case%ext_bdf, dt_controller)
+            this%case%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
             'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -619,7 +615,7 @@ contains
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
           call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
-          this%case%ext_bdf, dt_controller)
+               this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -690,58 +686,58 @@ contains
 
   end subroutine simulation_settime
 
-  !> Restart a case @a C from a given checkpoint
-  subroutine simulation_restart(C, t)
-    implicit none
-    type(case_t), intent(inout) :: C
-    real(kind=rp), intent(inout) :: t
-    integer :: i
-    type(file_t) :: chkpf, previous_meshf
-    character(len=LOG_SIZE) :: log_buf
-    character(len=:), allocatable :: restart_file
-    character(len=:), allocatable :: restart_mesh_file
-    real(kind=rp) :: tol
-    logical :: found
+  ! !> Restart a case @a C from a given checkpoint
+  ! subroutine simulation_restart(C, t)
+  !   implicit none
+  !   type(case_t), intent(inout) :: C
+  !   real(kind=rp), intent(inout) :: t
+  !   integer :: i
+  !   type(file_t) :: chkpf, previous_meshf
+  !   character(len=LOG_SIZE) :: log_buf
+  !   character(len=:), allocatable :: restart_file
+  !   character(len=:), allocatable :: restart_mesh_file
+  !   real(kind=rp) :: tol
+  !   logical :: found
 
-    call C%params%get('case.restart_file', restart_file, found)
-    call C%params%get('case.restart_mesh_file', restart_mesh_file,&
-         found)
+  !   call C%params%get('case.restart_file', restart_file, found)
+  !   call C%params%get('case.restart_mesh_file', restart_mesh_file,&
+  !        found)
 
-    if (found) then
-       previous_meshf = file_t(trim(restart_mesh_file))
-       call previous_meshf%read(C%fluid%chkp%previous_mesh)
-    end if
+  !   if (found) then
+  !      previous_meshf = file_t(trim(restart_mesh_file))
+  !      call previous_meshf%read(C%fluid%chkp%previous_mesh)
+  !   end if
 
-    call C%params%get('case.mesh2mesh_tolerance', tol,&
-         found)
+  !   call C%params%get('case.mesh2mesh_tolerance', tol,&
+  !        found)
 
-    if (found) C%fluid%chkp%mesh2mesh_tol = tol
+  !   if (found) C%fluid%chkp%mesh2mesh_tol = tol
 
-    chkpf = file_t(trim(restart_file))
-    call chkpf%read(C%fluid%chkp)
-    C%dtlag = C%fluid%chkp%dtlag
-    C%tlag = C%fluid%chkp%tlag
+  !   chkpf = file_t(trim(restart_file))
+  !   call chkpf%read(C%fluid%chkp)
+  !   C%dtlag = C%fluid%chkp%dtlag
+  !   C%tlag = C%fluid%chkp%tlag
 
-    !Free the previous mesh, dont need it anymore
-    call C%fluid%chkp%previous_mesh%free()
-    do i = 1, size(C%dtlag)
-       call C%ext_bdf%set_coeffs(C%dtlag)
-    end do
+  !   !Free the previous mesh, dont need it anymore
+  !   call C%fluid%chkp%previous_mesh%free()
+  !   do i = 1, size(C%dtlag)
+  !      call C%ext_bdf%set_coeffs(C%dtlag)
+  !   end do
 
-    call C%fluid%restart(C%dtlag, C%tlag)
-    if (allocated(C%scalar)) call C%scalar%restart( C%dtlag, C%tlag)
+  !   call C%fluid%restart(C%dtlag, C%tlag)
+  !   if (allocated(C%scalar)) call C%scalar%restart( C%dtlag, C%tlag)
 
-    t = C%fluid%chkp%restart_time()
-    call neko_log%section('Restarting from checkpoint')
-    write(log_buf,'(A,A)') 'File :   ', &
-         trim(restart_file)
-    call neko_log%message(log_buf)
-    write(log_buf,'(A,E15.7)') 'Time : ', t
-    call neko_log%message(log_buf)
-    call neko_log%end_section()
+  !   t = C%fluid%chkp%restart_time()
+  !   call neko_log%section('Restarting from checkpoint')
+  !   write(log_buf, '(A,A)') 'File :   ', &
+  !        trim(restart_file)
+  !   call neko_log%message(log_buf)
+  !   write(log_buf, '(A,E15.7)') 'Time : ', t
+  !   call neko_log%message(log_buf)
+  !   call neko_log%end_section()
 
-    call C%output_controller%set_counter(t)
-  end subroutine simulation_restart
+  !   call C%output_controller%set_counter(t)
+  ! end subroutine simulation_restart
 
   !> Write a checkpoint at joblimit
   subroutine simulation_joblimit_chkp(C, t)

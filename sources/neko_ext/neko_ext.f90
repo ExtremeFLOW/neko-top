@@ -46,6 +46,8 @@ contains
     logical :: has_scalar
     type(field_t), pointer :: u, v, w, p, s
 
+    t = 0.0_rp
+
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
     ! ------------------------------------------------------------------------ !
@@ -56,6 +58,8 @@ contains
     p => neko_case%fluid%p
     if (allocated(neko_case%scalar)) then
        s => neko_case%scalar%s
+    else
+       nullify(s)
     end if
 
     ! ------------------------------------------------------------------------ !

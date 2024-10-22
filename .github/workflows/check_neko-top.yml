@@ -80,7 +80,8 @@ jobs:
           PFUNIT_DIR: ${{ steps.setup-pfunit.outputs.install-dir }}
           GSLIB_DIR: ${{ steps.setup-gslib.outputs.install-dir }}
         run: |
-          cmake -B build -S . -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
+          cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug \
+            -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
             -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
             -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=OFF
 

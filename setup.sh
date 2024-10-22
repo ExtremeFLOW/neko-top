@@ -22,6 +22,7 @@ function help() {
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
+    echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
 }
 
 # Assign default values to the options
@@ -102,18 +103,26 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 # ============================================================================ #
 # Compile the Neko-TOP and example codes.
 
+# Set CMAKE_VARIABLES to pass to the cmake command
+if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
+
+# If CMAKE_VARIABLES is a string, convert it to an array
+if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
+    CMAKE_VARIABLES=($CMAKE_VARIABLES)
+fi
+
 # Set the variables for the compilation
-VARIABLES=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
-VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
-[ "$TEST" == true ] && VARIABLES+=("-DBUILD_TESTING=ON")
-[ "$TEST" == true ] && VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-[ "$DEVICE_TYPE" != "OFF" ] && VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
+CMAKE_VARIABLES+=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
+CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
+[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
+[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
+[ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
 
 printf "Compiling the example codes and Neko-TOP\n"
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${VARIABLES[@]}"
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
 
 # ============================================================================ #
