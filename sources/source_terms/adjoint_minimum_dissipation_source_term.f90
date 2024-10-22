@@ -104,9 +104,6 @@ contains
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
-
 
     ! we shouldn't be initializing this from JSON
     ! maybe throw an error?
@@ -179,7 +176,6 @@ contains
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: i
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
     !type(field_t), pointer :: dudx, dudy, dudz

@@ -296,9 +296,7 @@ contains
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     logical, intent(in) :: kspv_init
-    type(dirichlet_t) :: bdry_mask
     character(len=LOG_SIZE) :: log_buf
-    real(kind=rp), allocatable :: real_vec(:)
     real(kind=rp) :: real_val
     logical :: logical_val
     integer :: integer_val, ierr
@@ -958,7 +956,6 @@ contains
   subroutine adjoint_scheme_validate(this)
     class(adjoint_scheme_t), target, intent(inout) :: this
     ! Variables for retrieving json parameters
-    logical :: logical_val
 
     if ( (.not. associated(this%u_adj)) .or. &
          (.not. associated(this%v_adj)) .or. &
@@ -1237,7 +1234,6 @@ contains
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
     procedure(user_material_properties), pointer :: dummy_mp_ptr
-    logical :: nondimensional
     real(kind=rp) :: dummy_lambda, dummy_cp
 
     ! TODO
@@ -1254,6 +1250,7 @@ contains
        call user%material_properties(0.0_rp, 0, this%rho, this%mu, &
             dummy_cp, dummy_lambda, params)
     else
+
        ! Incorrect user input
        if (params%valid_path('case.fluid.Re') .and. &
             (params%valid_path('case.fluid.mu') .or. &
