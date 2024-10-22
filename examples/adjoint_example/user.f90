@@ -41,7 +41,6 @@ contains
   subroutine adjoint_forcing(f, t)
     class(fluid_user_source_term_t), intent(inout) :: f
     real(kind=rp), intent(in) :: t
-    integer :: i
     type(field_t), pointer :: u, v, w
     !type(field_t), pointer :: dudx, dudy, dudz
     !type(field_t), pointer :: dvdx, dvdy, dvdz

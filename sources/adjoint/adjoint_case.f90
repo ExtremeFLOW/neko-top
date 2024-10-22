@@ -112,7 +112,6 @@ contains
   subroutine adjoint_case_init_common(this, neko_case)
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
-    character(len=:), allocatable :: output_directory
     integer :: lx = 0
     logical :: scalar = .false.
     real(kind=rp) :: real_val
@@ -240,10 +239,10 @@ contains
     call this%output_controller%init(neko_case%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, neko_case%scalar, &
-            path = trim(output_directory))
+            path = trim(neko_case%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &
-            path = trim(output_directory))
+            path = trim(neko_case%output_directory))
     end if
 
     call json_get_or_default(neko_case%params, 'case.fluid.output_control',&

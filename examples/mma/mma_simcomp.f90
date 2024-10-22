@@ -108,7 +108,7 @@ contains
 
     real(kind=rp), allocatable ::a(:), c(:), d(:)
     real(kind=rp) :: a0
-    integer :: nloc, nglobal, ierr, rank
+    integer :: nloc
 
 
     allocate(a(this%m))
@@ -116,22 +116,22 @@ contains
     allocate(d(this%m))
 
 
-    a0= this%a0_const
-    a= this%a_const
-    c= this%c_const
-    d= this%d_const
-    ! a0= 1.0
-    ! a= 0.0
-    ! c= 100000.0
-    ! d= 1000.0
+    a0 = this%a0_const
+    a = this%a_const
+    c = this%c_const
+    d = this%d_const
+    ! a0 = 1.0
+    ! a = 0.0
+    ! c = 100000.0
+    ! d = 1000.0
     nloc = this%designx%dof%size()
-    ! print *, "nloc=", nloc
+    ! print *, "nloc = ", nloc
     ! call MPI_Allreduce(nloc, nglobal, 1, &
     !     MPI_INTEGER, mpi_sum, neko_comm, ierr)
-    ! print *, "nglobal=", nglobal
+    ! print *, "nglobal = ", nglobal
 
     ! initial design
-    this%designx%x=1.0
+    this%designx%x = 1.0
     this%xmax%x = 10.0_rp
     this%xmin%x = 0.0_rp
     call this%mma%init(reshape(this%designx%x, [nloc]), &
@@ -140,12 +140,18 @@ contains
     ! Get the rank of the current process
     ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
     ! print *, "************************"
-    ! print *, 'Processor ID (Rank): ', rank, "Max_x= ", maxval(this%designx%dof%x)
-    ! print *, 'Processor ID (Rank): ', rank, "min_x= ", minval(this%designx%dof%x)
-    ! print *, 'Processor ID (Rank): ', rank, "Max_y= ", maxval(this%designx%dof%y)
-    ! print *, 'Processor ID (Rank): ', rank, "min_y= ", minval(this%designx%dof%y)
-    ! print *, 'Processor ID (Rank): ', rank, "Max_z= ", maxval(this%designx%dof%z)
-    ! print *, 'Processor ID (Rank): ', rank, "min_z= ", minval(this%designx%dof%z)
+    ! print *, 'Processor ID (Rank): ', rank, "Max_x = ", &
+    ! maxval(this%designx%dof%x)
+    ! print *, 'Processor ID (Rank): ', rank, "min_x = ", &
+    ! minval(this%designx%dof%x)
+    ! print *, 'Processor ID (Rank): ', rank, "Max_y = ", &
+    ! maxval(this%designx%dof%y)
+    ! print *, 'Processor ID (Rank): ', rank, "min_y = ", &
+    ! minval(this%designx%dof%y)
+    ! print *, 'Processor ID (Rank): ', rank, "Max_z = ", &
+    ! maxval(this%designx%dof%z)
+    ! print *, 'Processor ID (Rank): ', rank, "min_z = ", &
+    ! minval(this%designx%dof%z)
     ! print *, "************************"
 
   end subroutine simcomp_test_init_from_attributes
@@ -169,35 +175,33 @@ contains
 
     real(kind=rp) :: L
 
-    integer :: iter, i, j, k, e, counter, ierr, rank, size, nglobal
+    integer :: iter, i, ierr, rank, size, nglobal
     integer, allocatable :: recv_counts(:), displs(:)
-    real(kind=rp), dimension(2,4) :: teststuff
 
     real(kind=rp) :: start_time, end_time
     real(kind=rp), dimension(this%mma%get_n()) :: x
 
-    real(kind=rp), dimension(this%mma%get_m()) :: fval, fvalglobal
+    real(kind=rp), dimension(this%mma%get_m()) :: fval
     real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
-    real(kind=rp) :: f0val, f0valeps, f0valglobal
+    real(kind=rp) :: f0val
     real(kind=rp), dimension(this%mma%get_n()) :: df0dx
-    ! character(len=50) :: filename
+    ! character(len = 50) :: filename
     real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
     ! real(kind=rp), dimension(4320,4) :: all_stuff
     real(kind=rp), allocatable :: all_stuff(:,:)
     integer, allocatable :: nloc_all(:)
 
-    character(len=80) :: iFileName ! Filename to save the VTK data
-
-    L=0_rp
+    L = 0.0_rp
 
 
     call cpu_time(start_time)
     ! call write_field_to_vector(this%designx,x,this%mma%get_n())
-    x= reshape(this%designx%x, [this%mma%get_n()])
-    call func1 (this, this%mma%get_n(), this%mma%get_m(), L, f0val, df0dx, fval , dfdx)
+    x = reshape(this%designx%x, [this%mma%get_n()])
+    call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
+         f0val, df0dx, fval, dfdx)
 
-    print *, 'iter=', 0,&
-         '-------,f0val= ', f0val, ',   fval= ', fval
+    print *, 'iter = ', 0,&
+         '-------, f0val = ', f0val, ',   fval = ', fval
 
     stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
     stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
@@ -235,7 +239,7 @@ contains
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
-    if (rank == 0) then
+    if (rank .eq. 0) then
        call write_stuff_vtk(all_stuff, nglobal, "stuff_init.vtk")
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -245,15 +249,17 @@ contains
     do iter = 1, 100 !10
        call this%mma%update(iter, x, df0dx, fval, dfdx)
        ! print *,"first"
-       this%designx%x = reshape(x ,shape(this%designx%x))
+       this%designx%x = reshape(x,shape(this%designx%x))
 
-       call func1 (this, this%mma%get_n(), this%mma%get_m(), L, f0val, df0dx, fval , dfdx)
-       call this%mma%KKT(x,df0dx,fval,dfdx)
+       call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
+            f0val, df0dx, fval, dfdx)
+       call this%mma%KKT(x, df0dx, fval, dfdx)
 
-       if (rank == 0) then
-          print *, 'iter=', iter,&
-               '-------,f0val= ', f0val, ',   fval= ', fval(1), &
-               ',  KKTmax=', this%mma%get_residumax(), ', KKTnorm2=', this%mma%get_residunorm()
+       if (rank .eq. 0) then
+          print *, 'iter = ', iter,&
+               '-------,f0val = ', f0val, ',   fval = ', fval(1), &
+               ',  KKTmax = ', this%mma%get_residumax(), &
+               ', KKTnorm2 = ', this%mma%get_residunorm()
        end if
 
        ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
@@ -261,7 +267,7 @@ contains
        if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
     end do
 
-    ! print *, "f0val=", f0val, "fval=", fval
+    ! print *, "f0val = ", f0val, "fval = ", fval
 
     call cpu_time(end_time)
 
@@ -287,7 +293,7 @@ contains
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
-    if (rank == 0) then
+    if (rank .eq. 0) then
        call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
     end if
 
@@ -299,19 +305,19 @@ contains
     !  The array is called stuff(n,4) holding the coordinates of  !
     !  all points and thier corresponding scalar value            !
     !  For a given point n, the array is defined as follows:      !
-    !  x =stuff(n,1), y=stuff(n,2), z=stuff(n,3)                  !
-    !  scalar field value= stuff(n,4)                             !
+    !  x = stuff(n,1), y = stuff(n,2), z = stuff(n,3)             !
+    !  scalar field value = stuff(n,4)                            !
     ! ----------------------------------------------------------- !
-    implicit none
     integer, intent(in) :: n ! Number of design variables
-    real(kind=rp), dimension(n,4), intent(in) :: stuff ! Array containing x, y, z, and T values
+    !> Array containing x, y, z, and T values
+    real(kind=rp), dimension(n, 4), intent(in) :: stuff
     character(len=*), intent(in) :: filename ! Filename to save the VTK data
 
     integer :: i ! Loop variable
     integer :: unit ! File unit number
 
     ! Open the VTK file for writing
-    open(newunit=unit, file=filename, status="replace", action="write")
+    open(newunit = unit, file = filename, status = "replace", action = "write")
 
     ! Write VTK header
     write(unit, '(A)') '# vtk DataFile Version 3.0'
@@ -338,13 +344,13 @@ contains
 
   end subroutine write_stuff_vtk
 
-  subroutine func1 (this, n, m, L, f0val, df0dx, fval , dfdx)
+  subroutine func1 (this, n, m, L, f0val, df0dx, fval, dfdx)
     ! ----------------------------------------------------------- !
     !  This subroutine calculates function values and gradients   !
     !  for "toy problem 3":                                       !
     !                                                             !
-    !    minimize sum_(j=1,..,n) xj/n                             !
-    !  subject to sum_(j=1,..,n) {(xj - Xj_GLL)^2}=0              !
+    !    minimize sum_(j = 1,..,n) xj/n                           !
+    !  subject to sum_(j = 1,..,n) {(xj - Xj_GLL)^2} = 0          !
     ! ----------------------------------------------------------- !
     implicit none
     class(mma_comp_t), intent(inout) :: this
@@ -354,59 +360,58 @@ contains
     real(kind=rp), intent(inout) :: f0val
     real(kind=rp), dimension(n), intent(inout) :: df0dx
     real(kind=rp), dimension(m), intent(inout) :: fval
-    real(kind=rp), dimension(m,n), intent(inout) :: dfdx
+    real(kind=rp), dimension(m, n), intent(inout) :: dfdx
 
-    real(kind=rp), dimension(n) :: x, coordx, coordy, coordz
-    integer :: i,j,k,e, counter, ierr, nglobal
+    real(kind=rp), dimension(n) :: x, coordx
+    integer :: ierr, nglobal
     real(kind=rp) :: Globalf0val
 
 
     call MPI_Allreduce(n, nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
+    x = reshape(this%designx%x, [n])
+    coordx = reshape(this%designx%dof%x, [n])
 
-    x= reshape(this%designx%x, [n])
-    coordx= reshape(this%designx%dof%x, [n])
-
-    f0val=sum(x)/nglobal
-    df0dx=1.0_rp/nglobal
-    Globalf0val=0_rp
+    f0val = sum(x) / nglobal
+    df0dx = 1.0_rp / nglobal
+    Globalf0val = 0.0_rp
     call MPI_Allreduce(f0val, Globalf0val, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    f0val=Globalf0val
-    ! f0val=0
-    ! df0dx=0
-    fval(1)=sum((x-coordx)**2)
-    ! fval(1)=sum(this%designx%x) - this%mma%get_n()*L
-    Globalf0val=0_rp
+    f0val = Globalf0val
+    ! f0val = 0
+    ! df0dx = 0
+    fval(1) = sum((x-coordx)**2)
+    ! fval(1) = sum(this%designx%x) - this%mma%get_n()*L
+    Globalf0val = 0.0_rp
     call MPI_Allreduce(fval(1), Globalf0val, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    fval(1)=Globalf0val
+    fval(1) = Globalf0val
 
-    dfdx(1,:)=2*(x-coordx)
-    fval(2) = -fval(1)
+    dfdx(1,:) = 2.0_rp * (x - coordx)
+    fval(2) = - fval(1)
     dfdx(2,:) = - dfdx(1,:)
 
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! f0val=sum(this%designx%x)/nglobal
-    ! df0dx=1.0_rp/nglobal
-    ! Globalf0val=0_rp
+    ! f0val = sum(this%designx%x)/nglobal
+    ! df0dx = 1.0_rp/nglobal
+    ! Globalf0val = 0.0_rp
     ! call MPI_Allreduce(f0val, Globalf0val, 1, &
     !   mpi_real_precision, mpi_sum, neko_comm, ierr)
-    ! f0val=Globalf0val
+    ! f0val = Globalf0val
 
-    ! ! f0val=0
-    ! ! df0dx=0
+    ! ! f0val = 0
+    ! ! df0dx = 0
 
-    ! fval(1)=sum(this%designx%x)/nglobal
-    ! ! fval(1)=sum(this%designx%x) - this%mma%get_n()*L
-    ! Globalf0val=0_rp
+    ! fval(1) = sum(this%designx%x)/nglobal
+    ! ! fval(1) = sum(this%designx%x) - this%mma%get_n()*L
+    ! Globalf0val = 0.0_rp
     ! call MPI_Allreduce(fval(1), Globalf0val, 1, &
     !   mpi_real_precision, mpi_sum, neko_comm, ierr)
-    ! fval(1)=Globalf0val
+    ! fval(1) = Globalf0val
 
-    ! dfdx(1,:)=1.0_rp/nglobal
+    ! dfdx(1,:) = 1.0_rp/nglobal
     ! fval(2) = -fval(1)
     ! dfdx(2,:) = - dfdx(1,:)
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
