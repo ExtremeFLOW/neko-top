@@ -303,15 +303,19 @@ contains
 !          else
           ! TODO
           ! I actually think for the passive scalar it goes:
-          ! 'v' -> 'o'
+          ! 'v' -> 'w'
+          ! 'n' -> 'n' (maybe flux = 0?)
           !
-          ! Basically everthing goes Neumann...
           ! But I could be wrong.
           ! Come back to this.
           this%n_dir_bcs = this%n_dir_bcs + 1
           call this%dir_bcs(this%n_dir_bcs)%init_base(this%c_Xh)
           call this%dir_bcs(this%n_dir_bcs)%mark_zone(zones(i))
-          read(bc_label(3:), *) dir_value
+          ! TODO
+          ! again, I'm not sure this is the best way of enforcing this, but
+          ! regardless of the specified dirichlet value, we should be zero
+          ! read(bc_label(3:), *) dir_value
+          dir_value = 0.0_rp
           call this%dir_bcs(this%n_dir_bcs)%set_g(dir_value)
           call this%dir_bcs(this%n_dir_bcs)%finalize()
        end if
@@ -320,7 +324,10 @@ contains
           this%n_neumann_bcs = this%n_neumann_bcs + 1
           call this%neumann_bcs(this%n_neumann_bcs)%init_base(this%c_Xh)
           call this%neumann_bcs(this%n_neumann_bcs)%mark_zone(zones(i))
-          read(bc_label(3:), *) flux
+          ! TODO
+          ! again... ditto with these BC's
+          ! read(bc_label(3:), *) flux
+          flux = 0.0_rp
           call this%neumann_bcs(this%n_neumann_bcs)%finalize_neumann(flux)
        end if
 
@@ -328,15 +335,31 @@ contains
        if (bc_label(1:4) .eq. 'user') then
           ! TODO
           ! COME BACK TO THIS
-          ! but I feel like... even if it's user, we should be Neuman on this
-          ! BC...
+          ! I feel like, if it's user, it's basically enforced as a dirichlet
+          ! so user is basically fancy dirichlet,
+          ! which means in the adjoint it's 'w'
           ! call this%user_bc%mark_zone(zones(i))
-          this%n_neumann_bcs = this%n_neumann_bcs + 1
-          call this%neumann_bcs(this%n_neumann_bcs)%init_base(this%c_Xh)
-          call this%neumann_bcs(this%n_neumann_bcs)%mark_zone(zones(i))
-          ! read(bc_label(3:), *) flux
-          flux = 0.0_rp
-          call this%neumann_bcs(this%n_neumann_bcs)%finalize_neumann(flux)
+          this%n_dir_bcs = this%n_dir_bcs + 1
+          call this%dir_bcs(this%n_dir_bcs)%init_base(this%c_Xh)
+          call this%dir_bcs(this%n_dir_bcs)%mark_zone(zones(i))
+          ! read(bc_label(3:), *) dir_value
+          ! TODO
+          ! Be so careful about how 'w' is enforced...
+          ! I don't think it's the same as setting dirichlet = 0.
+          ! Because BC's are enforced by dv not v. (and same for the matrices)
+
+          ! So I think for a wall, they treat them special by excluding them
+          ! somehow.
+
+          ! For a constant dirichlet, v = V_in, they effectivly force dv = 0, 
+          ! as in, no change.
+          
+          ! So I don't know what I'm doing here with:
+          dir_value = 0.0_rp
+          ! Because I think that's still going to set dv = 0.
+          ! This may only work because the initial condition is 0 everywhere.
+          call this%dir_bcs(this%n_dir_bcs)%set_g(dir_value)
+          call this%dir_bcs(this%n_dir_bcs)%finalize()
        end if
 
     end do
@@ -697,16 +720,6 @@ contains
     !
     ! Maybe return to this after speaking to Timofey
     call this%user_bc%set_eval(usr_eval)
-
-    ! TODO
-    ! I'm not even sure that 'v' -> 'w' is true for the passive scalar...
-    ! I'll talk to Martin, but right now I think it's a Robin condition.
-
-    ! - ds/dn * s_adj + s * ds_adj/dn = 0
-
-    ! So in fact, dirichlet zero is really bad. If anything, Neuman will do a 
-    ! better job of setting something close to this condition.
-
   end subroutine adjoint_scalar_scheme_set_user_bc
 
 
