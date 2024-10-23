@@ -52,27 +52,43 @@ contains
     integer, intent(in) :: ie
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
+    real(kind=rp) :: L, k, z_0
+    ! TODO
+    ! OK here I'm doing something different to Casper.
+    ! I feel like since we get a term in the adjoint velocity equation that 
+    ! looks like s_adj * grad(s), it's not a good idea to have discontinuity
+    ! on this boundary.
+    ! ie,
+    ! 
+    !    DONT                    DO (but smoother)
+    !        _______               ______
+    !       |                     /
+    !       |                    /
+    ! -------             -------
+    !
+    !
+    ! A logistic function seems reasonable...
+    L = 1.0_rp
+    k = 6.0_rp
+    z_0 = 1.0_rp
 
-    if(y.gt.1.0_rp) then
-      s = 1.0_rp
-    else
-      s = 0.0_rp
-    end if
+    s = L / (1.0_rp + exp(-k*(z - z_0)))
+
   end subroutine scalar_bc
 
   !> User initial condition                                                     
   subroutine scalar_ic(s, params)                                                  
     type(field_t), intent(inout) :: s                                           
     type(json_file), intent(inout) :: params                                    
-    integer :: i, e, k, j                                                       
-    real(kind=rp) :: rand, z                                                    
+    integer :: i
+    real(kind=rp) :: L, k, z_0
+
+    L = 1.0_rp
+    k = 6.0_rp
+    z_0 = 1.0_rp
                                                                                 
     do i = 1, s%dof%size()                                                      
-       if(s%dof%y(i,1,1,1).gt.1.0_rp) then
-       s%x(i,1,1,1) = 1.0_rp                                       
-      else
-       s%x(i,1,1,1) = 0.0_rp                                       
-      end if
+       s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
     end do                                                                      
                                                                                 
     end subroutine scalar_ic
