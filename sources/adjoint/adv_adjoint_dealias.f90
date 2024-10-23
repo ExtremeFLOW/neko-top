@@ -750,6 +750,7 @@ contains
             end do
 
             ! map back to GLL
+            idx = (e-1)*this%Xh_GLL%lxyz+1
             call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
             call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
 

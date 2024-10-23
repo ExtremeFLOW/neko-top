@@ -9,7 +9,7 @@
         "end_time": 3.0,
         "timestep": 1e-4,
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": false
         },
@@ -52,7 +52,7 @@
             },
             "boundary_types": [ "v", "o", "w", "w", "w", "w" ],
             "output_control": "simulationtime",
-            "output_value": 0.5,
+            "output_value": 0.25,
         },
         "scalar": {
             "enabled": true,
