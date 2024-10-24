@@ -30,9 +30,9 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `adjoint_scalar_convection_source_term` type.
+!> Implements the `adjoint_scalar_convection_source_term_dealias` type.
 ! this is a such a dumb name
-module adjoint_scalar_convection_source_term
+module adjoint_scalar_convection_source_term_dealias
   use num_types, only : rp
   use field_list, only : field_list_t
   use field, only: field_t
@@ -61,31 +61,32 @@ module adjoint_scalar_convection_source_term
   ! it's a source term acting on the adjoint velocity equations, of the form:
   ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: &
-  adjoint_scalar_convection_source_term_t
+  adjoint_scalar_convection_source_term_dealias_t
      !> here we have s and s_adj
      type(field_t), pointer :: s, s_adj
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
-     adjoint_scalar_convection_source_term_init_from_json
+     adjoint_scalar_convection_source_term_dealias_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       adjoint_scalar_convection_source_term_init_from_components
+       adjoint_scalar_convection_source_term_dealias_init_from_components
      !> Destructor.
-     procedure, pass(this) :: free => adjoint_scalar_convection_source_term_free
+     procedure, pass(this) :: free => &
+     adjoint_scalar_convection_source_term_dealias_free
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute_ => &
-     adjoint_scalar_convection_source_term_compute
-  end type adjoint_scalar_convection_source_term_t
+     adjoint_scalar_convection_source_term_dealias_compute
+  end type adjoint_scalar_convection_source_term_dealias_t
 
 contains
   !> The common constructor using a JSON object.
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
-  subroutine adjoint_scalar_convection_source_term_init_from_json(this, &
+  subroutine adjoint_scalar_convection_source_term_dealias_init_from_json(this, &
   json, fields, coef)
-    class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
+    class(adjoint_scalar_convection_source_term_dealias_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
@@ -100,13 +101,13 @@ contains
     ! init from components anyway...
 
 
-  end subroutine adjoint_scalar_convection_source_term_init_from_json
+  end subroutine adjoint_scalar_convection_source_term_dealias_init_from_json
 
 
-  subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
+  subroutine adjoint_scalar_convection_source_term_dealias_init_from_components(this,&
        f_x, f_y, f_z, &
        s, s_adj, coef)
-    class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
+    class(adjoint_scalar_convection_source_term_dealias_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
     type(coef_t) :: coef
@@ -141,20 +142,20 @@ contains
 
     ! TODO
     !this%mask => mask
-  end subroutine adjoint_scalar_convection_source_term_init_from_components
+  end subroutine adjoint_scalar_convection_source_term_dealias_init_from_components
 
   !> Destructor.
-  subroutine adjoint_scalar_convection_source_term_free(this)
-    class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
+  subroutine adjoint_scalar_convection_source_term_dealias_free(this)
+    class(adjoint_scalar_convection_source_term_dealias_t), intent(inout) :: this
 
     call this%free_base()
-  end subroutine adjoint_scalar_convection_source_term_free
+  end subroutine adjoint_scalar_convection_source_term_dealias_free
 
   !> Computes the source term and adds the result to `fields`.
   !! @param t The time value.
   !! @param tstep The current time-step.
-  subroutine adjoint_scalar_convection_source_term_compute(this, t, tstep)
-    class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
+  subroutine adjoint_scalar_convection_source_term_dealias_compute(this, t, tstep)
+    class(adjoint_scalar_convection_source_term_dealias_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     integer :: n_fields, i, n
@@ -210,6 +211,6 @@ contains
     
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)
-  end subroutine adjoint_scalar_convection_source_term_compute
+  end subroutine adjoint_scalar_convection_source_term_dealias_compute
 
-end module adjoint_scalar_convection_source_term
+end module adjoint_scalar_convection_source_term_dealias
