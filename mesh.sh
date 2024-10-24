@@ -9,11 +9,11 @@ function help() {
 
     echo -e "\n\e[4mDescription:\e[0m"
     echo -e "  This script automates the creation and convertions of meshes."
-    echo -e "  Cubit is used to create meshes from the journal files."
+    echo -e "  Cubit is used to create meshes from the input files."
     echo -e "  The meshes are then converted to Nek5000 format using exo2nek."
     echo -e "  Finally, the meshes are converted to Neko format using rea2nbin."
     echo -e ""
-    echo -e "  The user should specify the pattern used to find journal files"
+    echo -e "  The user should specify the pattern used to find input files"
     echo -e "  in the INPUT_PATH folder, which defaults to data. Completed"
     echo -e "  meshes are stored in the OUTPUT_PATH folder, which defaults to"
     echo -e "  data_local."
@@ -27,7 +27,7 @@ function help() {
 
     printf "\e[4mOptions:\e[0m\n"
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
-    printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
+    printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all input files available."
     printf "  -%-1s, --%-10s %-60s\n" "k" "keep" "Keep logs and temporaries."
     printf "  -%-1s, --%-10s %-60s\n" "r" "remesh" "Do complete remesh."
     printf "  -%-1s, --%-10s %-60s\n" "d" "dimension" "Dimension of GMSH file."
@@ -54,7 +54,7 @@ eval set -- "$PARSED"
 while true; do
     case "$1" in
     "-h" | "--help") help && exit ;;                   # Print help
-    "-a" | "--all") ALL=true && shift ;;               # Run all journals available
+    "-a" | "--all") ALL=true && shift ;;               # Run all file_list available
     "-k" | "--keep") KEEP=true && shift ;;             # Keep logs and temporaries
     "-r" | "--remesh") REMESH=true && shift ;;         # Do complete remesh
     "-d" | "--dimension") DIMENSION="$2" && shift 2 ;; # Dimension of GMSH file
@@ -72,8 +72,8 @@ export ALL KEEP REMESH DIMENSION
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
 
-# Set the path to the journal files and the output meshes
-[ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Journal files
+# Set the path to the input files and the output meshes
+[ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Input files
 [ -z $OUTPUT_PATH ] && OUTPUT_PATH="$MAIN_DIR/data_local" # Meshes
 
 # Set the path to the external dependencies
@@ -98,39 +98,39 @@ find_exo2nek
 find_rea2nbin
 
 # ============================================================================ #
-# Loop through the inputs and extract the journals
+# Loop through the inputs and extract the file_list
 
 SUPPORTED_TYPES=(".jou")
 
-journals=""
+file_list=""
 for input in $@; do
     [[ $ALL == "true" ]] && break
     input_name="$(basename $input)"
     input_dir=$(realpath $INPUT_PATH/$(dirname $input))
 
-    file_list=$(find $input_dir -type f -name "$input_name")
+    tmp_list=$(find $input_dir -type f -name "$input_name")
 
     # Ignore invalid inputs
-    if [ -z "${file_list[@]}" ]; then
+    if [ -z "${tmp_list[@]}" ]; then
         printf '  %-10s %-67s\n' "Not Found:" "$input"
         continue
     fi
 
-    # Extract the journals from the input
+    # Extract the file_list from the input
     for type in $SUPPORTED_TYPES; do
-        for file in $file_list; do
-            [[ $file == *$type ]] && journals+="$file "
+        for file in $tmp_list; do
+            [[ $file == *$type ]] && file_list+="$file "
         done
     done
 done
 
 if [ "$ALL" == "true" ]; then
-    journals=""
-    for journal in $(find $INPUT_PATH -name "*.jou" 2>>/dev/null); do
-        journals+="$journal "
+    file_list=""
+    for input_file in $(find $INPUT_PATH -name "*.jou" 2>>/dev/null); do
+        file_list+="$input_file "
     done
 fi
-[ -z "$journals" ] && exit 0
+[ -z "$file_list" ] && exit 0
 
 # ============================================================================ #
 # Function to run meshing
@@ -177,50 +177,59 @@ function mesh() {
 }
 
 # ============================================================================ #
-# Run the journals
+# Run the file_list
 
 full_start=$(date +%s.%N)
 
 mkdir -p $OUTPUT_PATH $LPATH
-printf "\n\e[4mQueueing journals.\e[0m\n"
+printf "\n\e[4mQueueing file_list.\e[0m\n"
 
-for journal in $journals; do
-    journal_name=${journal#$INPUT_PATH/}
-    journal_dir=$(dirname $journal_name)
+for input_file in $file_list; do
+    input_name=$(basename ${input_file%.*})
+    input_dir=$(dirname ${input_file#$INPUT_PATH/})
+    input_type=$(basename ${input_file##*.})
 
-    if [ -f "$OUTPUT_PATH/${journal_name%.*}.nmsh" ]; then
+    if [ -f "$OUTPUT_PATH/$input_dir/$input_name.nmsh" ]; then
         if [ $REMESH == "true" ]; then
-            printf '  %-10s %-67s\n' "Remeshing:" "$journal_name"
-            rm -f $OUTPUT_PATH/${journal_name%.*}.nmsh
+            printf '  %-11s' "Remeshing:"
+            rm -f $OUTPUT_PATH/${input_name%.*}.nmsh
         else
-            printf '  %-10s %-67s\n' "Skipping:" "$journal_name"
+            printf '  %-11s' "Skipping:"
             continue
         fi
     else
-        printf '  %-10s %-67s\n' "Meshing:" "$journal_name"
+        printf '  %-11s' "Meshing:"
     fi
+    printf '%-67s\n' "$input_dir/$input_name.$input_type"
 
-    mkdir -p $OUTPUT_PATH/$journal_dir/tmp
-    cd $OUTPUT_PATH/$journal_dir/tmp
+    mkdir -p $OUTPUT_PATH/$input_dir/tmp
+    cd $OUTPUT_PATH/$input_dir/tmp
 
-    mesh $journal
+    case $input_type in
+    "jou") jou2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    *)
+        printf >&2 "\n\e[4mError:\e[0m\n"
+        printf >&2 "  %-10s %-67s\n" "Invalid:" "Journal type: $input_file"
+        ;;
 
-    cp ./*.nmsh -ft $OUTPUT_PATH/$journal_dir
-    if [ $KEEP == "true" ]; then
-        rm -fr $OUTPUT_PATH/$journal_dir/tmp
-    fi
+    esac
+
+    cp ./*.nmsh -ft $OUTPUT_PATH/$input_dir
     cd $CURRENT_DIR
+    if [ $KEEP == "true" ]; then
+        rm -fr $OUTPUT_PATH/$input_dir/tmp
+    fi
 done
 
 # ============================================================================ #
 # Print the results
 
-for journal in $journals; do
-    journal_name=$(basename $journal)
-    journal_dir=$(dirname $journal)
+for input_file in $file_list; do
+    input_name=$(basename $input_file)
+    input_dir=$(dirname $input_file)
 
-    if [ -f "$INPUT_PATH/${journal%.*}.log" ]; then
-        printf '  %-10s %-67s\n' "Error:" "Mesh not created: $journal"
+    if [ -f "$INPUT_PATH/${input_file%.*}.log" ]; then
+        printf '  %-10s %-67s\n' "Error:" "Mesh not created: $input_file"
     fi
 
 done
