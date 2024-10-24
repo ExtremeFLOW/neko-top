@@ -178,10 +178,10 @@ function run {
     printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        { time ./run.sh 1>$logfile; } 2>&1
+        { time ./run.sh 1>$logfile 2>error.err; } 2>&1
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
-            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.err
         } 2>&1
     else
         # Look for the number of cores to use
