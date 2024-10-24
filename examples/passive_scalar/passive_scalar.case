@@ -11,7 +11,7 @@
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
-            "dealias": false
+            "dealias": true
         },
         "adjoint": {
             "initial_condition": {
