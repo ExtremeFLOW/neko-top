@@ -29,13 +29,41 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
     printf "  -%-1s, --%-10s %-60s\n" "k" "keep" "Keep logs and temporaries."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previous runs."
     printf "  -%-1s, --%-10s %-60s\n" "r" "remesh" "Do complete remesh."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "dimension" "Dimension of GMSH file."
 
     exit 0
 }
-
 if [ $# -lt 1 ]; then help; fi
+
+# Assign default values to the options
+ALL=false    # Run all meshing
+KEEP=false   # Keep logs and temporaries
+REMESH=false # Do complete remesh
+DIMENSION=3  # Dimension of GMSH file
+
+# List possible options
+OPTIONS=help,all,keep,remesh,dimension:
+OPT=h,a,k,r,d:
+
+# Parse the inputs for options
+PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+eval set -- "$PARSED"
+
+# Loop through the options and set the variables
+while true; do
+    case "$1" in
+    "-h" | "--help") help && exit ;;                   # Print help
+    "-a" | "--all") ALL=true && shift ;;               # Run all journals available
+    "-k" | "--keep") KEEP=true && shift ;;             # Keep logs and temporaries
+    "-r" | "--remesh") REMESH=true && shift ;;         # Do complete remesh
+    "-d" | "--dimension") DIMENSION="$2" && shift 2 ;; # Dimension of GMSH file
+
+    # End of options
+    "--") shift && break ;;
+    esac
+done
+export ALL KEEP REMESH DIMENSION
 
 # ============================================================================ #
 # User defined inputs.
@@ -152,7 +180,7 @@ for in in $@; do
     fi
 done
 
-if [ $ALL ]; then
+if [ "$ALL" == "true" ]; then
     journals=""
     for journal in $(find $INPUT_PATH -name "*.jou" 2>>/dev/null); do
         journals+="$journal "
@@ -225,12 +253,13 @@ full_start=$(date +%s.%N)
 
 mkdir -p $OUTPUT_PATH $LPATH
 printf "\n\e[4mQueueing journals.\e[0m\n"
+
 for journal in $journals; do
     journal_name=${journal#$INPUT_PATH/}
     journal_dir=$(dirname $journal_name)
 
     if [ -f "$OUTPUT_PATH/${journal_name%.*}.nmsh" ]; then
-        if [ $REMESH ]; then
+        if [ $REMESH == "true" ]; then
             printf '  %-10s %-67s\n' "Remeshing:" "$journal_name"
             rm -f $OUTPUT_PATH/${journal_name%.*}.nmsh
         else
@@ -247,7 +276,7 @@ for journal in $journals; do
     mesh $journal
 
     cp ./*.nmsh -ft $OUTPUT_PATH/$journal_dir
-    if [ ! $KEEP ]; then
+    if [ $KEEP == "true" ]; then
         rm -fr $OUTPUT_PATH/$journal_dir/tmp
     fi
     cd $CURRENT_DIR
