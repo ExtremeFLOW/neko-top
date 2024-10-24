@@ -21,6 +21,7 @@ contains
   subroutine user_setup(user)
     type(user_t), intent(inout) :: user
     user%init_user_simcomp => user_simcomp
+    user%fluid_user_if => fluid_bc
     user%scalar_user_bc => scalar_bc
     user%scalar_user_ic => scalar_ic
   end subroutine user_setup
@@ -37,6 +38,33 @@ contains
     call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
 
   end subroutine user_simcomp
+
+    ! user-defined boundary condition
+    subroutine fluid_bc(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
+      real(kind=rp), intent(inout) :: u
+      real(kind=rp), intent(inout) :: v
+      real(kind=rp), intent(inout) :: w
+      real(kind=rp), intent(in) :: x
+      real(kind=rp), intent(in) :: y
+      real(kind=rp), intent(in) :: z
+      real(kind=rp), intent(in) :: nx
+      real(kind=rp), intent(in) :: ny
+      real(kind=rp), intent(in) :: nz
+      integer, intent(in) :: ix
+      integer, intent(in) :: iy
+      integer, intent(in) :: iz
+      integer, intent(in) :: ie
+      real(kind=rp), intent(in) :: t
+      integer, intent(in) :: tstep
+
+      ! Casper said he used a parabloid, which is not a solution to NS but
+      ! I suppose it will sort itself out with enough distance...
+   
+      u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
+      v = 0._rp
+      w = 0._rp
+   
+    end subroutine fluid_bc
 
     subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
     real(kind=rp), intent(inout) :: s

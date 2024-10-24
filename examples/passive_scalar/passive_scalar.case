@@ -31,10 +31,7 @@
                 ]
             },
             "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0, 0.0, 0.0
-                ]
+                "type": "user"
             },
             "velocity_solver": {
                 "type": "cg",

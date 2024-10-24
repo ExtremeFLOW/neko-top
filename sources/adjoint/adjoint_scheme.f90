@@ -1103,7 +1103,11 @@ contains
       type is (usr_inflow_t)
        call bc_if%set_eval(usr_eval)
       class default
-       call neko_error("Not a user defined inflow condition")
+       ! call neko_error("Not a user defined inflow condition")
+       !! @todo
+       !! I think I've covered this case by prescribing walls on user BCs
+       !! but come back to this
+       !! In fact, this is probably a very dangerous way to treat user BCs
     end select
   end subroutine adjoint_scheme_set_usr_inflow
 
