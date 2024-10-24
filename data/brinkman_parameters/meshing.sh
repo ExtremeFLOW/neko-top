@@ -19,7 +19,7 @@
 #0 30.0 0
 #EOF
 ##
-#rea2nbin_dirichlet brink_cyl.re2 immersed_M1.nmsh
+#rea2nbin brink_cyl.re2 immersed_M1.nmsh
 
 ## Immersed meshed
 gmsh -0 immersed_M1.geo
@@ -30,7 +30,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 immersed_M1.nmsh
+rea2nbin brink_cyl.re2 immersed_M1.nmsh
 
 
 gmsh -0 immersed_M2.geo
@@ -41,7 +41,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 immersed_M2.nmsh
+rea2nbin brink_cyl.re2 immersed_M2.nmsh
 
 
 gmsh -0 immersed_M3.geo
@@ -52,7 +52,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 immersed_M3.nmsh
+rea2nbin brink_cyl.re2 immersed_M3.nmsh
 
 gmsh -0 immersed_M4.geo
 # This is to rebuild the mesh
@@ -62,7 +62,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 immersed_M4.nmsh
+rea2nbin brink_cyl.re2 immersed_M4.nmsh
 
 ## MESHED meshed
 
@@ -74,7 +74,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 meshed_M2.nmsh
+rea2nbin brink_cyl.re2 meshed_M2.nmsh
 
 gmsh -0 meshed_M3.geo
 # This is to rebuild the mesh
@@ -84,7 +84,7 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 meshed_M3.nmsh
+rea2nbin brink_cyl.re2 meshed_M3.nmsh
 
 gmsh -0 meshed_M4.geo
 # This is to rebuild the mesh
@@ -94,4 +94,4 @@ brink_cyl
 0
 EOF
 #
-rea2nbin_dirichlet brink_cyl.re2 meshed_M4.nmsh
+rea2nbin brink_cyl.re2 meshed_M4.nmsh
