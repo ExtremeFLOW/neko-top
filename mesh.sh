@@ -30,7 +30,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all input files available."
     printf "  -%-1s, --%-10s %-60s\n" "k" "keep" "Keep logs and temporaries."
     printf "  -%-1s, --%-10s %-60s\n" "r" "remesh" "Do complete remesh."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "dimension" "Dimension of GMSH file."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "dimension" "Dimension of mesh file."
 
     exit 0
 }
@@ -40,7 +40,7 @@ if [ $# -lt 1 ]; then help; fi
 ALL=false    # Run all meshing
 KEEP=false   # Keep logs and temporaries
 REMESH=false # Do complete remesh
-DIMENSION=3  # Dimension of GMSH file
+DIMENSION=2  # Dimension of GMSH file
 
 # List possible options
 OPTIONS=help,all,keep,remesh,dimension:
@@ -92,15 +92,12 @@ export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
 # Ensure executables are available
 
 source $MAIN_DIR/scripts/dependencies.sh
-
-find_cubit
-find_exo2nek
-find_rea2nbin
+source $MAIN_DIR/scripts/meshing.sh
 
 # ============================================================================ #
 # Loop through the inputs and extract the file_list
 
-SUPPORTED_TYPES=(".jou")
+SUPPORTED_TYPES=(".jou", ".exo", ".re2", ".geo")
 
 file_list=""
 for input in $@; do
@@ -117,7 +114,7 @@ for input in $@; do
     fi
 
     # Extract the file_list from the input
-    for type in $SUPPORTED_TYPES; do
+    for type in ${SUPPORTED_TYPES[@]}; do
         for file in $tmp_list; do
             [[ $file == *$type ]] && file_list+="$file "
         done
@@ -126,68 +123,30 @@ done
 
 if [ "$ALL" == "true" ]; then
     file_list=""
-    for input_file in $(find $INPUT_PATH -name "*.jou" 2>>/dev/null); do
-        file_list+="$input_file "
+
+    tmp_list=$(find $INPUT_PATH -type f)
+
+    # Extract the file_list from the input
+    for type in ${SUPPORTED_TYPES[@]}; do
+        for file in $tmp_list; do
+            [[ $file == *$type ]] && file_list+="$file "
+        done
     done
 fi
 [ -z "$file_list" ] && exit 0
-
-# ============================================================================ #
-# Function to run meshing
-
-function mesh() {
-    journal_name=$(basename $1)
-
-    rm -fr ${journal_name%.*}.log error.log
-
-    # Construct the mesh using Cubit
-    $cubit $1 1>>${journal_name%.*}.log 2>>error.log
-
-    if [[ ! -s error.log && $(find ./ -name "*.exo" | wc -l) -lt 1 ]]; then
-        printf "\n\e[4mError:\e[0m\n" 2>>error.log
-        printf "  %-10s %-67s\n" "Cubit:" "Exodus not created: $journal" 2>>error.log
-        exit 1
-    fi
-
-    # Convert the mesh from Exodus format to Nek5000 format
-    (
-        echo "$(ls *.exo 2>>error.log | wc -l)"
-        for file in *.exo; do echo "${file%.*}"; done
-        echo "0"
-        echo "0"
-        echo "${journal_name%.*}"
-    ) | $exo2nek 1>>${journal_name%.*}.log 2>>error.log
-
-    if [[ ! -s error.log && $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
-        printf "\n\e[4mError:\e[0m\n" 2>>error.log
-        printf "  %-10s %-67s\n" "exo2nek:" "re2 not created: $journal" 2>>error.log
-        exit 1
-    fi
-
-    # Convert the mesh to Neko mesh format
-    for file in *.re2; do
-        $rea2nbin $file ${file%.*}.nmsh 1>>${journal_name%.*}.log 2>>error.log
-    done
-
-    if [[ ! -s error.log && $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
-        printf "\n\e[4mError:\e[0m\n" 2>>error.log
-        printf "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $journal" 2>>error.log
-        exit 1
-    fi
-}
 
 # ============================================================================ #
 # Run the file_list
 
 full_start=$(date +%s.%N)
 
-mkdir -p $OUTPUT_PATH $LPATH
+mkdir -p $OUTPUT_PATH
 printf "\n\e[4mQueueing file_list.\e[0m\n"
 
 for input_file in $file_list; do
     input_name=$(basename ${input_file%.*})
-    input_dir=$(dirname ${input_file#$INPUT_PATH/})
     input_type=$(basename ${input_file##*.})
+    input_dir=$(dirname ${input_file#$INPUT_PATH/})
 
     if [ -f "$OUTPUT_PATH/$input_dir/$input_name.nmsh" ]; then
         if [ $REMESH == "true" ]; then
@@ -202,23 +161,21 @@ for input_file in $file_list; do
     fi
     printf '%-67s\n' "$input_dir/$input_name.$input_type"
 
-    mkdir -p $OUTPUT_PATH/$input_dir/tmp
-    cd $OUTPUT_PATH/$input_dir/tmp
+    tmp="$OUTPUT_PATH/$input_dir/$input_name.tmp"
+    mkdir -p $tmp
+    cd $tmp
 
     case $input_type in
     "jou") jou2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
-    *)
-        printf >&2 "\n\e[4mError:\e[0m\n"
-        printf >&2 "  %-10s %-67s\n" "Invalid:" "Journal type: $input_file"
-        ;;
-
+    "exo") exo2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    "re2") re2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    "geo") geo2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     esac
 
-    cp ./*.nmsh -ft $OUTPUT_PATH/$input_dir
-    cd $CURRENT_DIR
-    if [ $KEEP == "true" ]; then
-        rm -fr $OUTPUT_PATH/$input_dir/tmp
-    fi
+    cp *.nmsh -ft $OUTPUT_PATH/$input_dir
+
+    # Clean up the temporary files
+    [ $KEEP == "false" ] && rm -fr $tmp
 done
 
 # ============================================================================ #

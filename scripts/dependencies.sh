@@ -304,7 +304,7 @@ function find_exo2nek() {
 }
 
 # ============================================================================ #
-# Ensure Rea2Nbin is installed, if not install it.
+# Ensure Rea2Nbin is installed.
 function find_rea2nbin() {
     find_json_fortran $JSON_FORTRAN_DIR
 
@@ -319,6 +319,43 @@ function find_rea2nbin() {
         exit 1
     fi
     export rea2nbin
+}
+
+# ============================================================================ #
+# Ensure Gmsh is installed.
+function find_gmsh() {
+    # Check if gmsh is available
+    if [ ! -z "$(which gmsh)" ]; then
+        gmsh=$(which gmsh)
+    else
+        error "Gmsh not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+    export gmsh
+}
+
+# ============================================================================ #
+# Ensure Gmsh2Nek is installed.
+function find_gmsh2nek() {
+
+    # Check if gmsh2nek is available
+    if [ ! -z "$(which gmsh2nek)" ]; then
+        gmsh2nek=$(which gmsh2nek)
+    elif [ -f "$NEKO_DIR/bin/gmsh2nek" ]; then
+        gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
+    elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
+        cd $NEKO_DIR/contrib/gmsh2nek
+        ./compile.sh
+        cd $CURRENT_DIR
+        gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
+    else
+        error "gmsh2nek not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    export gmsh2nek
 }
 
 # ============================================================================ #
