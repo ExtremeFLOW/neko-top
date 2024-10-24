@@ -32,73 +32,24 @@
 
 ! Implements the `adjoint_case_t` type.
 module adjoint_case
-  use num_types, only: rp, dp
-  use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
-  use simulation_component, only: simulation_component_t
+  use num_types, only: rp, dp, sp
   use case, only: case_t
-  use field, only: field_t
-  use coefs, only: coef_t
-  use field_registry, only: neko_field_registry
-  use scratch_registry, only: neko_scratch_registry
-  use adjoint_pnpn, only: adjoint_pnpn_t
-  use adjoint_output, only: adjoint_output_t
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
-       field_glsc3
-  use field_math, only: field_add2
-  use math, only: glsc2, glsc3
-  use device_math, only: device_glsc2
-  use adv_lin_no_dealias, only: adv_lin_no_dealias_t
-  use logger, only: neko_log, LOG_SIZE
   use adjoint_scheme, only: adjoint_scheme_t
   use adjoint_fctry, only: adjoint_scheme_factory
-  use time_step_controller, only: time_step_controller_t
-  use time_scheme_controller, only: time_scheme_controller_t
-  use mpi_f08, only: MPI_WTIME
-  use jobctrl, only: jobctrl_time_limit
-  use profiler, only: profiler_start, profiler_stop, profiler_start_region, &
-       profiler_end_region
-  use file, only: file_t
-  use num_types, only: rp, sp, dp
-  use fluid_scheme, only: fluid_scheme_factory
-  use fluid_pnpn, only: fluid_pnpn_t
-  use fluid_scheme, only: fluid_scheme_t
-  use fluid_output, only: fluid_output_t
-  use chkp_output, only: chkp_output_t
-  use mean_sqr_flow_output, only: mean_sqr_flow_output_t
-  use mean_flow_output, only: mean_flow_output_t
-  use fluid_stats_output, only: fluid_stats_output_t
-  use mpi_f08, only: MPI_COMM_WORLD
-  use mesh_field, only: mesh_fld_t, mesh_field_init, mesh_field_free
-  use parmetis, only: parmetis_partmeshkway
-  use redist, only: redist_mesh
-  use output_controller, only: output_controller_t
-  use flow_ic, only: set_flow_ic
-  use scalar_ic, only: set_scalar_ic
-  use field, only: field_t
-  use field_registry, only: neko_field_registry
-  use stats, only: stats_t
-  use file, only: file_t
-  use utils, only: neko_error
-  use mesh, only: mesh_t
-  use time_scheme_controller, only: time_scheme_controller_t
-  use logger, only: neko_log, NEKO_LOG_QUIET, LOG_SIZE
-  use jobctrl, only: jobctrl_set_time_limit
-  use user_intf, only: user_t
-  use scalar_pnpn, only: scalar_pnpn_t
-  use json_module, only: json_file, json_core, json_value
-  use json_utils, only: json_get, json_get_or_default
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
-  use point_zone_registry, only: neko_point_zone_registry
+  use adjoint_pnpn, only: adjoint_pnpn_t
+  use adjoint_output, only: adjoint_output_t
   use adjoint_ic, only: set_adjoint_ic
-  use json_utils, only: json_extract_item
+  use output_controller, only: output_controller_t
+  use file, only: file_t
+  use json_module, only: json_file
+  use json_utils, only: json_get, json_get_or_default
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use adjoint_scalar_convection_source_term, only: &
   adjoint_scalar_convection_source_term_t
   use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
+  use scalar_ic, only : set_scalar_ic
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   implicit none
   private
@@ -207,14 +158,8 @@ contains
     character(len=:), allocatable :: output_directory
     integer :: lx = 0
     logical :: scalar = .false.
-    type(file_t) :: msh_file, bdry_file, part_file
-    logical :: found, logical_val
-    integer :: integer_val
     real(kind=rp) :: real_val
     character(len=:), allocatable :: string_val
-    real(kind=rp) :: stats_start_time, stats_output_val
-    integer :: stats_sampling_interval
-    integer :: output_dir_len
     integer :: precision
 
     ! extra things for json

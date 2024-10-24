@@ -33,54 +33,25 @@
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
 module steady_state_problem
-  use num_types, only : rp
-  use field_list, only : field_list_t
-  use json_module, only : json_file
-  use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
-  use field, only: field_t
-  use field_math, only: field_col3, field_addcol3
-  use user_intf, only: user_t, simulation_component_user_settings
-  use json_module, only: json_file
-  use steady_simcomp, only: steady_simcomp_t
-  use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl, grad
-  use scratch_registry, only : neko_scratch_registry
-  use objective_function, only : objective_function_t
-  use fluid_scheme, only : fluid_scheme_t
-  use adjoint_scheme, only : adjoint_scheme_t
-  use fluid_source_term, only: fluid_source_term_t
-  use math, only : glsc2
-  use field_math, only: field_rone, field_cmult
+  use num_types, only: rp, sp
   use problem, only: problem_t
-  use neko, only: neko_init, neko_solve, neko_finalize
-  use case, only: case_t
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
-  use source_term, only: source_term_t
-  use source_term_handler, only: source_term_handler_t
-  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use objective_function, only: objective_function_t
-  use minimum_dissipation_objective_function, only: &
-  minimum_dissipation_objective_function_t
-  use field, only:field_t
-  use scratch_registry, only : neko_scratch_registry
-  use num_types, only : rp, sp, dp, qp
-  use field_math, only: field_rzero, field_rone
-  use volume_constraint, only: volume_constraint_t
-  use fld_file_output, only : fld_file_output_t
+  use neko, only: neko_init, neko_finalize, neko_solve
+  use case, only: case_t
   use topopt_design, only: topopt_design_t
-  use user_intf, only : user_t
+  use json_file_module, only: json_file
+  use minimum_dissipation_objective_function, only: &
+       minimum_dissipation_objective_function_t
+  use volume_constraint, only: volume_constraint_t
+  use fld_file_output, only: fld_file_output_t
+  use steady_simcomp, only: steady_simcomp_t
+  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
+  use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use json_value_module, only: json_value
+  use utils, only: neko_error
+  use user_intf, only: simulation_component_user_settings
+  use simcomp_executor, only: neko_simcomps
   implicit none
   private
 

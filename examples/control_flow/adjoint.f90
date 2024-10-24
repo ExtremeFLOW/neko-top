@@ -383,7 +383,8 @@ contains
     end if
 
     ! HARRY
-    ! fuck the output_controller_t we're changing this anyway
+    ! We should be using our own output_controller_t, 
+    ! not the one used internally by neko.
     call json_get_or_default(C%params, 'case.fluid.output_control',&
          string_val, 'org')
 

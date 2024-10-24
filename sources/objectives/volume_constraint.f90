@@ -179,7 +179,6 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(case_t), intent(in) :: primal
     type(topopt_design_t), intent(inout) :: design
-    integer :: i
     integer n
 
     n = design%design_indicator%size()

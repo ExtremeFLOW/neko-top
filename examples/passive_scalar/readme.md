@@ -91,6 +91,7 @@ I've added the adjoint convective term in
 But they still require testing.
 
 TODO:
+- DONT FORGET TO EVALUATE THE CONVECTIVE TERM ON THE DEALIASED MESH!
 - obviously testing... but we don't really have a good case to test yet
 When I did my derivation (I'll write it up neatly at some point...) 
 - Double check with Casper what the BC's are, it looks like he keeps drawing

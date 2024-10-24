@@ -34,20 +34,17 @@
 module adv_lin_dealias
   use advection_adjoint, only: advection_adjoint_t
   use num_types, only : rp
-  use math, only : vdot3, sub2, subcol3, rzero
-  use utils, only : neko_error
+  use math, only : vdot3, sub2
   use space, only : space_t, GL
   use field, only : field_t
   use coefs, only : coef_t
   use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
-  use operators, only : opgrad, conv1, cdtp
+  use operators, only : opgrad, cdtp
   use interpolation, only : interpolator_t
   use device_math, only : device_vdot3, device_sub2, device_col3, device_add4
-  use device, only : device_free, device_map, device_get_ptr, device_memcpy, &
-       HOST_TO_DEVICE
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR, &
-       c_associated
+  use device, only : device_map
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   implicit none
   private
 
@@ -267,10 +264,9 @@ contains
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: duyb, dvyb, dwyb
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: duzb, dvzb, dwzb
 
-    real(kind=rp), dimension(this%Xh_GL%lxyz) :: vr, vs, vt
     real(kind=rp), dimension(this%Xh_GLL%lxyz) :: tempx, tempy, tempz
     integer :: e, i, idx, nel, n_GL
-    real :: fac
+
     nel = coef%msh%nelv
     n_GL = nel * this%Xh_GL%lxyz
     associate(c_GL => this%coef_GL)

@@ -46,26 +46,11 @@ module adjoint_lube_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
   use json_module, only : json_file
-  use json_utils, only: json_get, json_get_or_default
   use source_term, only : source_term_t
   use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
   use field, only: field_t
   use topopt_design, only: topopt_design_t
-  use field_math, only: field_subcol3, field_addcol3, field_copy, field_cmult
-  use user_intf, only: user_t, simulation_component_user_settings
-  use json_module, only: json_file
-  use steady_simcomp, only: steady_simcomp_t
-  use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl
+  use field_math, only: field_addcol3, field_copy, field_cmult
   use scratch_registry, only : neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
@@ -109,8 +94,8 @@ contains
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
+    ! real(kind=rp), allocatable :: values(:)
+    ! real(kind=rp) :: start_time, end_time
 
 
     ! we shouldn't be initializing this from JSON
@@ -189,7 +174,6 @@ contains
     class(adjoint_lube_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: i
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)

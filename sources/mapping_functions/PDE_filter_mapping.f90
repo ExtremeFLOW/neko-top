@@ -33,44 +33,35 @@
 !
 !> A PDE based filter
 module PDE_filter
-  use num_types, only : rp
-  use json_module, only : json_file
-  use field_registry, only : neko_field_registry
-  use field, only : field_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use num_types, only: rp
+  use json_module, only: json_file
+  use field_registry, only: neko_field_registry
+  use field, only: field_t
   use coefs, only: coef_t
-  use ax_product, only : ax_t, ax_helm_factory
-  use krylov, only : ksp_t, ksp_monitor_t, krylov_solver_factory, &
-  krylov_solver_destroy
-  use precon, only : pc_t, precon_factory, precon_destroy
+  use ax_product, only: ax_t, ax_helm_factory
+  use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory, &
+       krylov_solver_destroy
+  use precon, only: pc_t, precon_factory, precon_destroy
   use bc, only: bc_list_add, bc_list_t, bc_list_apply_scalar, bc_list_init, &
-  bc_list_free
-  use neumann, only : neumann_t
-  use profiler, only : profiler_start_region, profiler_end_region
-  use gather_scatter, only : gs_t, GS_OP_ADD
+       bc_list_free
+  use neumann, only: neumann_t
+  use profiler, only: profiler_start_region, profiler_end_region
+  use gather_scatter, only: gs_t, GS_OP_ADD
   use pnpn_residual, only: pnpn_prs_res_t
-  use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use field_registry, only : neko_field_registry
-  use logger, only : neko_log, LOG_SIZE
+  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
+  use field_registry, only: neko_field_registry
   use mapping, only: mapping_t
   use scratch_registry, only: neko_scratch_registry
-  use field_math, only: field_col2, field_invcol2, field_copy
+  use field_math, only: field_copy
   use coefs, only: coef_t
-  use neumann, only : neumann_t
-  use profiler, only : profiler_start_region, profiler_end_region
-  use gather_scatter, only : gs_t, GS_OP_ADD
-  use pnpn_residual, only: pnpn_prs_res_t
-  use mesh, only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use field_registry, only : neko_field_registry
-  use logger, only : neko_log, LOG_SIZE
-  use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use dofmap, only :  dofmap_t
-  use jacobi, only : jacobi_t
-  use device_jacobi, only : device_jacobi_t
-  use sx_jacobi, only : sx_jacobi_t
-  use hsmg, only : hsmg_t
-  use utils, only : neko_error
+  use logger, only: neko_log, LOG_SIZE
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use dofmap, only: dofmap_t
+  use jacobi, only: jacobi_t
+  use device_jacobi, only: device_jacobi_t
+  use sx_jacobi, only: sx_jacobi_t
+  use hsmg, only: hsmg_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -79,31 +70,31 @@ module PDE_filter
   !! by solving an equation
   !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
   type, public, extends(mapping_t) :: PDE_filter_t
-    !> Ax
+     !> Ax
      class(ax_t), allocatable :: Ax
-    !> Solver results monitors ( filter )
-    type(ksp_monitor_t) :: ksp_results(1)
-    !> Krylov solver for the filter
-    class(ksp_t), allocatable  :: ksp_filt
-    !> Filter Preconditioner
-    class(pc_t), allocatable :: pc_filt
-    !> They will all be Neumann conditions.
+     !> Solver results monitors ( filter )
+     type(ksp_monitor_t) :: ksp_results(1)
+     !> Krylov solver for the filter
+     class(ksp_t), allocatable :: ksp_filt
+     !> Filter Preconditioner
+     class(pc_t), allocatable :: pc_filt
+     !> They will all be Neumann conditions.
      type(neumann_t) :: filter_bcs
-    !> Filter boundary conditions
-    type(bc_list_t) :: bclst_filt
+     !> Filter boundary conditions
+     type(bc_list_t) :: bclst_filt
 
-    ! Inputs from the user
-    !> filter radius
-    real(kind=rp)  :: r
-    !> tolerance for PDE filter
-    real(kind=rp) :: abstol_filt
-    !> max iterations for PDE filter
-    integer :: ksp_max_iter
-    !> method for solving PDE
-    character(len=:), allocatable :: ksp_solver
-    ! > preconditioner type
-    character(len=:), allocatable :: precon_type_filt
-    integer :: ksp_n, n, i
+     ! Inputs from the user
+     !> filter radius
+     real(kind=rp) :: r
+     !> tolerance for PDE filter
+     real(kind=rp) :: abstol_filt
+     !> max iterations for PDE filter
+     integer :: ksp_max_iter
+     !> method for solving PDE
+     character(len=:), allocatable :: ksp_solver
+     ! > preconditioner type
+     character(len=:), allocatable :: precon_type_filt
+     integer :: ksp_n, n, i
 
 
 
@@ -150,7 +141,7 @@ contains
 
     call this%init_base(json, coef)
     call PDE_filter_init_from_attributes(this, coef)
-   
+
   end subroutine PDE_filter_init_from_json
 
   !> Actual constructor.
@@ -159,7 +150,7 @@ contains
     type(coef_t), intent(inout) :: coef
     integer :: n
     character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
-    bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
+         bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
 
 
 
@@ -176,7 +167,7 @@ contains
     ! Mark ALL the BCs as Neumann, regardless of what's prescribed
     bc_labels_all_neuman = 'o'
     call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
-                        'o', bc_labels_all_neuman)
+         'o', bc_labels_all_neuman)
 
     ! set the flux to zero
     call this%filter_bcs%finalize_neumann(0.0_rp)
@@ -190,19 +181,19 @@ contains
 
     ! set up krylov solver
     call krylov_solver_factory(this%ksp_filt, n, this%ksp_solver, &
-    this%ksp_max_iter, this%abstol_filt)
+         this%ksp_max_iter, this%abstol_filt)
 
     ! set up preconditioner
     call filter_precon_factory(this%pc_filt, this%ksp_filt, &
-            this%coef, this%coef%dof, this%coef%gs_h, this%bclst_filt, &
-            this%precon_type_filt)
+         this%coef, this%coef%dof, this%coef%gs_h, this%bclst_filt, &
+         this%precon_type_filt)
 
   end subroutine PDE_filter_init_from_attributes
 
   !> Destructor.
   subroutine PDE_filter_free(this)
     class(PDE_filter_t), intent(inout) :: this
-     if (allocated(this%Ax)) then
+    if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
 
@@ -223,10 +214,10 @@ contains
   !! @param X_in unfiltered field
   subroutine PDE_filter_apply(this, X_out, X_in)
     class(PDE_filter_t), intent(inout) :: this
-    type(field_t), intent(in) ::  X_in
-    type(field_t), intent(inout) ::  X_out
+    type(field_t), intent(in) :: X_in
+    type(field_t), intent(inout) :: X_out
     integer :: n, i
-    type(field_t), pointer ::  RHS
+    type(field_t), pointer :: RHS
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(1)
@@ -265,7 +256,7 @@ contains
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
-      this%ksp_results(1) = &
+    this%ksp_results(1) = &
          this%ksp_filt%solve(this%Ax, X_out, RHS%x, n, this%coef, &
          this%bclst_filt, this%coef%gs_h)
 
@@ -310,11 +301,11 @@ contains
   ! in the next group meeting.
   subroutine PDE_filter_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
     class(PDE_filter_t), intent(inout) :: this
-    type(field_t), intent(in) ::  X_in
-    type(field_t), intent(in) ::  df_dX_out
-    type(field_t), intent(inout) ::  df_dX_in
+    type(field_t), intent(in) :: X_in
+    type(field_t), intent(in) :: df_dX_out
+    type(field_t), intent(inout) :: df_dX_in
     integer :: n, i
-    type(field_t), pointer ::  RHS
+    type(field_t), pointer :: RHS
     integer :: temp_indices(1)
     type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
@@ -329,7 +320,7 @@ contains
        ! I think this is correct but I've never tested it
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
-       call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d,  n)
+       call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d, n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
@@ -353,7 +344,7 @@ contains
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
-      this%ksp_results(1) = &
+    this%ksp_results(1) = &
          this%ksp_filt%solve(this%Ax, dF_dX_in, RHS%x, n, this%coef, &
          this%bclst_filt, this%coef%gs_h)
 
@@ -376,7 +367,7 @@ contains
 
   end subroutine PDE_filter_apply_backward
 
-    subroutine filter_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
+  subroutine filter_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
 
     implicit none
     class(pc_t), allocatable, target, intent(inout) :: pc
@@ -390,13 +381,13 @@ contains
     call precon_factory(pc, pctype)
 
     select type (pcp => pc)
-    type is (jacobi_t)
+      type is (jacobi_t)
        call pcp%init(coef, dof, gs)
-    type is (sx_jacobi_t)
+      type is (sx_jacobi_t)
        call pcp%init(coef, dof, gs)
-    type is (device_jacobi_t)
+      type is (device_jacobi_t)
        call pcp%init(coef, dof, gs)
-    type is (hsmg_t)
+      type is (hsmg_t)
        if (len_trim(pctype) .gt. 4) then
           if (index(pctype, '+') .eq. 5) then
              call pcp%init(dof%msh, dof%Xh, coef, dof, gs, &
