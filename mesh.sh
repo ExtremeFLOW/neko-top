@@ -98,44 +98,30 @@ find_exo2nek
 find_rea2nbin
 
 # ============================================================================ #
-# Handle inputs and settings
+# Loop through the inputs and extract the journals
+
+SUPPORTED_TYPES=(".jou")
 
 journals=""
-for in in $@; do
+for input in $@; do
+    [[ $ALL == "true" ]] && break
+    input_name="$(basename $input)"
+    input_dir=$(realpath $INPUT_PATH/$(dirname $input))
 
-    # Opions and flags
-    if [[ ${in:0:2} == "--" ]]; then
-        case "${in:2}" in
-        "help") help ;;          # Print help
-        "all") ALL=true ;;       # Run all journals available
-        "keep") KEEP=true ;;     # Clean logs
-        "delete") DELETE=true ;; # Delete previous runs
-        "remesh") REMESH=true ;; # Do complete remesh
-        \?) printf '  %-10s %-67s\n' "Invalid option:" "$in" && exit 1 ;;
-        esac
-
-    elif [[ ${in:0:1} == "-" ]]; then
-        for ((i = 1; i < ${#in}; i++)); do
-            case "${in:$i:1}" in
-            "h") help ;;        # Print help
-            "a") ALL=true ;;    # Run all journals available
-            "k") KEEP=true ;;   # Clean logs
-            "d") DELETE=true ;; # Delete previous runs
-            "r") REMESH=true ;; # Do complete remesh
-            \?) printf '  %-10s %-67s\n' "Invalid option:" "${in:$i:1}" && exit 1 ;;
-            esac
-        done
+    file_list=$(find $input_dir -type f -name "$input_name")
 
     # Ignore invalid inputs
-    elif [[ -z $(ls $INPUT_PATH/$in 2>>/dev/null) ]]; then
-        printf '  %-10s %-67s\n' "Not Found:" "$in"
+    if [ -z "${file_list[@]}" ]; then
+        printf '  %-10s %-67s\n' "Not Found:" "$input"
+        continue
+    fi
 
     # Extract the journals from the input
-    elif [[ ! $ALL ]]; then
-        for journal in $(find $INPUT_PATH/$in -name "*.jou"); do
-            journals+="$journal "
+    for type in $SUPPORTED_TYPES; do
+        for file in $file_list; do
+            [[ $file == *$type ]] && journals+="$file "
         done
-    fi
+    done
 done
 
 if [ "$ALL" == "true" ]; then
@@ -144,21 +130,7 @@ if [ "$ALL" == "true" ]; then
         journals+="$journal "
     done
 fi
-
-if [ ! "$journals" ]; then
-    exit
-fi
-
-if [ $DELETE ]; then
-    printf 'Do you wish to delete ALL datasets? [Yes No]\n'
-    read -p '> ' yn
-    case $yn in
-    [Yy]*) echo "Removing..." && rm -fr $OUTPUT_PATH && echo "Results removed" ;;
-    *) echo "Results not removed" ;;
-    esac
-    printf 'Logs have been cleaned.\n'
-    rm -fr $LPATH
-fi
+[ -z "$journals" ] && exit 0
 
 # ============================================================================ #
 # Function to run meshing
