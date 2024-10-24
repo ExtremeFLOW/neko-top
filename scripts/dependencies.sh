@@ -187,6 +187,7 @@ function find_neko() {
     fi
 
     # Determine available features
+    FEATURES="--enable-contrib "
     [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
     [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
     [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
@@ -254,6 +255,107 @@ function find_neko() {
 
     export NEKO_DIR=$(realpath $NEKO_DIR)
     export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
+}
+
+# ============================================================================ #
+# Enssure Cubit is installed, if not install it.
+function find_cubit() {
+
+    # Check if Cubit are available
+    if [ ! -z "$(which cubit)" ]; then
+        cubit=$(which cubit)
+    elif [ ! -z "$(which coreform_cubit)" ]; then
+        cubit=$(which coreform_cubit)
+    elif [ ! -z "$(which trelis)" ]; then
+        cubit=$(which trelis)
+    else
+        error "Cubit not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    # Setup the alias and export the variable
+    export cubit
+
+}
+
+# ============================================================================ #
+# Ensure ExodusII to Nek5000 is installed, if not install it.
+function find_exo2nek() {
+    find_nek5000 $NEK5000_DIR
+
+    # Check if exo2nek is available
+    if [ ! -z "$(which exo2nek)" ]; then
+        exo2nek=$(which exo2nek)
+    elif [ -f "$NEK5000_DIR/bin/exo2nek" ]; then
+        exo2nek="$NEK5000_DIR/bin/exo2nek"
+    elif [ -f "$NEK5000_DIR/tools/maketools" ]; then
+        cd $NEK5000_DIR/tools
+        ./maketools exo2nek
+        cd $CURRENT_DIR
+        exo2nek="$NEK5000_DIR/bin/exo2nek"
+    else
+        error "exo2nek not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    export exo2nek
+}
+
+# ============================================================================ #
+# Ensure Rea2Nbin is installed.
+function find_rea2nbin() {
+    find_json_fortran $JSON_FORTRAN_DIR
+
+    # Check if rea2nbin is available
+    if [ ! -z "$(which rea2nbin)" ]; then
+        rea2nbin=$(which rea2nbin)
+    elif [ -f "$NEKO_DIR/bin/rea2nbin" ]; then
+        rea2nbin="$NEKO_DIR/bin/rea2nbin"
+    else
+        error "rea2nbin not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+    export rea2nbin
+}
+
+# ============================================================================ #
+# Ensure Gmsh is installed.
+function find_gmsh() {
+    # Check if gmsh is available
+    if [ ! -z "$(which gmsh)" ]; then
+        gmsh=$(which gmsh)
+    else
+        error "Gmsh not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+    export gmsh
+}
+
+# ============================================================================ #
+# Ensure Gmsh2Nek is installed.
+function find_gmsh2nek() {
+
+    # Check if gmsh2nek is available
+    if [ ! -z "$(which gmsh2nek)" ]; then
+        gmsh2nek=$(which gmsh2nek)
+    elif [ -f "$NEKO_DIR/bin/gmsh2nek" ]; then
+        gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
+    elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
+        cd $NEKO_DIR/contrib/gmsh2nek
+        ./compile.sh
+        cd $CURRENT_DIR
+        gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
+    else
+        error "gmsh2nek not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    export gmsh2nek
 }
 
 # ============================================================================ #
