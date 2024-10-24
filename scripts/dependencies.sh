@@ -174,13 +174,13 @@ _ACEOF
 function find_neko() {
 
     # Find the required external dependencies
-    find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
-    find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
-    find_gslib $GSLIB_DIR               # Re-defines the GSLIB_DIR variable.
+    find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+    find_gslib $GSLIB_DIR                          # Re-defines the GSLIB_DIR variable.
+    [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
     # Clone Neko from the repository if it does not exist.
     if [[ ! -d $1 || $(ls -A $1 | wc -l) -eq 0 ]]; then
-        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="master"
+        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="develop"
 
         git clone --depth 1 --branch $NEKO_VERSION \
             https://github.com/ExtremeFLOW/neko.git $1
@@ -193,7 +193,14 @@ function find_neko() {
 
     # Handle device specific features
     if [ "$DEVICE_TYPE" == "CUDA" ]; then
-        [ ! -z "$CUDA_DIR" ] && FEATURES+=" --with-cuda=$CUDA_DIR"
+        if [ -d "$CUDA_DIR" ]; then
+            FEATURES+=" --with-cuda=$CUDA_DIR"
+        else
+            error "CUDA_DIR is not set."
+            error "Please set CUDA_DIR to the directory containing"
+            error "the CUDA installation."
+            exit 1
+        fi
     elif [ "$DEVICE_TYPE" != "OFF" ]; then
         printf "Invalid device type: $DEVICE_TYPE\n"
         exit 1
@@ -220,6 +227,16 @@ function find_neko() {
         [ "$CLEAN" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
         [ "$TEST" == true ] && make check
+    fi
+
+    # Verify installation device type
+    if [ "$DEVICE_TYPE" == "CUDA" ]; then
+        # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
+        if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
+            error "CUDA backend not found in Neko."
+            error "Please ensure that the CUDA installation is correct."
+            exit 1
+        fi
     fi
 
     cd $CURRENT_DIR

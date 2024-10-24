@@ -32,9 +32,9 @@ function cleanup {
         -exec mv -t $results {} +
 
     if [ -s "error.err" ]; then
-        printf "ERROR: An error occured during execution. " >&2
-        printf "See error.err for details.\n" >&2
-        exit 1
+        printf "ERROR: An error occured during execution.\n"
+        printf "See error.err for details.\n"
+        return 1
     else
         printf "=%.0s" {1..80} && printf "\n"
         printf "Example concluded.\n"
@@ -51,6 +51,44 @@ function cleanup {
 }
 
 function prepare {
+    set +e
+
+    # ------------------------------------------------------------------------ #
+    # Report the Job environment if it exists
+
+    if [ ! -z "$SLURM_JOB_NAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "SLURM Job: %s\n" $SLURM_JOB_NAME
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Job ID: %s\n" $SLURM_JOB_ID
+        printf "Job Node: %s\n" $SLURM_JOB_NODELIST
+        printf "Job Partition: %s\n" $SLURM_JOB_PARTITION
+        printf "Job Account: %s\n" $SLURM_JOB_ACCOUNT
+        printf "Job Time: %s\n" $SLURM_JOB_TIME
+        printf "Job Memory: %s\n" $SLURM_JOB_MEMORY
+        printf "Job CPUs: %s\n" $SLURM_JOB_CPUS_PER_NODE
+        printf "Job GPUs: %s\n" $SLURM_JOB_GPUS
+        printf "Job QOS: %s\n" $SLURM_JOB_QOS
+        printf "Job Reservation: %s\n" $SLURM_JOB_RESERVATION
+        printf "Job Work Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output File: %s\n" $SLURM_JOB_NAME
+        printf "Job Error File: %s\n" $SLURM_JOB_NAME
+
+    elif [ ! -z "$LSB_JOBNAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "LSF10 Job: %s\n" $LSB_JOBNAME
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Job ID: %s\n" $LSB_JOBID
+        printf "Job CPUs: %s\n" $LSB_DJOB_NUMPROC
+
+    fi
+
+    [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
+    if [ ! -z "$(which module 2>>/dev/null)" ]; then
+        printf "\nModules:\n"
+        module list 2>&1
+    fi
 
     # ------------------------------------------------------------------------ #
     # Ensure the environment is set up
@@ -63,18 +101,22 @@ function prepare {
     JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
         -exec test -f '{}'/libjsonfortran.so \; -print)
     export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export PATH="$NEKO_DIR/bin:$PATH"
 
+    # ------------------------------------------------------------------------ #
     # Run preparation if it exists
+
     if [ -f "prepare.sh" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "Preparing example.\n\n"
+        printf "=%.0s" {1..80} && printf "\n"
 
         { time ./prepare.sh; } 2>&1
 
         if [ -s "error.err" ]; then
-            printf "\nERROR: An error occured during preparation. " >&2
-            printf "See error.err for details.\n" >&2
-            exit 1
+            printf "\nERROR: An error occured during preparation.\n"
+            printf "See error.err for details.\n"
+            return 1
         else
             printf "\nPreparation concluded.\n"
         fi
@@ -83,9 +125,9 @@ function prepare {
     # ------------------------------------------------------------------------ #
     # Find the Neko executable
 
-    if [ -f neko ]; then
+    if [ -f ./neko ]; then
         neko=$(realpath ./neko)
-    elif [ ! -z "$(ls *.f90 2>/dev/null)" ]; then
+    elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
@@ -97,8 +139,8 @@ function prepare {
     fi
 
     if [ ! -f "$neko" ]; then
-        printf "ERROR: Neko executable not found." >&2
-        exit 1
+        printf "ERROR: Neko executable not found."
+        return 1
     fi
     export neko
 }
@@ -107,6 +149,7 @@ function prepare {
 # Define the run function
 
 function run {
+    set -e
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
@@ -122,31 +165,42 @@ function run {
     printf "=%.0s" {1..80} && printf "\n"
     printf "Executing Neko.\n\n"
 
-    casefile=$(find . -name "*.case")
-    if [ -z "$casefile" ]; then
-        printf "ERROR: No case file found.\n" >&2
-        exit 1
+    casefile=($(find . -name "*.case"))
+    if [[ ${#casefile[@]} -eq 0 ]]; then
+        printf "ERROR: No case file found.\n"
+        return 1
+    elif [[ ${#casefile[@]} -eq 1 ]]; then
+        casefile=${casefile[0]}
+        logfile=$(basename -- ${casefile%.*}).log
+    else
+        logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
+    printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        export PATH="$NEKO_DIR/bin:$PATH"
-
-        logfile=$(basename -- $(dirname $(realpath $0)))
-
-        { time ./run.sh 2>error.err; } 2>&1
-    else
-        casename=$(basename -- ${casefile%.*})
-        printf "See $casename.log for the status output.\n"
-
+        { time ./run.sh 1>$logfile; } 2>&1
+    elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
-            time $(mpirun --pernode $neko $casefile 1>$casename.log 2>error.err)
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile
         } 2>&1
+    else
+        # Look for the number of cores to use
+        if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+            ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
+        elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
+            ncores=$LSB_DJOB_NUMPROC
+        fi
+
+        if [ -z "$ncores" ]; then
+            ncores="1"
+        fi
+        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.err); } 2>&1
     fi
 
     if [ -s "error.err" ]; then
-        printf "\nERROR: An error occured during execution. " >&2
-        printf "See error.err for details.\n" >&2
-        exit 1
+        printf "\nERROR: An error occured during execution.\n"
+        printf "See error.err for details.\n"
+        return 1
     else
         printf "\nNeko execution concluded.\n"
     fi

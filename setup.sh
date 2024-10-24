@@ -22,6 +22,7 @@ function help() {
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
+    echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
 }
 
 # Assign default values to the options
@@ -63,6 +64,9 @@ EXTERNAL_DIR="$MAIN_DIR/external"
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
 
+printf "=%.0s" {1..80} && printf "\n"
+printf "Preparing environment.\n\n"
+
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
     source $MAIN_DIR/prepare.env
@@ -86,28 +90,39 @@ if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
 # ============================================================================ #
 # Install dependencies (See scripts/dependencies.sh for details)
 
-check_system_dependencies           # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000 $NEK5000_DIR           # Re-defines the NEK5000_DIR variable.
-find_pfunit $PFUNIT_DIR             # Re-defines the PFUNIT_DIR variable.
-find_neko $NEKO_DIR                 # Re-defines the NEKO_DIR variable.
+printf "=%.0s" {1..80} && printf "\n"
+printf "Setting up external dependencies\n"
+
+check_system_dependencies                      # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
+find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
+[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #
 # Compile the Neko-TOP and example codes.
 
+# Set CMAKE_VARIABLES to pass to the cmake command
+if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
+
+# If CMAKE_VARIABLES is a string, convert it to an array
+if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
+    CMAKE_VARIABLES=($CMAKE_VARIABLES)
+fi
+
 # Set the variables for the compilation
-VARIABLES=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
-VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
-[ "$TEST" == true ] && VARIABLES+=("-DBUILD_TESTING=ON")
-[ "$TEST" == true ] && VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-[ "$DEVICE_TYPE" != "OFF" ] && VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
+CMAKE_VARIABLES+=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
+CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
+[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
+[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
+[ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
 
 printf "Compiling the example codes and Neko-TOP\n"
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${VARIABLES[@]}"
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
 
 # ============================================================================ #

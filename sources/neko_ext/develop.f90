@@ -17,9 +17,6 @@ contains
   !> @param[in] b Second vector
   !> @return Cross product \f$ a \times b \f$
   pure function cross(a, b) result(c)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(3), intent(in) :: a
     real(kind=rp), dimension(3), intent(in) :: b
     real(kind=rp), dimension(3) :: c
@@ -35,9 +32,6 @@ contains
   !> @param[in] b Second vector.
   !> @return dot product \f$ a \cdot b \f$.
   pure function dot(a, b) result(d)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(3), intent(in) :: a(3)
     real(kind=rp), dimension(3), intent(in) :: b(3)
     real(kind=rp) :: d
@@ -53,8 +47,6 @@ contains
   !> @note The vertices must be ordered in order either clockwise or
   !> counter-clockwise around the polygon.
   pure function area(nv, vertices) result(a)
-    use num_types
-    implicit none
     integer, intent(in) :: nv
     real(kind=rp), dimension(3, nv), intent(in) :: vertices
     real(kind=rp) :: a
@@ -84,9 +76,6 @@ contains
   !> @param[in] facet_type Type of facet, optional,
   !> (0 = interior, 1 = outlet [default]).
   subroutine get_facets(C, out, facet_type)
-    use case
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, dimension(:, :), allocatable, intent(out) :: out
     integer, intent(in), optional :: facet_type
@@ -137,9 +126,6 @@ contains
   !> @param[out] out List of outlet facets, size (2, N_facets),
   !> first row is element ID, second row is facet ID.
   subroutine get_facets_outlet(C, out)
-    use case, only: case_t
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, dimension(:, :), allocatable, intent(out) :: out
 
@@ -154,9 +140,6 @@ contains
   !> weights must be the same size as the array. If no weights are supplied, the
   !> unweighted sum is computed.
   pure function sum_weighted(a, w) result(s)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(:), intent(in) :: a
     real(kind=rp), dimension(:), intent(in), optional :: w
     real(kind=rp) :: s
@@ -176,9 +159,6 @@ contains
   !> @details This function computes the weighted average of an array. The
   !> weights must be the same size as the array.
   pure function average_weighted(a, w) result(m)
-    use num_types
-    implicit none
-
     real(kind=rp), dimension(:), intent(in) :: a
     real(kind=rp), dimension(:), intent(in), optional :: w
     real(kind=rp) :: m
@@ -197,12 +177,6 @@ contains
   !> @param[in] facet_id Facet ID.
   !> @param[out] nodes Node list.
   subroutine get_facet_nodes(C, element_id, facet_id, nodes)
-    use case
-    use num_types
-    use tuple
-    use hex
-    implicit none
-
     type(case_t), intent(in) :: C
     integer, intent(in) :: element_id
     integer, intent(in) :: facet_id
@@ -246,14 +220,6 @@ contains
   end subroutine get_facet_nodes
 
   subroutine estimate_temperature(neko_case)
-    use case, only: case_t
-    use global_interpolation, only: global_interpolation_t
-    use json_utils, only: json_get_or_default
-    use logger, only: neko_log, LOG_SIZE
-    use num_types, only: rp
-    use tuple, only: tuple4_i4_t
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
     type(global_interpolation_t) :: interpolator
 
