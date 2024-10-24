@@ -2,7 +2,15 @@
 ! Supporting functions
 ! ============================================================================ !
 module develop
+  use case, only: case_t
+  use global_interpolation, only: global_interpolation_t
+  use json_utils, only: json_get_or_default
+  use logger, only: neko_log, LOG_SIZE
+  use num_types, only: rp
+  use tuple, only: tuple4_i4_t
   use utils, only: neko_error
+  use hex, only: hex_t
+  implicit none
 
   integer, public, parameter :: facet_type_interior = 0
   integer, public, parameter :: facet_type_outlet = 1
