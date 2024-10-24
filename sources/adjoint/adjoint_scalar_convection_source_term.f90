@@ -195,6 +195,15 @@ contains
     ! call opgrad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
     call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
 
+    ! I can't explain why this is correct, but I know it is!
+    ! Sit down with a pen and paper !!
+    n = dsdx%size()
+    do i = 1, n
+       dsdx%x(i,1,1,1) = dsdx%x(i,1,1,1) / this%coef%B(i,1,1,1)
+       dsdy%x(i,1,1,1) = dsdy%x(i,1,1,1) / this%coef%B(i,1,1,1)
+       dsdz%x(i,1,1,1) = dsdz%x(i,1,1,1) / this%coef%B(i,1,1,1)
+    end do
+
     ! TODO
     ! So in principal, the derivatives could have kinks now.
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
