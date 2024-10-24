@@ -91,53 +91,11 @@ export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
 # ============================================================================ #
 # Ensure executables are available
 
-# Check if Cubit are available
-if [ ! -z "$(which cubit)" ]; then
-    cubit=$(which cubit)
-elif [ ! -z "$(which coreform_cubit)" ]; then
-    cubit=$(which coreform_cubit)
-elif [ ! -z "$(which trelis)" ]; then
-    cubit=$(which trelis)
-else
-    echo "Cubit not found. Please ensure it is installed and available in the PATH."
-    exit 1
-fi
-cubit="$cubit -nojournal -nographics -batch -noecho"
-
 source $MAIN_DIR/scripts/dependencies.sh
-find_nek5000 $NEK5000_DIR
 
-# Check if exo2nek is available
-if [ ! -z "$(which exo2nek)" ]; then
-    exo2nek=$(which exo2nek)
-elif [ -f "$NEK5000_DIR/bin/exo2nek" ]; then
-    exo2nek="$NEK5000_DIR/bin/exo2nek"
-elif [ -f "$NEK5000_DIR/tools/maketools" ]; then
-    cd $NEK5000_DIR/tools
-    ./maketools exo2nek
-    cd $CURRENT_DIR
-    exo2nek="$NEK5000_DIR/bin/exo2nek"
-else
-    echo "exo2nek not found. Please ensure it is installed and available in the PATH."
-    exit 1
-fi
-
-# Check if rea2nbin is available
-if [ ! -z "$(which rea2nbin)" ]; then
-    rea2nbin=$(which rea2nbin)
-elif [ -f "$NEKO_DIR/bin/rea2nbin" ]; then
-    rea2nbin="$NEKO_DIR/bin/rea2nbin"
-else
-    echo "rea2nbin not found. Please ensure it is installed and available in the PATH."
-    exit 1
-fi
-
-# Set the LD_LIBRARY_PATH to ensure the libraries are found
-if [ -d "$JSON_FORTRAN_DIR/lib" ]; then
-    export LD_LIBRARY_PATH="$JSON_FORTRAN_DIR/lib:$LD_LIBRARY_PATH"
-elif [ -d "$JSON_FORTRAN_DIR/lib64" ]; then
-    export LD_LIBRARY_PATH="$JSON_FORTRAN_DIR/lib64:$LD_LIBRARY_PATH"
-fi
+find_cubit
+find_exo2nek
+find_rea2nbin
 
 # ============================================================================ #
 # Handle inputs and settings
