@@ -43,30 +43,22 @@ if [ $# -lt 1 ]; then help; fi
 # Define all needed folders relative to the project folder. (without trailing /)
 CURRENT_DIR=$(pwd)
 MAIN_DIR=$(dirname $(realpath $0))
-INPUT_PATH="$MAIN_DIR/data"        # Journal files
-OUTPUT_PATH="$MAIN_DIR/data_local" # Meshes
+
+# Set the path to the journal files and the output meshes
+[ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Journal files
+[ -z $OUTPUT_PATH ] && OUTPUT_PATH="$MAIN_DIR/data_local" # Meshes
 
 # Set the path to the external dependencies
-if [ -z "$NEK5000_DIR" ]; then
-    NEK5000_DIR="$MAIN_DIR/external/Nek5000"
-fi
-if [ -z "$NEKO_DIR" ]; then
-    NEKO_DIR="$MAIN_DIR/external/neko"
-fi
-if [ -z "$JSON_FORTRAN_DIR" ]; then
-    JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
-fi
+[ -z "$NEK5000_DIR" ] && NEK5000_DIR="$MAIN_DIR/external/Nek5000"
+[ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
+[ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
 
-# If the user specified a relative path, then make it absolute
-if [[ ! "$NEK5000_DIR" = /* ]]; then
-    NEK5000_DIR=$(realpath $NEK5000_DIR)
-fi
-if [[ ! "$NEKO_DIR" = /* ]]; then
-    NEKO_DIR=$(realpath $NEKO_DIR)
-fi
-if [[ ! "$JSON_FORTRAN_DIR" = /* ]]; then
-    JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
-fi
+# Force the paths to be absolute
+export INPUT_PATH=$(realpath $INPUT_PATH)
+export OUTPUT_PATH=$(realpath $OUTPUT_PATH)
+export NEK5000_DIR=$(realpath $NEK5000_DIR)
+export NEKO_DIR=$(realpath $NEKO_DIR)
+export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
 
 # ============================================================================ #
 # Ensure executables are available
