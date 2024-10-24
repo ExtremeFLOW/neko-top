@@ -258,6 +258,70 @@ function find_neko() {
 }
 
 # ============================================================================ #
+# Enssure Cubit is installed, if not install it.
+function find_cubit() {
+
+    # Check if Cubit are available
+    if [ ! -z "$(which cubit)" ]; then
+        cubit=$(which cubit)
+    elif [ ! -z "$(which coreform_cubit)" ]; then
+        cubit=$(which coreform_cubit)
+    elif [ ! -z "$(which trelis)" ]; then
+        cubit=$(which trelis)
+    else
+        error "Cubit not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    # Setup the alias and export the variable
+    export cubit
+
+}
+
+# ============================================================================ #
+# Ensure ExodusII to Nek5000 is installed, if not install it.
+function find_exo2nek() {
+    find_nek5000 $NEK5000_DIR
+
+    # Check if exo2nek is available
+    if [ ! -z "$(which exo2nek)" ]; then
+        exo2nek=$(which exo2nek)
+    elif [ -f "$NEK5000_DIR/bin/exo2nek" ]; then
+        exo2nek="$NEK5000_DIR/bin/exo2nek"
+    elif [ -f "$NEK5000_DIR/tools/maketools" ]; then
+        cd $NEK5000_DIR/tools
+        ./maketools exo2nek
+        cd $CURRENT_DIR
+        exo2nek="$NEK5000_DIR/bin/exo2nek"
+    else
+        error "exo2nek not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+
+    export exo2nek
+}
+
+# ============================================================================ #
+# Ensure Rea2Nbin is installed, if not install it.
+function find_rea2nbin() {
+    find_json_fortran $JSON_FORTRAN_DIR
+
+    # Check if rea2nbin is available
+    if [ ! -z "$(which rea2nbin)" ]; then
+        rea2nbin=$(which rea2nbin)
+    elif [ -f "$NEKO_DIR/bin/rea2nbin" ]; then
+        rea2nbin="$NEKO_DIR/bin/rea2nbin"
+    else
+        error "rea2nbin not found."
+        error "Please ensure it is installed and available in the PATH."
+        exit 1
+    fi
+    export rea2nbin
+}
+
+# ============================================================================ #
 # Helper function to print errors
 function error() {
     echo -e "$1" >&2
