@@ -25,15 +25,15 @@ function cleanup {
     # Move all files which are not the error or executable files to the log
     # folder
     find ./ -type f \
-        -not -name "error.err" \
+        -not -name "error.log" \
         -not -name "neko" \
         -not -name "output.log" \
         -not -name "*.chkp" \
         -exec mv -t $results {} +
 
-    if [ -s "error.err" ]; then
+    if [ -s "error.log" ]; then
         printf "ERROR: An error occured during execution.\n"
-        printf "See error.err for details.\n"
+        printf "See error.log for details.\n"
         return 1
     else
         printf "=%.0s" {1..80} && printf "\n"
@@ -42,7 +42,7 @@ function cleanup {
     fi
 
     # Remove all but the log files
-    find ./ -type f -not -name "error.err" -not -name "output.log" -delete
+    find ./ -type f -not -name "error.log" -not -name "output.log" -delete
 
     # Clear the output file to indicate successful completion
     cp -ft $results output.log
@@ -113,9 +113,9 @@ function prepare {
 
         { time ./prepare.sh; } 2>&1
 
-        if [ -s "error.err" ]; then
+        if [ -s "error.log" ]; then
             printf "\nERROR: An error occured during preparation.\n"
-            printf "See error.err for details.\n"
+            printf "See error.log for details.\n"
             return 1
         else
             printf "\nPreparation concluded.\n"
@@ -178,10 +178,10 @@ function run {
     printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        { time ./run.sh 1>$logfile; } 2>&1
+        { time ./run.sh 1>$logfile 2>error.log; } 2>&1
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
-            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.log
         } 2>&1
     else
         # Look for the number of cores to use
@@ -194,12 +194,12 @@ function run {
         if [ -z "$ncores" ]; then
             ncores="1"
         fi
-        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.err); } 2>&1
+        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log); } 2>&1
     fi
 
-    if [ -s "error.err" ]; then
+    if [ -s "error.log" ]; then
         printf "\nERROR: An error occured during execution.\n"
-        printf "See error.err for details.\n"
+        printf "See error.log for details.\n"
         return 1
     else
         printf "\nNeko execution concluded.\n"

@@ -59,14 +59,14 @@ fi
 printf "\n\e[4mTest status.\e[m\n"
 
 for test in ${tests[@]}; do
-    if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
+    if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
         rm -fr $LPATH/$test
     fi
 done
 
 for test in ${tests[@]}; do
-    if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.err ]]; then
+    if [[ -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         file=($(find $LPATH/$test -type f -name "*.case"))
 
         # If more than one file exists
@@ -112,9 +112,9 @@ done
 
 for test in ${tests[@]}; do
     # Check if there were errors. Print them if there were.
-    if [ -s $LPATH/$test/error.err ]; then
+    if [ -s $LPATH/$test/error.log ]; then
 
-        if [ "$(head -n 1 $LPATH/$test/error.err)" = "Interrupted" ]; then
+        if [ "$(head -n 1 $LPATH/$test/error.log)" = "Interrupted" ]; then
             printf '\t\e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
         else
             printf '\t\e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
@@ -127,9 +127,9 @@ done
 
 for test in ${tests[@]}; do
     # Check if there were errors. Print them if there were.
-    if [ -s $LPATH/$test/error.err ]; then
+    if [ -s $LPATH/$test/error.log ]; then
 
-        if [ "$(head -n 1 $LPATH/$test/error.err)" = "Interrupted" ]; then
+        if [ "$(head -n 1 $LPATH/$test/error.log)" = "Interrupted" ]; then
             continue
         fi
 
@@ -145,12 +145,12 @@ for test in ${tests[@]}; do
         done
 
         printf "\n"
-        if [ $(cat $LPATH/$test/error.err | wc -l) -ge "10" ]; then
-            head -n 5 $LPATH/$test/error.err | fold -w 80
+        if [ $(cat $LPATH/$test/error.log | wc -l) -ge "10" ]; then
+            head -n 5 $LPATH/$test/error.log | fold -w 80
             printf ".....\n"
-            tail -n 5 $LPATH/$test/error.err | fold -w 80
+            tail -n 5 $LPATH/$test/error.log | fold -w 80
         else
-            cat $LPATH/$test/error.err | fold -w 80
+            cat $LPATH/$test/error.log | fold -w 80
         fi
         printf "\n"
 

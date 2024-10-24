@@ -238,7 +238,7 @@ function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
     source $SPATH/functions.sh
-    run $1 1>output.log 2>error.err
+    run $1 1>output.log 2>error.log
     cd $CURRENT_DIR
 }
 
@@ -257,7 +257,7 @@ function Submit() {
             printf >&2 "Please set the MN5_ACCOUNT variable in the environment.\n"
             exit 1
         fi
-        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.err
+        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
 
     else
         printf >&2 "No or invalid cluster specified for submission.\n"
@@ -274,7 +274,7 @@ function Submit() {
 INTERRUPTED=0
 function handler() {
     if [ "$MAIN_DIR" != "$(pwd)" ]; then
-        printf "Interrupted" >error.err
+        printf "Interrupted" >error.log
     fi
     INTERRUPTED=1
 }
@@ -306,7 +306,7 @@ for case in ${example_list[@]}; do
     # Setup the log folder
     if [[ -f "$log/output.log" &&
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
-        rm -f $log/error.err && touch $log/error.err
+        rm -f $log/error.log && touch $log/error.log
 
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
@@ -314,8 +314,8 @@ for case in ${example_list[@]}; do
     fi
 
     # Remove old output and error files
-    find $log -type f -name "*.log" -or -name "error.err" -delete
-    touch $log/output.log $log/error.err
+    find $log -type f -name "*.log" -or -name "error.log" -delete
+    touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
     if [ ${case: -3} == ".sh" ]; then
