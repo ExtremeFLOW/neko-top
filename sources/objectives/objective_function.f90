@@ -129,7 +129,7 @@ module objective_function
        class(objective_function_t), intent(inout) :: this
        ! these ones are inout because we may need to append source terms etc
        ! TODO
-       ! At first I thought we could just pass the fluid, but if we have 
+       ! At first I thought we could just pass the fluid, but if we have
        ! passive scalars it's better to pass the whole case down.
        class(case_t), intent(inout) :: primal
        class(adjoint_case_t), intent(inout) :: adjoint
@@ -184,7 +184,7 @@ contains
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => &
-       neko_point_zone_registry%get_point_zone(mask_name)
+            neko_point_zone_registry%get_point_zone(mask_name)
     end if
 
   end subroutine objective_function_init_base

@@ -233,11 +233,11 @@ contains
        ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
        ! (the whole design, so we get all the coeffients)
        call field_col3(objective_field, primal%fluid%u, &
-       design%brinkman_amplitude)
+            design%brinkman_amplitude)
        call field_addcol3(objective_field, primal%fluid%v, &
-       design%brinkman_amplitude)
+            design%brinkman_amplitude)
        call field_addcol3(objective_field, primal%fluid%w, &
-       design%brinkman_amplitude)
+            design%brinkman_amplitude)
        if (this%if_mask) then
           this%lube_value = glsc2_mask(objective_field%x, primal%fluid%C_Xh%b, &
                n, this%mask%mask, this%mask%size)
@@ -276,11 +276,11 @@ contains
 
     ! here it should just be an inner product between the forward and adjoint
     call field_col3(this%sensitivity_to_coefficient, primal%fluid%u, &
-    adjoint%scheme%u_adj)
+         adjoint%scheme%u_adj)
     call field_addcol3(this%sensitivity_to_coefficient, primal%fluid%v, &
-    adjoint%scheme%v_adj)
+         adjoint%scheme%v_adj)
     call field_addcol3(this%sensitivity_to_coefficient, primal%fluid%w, &
-    adjoint%scheme%w_adj)
+         adjoint%scheme%w_adj)
     ! but negative
     call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
 
@@ -293,7 +293,7 @@ contains
 
     if (this%if_lube) then
        call neko_scratch_registry%request_field(lube_contribution, &
-       temp_indices(1))
+            temp_indices(1))
        call field_col3(lube_contribution, primal%fluid%u, primal%fluid%u)
        call field_addcol3(lube_contribution, primal%fluid%v, primal%fluid%v)
        call field_addcol3(lube_contribution, primal%fluid%w, primal%fluid%w)

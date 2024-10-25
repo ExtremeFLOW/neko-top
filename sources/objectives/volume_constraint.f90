@@ -143,7 +143,7 @@ contains
     if (design%if_mask) then
        ! init the base
        call this%init_base(primal%fluid%dm_Xh, design%if_mask, &
-       design%optimization_domain%name)
+            design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
        call neko_scratch_registry%request_field(work , temp_indices(1))
@@ -191,7 +191,7 @@ contains
           call neko_error('GPU not supported volume constraint')
        else
           this%volume = glsc2_mask(design%design_indicator%x, &
-             primal%fluid%c_xh%B, n, this%mask%mask, this%mask%size)
+               primal%fluid%c_xh%B, n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then

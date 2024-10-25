@@ -124,7 +124,7 @@ contains
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
           call this%scalar%step(t_adj, tstep_adj, this%case%dt, &
-          this%case%ext_bdf, dt_controller)
+               this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &

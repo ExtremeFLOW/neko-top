@@ -35,28 +35,28 @@
 ! todo: module name
 ! HARRY
 ! NOTE
-! This seems really silly to make a brand new scheme just change the convective 
+! This seems really silly to make a brand new scheme just change the convective
 ! term.
 ! In the velocity it made sense because we needed different inputs, but here the
-! convective term takes the exact same inputs, so really the only difference 
+! convective term takes the exact same inputs, so really the only difference
 ! would be in the factory...
 !
 ! However...
-! We still rely too heavily on registry, so we can't really have multiple 
+! We still rely too heavily on registry, so we can't really have multiple
 ! passive scalars.
 !
-! PS, an alternative to "scalars as simcomps" would be a "scalar list" so you 
-! could execute multiple passive scalars... and then in the JSON you could name 
+! PS, an alternative to "scalars as simcomps" would be a "scalar list" so you
+! could execute multiple passive scalars... and then in the JSON you could name
 ! them all uniquely
 ! (or cycle through s1, s2, etc if nothing is specified.)
 !
-! But for now we're making essentially a copy of a scalar with the necessary 
+! But for now we're making essentially a copy of a scalar with the necessary
 ! changes.
 !
 ! Question for Tim:
-! Is is possible to somehow link adjoint_scalar_scheme.f90 to scalar_scheme.f90 
+! Is is possible to somehow link adjoint_scalar_scheme.f90 to scalar_scheme.f90
 ! in github?
-! so that if a change is made to scalar_scheme.f90 by someone else, it is 
+! so that if a change is made to scalar_scheme.f90 by someone else, it is
 ! somehow reflected in adjoint_scalar_scheme.f90?
 ! That would be cool
 !
@@ -93,7 +93,7 @@ module adjoint_scalar_scheme
   use json_utils, only : json_get, json_get_or_default
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
-                        user_material_properties
+       user_material_properties
   use utils, only : neko_error
   use comm, only: NEKO_COMM, MPI_INTEGER, MPI_SUM
   use scalar_source_term, only : scalar_source_term_t
@@ -104,7 +104,7 @@ module adjoint_scalar_scheme
   use time_step_controller, only : time_step_controller_t
   ! steal some things from the OG passive scalar
   use scalar_scheme, only: scalar_scheme_solver_factory, &
-  scalar_scheme_precon_factory
+       scalar_scheme_precon_factory
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
@@ -204,13 +204,13 @@ module adjoint_scalar_scheme
      procedure(adjoint_scalar_scheme_step_intrf), pass(this), deferred :: step
      !> Restart from a checkpoint.
      procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: &
-     restart
+          restart
   end type adjoint_scalar_scheme_t
 
   !> Abstract interface to initialize a scalar formulation
   abstract interface
      subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, params, &
-     user, ulag, vlag, wlag, time_scheme, rho)
+          user, ulag, vlag, wlag, time_scheme, rho)
        import adjoint_scalar_scheme_t
        import json_file
        import coef_t
@@ -350,9 +350,9 @@ contains
           ! So I think for a wall, they treat them special by excluding them
           ! somehow.
 
-          ! For a constant dirichlet, v = V_in, they effectivly force dv = 0, 
+          ! For a constant dirichlet, v = V_in, they effectivly force dv = 0,
           ! as in, no change.
-          
+
           ! So I don't know what I'm doing here with:
           dir_value = 0.0_rp
           ! Because I think that's still going to set dv = 0.
@@ -383,7 +383,7 @@ contains
   !! @param scheme The name of the scalar scheme.
   !! @param user Type with user-defined procedures.
   subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, params, &
-  scheme, user, rho)
+       scheme, user, rho)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     type(coef_t), target, intent(inout) :: c_Xh
@@ -440,8 +440,8 @@ contains
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh
 
-	 ! TODO
-	 ! all the JSON pointing to adjoint stuff
+    ! TODO
+    ! all the JSON pointing to adjoint stuff
     !
     ! Material properties
     !
@@ -697,12 +697,12 @@ contains
     procedure(usr_scalar_bc_eval) :: usr_eval
 
     ! TODO
-    ! perhaps this is really short sighted, but a user BC will always be 
+    ! perhaps this is really short sighted, but a user BC will always be
     ! dirichlet in the forward, so we can assume it's going to be 'w' in the
     ! adjoint.
     !
-    ! of course the exception here is if we have objective functions as 
-    ! surface intergrals, then we get weird BC's for the adjoint on those 
+    ! of course the exception here is if we have objective functions as
+    ! surface intergrals, then we get weird BC's for the adjoint on those
     ! surfaces...
     !
     ! So right now we apply the same as the forward, which is WRONG.
@@ -756,7 +756,7 @@ contains
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
-    procedure(user_material_properties),  pointer :: dummy_mp_ptr
+    procedure(user_material_properties), pointer :: dummy_mp_ptr
     real(kind=rp) :: dummy_mu, dummy_rho
 
     dummy_mp_ptr => dummy_user_material_properties
@@ -767,10 +767,10 @@ contains
        & file!"
        call neko_log%message(log_buf)
        call user%material_properties(0.0_rp, 0, dummy_rho, dummy_mu, &
-                                        this%cp, this%lambda, params)
+            this%cp, this%lambda, params)
     else
        if (params%valid_path('case.scalar.Pe') .and. &
-           (params%valid_path('case.scalar.lambda') .or. &
+            (params%valid_path('case.scalar.lambda') .or. &
             params%valid_path('case.scalar.cp'))) then
           call neko_error("To set the material properties for the scalar,&
           & either provide Pe OR lambda and cp in the case file.")
@@ -786,7 +786,7 @@ contains
 
           ! Read Pe into lambda for further manipulation.
           call json_get(params, 'case.scalar.Pe', this%lambda)
-          write(log_buf, '(A,ES13.6)') 'Pe         :',  this%lambda
+          write(log_buf, '(A,ES13.6)') 'Pe         :', this%lambda
           call neko_log%message(log_buf)
 
           ! Set cp and rho to 1 since the setup is non-dimensional.

@@ -227,7 +227,7 @@ contains
 
 
     ! TODO
-    ! Regarding masks and filters, 
+    ! Regarding masks and filters,
     ! I suppose there are two ways of thinking about it:
     ! 1) Mask first, then filter
     ! 2) filter first, then mask
@@ -296,7 +296,7 @@ contains
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
        call mask_exterior_const(this%design_indicator, &
-       this%optimization_domain, 0.0_rp)
+            this%optimization_domain, 0.0_rp)
     end if
 
     ! TODO
