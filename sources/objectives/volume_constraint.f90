@@ -67,7 +67,8 @@ module volume_constraint
   use topopt_design, only: topopt_design_t
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t
-  use mask_ops, only: masked_glsc2, mask_exterior_const
+  use mask_ops, only: mask_exterior_const
+  use math_ext, only: glsc2_mask
   implicit none
   private
 
@@ -150,8 +151,8 @@ contains
        if (neko_bcknd_device .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume_domain = masked_glsc2(work%x, primal%fluid%c_xh%B, &
-          this%mask, n)
+          this%volume_domain = glsc2_mask(work%x, primal%fluid%c_xh%B, &
+               n, this%mask%mask, this%mask%size)
        end if
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
@@ -189,8 +190,8 @@ contains
        if (neko_bcknd_device .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = masked_glsc2(design%design_indicator%x, &
-          primal%fluid%c_xh%B, this%mask, n)
+          this%volume = glsc2_mask(design%design_indicator%x, &
+             primal%fluid%c_xh%B, n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then

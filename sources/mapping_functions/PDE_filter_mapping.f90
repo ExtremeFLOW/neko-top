@@ -127,9 +127,6 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
-    character(len=20) :: fields(1)
-    real(kind=rp) :: tmp_real
-
 
     ! TODO
     ! I'll do the json stuff later...
@@ -218,7 +215,6 @@ contains
     type(field_t), intent(inout) :: X_out
     integer :: n, i
     type(field_t), pointer :: RHS
-    type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(1)
 
@@ -307,7 +303,6 @@ contains
     integer :: n, i
     type(field_t), pointer :: RHS
     integer :: temp_indices(1)
-    type(field_t), pointer :: ta1, ta2, ta3
     character(len=LOG_SIZE) :: log_buf
 
     n = this%coef%dof%size()

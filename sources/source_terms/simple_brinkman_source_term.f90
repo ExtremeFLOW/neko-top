@@ -77,8 +77,6 @@ contains
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
 
 
     ! we shouldn't be initializing this from JSON
@@ -143,7 +141,6 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     type(field_t), pointer :: fu, fv, fw
-    integer :: n
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
