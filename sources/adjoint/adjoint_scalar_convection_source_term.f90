@@ -89,8 +89,6 @@ contains
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
 
     ! this is a bit weird... because I don't think this should come from the 
     ! JSON. 
@@ -112,7 +110,6 @@ contains
     type(coef_t) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: s, s_adj
     ! TODo
     ! do masks later
@@ -157,7 +154,7 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: n_fields, i, n
+    integer :: i, n
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz

@@ -55,8 +55,6 @@ contains
   ! Compute the simcomp_test field.
   subroutine solve_adjoint(this)
     type(adjoint_case_t), intent(inout) :: this
-    real(kind=rp) :: t
-    integer :: tstep
 
     real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time

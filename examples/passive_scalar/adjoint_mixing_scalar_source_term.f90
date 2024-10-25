@@ -99,8 +99,6 @@ contains
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
 
 
   end subroutine adjoint_mixing_scalar_source_term_init_from_json
@@ -160,7 +158,6 @@ contains
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: n_fields, i, n
     type(field_t), pointer :: fs
     type(field_t), pointer :: work
     integer :: temp_indices(1)

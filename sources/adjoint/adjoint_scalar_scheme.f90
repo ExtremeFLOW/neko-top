@@ -281,7 +281,6 @@ contains
     character(len=NEKO_MSH_MAX_ZLBL_LEN) :: bc_label
     integer :: i
     real(kind=rp) :: dir_value, flux
-    logical :: bc_exists
 
     do i = 1, size(bc_labels)
        bc_label = trim(bc_labels(i))
@@ -397,7 +396,7 @@ contains
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
     logical :: logical_val
-    real(kind=rp) :: real_val, solver_abstol
+    real(kind=rp) :: solver_abstol
     integer :: integer_val, ierr
     character(len=:), allocatable :: solver_type, solver_precon
 
