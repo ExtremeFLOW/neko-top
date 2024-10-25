@@ -106,7 +106,6 @@ contains
   !> The constructor for the base problem.
   subroutine steady_state_problem_init(this)
     class(steady_state_problem_t), intent(inout) :: this
-    type(json_file) :: simcomp_settings
 
     call this%init_base()
 
