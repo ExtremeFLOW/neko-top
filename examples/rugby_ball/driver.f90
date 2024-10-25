@@ -35,12 +35,9 @@ program usrneko
   ! redundant when we do this properly)
   type(field_t), pointer :: wo1, wo2
   integer :: temp_indices(3)
-  integer :: n, optimization_iteration
+  integer :: n, optimization_iteration, m
   real(kind=rp), dimension(1) :: fval
   real(kind=rp), allocatable :: x_switch(:)
-
-
-
 
   ! init the problem (base)
   call problem%init()
@@ -50,7 +47,7 @@ program usrneko
 
   ! TODO
   ! call `optimizer%init(problem, design)`
-!------------------------------------------------------------------------------
+  !------------------------------------------------------------------------------
   ! this all has to be wrapped up again!
   ! so that we have an `optimizer_t` class, where it would pick out MMA.
   ! so this would be:
@@ -68,10 +65,12 @@ program usrneko
   call field_rzero(wo1)
   call field_rone (wo2)
   ! obviously do this properly in the future...
-  n = design%design_indicator%size()
+  n = problem%get_n()
+  m = problem%get_m()
+
   call optimizer%init_json(design%design_indicator%x, n, &
   !    m, a0         a_i          c_i           d_i
-       1, 0.0_rp, [0.0_rp], [100.0_rp], [0.0_rp], wo1%x, wo2%x, &
+       m, 0.0_rp, [0.0_rp], [100.0_rp], [0.0_rp], wo1%x, wo2%x, &
        problem%C%params)
   ! -------------------------------------------------------------------!
   !      Internal parameters for MMA                                   !

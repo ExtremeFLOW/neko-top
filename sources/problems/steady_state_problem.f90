@@ -42,6 +42,7 @@ module steady_state_problem
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
+  use objective_function, only: objective_function_t
   use minimum_dissipation_objective_function, only: &
        minimum_dissipation_objective_function_t
   use volume_constraint, only: volume_constraint_t
@@ -74,6 +75,11 @@ module steady_state_problem
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
 
+     !> Number of design variables.
+     integer :: n
+     !> Number of constraints.
+     integer :: m
+
    contains
      !> The common constructor using a JSON object.
      ! TODO
@@ -100,6 +106,13 @@ module steady_state_problem
      procedure, pass(this) :: compute_sensitivity => &
           steady_state_problem_compute_sensitivity_topopt
      ! but we could point to more depending on what design is coming in
+
+     !> Return the number of design variables.
+     procedure, pass(this) :: get_n => problem_get_num_design_variables
+
+     !> Return the number of constraints.
+     procedure, pass(this) :: get_m => problem_get_num_constraints
+
   end type steady_state_problem_t
 
 contains
@@ -154,6 +167,7 @@ contains
 
     ! init the design
     call design%init(this%C%params, this%C%fluid%c_Xh)
+    this%n = design%design_indicator%size()
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -222,6 +236,7 @@ contains
     ! minimum dissipation objective function
     call this%objective_function%init(design, this%C%fluid, this%adj%scheme)
     ! volume constraint
+    this%m = 1
     call this%volume_constraint%init(design, this%C%fluid, this%adj%scheme)
 
     ! init the sampler
@@ -244,17 +259,17 @@ contains
     call this%output%fields%assign(3, this%C%fluid%v)
     call this%output%fields%assign(4, this%C%fluid%w)
     ! I don't know why these ones need assign_to_field?
-    call this%output%fields%assign_to_field(5, design%design_indicator)
+    call this%output%fields%assign(5, design%design_indicator)
     call this%output%fields%assign(6, this%adj%scheme%u_adj)
     call this%output%fields%assign(7, this%adj%scheme%v_adj)
     call this%output%fields%assign(8, this%adj%scheme%w_adj)
     call this%output%fields%assign(9, this%adj%scheme%p_adj)
-    call this%output%fields%assign_to_field(10, design%brinkman_amplitude)
+    call this%output%fields%assign(10, design%brinkman_amplitude)
     call this%output%fields%assign_to_field(11, &
          this%objective_function%sensitivity_to_coefficient)
     call this%output%fields%assign_to_field(12, &
          this%volume_constraint%sensitivity_to_coefficient)
-    call this%output%fields%assign_to_field(13, design%sensitivity)
+    call this%output%fields%assign(13, design%sensitivity)
     ! TODO
     ! I still haven't done the design%sensitivity as a field list!
     ! so it will eventually be
@@ -394,4 +409,23 @@ contains
     call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
 
   end subroutine steady_state_simcomp
+
+  ! ========================================================================== !
+  ! Simple getters
+
+  !> Return the number of design variables.
+  pure function problem_get_num_design_variables(this) result(n)
+    class(steady_state_problem_t), intent(in) :: this
+    integer :: n
+
+    n = this%n
+  end function problem_get_num_design_variables
+
+  !> Return the number of constraints.
+  pure function problem_get_num_constraints(this) result(m)
+    class(steady_state_problem_t), intent(in) :: this
+    integer :: m
+
+    m = this%m
+  end function problem_get_num_constraints
 end module steady_state_problem
