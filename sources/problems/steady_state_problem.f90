@@ -57,13 +57,62 @@ module steady_state_problem
   implicit none
   private
 
-  !> To compute a steady state problem
-  type, public, extends(problem_t) :: steady_state_problem_t
-
+  type :: simulation_t
      !> and primal case
      type(case_t), public :: C
      !> and adjoint case
      type(adjoint_case_t), public :: adj
+
+   contains
+     !> Initialize the simulation
+     procedure, pass(this) :: init => simulation_init
+     !> Free the simulation
+     procedure, pass(this) :: free => simulation_free
+     !> Run the simulation
+     procedure, pass(this) :: run => simulation_run
+  end type simulation_t
+
+  !> Initialize the simulation
+  subroutine simulation_init(this)
+    class(simulation_t), intent(inout) :: this
+
+    ! append a steady state simcomp
+    this%C%usr%init_user_simcomp => steady_state_simcomp
+    ! call user_setup(this%C%usr)
+
+
+    ! initialize the primal
+    call neko_init(this%C)
+    ! initialize the adjoint
+    call adjoint_init(this%adj, this%C)
+
+  end subroutine simulation_init
+
+  !> Free the simulation
+  subroutine simulation_free(this)
+    class(simulation_t), intent(inout) :: this
+
+    call adjoint_free(this%adj)
+    call neko_finalize(this%C)
+
+  end subroutine simulation_free
+
+  !> Run the simulation
+  subroutine simulation_run(this)
+    class(simulation_t), intent(inout) :: this
+
+    ! run the primal
+    call neko_solve(this%C)
+    ! run the adjoint
+    call solve_adjoint(this%adj)
+
+  end subroutine simulation_run
+
+  !> To compute a steady state problem
+  type, public, extends(problem_t) :: steady_state_problem_t
+
+     !> The simulation
+     type(simulation_t) :: simulation
 
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
@@ -75,8 +124,6 @@ module steady_state_problem
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
 
-     !> Number of design variables.
-     integer :: n
      !> Number of constraints.
      integer :: m
 
@@ -122,15 +169,6 @@ contains
 
     call this%init_base()
 
-    ! append a steady state simcomp
-    this%C%usr%init_user_simcomp => steady_state_simcomp
-    ! call user_setup(this%C%usr)
-
-
-    ! initialize the primal
-    call neko_init(this%C)
-    ! initialize the adjoint
-    call adjoint_init(this%adj, this%C)
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
@@ -167,7 +205,6 @@ contains
 
     ! init the design
     call design%init(this%C%params, this%C%fluid%c_Xh)
-    this%n = design%design_indicator%size()
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -290,8 +327,9 @@ contains
   !> Destructor.
   subroutine steady_state_problem_free(this)
     class(steady_state_problem_t), intent(inout) :: this
-    call adjoint_free(this%adj)
-    call neko_finalize(this%C)
+
+    call this%free_base()
+    call this%simulation%free()
     ! TODO
     ! probably also objective functions etc
 
@@ -316,7 +354,8 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
-    call neko_solve(this%C)
+    call this%simulation%run()
+
     ! TODO
     ! In the future, the objective_function_t will potentially include
     ! simulation components so that we can

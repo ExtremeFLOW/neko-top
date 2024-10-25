@@ -32,13 +32,40 @@
 
  ! Implements the `topopt_design_t` type.
 module design
-
   implicit none
   private
 
   !> A topology optimization design variable
   type, abstract, public :: design_t
+     private
+
+     !> The number of design variables
+     integer :: n = 0
+
+   contains
+
+     !> Initialize the base design
+     procedure, pass(this), public :: init_base => design_init
+
+     !> Return the number of design variables
+     procedure, pass(this), public :: get_n => design_get_n
 
   end type design_t
+
+contains
+
+  !> Initialize the base design
+  subroutine design_init(this, n)
+    class(design_t), intent(inout) :: this
+    integer, intent(in) :: n
+    this%n = n
+  end subroutine design_init
+
+  !> Return the number of design variables
+  pure function design_get_n(this) result(n)
+    class(design_t), intent(in) :: this
+    integer :: n
+    n = this%n
+  end function design_get_n
 
 end module design

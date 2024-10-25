@@ -65,7 +65,7 @@ program usrneko
   call field_rzero(wo1)
   call field_rone (wo2)
   ! obviously do this properly in the future...
-  n = problem%get_n()
+  n = design%get_n()
   m = problem%get_m()
 
   call optimizer%init_json(design%design_indicator%x, n, &

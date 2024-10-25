@@ -190,6 +190,7 @@ contains
     type(coef_t), intent(inout) :: coef
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
+
     ! init the fields
     call this%design_indicator%init(coef%dof, "design_indicator")
     call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
@@ -287,7 +288,7 @@ contains
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)
 
-
+    call this%init_base(n)
   end subroutine topopt_design_init
 
 
