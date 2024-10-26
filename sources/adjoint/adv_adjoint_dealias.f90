@@ -116,20 +116,20 @@ module adv_lin_dealias
      !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
      !! the RHS.
      procedure, pass(this) :: compute_linear => &
-     compute_linear_advection_dealias
+          compute_linear_advection_dealias
      !> Add the adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$,
      !! to
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => &
-     compute_adjoint_advection_dealias
+          compute_adjoint_advection_dealias
      !> Compute the adjoint passive scalar.
-     ! If one integrates by parts, this essentially switches sign and adds some 
-     ! boundary terms. 
+     ! If one integrates by parts, this essentially switches sign and adds some
+     ! boundary terms.
      ! We keep the differential operator on the test function
      procedure, pass(this) :: compute_adjoint_scalar => &
-     compute_adjoint_scalar_advection_dealias
+          compute_adjoint_scalar_advection_dealias
      ! NOTE
      ! This linearized advection term is the same as a normal advection term
      ! so not sure what to do here...
@@ -676,7 +676,7 @@ contains
     end associate
   end subroutine compute_linear_advection_dealias
 
-  !> Add the adjoint advection term for a scalar, 
+  !> Add the adjoint advection term for a scalar,
   !! i.e. \f$ - u \cdot \nabla s^\dagger \f$, to the
   !! RHS.
   !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
@@ -691,7 +691,7 @@ contains
   !! @param n Typically the size of the mesh.
   !! @param dt Current time-step, not required for this method.
   subroutine compute_adjoint_scalar_advection_dealias(this, vxb, vyb, vzb, s, &
-  fs, Xh, coef, n, dt)
+       fs, Xh, coef, n, dt)
     class(adv_lin_dealias_t), intent(inout) :: this
     type(field_t), intent(inout) :: vxb, vyb, vzb
     type(field_t), intent(inout) :: s
@@ -713,11 +713,11 @@ contains
 
     associate(c_GL => this%coef_GL)
       if (NEKO_BCKND_DEVICE .eq. 1) then
-        !! TODO
+         !! TODO
 
 
       else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
-        !! TODO
+         !! TODO
 
       else
          do e = 1, coef%msh%nelv

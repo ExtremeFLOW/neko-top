@@ -45,7 +45,7 @@ module adjoint_scalar_pnpn
   use neumann, only : neumann_t
   use field, only : field_t
   use bc, only : bc_list_t, bc_list_init, bc_list_free, bc_list_apply_scalar, &
-                 bc_list_add
+       bc_list_add
   use mesh, only : mesh_t
   use checkpoint, only : chkp_t
   use coefs, only : coef_t
@@ -203,7 +203,7 @@ contains
     ! diriclet on the inflow -> 'w'
     ! symetry on the remaining walls? is the $ \nabla \cdot \mathbf{n} = 0 $
     ! and I think these stay symetry in the adjoint.
-    ! so it's only the diriclet conditions to worry about 
+    ! so it's only the diriclet conditions to worry about
     call this%bc_res%init_base(this%c_Xh)
     do i = 1, this%n_dir_bcs
        call this%bc_res%mark_facets(this%dir_bcs(i)%marked_facet)
@@ -215,7 +215,7 @@ contains
     end if
 
     call this%bc_res%mark_zones_from_list(msh%labeled_zones, 'd_s', &
-                                         this%bc_labels)
+         this%bc_labels)
     call this%bc_res%finalize()
     call this%bc_res%set_g(0.0_rp)
 
@@ -224,8 +224,8 @@ contains
 
 
     ! Intialize projection space
-    call this%proj_s%init(this%dm_Xh%size(), this%projection_dim,  &
-                            this%projection_activ_step)
+    call this%proj_s%init(this%dm_Xh%size(), this%projection_dim, &
+         this%projection_activ_step)
 
     ! Add lagged term to checkpoint
     ! @todo Init chkp object, note, adding 3 slags
@@ -239,7 +239,7 @@ contains
     ! but I guess it's the oifs stuff?
     ! TODO
     ! we're behind neko by a few PRs it would seem...
-    ! 
+    !
     !call advection_adjoint_factory(this%adv, params, this%c_Xh, &
     !                       ulag, vlag, wlag, this%chkp%dtlag, &
     !                       this%chkp%tlag, time_scheme, this%slag)
@@ -260,17 +260,17 @@ contains
     call col2(this%slag%lf(2)%x, this%c_Xh%mult, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(this%s_adj%x, this%s_adj%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%slag%lf(1)%x, this%slag%lf(1)%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%slag%lf(2)%x, this%slag%lf(2)%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%abx1%x, this%abx1%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%abx2%x, this%abx2%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%advs%x, this%advs%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
     end if
 
     call this%gs_Xh%op(this%s_adj, GS_OP_ADD)
@@ -320,7 +320,7 @@ contains
   end subroutine adjoint_scalar_pnpn_free
 
   subroutine adjoint_scalar_pnpn_step(this, t, tstep, dt, ext_bdf, &
-  dt_controller)
+       dt_controller)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
     real(kind=rp), intent(inout) :: t
     integer, intent(inout) :: tstep
@@ -369,26 +369,26 @@ contains
       ! Apply Neumann boundary conditions
       call bc_list_apply_scalar(this%bclst_neumann, this%f_Xh%x, dm_Xh%size())
 
-         ! Add the advection operators to the right-hans-side.
-         ! HARRY
-         ! see, even this line is exactly the same because we have the same 
-         ! inputs we could have put the adjoint stuff convective term in with 
-         ! the same factory as the forward one.
-         ! Anywways... 
-         ! It's also maybe a good idea for us to be seperate from the main Neko
-         call this%adv%compute_adjoint_scalar(u, v, w, s, f_Xh, &
-                                      Xh, this%c_Xh, dm_Xh%size())
+      ! Add the advection operators to the right-hans-side.
+      ! HARRY
+      ! see, even this line is exactly the same because we have the same
+      ! inputs we could have put the adjoint stuff convective term in with
+      ! the same factory as the forward one.
+      ! Anywways...
+      ! It's also maybe a good idea for us to be seperate from the main Neko
+      call this%adv%compute_adjoint_scalar(u, v, w, s, f_Xh, &
+           Xh, this%c_Xh, dm_Xh%size())
 
-         ! At this point the RHS contains the sum of the advection operator,
-         ! Neumann boundary sources and additional source terms, evaluated using
-         ! the scalar field from the previous time-step. Now, this value is used in
-         ! the explicit time scheme to advance these terms in time.
-         call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-                                     ext_bdf%advection_coeffs, n)
+      ! At this point the RHS contains the sum of the advection operator,
+      ! Neumann boundary sources and additional source terms, evaluated using
+      ! the scalar field from the previous time-step. Now, this value is used in
+      ! the explicit time scheme to advance these terms in time.
+      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
+           ext_bdf%advection_coeffs, n)
 
-         ! Add the RHS contributions coming from the BDF scheme.
-         call makebdf%compute_scalar(slag, f_Xh%x, s, c_Xh%B, rho, dt, &
-              ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      ! Add the RHS contributions coming from the BDF scheme.
+      call makebdf%compute_scalar(slag, f_Xh%x, s, c_Xh%B, rho, dt, &
+           ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
 
       call slag%update()
 
@@ -406,7 +406,7 @@ contains
 
       ! Compute scalar residual.
       call profiler_start_region('Scalar_residual', 20)
-      call res%compute(Ax, s,  s_res, f_Xh, c_Xh, msh, Xh, lambda_field, &
+      call res%compute(Ax, s, s_res, f_Xh, c_Xh, msh, Xh, lambda_field, &
            rho*cp, ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
 
 
@@ -426,8 +426,8 @@ contains
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Scalar_solve', 21)
 
-     call this%proj_s%post_solving(ds%x, Ax, c_Xh, &
-                                 this%bclst_ds, gs_Xh, n, tstep, dt_controller)
+      call this%proj_s%post_solving(ds%x, Ax, c_Xh, &
+           this%bclst_ds, gs_Xh, n, tstep, dt_controller)
 
       ! Update the solution
       if (NEKO_BCKND_DEVICE .eq. 1) then

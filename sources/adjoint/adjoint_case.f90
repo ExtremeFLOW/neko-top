@@ -47,7 +47,7 @@ module adjoint_case
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use adjoint_scalar_convection_source_term, only: &
-  adjoint_scalar_convection_source_term_t
+       adjoint_scalar_convection_source_term_t
   use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
   use scalar_ic, only : set_scalar_ic
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -61,7 +61,7 @@ module adjoint_case
   type :: adjoint_case_t
 
      ! TODO
-     ! I think it would be nicer if this was called `fluid` just like the 
+     ! I think it would be nicer if this was called `fluid` just like the
      ! forward.
      !
      ! so you're acessing forward%fluid
@@ -75,7 +75,7 @@ module adjoint_case
      type(adjoint_scalar_pnpn_t), allocatable :: scalar
      ! this is the extra term for adjoint convection
      type(adjoint_scalar_convection_source_term_t), allocatable :: &
-     adjoint_convection_term
+          adjoint_convection_term
      type(case_t), pointer :: case
 
      ! Fields
@@ -87,7 +87,7 @@ module adjoint_case
 
      ! this is to force 'w' on user_bcs
      procedure(usr_scalar_bc_eval), nopass, pointer :: force_user_bc_w => &
-     adjoint_force_user_bc_w
+          adjoint_force_user_bc_w
 
   end type adjoint_case_t
 
@@ -127,17 +127,17 @@ contains
 
     ! Check if the scalar field is allocated
     ! TODO
-    ! Man this is tricky... I agree that in principle, if we have a passive 
+    ! Man this is tricky... I agree that in principle, if we have a passive
     ! scalar in the forward then we should have a passive scalar in the adjoint
     !
     ! But if you look closely in Caspers paper, they have an objective and a
     ! pressure drop constraint.
     !
-    ! And the adjoint for the pressure drop constraint doesn't involve the 
+    ! And the adjoint for the pressure drop constraint doesn't involve the
     ! passive scalar.
     !
     ! I'm sure with enough thought we can figure out a smart way of handing
-    ! this. 
+    ! this.
     ! For now...
     ! I think it's ok to assume passive scalar forward => passive scalar adjoint
     !
@@ -155,7 +155,6 @@ contains
   subroutine adjoint_case_init_common(this, neko_case)
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
-    character(len=:), allocatable :: output_directory
     integer :: lx = 0
     logical :: scalar = .false.
     real(kind=rp) :: real_val
@@ -181,71 +180,71 @@ contains
     !
     ! TODO
     ! Tims forward vs adjoint JSON
-     if (neko_case%params%valid_path('case.scalar')) then
-        call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-     scalar,                             .true.)
-     end if
+    if (neko_case%params%valid_path('case.scalar')) then
+       call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
+            scalar, .true.)
+    end if
 
-     if (scalar) then
-        allocate(this%scalar)
-        ! TODO
-        ! this%scalar%chkp%tlag => this%tlag
-        ! this%scalar%chkp%dtlag => this%dtlag
-        !
-        ! I don't know what this is yet
-        call this%scalar%init(neko_case%msh, this%scheme%c_Xh, &
-             this%scheme%gs_Xh, neko_case%params, neko_case%usr,&
-             this%scheme%ulag, this%scheme%vlag, this%scheme%wlag, &
-             neko_case%ext_bdf, this%scheme%rho)
-        call this%scheme%chkp%add_scalar(this%scalar%s_adj)
+    if (scalar) then
+       allocate(this%scalar)
+       ! TODO
+       ! this%scalar%chkp%tlag => this%tlag
+       ! this%scalar%chkp%dtlag => this%dtlag
+       !
+       ! I don't know what this is yet
+       call this%scalar%init(neko_case%msh, this%scheme%c_Xh, &
+            this%scheme%gs_Xh, neko_case%params, neko_case%usr,&
+            this%scheme%ulag, this%scheme%vlag, this%scheme%wlag, &
+            neko_case%ext_bdf, this%scheme%rho)
+       call this%scheme%chkp%add_scalar(this%scalar%s_adj)
 
-        ! TODO
-        ! we don't have checkpoints yet
-        ! this%scheme%chkp%abs1 => this%scalar%abx1
-        ! this%scheme%chkp%abs2 => this%scalar%abx2
-        ! this%scheme%chkp%slag => this%scalar%slag
+       ! TODO
+       ! we don't have checkpoints yet
+       ! this%scheme%chkp%abs1 => this%scalar%abx1
+       ! this%scheme%chkp%abs2 => this%scalar%abx2
+       ! this%scheme%chkp%slag => this%scalar%slag
 
-        ! TODO HUGE HUGE TODO
-        ! So if we have a passive scalar we also get a source term entering
-        ! the adjoint velocity equation which arises when you linearize the
-        ! the convective term in passive scalar equation.
-        !
-        ! $\phi^\dagger \nabla \phi$
-        ! 
-        ! I'm SOOOOO worried I have the sign the wrong way around.
-        ! We really have to write the adjoint derivation nicely.
-        !
-        ! for now I'm assuming in our adjoint derivation we ADD all the 
-        ! equations together.
-        ! - So it starts as being positive on the LHS
-        ! - if we treat this term as a source term it goes on the RHS, so now
-        !   it's negative on the RHS.
-        !
-        ! I checked through Casper's adjoint equations and the first term
-        ! after the = sign of eq (14) looks like the term I'm talking about.
-        ! And his is negative too.
-        ! So I THINK this is correct, but we need to double check.
+       ! TODO HUGE HUGE TODO
+       ! So if we have a passive scalar we also get a source term entering
+       ! the adjoint velocity equation which arises when you linearize the
+       ! the convective term in passive scalar equation.
+       !
+       ! $\phi^\dagger \nabla \phi$
+       !
+       ! I'm SOOOOO worried I have the sign the wrong way around.
+       ! We really have to write the adjoint derivation nicely.
+       !
+       ! for now I'm assuming in our adjoint derivation we ADD all the
+       ! equations together.
+       ! - So it starts as being positive on the LHS
+       ! - if we treat this term as a source term it goes on the RHS, so now
+       !   it's negative on the RHS.
+       !
+       ! I checked through Casper's adjoint equations and the first term
+       ! after the = sign of eq (14) looks like the term I'm talking about.
+       ! And his is negative too.
+       ! So I THINK this is correct, but we need to double check.
 
-        ! and it should be appended to the adjoint velocity
+       ! and it should be appended to the adjoint velocity
 
-        ! allocate it
-        allocate(this%adjoint_convection_term)
-        ! initialize it
-        call this%adjoint_convection_term%init_from_components( &
-             this%scheme%f_adj_x, this%scheme%f_adj_y, &
-             this%scheme%f_adj_z, &
-             neko_case%scalar%s, &
-             this%scalar%s_adj, this%scheme%c_Xh)
-        ! append it to the adjoint velocity equation
-        call this%scheme%source_term%add(this%adjoint_convection_term)
-     end if
+       ! allocate it
+       allocate(this%adjoint_convection_term)
+       ! initialize it
+       call this%adjoint_convection_term%init_from_components( &
+            this%scheme%f_adj_x, this%scheme%f_adj_y, &
+            this%scheme%f_adj_z, &
+            neko_case%scalar%s, &
+            this%scalar%s_adj, this%scheme%c_Xh)
+       ! append it to the adjoint velocity equation
+       call this%scheme%source_term%add(this%adjoint_convection_term)
+    end if
 
     ! TODO
     ! I don't really know how we should handle this...
     ! I feel like, even if someone puts a strange BC it will be diriclette
     ! so the adjoint will go to 'w'.
     !
-    ! What we really need is a robust way to set BCs based on objective 
+    ! What we really need is a robust way to set BCs based on objective
     ! functions, because that's when we're going to get weird unique BCs for
     ! the adjoint.
     !
@@ -293,7 +292,7 @@ contains
 
     if (scalar) then
        ! TODO
-       ! perhaps we should consider: 
+       ! perhaps we should consider:
        ! `adjoint` -> `adjoint_fluid` in the casefile?
        json_key = json_key_fallback(neko_case%params, &
             'case.adjoint_scalar.initial_condition', &
@@ -303,17 +302,17 @@ contains
        call json_get_subdict(neko_case%params, json_key, ic_json)
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(this%scalar%s_adj, &
-            this%scalar%c_Xh, this%scalar%gs_Xh, string_val, ic_json)
+               this%scalar%c_Xh, this%scalar%gs_Xh, string_val, ic_json)
        else
-       	 ! TODO
-       	 ! this is wrong, it's point to the neko case.
-       	 ! I think we need to discus the case file before we can do user
-       	 ! defined stuff. 
-       	 ! But I guess we should ALSO have user functionality for the adjoint
-       	 !
-       !   call set_scalar_ic(this%scalar%s_adj, &
-       !     this%scalar%c_Xh, this%scalar%gs_Xh, &
-       !     neko_case%usr%scalar_user_ic, ic_json)
+          ! TODO
+          ! this is wrong, it's point to the neko case.
+          ! I think we need to discus the case file before we can do user
+          ! defined stuff.
+          ! But I guess we should ALSO have user functionality for the adjoint
+          !
+          !   call set_scalar_ic(this%scalar%s_adj, &
+          !     this%scalar%c_Xh, this%scalar%gs_Xh, &
+          !     neko_case%usr%scalar_user_ic, ic_json)
        end if
     end if
 
@@ -353,10 +352,10 @@ contains
     call this%output_controller%init(neko_case%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, this%scalar, &
-            path = trim(output_directory))
+            path = trim(neko_case%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &
-            path = trim(output_directory))
+            path = trim(neko_case%output_directory))
     end if
 
     call json_get_or_default(neko_case%params, 'case.fluid.output_control',&
@@ -407,23 +406,23 @@ contains
 
   end subroutine adjoint_free
 
-  subroutine adjoint_force_user_bc_w(s, x, y, z, nx, ny, nz, &                    
-                                   ix, iy, iz, ie, t, tstep)                    
-       real(kind=rp), intent(inout) :: s                                        
-       real(kind=rp), intent(in) :: x                                           
-       real(kind=rp), intent(in) :: y                                           
-       real(kind=rp), intent(in) :: z                                           
-       real(kind=rp), intent(in) :: nx                                          
-       real(kind=rp), intent(in) :: ny                                          
-       real(kind=rp), intent(in) :: nz                                          
-       integer, intent(in) :: ix                                                
-       integer, intent(in) :: iy                                                
-       integer, intent(in) :: iz                                                
-       integer, intent(in) :: ie                                                
-       real(kind=rp), intent(in) :: t                                           
-       integer, intent(in) :: tstep                                             
+  subroutine adjoint_force_user_bc_w(s, x, y, z, nx, ny, nz, &
+       ix, iy, iz, ie, t, tstep)
+    real(kind=rp), intent(inout) :: s
+    real(kind=rp), intent(in) :: x
+    real(kind=rp), intent(in) :: y
+    real(kind=rp), intent(in) :: z
+    real(kind=rp), intent(in) :: nx
+    real(kind=rp), intent(in) :: ny
+    real(kind=rp), intent(in) :: nz
+    integer, intent(in) :: ix
+    integer, intent(in) :: iy
+    integer, intent(in) :: iz
+    integer, intent(in) :: ie
+    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: tstep
 
-       s = 0.0_rp
-   end subroutine adjoint_force_user_bc_w
+    s = 0.0_rp
+  end subroutine adjoint_force_user_bc_w
 end module adjoint_case
 

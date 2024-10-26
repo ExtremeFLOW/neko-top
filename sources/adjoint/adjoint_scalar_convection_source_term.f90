@@ -54,28 +54,28 @@ module adjoint_scalar_convection_source_term
   ! I don't know how to name this term, but when you have a passive
   ! scalar you get an extra term in the adjoint velocity equation, which comes
   ! from the convective term in the passive scalar equation.
-  ! Maybe this should be called just `adjoint_scalar_convection`? 
+  ! Maybe this should be called just `adjoint_scalar_convection`?
   ! but it does come in a source term...
 
   ! In any case,
   ! it's a source term acting on the adjoint velocity equations, of the form:
   ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: &
-  adjoint_scalar_convection_source_term_t
+       adjoint_scalar_convection_source_term_t
      !> here we have s and s_adj
      type(field_t), pointer :: s, s_adj
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
-     adjoint_scalar_convection_source_term_init_from_json
+          adjoint_scalar_convection_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       adjoint_scalar_convection_source_term_init_from_components
+          adjoint_scalar_convection_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => adjoint_scalar_convection_source_term_free
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute_ => &
-     adjoint_scalar_convection_source_term_compute
+          adjoint_scalar_convection_source_term_compute
   end type adjoint_scalar_convection_source_term_t
 
 contains
@@ -84,16 +84,14 @@ contains
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   subroutine adjoint_scalar_convection_source_term_init_from_json(this, &
-  json, fields, coef)
+       json, fields, coef)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(inout), target :: fields
     type(coef_t), intent(inout), target :: coef
-    real(kind=rp), allocatable :: values(:)
-    real(kind=rp) :: start_time, end_time
 
-    ! this is a bit weird... because I don't think this should come from the 
-    ! JSON. 
+    ! this is a bit weird... because I don't think this should come from the
+    ! JSON.
     ! Maybe we should think of all these source terms as only "appendable"
     !
     ! Because we'll never have the whole case here, so we'll never be able
@@ -112,7 +110,6 @@ contains
     type(coef_t) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: s, s_adj
     ! TODo
     ! do masks later
@@ -157,23 +154,23 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: n_fields, i, n
+    integer :: i, n
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz
 
-    
+
     call neko_scratch_registry%request_field(dsdx, temp_indices(1))
     call neko_scratch_registry%request_field(dsdy, temp_indices(2))
     call neko_scratch_registry%request_field(dsdz, temp_indices(3))
-    
+
     fu => this%fields%get(1)
     fv => this%fields%get(2)
     fw => this%fields%get(3)
-    
-    
-    
-    ! we basically just need the term 
+
+
+
+    ! we basically just need the term
     ! $\nabla s s_adj$
     ! TODO
     ! In principle, this should have to option to be evaluated on the dealiased
@@ -216,7 +213,7 @@ contains
     call field_subcol3(fu,this%s_adj,dsdx)
     call field_subcol3(fv,this%s_adj,dsdy)
     call field_subcol3(fw,this%s_adj,dsdz)
-    
+
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine adjoint_scalar_convection_source_term_compute

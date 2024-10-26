@@ -128,7 +128,6 @@ contains
     class(adjoint_case_t), intent(inout) :: adjoint
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
-    type(adjoint_lube_source_term_t) :: lube_term
     character(len=:), allocatable :: objective_location_zone_name
     logical :: if_mask
 
@@ -173,12 +172,10 @@ contains
     class(scalar_mixing_objective_function_t), intent(inout) :: this
     class(case_t), intent(in) :: primal
     type(topopt_design_t), intent(inout) :: design
-    integer :: i
-    type(field_t), pointer :: wo1, wo2, wo3
-    type(field_t), pointer :: objective_field
     integer :: temp_indices(1)
     integer n
     real (kind=rp) :: average_upstream
+    type(field_t), pointer :: wo1
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     n = wo1%size()
@@ -226,8 +223,6 @@ contains
     type(topopt_design_t), intent(inout) :: design
     class(case_t), intent(in) :: primal
     class(adjoint_case_t), intent(in) :: adjoint
-    type(field_t), pointer :: lube_contribution
-    integer :: temp_indices(1)
 
 
     ! here it should just be an inner product between the forward and adjoint

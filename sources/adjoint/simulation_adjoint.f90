@@ -48,27 +48,20 @@ module simulation_adjoint
   implicit none
   private
 
-  public :: solve_adjoint
+  public :: solve_adjoint, simulation_restart
 
 contains
 
   ! Compute the simcomp_test field.
   subroutine solve_adjoint(this)
     type(adjoint_case_t), intent(inout) :: this
-    real(kind=rp) :: t
-    integer :: tstep
-
-    type(field_t), pointer :: u, v, w, p, s
-    character(len=256) :: msg
 
     real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time
     character(len=LOG_SIZE) :: log_buf
     integer :: tstep_adj
-    character(len=:), allocatable :: restart_file
-    logical :: output_at_end, found
+    logical :: output_at_end
     type(time_step_controller_t) :: dt_controller
-    integer :: idx
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the adjoint field.
@@ -131,7 +124,7 @@ contains
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
           call this%scalar%step(t_adj, tstep_adj, this%case%dt, &
-          this%case%ext_bdf, dt_controller)
+               this%case%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -214,7 +207,6 @@ contains
 
 !> Restart a case @a C from a given checkpoint
   subroutine simulation_restart(C, t)
-    implicit none
     type(case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: t
     integer :: i

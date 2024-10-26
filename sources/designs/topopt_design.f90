@@ -41,8 +41,8 @@ module topopt_design
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
-  use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
 
   implicit none
@@ -220,14 +220,14 @@ contains
     ! Initialize the mask
     if (this%if_mask) then
        this%optimization_domain => &
-       neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
+            neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
     end if
 
 
 
 
     ! TODO
-    ! Regarding masks and filters, 
+    ! Regarding masks and filters,
     ! I suppose there are two ways of thinking about it:
     ! 1) Mask first, then filter
     ! 2) filter first, then mask
@@ -256,7 +256,7 @@ contains
     ! if we mask first then filter, at least all the boundaries will be smooth.
     if (this%if_mask) then
        call mask_exterior_const(this%design_indicator, &
-       this%optimization_domain, 0.0_rp)
+            this%optimization_domain, 0.0_rp)
     end if
 
     ! TODO
@@ -296,7 +296,7 @@ contains
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
        call mask_exterior_const(this%design_indicator, &
-       this%optimization_domain, 0.0_rp)
+            this%optimization_domain, 0.0_rp)
     end if
 
     ! TODO
@@ -333,12 +333,9 @@ contains
          this%filtered_design)
 
     ! TODO
-    ! oh oh... I don't know what to do here...
-    ! I'm just following the vibe of "everything in the adjoint happens in
-    ! reverse". So I'm masking at the end.
-    ! This could be wrong, talk to the big dogs.
+    ! DELETE THIS LATER
     !
-    ! Also, depending on how Abbas writes the interface for the optimization
+    ! When Abbas writes the interface for the optimization
     ! module this may be a moot point, because we would only really collect
     ! the sensitivity of the design variables inside the mask.
     !
@@ -347,7 +344,7 @@ contains
     ! test something in the passive scalar.
     if (this%if_mask) then
        call mask_exterior_const(this%sensitivity, this%optimization_domain, &
-       0.0_rp)
+            0.0_rp)
     end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)

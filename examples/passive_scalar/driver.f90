@@ -18,7 +18,7 @@ program usrneko
        only: minimum_dissipation_objective_function_t
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
-  use num_types, only : rp, sp, dp, qp
+  use num_types, only : rp, sp
   use field_math, only: field_rzero, field_rone, field_cmult
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
@@ -41,7 +41,7 @@ program usrneko
 
   ! these are some things needed for MMA/ work arrays (all these will become
   ! redundant when we do this properly)
-  type(field_t), pointer :: wo1, wo2, wo3
+  type(field_t), pointer :: wo1, wo2
   integer :: temp_indices(2)
   integer :: n, optimization_iteration
   real(kind=rp), dimension(1) :: fval
