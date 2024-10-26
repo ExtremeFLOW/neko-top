@@ -133,7 +133,7 @@ contains
 
     ! TODO
     ! I'll do the json stuff later...
-    this%r = 0.1
+    this%r = 0.05
     this%abstol_filt = 0.0000000001_rp
     this%ksp_max_iter = 200
     this%ksp_solver = "gmres"

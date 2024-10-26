@@ -181,7 +181,6 @@ program usrneko
     ! do the adjoint mapping
     call design%map_backward(&
          objective%sensitivity_to_coefficient)
-     fval(1) = problem%volume_constraint%objective_function_value
 
      !call design%sample(real(optimization_iteration,kind=rp))
     call output%sample(real(optimization_iteration,kind=rp))
@@ -198,7 +197,8 @@ program usrneko
        x_switch = reshape(x,[optimizer%get_n()])
 
        call cmult(dfdx,100.0_rp,n)
-       fval(1) = fval(1)*100.0_rp
+       ! fval(1) = fval(1)*100.0_rp
+       fval(1) = 0.0_rp
        call cmult(df0dx, 0.01_rp, n)
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
@@ -232,10 +232,15 @@ program usrneko
 
      call reset(C)
      ! TODO
+     call adj%scheme%restart(C%dtlag, C%tlag)
+     if (allocated(adj%scalar)) then
+        call adj%scalar%restart(C%dtlag, C%tlag)
+     end if
      ! reset for the adjoint
      call field_rzero(adj%scheme%u_adj)
      call field_rzero(adj%scheme%v_adj)
      call field_rzero(adj%scheme%w_adj)
+     call field_rzero(adj%scalar%s_adj)
 
      ! don't forget to unfreeze the fluid!
      C%fluid%freeze = .false.

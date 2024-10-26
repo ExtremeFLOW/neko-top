@@ -6,8 +6,8 @@
         "output_checkpoints": false,
         "output_at_end": true,
         "output_boundary": false,
-        "end_time": 3.0,
-        "timestep": 1e-4,
+        "end_time": 9.0,
+        "timestep": 5e-4,
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
@@ -49,7 +49,7 @@
             },
             "boundary_types": [ "v", "o", "w", "w", "w", "w" ],
             "output_control": "simulationtime",
-            "output_value": 0.25,
+            "output_value": 2.00,
         },
         "scalar": {
             "enabled": true,
@@ -73,7 +73,7 @@
                 "geometry": "box",
                 "x_bounds": [
                     1.0,
-                    3.0,
+                    5.0,
                 ],
                 "y_bounds": [
                     -1.0,
@@ -88,8 +88,8 @@
                 "name": "objective_location",
                 "geometry": "box",
                 "x_bounds": [
-                    3.0,
-                    5.0,
+                    5.75,
+                    7.0,
                 ],
                 "y_bounds": [
                     -1.0,

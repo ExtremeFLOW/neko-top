@@ -69,8 +69,12 @@ contains
        neko_case%tlag(i) = t - i*neko_case%dtlag(i)
     end do
 
-    ! Reset the time step counter
-    call neko_case%output_controller%set_counter(t)
+    ! ! Reset the time step counter
+    ! call neko_case%output_controller%set_counter(t)
+    ! This is setting:
+    ! this%nexecutions = int(t / this%time_interval) + 1
+    ! So setting it to never execute.
+    ! Maybe this is what we want, but I don't think so.
 
     ! Restart the fields
     call neko_case%fluid%restart(neko_case%dtlag, neko_case%tlag)

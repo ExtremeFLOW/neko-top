@@ -97,7 +97,7 @@ contains
     !
     ! A logistic function seems reasonable...
     L = 1.0_rp
-    k = 6.0_rp
+    k = 20.0_rp
     z_0 = 1.0_rp
 
     s = L / (1.0_rp + exp(-k*(z - z_0)))
@@ -112,7 +112,7 @@ contains
     real(kind=rp) :: L, k, z_0
 
     L = 1.0_rp
-    k = 6.0_rp
+    k = 20.0_rp
     z_0 = 1.0_rp
                                                                                 
     do i = 1, s%dof%size()                                                      
