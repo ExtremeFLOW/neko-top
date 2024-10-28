@@ -355,7 +355,6 @@ contains
   subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
-    call solve_adjoint(this%simulation%adjoint_case)
 
     ! again, in the future, the objective_function_t will potentially include
     ! simulation components so that we can

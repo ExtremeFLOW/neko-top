@@ -92,9 +92,12 @@ contains
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
-    call json_extract_item(this%neko_case%params, "case.simulation_components", 1, simcomp_settings)
+    call json_extract_item(this%neko_case%params, &
+         "case.simulation_components", 1, simcomp_settings)
 
-    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
+    call steady_comp%init(simcomp_settings, this%neko_case)
+
+    call neko_simcomps%add_user_simcomp(steady_comp)
 
   end subroutine simulation_init
 

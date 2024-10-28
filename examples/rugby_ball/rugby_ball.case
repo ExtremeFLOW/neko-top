@@ -6,7 +6,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 0.0001,
+        "end_time": 1.0,
         "timestep": 1e-4,
         "numerics": {
             "time_order": 3,
@@ -63,7 +63,7 @@
                 "compute_value": 1
             }
         ],
-     "point_zones": [
+        "point_zones": [
             {
                 "name": "optimization_domain",
                 "geometry": "box",
@@ -77,10 +77,10 @@
                 ],
                 "z_bounds": [
                     -1.0,
-                     1.0,
+                    1.0,
                 ],
-           }
-                 ]
+            }
+        ]
 
     }
 }

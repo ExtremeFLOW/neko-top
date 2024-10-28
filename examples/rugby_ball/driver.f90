@@ -29,7 +29,7 @@ program usrneko
 
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
-  use mpi_f08, only: MPI_Init, MPI_Finalize
+  use mpi_f08, only: MPI_Init, MPI_Finalize, MPI_Initialized
 
   implicit none
 
@@ -49,6 +49,7 @@ program usrneko
   real(kind=rp), allocatable :: x_switch(:)
   character(len=256) :: case_file
   integer :: argc, ierr
+  logical :: mpi_is_initialized
 
   !> parameters from the case file
   type(json_file) :: parameters
@@ -209,5 +210,8 @@ program usrneko
   ! TODO
   call optimizer%free()
 
-  call MPI_Finalize(ierr)
+  call MPI_Initialized(mpi_is_initialized, ierr)
+  if (mpi_is_initialized) then
+     call MPI_Finalize(ierr)
+  end if
 end program usrneko
