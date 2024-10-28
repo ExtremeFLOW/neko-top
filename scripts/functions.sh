@@ -129,8 +129,8 @@ function prepare {
         neko=$(realpath ./neko)
     elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
         printf "=%.0s" {1..80} && printf "\n"
-        printf "Building user Neko\n"
-        printf "=%.0s" {1..80} && printf "\n"
+        printf "Building user Neko based on the following files\n"
+        for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
         $NEKO_DIR/bin/makeneko *.f90
         neko=$(realpath ./neko)
