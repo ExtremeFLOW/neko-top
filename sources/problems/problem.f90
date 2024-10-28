@@ -83,7 +83,6 @@ module problem
      !> Sample the problem
      procedure, pass(this), public :: write => problem_write
 
-
   end type problem_t
 
   ! -------------------------------------------------------------------------- !

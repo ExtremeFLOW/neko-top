@@ -23,6 +23,15 @@ program usrneko
   use math, only: copy, cmult
   use mask_ops, only: mask_exterior_const
 
+  use json_utils_ext, only: read_case
+  use json_module, only: json_file
+  use utils, only: neko_error
+
+  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+
+  use mpi_f08, only: MPI_Init, MPI_Finalize
+
+  implicit none
 
   !> a problem type
   type(steady_state_problem_t) :: problem
@@ -38,6 +47,21 @@ program usrneko
   integer :: n, optimization_iteration, m
   real(kind=rp), dimension(1) :: fval
   real(kind=rp), allocatable :: x_switch(:)
+  character(len=256) :: case_file
+  integer :: argc, ierr
+
+  !> parameters from the case file
+  type(json_file) :: parameters
+
+  call MPI_Init(ierr)
+
+  argc = command_argument_count()
+  if (argc .ne. 1) then
+     call neko_error('Case file not provided')
+  end if
+  call get_command_argument(1, case_file)
+
+  parameters = read_case(case_file)
 
   ! init the problem (base)
   call problem%init()
@@ -71,7 +95,7 @@ program usrneko
   call optimizer%init_json(design%design_indicator%x, n, &
   !    m, a0         a_i          c_i           d_i
        m, 0.0_rp, [0.0_rp], [100.0_rp], [0.0_rp], wo1%x, wo2%x, &
-       problem%C%params)
+       parameters)
   ! -------------------------------------------------------------------!
   !      Internal parameters for MMA                                   !
   !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -176,18 +200,6 @@ program usrneko
      optimization_iteration = optimization_iteration + 1
      call design%map_forward()
 
-     call reset(problem%C)
-     ! TODO
-     ! reset for the adjoint
-     call field_rzero(problem%adj%scheme%u_adj)
-     call field_rzero(problem%adj%scheme%v_adj)
-     call field_rzero(problem%adj%scheme%w_adj)
-
-     ! don't forget to unfreeze the fluid!
-     problem%C%fluid%freeze = .false.
-
-
-
   end do
 !------------------------------------------------------------------------------
 
@@ -197,4 +209,5 @@ program usrneko
   ! TODO
   call optimizer%free()
 
+  call MPI_Finalize(ierr)
 end program usrneko

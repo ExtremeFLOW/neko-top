@@ -43,7 +43,7 @@ contains
     real(kind=rp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
-    logical :: has_scalar
+    logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
 
     t = 0.0_rp
@@ -130,6 +130,15 @@ contains
                neko_case%params)
        end if
     end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Reset the "freeze" paramter of the flow
+    ! ------------------------------------------------------------------------ !
+
+    call json_get_or_default(neko_case%params, &
+         'case.fluid.freeze_flow', freezeflow, .false.)
+
+    neko_case%fluid%freeze = freezeflow
 
   end subroutine reset
 
