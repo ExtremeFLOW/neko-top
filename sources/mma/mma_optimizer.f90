@@ -76,26 +76,43 @@ contains
     !if not, then prob is of abstract type problem_t and therefore we get errors
     !later on we will add other types of problem here as well:
     ! if (.not. (associated(this%steady_state_prob) .and. &
-    !           (associated(this%unsteady_prob) .and.
+    !           (associated(this%unsteady_prob) .and. ... &
     !     ......  ))
     if (.not. associated(this%steady_state_prob)) then
-      call neko_error('steady_state_prob not initialized in mma_optimizer_run')
+      call neko_error('Undefined problem type initialized in mma_optimizer_run')
     endif
 
     call this%prob%compute()
-    ! print *, "initial objective function value=" , &
-    !   this%steady_state_prob%volume_constraint%objective_function_value
-    ! print *, "size(this%prob%design%design_indicator%x)=", &
-    !   size(this%steady_state_prob%design%design_indicator%x)
-    ! print *, "size(this%prob%volume_constraint%sensitivity_to_coefficient%x)=",&
-    !   size(this%steady_state_prob%volume_constraint%sensitivity_to_coefficient%x)
+    print *, "initial objective function value=" , &
+      this%steady_state_prob%volume_constraint%objective_function_value
+    print *, "size(this%prob%design%design_indicator%x)=", &
+      size(this%steady_state_prob%design%design_indicator%x)
+    print *, "size(&
+      &this%prob%volume_constraint%sensitivity_to_coefficient%x)=",&
+      size(&
+     this%steady_state_prob%volume_constraint%sensitivity_to_coefficient%x)
           
+
+    !Writing the optimization data in a separate file
+    open(1368, file="optimization_data.txt", status="replace")
+    ! Loop to write labeled integer and real values
+
     associate(x => this%steady_state_prob%design%design_indicator%x, &
-      f0val => this%steady_state_prob%objective_function%dissipation, &
-      fval => this%steady_state_prob%volume_constraint%objective_function_value, &
-      df0dx => this%steady_state_prob%design%sensitivity%x, &
-      dfdx => this%steady_state_prob%volume_constraint%sensitivity_to_coefficient%x)
-    do iter = 1, 2 !max_iter
+      f0val => &
+        this%steady_state_prob%objective_function%objective_function_value, &
+      fval => &
+        this%steady_state_prob%volume_constraint%objective_function_value, &
+      df0dx => &
+        this%steady_state_prob%design%sensitivity%x, &
+      dfdx => &
+        this%steady_state_prob%volume_constraint%sensitivity_to_coefficient%x)
+
+    write(1368, '("iter=", I3, ", f0val=", ES25.17, &
+      & ", fval(1)=", ES25.17, ", KKTmax=", ES25.17, ", tolerance=", ES25.17, &
+      & ", KKTnorm2=", ES25.17)') 0, f0val, fval, &
+      & this%mma%get_residumax(), tolerance, this%mma%get_residunorm()
+
+    do iter = 1, 10!max_iter
       if (this%mma%get_residumax() .lt. tolerance) exit
 
       ! mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
@@ -106,11 +123,18 @@ contains
       call this%mma%KKT(x,df0dx,reshape([fval],[this%mma%get_m()]),dfdx)
       print *, 'iter=', iter,&
         '-------,f0val= ', f0val, ',   fval= ', fval, &
-        ',  KKTmax=', this%mma%get_residumax(), ', KKTnorm2=', this%mma%get_residunorm()
+        ',  KKTmax=', this%mma%get_residumax(), ', KKTnorm2=',&
+        this%mma%get_residunorm()
+
+      write(1368, '("iter=", I3, ", f0val=", ES25.17, &
+        & ", fval(1)=", ES25.17, ", KKTmax=", ES25.17, &
+        & ", KKTnorm2=", ES25.17)') iter, f0val, fval, &
+        & this%mma%get_residumax(), this%mma%get_residunorm()
+
 
     end do
     end associate
-
+    close(1368)
     ! mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
     !call this%mma%update(this%prob%design%design_indicator%x)
 
@@ -122,7 +146,8 @@ contains
     ! print *, "size(this%prob%design%design_indicator%x)=", &
     !     size(this%prob%design%design_indicator%x)
 
-    ! print *, "size(this%prob%volume_constraint%sensitivity_to_coefficient%x)=",&
+    ! print *, "size(&
+    ! this%prob%volume_constraint%sensitivity_to_coefficient%x)=",&
     !     size(this%prob%volume_constraint%sensitivity_to_coefficient%x)
 
     ! ! Optimization loop
