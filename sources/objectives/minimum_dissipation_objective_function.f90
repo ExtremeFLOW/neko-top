@@ -62,38 +62,21 @@
 !
 module minimum_dissipation_objective_function
   use num_types, only : rp
-  use field_list, only : field_list_t
-  use json_module, only : json_file
-  use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
   use field, only: field_t
-  use topopt_design, only: topopt_design_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
-  use user_intf, only: user_t, simulation_component_user_settings
-  use json_module, only: json_file
-  use steady_simcomp, only: steady_simcomp_t
-  use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl, grad
+  use operators, only: grad
   use scratch_registry, only : neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
-  adjoint_minimum_dissipation_source_term_t
+       adjoint_minimum_dissipation_source_term_t
   use objective_function, only : objective_function_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
-  use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
+  use math_ext, only: glsc2_mask
   implicit none
   private
 
@@ -140,6 +123,8 @@ contains
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
+    character(len=:), allocatable :: objective_location_zone_name
+    logical :: if_mask
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
@@ -149,7 +134,11 @@ contains
     !this%obj_scale = 0.00000001_rp
 
 
-    call this%init_base(fluid%dm_Xh)
+    ! mask would also be read from JSON... I'm hard coding
+    if_mask = .false.
+    objective_location_zone_name = "objective_location"
+
+    call this%init_base(fluid%dm_Xh, if_mask, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
@@ -157,6 +146,7 @@ contains
     call adjoint_forcing%init_from_components( &
          adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, &
          fluid%u, fluid%v, fluid%w, this%obj_scale, &
+         this%mask, this%if_mask, &
          adjoint%c_Xh)
     ! append adjoint forcing term based on objective function
     call adjoint%source_term%add_source_term(adjoint_forcing)
@@ -171,6 +161,7 @@ contains
             adjoint%f_adj_x, adjoint%f_adj_y, adjoint%f_adj_z, design, &
             this%k*this%obj_scale, &
             fluid%u, fluid%v, fluid%w, &
+            this%mask, this%if_mask, &
             adjoint%c_Xh)
        ! append adjoint forcing term based on objective function
        call adjoint%source_term%add_source_term(lube_term)
@@ -196,7 +187,6 @@ contains
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
     type(topopt_design_t), intent(inout) :: design
-    integer :: i
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
@@ -208,9 +198,6 @@ contains
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
 
     ! compute the objective function.
-    ! TODO
-    ! we should be using masks etc
-
     call grad(wo1%x, wo2%x, wo3%x, fluid%u%x, fluid%C_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
@@ -228,7 +215,12 @@ contains
 
     ! integrate the field
     n = wo1%size()
-    this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+    if (this%if_mask) then
+       this%dissipation = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+            n, this%mask%mask, this%mask%size)
+    else
+       this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+    end if
 
     if (this%if_lube) then
        ! it's becoming so stupid to pass the whole fluid and adjoint and
@@ -239,7 +231,12 @@ contains
        call field_col3(objective_field, fluid%u, design%brinkman_amplitude)
        call field_addcol3(objective_field, fluid%v, design%brinkman_amplitude)
        call field_addcol3(objective_field, fluid%w, design%brinkman_amplitude)
-       this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
+       if (this%if_mask) then
+          this%lube_value = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+               n, this%mask%mask, this%mask%size)
+       else
+          this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
+       end if
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value
     else
@@ -286,7 +283,7 @@ contains
 
     if (this%if_lube) then
        call neko_scratch_registry%request_field(lube_contribution, &
-       temp_indices(1))
+            temp_indices(1))
        call field_col3(lube_contribution, fluid%u, fluid%u)
        call field_addcol3(lube_contribution, fluid%v, fluid%v)
        call field_addcol3(lube_contribution, fluid%w, fluid%w)

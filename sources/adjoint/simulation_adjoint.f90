@@ -42,14 +42,13 @@ module simulation_adjoint
   use field, only: field_t
   use profiler, only: profiler_start, profiler_stop, &
        profiler_start_region, profiler_end_region
-  use simcomp_executor, only: neko_simcomps
   use json_utils, only: json_get_or_default
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
   implicit none
   private
 
-  public :: solve_adjoint
+  public :: solve_adjoint, simulation_restart
 
 contains
 
@@ -59,17 +58,12 @@ contains
     real(kind=rp) :: t
     integer :: tstep
 
-    type(field_t), pointer :: u, v, w, p, s
-    character(len=256) :: msg
-
     real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time
     character(len=LOG_SIZE) :: log_buf
     integer :: tstep_adj
-    character(len=:), allocatable :: restart_file
-    logical :: output_at_end, found
+    logical :: output_at_end
     type(time_step_controller_t) :: dt_controller
-    integer :: idx
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the adjoint field.
@@ -83,7 +77,7 @@ contains
     t_adj = 0d0
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
-    write(log_buf, '(A, E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
+    write(log_buf, '(A,E15.7,A,E15.7,A)') 'T : [', 0d0, ',', &
          this%case%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
@@ -212,7 +206,6 @@ contains
 
 !> Restart a case @a C from a given checkpoint
   subroutine simulation_restart(C, t)
-    implicit none
     type(case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: t
     integer :: i

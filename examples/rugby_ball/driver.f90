@@ -13,7 +13,7 @@ program usrneko
   use objective_function, only: objective_function_t
   use field, only:field_t
   use scratch_registry, only : neko_scratch_registry
-  use num_types, only : rp, sp, dp, qp
+  use num_types, only : rp
   use field_math, only: field_rzero, field_rone, field_cmult
   use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
@@ -21,6 +21,7 @@ program usrneko
   use mma, only: mma_t
   use neko_ext, only: reset
   use math, only: copy, cmult
+  use mask_ops, only: mask_exterior_const
 
 
   !> a problem type
@@ -32,7 +33,7 @@ program usrneko
 
   ! these are some things needed for MMA/ work arrays (all these will become
   ! redundant when we do this properly)
-  type(field_t), pointer :: wo1, wo2, wo3
+  type(field_t), pointer :: wo1, wo2
   integer :: temp_indices(3)
   integer :: n, optimization_iteration
   real(kind=rp), dimension(1) :: fval
@@ -100,6 +101,20 @@ program usrneko
      ! in this case it's MMA so we need gradient information
      call problem%compute_sensitivity()
 
+     ! TODO
+     ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
+     ! the only design variables entering MMA are those within the mask.
+     ! This way you get the correct N etc.
+
+     ! Look into the `masked_red_copy` function that Martin implemented.
+     ! That function will copy from one array to another, but the target
+     ! only have the size of the mask, not the full size.
+     if (design%if_mask) then
+        call mask_exterior_const(&
+             problem%volume_constraint%sensitivity_to_coefficient, &
+             design%optimization_domain, 0.0_rp)
+     end if
+
      ! now we have the optimizer act on the design field.
 
      fval(1) = problem%volume_constraint%objective_function_value
@@ -112,6 +127,7 @@ program usrneko
        ! TODO
        ! I'm CERTAIN the mass matrix comes in here, but I need to sit down
        ! with a pen and paper
+
 
        ! TODO
        ! for heuristic reasons, it's important to rescale the dfdx etc so
@@ -132,7 +148,7 @@ program usrneko
        ! TODO
        ! this is a really dumb way of handling the reshaping..
        if ( .not. allocated(x_switch) ) then
-       allocate(x_switch(optimizer%get_n()))
+          allocate(x_switch(optimizer%get_n()))
        end if
 
        x_switch = reshape(x,[optimizer%get_n()])

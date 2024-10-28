@@ -1,7 +1,7 @@
 module json_utils_ext
 
   use json_file_module, only: json_file
-  use json_value_module, only: json_value, json_core
+  use json_value_module, only: json_value
   use utils, only: neko_error
   implicit none
   private

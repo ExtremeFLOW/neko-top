@@ -32,76 +32,19 @@
 
  ! Implements the `topopt_design_t` type.
 module topopt_design
-  use num_types, only: rp, dp
-  use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
-  use simulation_component, only: simulation_component_t
-  use case, only: case_t
+  use num_types, only: rp, sp
   use field, only: field_t
-  use coefs, only: coef_t
-  use field_registry, only: neko_field_registry
-  use scratch_registry, only: neko_scratch_registry
-  use adjoint_pnpn, only: adjoint_pnpn_t
-  use adjoint_output, only: adjoint_output_t
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
-       field_glsc3
-  use field_math, only: field_add2
-  use math, only: glsc2, glsc3
-  use device_math, only: device_glsc2
-  use adv_lin_no_dealias, only: adv_lin_no_dealias_t
-  use logger, only: neko_log, LOG_SIZE
-  use adjoint_scheme, only: adjoint_scheme_t
-  use adjoint_fctry, only: adjoint_scheme_factory
-  use time_step_controller, only: time_step_controller_t
-  use time_scheme_controller, only: time_scheme_controller_t
-  use mpi_f08, only: MPI_WTIME
-  use jobctrl, only: jobctrl_time_limit
-  use profiler, only: profiler_start, profiler_stop, profiler_start_region, &
-       profiler_end_region
-  use file, only: file_t
-  use num_types, only : rp, sp, dp
-  use fluid_scheme, only : fluid_scheme_factory
-  use fluid_pnpn, only : fluid_pnpn_t
-  use fluid_scheme, only : fluid_scheme_t
-  use fluid_output, only : fluid_output_t
-  use chkp_output, only : chkp_output_t
-  use mean_sqr_flow_output, only : mean_sqr_flow_output_t
-  use mean_flow_output, only : mean_flow_output_t
-  use fluid_stats_output, only : fluid_stats_output_t
-  use mpi_f08
-  use mesh_field, only : mesh_fld_t, mesh_field_init, mesh_field_free
-  use parmetis, only : parmetis_partmeshkway
-  use redist, only : redist_mesh
-  use flow_ic, only : set_flow_ic
-  use scalar_ic, only : set_scalar_ic
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use stats, only : stats_t
-  use file, only : file_t
-  use utils, only : neko_error
-  use mesh, only : mesh_t
-  use comm
-  use time_scheme_controller, only : time_scheme_controller_t
-  use logger, only : neko_log, NEKO_LOG_QUIET, LOG_SIZE
-  use jobctrl, only : jobctrl_set_time_limit
-  use user_intf, only : user_t
-  use scalar_pnpn, only : scalar_pnpn_t
-  use json_module, only : json_file, json_core, json_value
-  use json_utils, only : json_get, json_get_or_default
-  use scratch_registry, only : scratch_registry_t, neko_scratch_registry
-  use point_zone_registry, only: neko_point_zone_registry
-  use adjoint_ic, only : set_adjoint_ic
-  use json_utils, only : json_extract_item
-  use json_utils_ext, only: json_key_fallback, json_get_subdict
-  use dofmap, only : dofmap_t
-  use filters, only: permeability_field
-  use mma, only: mma_t
-  use fld_file_output, only : fld_file_output_t
-  use linear_mapping, only: linear_mapping_t
-  use RAMP_mapping, only: RAMP_mapping_t
+  use json_module, only: json_file
+  use mapping, only: mapping_t
   use PDE_filter, only: PDE_filter_t
-  !use design_variable, only: design_variable_t
+  use RAMP_mapping, only: RAMP_mapping_t
+  use coefs, only: coef_t
+  use scratch_registry, only: neko_scratch_registry
+  use fld_file_output, only: fld_file_output_t
+  use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
+  use mask_ops, only: mask_exterior_const
+
   implicit none
   private
 
@@ -194,10 +137,10 @@ module topopt_design
      type(field_t) :: filtered_design
 
 
-     !
-     ! TODO
-     ! you also had lots of masks etc that was a nice idea,
-     ! but we'll cross that bridge later
+     !> A mask indicating the optimization domain
+     class(point_zone_t), pointer :: optimization_domain
+     !> A logical if we're restricting the optimization domain
+     logical :: if_mask
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -243,6 +186,7 @@ contains
     class(topopt_design_t), target, intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
+    character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
     ! init the fields
     call this%design_indicator%init(coef%dof, "design_indicator")
@@ -265,6 +209,55 @@ contains
           this%design_indicator%x(i,1,1,1) = 1.0_rp
        end if
     end do
+
+    ! TODO, of course when we move all of Tim's stuff for initialization of
+    ! the initial design field we'll be reading things properly from the JSON.
+    ! call json_get(json, 'name', optimization_domain_zone_name)
+    ! Right now, I'm hardcoding the name of the point zone.
+    this%if_mask = .true.
+    optimization_domain_zone_name = "optimization_domain"
+
+    ! Initialize the mask
+    if (this%if_mask) then
+       this%optimization_domain => &
+            neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
+    end if
+
+
+
+
+    ! TODO
+    ! Regarding masks and filters, 
+    ! I suppose there are two ways of thinking about it:
+    ! 1) Mask first, then filter
+    ! 2) filter first, then mask
+    !
+    ! Each one can be used to achieve different results, and when we do complex
+    ! non-linear filter cascades the choice here has implications for exactly
+    ! how we define "minimum size control".
+    !
+    ! On top of this, I've only ever used spatial convolution filters before,
+    ! not PDE based filters.
+    ! With these filters you need to think of how your domain is "padded" when
+    ! you move the kernel over the boundary. Again, you can achieve different
+    ! effects depending on the choice of padding.
+    ! I don't really know if there's a similar implication for PDE based
+    ! based filters, I bet there is. (We should ask Niels and Casper) I bet it
+    ! means we need to consider the boundary of the mask as the boundary we
+    ! enforce to be Nuemann, not the boundary of the computational domain.
+    ! That sounds REALLY hard to implement...I hope it doesn't come down to
+    ! that.
+    !
+    ! We can always change this decision later, but I'm going with (1)
+    ! mask first, then filter.
+    ! The reason being, one of the purposes of the filtering is to avoid sharp
+    ! interfaces, if we filter first then mask there's a chance we have a sharp
+    ! interface on the boundary of the optimization domain.
+    ! if we mask first then filter, at least all the boundaries will be smooth.
+    if (this%if_mask) then
+       call mask_exterior_const(this%design_indicator, &
+            this%optimization_domain, 0.0_rp)
+    end if
 
     ! TODO
     ! we would also need to make a mapping type that reads in
@@ -300,16 +293,22 @@ contains
     class(topopt_design_t), target, intent(inout) :: this
 
 
+    ! TODO, see previous todo about mask first, then mapping
+    if (this%if_mask) then
+       call mask_exterior_const(this%design_indicator, &
+       this%optimization_domain, 0.0_rp)
+    end if
+
     ! TODO
     ! this should be somehow deffered so we can pick different mappings!!!
     ! so this would be:
     ! call mapper%forward(fld_out, fld_in)
 
     call this%filter%apply_forward(this%filtered_design, &
-    this%design_indicator)
+         this%design_indicator)
 
     call this%mapping%apply_forward(this%brinkman_amplitude, &
-    this%filtered_design)
+         this%filtered_design)
 
 
   end subroutine topopt_design_map_forward
@@ -325,13 +324,28 @@ contains
     ! so this would be:
     ! call mapper%backward(fld_out, fld_in)
     call neko_scratch_registry%request_field(dF_dfiltered_design, &
-    temp_indices(1))
+         temp_indices(1))
 
     call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
-    this%filtered_design)
+         this%filtered_design)
 
     call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
-    this%filtered_design)
+         this%filtered_design)
+
+    ! TODO
+    ! DELETE THIS LATER
+    !
+    ! When Abbas writes the interface for the optimization
+    ! module this may be a moot point, because we would only really collect
+    ! the sensitivity of the design variables inside the mask.
+    !
+    ! Note for Abbas,
+    ! I'm NOT doing this because I'm too lazy and I just need masks so I can
+    ! test something in the passive scalar.
+    if (this%if_mask) then
+       call mask_exterior_const(this%sensitivity, this%optimization_domain, &
+            0.0_rp)
+    end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -351,4 +365,5 @@ contains
     call this%output%sample(t)
 
   end subroutine topopt_design_sample
+
 end module topopt_design

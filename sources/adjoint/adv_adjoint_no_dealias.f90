@@ -35,20 +35,17 @@
 module adv_lin_no_dealias
   use advection_adjoint, only: advection_adjoint_t
   use num_types, only: rp
-  use math, only: vdot3, sub2, subcol3, rzero
-  use utils, only: neko_error
-  use space, only: space_t, GL
+  use math, only: subcol3, rzero
+  use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
   use scratch_registry, only : neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
-  use interpolation, only: interpolator_t
   use device_math, only: device_vdot3, device_sub2, device_add4, &
        device_col3, device_subcol3, device_rzero
-  use device, only: device_free, device_map, device_memcpy, device_get_ptr, &
-       HOST_TO_DEVICE
+  use device, only: device_free, device_map, device_get_ptr
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, &
        c_associated
   implicit none
@@ -137,7 +134,6 @@ contains
     real(kind=rp), dimension(Xh%lxyz) :: duyb, dvyb, dwyb
     real(kind=rp), dimension(Xh%lxyz) :: duzb, dvzb, dwzb
     ! temporary arrays
-    real(kind=rp), dimension(Xh%lxyz) :: tfx, tfy, tfz
     integer :: e, i, idx, idxx
 
 
@@ -282,7 +278,6 @@ contains
     type(coef_t), intent(inout) :: coef
     type(c_ptr) :: ub_d, vb_d, wb_d
     type(c_ptr) :: work1_d, work2_d, work3_d, w1_d, w2_d, w3_d
-    integer :: i
 
     work1_d = work1%x_d
     work2_d = work2%x_d
