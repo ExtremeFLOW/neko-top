@@ -37,7 +37,7 @@ make_a_case() {
                         mv $name/case.template $name/cylinder.case
                         # now all the replacements
 
-                        new_line='4s#.*#"mesh_file":"data/brinkman_parameters/immersed_M'$mesh'.nmsh",#'
+                        new_line='4s#.*#"mesh_file":"data_local/brinkman_parameters/immersed_M'$mesh'.nmsh",#'
                         sed -i $new_line $name/cylinder.case
                         new_line='25s#.*#"Re":'$Re',#'
                         sed -i $new_line $name/cylinder.case
