@@ -140,6 +140,11 @@ contains
     !   end if
     !end if
 
+!    call set_scalar_ic(s, &
+!         neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
+!         'user', &
+!         neko_case%params)
+
   end subroutine reset
 
   !> @brief Setup the iteration

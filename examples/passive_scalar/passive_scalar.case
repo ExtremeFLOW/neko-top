@@ -54,7 +54,7 @@
         "scalar": {
             "enabled": true,
             // in the real case we'll be working with a much higher Peclet number
-            "Pe": 200.0,
+            "Pe": 500.0,
             "boundary_types": [
                 "user",
                 "o",
