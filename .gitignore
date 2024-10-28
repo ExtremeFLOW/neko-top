@@ -5,6 +5,7 @@
 [Dd]ata_local
 [Ee]xternal/
 
+examples/**/neko
 examples/debug/*
 !examples/debug/debug.case
 !examples/debug/CMakeLists.txt
@@ -16,14 +17,10 @@ tests/**/*.[Ff]90
 prepare.env
 
 # Project specific files
-neko
-!neko/
 *.nek5000
 *.f*
 
 # Temporary files
-*.exo
-*.re2
 __pycache__/
 .venv
 *.swp
