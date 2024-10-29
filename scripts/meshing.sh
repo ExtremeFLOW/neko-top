@@ -157,3 +157,40 @@ function geo2nbin() {
         exit 1
     fi
 }
+
+# ============================================================================ #
+# GMsh to neko binary mesh
+
+function msh2nbin() {
+    set -e
+
+    find_gmsh2nek
+    find_rea2nbin
+
+    input_file=$1
+    input_name=$(basename ${1%.*})
+
+    ln -sf $input_file $input_name.msh
+
+    # Convert the mesh from GMsh format to Nek5000 format
+    (
+        echo "$DIMENSION"
+        echo "$input_name"
+        echo "0"
+    ) | $gmsh2nek
+
+    if [[ $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
+        printf >&2 "\n\e[4mError:\e[0m\n"
+        printf >&2 "  %-10s %-67s\n" "gmsh2nek:" "re2 not created: $input_file"
+        exit 1
+    fi
+
+    # Convert the mesh to Neko mesh format
+    $rea2nbin ${mesh_file%.*}.re2 $input_name.nmsh
+
+    if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
+        printf >&2 "\n\e[4mError:\e[0m\n"
+        printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
+        exit 1
+    fi
+}

@@ -18,6 +18,9 @@ function help() {
     echo -e "  meshes are stored in the OUTPUT_PATH folder, which defaults to"
     echo -e "  data_local."
     echo -e ""
+    echo -e "Please note, periodic boundary conditions are not supported"
+    echo -e "directly."
+    echo -e ""
     echo -e "  This code depends on the following external libraries:"
     echo -e "    - Cubit"
     echo -e "    - Nek5000"
@@ -97,7 +100,7 @@ source $MAIN_DIR/scripts/meshing.sh
 # ============================================================================ #
 # Loop through the inputs and extract the file_list
 
-SUPPORTED_TYPES=(".jou" ".exo" ".re2" ".geo")
+SUPPORTED_TYPES=(".jou" ".e" ".exo" ".rea" ".re2" ".geo")
 
 file_list=""
 for input in $@; do
@@ -168,9 +171,10 @@ for input_file in $file_list; do
 
     case $input_type in
     "jou") jou2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
-    "exo") exo2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
-    "re2") re2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    "e" | "exo") exo2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    "rea" | "re2") re2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     "geo") geo2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
+    "msh") msh2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     esac
 
     cp *.nmsh -ft $OUTPUT_PATH/$input_dir
