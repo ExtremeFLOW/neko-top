@@ -63,8 +63,8 @@ jobs:
     name: "Check scores"
     runs-on: ubuntu-20.04
     needs:
-      - score-develop
       - score-current
+      - score-develop
 
     steps:
       - name: Checkout current branch
@@ -112,7 +112,7 @@ jobs:
   # Run the flint linter on the changed fortran files and provide suggestions
   # for improvements. The suggestions are saved in a linter-report.txt file.
   lint-changes:
-    name: "Lint changes"
+    name: "Suggest improvements"
     runs-on: ubuntu-20.04
     needs:
       - score-current
@@ -210,11 +210,11 @@ jobs:
 
   # Create a badge for the flint score
   create-badge-lint:
-    name: "Create linting badge"
+    name: "Create badge"
     runs-on: ubuntu-20.04
     needs:
-      - check-scores
       - score-current
+      - score-develop
 
     steps:
       - name: Checkout
