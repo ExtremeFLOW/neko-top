@@ -59,18 +59,14 @@ contains
   function read_case(filename) result(case_params)
     character(len=*), intent(in) :: filename
     type(json_file) :: case_params
-    integer :: pe_rank, ierr, length
+
+    integer :: pe_rank, ierr, length, argc
     character(len=:), allocatable :: json_buffer
     character(len=4) :: suffix
+    logical :: mpi_is_initialized
 
     pe_rank = 0
     call MPI_Comm_rank(MPI_COMM_WORLD, pe_rank, ierr)
-
-    call filename_suffix(filename, suffix)
-
-    if (trim(suffix) .ne. 'case') then
-       call neko_error('Invalid case file')
-    end if
 
     if (pe_rank .eq. 0) then
        call case_params%load_file(filename = trim(filename))
@@ -78,11 +74,11 @@ contains
        length = len(json_buffer)
     end if
 
+
     call MPI_Bcast(length, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
     if (pe_rank .ne. 0) allocate(character(len = length) :: json_buffer)
     call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
     call case_params%load_from_string(json_buffer)
-
     deallocate(json_buffer)
 
   end function read_case

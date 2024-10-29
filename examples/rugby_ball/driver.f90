@@ -56,12 +56,12 @@ program usrneko
 
   call MPI_Init(ierr)
 
+  ! Handle the case file input
   argc = command_argument_count()
   if (argc .ne. 1) then
      call neko_error('Case file not provided')
   end if
   call get_command_argument(1, case_file)
-
   parameters = read_case(case_file)
 
   ! init the problem (base)
@@ -210,8 +210,4 @@ program usrneko
   ! TODO
   call optimizer%free()
 
-  call MPI_Initialized(mpi_is_initialized, ierr)
-  if (mpi_is_initialized) then
-     call MPI_Finalize(ierr)
-  end if
 end program usrneko

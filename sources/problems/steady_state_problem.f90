@@ -234,10 +234,12 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call this%objective_function%init(design, this%simulation%neko_case%fluid, this%simulation%adjoint_case%scheme)
+    call this%objective_function%init(design, this%simulation%neko_case%fluid, &
+         this%simulation%adjoint_case%scheme)
     ! volume constraint
     this%m = 1
-    call this%volume_constraint%init(design, this%simulation%neko_case%fluid, this%simulation%adjoint_case%scheme)
+    call this%volume_constraint%init(design, this%simulation%neko_case%fluid, &
+         this%simulation%adjoint_case%scheme)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -328,8 +330,8 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%compute(design, this%simulation%neko_case%fluid)
-    call this%volume_constraint%compute(design, this%simulation%neko_case%fluid)
+    call this%objective_function%compute(design)
+    call this%volume_constraint%compute(design)
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
@@ -347,7 +349,6 @@ contains
     !
 
     call this%simulation%reset()
-
 
   end subroutine steady_state_problem_compute_topopt
 
