@@ -19,7 +19,7 @@ contains
   subroutine user_setup(usr)
     type(user_t), intent(inout) :: usr
     usr%fluid_user_ic => cylinder_ic
-    usr%material_properties => set_material_properties
+    ! usr%material_properties => set_material_properties
   end subroutine user_setup
 
   !> Read the material properties from the JSON file

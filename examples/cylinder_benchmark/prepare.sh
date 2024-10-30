@@ -43,14 +43,8 @@ for arg in "$@"; do
         q) QUIET=1 ;;
         *) echo -e "Invalid option: ${arg:1}" >&2 && help ;;
         esac
-    else
-        cases="$cases $arg"
     fi
 done
-
-cases=(
-    "brinkman_explicit.case"
-)
 
 # ============================================================================ #
 # Ensure Neko can be found and set default mesh size
