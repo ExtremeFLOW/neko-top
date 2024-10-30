@@ -17,6 +17,8 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 
 1. \subpage permeability_block
 2. \subpage easy-E
+3. \subpage power_iterations
+4. \subpage rugby_ball
 
 ## Execution of examples
 

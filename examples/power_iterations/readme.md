@@ -1,4 +1,4 @@
-# PowerIterations
+# PowerIterations {#power_iterations}
 
 We hav a split field, being driven by a baseflow and described by a field of
 pertubations.
