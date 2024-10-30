@@ -32,7 +32,7 @@
                 "max_iterations": 800
             },
             "output_control": "simulationtime",
-            "output_value": 0.1,
+            "output_value": 0.5,
             "boundary_types": [
                 "v",
                 "o",
