@@ -82,7 +82,7 @@ make_a_case() {
 # ----------------------------------------------#
 
 # Implementation
-mesh_list=("3")
+mesh_list=("2")
 Re_list=("200")
 chi_list=("1" "100" "1000")
 implicit_list=("true" "false")
@@ -94,7 +94,7 @@ make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
 # I still don't know exactly what the remaining cases should be..
 
 # Can we do the filter radius??
-mesh_list=("3")
+mesh_list=("2")
 Re_list=("200")
 chi_list=("1000")
 implicit_list=("true")

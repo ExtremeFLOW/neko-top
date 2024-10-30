@@ -33,23 +33,21 @@ contains
     real(kind=rp) :: div_tot
 
     call neko_field_registry%add_field(u%dof, "brinkman_indicator", .true.)
-    call neko_field_registry%add_field(u%dof, "div_fam", .true.)
 
     brinkman => neko_field_registry%get_field("brinkman_indicator")
-    divergence => neko_field_registry%get_field_by_name('div_fam')
 
     ntot = u%dof%size()
 
 
     ! calculate the leakage
     leakage = leak(brinkman%x,u%x,v%x,w%x,coef%b,ntot)
-    ! calculate the divergence
-    call div(divergence%x, u%x, v%x, w%x, coef)
-    div_tot = glsc3(divergence%x,divergence%x,coef%b,ntot)
-    if (pe_rank .eq. 0) then
-       print *, 'Leakage = ', leakage, ',  ', t
-       print *, 'Divergence = ', sqrt(div_tot), ', ', t
-    endif
+    ! ! calculate the divergence
+    ! call div(divergence%x, u%x, v%x, w%x, coef)
+    ! div_tot = glsc3(divergence%x,divergence%x,coef%b,ntot)
+    ! if (pe_rank .eq. 0) then
+    !    print *, 'Leakage = ', leakage, ',  ', t
+    !    print *, 'Divergence = ', sqrt(div_tot), ', ', t
+    ! endif
 
 
 

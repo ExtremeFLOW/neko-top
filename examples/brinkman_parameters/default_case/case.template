@@ -104,9 +104,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "brinkman",
-                    "UF_indicator"
                 ],
                 "output_file": "leakage.csv",
                 "compute_control": "simulationtime",
@@ -129,8 +126,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "UF_indicator"
                 ],
                 "output_file": "recirculation.csv",
                 "compute_control": "simulationtime",
@@ -153,9 +148,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "brinkman",
-                    "UF_indicator"
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
@@ -178,9 +170,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "brinkman",
-                    "UF_indicator"
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
@@ -203,9 +192,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "brinkman",
-                    "UF_indicator"
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
@@ -228,8 +214,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "UF_indicator"
                 ],
                 "output_file": "circ_048.csv",
                 "compute_control": "simulationtime",
@@ -254,8 +238,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "UF_indicator"
                 ],
                 "output_file": "circ_050.csv",
                 "compute_control": "simulationtime",
@@ -280,8 +262,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "UF_indicator"
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
@@ -306,8 +286,6 @@
                     "v",
                     "w",
                     "p",
-                    "brinkman_indicator",
-                    "UF_indicator"
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
@@ -323,16 +301,6 @@
                     }
                 ]
             },
-            // divergence
-            {
-                "type": "field_writer",
-                "fields": [ "div_fam" ],
-                "output_filename": "divergence",
-                "precision": "double",
-                "output_control": "simulationtime",
-                "output_value": 2.50
-            }
-
         ]
     }
 }
