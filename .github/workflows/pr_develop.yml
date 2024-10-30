@@ -85,11 +85,11 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_lint.yml
 
-  # check_formatting:
-  #   name: Formatting
-  #   needs:
-  #     - prepare
-  #   uses: ./.github/workflows/check_formatting.yml
+  check_documentation:
+    name: Documentation
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_documentation.yml
 
   check_compilation:
     name: Compilation
@@ -108,12 +108,14 @@ jobs:
       - prepare
       - check_lint
       # - check_formatting
+      - check_documentation
       - check_compilation
     runs-on: ubuntu-latest
     env:
       draft_status: ${{ needs.prepare.result }}
       flint_status: ${{ needs.check_lint.result }}
       compile_status: ${{ needs.check_compilation.result }}
+      documentation_status: ${{ needs.check_documentation.result }}
 
     steps:
       - name: All checks passed
@@ -130,6 +132,10 @@ jobs:
           fi
           if [ "$compile_status" != "success" ]; then
             fail+=("\t- Compilation check: $compile_status")
+            success=false
+          fi
+          if [ "$documentation_status" != "success" ]; then
+            fail+=("\t- Documentation check: $documentation_status")
             success=false
           fi
 
