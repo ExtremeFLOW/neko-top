@@ -57,17 +57,11 @@ make_a_case() {
                         sed -i $new_line $name/cylinder.case
 
                         # time step is a bit strange
-                        case $mesh in
-                        "2")
-                            dt="2.5e-3"
-                            ;;
-                        "3")
-                            dt="1.6e-3"
-                            ;;
-                        "4")
-                            dt="1.25e-3"
-                            ;;
-                        esac
+                        # we know the maximum allowable timestep scales inversly
+                        # proportional to the brinkman amplitude.
+                        # at chi_max = 100, we were still safe with dt = 2.5e-3
+                        # so let's call it 0.25 / chi_max
+                        dt=$(echo "scale=6; 0.25 / $chi" | bc)
                         new_line='10s#.*#"timestep":'$dt',#'
                         sed -i $new_line $name/cylinder.case
 
@@ -100,83 +94,109 @@ chi_list=("1000")
 implicit_list=("true")
 radius_list=("0" "0.01" "0.05" "0.1")
 
+
+
+
 case_name="Filter_radius"
 make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
 
-# I still don't know exactly what the remaining cases should be..
+# Can we do the filter radius??
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+implicit_list=("true")
+radius_list=("0" "0.01" "0.05" "0.1")
 
-# omg Tim you're going to read this eventually and this it's such a stupid way of doing this hahahaha
+case_name="Filter_radius"
+make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
 
-# Mesh		4
-# dt			10
-# Re			25
-# Chi			69
-# implcit	72
-# radius		76
 
-# mesh study
-declare -a mesh_list=("2" "3" "4")
-declare -a Re_list=("200")
 
-big_name="Mesh_study"
-rm -r $big_name 2>/dev/null
-mkdir $big_name
 
-for mesh in "${mesh_list[@]}"; do
-    for Re in "${Re_list[@]}"; do
-        name=$big_name/mesh${mesh}_Re${Re}
-        cp -r default_case_meshed $name
-        mv $name/case.template $name/cylinder.case
-        # now all the replacements
 
-        new_line='4s#.*#"mesh_file":"data_local/brinkman_parameters/meshed_M'$mesh'.nmsh",#'
-        sed -i $new_line $name/cylinder.case
-        new_line='25s#.*#"Re":'$Re',#'
-        sed -i $new_line $name/cylinder.case
-        # time step is a bit strange
-        case $mesh in
-        "2")
-            dt="2.5e-3"
-            ;;
-        "3")
-            dt="1.6e-3"
-            ;;
-        "4")
-            dt="1.25e-3"
-            ;;
-        esac
-        new_line='10s#.*#"timestep":'$dt',#'
-        sed -i $new_line $name/cylinder.case
-    done
-done
+# Can we do the filter radius??
+mesh_list=("2")
+Re_list=("200" "400" "1000")
+chi_list=("1000")
+implicit_list=("true")
+radius_list=("0.1")
 
-# Reynolds study
-declare -a mesh_list=("3")
-declare -a Re_list=("200" "1000" "2000" "3900")
-
-big_name="Re_study"
-rm -r $big_name 2>/dev/null
-mkdir $big_name
-
-for mesh in "${mesh_list[@]}"; do
-    for Re in "${Re_list[@]}"; do
-        name=$big_name/mesh${mesh}_Re${Re}
-        cp -r default_case_meshed $name
-        mv $name/case.template $name/cylinder.case
-        # now all the replacements
-
-        new_line='4s#.*#"mesh_file":"data_local/brinkman_parameters/meshed_M'$mesh'.nmsh",#'
-        sed -i $new_line $name/cylinder.case
-        new_line='25s#.*#"Re":'$Re',#'
-        sed -i $new_line $name/cylinder.case
-        # time step is a bit strange
-        case $Re in
-        "200") dt="2.50e-3" ;;
-        "1000") dt="0.50e-3" ;;
-        "2000") dt="0.25e-3" ;;
-        "3900") dt="0.01e-3" ;;
-        esac
-        new_line='10s#.*#"timestep":'$dt',#'
-        sed -i $new_line $name/cylinder.case
-    done
-done
+case_name="Re_study"
+make_a_case mesh_list Re_list chi_list implicit_list radius_list $case_name
+## I still don't know exactly what the remaining cases should be..
+#
+## omg Tim you're going to read this eventually and this it's such a stupid way of doing this hahahaha
+#
+## Mesh		4
+## dt			10
+## Re			25
+## Chi			69
+## implcit	72
+## radius		76
+#
+## mesh study
+#declare -a mesh_list=("2" "3" "4")
+#declare -a Re_list=("200")
+#
+#big_name="Mesh_study"
+#rm -r $big_name 2>/dev/null
+#mkdir $big_name
+#
+#for mesh in "${mesh_list[@]}"; do
+#    for Re in "${Re_list[@]}"; do
+#        name=$big_name/mesh${mesh}_Re${Re}
+#        cp -r default_case_meshed $name
+#        mv $name/case.template $name/cylinder.case
+#        # now all the replacements
+#
+#        new_line='4s#.*#"mesh_file":"data_local/brinkman_parameters/meshed_M'$mesh'.nmsh",#'
+#        sed -i $new_line $name/cylinder.case
+#        new_line='25s#.*#"Re":'$Re',#'
+#        sed -i $new_line $name/cylinder.case
+#        # time step is a bit strange
+#        case $mesh in
+#        "2")
+#            dt="2.5e-3"
+#            ;;
+#        "3")
+#            dt="1.6e-3"
+#            ;;
+#        "4")
+#            dt="1.25e-3"
+#            ;;
+#        esac
+#        new_line='10s#.*#"timestep":'$dt',#'
+#        sed -i $new_line $name/cylinder.case
+#    done
+#done
+#
+## Reynolds study
+#declare -a mesh_list=("1")
+#declare -a Re_list=("200" "1000" "2000" "3900")
+#
+#big_name="Re_study"
+#rm -r $big_name 2>/dev/null
+#mkdir $big_name
+#
+#for mesh in "${mesh_list[@]}"; do
+#    for Re in "${Re_list[@]}"; do
+#        name=$big_name/mesh${mesh}_Re${Re}
+#        cp -r default_case_meshed $name
+#        mv $name/case.template $name/cylinder.case
+#        # now all the replacements
+#
+#        new_line='4s#.*#"mesh_file":"data_local/brinkman_parameters/meshed_M'$mesh'.nmsh",#'
+#        sed -i $new_line $name/cylinder.case
+#        new_line='25s#.*#"Re":'$Re',#'
+#        sed -i $new_line $name/cylinder.case
+#        # time step is a bit strange
+#        case $Re in
+#        "200") dt="2.50e-3" ;;
+#        "1000") dt="0.50e-3" ;;
+#        "2000") dt="0.25e-3" ;;
+#        "3900") dt="0.01e-3" ;;
+#        esac
+#        new_line='10s#.*#"timestep":'$dt',#'
+#        sed -i $new_line $name/cylinder.case
+#    done
+#done
