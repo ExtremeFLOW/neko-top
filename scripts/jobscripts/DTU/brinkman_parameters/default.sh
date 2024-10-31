@@ -17,7 +17,7 @@
 #BSUB -q "hpc"
 
 # Ask for n cores placed on R host.
-#BSUB -n 24
+#BSUB -n 72
 #BSUB -R "span[ptile=24]"
 # #BSUB -gpu "num=1:mode=exclusive_process"
 
