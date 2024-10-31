@@ -45,7 +45,7 @@ done
 
 # Reynolds study
 declare -a mesh_list=("3")
-declare -a Re_list=("200" "1000" "2000")
+declare -a Re_list=("200" "1000" "2000" "3900")
 
 big_name="Re_study"
 rm -r $big_name 2>/dev/null
@@ -63,16 +63,11 @@ for mesh in "${mesh_list[@]}"; do
         new_line='25s#.*#"Re":'$Re',#'
         sed -i $new_line $name/cylinder.case
         # time step is a bit strange
-        case $mesh in
-        "2")
-            dt="2.5e-3"
-            ;;
-        "3")
-            dt="1.6e-3"
-            ;;
-        "4")
-            dt="1.25e-3"
-            ;;
+        case $Re in
+        "200") dt="2.50e-3" ;;
+        "1000") dt="0.50e-3" ;;
+        "2000") dt="0.25e-3" ;;
+        "3900") dt="0.01e-3" ;;
         esac
         new_line='10s#.*#"timestep":'$dt',#'
         sed -i $new_line $name/cylinder.case
