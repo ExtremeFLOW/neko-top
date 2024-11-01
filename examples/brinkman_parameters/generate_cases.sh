@@ -69,6 +69,10 @@ make_a_case() {
                                 exit 1
                             fi
 
+                            # Compute the expected timestep, in exponential notation
+                            dt=$(echo "scale=10; 1.0 / ($Re*$chi)" | bc)
+                            dt=$(printf "%.1e" $dt)
+
                             # now all the replacements
 
                             # Locate the pattern and replace it
@@ -92,11 +96,15 @@ make_a_case() {
                             radius_pattern='"radius": 0.05'
                             radius_replacement='"radius": '$radius
 
+                            timestep_pattern='"timestep": 2.5e-3'
+                            timestep_replacement='"timestep": '$dt
+
                             sed -i "s#$mesh_pattern#$mesh_replacement#" $casefile
                             sed -i "s#$re_pattern#$re_replacement#" $casefile
                             sed -i "s#$chi_pattern#$chi_replacement#" $casefile
                             sed -i "s#$implicit_pattern#$implicit_replacement#" $casefile
                             sed -i "s#$radius_pattern#$radius_replacement#" $casefile
+                            sed -i "s#$timestep_pattern#$timestep_replacement#" $casefile
                         done
                     done
                 done
