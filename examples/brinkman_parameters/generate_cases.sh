@@ -83,8 +83,8 @@ make_a_case() {
                             re_pattern='"Re": 200.0'
                             re_replacement='"Re": '$Re
 
-                            chi_pattern='"limits": \[ 0.0, 100.0'
-                            chi_replacement='"limits": \[ 0.0, '$chi
+                            chi_pattern='"limits": \[ 0.0, 100.0 \]'
+                            chi_replacement='"limits": \[ 0.0, '$chi' \]'
 
                             implicit_pattern='"implicit": true'
                             implicit_replacement='"implicit": '$implicit
