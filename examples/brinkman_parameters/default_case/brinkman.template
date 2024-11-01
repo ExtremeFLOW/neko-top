@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh",
+        "mesh_file": "data_local/brinkman_parameters/immersed_MX.nmsh",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
@@ -63,10 +63,7 @@
                         }
                     ],
                     "brinkman": {
-                        "limits": [
-                            0.0,
-                            100.0
-                        ],
+                        "limits": [ 0.0, 100.0 ],
                         "penalty": 1.0,
                         "implicit": true,
                     },
