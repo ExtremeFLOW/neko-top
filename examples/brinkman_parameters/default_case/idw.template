@@ -2,7 +2,6 @@
     "version": 1.0,
     "case": {
         "mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh",
-        // "output_directory": "cylinder_fields",
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
@@ -56,27 +55,19 @@
             ],
             "source_terms": [
                 {
-                    "type": "brinkman",
+                    "type": "idw",
+                    "rmax": 1.0,
+                    "power_parameter": 1.0,
+                    "one_sided": true,
                     "objects": [
                         {
-                            "type": "point_zone",
-                            "name": "cylinder"
+                            "type": "boundary_mesh",
+                            "name": "data/surfaces/cylinder.stl"
                         }
-                    ],
-                    "brinkman": {
-                        "limits": [
-                            0.0,
-                            100.0
-                        ],
-                        "penalty": 1.0,
-                        "implicit": true,
-                    },
-                    "filter": {
-                        "type": "PDE",
-                        "radius": 0.05
-                    }
+                    ]
                 }
-            ]
+            ],
+
         },
         "point_zones": [
             {
