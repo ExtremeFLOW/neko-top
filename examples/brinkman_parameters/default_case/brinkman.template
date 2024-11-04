@@ -58,11 +58,12 @@
                     "type": "brinkman",
                     "objects": [
                         {
-                            "type": "point_zone",
-                            "name": "cylinder",
-                            "filter": {
-                                "type": "none"
-                            }
+                            "type": "boundary_mesh",
+                            "name": "data/surfaces/cylinder.stl",
+                            "distance_transform": {
+                                "type": "step",
+                                "value": 0.0
+                            },
                         }
                     ],
                     "brinkman": {
