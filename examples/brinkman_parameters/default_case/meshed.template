@@ -97,58 +97,6 @@
                 "field": "v",
                 "direction": "y"
             },
-            // the one for leakage
-            {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w",
-                    "p",
-                    "du_dx",
-                    "du_dy",
-                    "dv_dx",
-                    "dv_dy",
-                ],
-                "output_file": "leakage.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.05,
-                "points": [
-                    {
-                        "type": "line",
-                        "start": [ 0.00001, -5.0001, 0.51 ],
-                        "end": [ 0.00001, 5.0, 0.51 ],
-                        "amount": 400
-                    }
-                ]
-            },
-
-            // the one for recirculation length
-            {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w",
-                    "p",
-                    "du_dx",
-                    "du_dy",
-                    "dv_dx",
-                    "dv_dy",
-                ],
-                "output_file": "recirculation.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.05,
-                "points": [
-                    {
-                        "type": "line",
-                        "start": [ -1.0, 0.00001, 0.51 ],
-                        "end": [ 20.0, 0.00001, 0.51 ],
-                        "amount": 400
-                    }
-                ]
-            },
-
             // one BL (45 degrees)
             {
                 "type": "probes",
@@ -164,11 +112,11 @@
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.17677669529, 0.17677669529, 0.51 ],
+                        "start": [ 0.3535533906, 0.3535533906, 0.51 ],
                         "end": [ 0.53033008589, 0.53033008589, 0.51 ],
                         "amount": 400
                     }
@@ -190,11 +138,11 @@
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.21650635094, 0.125, 0.51 ],
+                        "start": [ 0.4330213621, 0.250005, 0.51 ],
                         "end": [ 0.64951905283, 0.375, 0.51 ],
                         "amount": 400
                     }
@@ -216,46 +164,18 @@
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
-                        "start": [ 0.125, 0.21650635094, 0.51 ],
+                        "start": [ 0.250005, 0.4330213621, 0.51 ],
                         "end": [ 0.375, 0.64951905283, 0.51 ],
                         "amount": 400
                     }
                 ]
             },
 
-            // circles 0.48
-            {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w",
-                    "p",
-                    "du_dx",
-                    "du_dy",
-                    "dv_dx",
-                    "dv_dy",
-                ],
-                "output_file": "circ_048.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.05,
-                "points": [
-                    {
-                        "type": "circle",
-                        "center": [ 0.0, 0.0, 0.51 ],
-                        "normal": [ 0.0, 0.0, 1.0 ],
-                        "axis": "x",
-                        "radius": 0.48,
-                        "amount": 720
-                    }
-                ]
-            },
-
-            // circles 0.50
+            // circles 0.51
             {
                 "type": "probes",
                 "fields": [
@@ -270,14 +190,14 @@
                 ],
                 "output_file": "circ_050.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
                         "center": [ 0.0, 0.0, 0.51 ],
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
-                        "radius": 0.50,
+                        "radius": 0.51,
                         "amount": 720
                     }
                 ]
@@ -298,7 +218,7 @@
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -326,7 +246,7 @@
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -338,6 +258,21 @@
                     }
                 ]
             },
+//            // Surface integral on cylinder 
+//            // NOTE! we should be careful, neko is technically 3D not 2D,
+//            // So this will be doing a surface integral. The only reason I 
+//            // this we'll get the same results is that it is unit thickness.
+//            // But if we end up doing a long 3D cylinder we need to remember
+//            // to account for the spanwise length.
+//            {
+//              "type": "force_torque",
+//              "zone_id": 1,
+//              "center": [0.0, 0.0, 0.0],
+//              "scale": 1.0
+//              "long_print" : false
+//              "compute_control" : "simulationtime",
+//              "compute_value" : 0.01
+//            },
         ]
     }
 }
