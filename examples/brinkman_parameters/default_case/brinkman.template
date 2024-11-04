@@ -135,7 +135,7 @@
                 ],
                 "output_file": "leakage.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
@@ -161,7 +161,7 @@
                 ],
                 "output_file": "recirculation.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
@@ -187,7 +187,7 @@
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
@@ -213,7 +213,7 @@
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
@@ -239,7 +239,7 @@
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "line",
@@ -265,7 +265,7 @@
                 ],
                 "output_file": "circ_048.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -293,7 +293,7 @@
                 ],
                 "output_file": "circ_050.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -321,7 +321,7 @@
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
@@ -349,7 +349,7 @@
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
-                "compute_value": 0.05,
+                "compute_value": 0.01,
                 "points": [
                     {
                         "type": "circle",
