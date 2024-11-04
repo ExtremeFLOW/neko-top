@@ -20,7 +20,7 @@ make_a_case() {
     # 4) Re_list
     local -n _Re_list=$4
     # 5) chi_list
-    local -n _chi_list=54
+    local -n _chi_list=$5
     # 6) implicit_list
     local -n _implicit_list=$6
     # 7) radius_list
