@@ -34,7 +34,6 @@ contains
        brinkman => neko_field_registry%get_field("brinkman_indicator")
        mapped_brinkman => neko_field_registry%get_field("brinkman")
 
-
        ntot = u%dof%size()
 
        ! Another good metric inspired by
