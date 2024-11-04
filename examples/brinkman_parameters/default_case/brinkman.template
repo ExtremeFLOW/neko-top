@@ -45,8 +45,8 @@
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
-            "output_control": "nsamples",
-            "output_value": 250,
+            "output_control": "simulationtime",
+            "output_value": 2.5,
             "boundary_types": [
                 "v",
                 "o+dong",
