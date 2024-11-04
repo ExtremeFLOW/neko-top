@@ -52,7 +52,7 @@ make_a_case() {
                             [ ${#_implicit_list[@]} -gt 1 ] && name+=implicit_${implicit}_
                             [ ${#_radius_list[@]} -gt 1 ] && name+=radius_${radius//./-}_
                             name=${name%_}
-                            echo $name
+                            echo "$experiment_name: $name"
 
                             # Create directory and copy the default files
                             mkdir -p $folder/$name
