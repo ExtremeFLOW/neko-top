@@ -9,21 +9,22 @@
 # radius        76
 
 make_a_case() {
+    # 1) Name of the experiment
+    experiment_name=$1
+
     # inputs:
-    # 1) Boundary method
-    local -n _method_list=$1
-    # 2) mesh_list
-    local -n _mesh_list=$2
-    # 3) Re_list
-    local -n _Re_list=$3
-    # 4) chi_list
-    local -n _chi_list=$4
-    # 5) implicit_list
-    local -n _implicit_list=$5
-    # 6) radius_list
-    local -n _radius_list=$6
-    # 7) name_list
-    experiment_name=$7
+    # 2) Boundary method
+    local -n _method_list=$2
+    # 3) mesh_list
+    local -n _mesh_list=$3
+    # 4) Re_list
+    local -n _Re_list=$4
+    # 5) chi_list
+    local -n _chi_list=54
+    # 6) implicit_list
+    local -n _implicit_list=$6
+    # 7) radius_list
+    local -n _radius_list=$7
 
     # Define the location of the case
     root_folder=$(realpath $(dirname $0))
@@ -115,7 +116,6 @@ make_a_case() {
 
 # CASES
 # ---------------------------------------------------------------------------- #
-
 case_name="Implementation"
 
 method_list=("brinkman")
@@ -125,10 +125,10 @@ chi_list=("1" "100" "1000")
 implicit_list=("true" "false")
 radius_list=("0.05")
 
-make_a_case method_list mesh_list Re_list chi_list implicit_list radius_list $case_name
+make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
+    radius_list
 
 # ---------------------------------------------------------------------------- #
-
 case_name="Filter_radius"
 
 method_list=("brinkman")
@@ -138,16 +138,18 @@ chi_list=("1000")
 implicit_list=("true")
 radius_list=("0" "0.01" "0.05" "0.1")
 
-make_a_case method_list mesh_list Re_list chi_list implicit_list radius_list $case_name
+make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
+    radius_list
 
 # ---------------------------------------------------------------------------- #
 case_name="Re_study"
 
 method_list=("brinkman" "meshed" "idw")
 mesh_list=("2")
-Re_list=("200" "400" "1000")
+Re_list=("200" "400" "1000" "2000" "3900")
 chi_list=("1000")
 implicit_list=("true")
 radius_list=("0.1")
 
-make_a_case method_list mesh_list Re_list chi_list implicit_list radius_list $case_name
+make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
+    radius_list
