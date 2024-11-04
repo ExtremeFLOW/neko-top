@@ -30,36 +30,37 @@ contains
     real(kind=rp) :: leakage, lift, drag
     real(kind=rp) :: div_tot
 
-    ! We need the Brinkman term in the registry
-    brinkman => neko_field_registry%get_field("brinkman_indicator")
-    mapped_brinkman => neko_field_registry%get_field("brinkman")
+    if (neko_field_registry%field_exists("brinkman_indicator")) then
+       brinkman => neko_field_registry%get_field("brinkman_indicator")
+       mapped_brinkman => neko_field_registry%get_field("brinkman")
 
-    ntot = u%dof%size()
 
-    ! Another good metric inspired by
-    ! A. Ghasemi & A. Elham (2019)
-    ! "FLOW TOPOLOGY OPTIMIZATION IN PERIODIC DOMAINS WITH APPLICATION TO
-    ! MICRO HEAT EXCHANGER OPTIMIZATION"
+       ntot = u%dof%size()
 
-    ! I think they are aluding to that: we only have one source term (brinkman)
-    ! in the equation, so by integrating this source term we effectively are
-    ! computing the lift and drag. (without the need to know the interface
-    ! location)
-    ! I think that's quite clever!
+       ! Another good metric inspired by
+       ! A. Ghasemi & A. Elham (2019)
+       ! "FLOW TOPOLOGY OPTIMIZATION IN PERIODIC DOMAINS WITH APPLICATION TO
+       ! MICRO HEAT EXCHANGER OPTIMIZATION"
+       ! I think they are aluding to that: we only have one source term (brinkman)
+       ! in the equation, so by integrating this source term we effectively are
+       ! computing the lift and drag. (without the need to know the interface
+       ! location)
+       ! I think that's quite clever!
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-    call field_col3(work, mapped_brinkman, u)
-    drag = glsc2(work%x, coef%B, ntot)
-    call field_col3(work, mapped_brinkman, v)
-    lift = glsc2(work%x, coef%B, ntot)
-    call neko_scratch_registry%relinquish_field(temp_indices)
+       call neko_scratch_registry%request_field(work, temp_indices(1))
+       call field_col3(work, mapped_brinkman, u)
+       drag = glsc2(work%x, coef%B, ntot)
+       call field_col3(work, mapped_brinkman, v)
+       lift = glsc2(work%x, coef%B, ntot)
+       call neko_scratch_registry%relinquish_field(temp_indices)
 
-    ! calculate the leakage
-    leakage = leak(brinkman%x, u%x, v%x, w%x, coef%b, ntot)
-    if (pe_rank .eq. 0) then
-       print *, 'Leakage = ', leakage, ',  ', t
-       print *, 'Lift = ', lift, ',  ', t
-       print *, 'Drag = ', drag, ',  ', t
+       ! calculate the leakage
+       leakage = leak(brinkman%x, u%x, v%x, w%x, coef%b, ntot)
+       if (pe_rank .eq. 0) then
+          print *, 'Leakage = ', leakage, ',  ', t
+          print *, 'Lift = ', lift, ',  ', t
+          print *, 'Drag = ', drag, ',  ', t
+       end if
     end if
 
   end subroutine user_calc_quantities
