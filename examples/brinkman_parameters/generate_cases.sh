@@ -40,7 +40,7 @@ make_a_case() {
                         for radius in "${_radius_list[@]}"; do
 
                             # Build the name of the experiment
-                            name=$experiment_name/
+                            name=""
 
                             # If there is only one value in the list, don't
                             # include it in the name
