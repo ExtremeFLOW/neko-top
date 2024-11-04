@@ -71,7 +71,7 @@ make_a_case() {
                             fi
 
                             # Compute the expected timestep, in exponential notation
-                            dt=$(echo "scale=10; 1.0 / ($Re*$chi)" | bc)
+                            dt=$(echo "scale=10; 100.0 / ($Re*$chi)" | bc)
                             dt=$(printf "%.1e" $dt)
 
                             # now all the replacements
