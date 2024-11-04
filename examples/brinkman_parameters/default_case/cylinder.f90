@@ -28,13 +28,9 @@ contains
 
     integer :: ntot
     real(kind=rp) :: leakage, lift, drag
-    real(kind=rp) :: div_tot
 
     if (neko_field_registry%field_exists("brinkman_indicator")) then
        brinkman => neko_field_registry%get_field("brinkman_indicator")
-
-
-       ntot = u%dof%size()
 
        ! Another good metric inspired by
        ! A. Ghasemi & A. Elham (2019)
@@ -47,6 +43,7 @@ contains
        ! location)
        ! I think that's quite clever!
 
+       ntot = u%dof%size()
        call neko_scratch_registry%request_field(work, temp_indices(1))
        call field_col3(work, brinkman, u)
        drag = glsc2(work%x, coef%B, ntot)
