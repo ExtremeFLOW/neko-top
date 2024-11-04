@@ -22,9 +22,9 @@ contains
     type(coef_t), intent(inout) :: coef
     type(json_file), intent(inout) :: params
     type(field_t), intent(inout) :: u, v, w, p
-    type(field_t), pointer :: brinkman
+    type(field_t), pointer :: brinkman, mapped_brinkman
     type(field_t), pointer :: work
-    integer :: temp_indices(1)
+    integer :: temp_indices(2)
 
     integer :: ntot
     real(kind=rp) :: leakage, lift, drag
@@ -32,6 +32,7 @@ contains
 
     ! We need the Brinkman term in the registry
     brinkman => neko_field_registry%get_field("brinkman_indicator")
+    mapped_brinkman => neko_field_registry%get_field("brinkman")
 
     ntot = u%dof%size()
 
@@ -47,9 +48,9 @@ contains
     ! I think that's quite clever!
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
-    call field_col3(work, brinkman, u)
+    call field_col3(work, mapped_brinkman, u)
     drag = glsc2(work%x, coef%B, ntot)
-    call field_col3(work, brinkman, v)
+    call field_col3(work, mapped_brinkman, v)
     lift = glsc2(work%x, coef%B, ntot)
     call neko_scratch_registry%relinquish_field(temp_indices)
 
