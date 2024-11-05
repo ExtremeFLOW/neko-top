@@ -70,9 +70,18 @@ make_a_case() {
                                 exit 1
                             fi
 
+                            # Set the timestep based on which mesh wass chosen
+                            case $mesh in
+                            2) dt_mesh="2.50E-03" ;;
+                            3) dt_mesh="2.00E-03" ;;
+                            4) dt_mesh="1.13E-03" ;;
+                            esac
+
                             # Compute the expected timestep, in exponential notation
-                            dt=$(echo "scale=10; 100.0 / ($Re*$chi)" | bc)
-                            dt=$(printf "%.1e" $dt)
+                            dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
+                            # Compute min of the two
+                            [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
+                            dt=$(printf "%.2e" $dt)
 
                             # now all the replacements
 
