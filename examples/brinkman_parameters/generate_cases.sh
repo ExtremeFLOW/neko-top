@@ -100,7 +100,7 @@ make_a_case() {
                                 mesh_pattern='"mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh"'
                                 mesh_replacement='"mesh_file": "data_local/brinkman_parameters/meshed_M'$mesh'.nmsh"'
                             else
-                                mesh_pattern='"mesh_file": "data_local/brinkman_parameters/immersed_MX.nmsh"'
+                                mesh_pattern='"mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh"'
                                 mesh_replacement='"mesh_file": "data_local/brinkman_parameters/immersed_M'$mesh'.nmsh"'
                             fi
 
