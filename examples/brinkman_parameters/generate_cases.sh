@@ -1,12 +1,12 @@
 #!/bin/bash
-# omg Tim you're going to read this eventually and this it's such a stupid way of doing this hahahaha
+# This script generates the cases for the Brinkman parameters study.
+# The script is organized in the following way:
+# 1) Define the function make_a_case, which generates the cases for a given
+#    experiment.
+# 2) Define the experiments, which are a set of cases with different parameters.
+# 3) Call make_a_case for each experiment.
 
-# Mesh          4
-# dt            10
-# Re            25
-# Chi           69
-# implcit       72
-# radius        76
+export ROOT_FOLDER=$(realpath $(dirname $0))
 
 make_a_case() {
     # 1) Name of the experiment
@@ -27,8 +27,7 @@ make_a_case() {
     local -n _radius_list=$7
 
     # Define the location of the case
-    root_folder=$(realpath $(dirname $0))
-    folder=$(realpath $root_folder/$experiment_name)
+    folder=$(realpath $ROOT_FOLDER/$experiment_name)
 
     rm -r $folder 2>/dev/null
     mkdir -p $folder
@@ -48,6 +47,8 @@ make_a_case() {
                             [ ${#_method_list[@]} -gt 1 ] && name+=${method}_
                             [ ${#_mesh_list[@]} -gt 1 ] && name+=mesh_${mesh}_
                             [ ${#_Re_list[@]} -gt 1 ] && name+=re_${Re}_
+
+                            # Case specific parameters
                             if [ "$method" == "brinkman" ]; then
                                 [ ${#_chi_list[@]} -gt 1 ] && name+=chi_${chi}_
                                 [ ${#_implicit_list[@]} -gt 1 ] && name+=implicit_${implicit}_
@@ -57,19 +58,17 @@ make_a_case() {
                             echo "$experiment_name: $name"
 
                             # Create directory and copy the default files
-                            if [ -d $folder/$name ]; then
-                                continue
-                            fi
+                            [ -d $folder/$name ] && continue
                             mkdir -p $folder/$name
-                            cp -t $folder/$name $root_folder/default_case/cylinder.f90
+                            cp -t $folder/$name $ROOT_FOLDER/default_case/cylinder.f90
 
                             casefile=$folder/$name/cylinder.case
                             if [ $method == "brinkman" ]; then
-                                cp $root_folder/default_case/brinkman.template $casefile
+                                cp $ROOT_FOLDER/default_case/brinkman.template $casefile
                             elif [ $method == "idw" ]; then
-                                cp $root_folder/default_case/idw.template $casefile
+                                cp $ROOT_FOLDER/default_case/idw.template $casefile
                             elif [ $method == "meshed" ]; then
-                                cp $root_folder/default_case/meshed.template $casefile
+                                cp $ROOT_FOLDER/default_case/meshed.template $casefile
                             else
                                 echo "Method not recognized"
                                 exit 1
