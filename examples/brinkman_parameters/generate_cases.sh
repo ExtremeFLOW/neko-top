@@ -48,13 +48,18 @@ make_a_case() {
                             [ ${#_method_list[@]} -gt 1 ] && name+=${method}_
                             [ ${#_mesh_list[@]} -gt 1 ] && name+=mesh_${mesh}_
                             [ ${#_Re_list[@]} -gt 1 ] && name+=re_${Re}_
-                            [ ${#_chi_list[@]} -gt 1 ] && name+=chi_${chi}_
-                            [ ${#_implicit_list[@]} -gt 1 ] && name+=implicit_${implicit}_
-                            [ ${#_radius_list[@]} -gt 1 ] && name+=radius_${radius//./-}_
+                            if [ "$method" == "brinkman" ]; then
+                                [ ${#_chi_list[@]} -gt 1 ] && name+=chi_${chi}_
+                                [ ${#_implicit_list[@]} -gt 1 ] && name+=implicit_${implicit}_
+                                [ ${#_radius_list[@]} -gt 1 ] && name+=radius_${radius//./-}_
+                            fi
                             name=${name%_}
                             echo "$experiment_name: $name"
 
                             # Create directory and copy the default files
+                            if [ -d $folder/$name ]; then
+                                continue
+                            fi
                             mkdir -p $folder/$name
                             cp -t $folder/$name $root_folder/default_case/cylinder.f90
 
@@ -71,19 +76,25 @@ make_a_case() {
                             fi
 
                             # Set the timestep based on which mesh wass chosen
+
                             case $mesh in
                             2) dt_mesh="2.50E-03" ;;
                             3) dt_mesh="2.00E-03" ;;
                             4) dt_mesh="1.13E-03" ;;
+                            *) dt_mesh="0" ;;
                             esac
 
-                            # Compute the expected timestep, in exponential notation
-                            dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
-                            # Compute min of the two
-                            [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
-                            dt=$(printf "%.2e" $dt)
-
-                            # now all the replacements
+                            if [ $method == "meshed" ]; then
+                                # Use the meshed timestep directly
+                                dt=$dt_mesh
+                            else
+                                # Compute the expected timestep, in exponential notation
+                                dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
+                                # Compute min of the two
+                                dt_mesh=$(printf "%f" $dt_mesh)
+                                [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
+                                dt=$(printf "%.2e" $dt)
+                            fi
 
                             # Locate the pattern and replace it
                             if [ $method == "meshed" ]; then
@@ -156,6 +167,19 @@ case_name="Re_study"
 method_list=("brinkman" "meshed" "idw")
 mesh_list=("2")
 Re_list=("200" "400" "1000" "2000" "3900")
+chi_list=("1000")
+implicit_list=("true")
+radius_list=("0.1")
+
+make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
+    radius_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Mesh_study"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("200" "1000")
 chi_list=("1000")
 implicit_list=("true")
 radius_list=("0.1")
