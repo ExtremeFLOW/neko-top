@@ -12,13 +12,6 @@
             "polynomial_order": 7,
             "dealias": true
         },
-        "statistics": {
-            "enabled": true,
-            "output_control": "simulationtime",
-            "output_value": 50.0,
-            "start_time": 150.0,
-            "sampling_interval": 10
-        },
         "fluid": {
             "scheme": "pnpn",
             "Re": 200.0,
@@ -111,58 +104,17 @@
                 "field": "v",
                 "direction": "y"
             },
-            // the one for leakage
-            {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w",
-                    "p",
-                    "du_dx",
-                    "du_dy",
-                    "dv_dx",
-                    "dv_dy",
-                ],
-                "output_file": "leakage.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.01,
-                "points": [
-                    {
-                        "type": "line",
-                        "start": [ 0.00001, -5.0001, 0.51 ],
-                        "end": [ 0.00001, 5.0, 0.51 ],
-                        "amount": 400
-                    }
-                ]
-            },
 
-            // the one for recirculation length
+            // Statistics
             {
-                "type": "probes",
-                "fields": [
-                    "u",
-                    "v",
-                    "w",
-                    "p",
-                    "du_dx",
-                    "du_dy",
-                    "dv_dx",
-                    "dv_dy",
-                ],
-                "output_file": "recirculation.csv",
-                "compute_control": "simulationtime",
-                "compute_value": 0.01,
-                "points": [
-                    {
-                        "type": "line",
-                        "start": [ -1.0, 0.00001, 0.51 ],
-                        "end": [ 20.0, 0.00001, 0.51 ],
-                        "amount": 400
-                    }
-                ]
+                "type": "fluid_stats",
+                "compute_control": "tsteps",
+                "compute_value": 5,
+                "output_control": "simulationtime",
+                "output_value": 50,
+                "start_time":150.0,
+                "set_of_stats":"basic"
             },
-
             // one BL (45 degrees)
             {
                 "type": "probes",
