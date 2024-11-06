@@ -94,7 +94,7 @@ contains
     ntot = u%dof%size()
     do i = 1, ntot
        u%x(i,1,1,1) = 1.0_rp
-       w%x(i,1,1,1) = 1.0_rp
+       w%x(i,1,1,1) = 0.0_rp
 
        ! just to break the symmetry and induce shedding quicker
        if (abs(u%dof%y(i,1,1,1)) .lt. 4.0_rp) then
