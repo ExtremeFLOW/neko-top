@@ -1,6 +1,9 @@
 module user
   use neko
   use field_math, only: field_col3
+  use point_zone, only: point_zone_t
+  use point_zone_registry, only: neko_point_zone_registry
+  use math, only: cfill_mask, glsc2
   implicit none
 
   ! Global user variables
@@ -89,6 +92,7 @@ contains
     type(field_t), intent(inout) :: w
     type(field_t), intent(inout) :: p
     type(json_file), intent(inout) :: params
+    class(point_zone_t), pointer :: zone
     integer :: i, ntot
 
     ntot = u%dof%size()
@@ -98,13 +102,23 @@ contains
 
        ! just to break the symmetry and induce shedding quicker
        if (abs(u%dof%y(i,1,1,1)) .lt. 4.0_rp) then
-          v%x(i,1,1,1) = 0.1_rp
+          v%x(i,1,1,1) = 0.001_rp
        else
           v%x(i,1,1,1) = 0.0_rp
        end if
 
     end do
-    p = 0._rp
+    p = 0.0_rp
+
+    ! Get the cylinder mask
+    if (neko_point_zone_registry%point_zone_exists("cylinder")) then
+       zone => neko_point_zone_registry%get_point_zone("cylinder")
+
+       ! Set the velocity to zero inside the cylinder
+       call cfill_mask(u%x, 0.0_rp, u%size(), zone%mask, zone%size)
+       call cfill_mask(v%x, 0.0_rp, v%size(), zone%mask, zone%size)
+       call cfill_mask(w%x, 0.0_rp, w%size(), zone%mask, zone%size)
+    end if
   end subroutine user_ic
 
 
