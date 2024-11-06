@@ -28,6 +28,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
     printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
+    printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
     for case in $(find $EPATH -name "*.case" 2>/dev/null); do
@@ -46,10 +47,11 @@ NEKO=false
 DELETE=false
 CLUSTER=""
 DRY=false
+RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run
-OPT="a,c,h,n,s:,d"
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
+OPT="a,c,h,n,s:,d,r"
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -65,6 +67,7 @@ while true; do
     "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
     "-s" | "--submit") CLUSTER="$2" && shift 2 ;; # Submit to the queue
     "--dry-run") DRY=true && shift ;;             # Dry run
+    "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
 
     # End of options
     "--") shift && break ;;
@@ -298,6 +301,11 @@ for case in ${example_list[@]}; do
     if [[ ${case: -5} == ".case" &&
         $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
         example=$example/$case_name
+    fi
+
+    if [ "$RERUN" == false ] && [ -d "$RPATH/$example" ]; then
+        printf '\t%-12s %-s\n' "Skipped:" "$example"
+        continue
     fi
 
     export log=$LPATH/$example && mkdir -p $log
