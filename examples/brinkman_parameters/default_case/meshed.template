@@ -7,6 +7,9 @@
         "output_checkpoints": false,
         "end_time": 300.0,
         "timestep": 2.5e-3,
+        "variable_timestep": true,
+        "target_cfl": 0.4,
+        "max_timestep": 1.0E-2,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -261,9 +264,9 @@
                     }
                 ]
             },
-            // Surface integral on cylinder 
+            // Surface integral on cylinder
             // NOTE! we should be careful, neko is technically 3D not 2D,
-            // So this will be doing a surface integral. The only reason I 
+            // So this will be doing a surface integral. The only reason I
             // this we'll get the same results is that it is unit thickness.
             // But if we end up doing a long 3D cylinder we need to remember
             // to account for the spanwise length.
