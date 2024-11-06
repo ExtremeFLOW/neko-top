@@ -7,6 +7,9 @@
         "output_checkpoints": false,
         "end_time": 300.0,
         "timestep": 2.5e-3,
+        "variable_timestep": true,
+        "target_cfl": 0.4,
+        "max_timestep": 1.0E-2,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
