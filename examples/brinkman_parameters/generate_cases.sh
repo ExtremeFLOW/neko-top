@@ -62,8 +62,6 @@ make_a_case() {
                                         name+=chi_${chi}_
                                         name+=implicit_${implicit}_
                                         name+=radius_${radius//./-}_
-                                    elif [ "$method" == "meshed" ]; then
-
                                     elif [ "$method" == "idw" ]; then
                                         name+=rmax_${rmax}_
                                         name+=rpower_${rpower}_
