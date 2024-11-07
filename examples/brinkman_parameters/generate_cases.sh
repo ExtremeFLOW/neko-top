@@ -27,10 +27,13 @@ make_a_case() {
     local -n _radius_list=$7
 
     # Define the location of the case
-    folder=$(realpath $ROOT_FOLDER/$experiment_name)
+    folder=$(realpath $ROOT_FOLDER/cases)
+    mkdir -p $folder $ROOT_FOLDER/experiments
 
-    rm -r $folder 2>/dev/null
-    mkdir -p $folder
+    # Create the experiment file and write the header
+    experiment_file=$ROOT_FOLDER/experiments/$experiment_name.csv
+    [ -f $experiment_file ] && rm $experiment_file
+    echo "name,method,mesh,Re,chi,implicit,radius" >$experiment_file
 
     for method in "${_method_list[@]}"; do
         for mesh in "${_mesh_list[@]}"; do
@@ -44,18 +47,25 @@ make_a_case() {
 
                             # If there is only one value in the list, don't
                             # include it in the name
-                            [ ${#_method_list[@]} -gt 1 ] && name+=${method}_
-                            [ ${#_mesh_list[@]} -gt 1 ] && name+=mesh_${mesh}_
-                            [ ${#_Re_list[@]} -gt 1 ] && name+=re_${Re}_
+                            name+=${method}_
+                            name+=mesh_${mesh}_
+                            name+=re_${Re}_
 
                             # Case specific parameters
                             if [ "$method" == "brinkman" ]; then
-                                [ ${#_chi_list[@]} -gt 1 ] && name+=chi_${chi}_
-                                [ ${#_implicit_list[@]} -gt 1 ] && name+=implicit_${implicit}_
-                                [ ${#_radius_list[@]} -gt 1 ] && name+=radius_${radius//./-}_
+                                name+=chi_${chi}_
+                                name+=implicit_${implicit}_
+                                name+=radius_${radius//./-}_
+                            else
+                                chi=-
+                                implicit=-
+                                radius=-
                             fi
                             name=${name%_}
                             echo "$experiment_name: $name"
+
+                            # Write the experiment to the experiment file
+                            echo "$name,$method,$mesh,$Re,$chi,$implicit,$radius" >>$experiment_file
 
                             # Create directory and copy the default files
                             [ -d $folder/$name ] && continue
@@ -63,19 +73,15 @@ make_a_case() {
                             cp -t $folder/$name $ROOT_FOLDER/default_case/cylinder.f90
 
                             casefile=$folder/$name/cylinder.case
-                            if [ $method == "brinkman" ]; then
-                                cp $ROOT_FOLDER/default_case/brinkman.template $casefile
-                            elif [ $method == "idw" ]; then
-                                cp $ROOT_FOLDER/default_case/idw.template $casefile
-                            elif [ $method == "meshed" ]; then
-                                cp $ROOT_FOLDER/default_case/meshed.template $casefile
+                            if [ -f $ROOT_FOLDER/default_case/$method.template ]; then
+                                cp $ROOT_FOLDER/default_case/$method.template $casefile
                             else
                                 echo "Method not recognized"
+                                rm -fr $folder/$name
                                 exit 1
                             fi
 
                             # Set the timestep based on which mesh wass chosen
-
                             case $mesh in
                             2) dt_mesh="2.50E-03" ;;
                             3) dt_mesh="2.00E-03" ;;
