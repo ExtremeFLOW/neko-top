@@ -55,16 +55,16 @@ make_a_case() {
                                     # include it in the name
                                     name+=${method}_
                                     name+=mesh_${mesh}_
-                                    name+=re_${Re}_
+                                    name+=re_${Re//./-}_
 
                                     # Case specific parameters
                                     if [ "$method" == "brinkman" ]; then
-                                        name+=chi_${chi}_
+                                        name+=chi_${chi//./-}_
                                         name+=implicit_${implicit}_
                                         name+=radius_${radius//./-}_
                                     elif [ "$method" == "idw" ]; then
-                                        name+=rmax_${rmax}_
-                                        name+=rpower_${rpower}_
+                                        name+=rmax_${rmax//./-}_
+                                        name+=rpower_${rpower//./-}_
                                     else
                                         chi=-
                                         implicit=-
@@ -159,6 +159,9 @@ make_a_case() {
         done
     done
 }
+
+# Clear the experiments folder and the cases folder
+rm -fr $ROOT_FOLDER/experiments $ROOT_FOLDER/cases
 
 # CASES
 # ---------------------------------------------------------------------------- #
