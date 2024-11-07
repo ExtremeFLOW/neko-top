@@ -25,6 +25,10 @@ make_a_case() {
     local -n _implicit_list=$6
     # 7) radius_list
     local -n _radius_list=$7
+    # 8) rmax_list
+    local -n _rmax_list=$8
+    # 9) rpower_list
+    local -n _rpower_list=$9
 
     # Define the location of the case
     folder=$(realpath $ROOT_FOLDER/cases)
@@ -33,7 +37,7 @@ make_a_case() {
     # Create the experiment file and write the header
     experiment_file=$ROOT_FOLDER/experiments/$experiment_name.csv
     [ -f $experiment_file ] && rm $experiment_file
-    echo "name,method,mesh,Re,chi,implicit,radius" >$experiment_file
+    echo "name,method,mesh,Re,chi,implicit,radius,rmax,rpower" >>$experiment_file
 
     for method in "${_method_list[@]}"; do
         for mesh in "${_mesh_list[@]}"; do
@@ -41,96 +45,115 @@ make_a_case() {
                 for chi in "${_chi_list[@]}"; do
                     for implicit in "${_implicit_list[@]}"; do
                         for radius in "${_radius_list[@]}"; do
+                            for rmax in "${_rmax_list[@]}"; do
+                                for rpower in "${_rpower_list[@]}"; do
 
-                            # Build the name of the experiment
-                            name=""
+                                    # Build the name of the experiment
+                                    name=""
 
-                            # If there is only one value in the list, don't
-                            # include it in the name
-                            name+=${method}_
-                            name+=mesh_${mesh}_
-                            name+=re_${Re}_
+                                    # If there is only one value in the list, don't
+                                    # include it in the name
+                                    name+=${method}_
+                                    name+=mesh_${mesh}_
+                                    name+=re_${Re}_
 
-                            # Case specific parameters
-                            if [ "$method" == "brinkman" ]; then
-                                name+=chi_${chi}_
-                                name+=implicit_${implicit}_
-                                name+=radius_${radius//./-}_
-                            else
-                                chi=-
-                                implicit=-
-                                radius=-
-                            fi
-                            name=${name%_}
-                            echo "$experiment_name: $name"
+                                    # Case specific parameters
+                                    if [ "$method" == "brinkman" ]; then
+                                        name+=chi_${chi}_
+                                        name+=implicit_${implicit}_
+                                        name+=radius_${radius//./-}_
+                                    elif [ "$method" == "meshed" ]; then
 
-                            # Write the experiment to the experiment file
-                            echo "$name,$method,$mesh,$Re,$chi,$implicit,$radius" >>$experiment_file
+                                    elif [ "$method" == "idw" ]; then
+                                        name+=rmax_${rmax}_
+                                        name+=rpower_${rpower}_
+                                    else
+                                        chi=-
+                                        implicit=-
+                                        radius=-
+                                        rmax=-
+                                        rpower=-
+                                    fi
+                                    name=${name%_}
+                                    echo "$experiment_name: $name"
 
-                            # Create directory and copy the default files
-                            [ -d $folder/$name ] && continue
-                            mkdir -p $folder/$name
-                            cp -t $folder/$name $ROOT_FOLDER/default_case/cylinder.f90
+                                    # Write the experiment to the experiment file
+                                    echo "$name,$method,$mesh,$Re,$chi,$implicit,$radius,$rmax,$rpower" >>$experiment_file
 
-                            casefile=$folder/$name/cylinder.case
-                            if [ -f $ROOT_FOLDER/default_case/$method.template ]; then
-                                cp $ROOT_FOLDER/default_case/$method.template $casefile
-                            else
-                                echo "Method not recognized"
-                                rm -fr $folder/$name
-                                exit 1
-                            fi
+                                    # Create directory and copy the default files
+                                    [ -d $folder/$name ] && continue
+                                    mkdir -p $folder/$name
+                                    cp -t $folder/$name $ROOT_FOLDER/default_case/cylinder.f90
 
-                            # Set the timestep based on which mesh wass chosen
-                            case $mesh in
-                            2) dt_mesh="2.50E-03" ;;
-                            3) dt_mesh="2.00E-03" ;;
-                            4) dt_mesh="1.13E-03" ;;
-                            *) dt_mesh="0" ;;
-                            esac
+                                    casefile=$folder/$name/cylinder.case
+                                    if [ -f $ROOT_FOLDER/default_case/$method.template ]; then
+                                        cp $ROOT_FOLDER/default_case/$method.template $casefile
+                                    else
+                                        echo "Method not recognized"
+                                        rm -fr $folder/$name
+                                        exit 1
+                                    fi
 
-                            if [ $method == "meshed" ]; then
-                                # Use the meshed timestep directly
-                                dt=$dt_mesh
-                            else
-                                # Compute the expected timestep, in exponential notation
-                                dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
-                                # Compute min of the two
-                                dt_mesh=$(printf "%f" $dt_mesh)
-                                [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
-                                dt=$(printf "%.2e" $dt)
-                            fi
+                                    # Set the timestep based on which mesh wass chosen
+                                    case $mesh in
+                                    2) dt_mesh="2.50E-03" ;;
+                                    3) dt_mesh="2.00E-03" ;;
+                                    4) dt_mesh="1.13E-03" ;;
+                                    *) dt_mesh="0" ;;
+                                    esac
 
-                            # Locate the pattern and replace it
-                            if [ $method == "meshed" ]; then
-                                mesh_pattern='"mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh"'
-                                mesh_replacement='"mesh_file": "data_local/brinkman_parameters/meshed_M'$mesh'.nmsh"'
-                            else
-                                mesh_pattern='"mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh"'
-                                mesh_replacement='"mesh_file": "data_local/brinkman_parameters/immersed_M'$mesh'.nmsh"'
-                            fi
+                                    if [ $method == "meshed" ]; then
+                                        # Use the meshed timestep directly
+                                        dt=$dt_mesh
+                                    else
+                                        # Compute the expected timestep, in exponential notation
+                                        dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
+                                        # Compute min of the two
+                                        dt_mesh=$(printf "%f" $dt_mesh)
+                                        [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
+                                        dt=$(printf "%.2e" $dt)
+                                    fi
 
-                            re_pattern='"Re": 200.0'
-                            re_replacement='"Re": '$Re
+                                    # Locate the pattern and replace it
+                                    if [ $method == "meshed" ]; then
+                                        mesh_pattern='"mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh"'
+                                        mesh_replacement='"mesh_file": "data_local/brinkman_parameters/meshed_M'$mesh'.nmsh"'
+                                    else
+                                        mesh_pattern='"mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh"'
+                                        mesh_replacement='"mesh_file": "data_local/brinkman_parameters/immersed_M'$mesh'.nmsh"'
+                                    fi
 
-                            chi_pattern='"limits": \[ 0.0, 100.0 \]'
-                            chi_replacement='"limits": \[ 0.0, '$chi' \]'
+                                    re_pattern='"Re": 200.0'
+                                    re_replacement='"Re": '$Re
 
-                            implicit_pattern='"implicit": true'
-                            implicit_replacement='"implicit": '$implicit
+                                    chi_pattern='"limits": \[ 0.0, 100.0 \]'
+                                    chi_replacement='"limits": \[ 0.0, '$chi' \]'
 
-                            radius_pattern='"radius": 0.05'
-                            radius_replacement='"radius": '$radius
+                                    implicit_pattern='"implicit": true'
+                                    implicit_replacement='"implicit": '$implicit
 
-                            timestep_pattern='"timestep": 2.5e-3'
-                            timestep_replacement='"timestep": '$dt
+                                    radius_pattern='"radius": 0.05'
+                                    radius_replacement='"radius": '$radius
 
-                            sed -i "s#$mesh_pattern#$mesh_replacement#" $casefile
-                            sed -i "s#$re_pattern#$re_replacement#" $casefile
-                            sed -i "s#$chi_pattern#$chi_replacement#" $casefile
-                            sed -i "s#$implicit_pattern#$implicit_replacement#" $casefile
-                            sed -i "s#$radius_pattern#$radius_replacement#" $casefile
-                            sed -i "s#$timestep_pattern#$timestep_replacement#" $casefile
+                                    rmax_pattern='"rmax": 1.0'
+                                    rmax_replacement='"rmax": '$rmax
+
+                                    rpower_pattern='"power_parameter": 1.0'
+                                    rpower_replacement='"power_parameter": '$rpower
+
+                                    timestep_pattern='"timestep": 2.5e-3'
+                                    timestep_replacement='"timestep": '$dt
+
+                                    sed -i "s#$mesh_pattern#$mesh_replacement#" $casefile
+                                    sed -i "s#$re_pattern#$re_replacement#" $casefile
+                                    sed -i "s#$chi_pattern#$chi_replacement#" $casefile
+                                    sed -i "s#$implicit_pattern#$implicit_replacement#" $casefile
+                                    sed -i "s#$radius_pattern#$radius_replacement#" $casefile
+                                    sed -i "s#$rmax_pattern#$rmax_replacement#" $casefile
+                                    sed -i "s#$rpower_pattern#$rpower_replacement#" $casefile
+                                    sed -i "s#$timestep_pattern#$timestep_replacement#" $casefile
+                                done
+                            done
                         done
                     done
                 done
@@ -149,9 +172,13 @@ Re_list=("200")
 chi_list=("1" "100" "1000")
 implicit_list=("true" "false")
 radius_list=("0.05")
+rmax_list=("1.0")
+rpower_list=("1.0")
 
-make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
-    radius_list
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list implicit_list radius_list \
+    rmax_list rpower_list
 
 # ---------------------------------------------------------------------------- #
 case_name="Filter_radius"
@@ -162,9 +189,13 @@ Re_list=("200")
 chi_list=("1000")
 implicit_list=("true")
 radius_list=("0" "0.01" "0.05" "0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
 
-make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
-    radius_list
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list implicit_list radius_list \
+    rmax_list rpower_list
 
 # ---------------------------------------------------------------------------- #
 case_name="Re_study"
@@ -175,9 +206,13 @@ Re_list=("200" "400" "1000" "2000" "3900")
 chi_list=("1000")
 implicit_list=("true")
 radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
 
-make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
-    radius_list
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list implicit_list radius_list \
+    rmax_list rpower_list
 
 # ---------------------------------------------------------------------------- #
 case_name="Mesh_study"
@@ -188,6 +223,10 @@ Re_list=("200" "1000")
 chi_list=("1000")
 implicit_list=("true")
 radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
 
-make_a_case $case_name method_list mesh_list Re_list chi_list implicit_list \
-    radius_list
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list implicit_list radius_list \
+    rmax_list rpower_list
