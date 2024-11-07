@@ -39,6 +39,9 @@ make_a_case() {
     [ -f $experiment_file ] && rm $experiment_file
     echo "name,method,mesh,Re,chi,implicit,radius,rmax,rpower" >>$experiment_file
 
+    # Loop over all the parameters
+    echo "Generating cases for $experiment_name"
+
     for method in "${_method_list[@]}"; do
         for mesh in "${_mesh_list[@]}"; do
             for Re in "${_Re_list[@]}"; do
@@ -73,7 +76,7 @@ make_a_case() {
                                         rpower=-
                                     fi
                                     name=${name%_}
-                                    echo "$experiment_name: $name"
+                                    printf "\t - $name\n"
 
                                     # Write the experiment to the experiment file
                                     echo "$name,$method,$mesh,$Re,$chi,$implicit,$radius,$rmax,$rpower" >>$experiment_file
