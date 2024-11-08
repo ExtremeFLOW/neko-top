@@ -65,7 +65,6 @@
                     "brinkman": {
                         "limits": [ 0.0, 100.0 ],
                         "penalty": 1.0,
-                        "implicit": true,
                     },
                     "filter": {
                         "type": "PDE",
