@@ -196,6 +196,9 @@ function run {
             ncores="$(lscpu | grep "Core(s) per socket" | awk '{print $4}')"
             ncores=$((nsockets * ncores))
         fi
+
+        # ncores=1
+
         { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log); } 2>&1
     fi
 

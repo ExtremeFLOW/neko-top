@@ -125,7 +125,7 @@ contains
 
        ! just to break the symmetry and induce shedding quicker
        if (abs(u%dof%y(i,1,1,1)) .lt. 4.0_rp) then
-          v%x(i,1,1,1) = 0.1_rp
+          v%x(i,1,1,1) = 0.01_rp
        else
           v%x(i,1,1,1) = 0.0_rp
        end if
