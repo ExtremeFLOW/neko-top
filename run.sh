@@ -319,6 +319,9 @@ for case in ${example_list[@]}; do
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
+    elif [ -f "$log/output.log" ]; then
+        printf '\t%-12s %-s\n' "Skipping:" "$example"
+        continue
     fi
 
     # Remove old output and error files
