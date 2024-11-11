@@ -81,8 +81,11 @@ def plot_lift_drag(case_list, lift_axis, drag_axis):
         case = case_list[j]
         for i in range(len(case["forces"])):
             force_measure = case["forces"][i]
-            ax[0].plot(force_measure["t"], force_measure["fy_tot"],label=case["name"] + force_measure["type"])
-            ax[1].plot(force_measure["t"], force_measure["fx_tot"], label=case["name"] + force_measure["type"])
+            # I can tell already we only only want 0.5
+            # but this can be changed
+            if force_measure["type"] == 'circ_050' or force_measure["type"] == 'meshed' or force_measure["type"] == 'method3':
+                ax[0].plot(force_measure["t"], force_measure["fy_tot"],label=case["name"] + force_measure["type"])
+                ax[1].plot(force_measure["t"], force_measure["fx_tot"], label=case["name"] + force_measure["type"])
     ax[0].set_ylabel("Lift")
     ax[1].set_ylabel("Drag")
     ax[1].set_xlabel("Time")
@@ -90,7 +93,7 @@ def plot_lift_drag(case_list, lift_axis, drag_axis):
     ax[1].set_ylim(drag_axis)
     ax[1].legend()
     plt.show()
-
+    
 def read_force_torque(path_name):
     # note!
     # I bet this isn't the best for long logfiles!
