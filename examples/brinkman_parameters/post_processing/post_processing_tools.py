@@ -1,3 +1,49 @@
+def calc_lift_and_drag(root_name,case_name,method,Re):
+    # somehow search for all the rings! If i was better at python I would use the os somehow to find everything starting with 'circ'
+    # but I'm not.. so I'm listing them manually.
+    circ_list = ['048', '050', '0501', '0502', '0505', '051', '052', '055']
+    # First is lift and drag
+    if method == 'meshed':
+        # here we just need the logfile
+        path_name = root_name + case_name + '/cylinder.log'
+        t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = read_force_torque(path_name)
+        force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+        all_forces = [force_measure]
+        # We could in principal use method 2, but it's not required I guess.
+    elif method == 'brinkman':
+        # Now we have concentric rings
+        all_forces = []
+        for i in range(len(circ_list)):
+            path_name = root_name + case_name + '/circ_' + circ_list[i] + '.csv'
+            t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = surface_integral_from_probes(path_name, Re)
+            force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+            all_forces.append(force_measure)
+
+        # we also have the 3rd measure
+        path_name = root_name + case_name + "/cylinder.log"
+        t, fx_tot, fy_tot = read_brinkman_force(path_name)
+        # let's just fill the others with zeros to indicate this is the strange one:
+        fx_p = np.zeros(len(t))
+        fx_visc = np.zeros(len(t))
+        fy_p = np.zeros(len(t))
+        fy_visc = np.zeros(len(t))
+        force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+        all_forces.append(force_measure)
+    elif method == 'idw':
+        # I guess we do the same as brinkman without the last step
+        # Now we have concentric rings
+        all_forces = []
+        for i in range(len(circ_list)):
+            path_name = root_name + case_name + '/circ_' + circ_list[i] + '.csv'
+            t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = surface_integral_from_probes(path_name, Re)
+            force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+            all_forces.append(force_measure)
+    else:
+        print('INCORRECT METHOD!')
+
+    return all_forces
+
+
 def read_force_torque(path_name):
     # note!
     # I bet this isn't the best for long logfiles!
@@ -147,3 +193,29 @@ def surface_integral_from_probes(input_filename, Re):
     time_values = time_reshaped[0,:] # Extract the time from the last probe's time array
 
     return time_values, total_drag, drag, shear_drag, total_lift, lift, shear_lift
+
+
+def read_brinkman_force(path_name):
+    t_list = []
+    fx_list = []
+    fy_list = []
+
+    with open(path_name) as file:
+        for line in file:
+            s = line.rstrip()
+            index = s.find("Lift")
+            if index >= 1:
+                numbers = np.array(line.rstrip().split())
+                t_list.append(numbers[4].astype(float))
+                fy_list.append(numbers[2].astype(float))
+            index = s.find("Drag")
+            if index >= 1:
+                numbers = np.array(line.rstrip().split())
+                fx_list.append(numbers[2].astype(float))
+
+    t = np.array(t_list)
+    fx = np.array(fx_list)
+    fy = np.array(fy_list)
+    return t, fx, fy
+
+
