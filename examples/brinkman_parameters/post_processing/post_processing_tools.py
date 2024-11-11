@@ -5,9 +5,17 @@ def calc_lift_and_drag(root_name,case_name,method,Re):
     # First is lift and drag
     if method == 'meshed':
         # here we just need the logfile
-        path_name = root_name + case_name + '/cylinder.log'
+        path_name = root_name + case_name + '/cylinder.log' 
         t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = read_force_torque(path_name)
-        force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+        force_measure = {}
+        force_measure["t"] = t
+        force_measure["fx_tot"] = fx_tot
+        force_measure["fx_p"] = fx_p
+        force_measure["fx_visc"] = fx_visc
+        force_measure["fy_tot"] = fy_tot
+        force_measure["fy_p"] = fy_p
+        force_measure["fy_visc"] = fy_visc
+        force_measure["type"] = "meshed"
         all_forces = [force_measure]
         # We could in principal use method 2, but it's not required I guess.
     elif method == 'brinkman':
@@ -16,7 +24,15 @@ def calc_lift_and_drag(root_name,case_name,method,Re):
         for i in range(len(circ_list)):
             path_name = root_name + case_name + '/circ_' + circ_list[i] + '.csv'
             t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = surface_integral_from_probes(path_name, Re)
-            force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+            force_measure = {}
+            force_measure["t"] = t
+            force_measure["fx_tot"] = fx_tot
+            force_measure["fx_p"] = fx_p
+            force_measure["fx_visc"] = fx_visc
+            force_measure["fy_tot"] = fy_tot
+            force_measure["fy_p"] = fy_p
+            force_measure["fy_visc"] = fy_visc
+            force_measure["type"] = 'circ_' + circ_list[i] + '.csv'
             all_forces.append(force_measure)
 
         # we also have the 3rd measure
@@ -27,7 +43,15 @@ def calc_lift_and_drag(root_name,case_name,method,Re):
         fx_visc = np.zeros(len(t))
         fy_p = np.zeros(len(t))
         fy_visc = np.zeros(len(t))
-        force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+        force_measure = {}
+        force_measure["t"] = t
+        force_measure["fx_tot"] = fx_tot
+        force_measure["fx_p"] = fx_p
+        force_measure["fx_visc"] = fx_visc
+        force_measure["fy_tot"] = fy_tot
+        force_measure["fy_p"] = fy_p
+        force_measure["fy_visc"] = fy_visc
+        force_measure["type"] = 'method3'
         all_forces.append(force_measure)
     elif method == 'idw':
         # I guess we do the same as brinkman without the last step
@@ -36,13 +60,36 @@ def calc_lift_and_drag(root_name,case_name,method,Re):
         for i in range(len(circ_list)):
             path_name = root_name + case_name + '/circ_' + circ_list[i] + '.csv'
             t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc = surface_integral_from_probes(path_name, Re)
-            force_measure = [t, fx_tot, fx_p, fx_visc, fy_tot, fy_p, fy_visc]
+            force_measure = {}
+            force_measure["t"] = t
+            force_measure["fx_tot"] = fx_tot
+            force_measure["fx_p"] = fx_p
+            force_measure["fx_visc"] = fx_visc
+            force_measure["fy_tot"] = fy_tot
+            force_measure["fy_p"] = fy_p
+            force_measure["fy_visc"] = fy_visc
+            force_measure["type"] = 'circ_' + circ_list[i] + '.csv'
             all_forces.append(force_measure)
     else:
         print('INCORRECT METHOD!')
 
     return all_forces
 
+def plot_lift_drag(case_list, lift_axis, drag_axis):
+    fig, ax = plt.subplots(2,1, figsize=(10, 5), dpi = 200)
+    for j in range(len(case_list)):
+        case = case_list[j]
+        for i in range(len(case["forces"])):
+            force_measure = case["forces"][i]
+            ax[0].plot(force_measure["t"], force_measure["fy_tot"],label=case["name"] + force_measure["type"])
+            ax[1].plot(force_measure["t"], force_measure["fx_tot"], label=case["name"] + force_measure["type"])
+    ax[0].set_ylabel("Lift")
+    ax[1].set_ylabel("Drag")
+    ax[1].set_xlabel("Time")
+    ax[0].set_ylim(lift_axis)
+    ax[1].set_ylim(drag_axis)
+    ax[1].legend()
+    plt.show()
 
 def read_force_torque(path_name):
     # note!
