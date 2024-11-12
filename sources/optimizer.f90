@@ -7,7 +7,6 @@ module optimizer
 
     use problem, only: problem_t
     use num_types, only : rp
-
     implicit none
     private
 
@@ -15,7 +14,15 @@ module optimizer
     type, abstract, public :: optimizer_t
         !> Pointer to the problem that the optimizer will work on
         class(problem_t), pointer :: prob
-
+        !> Scaling fval and dfdx.
+        !! Note that the values are not updated but they are scaled when passed 
+        !! to the optimizer.
+        !! (if auto_scale then fval=scale else fval=scale*fval)
+        !! When auto_scale is true, we use an adaptable scale for
+        !! fval and dfdx in every iteration (variable scale)
+        
+        real(kind=rp) :: scale
+        logical :: auto_scale
     contains
         !> Initialize the optimizer, associate it with a specific problem
         procedure(optimizer_init), pass(this), deferred :: init
