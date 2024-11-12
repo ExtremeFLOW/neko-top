@@ -1,4 +1,4 @@
-from post_processing_tools import compute_everything, plot_lift_drag
+from post_processing_tools import compute_everything, plot_everything
 import os
 import csv
 import matplotlib.pyplot as plt
@@ -14,10 +14,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 
 # Define the path to 'experiments'
-experiments_dir = os.path.join(parent_dir, "results", "brinkman_parameters_fake", "experiments")
+# experiments_dir = os.path.join(parent_dir, "results", "brinkman_parameters_fake", "experiments")
+experiments_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "experiments")
 
 # Define the path to 'cases'
-cases_dir = os.path.join(parent_dir, "results", "brinkman_parameters_fake", "cases")
+cases_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "cases")
 
 # Path to the original file
 file_path = os.path.join(experiments_dir, experiment + ".csv")
@@ -93,19 +94,4 @@ if os.path.exists(file_path):
 else:
     print(f"The file {file_path} does not exist.")
 
-
-# make a list of cases
-# case_list = [meshed, IBM]
-
-# plotting parameters
-lift_axis = [-1, 1]
-drag_axis = [0, 1.5]
-
-# Define the filename for saving the plot
-plot_file_name = experiments_dir + "/" + experiment + "_LiftandDrag.png"
-
-# Generate the plot
-plot_lift_drag(case_list, lift_axis, drag_axis, plot_file_name)
-
-# Optionally, display the plot
-plt.show()
+plot_everything(case_list, experiments_dir, experiment)

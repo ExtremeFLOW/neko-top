@@ -5,14 +5,60 @@ import numpy as np
 import os
 
 # Imports for Bertie tools
+os.environ["PYNEKTOOLS_HIDE_LOG"] = 'true'
+from mpi4py import MPI #equivalent to the use of MPI_init() in C
+from pynektools.io.ppymech.neksuite import pynekread
+from pynektools.datatypes.msh import Mesh
+from pynektools.datatypes.field import FieldRegistry
+
+
 
 def compute_everything(root_name, case_name, method, mesh, Re, chi, implicit, radius):
     case = {}
     case["name"] = case_name
+
     # lift and drag calculations
-    case["forces"] = calc_lift_and_drag(root_name,case_name,method, Re)
+    # case["forces"] = calc_lift_and_drag(root_name,case_name,method, Re)
+
+    # wake lines
+    file_name = root_name + '/' + case_name + '/fluid_stats0/fluid_stats0'
+    case["mesh"], case["fld"] = load_stats_file(file_name, 2)
+    y_lims = [-15, 15]
+    n_pts = 300
+    wake_positions = [10, 15, 20]
+    case["wake_positions"] = wake_positions
+    case["wake_xyz"], case["wake_u"]  = generate_wake_lines(case["mesh"], case["fld"], case["wake_positions"], y_lims, n_pts)
+
+    # average forces
+    ring_radii = [0.50, 0.501, 0.502, 0.504, 0.508, 0.516, 0.532]
+    n_points = 360
+    case["stats_forces"] = calculate_forces(case["mesh"], case["fld"], ring_radii, n_points, Re)
+
+    # we should put separation angle here too.
+
 
     return case
+
+def plot_everything(case_list, result_path, experiment):
+    # Plot lift and drag
+    lift_axis = [-1, 1]
+    drag_axis = [0, 1.5]
+    file_name = result_path + '/' + experiment + '_lift_and_drag.png'
+    # plot_lift_drag(case_list, lift_axis, drag_axis, file_name)
+
+
+    # Plot wake lines
+    y_lims = [-15, 15]
+    U_lims = [0.5, 1.2]
+    file_name = result_path + '/' + experiment + '_wake_lines.png'
+    plot_wake_lines(case_list, U_lims, y_lims, file_name)
+
+    # force_rings
+    rings = [0.50, 0.532]
+    file_name = result_path + '/' + experiment + '_average_force_distribution.png'
+    plot_ring(case_list, rings, file_name)
+    file_name = result_path + '/' + experiment + '_force_against_radius.png'
+    plot_total_against_radius(case_list, file_name)
 
 def calc_lift_and_drag(root_name,case_name,method,Re):
     # somehow search for all the rings! If i was better at python I would use the os somehow to find everything starting with 'circ'
@@ -362,7 +408,7 @@ def generate_wake_lines(msh, fld, wake_positions, y_lims, n_pts):
     # I think we only really need u...
     return xyz, wake_u
 
-def plot_wake_lines(case_list):
+def plot_wake_lines(case_list, U_lims, y_lims, output_filename):
     # gotta assume they're all the same
     wake_positions = case_list[0]["wake_positions"]
     fig, ax = plt.subplots(1, len(wake_positions), figsize=(10, 5), dpi = 200)
@@ -375,7 +421,7 @@ def plot_wake_lines(case_list):
         ax[i].set_xlim(U_lims)
         ax[i].set_ylim(y_lims)
     ax[len(wake_positions)-1].legend()
-    plt.show()
+    plt.savefig(output_filename)
 
 def calculate_forces(msh, fld, ring_radii, n_points, Re):
     from mpi4py import MPI #equivalent to the use of MPI_init() in C
@@ -514,7 +560,10 @@ def calculate_forces(msh, fld, ring_radii, n_points, Re):
 
     return force_measure
 
-def plot_ring(case_list, rings_plot):
+def plot_ring(case_list, rings_plot, output_filename):
+    import pynektools.interpolation.pointclouds as pcs
+    # assume they're all the same
+    n_points = case_list[0]["stats_forces"]["fx_tot"].shape[1]
     th_1d = pcs.generate_1d_arrays([0, 2*np.pi], n_points, mode="equal")
 
     fig, ax = plt.subplots(len(rings_plot),1, figsize=(10, 5*len(rings_plot)), dpi = 200)
@@ -527,13 +576,13 @@ def plot_ring(case_list, rings_plot):
             print(ring_index)
             F_tot = np.sqrt(case["stats_forces"]["fx_tot"][ring_index,:].flatten()**2 + case["stats_forces"]["fy_tot"][ring_index,:].flatten()**2)
             ax[i].plot(th_1d/np.pi*180, F_tot, label=case["name"])
-        ax[i].set_title('Ring at r ='+str(np.array(ring_radii)[ring_index]))
+        ax[i].set_title('Ring at r ='+str(rings_plot[i]))
         ax[i].set_xlabel(r'$\theta$')
         ax[i].set_ylabel(r'$|F|$')
     ax[0].legend()
-    plt.show()
+    plt.savefig(output_filename)
 
-def plot_total_against_radius(case_list):
+def plot_total_against_radius(case_list, output_file):
     # Maybe look at how lift and drag changes with the circle we take:
     fig, ax = plt.subplots(1,2, figsize=(10, 5), dpi = 200)
     for j in range(len(case_list)):
@@ -545,4 +594,4 @@ def plot_total_against_radius(case_list):
     ax[1].set_title('Lift')
     ax[1].set_xlabel('r')
     ax[1].legend()
-    plt.show()
+    plt.savefig(output_file)
