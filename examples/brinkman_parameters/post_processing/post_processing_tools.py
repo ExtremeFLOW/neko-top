@@ -1,3 +1,19 @@
+# imports for L/D
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+# Imports for Bertie tools
+
+def compute_everything(root_name, case_name, method, mesh, Re, chi, implicit, radius):
+    case = {}
+    case["name"] = case_name
+    # lift and drag calculations
+    case["forces"] = calc_lift_and_drag(root_name,case_name,method, Re)
+
+    return case
+
 def calc_lift_and_drag(root_name,case_name,method,Re):
     # somehow search for all the rings! If i was better at python I would use the os somehow to find everything starting with 'circ'
     # but I'm not.. so I'm listing them manually.
@@ -75,7 +91,7 @@ def calc_lift_and_drag(root_name,case_name,method,Re):
 
     return all_forces
 
-def plot_lift_drag(case_list, lift_axis, drag_axis):
+def plot_lift_drag(case_list, lift_axis, drag_axis, output_filename):
     fig, ax = plt.subplots(2,1, figsize=(10, 5), dpi = 200)
     for j in range(len(case_list)):
         case = case_list[j]
@@ -92,7 +108,7 @@ def plot_lift_drag(case_list, lift_axis, drag_axis):
     ax[0].set_ylim(lift_axis)
     ax[1].set_ylim(drag_axis)
     ax[1].legend()
-    plt.show()
+    plt.savefig(output_filename)
     
 def read_force_torque(path_name):
     # note!
