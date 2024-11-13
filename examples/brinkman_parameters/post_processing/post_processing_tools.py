@@ -3,6 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import csv
 
 # Imports for Bertie tools
 os.environ["PYNEKTOOLS_HIDE_LOG"] = 'true'
@@ -13,52 +14,93 @@ from pynektools.datatypes.field import FieldRegistry
 
 
 
-def compute_everything(root_name, case_name, method, mesh, Re, chi, implicit, radius):
+def compute_everything(root_name, case_name, method, mesh, Re, chi, implicit, radius, plot_params):
     case = {}
     case["name"] = case_name
 
     # lift and drag calculations
-    # case["forces"] = calc_lift_and_drag(root_name,case_name,method, Re)
+    if plot_params["if_lift_and_drag"] == True:
+        case["forces"] = calc_lift_and_drag(root_name,case_name,method, Re)
 
     # wake lines
-    file_name = root_name + '/' + case_name + '/fluid_stats0/fluid_stats0'
-    case["mesh"], case["fld"] = load_stats_file(file_name, 2)
-    y_lims = [-15, 15]
-    n_pts = 300
-    wake_positions = [10, 15, 20]
-    case["wake_positions"] = wake_positions
-    case["wake_xyz"], case["wake_u"]  = generate_wake_lines(case["mesh"], case["fld"], case["wake_positions"], y_lims, n_pts)
+    if plot_params["if_stats_wake"] == True:
+        file_name = root_name + '/' + case_name + '/fluid_stats0/fluid_stats0'
+        case["mesh"], case["fld"] = load_stats_file(file_name, 2)
+        y_lims = plot_params["wake_y_lim"] 
+        n_pts = plot_params["wake_n_pts"]
+        case["wake_positions"] = plot_params["wake_positions"]
+        case["wake_xyz"], case["wake_u"]  = generate_wake_lines(case["mesh"], case["fld"], case["wake_positions"], y_lims, n_pts)
 
     # average forces
-    ring_radii = [0.50, 0.501, 0.502, 0.504, 0.508, 0.516, 0.532]
-    n_points = 360
-    case["stats_forces"] = calculate_forces(case["mesh"], case["fld"], ring_radii, n_points, Re)
+    if plot_params["if_stats_force"] == True:
+        ring_radii = plot_params["force_ring_radii"]
+        n_points = plot_params["force_n_pts"]
+        case["stats_forces"] = calculate_forces(case["mesh"], case["fld"], ring_radii, n_points, Re)
 
     # we should put separation angle here too.
 
 
     return case
 
-def plot_everything(case_list, result_path, experiment):
+def plot_everything(case_list, result_path, experiment, plot_params):
     # Plot lift and drag
-    lift_axis = [-1, 1]
-    drag_axis = [0, 1.5]
-    file_name = result_path + '/' + experiment + '_lift_and_drag.png'
-    # plot_lift_drag(case_list, lift_axis, drag_axis, file_name)
+    if plot_params["if_lift_and_drag"] == True:
+        lift_axis = plot_params["lift_axis"]
+        drag_axis = plot_params["drag_axis"]
+        file_name = result_path + '/' + experiment + '_lift_and_drag.png'
+        plot_lift_drag(case_list, lift_axis, drag_axis, file_name)
 
 
     # Plot wake lines
-    y_lims = [-15, 15]
-    U_lims = [0.5, 1.2]
-    file_name = result_path + '/' + experiment + '_wake_lines.png'
-    plot_wake_lines(case_list, U_lims, y_lims, file_name)
+    if plot_params["if_stats_wake"] == True:
+        y_lims = plot_params["wake_y_lim"]
+        U_lims = plot_params["wake_U_lims"]
+        file_name = result_path + '/' + experiment + '_wake_lines.png'
+        plot_wake_lines(case_list, U_lims, y_lims, file_name)
 
     # force_rings
-    rings = [0.50, 0.532]
-    file_name = result_path + '/' + experiment + '_average_force_distribution.png'
-    plot_ring(case_list, rings, file_name)
-    file_name = result_path + '/' + experiment + '_force_against_radius.png'
-    plot_total_against_radius(case_list, file_name)
+    if plot_params["if_stats_force"] == True:
+        rings = plot_params["force_ring_plot"]
+        file_name = result_path + '/' + experiment + '_average_force_distribution.png'
+        plot_ring(case_list, rings, file_name)
+        file_name = result_path + '/' + experiment + '_force_against_radius.png'
+        plot_total_against_radius(case_list, file_name)
+
+def generate_tables(case_list, result_path, experiment, plot_params):
+    # We want average lift and drag based on the time series data
+    t_start = 2.0
+    experiment_filename = result_path + '/' + experiment + '_avg_LD_tstart' + str(t_start)
+    tabulate_lift_and_drag(case_list, t_start, experiment_filename)
+
+
+def tabulate_lift_and_drag(case_list, t_start, experiment_filename):
+    
+    # these are the guys we're interested in
+    measures = ["fx_tot", "fx_p", "fx_visc", "fy_tot", "fy_p", "fy_visc"] 
+    for measure in measures:
+        output_filename = experiment_filename + '_' + measure + '.csv'
+        with open(output_filename, 'w') as output_file:        
+            output_file.write('Mean, Amplitude, method, name, ' + measure + '\n')     
+            for i in range(len(case_list)):
+                case = case_list[i]
+                for j in range(len(case["forces"])):
+                    force_measure = case["forces"][j]
+                    mean, amp = mean_and_amp(force_measure["t"], force_measure[measure], t_start)
+                    output_file.write("{:06f}".format(mean) + ', ' + "{:06f}".format(amp) + ', ' + '{s:<20}'.format(s=force_measure["type"]+',') + '{s:<10}'.format(s=case["name"]) + '\n')     
+
+def mean_and_amp(t, x, t_start):
+    inds = np.where(t > t_start)
+    mean = np.mean(x[inds])
+    # probs not the best metric for "amplitude"
+    # VERY conservative, take the MAX separation and divide by two.
+    amplitude = (np.max(x[inds]) - np.min(x[inds]))/2
+
+    # I'm not good with python... if this was matlab I would
+    # - use `findpeaks`
+    # - classify them on either side of the mean
+    # - take the mean/standard deviation of the points
+    # - calculate a mean/stdv on the amplitude
+    return mean, amplitude
 
 def calc_lift_and_drag(root_name,case_name,method,Re):
     # somehow search for all the rings! If i was better at python I would use the os somehow to find everything starting with 'circ'
@@ -224,9 +266,7 @@ def surface_integral_from_probes(input_filename, Re):
         dudy = data[6]     # Column G is dudy
         dvdx = data[7]     # Column H is dvdx
         dvdy = data[8]     # Column I is dvdy
-        derivative_available = True
     print("Loading data from file (",os.path.basename(input_filename),") successfully done. n= ", n, " points/probs detected.")
-    print(derivative_available)
     radius = np.sqrt(x_coords[0]**2 + y_coords[0]**2)  # Radius of the circle
     # Calculate theta for each probe based on x and y coordinates
     theta = np.arctan2(y_coords, x_coords)  # Angle in radians for each probe
@@ -573,7 +613,6 @@ def plot_ring(case_list, rings_plot, output_filename):
         for j in range(len(case_list)):
             case = case_list[j]
             ring_index = np.where(np.array(case["stats_forces"]["ring"]) == np.array(rings_plot[i]))
-            print(ring_index)
             F_tot = np.sqrt(case["stats_forces"]["fx_tot"][ring_index,:].flatten()**2 + case["stats_forces"]["fy_tot"][ring_index,:].flatten()**2)
             ax[i].plot(th_1d/np.pi*180, F_tot, label=case["name"])
         ax[i].set_title('Ring at r ='+str(rings_plot[i]))
