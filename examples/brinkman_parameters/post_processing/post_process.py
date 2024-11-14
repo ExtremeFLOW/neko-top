@@ -3,9 +3,25 @@ import os
 import csv
 import matplotlib.pyplot as plt
 
+# OK, I (Harry) am definitely not the person to be making a judgement call like
+# this hahahaha, it's very computer science-y and is based on a conversation
+# over coffee with Bertie and a very superficial amount of googling.
+#
+# The current csv format is always going to be a killer for us to read, and if
+# we have to read them all, every time, just to fuck around with the axis of
+# a plot it's going to be a nightmare.
+#
+# I'm SURE there's a better way of doing this, but according to google, Pickle
+# is a good option.
+#
+# So we divide this script into a preprocessing reader + pickle saver 
+#
+# And then we have the actual plotting script.
+import pickle
+plot_params = {}
+plot_params["precompute"]       = True       # do we read the csv or the pickle?
 
 # Settings for post processing
-plot_params = {}
 # Lift and drag
 plot_params["if_lift_and_drag"] = True
 plot_params["lift_axis"]        = [-1, 1]    # axis for plotted lift   
@@ -45,9 +61,13 @@ cases_dir = os.path.join(parent_dir, "results", "brinkman_parameters", "cases")
 logs_dir = os.path.join(experiments_dir, "logs")
 plots_dir = os.path.join(experiments_dir, "plots")
 tables_dir = os.path.join(experiments_dir, "tables")
+pickle_dir = os.path.join(experiments_dir, "pickle_files")
 os.makedirs(logs_dir, exist_ok=True)
 os.makedirs(plots_dir, exist_ok=True)
 os.makedirs(tables_dir, exist_ok=True)
+os.makedirs(pickle_dir, exist_ok=True)
+
+
 
 # List all .csv files in the experiments directory
 csv_files = [f for f in os.listdir(experiments_dir) if f.endswith('.csv')]
@@ -102,8 +122,18 @@ for csv_file in csv_files:
                             implicit = bool(row[reader.fieldnames[5]])
                             radius = float(row[reader.fieldnames[6]])
                         
-                        # Calculate and append case data
-                        case = compute_everything(cases_dir + "/", case_folder_name, method, mesh, Re, chi, implicit, radius, plot_params)
+                        # either Calculate or load the case and append case data
+                        pickle_name = pickle_dir + '/' + case_folder_name + '.pkl'
+                        if plot_params["precompute"] == True:
+                            case = compute_everything(cases_dir + "/", case_folder_name, method, mesh, Re, chi, implicit, radius, plot_params)
+                            # save the pickle file
+                            with open(pickle_name, 'wb') as f:
+                                pickle.dump(case, f)
+                        else:
+                            # save the pickle file
+                            with open(pickle_name, 'rb') as f:
+                                case = pickle.load(f)
+
                         case_list.append(case)
                         
                     else:
