@@ -16,6 +16,8 @@ function help() {
     echo -e "  file. The examples folder is searched for the specified pattern."
     echo -e "  If multiple matching case files are found, then all of them are"
     echo -e "  run."
+    echo -e "  Please note: Cases are in fact json files. We support regular"
+    echo -e "  json files, json files hidden under the '.case' filename."
     echo -e ""
     echo -e "  See Readme for additional details."
     echo -e ""
@@ -122,18 +124,21 @@ for in in $@; do
     matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
     matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
     matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
+    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.json"))
 
     for match in ${matches[@]}; do
         file_list=()
         if [ -d $match ]; then
-            file_list=($(find $match -name "run.sh" 2>/dev/null))
-            file_list+=($(find $match -name "*.case" 2>/dev/null))
+            file_list=($(find $match -name "run.sh" 2>/dev/null))  # BUG: fail on spaces
+            file_list+=($(find $match -name "*.case" 2>/dev/null)) # BUG: fail on spaces
+            file_list+=($(find $match -name "*.json" 2>/dev/null)) # BUG: fail on spaces
         fi
         if [ -f $match ]; then
             file_list+=($match)
         fi
 
         for file in ${file_list[@]}; do
+            echo "Checking file: $file"
             dir=$(dirname $file)
             if [[ -f $dir/run.sh ]]; then
                 example_list+=("${dir#$EPATH/}/run.sh")
@@ -150,6 +155,7 @@ done
 if [ "$ALL" == true ]; then
     file_list=($(find $EPATH -name "run.sh" 2>/dev/null))
     file_list+=($(find $EPATH -name "*.case" 2>/dev/null))
+    file_list+=($(find $EPATH -name "*.json" 2>/dev/null))
 
     example_list=()
     for file in ${file_list[@]}; do
@@ -189,23 +195,26 @@ done
 for i in ${!example_list[@]}; do
     example=${example_list[$i]}
     parent=$(dirname ${example%/*.*})
-    while [[ $parent != "." &&
-        -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case')" ]]; do
-        parent=$(dirname $parent)
+    while [ $parent != "." ]; do
+
+        if [[ ! -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case' -or -name '*.json')" ]]; then
+
+            printf >&2 "\e[1;31mInvalid example file:\e[m\n"
+            printf >&2 "$EPATH/$example\n"
+            printf >&2 "\tNested examples are not allowed.\n"
+            printf >&2 "\tMove the $example file to the root of example suite\n"
+            if [[ ${example: -5} == ".case" || ${example: -5} == ".json" ]]; then
+                printf >&2 "\tor create a run.sh file in the parent folder.\n"
+            fi
+
+            unset example_list[$i]
+
+            parent="."
+        else
+            parent=$(dirname $parent)
+        fi
     done
 
-    if [ $parent != "." ]; then
-
-        printf >&2 "\e[1;31mInvalid example file:\e[m\n"
-        printf >&2 "$EPATH/$example\n"
-        printf <&2 "\tNested examples are not allowed.\n"
-        printf <&2 "\tMove the $example file to the root of example suite\n"
-        if [ ${example: -5} == ".case" ]; then
-            printf >&2 "\tor create a run.sh file in the parent folder.\n"
-        fi
-
-        unset example_list[$i]
-    fi
 done
 
 # Remove duplicates and check for nested examples
@@ -295,8 +304,8 @@ for case in ${example_list[@]}; do
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
     example=$case_dir
-    if [[ ${case: -5} == ".case" &&
-        $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
+
+    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" -print | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 
@@ -318,15 +327,18 @@ for case in ${example_list[@]}; do
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
-    if [ ${case: -3} == ".sh" ]; then
-        find $EPATH/$case_dir -name "*.case" -exec cp -ft $log {} +
+    if [ $case == "run.sh" ]; then
+        find $EPATH/$case_dir -name "*.case" -or -name "*.json" \
+            -exec cp -ft $log {} +
     elif [ ${case: -5} == ".case" ]; then
+        cp -ft $log $EPATH/$case
+    elif [ ${case: -5} == ".json" ]; then
         cp -ft $log $EPATH/$case
     fi
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
-        -not -name "*.case" -and -not -name "*.nmsh" \
+        -not -name "*.case" -and -not -name "*.json" -and -not -name "*.nmsh" \
         -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
