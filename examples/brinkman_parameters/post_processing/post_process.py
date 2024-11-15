@@ -50,7 +50,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 
 # Define the path to 'experiments'
-experiments_dir = os.path.join(parent_dir, "results", "brinkman_parameters", "experiments")
+experiments_dir = os.path.join(parent_dir, "examples", "brinkman_parameters", "experiments")
 # experiments_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "experiments")
 
 # Define the path to 'cases'
