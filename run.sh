@@ -129,16 +129,15 @@ for in in $@; do
     for match in ${matches[@]}; do
         file_list=()
         if [ -d $match ]; then
-            file_list=($(find $match -name "run.sh" 2>/dev/null))  # BUG: fail on spaces
-            file_list+=($(find $match -name "*.case" 2>/dev/null)) # BUG: fail on spaces
-            file_list+=($(find $match -name "*.json" 2>/dev/null)) # BUG: fail on spaces
+            file_list=($(find $match -name "run.sh" 2>/dev/null))
+            file_list+=($(find $match -name "*.case" 2>/dev/null))
+            file_list+=($(find $match -name "*.json" 2>/dev/null))
         fi
         if [ -f $match ]; then
             file_list+=($match)
         fi
 
         for file in ${file_list[@]}; do
-            echo "Checking file: $file"
             dir=$(dirname $file)
             if [[ -f $dir/run.sh ]]; then
                 example_list+=("${dir#$EPATH/}/run.sh")
@@ -219,6 +218,26 @@ done
 
 # Remove duplicates and check for nested examples
 example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
+
+# If multiple examples with same name and  different file extensions are found
+# we stop the execution and print an error message.
+for example in ${example_list[@]}; do
+
+    matches=($(
+        find $EPATH -wholename "$EPATH/${example%.*}.json" \
+            -or -wholename "$EPATH/${example%.*}.case"
+    ))
+
+    if [ ${#matches[@]} -gt 1 ]; then
+        printf >&2 "\e[1;31mInvalid example file:\e[m ${example%.*}\n"
+        printf >&2 "\tMultiple examples with the same name found.\n"
+        printf >&2 "\tPlease remove the duplicates.\n"
+        for match in ${matches[@]}; do
+            printf >&2 "\t- ${match#$EPATH/}\n"
+        done
+        exit 1
+    fi
+done
 
 # Check if any examples were found, if not, exit.
 if [ -z $example_list ]; then
@@ -305,7 +324,7 @@ for case in ${example_list[@]}; do
     # same folder, we add the case name to the example name.
     example=$case_dir
 
-    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" -print | wc -l) > 1 ]]; then
+    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 
