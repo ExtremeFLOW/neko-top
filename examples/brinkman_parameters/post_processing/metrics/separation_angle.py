@@ -21,7 +21,8 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
     file_name : str
         The name of the file to run the benchmark on.
     cache_dir : str, optional
-        The directory to store the cache files.
+        The directory to store the cache files. Cached files will be used if
+        they exist. If None, no caching will be used. Default is None.
 
     Returns
     -------
@@ -43,16 +44,29 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
             The index at which the vortex building is complete.
     """
 
-    if cache_dir is not None:
-        file_extension = os.path.splitext(file_name)[1]
+    # ------------------------------------------------------------------------ #
+    # Caching
+    #
+    # We are going to cache the results of the benchmark to avoid recomputing
+    # the results. This is useful when running the benchmark multiple times. The
+    # cache file will be stored in the cache_dir directory. The benchmark
+    # results will be cached using pickle and be named after the file_name
+    # relative to the cache_dir.
 
+    if cache_dir is not None:
+        file_ext = os.path.splitext(file_name)[1]
         cache_file = os.path.join(
-            cache_dir,
-            f"{os.path.basename(file_name).replace(file_extension, '_inflection.pkl')}"
-        )
+            cache_dir, "inflection_benchmark",
+            os.path.relpath(file_name,
+                            cache_dir).replace("../", "").replace("/", "_"))
+        cache_file = cache_file.replace(file_ext, ".pkl")
+
         if os.path.exists(cache_file):
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
+
+    # ------------------------------------------------------------------------ #
+    # Main computation
 
     # Read in the file and setup the data
     probes = ProbesReader(file_name)
@@ -61,6 +75,7 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
     times = probes.times
 
     fields = np.asarray((probes.fields["u"], probes.fields["v"]))
+    del probes
 
     center = np.array([0.0, 0.0, 0.0])
     angles = track_inflection_point(center, points, fields, times)
@@ -84,6 +99,9 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
         amplitude=amplitude,
         bias=bias,
     )
+
+    # ------------------------------------------------------------------------ #
+    # Caching the results
 
     if cache_dir is not None:
         os.makedirs(os.path.dirname(cache_file), exist_ok=True)
