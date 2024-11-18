@@ -39,7 +39,7 @@
 
 # Definitions of output files.
 #BSUB -oo output.log
-#BSUB -eo error.err
+#BSUB -eo error.log
 
 # ============================================================================ #
 # Determine if the script is run on the HPC or locally
