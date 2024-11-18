@@ -128,7 +128,7 @@ for csv_file in csv_files:
                         # this will be full of all the functions we're interested in,
                         # for now it's just one to test
                         file_name = os.path.join(case_file_path, 'circ_0501.csv')
-                        cache_file = os.path.join(pickle_dir, case_folder_name, 'circ_0501.csv')
+                        cache_file = pickle_dir
                         force_measure = surface_integral_lift_and_drag(file_name, Re, cache_file)
                         # append a single curve to the plot
                         plot_force_measure(force_measure, fig_LD, ax_LD)

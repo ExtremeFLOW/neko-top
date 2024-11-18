@@ -49,7 +49,6 @@ def init_plot_force_measure(plot_params):
 def plot_force_measure(force_measure, fig, ax):
     ax[0].plot(force_measure["t"], force_measure["fy_tot"], label = force_measure["type"])
     ax[1].plot(force_measure["t"], force_measure["fx_tot"], label = force_measure["type"])
-    print(force_measure["fx_p"])
 
 def finalize_plot_force_measure(plot_params, fig, ax, output_filename):
     lift_axis = plot_params["lift_axis"]
