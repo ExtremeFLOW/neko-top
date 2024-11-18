@@ -98,16 +98,16 @@ make_a_case() {
                                 *) dt_mesh="0" ;;
                                 esac
 
-                                if [ $method == "meshed" ]; then
-                                    # Use the meshed timestep directly
-                                    dt=$dt_mesh
-                                else
+                                if [ $method == "brinkman" ]; then
                                     # Compute the expected timestep, in exponential notation
-                                    dt=$(echo "scale=10; 50.0 / ($Re*$chi)" | bc)
+                                    dt=$(echo "scale=10; 0.25 / ($chi)" | bc)
                                     # Compute min of the two
                                     dt_mesh=$(printf "%f" $dt_mesh)
                                     [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
                                     dt=$(printf "%.2e" $dt)
+                                else
+                                    # Use the meshed timestep directly
+                                    dt=$dt_mesh
                                 fi
 
                                 # Locate the pattern and replace it
@@ -176,12 +176,12 @@ make_a_case $case_name \
 # ---------------------------------------------------------------------------- #
 case_name="Filter_radius"
 
-method_list=("brinkman")
+method_list=("brinkman" "idw")
 mesh_list=("2")
 Re_list=("200")
 chi_list=("1000")
 radius_list=("0" "0.01" "0.05" "0.1")
-rmax_list=("1.0")
+rmax_list=("0.0" "1.0" "2.0" "5.0")
 rpower_list=("1.0")
 
 make_a_case $case_name \
