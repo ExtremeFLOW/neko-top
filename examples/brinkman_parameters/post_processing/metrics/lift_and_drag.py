@@ -27,21 +27,19 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
     -------
     results : dict
         The results of the benchmark.
-        times: np.array
+        t: np.array
             The time steps.
-        points: np.ndarray
-            Coordinates of all points on the circle.
-        total_drag: np.ndarray
+        fx_tot: np.ndarray
             Total_drag vs time
-        drag: np.array
+        fx_p: np.array
             Pressure drag vs time.
-        shear_drag: np.array
+        fx_visc: np.array
             Shear drag vs time.
-        total_lift: np.ndarray
+        fy_tot: np.ndarray
             Total_lift vs time
-        lift: np.array
+        fy_p: np.array
             Pressure lift vs time.
-        shear_lift: np.array
+        fy_visc: np.array
             Shear_lift vs time.
     """
     # ------------------------------------------------------------------------ #
@@ -126,19 +124,18 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
         shear_drag[t] = np.sum(shear_drag_components) * dS
         shear_lift[t] = np.sum(shear_lift_components) * dS
 
-    # Total drag and lift (pressure + shear)(1/Re)(Re=200)
+    # Total drag and lift (pressure + shear)
     total_drag = drag + shear_drag
     total_lift = lift + shear_lift
     
     results = dict(
-        time_values=times,
-        points=points,
-        total_drag=total_drag,
-        drag=drag,
-        shear_drag=shear_drag,
-        total_lift=total_lift,
-        lift=lift,
-        shear_lift=shear_lift,
+        t=times,
+        fx_tot=total_drag,
+        fx_p=drag,
+        fx_visc=shear_drag,
+        fy_tot=total_lift,
+        fy_p=lift,
+        fy_visc=shear_lift,
     )
     # ------------------------------------------------------------------------ #
     # Caching the results
@@ -152,3 +149,111 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
     
     
 #
+def read_force_torque(file_name: str, cache_dir: str = None) -> dict:
+    if cache_dir is not None:
+        file_ext = os.path.splitext(file_name)[1]
+        cache_file = os.path.join(
+            cache_dir, "lift_and_drag",
+            os.path.relpath(file_name,
+                            cache_dir).replace("../", "").replace("/", "_"))
+        cache_file = cache_file.replace(file_ext, ".pkl")
+
+        if os.path.exists(cache_file):
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+
+    # ------------------------------------------------------------------------ #
+    # Main computation
+    # note!
+    # I bet this isn't the best for long logfiles!
+    t_list = []
+    fx_tot_list = []
+    fx_visc_list = []
+    fx_p_list = []
+    fy_tot_list = []
+    fy_visc_list = []
+    fy_p_list = []
+    
+    with open(file_name) as file:
+        for line in file:
+            s = line.rstrip()
+            index = s.find("forcex")
+            if index >= 1: 
+                numbers = np.array(line.rstrip().split())
+                t_list.append(numbers[1].astype(float))
+                fx_tot_list.append(numbers[2].astype(float))
+                fx_p_list.append(numbers[3].astype(float))
+                fx_visc_list.append(float(numbers[4][:-1]))
+            index = s.find("forcey")
+            if index >= 1:
+                numbers = np.array(line.rstrip().split())
+                fy_tot_list.append(numbers[2].astype(float))
+                fy_p_list.append(numbers[3].astype(float))
+                fy_visc_list.append(float(numbers[4][:-1]))
+
+    results = dict(
+        t = np.array(t_list),
+        fx_tot = np.array(fx_tot_list),
+        fx_p = np.array(fx_p_list),
+        fx_visc = np.array(fx_visc_list),
+        fy_tot = np.array(fy_tot_list),
+        fy_p = np.array(fy_p_list),
+        fy_visc = np.array(fy_visc_list),
+        )
+    # ------------------------------------------------------------------------ #
+    # Caching the results
+    if cache_dir is not None:
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, "wb") as f:
+            pickle.dump(results, f)
+
+    return results
+
+def read_brinkman_force(file_name: str, cache_dir: str = None) -> dict:
+    if cache_dir is not None:
+        file_ext = os.path.splitext(file_name)[1]
+        cache_file = os.path.join(
+            cache_dir, "lift_and_drag",
+            os.path.relpath(file_name,
+                            cache_dir).replace("../", "").replace("/", "_"))
+        cache_file = cache_file.replace(file_ext, ".pkl")
+
+        if os.path.exists(cache_file):
+            with open(cache_file, "rb") as f:
+                return pickle.load(f)
+
+    # ------------------------------------------------------------------------ #
+    # Main computation
+    t_list = []
+    fx_list = []
+    fy_list = []
+
+    with open(file_name) as file:
+        for line in file:
+            s = line.rstrip()
+            index = s.find("Lift")
+            if index >= 1:
+                numbers = np.array(line.rstrip().split())
+                t_list.append(numbers[4].astype(float))
+                fy_list.append(numbers[2].astype(float))
+            index = s.find("Drag")
+            if index >= 1:
+                numbers = np.array(line.rstrip().split())
+                fx_list.append(numbers[2].astype(float))
+
+
+    results = dict(
+        t = np.array(t_list),
+        fx_tot = np.array(fx_list),
+        fy_tot = np.array(fy_list),
+        #note: the pressure viscous split doesn't apply here, we should always
+        #check that it exists before we try to plot
+        )
+    # ------------------------------------------------------------------------ #
+    # Caching the results
+    if cache_dir is not None:
+        os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+        with open(cache_file, "wb") as f:
+            pickle.dump(results, f)
+
+    return results
