@@ -35,7 +35,7 @@ make_a_case() {
     # Create the experiment file and write the header
     experiment_file=$ROOT_FOLDER/experiments/$experiment_name.csv
     [ -f $experiment_file ] && rm $experiment_file
-    echo "name,method,mesh,Re,chi,implicit,radius,rmax,rpower" >>$experiment_file
+    echo "name,method,mesh,Re,chi,radius,rmax,rpower" >>$experiment_file
 
     # Loop over all the parameters
     echo "Generating cases for $experiment_name"
