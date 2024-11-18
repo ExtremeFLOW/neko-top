@@ -58,7 +58,13 @@
                     "objects": [
                         {
                             "type": "boundary_mesh",
-                            "name": "data/surfaces/cylinder.stl"
+                            "name": "data/surfaces/cylinder.stl",
+                            "mesh_transform": {
+                                "type": "bounding_box",
+                                "box_min": [ -0.5, -0.5, 0.001 ],
+                                "box_max": [ 0.5, 0.5, 0.501 ],
+                                "keep_aspect_ratio": false
+                            }
                         }
                     ]
                 }
