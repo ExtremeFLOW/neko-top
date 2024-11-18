@@ -5,6 +5,7 @@
 import matplotlib.pyplot as plt
 import os
 import sys
+from statistics import mean
 
 try:
     from functions.experiment_reader import experiment_reader
@@ -45,14 +46,14 @@ def filter_radius(experiment_folder: str, results_folder: str):
             separation_angles = inflection_benchmark(circ_051, cache_dir)
 
             # Append the data to the plot
-            brinkman_data[
-                experiment['radius']] = separation_angles['max_freq'][0]
+            brinkman_data[experiment['radius']] = mean(
+                separation_angles['max_freq'])
 
         if experiment["method"] == "idw":
             separation_angles = inflection_benchmark(circ_051, cache_dir)
 
             # Append the data to the plot
-            idw_data[experiment['rmax']] = separation_angles['max_freq'][0]
+            idw_data[experiment['rmax']] = mean(separation_angles['max_freq'])
 
     # Add the legend
     # Create a figure and axis
