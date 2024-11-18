@@ -60,6 +60,12 @@
                                 "type": "step",
                                 "value": 0.0
                             },
+                            "mesh_transform": {
+                                "type": "bounding_box",
+                                "box_min": [ -0.5, -0.5, 0.001 ],
+                                "box_max": [ 0.5, 0.5, 0.501 ],
+                                "keep_aspect_ratio": false
+                            }
                         }
                     ],
                     "brinkman": {
