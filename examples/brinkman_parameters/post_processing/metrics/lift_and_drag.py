@@ -146,7 +146,7 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
     shear_lift = np.zeros(num_timesteps)
     
     # Calculate the arc length per segment
-    dS = (2 * np.pi * radius) / radius.size
+    dS = (2 * np.pi * radius) / theta.size
     
     
 
