@@ -3,11 +3,64 @@
 import os
 import pickle
 import numpy as np
+import matplotlib.pyplot as plt
 from pynektools.io.read_probes import ProbesReader
 
 # ============================================================================ #
-# Main function for computing the separation angle
+## Main function for computing the separation angle
+#def compute_lift_and_drag(file_name: str, method: str, Re: float) -> dict:
+#    
+#    # force the cache
+#    cache_dir = file_name
+#    # somehow search for all the rings! If i was better at python I would use 
+#    # the os somehow to find everything starting with 'circ'
+#    # but I'm not.. so I'm listing them manually.
+#    # AND I'm only going to select one
+#    #circ_list = ['048', '050', '0501', '0502', '0505', '051', '052', '055']
+#    circ_list = ['0501']
+#    # First is lift and drag
+#    if method == 'meshed':
+#        # here we just need the logfile
+#        path_name = root_name + case_name + '/cylinder.log' 
+#        force_measure = read_force_torque(path_name)
+#        # We could in principal use method 2, but it's not required I guess.
+#    elif method == 'brinkman':
+#        # Now we have concentric rings
+#        # hard code to a single ring
+#        path_name = root_name + case_name + '/circ_' + circ_list[0] + '.csv'
+#        force_measure = surface_integral_from_probes(path_name, Re)
+#
+#        # forget the last measure for now
+#
+#    elif method == 'idw':
+#        # I guess we do the same as brinkman without the last step
+#        path_name = root_name + case_name + '/circ_' + circ_list[0] + '.csv'
+#        force_measure = surface_integral_from_probes(path_name, Re)
+#    else:
+#        print('INCORRECT METHOD!')
+#
+#    return force_measure
 
+def init_plot_force_measure(plot_params):
+    # The fig sizes etc should be passed in with plot params in the future
+    fig, ax = plt.subplots(2,1, figsize=(10, 5), dpi = 200)
+    return fig, ax
+
+def plot_force_measure(force_measure, fig, ax):
+    ax[0].plot(force_measure["t"], force_measure["fy_tot"], label = force_measure["type"])
+    ax[1].plot(force_measure["t"], force_measure["fx_tot"], label = force_measure["type"])
+    print(force_measure["fx_p"])
+
+def finalize_plot_force_measure(plot_params, fig, ax, output_filename):
+    lift_axis = plot_params["lift_axis"]
+    drag_axis = plot_params["drag_axis"] 
+    ax[0].set_ylabel("Lift")
+    ax[1].set_ylabel("Drag")
+    ax[1].set_xlabel("Time")
+    ax[0].set_ylim(lift_axis)
+    ax[1].set_ylim(drag_axis)
+    ax[1].legend()
+    plt.savefig(output_filename)
 
 def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = None) -> dict:
     """
@@ -60,11 +113,13 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
         cache_file = cache_file.replace(file_ext, ".pkl")
 
         if os.path.exists(cache_file):
+            print("reading cache")
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
 
     # ------------------------------------------------------------------------ #
     # Main computation
+    print("computing")
 
     # Read in the file and setup the data
     probes = ProbesReader(file_name)
@@ -136,6 +191,7 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
         fy_tot=total_lift,
         fy_p=lift,
         fy_visc=shear_lift,
+        type= "probes r="+str(radius),
     )
     # ------------------------------------------------------------------------ #
     # Caching the results
@@ -199,6 +255,7 @@ def read_force_torque(file_name: str, cache_dir: str = None) -> dict:
         fy_tot = np.array(fy_tot_list),
         fy_p = np.array(fy_p_list),
         fy_visc = np.array(fy_visc_list),
+        type = "meshed",
         )
     # ------------------------------------------------------------------------ #
     # Caching the results
@@ -246,6 +303,7 @@ def read_brinkman_force(file_name: str, cache_dir: str = None) -> dict:
         t = np.array(t_list),
         fx_tot = np.array(fx_list),
         fy_tot = np.array(fy_list),
+        type = "method3"
         #note: the pressure viscous split doesn't apply here, we should always
         #check that it exists before we try to plot
         )

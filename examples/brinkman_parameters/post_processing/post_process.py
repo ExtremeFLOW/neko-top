@@ -1,4 +1,5 @@
 from post_processing_tools import compute_everything, plot_everything, generate_tables
+from metrics import *
 import os
 import csv
 import matplotlib.pyplot as plt
@@ -50,11 +51,11 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 
 # Define the path to 'experiments'
-experiments_dir = os.path.join(parent_dir, "examples", "brinkman_parameters", "experiments")
+experiments_dir = os.path.join(parent_dir, "results", "brinkman_parameters_fake", "experiments")
 # experiments_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "experiments")
 
 # Define the path to 'cases'
-cases_dir = os.path.join(parent_dir, "results", "brinkman_parameters", "cases")
+cases_dir = os.path.join(parent_dir, "results", "brinkman_parameters_fake", "cases")
 # cases_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
@@ -78,7 +79,8 @@ for csv_file in csv_files:
     file_path = os.path.join(experiments_dir, csv_file)
     output_file_path = os.path.join(logs_dir, experiment + "_log.csv")
 
-    case_list = []
+    # set up the axis for a test plot
+    fig_LD, ax_LD = init_plot_force_measure(plot_params)
 
     print("Starting with the experiment:", experiment)
     if os.path.exists(file_path):
@@ -123,18 +125,14 @@ for csv_file in csv_files:
                             radius = float(row[reader.fieldnames[6]])
                         
                         # either Calculate or load the case and append case data
-                        pickle_name = pickle_dir + '/' + case_folder_name + '.pkl'
-                        if plot_params["precompute"] == True:
-                            case = compute_everything(cases_dir + "/", case_folder_name, method, mesh, Re, chi, implicit, radius, plot_params)
-                            # save the pickle file
-                            with open(pickle_name, 'wb') as f:
-                                pickle.dump(case, f)
-                        else:
-                            # save the pickle file
-                            with open(pickle_name, 'rb') as f:
-                                case = pickle.load(f)
-
-                        case_list.append(case)
+                        # this will be full of all the functions we're interested in,
+                        # for now it's just one to test
+                        file_name = os.path.join(case_file_path, 'circ_0501.csv')
+                        cache_file = os.path.join(pickle_dir, case_folder_name, 'circ_0501.csv')
+                        force_measure = surface_integral_lift_and_drag(file_name, Re, cache_file)
+                        # append a single curve to the plot
+                        plot_force_measure(force_measure, fig_LD, ax_LD)
+                        del force_measure
                         
                     else:
                         row['status'] = 'not exists'  # If folder does not exist, set status as 'not exist'
@@ -145,7 +143,8 @@ for csv_file in csv_files:
 
     else:
         print(f"The file {file_path} does not exist.")
-    plot_everything(case_list, plots_dir, experiment, plot_params)
-    generate_tables(case_list, tables_dir, experiment, plot_params)
-print("All experiments processed.")
+    # here we would finalize all the plots
+    output_filename = plots_dir + '/' + experiment + '_lift_and_drag.png'
+    finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
 
+print("All experiments processed.")
