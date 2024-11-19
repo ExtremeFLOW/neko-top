@@ -112,13 +112,11 @@ def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = N
         cache_file = cache_file.replace(file_ext, ".pkl")
 
         if os.path.exists(cache_file):
-            print("reading cache")
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
 
     # ------------------------------------------------------------------------ #
     # Main computation
-    print("computing")
 
     # Read in the file and setup the data
     probes = ProbesReader(file_name)
