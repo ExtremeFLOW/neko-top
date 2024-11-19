@@ -1,5 +1,6 @@
 from post_processing_tools import compute_everything, plot_everything, generate_tables
 from metrics import *
+from functions import *
 import os
 import csv
 import matplotlib.pyplot as plt
@@ -15,48 +16,47 @@ import matplotlib.pyplot as plt
 # I'm SURE there's a better way of doing this, but according to google, Pickle
 # is a good option.
 #
-# So we divide this script into a preprocessing reader + pickle saver 
+# So we divide this script into a preprocessing reader + pickle saver
 #
 # And then we have the actual plotting script.
 import pickle
-plot_params = {}
-plot_params["precompute"]       = True       # do we read the csv or the pickle?
 
-# Settings for post processing
-# Lift and drag
-plot_params["if_lift_and_drag"] = True
-plot_params["lift_axis"]        = [-1, 1]    # axis for plotted lift   
-plot_params["drag_axis"]        = [0, 1.5]   # axis for plotted drag   
-# Statistics interpolation (wake deficit)
-plot_params["if_stats_wake"]    = False
-plot_params["wake_y_lim"]       = [-15, 15]  # y limits for wake profiles
-plot_params["wake_n_pts"]       = 300        # number points in the wake
-plot_params["wake_positions"]   = [10,15,20] # position for wakes
-plot_params["wake_U_lims"]      = [0.5, 1.2] # axis limits for wakes plot
-# Statistics interpolation (force rings)
-plot_params["if_stats_force"]   = False
-plot_params["force_n_pts"]      = 360        # number of interpolation points
-plot_params["force_ring_radii"] = [0.50, 0.501, 0.502, 0.504, 0.508, 0.516, 0.532]
-                                             # rings to consider
-plot_params["force_ring_plot"]  = [0.5, 0.532]
-                                             # rings to plot
-# For taking averages of time series
-plot_params["t_start"]          = 100.0      # time to start averaging
-
+plot_params = {
+    # Settings for post processing
+    # Lift and drag
+    "if_lift_and_drag": True,
+    "lift_axis": [-1, 1],  # axis for plotted lift,
+    "drag_axis": [0, 1.5],  # axis for plotted drag,
+    # Statistics interpolation (wake deficit)
+    "if_stats_wake": False,
+    "wake_y_lim": [-15, 15],  # y limits for wake profiles,
+    "wake_n_pts": 300,  # number points in the wake,
+    "wake_positions": [10, 15, 20],  # position for wakes,
+    "wake_U_lims": [0.5, 1.2],  # axis limits for wakes plot,
+    # Statistics interpolation (force rings)
+    "if_stats_force": False,
+    "force_n_pts": 360,  # number of interpolation points,
+    "force_ring_radii": [0.50, 0.501, 0.502, 0.504, 0.508, 0.516, 0.532],
+    # rings to consider
+    "force_ring_plot": [0.5, 0.532],
+    # rings to plot
+    # For taking averages of time series
+    "t_start": 100.0  # time to start averaging,
+}
 
 # Get the current directory
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
-# Navigate to the parent directory where the experiments and cases folders are located
-parent_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
+# Navigate to the root directory of the project
+nekotop_root = os.path.abspath(os.path.join(current_dir, "../../.."))
 
 # Define the path to 'experiments'
-experiments_dir = os.path.join(parent_dir, "results", "brinkman_parameters", "experiments")
-# experiments_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "experiments")
+experiments_dir = os.path.join(nekotop_root, "examples", "brinkman_parameters",
+                               "experiments")
 
 # Define the path to 'cases'
-cases_dir = os.path.join(parent_dir, "results", "brinkman_parameters", "cases")
-# cases_dir = os.path.join(parent_dir, "results", "only_stats", "brinkman_parameters", "cases")
+cases_dir = os.path.join(nekotop_root, "results", "brinkman_parameters",
+                         "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
 logs_dir = os.path.join(experiments_dir, "logs")
@@ -68,83 +68,48 @@ os.makedirs(plots_dir, exist_ok=True)
 os.makedirs(tables_dir, exist_ok=True)
 os.makedirs(pickle_dir, exist_ok=True)
 
-
-
 # List all .csv files in the experiments directory
-csv_files = [f for f in os.listdir(experiments_dir) if f.endswith('.csv')]
+experiment_files = [
+    f for f in os.listdir(experiments_dir) if f.endswith('.csv')
+]
 
 # Loop over each .csv file and run the script for each
-for csv_file in csv_files:
-    experiment = os.path.splitext(csv_file)[0]  # Remove the .csv extension
-    file_path = os.path.join(experiments_dir, csv_file)
-    output_file_path = os.path.join(logs_dir, experiment + "_log.csv")
+for file in experiment_files:
+    experiment = experiment_reader(os.path.join(experiments_dir, file))
+    experiment_name = file.split('.')[0]
 
     # set up the axis for a test plot
     fig_LD, ax_LD = init_plot_force_measure(plot_params)
 
-    print("Starting with the experiment:", experiment)
-    if os.path.exists(file_path):
-        # Open the original CSV file and read it
-        with open(file_path, 'r') as file:
-            reader = csv.DictReader(file)  # Read the file as a dictionary (each row is a dictionary)
+    print("Starting with the experiment:", experiment_name)
 
-            # Get the fieldnames (headers) from the original CSV
-            fieldnames = reader.fieldnames + ['status']  # Add 'status' to the fieldnames
-            
-            # Open the output CSV file for writing
-            with open(output_file_path, 'w', newline='') as output_file:
-                writer = csv.DictWriter(output_file, fieldnames=fieldnames)
-                writer.writeheader()  # Write the header row
+    # Loop through each case/case in the experiment
+    for case_number, case in enumerate(experiment):
+        print("Working on case number:", case_number, "   ", case["name"])
 
-                case_number = 1
-                # Loop through each row/case in the experiment
-                for row in reader:
-                    print("Working on case number:", case_number, "   ", row[reader.fieldnames[0]])
-                
-                    # Get the folder name from the first column (this is the experiment case folder)
-                    case_folder_name = row[reader.fieldnames[0]]
+        # Construct the path to the case folder
+        case_file_path = os.path.join(cases_dir, case["name"])
 
-                    # Construct the path to the case folder
-                    case_file_path = os.path.join(cases_dir, case_folder_name)
+        # Check if the particular case folder exists
+        if os.path.exists(case_file_path):
+            method = case["method"]
+            mesh = case["mesh"]
+            Re = case["Re"]
+            chi = case["chi"]
+            radius = case["radius"]
 
-                    # Check if the particular case folder exists
-                    if os.path.exists(case_file_path):
-                        row['status'] = 'exists'  # If folder exists, set status as 'exist'
-                        method = row[reader.fieldnames[1]]
-                        mesh = int(row[reader.fieldnames[2]])
-                        Re = float(row[reader.fieldnames[3]])
-                        if method == 'meshed':
-                            #If method is meshed then we can't read the following values from the file
-                            # therefore, I am just giving them some extream initial values
-                            chi = -1.0
-                            implicit = False
-                            radius = -1.0
-                        else:
-                            chi = float(row[reader.fieldnames[4]])
-                            implicit = bool(row[reader.fieldnames[5]])
-                            radius = float(row[reader.fieldnames[6]])
-                        
-                        # either Calculate or load the case and append case data
-                        # this will be full of all the functions we're interested in,
-                        # for now it's just one to test
-                        file_name = os.path.join(case_file_path, 'circ_0501.csv')
-                        cache_file = pickle_dir
-                        force_measure = surface_integral_lift_and_drag(file_name, Re, cache_file)
-                        # append a single curve to the plot
-                        plot_force_measure(force_measure, fig_LD, ax_LD)
-                        del force_measure
-                        
-                    else:
-                        row['status'] = 'not exists'  # If folder does not exist, set status as 'not exist'
+            # either Calculate or load the case and append case data
+            # this will be full of all the functions we're interested in,
+            # for now it's just one to test
+            file_name = os.path.join(case_file_path, 'circ_0501.csv')
+            force_measure = surface_integral_lift_and_drag(
+                file_name, Re, pickle_dir)
+            # append a single curve to the plot
+            plot_force_measure(force_measure, fig_LD, ax_LD)
+            del force_measure
 
-                    # Write the row with the new 'status' field to the output CSV
-                    writer.writerow(row)
-                    case_number += 1
-
-    else:
-        print(f"The file {file_path} does not exist.")
     # here we would finalize all the plots
-    output_filename = plots_dir + '/' + experiment + '_lift_and_drag.png'
+    output_filename = plots_dir + '/' + experiment_name + '_lift_and_drag.png'
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
 
 print("All experiments processed.")
