@@ -82,63 +82,76 @@ for file in experiment_files:
     fig_LD, ax_LD = init_plot_force_measure(plot_params)
     # Loop through each case/case in the experiment
     for case_number, case in enumerate(experiment):
-        print("Working on case number:", case_number, "   ", case["name"])
 
         # Construct the path to the case folder
         case_file_path = os.path.join(cases_dir, case["name"])
 
         # Check if the particular case folder exists
         if os.path.exists(case_file_path):
-            method = case["method"]
-            mesh = case["mesh"]
-            Re = case["Re"]
-            chi = case["chi"]
-            radius = case["radius"]
+            print("\tWorking on case:       ", case["name"])
+        else:
+            print("\tSkipping missing case: ", case["name"])
+            continue
 
-            # Force using surface integrals (meshed case)
-# ----------------------------------------------------------------------------#
-            if method == "meshed":
-                file_name = os.path.join(case_file_path, 'cylinder.log')
+        method = case["method"]
+        mesh = case["mesh"]
+        Re = case["Re"]
+        chi = case["chi"]
+        radius = case["radius"]
+
+        # Force using surface integrals (meshed case)
+        # -------------------------------------------------------------------- #
+        if method == "meshed":
+            file_name = os.path.join(case_file_path, 'cylinder.log')
+            try:
                 force_measure = read_force_torque(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
                 del force_measure
+            except Exception as e:
+                print("Error in case:", case["name"])
+                print("\t", e)
 
-            # Force using rho * u (brinkman case)
-# ----------------------------------------------------------------------------#
-            if method == "brinkman":
-                file_name = os.path.join(case_file_path, 'cylinder.log')
+        # Force using rho * u (brinkman case)
+        # -------------------------------------------------------------------- #
+        if method == "brinkman":
+            file_name = os.path.join(case_file_path, 'cylinder.log')
+            try:
                 force_measure = read_brinkman_force(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
                 del force_measure
+            except Exception as e:
+                print("Error in case:", case["name"])
+                print("\t", e)
 
-            # Using the rings
-# ----------------------------------------------------------------------------#
-            for circle in plot_params["force_ring_radii"]:
+        # Using the rings
+        # -------------------------------------------------------------------- #
+        for circle in plot_params["force_ring_radii"]:
 
-                try:
-                    # Lift and Drag
-                    # --------------------------------------------------------#
-                    file_name = os.path.join(case_file_path,
-                                             'circ_' + circle + '.csv')
-                    force_measure = surface_integral_lift_and_drag(
-                        file_name, Re, pickle_dir)
+            try:
+                # Lift and Drag
+                # ------------------------------------------------------------ #
+                file_name = os.path.join(case_file_path,
+                                         'circ_' + circle + '.csv')
+                force_measure = surface_integral_lift_and_drag(
+                    file_name, Re, pickle_dir)
 
-                    # append a single curve to the plot
-                    plot_force_measure(force_measure, fig_LD, ax_LD)
-                    del force_measure
+                # append a single curve to the plot
+                plot_force_measure(force_measure, fig_LD, ax_LD)
+                del force_measure
 
-                    # separation angle
-                    # --------------------------------------------------------#
-                    sep_angle = inflection_benchmark(file_name, Re, pickle_dir)
-                    # here we would have some plotting, but for now lets just
-                    # generate the pickle files
-                    del sep_angle
+                # separation angle
+                # ------------------------------------------------------------ #
+                sep_angle = inflection_benchmark(file_name, pickle_dir)
+                # here we would have some plotting, but for now lets just
+                # generate the pickle files
+                del sep_angle
 
-                except Exception as e:
-                    print("Error in case:", case["name"])
-                    print("\t", e)
+            except Exception as e:
+                print("Error in case:", case["name"])
+                print("\t", e)
 
     # here we would finalize all the plots
+    os.path.exists(plots_dir) or os.makedirs(plots_dir)
     output_filename = os.path.join(plots_dir,
                                    experiment_name + '_lift_and_drag.png')
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
