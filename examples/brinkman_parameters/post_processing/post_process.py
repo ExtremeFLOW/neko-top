@@ -78,11 +78,20 @@ for file in experiment_files:
     experiment = experiment_reader(os.path.join(experiments_dir, file))
     experiment_name = file.split('.')[0]
 
-    # set up the axis for a test plot
-    fig_LD, ax_LD = init_plot_force_measure(plot_params)
-
     print("Starting with the experiment:", experiment_name)
 
+    # This should be encased in a function.
+    #
+    # This function should take the experiment list, the variable we want to
+    # plot against and the pickle directory as arguments.
+    #
+    # example: plot_lift_and_drag(experiment, 'Re', pickle_dir)
+    #
+    # Possibly which should also accept a list of plot options so we can control
+    # styling etc.
+
+    # set up the axis for a test plot
+    fig_LD, ax_LD = init_plot_force_measure(plot_params)
     # Loop through each case/case in the experiment
     for case_number, case in enumerate(experiment):
         print("Working on case number:", case_number, "   ", case["name"])
@@ -104,6 +113,7 @@ for file in experiment_files:
             file_name = os.path.join(case_file_path, 'circ_0501.csv')
             force_measure = surface_integral_lift_and_drag(
                 file_name, Re, pickle_dir)
+
             # append a single curve to the plot
             plot_force_measure(force_measure, fig_LD, ax_LD)
             del force_measure
