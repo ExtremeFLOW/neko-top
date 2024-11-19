@@ -44,27 +44,17 @@ plot_params = {
     "t_start": 100.0  # time to start averaging,
 }
 
-# Get the current directory
+# Define useful paths for the script
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# Navigate to the root directory of the project
-nekotop_root = os.path.abspath(os.path.join(current_dir, "../../.."))
-
-# Define the path to 'experiments'
-experiments_dir = os.path.join(nekotop_root, "examples", "brinkman_parameters",
+root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
+experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
                                "experiments")
-
-# Define the path to 'cases'
-cases_dir = os.path.join(nekotop_root, "results", "brinkman_parameters",
-                         "cases")
-
-# Define the path to 'cache'
-pickle_dir = os.path.join(nekotop_root, "results", "brinkman_parameters",
-                          "cache")
+cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
-plots_dir = os.path.join(current_dir, "plots")
-tables_dir = os.path.join(current_dir, "tables")
+plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
+tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
+pickle_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 
 # List all .csv files in the experiments directory
 experiment_files = [
@@ -124,7 +114,8 @@ for file in experiment_files:
                     print("\t", e)
 
     # here we would finalize all the plots
-    output_filename = plots_dir + '/' + experiment_name + '_lift_and_drag.png'
+    output_filename = os.path.join(plots_dir,
+                                   experiment_name + '_lift_and_drag.png')
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
 
 print("All experiments processed.")
