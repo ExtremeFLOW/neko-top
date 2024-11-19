@@ -58,15 +58,13 @@ experiments_dir = os.path.join(nekotop_root, "examples", "brinkman_parameters",
 cases_dir = os.path.join(nekotop_root, "results", "brinkman_parameters",
                          "cases")
 
+# Define the path to 'cache'
+pickle_dir = os.path.join(nekotop_root, "results", "brinkman_parameters",
+                          "cache")
+
 # Create logs and plots folders in the experiments directory if they don't exist
-logs_dir = os.path.join(experiments_dir, "logs")
-plots_dir = os.path.join(experiments_dir, "plots")
-tables_dir = os.path.join(experiments_dir, "tables")
-pickle_dir = os.path.join(experiments_dir, "pickle_files")
-os.makedirs(logs_dir, exist_ok=True)
-os.makedirs(plots_dir, exist_ok=True)
-os.makedirs(tables_dir, exist_ok=True)
-os.makedirs(pickle_dir, exist_ok=True)
+plots_dir = os.path.join(current_dir, "plots")
+tables_dir = os.path.join(current_dir, "tables")
 
 # List all .csv files in the experiments directory
 experiment_files = [
@@ -122,7 +120,8 @@ for file in experiment_files:
                     plot_force_measure(force_measure, fig_LD, ax_LD)
                     del force_measure
                 except Exception as e:
-                    print("Error in case:", case["name"], "  ", e)
+                    print("Error in case:", case["name"])
+                    print("\t", e)
 
     # here we would finalize all the plots
     output_filename = plots_dir + '/' + experiment_name + '_lift_and_drag.png'
