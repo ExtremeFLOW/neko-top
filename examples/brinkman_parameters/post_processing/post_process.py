@@ -1,6 +1,7 @@
 from post_processing_tools import compute_everything, plot_everything, generate_tables
 from metrics import *
 from functions import *
+from experiments import *
 import os
 import csv
 import matplotlib.pyplot as plt
@@ -66,6 +67,9 @@ for file in experiment_files:
     experiment = experiment_reader(os.path.join(experiments_dir, file))
     experiment_name = file.split('.')[0]
 
+    # ok this will NOT be heavy so we can store them all as a list.
+    experiment_tabulated = []
+
     print("Starting with the experiment:", experiment_name)
 
     # This should be encased in a function.
@@ -84,6 +88,7 @@ for file in experiment_files:
     for case_number, case in enumerate(experiment):
         print("Working on case number:", case_number, "   ", case["name"])
 
+
         # Construct the path to the case folder
         case_file_path = os.path.join(cases_dir, case["name"])
 
@@ -95,12 +100,23 @@ for file in experiment_files:
             chi = case["chi"]
             radius = case["radius"]
 
+            # use something similar to case for a data point, so we already the
+            # names etc
+            case_tabulated = case
+            data_points = []
             # Force using surface integrals (meshed case)
 # ----------------------------------------------------------------------------#
             if method == "meshed":
                 file_name = os.path.join(case_file_path, 'cylinder.log')
                 force_measure = read_force_torque(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
+                means, amps = compress_to_data_point(force_measure, plot_params)
+                data_point = []
+                data_point = {
+                    "mean" : means,
+                    "amp"  : amps,
+                    "name" : "meshed_force"}
+                data_points.append(data_point)
                 del force_measure
 
             # Force using rho * u (brinkman case)
@@ -109,6 +125,12 @@ for file in experiment_files:
                 file_name = os.path.join(case_file_path, 'cylinder.log')
                 force_measure = read_brinkman_force(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
+                means, amps = compress_to_data_point(force_measure, plot_params)
+                data_point = {
+                    "mean" : means,
+                    "amp"  : amps,
+                    "name" : "brinkman_force"}
+                data_points.append(data_point)
                 del force_measure
 
             # Using the rings
@@ -125,6 +147,12 @@ for file in experiment_files:
 
                     # append a single curve to the plot
                     plot_force_measure(force_measure, fig_LD, ax_LD)
+                    means, amps = compress_to_data_point(force_measure, plot_params)
+                    data_point = {
+                        "mean" : means,
+                        "amp"  : amps,
+                        "name" : "force_"+circle}
+                    data_points.append(data_point)
                     del force_measure
 
                     # separation angle
@@ -132,15 +160,34 @@ for file in experiment_files:
                     sep_angle = inflection_benchmark(file_name, Re, pickle_dir)
                     # here we would have some plotting, but for now lets just
                     # generate the pickle files
+                    data_point = {
+                        "mean" : mean(sep_angle['max_freq']),
+                        "name" : "separation_angle_"+circle}
+                    data_points.append(data_point)
+                    
                     del sep_angle
 
                 except Exception as e:
                     print("Error in case:", case["name"])
                     print("\t", e)
+            case_tabulated["observables"] = data_points
+            experiment_tabulated.append(case_tabulated)
 
     # here we would finalize all the plots
     output_filename = os.path.join(plots_dir,
                                    experiment_name + '_lift_and_drag.png')
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
+    # and we could plot curves based on tabulated data
+    if experiment_name == "Filter_radius":
+        plot_study(experiment_tabulated, 
+            x_axis_variable = "radius", 
+            line_axis_variable = "method",
+            out_filename = "test_filter.png")
+    if experiment_name == "Mesh_study":
+        plot_study(experiment_tabulated, 
+            x_axis_variable = "mesh", 
+            line_axis_variable = "method",
+            out_filename = "test_mesh.png")
+        
 
 print("All experiments processed.")

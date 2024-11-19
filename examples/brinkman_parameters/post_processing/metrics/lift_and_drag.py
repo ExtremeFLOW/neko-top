@@ -40,6 +40,36 @@ from pynektools.io.read_probes import ProbesReader
 #        print('INCORRECT METHOD!')
 #
 #    return force_measure
+def compress_to_data_point(force_measure, plot_params):
+    means = {}
+    amps = {}
+    t_start = plot_params["t_start"]
+    # these are the guys we're interested in                                    
+    measures = ["fx_tot", "fx_p", "fx_visc", "fy_tot", "fy_p", "fy_visc"]
+    for measure in measures:
+        if measure in force_measure:
+            mean, amp = mean_and_amp(force_measure["t"], force_measure[measure], t_start)
+            means[measure] = mean
+            amps[measure] = amp
+    return means, amps
+
+def mean_and_amp(t, x, t_start):
+    inds = np.where(t > t_start)
+    if t[-1] > t_start:
+        mean = np.mean(x[inds])
+        # probs not the best metric for "amplitude"
+        # VERY conservative, take the MAX separation and divide by two.
+        amplitude = (np.max(x[inds]) - np.min(x[inds]))/2
+
+        # I'm not good with python... if this was matlab I would
+        # - use `findpeaks`
+        # - classify them on either side of the mean
+        # - take the mean/standard deviation of the points
+        # - calculate a mean/stdv on the amplitude
+    else:
+        mean = 0.0
+        amplitude = 0.0
+    return mean, amplitude
 
 def init_plot_force_measure(plot_params):
     # The fig sizes etc should be passed in with plot params in the future
