@@ -36,7 +36,7 @@ plot_params = {
     # Statistics interpolation (force rings)
     "if_stats_force": False,
     "force_n_pts": 360,  # number of interpolation points,
-    "force_ring_radii": [0.50, 0.501, 0.502, 0.504, 0.508, 0.516, 0.532],
+    "force_ring_radii": ["050", "0501", "0502", "0505", "051", "052", "055"],
     # rings to consider
     "force_ring_plot": [0.5, 0.532],
     # rings to plot
@@ -107,19 +107,22 @@ for file in experiment_files:
             chi = case["chi"]
             radius = case["radius"]
 
-            try:
-                # either Calculate or load the case and append case data
-                # this will be full of all the functions we're interested in,
-                # for now it's just one to test
-                file_name = os.path.join(case_file_path, 'circ_0501.csv')
-                force_measure = surface_integral_lift_and_drag(
-                    file_name, Re, pickle_dir)
+            for circle in plot_params["force_ring_radii"]:
 
-                # append a single curve to the plot
-                plot_force_measure(force_measure, fig_LD, ax_LD)
-                del force_measure
-            except Exception as e:
-                print("Error in case:", case["name"], "  ", e)
+                try:
+                    # either Calculate or load the case and append case data
+                    # this will be full of all the functions we're interested in,
+                    # for now it's just one to test
+                    file_name = os.path.join(case_file_path,
+                                             'circ_' + circle + '.csv')
+                    force_measure = surface_integral_lift_and_drag(
+                        file_name, Re, pickle_dir)
+
+                    # append a single curve to the plot
+                    plot_force_measure(force_measure, fig_LD, ax_LD)
+                    del force_measure
+                except Exception as e:
+                    print("Error in case:", case["name"], "  ", e)
 
     # here we would finalize all the plots
     output_filename = plots_dir + '/' + experiment_name + '_lift_and_drag.png'
