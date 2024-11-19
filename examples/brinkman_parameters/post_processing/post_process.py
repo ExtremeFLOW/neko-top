@@ -107,12 +107,29 @@ for file in experiment_files:
             chi = case["chi"]
             radius = case["radius"]
 
+            # Force using surface integrals (meshed case)
+# ----------------------------------------------------------------------------#
+            if method == "meshed":
+                file_name = os.path.join(case_file_path, 'cylinder.log')
+                force_measure = read_force_torque(file_name, pickle_dir)
+                plot_force_measure(force_measure, fig_LD, ax_LD)
+                del force_measure
+
+            # Force using rho * u (brinkman case)
+# ----------------------------------------------------------------------------#
+            if method == "brinkman":
+                file_name = os.path.join(case_file_path, 'cylinder.log')
+                force_measure = read_brinkman_force(file_name, pickle_dir)
+                plot_force_measure(force_measure, fig_LD, ax_LD)
+                del force_measure
+
+            # Using the rings
+# ----------------------------------------------------------------------------#
             for circle in plot_params["force_ring_radii"]:
 
                 try:
-                    # either Calculate or load the case and append case data
-                    # this will be full of all the functions we're interested in,
-                    # for now it's just one to test
+                    # Lift and Drag
+                    # --------------------------------------------------------#
                     file_name = os.path.join(case_file_path,
                                              'circ_' + circle + '.csv')
                     force_measure = surface_integral_lift_and_drag(
@@ -121,6 +138,14 @@ for file in experiment_files:
                     # append a single curve to the plot
                     plot_force_measure(force_measure, fig_LD, ax_LD)
                     del force_measure
+
+                    # separation angle
+                    # --------------------------------------------------------#
+                    sep_angle = inflection_benchmark(file_name, Re, pickle_dir)
+                    # here we would have some plotting, but for now lets just
+                    # generate the pickle files
+                    del sep_angle
+
                 except Exception as e:
                     print("Error in case:", case["name"], "  ", e)
 

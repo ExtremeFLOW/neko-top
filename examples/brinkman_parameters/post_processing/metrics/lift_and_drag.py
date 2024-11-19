@@ -208,7 +208,7 @@ def read_force_torque(file_name: str, cache_dir: str = None) -> dict:
     if cache_dir is not None:
         file_ext = os.path.splitext(file_name)[1]
         cache_file = os.path.join(
-            cache_dir, "lift_and_drag",
+            cache_dir, "lift_and_drag_meshed",
             os.path.relpath(file_name,
                             cache_dir).replace("../", "").replace("/", "_"))
         cache_file = cache_file.replace(file_ext, ".pkl")
@@ -269,7 +269,7 @@ def read_brinkman_force(file_name: str, cache_dir: str = None) -> dict:
     if cache_dir is not None:
         file_ext = os.path.splitext(file_name)[1]
         cache_file = os.path.join(
-            cache_dir, "lift_and_drag",
+            cache_dir, "lift_and_drag_brink",
             os.path.relpath(file_name,
                             cache_dir).replace("../", "").replace("/", "_"))
         cache_file = cache_file.replace(file_ext, ".pkl")
