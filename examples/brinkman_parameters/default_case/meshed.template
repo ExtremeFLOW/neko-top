@@ -181,7 +181,7 @@
                 ]
             },
 
-            // circles 0.51
+            // circles 0.50
             {
                 "type": "probes",
                 "fields": [
@@ -203,12 +203,119 @@
                         "center": [ 0.0, 0.0, 0.51 ],
                         "normal": [ 0.0, 0.0, 1.0 ],
                         "axis": "x",
+                        "radius": 0.50,
+                        "amount": 720
+                    }
+                ]
+            },
+            // circles 0.501
+            {
+                "type": "probes",
+                "fields": [
+                    "u",
+                    "v",
+                    "w",
+                    "p",
+                    "du_dx",
+                    "du_dy",
+                    "dv_dx",
+                    "dv_dy",
+                ],
+                "output_file": "circ_0501.csv",
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.51 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
+                        "radius": 0.501,
+                        "amount": 720
+                    }
+                ]
+            },
+            // circles 0.502
+            {
+                "type": "probes",
+                "fields": [
+                    "u",
+                    "v",
+                    "w",
+                    "p",
+                    "du_dx",
+                    "du_dy",
+                    "dv_dx",
+                    "dv_dy",
+                ],
+                "output_file": "circ_0502.csv",
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.51 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
+                        "radius": 0.502,
+                        "amount": 720
+                    }
+                ]
+            },
+            // circles 0.505
+            {
+                "type": "probes",
+                "fields": [
+                    "u",
+                    "v",
+                    "w",
+                    "p",
+                    "du_dx",
+                    "du_dy",
+                    "dv_dx",
+                    "dv_dy",
+                ],
+                "output_file": "circ_0505.csv",
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.51 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
+                        "radius": 0.505,
+                        "amount": 720
+                    }
+                ]
+            },
+            // circles 0.51
+            {
+                "type": "probes",
+                "fields": [
+                    "u",
+                    "v",
+                    "w",
+                    "p",
+                    "du_dx",
+                    "du_dy",
+                    "dv_dx",
+                    "dv_dy",
+                ],
+                "output_file": "circ_051.csv",
+                "compute_control": "simulationtime",
+                "compute_value": 0.01,
+                "points": [
+                    {
+                        "type": "circle",
+                        "center": [ 0.0, 0.0, 0.51 ],
+                        "normal": [ 0.0, 0.0, 1.0 ],
+                        "axis": "x",
                         "radius": 0.51,
                         "amount": 720
                     }
                 ]
             },
-
             // circles 0.52
             {
                 "type": "probes",

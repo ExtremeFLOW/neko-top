@@ -126,7 +126,7 @@
                 "output_control": "simulationtime",
                 "output_value": 50,
                 "start_time": 50.0,
-                "set_of_stats":"basic"
+                "set_of_stats": "basic"
             },
             // one BL (45 degrees)
             {

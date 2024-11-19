@@ -68,8 +68,7 @@
                         }
                     ]
                 }
-            ],
-
+            ]
         },
         "point_zones": [
             {
@@ -113,7 +112,6 @@
                 "field": "v",
                 "direction": "y"
             },
-
             // Statistics
             {
                 "type": "fluid_stats",
