@@ -107,16 +107,19 @@ for file in experiment_files:
             chi = case["chi"]
             radius = case["radius"]
 
-            # either Calculate or load the case and append case data
-            # this will be full of all the functions we're interested in,
-            # for now it's just one to test
-            file_name = os.path.join(case_file_path, 'circ_0501.csv')
-            force_measure = surface_integral_lift_and_drag(
-                file_name, Re, pickle_dir)
+            try:
+                # either Calculate or load the case and append case data
+                # this will be full of all the functions we're interested in,
+                # for now it's just one to test
+                file_name = os.path.join(case_file_path, 'circ_0501.csv')
+                force_measure = surface_integral_lift_and_drag(
+                    file_name, Re, pickle_dir)
 
-            # append a single curve to the plot
-            plot_force_measure(force_measure, fig_LD, ax_LD)
-            del force_measure
+                # append a single curve to the plot
+                plot_force_measure(force_measure, fig_LD, ax_LD)
+                del force_measure
+            except Exception as e:
+                print("Error in case:", case["name"], "  ", e)
 
     # here we would finalize all the plots
     output_filename = plots_dir + '/' + experiment_name + '_lift_and_drag.png'
