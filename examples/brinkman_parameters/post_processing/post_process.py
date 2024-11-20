@@ -103,17 +103,22 @@ plot_params = {
     # rings to consider (in the statistics!)
     "force_ring_plot": [0.5, 0.532],
     # rings to consider (in the time series!)
-    "force_ring_plot_time": ["050", "051"],
+    "force_ring_plot_time": ["051"],
     # rings to plot
     # For taking averages of time series
     "t_start": 100.0  # time to start averaging,
 }
+# colours
+prop_cycle = plt.rcParams['axes.prop_cycle']
+colors = prop_cycle.by_key()['color']
+
 
 # List all .csv files in the experiments directory
 experiment_files = [
     f for f in os.listdir(experiments_dir) if f.endswith('.csv')
 ]
 
+i_color = 0
 # Loop over each .csv file and run the script for each
 for file in experiment_files:
     experiment = experiment_reader(os.path.join(experiments_dir, file))
@@ -161,12 +166,13 @@ for file in experiment_files:
         data_points = []
 
         # Force using surface integrals (meshed case)
+        color = colors[i_color%len(colors)]
         # -------------------------------------------------------------------- #
         if method == "meshed":
             file_name = os.path.join(case_file_path, 'cylinder.log')
             try:
                 force_measure = read_force_torque(file_name, cache_dir)
-                plot_force_measure(force_measure, fig_LD, ax_LD)
+                plot_force_measure(force_measure, fig_LD, ax_LD, case, color, '--')
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
                 data_point = {
@@ -181,24 +187,25 @@ for file in experiment_files:
                 print("\t", e)
 
         # Force using rho * u (brinkman case)
+        # fuck this one...
         # -------------------------------------------------------------------- #
-        if method == "brinkman":
-            file_name = os.path.join(case_file_path, 'cylinder.log')
-            try:
-                force_measure = read_brinkman_force(file_name, cache_dir)
-                plot_force_measure(force_measure, fig_LD, ax_LD)
-                means, amps = compress_to_data_point(force_measure,
-                                                     plot_params)
-                data_point = {
-                    "mean": means,
-                    "amp": amps,
-                    "name": "brinkman_force"
-                }
-                data_points.append(data_point)
-                del force_measure
-            except Exception as e:
-                print("Error in case:", case["name"])
-                print("\t", e)
+        # if method == "brinkman":
+        #     file_name = os.path.join(case_file_path, 'cylinder.log')
+        #     try:
+        #         force_measure = read_brinkman_force(file_name, cache_dir)
+        #         plot_force_measure(force_measure, fig_LD, ax_LD)
+        #         means, amps = compress_to_data_point(force_measure,
+        #                                              plot_params)
+        #         data_point = {
+        #             "mean": means,
+        #             "amp": amps,
+        #             "name": "brinkman_force"
+        #         }
+        #         data_points.append(data_point)
+        #         del force_measure
+        #     except Exception as e:
+        #         print("Error in case:", case["name"])
+        #         print("\t", e)
 
         # Using the rings
         # -------------------------------------------------------------------- #
@@ -216,7 +223,7 @@ for file in experiment_files:
                 # just so we don't get a million curves, let's just do the
                 # 050 one.
                 if circle in plot_params["force_ring_plot_time"]:
-                    plot_force_measure(force_measure, fig_LD, ax_LD)
+                    plot_force_measure(force_measure, fig_LD, ax_LD, case, color, '-')
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
                 data_point = {
@@ -227,11 +234,28 @@ for file in experiment_files:
                 data_points.append(data_point)
                 del force_measure
 
+                # separation angle
+                # --------------------------------------------------------#
+                sep_angle = inflection_benchmark(file_name, cache_dir)
+                # here we would have some plotting, but for now lets just
+                # generate the pickle files
+                data_point = {
+                    "mean_Str": np.mean(sep_angle['max_freq']),
+                    "theta": np.rad2deg(np.max(sep_angle['bias'])),
+                    "name": "separation_angle_" + circle
+                }
+                data_points.append(data_point)
+
+                if circle in plot_params["force_ring_plot_time"]:
+                    plot_separation_angle(sep_angle, fig_LD, ax_LD, case, color, '-')
+                del sep_angle
+
             except Exception as e:
                 print("Error in case:", case["name"])
                 print("\t", e)
             case_tabulated["observables"] = data_points
             experiment_tabulated.append(case_tabulated)
+            i_color = i_color + 1
 
     # here we would finalize all the plots
     os.path.exists(plots_dir) or os.makedirs(plots_dir)
@@ -245,7 +269,25 @@ for file in experiment_files:
                    x_axis_variable="radius",
                    line_axis_variable="method",
                    out_filename=output_filename + '.png')
+    if experiment_name == "Re_study":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        plot_study(experiment_tabulated,
+                   x_axis_variable="Re",
+                   line_axis_variable="method",
+                   out_filename=output_filename + '.png')
     if experiment_name == "Mesh_study":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method",
+                   out_filename=output_filename + '.png')
+    if experiment_name == "Report_mesh_study_Re200":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method",
+                   out_filename=output_filename + '.png')
+    if experiment_name == "Report_mesh_study_Re1000":
         output_filename = os.path.join(plots_dir, experiment_name)
         plot_study(experiment_tabulated,
                    x_axis_variable="mesh",

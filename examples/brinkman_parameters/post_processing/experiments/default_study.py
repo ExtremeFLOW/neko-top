@@ -7,30 +7,34 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
 # - handle the axis names etc
 # - make the actual plotting neat and tidy!
     # for now I'm hardcoding a list of observables
-    lift_obs = {
-        "type"      : "force",
-        "label"     : "Lift",
-        "circle"    : "050",
-        "component" : "fy_tot",
-        "linestyle" : "-",
-        "axis"      : 1,
-        }
+#    lift_obs = {
+#        "type"      : "force",
+#        "label"     : "Lift",
+#        "circle"    : "050",
+#        "component" : "fy_tot",
+#        "linestyle" : "-",
+#        }
     drag_obs = {
         "type"      : "force",
         "label"     : "Drag",
         "circle"    : "050",
         "component" : "fx_tot",
-        "linestyle" : "--",
-        "axis"      : 2,
+        "linestyle" : "-",
         }
     separation_obs = {
         "type"      : "separation_angle",
         "label"     : "Separation angle",
         "circle"    : "050",
-        "linestyle" : ":",
-        "axis"      : 3,
+        "linestyle" : "-",
         }
-    observable_list = [lift_obs, drag_obs, separation_obs]
+    Str_obs = {
+        "type"      : "Str",
+        "label"     : "Strouhal number",
+        "circle"    : "050",
+        "linestyle" : "-",
+        }
+    #observable_list = [lift_obs, drag_obs, separation_obs, Str_obs]
+    observable_list = [drag_obs, separation_obs, Str_obs]
     # I tried different axis but it looked so bad. Better have differnt plots
     # # get the plot read
     # fig, ax = plt.subplots()
@@ -113,6 +117,11 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
     for a, axis in enumerate(ax):
         axis.legend()
         axis.set_ylabel(observable_list[a]["label"])
+        if a != len(ax)-1:
+            axis.set_xticks([])
+        if a % 2 == 1:
+           axis.yaxis.tick_right()
+           axis.yaxis.set_label_position("right")
     ax[-1].set_xlabel(x_axis_variable)
     plt.savefig(out_filename)        
 
@@ -155,13 +164,15 @@ def extract_observable(case, observable):
             observable["component"])
     if observable["type"] == "separation_angle":
         result = extract_sep_angle_observable(case, observable["circle"])
+    if observable["type"] == "Str":
+        result = extract_Str_observable(case, observable["circle"])
     return result
 
 def extract_force_observable(case, circle, component):
     # this should probably be nans or something
     name = "force_" + circle
     data = case["observables"]
-    result = 0.0
+    result = None
     for data_point in data:
         if data_point["name"] == name:
             if component in data_point["mean"]:
@@ -172,8 +183,17 @@ def extract_sep_angle_observable(case, circle):
     # this should probably be nans or something
     name = "separation_angle_" + circle
     data = case["observables"]
-    result = 0.0
+    result = None
     for data_point in data:
         if data_point["name"] == name:
-            result = data_point["mean"]
+            result = data_point["theta"]
+    return result
+def extract_Str_observable(case, circle):
+    # this should probably be nans or something
+    name = "separation_angle_" + circle
+    data = case["observables"]
+    result = None
+    for data_point in data:
+        if data_point["name"] == name:
+            result = data_point["mean_Str"]
     return result

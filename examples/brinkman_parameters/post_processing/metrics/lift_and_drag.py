@@ -73,22 +73,30 @@ def mean_and_amp(t, x, t_start):
 
 def init_plot_force_measure(plot_params):
     # The fig sizes etc should be passed in with plot params in the future
-    fig, ax = plt.subplots(2,1, figsize=(10, 5), dpi = 200)
+    fig, ax = plt.subplots(3,1, figsize=(10, 7.5), dpi = 200)
     return fig, ax
 
-def plot_force_measure(force_measure, fig, ax):
-    ax[0].plot(force_measure["t"], force_measure["fy_tot"], label = force_measure["type"])
-    ax[1].plot(force_measure["t"], force_measure["fx_tot"], label = force_measure["type"])
+def plot_force_measure(force_measure, fig, ax, case, color, linestyle):
+    # For both this plot, and the separation angles, we figure out what is the
+    # indipendent variable and only include that in the legend!!!.
+    ax[0].plot(force_measure["t"], force_measure["fy_tot"], label =  case["name"], color = color, linestyle = linestyle)
+    ax[1].plot(force_measure["t"], force_measure["fx_tot"], label =  case["name"], color = color, linestyle = linestyle)
+
+# a quick plotting function
+def plot_separation_angle(benchmark_results, fig, ax, case, color, linestyle):
+    # we only want the largest one
+    ax[2].plot(benchmark_results["times"], np.rad2deg(benchmark_results["angles"]), label =  case["name"], color=color, linestyle=linestyle)
 
 def finalize_plot_force_measure(plot_params, fig, ax, output_filename):
     lift_axis = plot_params["lift_axis"]
     drag_axis = plot_params["drag_axis"] 
     ax[0].set_ylabel("Lift")
     ax[1].set_ylabel("Drag")
-    ax[1].set_xlabel("Time")
     ax[0].set_ylim(lift_axis)
     ax[1].set_ylim(drag_axis)
+    ax[2].set_ylabel(r"$\theta$")
     ax[1].legend()
+    ax[2].set_xlabel("Time")
     plt.savefig(output_filename)
 
 def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = None) -> dict:
