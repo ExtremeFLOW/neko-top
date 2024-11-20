@@ -82,6 +82,11 @@ def plot_force_measure(force_measure, fig, ax, case, color, linestyle):
     ax[0].plot(force_measure["t"], force_measure["fy_tot"], label =  case["name"], color = color, linestyle = linestyle)
     ax[1].plot(force_measure["t"], force_measure["fx_tot"], label =  case["name"], color = color, linestyle = linestyle)
 
+# a quick plotting function
+def plot_separation_angle(benchmark_results, fig, ax, case, color, linestyle):
+    # we only want the largest one
+    ax[2].plot(benchmark_results["times"], np.rad2deg(benchmark_results["angles"]), label =  case["name"], color=color, linestyle=linestyle)
+
 def finalize_plot_force_measure(plot_params, fig, ax, output_filename):
     lift_axis = plot_params["lift_axis"]
     drag_axis = plot_params["drag_axis"] 

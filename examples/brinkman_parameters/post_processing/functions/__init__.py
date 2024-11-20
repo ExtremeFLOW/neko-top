@@ -1,1 +1,1 @@
-from .experiment_reader import experiment_reader
+from .readers import experiment_reader

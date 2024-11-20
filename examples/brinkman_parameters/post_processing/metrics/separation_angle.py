@@ -10,6 +10,11 @@ def plot_separation_angle(benchmark_results, fig, ax, case, color, linestyle):
     # we only want the largest one
     ax[2].plot(benchmark_results["times"], benchmark_results["angles"][:,0], label =  case["name"], color=color, linestyle=linestyle)
 # ============================================================================ #
+# Define the list exported through all
+
+__all__ = ["inflection_benchmark"]
+
+# ============================================================================ #
 # Main function for computing the separation angle
 
 

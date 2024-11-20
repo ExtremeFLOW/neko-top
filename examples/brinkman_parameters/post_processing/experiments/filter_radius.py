@@ -8,10 +8,10 @@ import sys
 from statistics import mean
 
 try:
-    from functions.experiment_reader import experiment_reader
+    from examples.brinkman_parameters.post_processing.functions.readers import experiment_reader
 except ImportError or ModuleNotFoundError:
     sys.path.append(os.path.join(os.path.dirname(__file__), '../functions'))
-    from experiment_reader import experiment_reader
+    from readers import experiment_reader
 try:
     from metrics.separation_angle import inflection_benchmark
 except ImportError or ModuleNotFoundError:
