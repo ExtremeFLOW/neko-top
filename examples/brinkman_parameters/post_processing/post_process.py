@@ -17,70 +17,6 @@ plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
 cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 
-# Set some default plotting options
-plot_options = {
-    "linestyle": "-",
-    "marker": "o",
-}
-
-# ============================================================================ #
-# Define the experiments and which metrics to plot
-
-metric_plots = [
-    {
-        # Experiment settings
-        "experiment_name": "Re_study",
-        "variable": "Re",
-        "variant_key": "method",
-        "variant_list": ["brinkman", "meshed", "idw"],
-
-        # Metric specific options
-        "metric": "Frequency of Inflection Points",
-        "circ_radius": "050",
-
-        # Cache and case directories
-        "cache_dir": cache_dir,
-        "cases_dir": cases_dir,
-
-        # Plotting options
-        "save_fig": True,
-        "fig_dir": plots_dir,
-        "fig_name": "Re_study_inflection.png",
-
-        # Plot styling
-        "axes_options": {
-            "xlabel": "Reynolds Number",
-            "ylabel": "Frequency of Inflection Points",
-        },
-        "legend_options": {
-            "title": "Method",
-            "loc": "upper right",
-        },
-        "plot_options": plot_options,
-    },
-]
-
-# ============================================================================ #
-# Execute the metric plotting
-
-for plot in metric_plots:
-    experiment_file = os.path.join(experiments_dir,
-                                   plot["experiment_name"] + ".csv")
-
-    experiment = experiment_reader(experiment_file)
-    plot_metric(experiment, **plot)
-
-plt.show(block=True)
-
-# Old code
-#
-#
-#
-#
-#
-#
-#
-#
 # ============================================================================ #
 # Post process the experiments
 
@@ -111,7 +47,6 @@ plot_params = {
 # colours
 prop_cycle = plt.rcParams['axes.prop_cycle']
 colors = prop_cycle.by_key()['color']
-
 
 # List all .csv files in the experiments directory
 experiment_files = [
@@ -166,13 +101,14 @@ for file in experiment_files:
         data_points = []
 
         # Force using surface integrals (meshed case)
-        color = colors[i_color%len(colors)]
+        color = colors[i_color % len(colors)]
         # -------------------------------------------------------------------- #
         if method == "meshed":
             file_name = os.path.join(case_file_path, 'cylinder.log')
             try:
                 force_measure = read_force_torque(file_name, cache_dir)
-                plot_force_measure(force_measure, fig_LD, ax_LD, case, color, '--')
+                plot_force_measure(force_measure, fig_LD, ax_LD, case, color,
+                                   '--')
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
                 data_point = {
@@ -223,7 +159,8 @@ for file in experiment_files:
                 # just so we don't get a million curves, let's just do the
                 # 050 one.
                 if circle in plot_params["force_ring_plot_time"]:
-                    plot_force_measure(force_measure, fig_LD, ax_LD, case, color, '-')
+                    plot_force_measure(force_measure, fig_LD, ax_LD, case,
+                                       color, '-')
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
                 data_point = {
@@ -247,7 +184,8 @@ for file in experiment_files:
                 data_points.append(data_point)
 
                 if circle in plot_params["force_ring_plot_time"]:
-                    plot_separation_angle(sep_angle, fig_LD, ax_LD, case, color, '-')
+                    plot_separation_angle(sep_angle, fig_LD, ax_LD, case,
+                                          color, '-')
                 del sep_angle
 
             except Exception as e:

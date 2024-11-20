@@ -48,13 +48,17 @@ def compute_metric(case: dict, metric: str, **kwargs) -> float:
 
         benchmark_results = inflection_benchmark(file_name, cache_dir)
 
-        match kwargs.get("which", "mean"):
+        match kwargs.get("which", None):
             case "0":
                 return benchmark_results["max_freq"][0]
             case "1":
                 return benchmark_results["max_freq"][1]
             case "2":
                 return benchmark_results["max_freq"][2]
+            case _:
+                raise ValueError(
+                    f"Please select 'which' inflection point to track: 0, 1, or 2."
+                )
 
     else:
         print(f"Metric {metric} not recognized.")
