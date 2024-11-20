@@ -59,9 +59,14 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
             cache_dir, "inflection_benchmark",
             os.path.relpath(file_name,
                             cache_dir).replace("../", "").replace("/", "_"))
-        cache_file = cache_file.replace(file_ext, ".pkl")
 
-        if os.path.exists(cache_file):
+        cache_file = cache_file.replace(file_ext, ".pkl")
+        exists = os.path.exists(cache_file)
+
+        # If the cache file exists and is not older than the file, load it
+        mod_time = os.path.getmtime(file_name)
+        cache_time = os.path.getmtime(cache_file) if exists else 0
+        if cache_time > mod_time:
             with open(cache_file, "rb") as f:
                 return pickle.load(f)
 
