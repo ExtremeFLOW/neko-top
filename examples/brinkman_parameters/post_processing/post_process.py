@@ -265,33 +265,49 @@ for file in experiment_files:
     # and we could plot curves based on tabulated data
     if experiment_name == "Filter_radius":
         output_filename = os.path.join(plots_dir, experiment_name)
-        plot_study(experiment_tabulated,
+        ax, fig = plot_study(experiment_tabulated,
                    x_axis_variable="radius",
-                   line_axis_variable="method",
-                   out_filename=output_filename + '.png')
-    if experiment_name == "Re_study":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        plot_study(experiment_tabulated,
-                   x_axis_variable="Re",
-                   line_axis_variable="method",
-                   out_filename=output_filename + '.png')
-    if experiment_name == "Mesh_study":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method",
-                   out_filename=output_filename + '.png')
-    if experiment_name == "Report_mesh_study_Re200":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method",
-                   out_filename=output_filename + '.png')
-    if experiment_name == "Report_mesh_study_Re1000":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method",
-                   out_filename=output_filename + '.png')
+                   line_axis_variable="method")
+        # extract just the meshed case
+        case_file_path = os.path.join(cases_dir, "meshed_mesh_4_re_200")
+        # extract the forces
+        file_name = os.path.join(case_file_path, 'cylinder.log')
+        force_measure = read_force_torque(file_name, cache_dir)
+        means, amps = compress_to_data_point(force_measure, plot_params)
+        file_name = os.path.join(case_file_path, 'circ_' + '050' + '.csv')
+        sep_angle = inflection_benchmark(file_name, cache_dir)
+        mean_Str = np.mean(sep_angle['max_freq'])
+        theta = np.rad2deg(np.max(sep_angle['bias']))
+        ax[0].plot([0.01,0.1],[means["fx_tot"],means["fx_tot"]], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[0].legend() 
+        ax[1].plot([0.01,0.1],[theta, theta], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[1].legend() 
+        ax[2].plot([0.01,0.1],[mean_Str, mean_Str], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[2].legend() 
+        plt.savefig(output_filename)
+#    if experiment_name == "Re_study":
+#        output_filename = os.path.join(plots_dir, experiment_name)
+#        plot_study(experiment_tabulated,
+#                   x_axis_variable="Re",
+#                   line_axis_variable="method",
+#                   out_filename=output_filename + '.png')
+#    if experiment_name == "Mesh_study":
+#        output_filename = os.path.join(plots_dir, experiment_name)
+#        plot_study(experiment_tabulated,
+#                   x_axis_variable="mesh",
+#                   line_axis_variable="method",
+#                   out_filename=output_filename + '.png')
+#    if experiment_name == "Report_mesh_study_Re200":
+#        output_filename = os.path.join(plots_dir, experiment_name)
+#        plot_study(experiment_tabulated,
+#                   x_axis_variable="mesh",
+#                   line_axis_variable="method",
+#                   out_filename=output_filename + '.png')
+#    if experiment_name == "Report_mesh_study_Re1000":
+#        output_filename = os.path.join(plots_dir, experiment_name)
+#        plot_study(experiment_tabulated,
+#                   x_axis_variable="mesh",
+#                   line_axis_variable="method",
+#                   out_filename=output_filename + '.png')
 
 print("All experiments processed.")

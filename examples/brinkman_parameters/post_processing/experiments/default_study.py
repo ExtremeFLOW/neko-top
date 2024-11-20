@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_filename):
+def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable):
 # its late at night and im tired, so here are the todo's:
 # - allow for an optional input to hold an aditional variable constant, ie, Re
 # - include the separation angle observable
@@ -123,7 +123,8 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
            axis.yaxis.tick_right()
            axis.yaxis.set_label_position("right")
     ax[-1].set_xlabel(x_axis_variable)
-    plt.savefig(out_filename)        
+    return ax, fig
+    #plt.savefig(out_filename)        
 
 def get_x_axis(x_axis_list, x_axis_variable, case):
     if x_axis_variable == "method":
