@@ -3,8 +3,7 @@ from metrics import *
 from functions import *
 from experiments import *
 import os
-import csv
-import matplotlib.pyplot as plt
+import numpy as np
 
 # OK, I (Harry) am definitely not the person to be making a judgement call like
 # this hahahaha, it's very computer science-y and is based on a conversation
@@ -87,7 +86,6 @@ for file in experiment_files:
     # Loop through each case/case in the experiment
     for case_number, case in enumerate(experiment):
 
-
         # Construct the path to the case folder
         case_file_path = os.path.join(cases_dir, case["name"])
 
@@ -116,11 +114,13 @@ for file in experiment_files:
             try:
                 force_measure = read_force_torque(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
-                means, amps = compress_to_data_point(force_measure, plot_params)
+                means, amps = compress_to_data_point(force_measure,
+                                                     plot_params)
                 data_point = {
-                    "mean" : means,
-                    "amp"  : amps,
-                    "name" : "meshed_force"}
+                    "mean": means,
+                    "amp": amps,
+                    "name": "meshed_force"
+                }
                 data_points.append(data_point)
                 del force_measure
             except Exception as e:
@@ -134,11 +134,13 @@ for file in experiment_files:
             try:
                 force_measure = read_brinkman_force(file_name, pickle_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
-                means, amps = compress_to_data_point(force_measure, plot_params)
+                means, amps = compress_to_data_point(force_measure,
+                                                     plot_params)
                 data_point = {
-                    "mean" : means,
-                    "amp"  : amps,
-                    "name" : "brinkman_force"}
+                    "mean": means,
+                    "amp": amps,
+                    "name": "brinkman_force"
+                }
                 data_points.append(data_point)
                 del force_measure
             except Exception as e:
@@ -159,24 +161,27 @@ for file in experiment_files:
 
                 # append a single curve to the plot
                 plot_force_measure(force_measure, fig_LD, ax_LD)
-                means, amps = compress_to_data_point(force_measure, plot_params)
+                means, amps = compress_to_data_point(force_measure,
+                                                     plot_params)
                 data_point = {
-                    "mean" : means,
-                    "amp"  : amps,
-                    "name" : "force_"+circle}
+                    "mean": means,
+                    "amp": amps,
+                    "name": "force_" + circle
+                }
                 data_points.append(data_point)
                 del force_measure
 
                 # separation angle
                 # --------------------------------------------------------#
-                sep_angle = inflection_benchmark(file_name, Re, pickle_dir)
+                sep_angle = inflection_benchmark(file_name, pickle_dir)
                 # here we would have some plotting, but for now lets just
                 # generate the pickle files
                 data_point = {
-                    "mean" : mean(sep_angle['max_freq']),
-                    "name" : "separation_angle_"+circle}
+                    "mean": np.mean(sep_angle['max_freq']),
+                    "name": "separation_angle_" + circle
+                }
                 data_points.append(data_point)
-                
+
                 del sep_angle
 
             except Exception as e:
@@ -192,15 +197,14 @@ for file in experiment_files:
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
     # and we could plot curves based on tabulated data
     if experiment_name == "Filter_radius":
-        plot_study(experiment_tabulated, 
-            x_axis_variable = "radius", 
-            line_axis_variable = "method",
-            out_filename = "test_filter.png")
+        plot_study(experiment_tabulated,
+                   x_axis_variable="radius",
+                   line_axis_variable="method",
+                   out_filename="test_filter.png")
     if experiment_name == "Mesh_study":
-        plot_study(experiment_tabulated, 
-            x_axis_variable = "mesh", 
-            line_axis_variable = "method",
-            out_filename = "test_mesh.png")
-        
+        plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method",
+                   out_filename="test_mesh.png")
 
 print("All experiments processed.")
