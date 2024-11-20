@@ -220,3 +220,19 @@ make_a_case $case_name \
     method_list mesh_list Re_list \
     chi_list radius_list \
     rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="IDW_study"
+
+method_list=("idw")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0.1")
+rmax_list=("1.0" "1.5" "2.0" "2.5" "3.0")
+rpower_list=("1.0" "1.5" "2.0" "2.5" "3.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
