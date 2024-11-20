@@ -34,6 +34,8 @@ def plot_metric(experiment: list[dict],
     # set up the axis for a test plot
     fig, ax = plt.subplots()
     ax.set_title(f"{metric} vs {variable}")
+    ax.set_xlabel(variable)
+    ax.set_ylabel(metric)
 
     if variant_key is None:
         plot_metric_all(experiment, metric, variable, ax, **kwargs)
