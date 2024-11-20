@@ -5,10 +5,6 @@ import pickle
 import numpy as np
 from pynektools.io.read_probes import ProbesReader
 
-# a quick plotting function
-def plot_separation_angle(benchmark_results, fig, ax, case, color, linestyle):
-    # we only want the largest one
-    ax[2].plot(benchmark_results["times"], benchmark_results["angles"][:,0], label =  case["name"], color=color, linestyle=linestyle)
 # ============================================================================ #
 # Define the list exported through all
 

@@ -11,11 +11,13 @@ root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
                                "experiments")
 cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
+#cases_dir = os.path.join(root_dir, "results", "only_stats","brinkman_parameters", "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
 plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
 cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
+#cache_dir = os.path.join(root_dir, "results", "only_stats", "brinkman_parameters", "cache")
 
 # ============================================================================ #
 # Post process the experiments
@@ -27,13 +29,13 @@ plot_params = {
     "lift_axis": [-1, 1],  # axis for plotted lift,
     "drag_axis": [0, 1.5],  # axis for plotted drag,
     # Statistics interpolation (wake deficit)
-    "if_stats_wake": False,
+    "if_stats_wake": True,
     "wake_y_lim": [-15, 15],  # y limits for wake profiles,
     "wake_n_pts": 300,  # number points in the wake,
     "wake_positions": [10, 15, 20],  # position for wakes,
-    "wake_U_lims": [0.5, 1.2],  # axis limits for wakes plot,
+    "wake_U_lim": [0.5, 1.2],  # axis limits for wakes plot,
     # Statistics interpolation (force rings)
-    "if_stats_force": False,
+    "if_stats_force": True,
     "force_n_pts": 360,  # number of interpolation points,
     "force_ring_radii": ["050", "0501", "0502", "0505", "051", "052", "055"],
     # rings to consider (in the statistics!)
@@ -53,9 +55,9 @@ experiment_files = [
     f for f in os.listdir(experiments_dir) if f.endswith('.csv')
 ]
 
-i_color = 0
 # Loop over each .csv file and run the script for each
 for file in experiment_files:
+    i_color = 0
     experiment = experiment_reader(os.path.join(experiments_dir, file))
     experiment_name = file.split('.')[0]
 
@@ -76,6 +78,7 @@ for file in experiment_files:
 
     # set up the axis for a test plot
     fig_LD, ax_LD = init_plot_force_measure(plot_params)
+    fig_wake, ax_wake = init_plot_a_wake_line(plot_params)
     # Loop through each case/case in the experiment
     for case_number, case in enumerate(experiment):
 
@@ -95,13 +98,31 @@ for file in experiment_files:
         chi = case["chi"]
         radius = case["radius"]
 
+        # somehow I've still fucked up this color order...
+        if i_color == 0:
+            ind = 0
+        else:
+            ind = i_color % len(colors)
+        color = colors[ind]
         # use something similar to case for a data point, so we already the
         # names etc
         case_tabulated = case
         data_points = []
 
+        # Wake lines
+        # -------------------------------------------------------------------- #
+        try:
+            wake_line = wake(case_file_path, plot_params, cache_dir)
+            wake_line["name"] = case["name"]
+            plot_a_wake_line(wake_line, plot_params, ax_wake, fig_wake, color, '-')
+        except Exception as e:
+            print("Error in statistics case:", case["name"])
+            print("\t", e)
+        # -------------------------------------------------------------------- #
+        # for processing the stats files, I guess we could also use the cache.
+
+
         # Force using surface integrals (meshed case)
-        color = colors[i_color % len(colors)]
         # -------------------------------------------------------------------- #
         if method == "meshed":
             file_name = os.path.join(case_file_path, 'cylinder.log')
@@ -191,15 +212,23 @@ for file in experiment_files:
             except Exception as e:
                 print("Error in case:", case["name"])
                 print("\t", e)
-            case_tabulated["observables"] = data_points
-            experiment_tabulated.append(case_tabulated)
-            i_color = i_color + 1
+        # -------------------------------------------------------------------- #
+        # tabulate them all and move on
+        case_tabulated["observables"] = data_points
+        experiment_tabulated.append(case_tabulated)
+        i_color = i_color + 1
+        # -------------------------------------------------------------------- #
+        # for processing the stats files, I guess we could also use the cache.
 
     # here we would finalize all the plots
     os.path.exists(plots_dir) or os.makedirs(plots_dir)
     output_filename = os.path.join(plots_dir,
                                    experiment_name + '_lift_and_drag.png')
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
+    os.path.exists(plots_dir) or os.makedirs(plots_dir)
+    output_filename = os.path.join(plots_dir,
+                                   experiment_name + '_wake_line.png')
+    finalize_plot_a_wake_line(plot_params, ax_wake, fig_wake, output_filename)
     # and we could plot curves based on tabulated data
     if experiment_name == "Filter_radius":
         output_filename = os.path.join(plots_dir, experiment_name)
@@ -216,36 +245,39 @@ for file in experiment_files:
         sep_angle = inflection_benchmark(file_name, cache_dir)
         mean_Str = np.mean(sep_angle['max_freq'])
         theta = np.rad2deg(np.max(sep_angle['bias']))
-        ax[0].plot([0.01,0.1],[means["fx_tot"],means["fx_tot"]], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[0].plot([0.01,0.1],[means["fx_tot"],means["fx_tot"]], 
+            linestyle = '--', color = 'k', label = "meshed reference")
         ax[0].legend() 
-        ax[1].plot([0.01,0.1],[theta, theta], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[1].plot([0.01,0.1],[theta, theta], linestyle = '--', color = 'k', 
+            label = "meshed reference")
         ax[1].legend() 
-        ax[2].plot([0.01,0.1],[mean_Str, mean_Str], linestyle = '--', color = 'k', label = "meshed reference")
+        ax[2].plot([0.01,0.1],[mean_Str, mean_Str], linestyle = '--', 
+            color = 'k', label = "meshed reference")
         ax[2].legend() 
-        plt.savefig(output_filename)
-#    if experiment_name == "Re_study":
-#        output_filename = os.path.join(plots_dir, experiment_name)
-#        plot_study(experiment_tabulated,
-#                   x_axis_variable="Re",
-#                   line_axis_variable="method",
-#                   out_filename=output_filename + '.png')
-#    if experiment_name == "Mesh_study":
-#        output_filename = os.path.join(plots_dir, experiment_name)
-#        plot_study(experiment_tabulated,
-#                   x_axis_variable="mesh",
-#                   line_axis_variable="method",
-#                   out_filename=output_filename + '.png')
-#    if experiment_name == "Report_mesh_study_Re200":
-#        output_filename = os.path.join(plots_dir, experiment_name)
-#        plot_study(experiment_tabulated,
-#                   x_axis_variable="mesh",
-#                   line_axis_variable="method",
-#                   out_filename=output_filename + '.png')
-#    if experiment_name == "Report_mesh_study_Re1000":
-#        output_filename = os.path.join(plots_dir, experiment_name)
-#        plot_study(experiment_tabulated,
-#                   x_axis_variable="mesh",
-#                   line_axis_variable="method",
-#                   out_filename=output_filename + '.png')
+        fig.savefig(output_filename)
+    if experiment_name == "Re_study":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig =  plot_study(experiment_tabulated,
+                   x_axis_variable="Re",
+                   line_axis_variable="method")
+        fig.savefig(output_filename)
+    if experiment_name == "Mesh_study":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig = plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method")
+        fig.savefig(output_filename)
+    if experiment_name == "Report_mesh_study_Re200":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig = plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method")
+        fig.savefig(output_filename)
+    if experiment_name == "Report_mesh_study_Re1000":
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig = plot_study(experiment_tabulated,
+                   x_axis_variable="mesh",
+                   line_axis_variable="method")
+        fig.savefig(output_filename)
 
 print("All experiments processed.")

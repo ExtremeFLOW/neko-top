@@ -97,7 +97,7 @@ def finalize_plot_force_measure(plot_params, fig, ax, output_filename):
     ax[2].set_ylabel(r"$\theta$")
     ax[1].legend()
     ax[2].set_xlabel("Time")
-    plt.savefig(output_filename)
+    fig.savefig(output_filename)
 
 def surface_integral_lift_and_drag(file_name: str, Re: float, cache_dir: str = None) -> dict:
     """
