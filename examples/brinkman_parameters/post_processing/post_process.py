@@ -37,8 +37,10 @@ plot_params = {
     "if_stats_force": False,
     "force_n_pts": 360,  # number of interpolation points,
     "force_ring_radii": ["050", "0501", "0502", "0505", "051", "052", "055"],
-    # rings to consider
+    # rings to consider (in the statistics!)
     "force_ring_plot": [0.5, 0.532],
+    # rings to consider (in the time series!)
+    "force_ring_plot_time": ["050", "051"],
     # rings to plot
     # For taking averages of time series
     "t_start": 100.0  # time to start averaging,
@@ -160,7 +162,10 @@ for file in experiment_files:
                     file_name, Re, pickle_dir)
 
                 # append a single curve to the plot
-                plot_force_measure(force_measure, fig_LD, ax_LD)
+                # just so we don't get a million curves, let's just do the 
+                # 050 one.
+                if circle in plot_params["force_ring_plot_time"]:
+                    plot_force_measure(force_measure, fig_LD, ax_LD)
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
                 data_point = {
@@ -197,14 +202,16 @@ for file in experiment_files:
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
     # and we could plot curves based on tabulated data
     if experiment_name == "Filter_radius":
+        output_filename = os.path.join(plots_dir, experiment_name)
         plot_study(experiment_tabulated,
                    x_axis_variable="radius",
                    line_axis_variable="method",
-                   out_filename="test_filter.png")
+                   out_filename=output_filename + '.png')
     if experiment_name == "Mesh_study":
+        output_filename = os.path.join(plots_dir, experiment_name)
         plot_study(experiment_tabulated,
                    x_axis_variable="mesh",
                    line_axis_variable="method",
-                   out_filename="test_mesh.png")
+                   out_filename=output_filename + '.png')
 
 print("All experiments processed.")

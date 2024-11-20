@@ -23,13 +23,25 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
         "linestyle" : "--",
         "axis"      : 2,
         }
-    observable_list = [lift_obs, drag_obs]
-    # get the plot read
-    fig, ax = plt.subplots()
-    # to be more general we should check how many axis are in the observable lsit
-    # I'm no good with python, I want something along the lines of plotyy in matlab
-    ax1 = ax.twinx()
-    ax2 = ax.twinx()
+    separation_obs = {
+        "type"      : "separation_angle",
+        "label"     : "Separation angle",
+        "circle"    : "050",
+        "linestyle" : ":",
+        "axis"      : 3,
+        }
+    observable_list = [lift_obs, drag_obs, separation_obs]
+    # I tried different axis but it looked so bad. Better have differnt plots
+    # # get the plot read
+    # fig, ax = plt.subplots()
+    # # to be more general we should check how many axis are in the observable lsit
+    # # I'm no good with python, I want something along the lines of plotyy in matlab
+    # ax1 = ax.twinx()
+    # ax2 = ax.twinx()
+    # ax3 = ax.twinx()
+    # ax_list = [ax1, ax2, ax3]
+
+    fig, ax = plt.subplots(len(observable_list), 1)
     # keep the colours
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
@@ -82,7 +94,7 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
     ind = variable_list.index(line_axis_variable)
     line_list = unique_list[ind]
     for j, line in enumerate(line_list):
-        observables = np.empty((len(x_axis_list), len(line_list)))
+        observables = np.empty((len(x_axis_list), len(observable_list)))
         for i, x_pt in enumerate(x_axis_list):
             for c, case in enumerate(experiment_tabulated):
                 if line == case[line_axis_variable] and x_pt == case[x_axis_variable]:
@@ -96,14 +108,12 @@ def plot_study(experiment_tabulated, x_axis_variable, line_axis_variable, out_fi
         x_axis = x_axis[inds]
         for o, obs in enumerate(observable_list):
             y_axis = observables[inds, o]
-            if obs["axis"] == 1:
-                ax1.plot(x_axis, y_axis, label = line + " " + obs["label"],
-                    linestyle = obs["linestyle"], color = colors[j])
-            if obs["axis"] == 2:
-                ax2.plot(x_axis, y_axis, label = line + " " + obs["label"],
-                    linestyle = obs["linestyle"], color = colors[j])
-    ax1.legend()
-    ax2.legend()
+            ax[o].plot(x_axis, y_axis, label = line,
+                linestyle = obs["linestyle"], color = colors[j])
+    for a, axis in enumerate(ax):
+        axis.legend()
+        axis.set_ylabel(observable_list[a]["label"])
+    ax[-1].set_xlabel(x_axis_variable)
     plt.savefig(out_filename)        
 
 def get_x_axis(x_axis_list, x_axis_variable, case):
@@ -143,6 +153,8 @@ def extract_observable(case, observable):
     if observable["type"] == "force":
         result = extract_force_observable(case, observable["circle"], 
             observable["component"])
+    if observable["type"] == "separation_angle":
+        result = extract_sep_angle_observable(case, observable["circle"])
     return result
 
 def extract_force_observable(case, circle, component):
@@ -154,4 +166,14 @@ def extract_force_observable(case, circle, component):
         if data_point["name"] == name:
             if component in data_point["mean"]:
                 result = data_point["mean"][component]
+    return result
+
+def extract_sep_angle_observable(case, circle):
+    # this should probably be nans or something
+    name = "separation_angle_" + circle
+    data = case["observables"]
+    result = 0.0
+    for data_point in data:
+        if data_point["name"] == name:
+            result = data_point["mean"]
     return result
