@@ -196,7 +196,7 @@ method_list=("brinkman" "meshed" "idw")
 mesh_list=("2")
 Re_list=("200" "400" "1000" "2000" "3900")
 chi_list=("1000")
-radius_list=("0.1")
+radius_list=("0.1" "0.01")
 rmax_list=("1.0")
 rpower_list=("1.0")
 
