@@ -10,14 +10,12 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
                                "experiments")
-cases_dir = os.path.join(root_dir, "results", "hpc", "brinkman_parameters",
-                         "cases")
+cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
 plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
-cache_dir = os.path.join(root_dir, "results", "hpc", "brinkman_parameters",
-                         "cache")
+cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 
 # ============================================================================ #
 # Post process the experiments
