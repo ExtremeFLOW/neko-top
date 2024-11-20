@@ -52,21 +52,3 @@ def experiment_reader(file_name: str):
             experiment.append(ex)
 
     return experiment
-
-
-if __name__ == '__main__':
-    # Get current directory
-    current_dir = os.path.dirname(os.path.realpath(__file__))
-    experiment_folder = os.path.join(current_dir, '../../experiments')
-    experiment_folder = os.path.abspath(experiment_folder)
-
-    # Read the experiment file
-    experiments = experiment_reader(
-        os.path.join(experiment_folder, 'Re_study.csv'))
-
-    # Print the experiment
-    for ex in experiments:
-        print(f'Experiment: {ex["name"]}')
-        for key, value in ex.items():
-            if key != 'name':
-                print(f'\t{key}: {value}')

@@ -6,6 +6,11 @@ import numpy as np
 from pynektools.io.read_probes import ProbesReader
 
 # ============================================================================ #
+# Define the list exported through all
+
+__all__ = ["inflection_benchmark", "inflection_mean_freq"]
+
+# ============================================================================ #
 # Main function for computing the separation angle
 
 
@@ -115,6 +120,27 @@ def inflection_benchmark(file_name: str, cache_dir: str = None) -> dict:
             pickle.dump(benchmark_results, f)
 
     return benchmark_results
+
+
+def inflection_mean_freq(file_name: str, cache_dir: str = None) -> float:
+    """
+    Return the mean of the dominant frequencies of the inflection points.
+
+    The function will return the mean of the dominant frequencies of the
+    inflection points.
+
+    Parameters
+    ----------
+    file_name : str
+        The name of the file to run the benchmark on.
+    cache_dir : str, optional
+        The directory to store the cache files. Cached files will be used if
+        they exist. If None, no caching will be used. Default is None.
+    """
+
+    benchmark_results = inflection_benchmark(file_name, cache_dir)
+
+    return benchmark_results["max_freq"].mean()
 
 
 # ============================================================================ #

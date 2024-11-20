@@ -1,2 +1,3 @@
-from .separation_angle import inflection_benchmark
+from .separation_angle import *
 from .lift_and_drag import *
+from .plot_metric import *

@@ -1,25 +1,71 @@
-from post_processing_tools import compute_everything, plot_everything, generate_tables
-from metrics import *
-from functions import *
-from experiments import *
 import os
-import numpy as np
 
-# OK, I (Harry) am definitely not the person to be making a judgement call like
-# this hahahaha, it's very computer science-y and is based on a conversation
-# over coffee with Bertie and a very superficial amount of googling.
+# Local imports
+from metrics import *
+from functions.readers import experiment_reader
+from experiments import *
+
+# Define useful paths for the script
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
+experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
+                               "experiments")
+cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
+
+# Create logs and plots folders in the experiments directory if they don't exist
+plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
+tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
+cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
+
+# ============================================================================ #
+# Define the experiments and which metrics to plot
+
+metric_plot: list[dict] = []
+
+metric_plot.append({
+    # Experiment settings
+    "experiment_name": "Re_study",
+    "variable": "Re",
+    "variant_key": "method",
+    "variant_list": ["brinkman", "meshed", "idw"],
+
+    # Metric specific options
+    "metric": "Frequency of Inflection Points",
+    "circ_radius": "050",
+
+    # Cache and case directories
+    "cache_dir": cache_dir,
+    "cases_dir": cases_dir,
+
+    # Plotting options
+    "save_fig": True,
+    "fig_dir": plots_dir,
+    "fig_name": "Re_study_inflection.png"
+})
+
+# ============================================================================ #
+# Execute the metric plotting
+
+for plot in metric_plot:
+    experiment_file = os.path.join(experiments_dir,
+                                   plot["experiment_name"] + ".csv")
+
+    experiment = experiment_reader(experiment_file)
+    plot_metric(experiment, **plot)
+
+plt.show(block=True)
+
+# Old code
 #
-# The current csv format is always going to be a killer for us to read, and if
-# we have to read them all, every time, just to fuck around with the axis of
-# a plot it's going to be a nightmare.
 #
-# I'm SURE there's a better way of doing this, but according to google, Pickle
-# is a good option.
 #
-# So we divide this script into a preprocessing reader + pickle saver
 #
-# And then we have the actual plotting script.
-import pickle
+#
+#
+#
+#
+# ============================================================================ #
+# Post process the experiments
 
 plot_params = {
     # Settings for post processing
@@ -46,18 +92,6 @@ plot_params = {
     "t_start": 100.0  # time to start averaging,
 }
 
-# Define useful paths for the script
-current_dir = os.path.dirname(os.path.abspath(__file__))
-root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
-experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
-                               "experiments")
-cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
-
-# Create logs and plots folders in the experiments directory if they don't exist
-plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
-tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
-pickle_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
-
 # List all .csv files in the experiments directory
 experiment_files = [
     f for f in os.listdir(experiments_dir) if f.endswith('.csv')
@@ -78,7 +112,7 @@ for file in experiment_files:
     # This function should take the experiment list, the variable we want to
     # plot against and the pickle directory as arguments.
     #
-    # example: plot_lift_and_drag(experiment, 'Re', pickle_dir)
+    # example: plot_lift_and_drag(experiment, 'Re', cache_dir)
     #
     # Possibly which should also accept a list of plot options so we can control
     # styling etc.
@@ -114,7 +148,7 @@ for file in experiment_files:
         if method == "meshed":
             file_name = os.path.join(case_file_path, 'cylinder.log')
             try:
-                force_measure = read_force_torque(file_name, pickle_dir)
+                force_measure = read_force_torque(file_name, cache_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
@@ -134,7 +168,7 @@ for file in experiment_files:
         if method == "brinkman":
             file_name = os.path.join(case_file_path, 'cylinder.log')
             try:
-                force_measure = read_brinkman_force(file_name, pickle_dir)
+                force_measure = read_brinkman_force(file_name, cache_dir)
                 plot_force_measure(force_measure, fig_LD, ax_LD)
                 means, amps = compress_to_data_point(force_measure,
                                                      plot_params)
@@ -159,10 +193,10 @@ for file in experiment_files:
                 file_name = os.path.join(case_file_path,
                                          'circ_' + circle + '.csv')
                 force_measure = surface_integral_lift_and_drag(
-                    file_name, Re, pickle_dir)
+                    file_name, Re, cache_dir)
 
                 # append a single curve to the plot
-                # just so we don't get a million curves, let's just do the 
+                # just so we don't get a million curves, let's just do the
                 # 050 one.
                 if circle in plot_params["force_ring_plot_time"]:
                     plot_force_measure(force_measure, fig_LD, ax_LD)
@@ -175,19 +209,6 @@ for file in experiment_files:
                 }
                 data_points.append(data_point)
                 del force_measure
-
-                # separation angle
-                # --------------------------------------------------------#
-                sep_angle = inflection_benchmark(file_name, pickle_dir)
-                # here we would have some plotting, but for now lets just
-                # generate the pickle files
-                data_point = {
-                    "mean": np.mean(sep_angle['max_freq']),
-                    "name": "separation_angle_" + circle
-                }
-                data_points.append(data_point)
-
-                del sep_angle
 
             except Exception as e:
                 print("Error in case:", case["name"])
