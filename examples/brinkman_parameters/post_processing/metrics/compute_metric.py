@@ -10,7 +10,7 @@ returns the computed metric.
 import os
 
 # Local imports
-from .separation_angle import inflection_mean_freq
+from .separation_angle import inflection_benchmark
 
 
 def compute_metric(case: dict, metric: str, **kwargs) -> float:
@@ -46,7 +46,15 @@ def compute_metric(case: dict, metric: str, **kwargs) -> float:
 
         file_name = os.path.join(case_dir, 'circ_' + circ_radius + '.csv')
 
-        return inflection_mean_freq(file_name, cache_dir)
+        benchmark_results = inflection_benchmark(file_name, cache_dir)
+
+        match kwargs.get("which", "mean"):
+            case "0":
+                return benchmark_results["max_freq"][0]
+            case "1":
+                return benchmark_results["max_freq"][1]
+            case "2":
+                return benchmark_results["max_freq"][2]
 
     else:
         print(f"Metric {metric} not recognized.")
