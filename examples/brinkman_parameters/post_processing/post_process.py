@@ -20,33 +20,33 @@ cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 # ============================================================================ #
 # Define the experiments and which metrics to plot
 
-metric_plot: list[dict] = []
+metric_plots = [
+    {
+        # Experiment settings
+        "experiment_name": "Re_study",
+        "variable": "Re",
+        "variant_key": "method",
+        "variant_list": ["brinkman", "meshed", "idw"],
 
-metric_plot.append({
-    # Experiment settings
-    "experiment_name": "Re_study",
-    "variable": "Re",
-    "variant_key": "method",
-    "variant_list": ["brinkman", "meshed", "idw"],
+        # Metric specific options
+        "metric": "Frequency of Inflection Points",
+        "circ_radius": "050",
 
-    # Metric specific options
-    "metric": "Frequency of Inflection Points",
-    "circ_radius": "050",
+        # Cache and case directories
+        "cache_dir": cache_dir,
+        "cases_dir": cases_dir,
 
-    # Cache and case directories
-    "cache_dir": cache_dir,
-    "cases_dir": cases_dir,
-
-    # Plotting options
-    "save_fig": True,
-    "fig_dir": plots_dir,
-    "fig_name": "Re_study_inflection.png"
-})
+        # Plotting options
+        "save_fig": True,
+        "fig_dir": plots_dir,
+        "fig_name": "Re_study_inflection.png"
+    },
+]
 
 # ============================================================================ #
 # Execute the metric plotting
 
-for plot in metric_plot:
+for plot in metric_plots:
     experiment_file = os.path.join(experiments_dir,
                                    plot["experiment_name"] + ".csv")
 
