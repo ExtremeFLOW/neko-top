@@ -33,8 +33,6 @@ def plot_metric(experiment: list[dict],
 
     # set up the axis for a test plot
     fig, ax = plt.subplots()
-    ax.set_xlabel(variable)
-    ax.set_ylabel(metric)
     ax.set_title(f"{metric} vs {variable}")
 
     if variant_key is None:
@@ -42,8 +40,10 @@ def plot_metric(experiment: list[dict],
     else:
         plot_metric_variant(experiment, metric, variable, variant_key,
                             variant_list, ax, **kwargs)
+        ax.legend(**kwargs.get("legend_options", {}))
 
-    ax.legend()
+    # Apply plot_style options
+    ax.set(**kwargs.get("axes_options", {}))
 
     # Save the figure
     if kwargs.get("save_fig", False):
@@ -110,8 +110,7 @@ def plot_metric_all(experiment: list[dict], metric: str, variable: str,
     # ------------------------------------------------------------------------ #
     # Plot the data
 
-    plot_options = kwargs.get("plot_options", {})
-    ax.plot(x, y, **plot_options)
+    ax.plot(x, y, **kwargs.get("plot_options", {}))
 
 
 def plot_metric_variant(experiment: list[dict], metric: str, variable: str,
@@ -172,6 +171,5 @@ def plot_metric_variant(experiment: list[dict], metric: str, variable: str,
         # -------------------------------------------------------------------- #
         # Plot the data
 
-        plot_options = kwargs.get("plot_options", {})
         # Add to the existing plot
-        ax.plot(x, y, label=variant, **plot_options)
+        ax.plot(x, y, label=variant, **kwargs.get("plot_options", {}))

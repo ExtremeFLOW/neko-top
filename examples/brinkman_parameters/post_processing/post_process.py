@@ -39,7 +39,21 @@ metric_plots = [
         # Plotting options
         "save_fig": True,
         "fig_dir": plots_dir,
-        "fig_name": "Re_study_inflection.png"
+        "fig_name": "Re_study_inflection.png",
+
+        # Plot styling
+        "axes_options": {
+            "xlabel": "Reynolds Number",
+            "ylabel": "Frequency of Inflection Points",
+        },
+        "legend_options": {
+            "title": "Method",
+            "loc": "upper right",
+        },
+        "plot_options": {
+            "linestyle": "-",
+            "marker": "o",
+        },
     },
 ]
 
