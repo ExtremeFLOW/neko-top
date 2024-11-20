@@ -17,6 +17,12 @@ plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
 cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 
+# Set some default plotting options
+plot_options = {
+    "linestyle": "-",
+    "marker": "o",
+}
+
 # ============================================================================ #
 # Define the experiments and which metrics to plot
 
@@ -50,10 +56,7 @@ metric_plots = [
             "title": "Method",
             "loc": "upper right",
         },
-        "plot_options": {
-            "linestyle": "-",
-            "marker": "o",
-        },
+        "plot_options": plot_options,
     },
 ]
 
