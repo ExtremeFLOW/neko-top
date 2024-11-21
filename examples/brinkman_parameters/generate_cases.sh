@@ -236,3 +236,77 @@ make_a_case $case_name \
     method_list mesh_list Re_list \
     chi_list radius_list \
     rmax_list rpower_list
+
+
+# ---------------------------------------------------------------------------- #
+# Cases that would visually be nice in the deliverable
+# They're all based on parameters in the previous studies so hopefully
+# this is just for plotting, and requires no additional calculations.
+# ---------------------------------------------------------------------------- #
+case_name="report_brinkman_filter_radius"
+
+method_list=("brinkman")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0" "0.01" "0.05" "0.1")
+rmax_list=("0.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #
+case_name="report_idw_rmax"
+
+method_list=("idw")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0")
+rmax_list=("0.0" "1.0" "2.0" "5.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #
+case_name="Report_mesh_study_Re200"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("200")
+chi_list=("1000")
+# this would be the one I really want
+#radius_list=("0.01")
+# these will arrive faster
+radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Report_mesh_study_Re1000"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("1000")
+chi_list=("1000")
+# this would be the one I really want
+#radius_list=("0.01")
+# these will arrive faster
+radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #
