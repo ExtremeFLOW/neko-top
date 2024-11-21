@@ -280,9 +280,9 @@ mesh_list=("2" "3" "4")
 Re_list=("200")
 chi_list=("1000")
 # this would be the one I really want
-#radius_list=("0.01")
+radius_list=("0.01")
 # these will arrive faster
-radius_list=("0.1")
+# radius_list=("0.1")
 rmax_list=("1.0")
 rpower_list=("1.0")
 
@@ -299,9 +299,9 @@ mesh_list=("2" "3" "4")
 Re_list=("1000")
 chi_list=("1000")
 # this would be the one I really want
-#radius_list=("0.01")
+radius_list=("0.01")
 # these will arrive faster
-radius_list=("0.1")
+# radius_list=("0.1")
 rmax_list=("1.0")
 rpower_list=("1.0")
 
