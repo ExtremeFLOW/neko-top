@@ -202,12 +202,22 @@ function run {
         { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log); } 2>&1
     fi
 
+    # ------------------------------------------------------------------------ #
+    # Check for errors and normal end
+
+    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
+    if [ -z "$normal_end" ]; then
+        printf >&2 "ERROR: Neko did not end normally.\n"
+    fi
+
     if [ -s "error.log" ]; then
-        printf "\nERROR: An error occured during execution.\n"
+        printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
         return 1
     else
-        printf "\nNeko execution concluded.\n"
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Example concluded.\n"
+        printf "=%.0s" {1..80} && printf "\n"
     fi
 
     # ------------------------------------------------------------------------ #
