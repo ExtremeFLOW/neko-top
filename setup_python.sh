@@ -7,6 +7,7 @@ if [ ! -d $ROOT_FOLDER/.venv ]; then
     python3 -m venv $ROOT_FOLDER/.venv
 fi
 source $ROOT_FOLDER/.venv/bin/activate
+python3 -m pip install h5py tqdm
 
 # Clone pyNekTools
 rm -fr $ROOT_FOLDER/external/pyNekTools
