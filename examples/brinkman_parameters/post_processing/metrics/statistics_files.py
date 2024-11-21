@@ -12,8 +12,6 @@ import matplotlib.pyplot as plt
 def wake(file_name: str, plot_params, cache_dir: str = None) -> dict:
 
     if cache_dir is not None:
-        print(file_name)
-        print(" ")
         file_ext = os.path.splitext(file_name)[1]
         cache_file = os.path.join(
             cache_dir, "wake_lines",
@@ -46,7 +44,6 @@ def wake(file_name: str, plot_params, cache_dir: str = None) -> dict:
     # Caching the results
 
     if cache_dir is not None:
-        print(cache_file)
         os.makedirs(os.path.dirname(cache_file), exist_ok=True)
         with open(cache_file, "wb") as f:
             pickle.dump(case, f)
@@ -208,7 +205,7 @@ def calculate_forces(msh, fld, ring_radii, n_points, Re):
     
     # This sets up the probes interpolation
     ring_probes = Probes(comm, probes = xyz, msh = msh, point_interpolator_type='multiple_point_legendre_numpy', \
-                             max_pts=256, find_points_comm_pattern='point_to_point')
+                             max_pts=256, find_points_comm_pattern='point_to_point', output_fname='/tmp/probes.csv')
     
     # here we actually probe
     ring_probes.interpolate_from_field_list(0, [dudx], comm, write_data=False)
