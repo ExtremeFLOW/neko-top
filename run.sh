@@ -252,6 +252,9 @@ function Submit() {
     cd $LPATH/$example
     if [ $CLUSTER == "DTU" ]; then
         export BSUB_QUIET=Y
+        if [ ! -z "$(bjobs -J $1 2>/dev/null)" ]; then
+            bkill -J $1 1>/dev/null 2>/dev/null
+        fi
         bsub -J $1 -env "all" <job_script.sh
 
     elif [ $CLUSTER == "MN5" ]; then
