@@ -206,7 +206,7 @@ function run {
     # Check for errors and normal end
 
     normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [ -z "$normal_end" ]; then
+    if [[ -z "$normal_end" && ! -s error.log ]]; then
         printf >&2 "ERROR: Neko did not end normally.\n"
     fi
 
