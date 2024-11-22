@@ -97,7 +97,7 @@ contains
 
     ntot = u%dof%size()
     do i = 1, ntot
-       u%x(i,1,1,1) = 1.0_rp
+       u%x(i,1,1,1) = sqrt(1.0_rp - 0.1_rp**2)
        w%x(i,1,1,1) = 0.0_rp
 
        ! just to break the symmetry and induce shedding quicker
