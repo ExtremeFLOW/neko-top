@@ -39,7 +39,7 @@ make_a_case() {
 
     # Loop over all the parameters
     echo "Generating cases for $experiment_name"
-
+    cases=()
     for method in "${_method_list[@]}"; do
         for mesh in "${_mesh_list[@]}"; do
             for Re in "${_Re_list[@]}"; do
@@ -61,7 +61,11 @@ make_a_case() {
                                 if [ "$method" == "brinkman" ]; then
                                     name+=chi_${chi//./-}_
                                     name+=radius_${radius//./-}_
+                                    rmax=-
+                                    rpower=-
                                 elif [ "$method" == "idw" ]; then
+                                    chi=-
+                                    radius=-
                                     name+=rmax_${rmax//./-}_
                                     name+=rpower_${rpower//./-}_
                                 else
@@ -71,6 +75,12 @@ make_a_case() {
                                     rpower=-
                                 fi
                                 name=${name%_}
+
+                                # Check if the case already exists
+                                for c in "${cases[@]}"; do
+                                    [ "$c" == "$name" ] && continue 2
+                                done
+                                cases+=($name)
                                 printf "\t - $name\n"
 
                                 # Write the experiment to the experiment file
@@ -236,7 +246,6 @@ make_a_case $case_name \
     method_list mesh_list Re_list \
     chi_list radius_list \
     rmax_list rpower_list
-
 
 # ---------------------------------------------------------------------------- #
 # Cases that would visually be nice in the deliverable
