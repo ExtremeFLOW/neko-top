@@ -288,7 +288,6 @@ trap 'handler' SIGINT
 
 # ============================================================================ #
 # Run the examples
-set +e # Do not exit on error during execution
 full_start=$(date +%s.%N)
 QUEUE=""
 

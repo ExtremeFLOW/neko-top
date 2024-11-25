@@ -1,149 +1,4 @@
 #!/bin/bash
-# ============================================================================ #
-# Define helpers for the run script
-
-function cleanup {
-    # Move the results to the results folder
-    results=$RPATH/$example
-    printf "=%.0s" {1..80} && printf "\n"
-    printf "Moving files to results folder: \n\t$results\n\n"
-
-    # Remove the results folder if it exists and create a new one
-    mkdir -p $results && rm -fr $results/*
-
-    # Move all the nek5000 files to the results folder and compress them.
-    for nek in $(find ./ -name "*.nek5000"); do
-        printf "Archiving:  %s\n" $nek
-
-        base=${nek%.*}
-        field=$(ls $base.f*)
-        mkdir -p $results/$base
-        mv -t $results/$base $nek $field
-    done
-    printf "\n"
-
-    # Move all files which are not the error or executable files to the log
-    # folder
-    find ./ -type f \
-        -not -name "error.log" \
-        -not -name "neko" \
-        -not -name "output.log" \
-        -not -name "*.chkp" \
-        -exec mv -t $results {} +
-
-    if [ -s "error.log" ]; then
-        printf "ERROR: An error occured during execution.\n"
-        printf "See error.log for details.\n"
-        return 1
-    else
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Example concluded.\n"
-        printf "=%.0s" {1..80} && printf "\n"
-    fi
-
-    # Remove all but the log files
-    find ./ -type f -not -name "error.log" -not -name "output.log" -delete
-
-    # Clear the output file to indicate successful completion
-    cp -ft $results output.log
-    rm -f output.log
-    touch output.log
-}
-
-function prepare {
-    set +e
-
-    # ------------------------------------------------------------------------ #
-    # Report the Job environment if it exists
-
-    if [ ! -z "$SLURM_JOB_NAME" ]; then
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "SLURM Job: %s\n" $SLURM_JOB_NAME
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Job ID: %s\n" $SLURM_JOB_ID
-        printf "Job Node: %s\n" $SLURM_JOB_NODELIST
-        printf "Job Partition: %s\n" $SLURM_JOB_PARTITION
-        printf "Job Account: %s\n" $SLURM_JOB_ACCOUNT
-        printf "Job Time: %s\n" $SLURM_JOB_TIME
-        printf "Job Memory: %s\n" $SLURM_JOB_MEMORY
-        printf "Job CPUs: %s\n" $SLURM_JOB_CPUS_PER_NODE
-        printf "Job GPUs: %s\n" $SLURM_JOB_GPUS
-        printf "Job QOS: %s\n" $SLURM_JOB_QOS
-        printf "Job Reservation: %s\n" $SLURM_JOB_RESERVATION
-        printf "Job Work Directory: %s\n" $SLURM_SUBMIT_DIR
-        printf "Job Output Directory: %s\n" $SLURM_SUBMIT_DIR
-        printf "Job Output File: %s\n" $SLURM_JOB_NAME
-        printf "Job Error File: %s\n" $SLURM_JOB_NAME
-
-    elif [ ! -z "$LSB_JOBNAME" ]; then
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "LSF10 Job: %s\n" $LSB_JOBNAME
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Job ID: %s\n" $LSB_JOBID
-        printf "Job CPUs: %s\n" $LSB_DJOB_NUMPROC
-
-    fi
-
-    [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
-    if [ ! -z "$(which module 2>>/dev/null)" ]; then
-        printf "\nModules:\n"
-        module list 2>&1
-    fi
-
-    # ------------------------------------------------------------------------ #
-    # Ensure the environment is set up
-
-    [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
-    if [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
-    fi
-
-    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
-        -exec test -f '{}'/libjsonfortran.so \; -print)
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
-    export PATH="$NEKO_DIR/bin:$PATH"
-
-    # ------------------------------------------------------------------------ #
-    # Run preparation if it exists
-
-    if [ -f "prepare.sh" ]; then
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Preparing example.\n\n"
-        printf "=%.0s" {1..80} && printf "\n"
-
-        { time ./prepare.sh; } 2>&1
-
-        if [ -s "error.log" ]; then
-            printf "\nERROR: An error occured during preparation.\n"
-            printf "See error.log for details.\n"
-            return 1
-        else
-            printf "\nPreparation concluded.\n"
-        fi
-    fi
-
-    # ------------------------------------------------------------------------ #
-    # Find the Neko executable
-
-    if [ -f ./neko ]; then
-        neko=$(realpath ./neko)
-    elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Building user Neko based on the following files\n"
-        for f in $(ls *.f90); do printf "\t- %s\n" $f; done
-
-        $NEKO_DIR/bin/makeneko *.f90
-        neko=$(realpath ./neko)
-    else
-        neko=$(realpath $NEKO_DIR/bin/neko)
-    fi
-
-    if [ ! -f "$neko" ]; then
-        printf "ERROR: Neko executable not found."
-        return 1
-    fi
-    export neko
-}
 
 # ============================================================================ #
 # Define the run function
@@ -153,7 +8,13 @@ function run {
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
-    prepare
+    prepare 2>error.log || return 1
+
+    if [ -s ./error.log ]; then
+        printf "ERROR: An error occured during preparation.\n"
+        printf "See error.log for details.\n"
+        return 1
+    fi
 
     # ------------------------------------------------------------------------ #
     # Execute the example
@@ -206,11 +67,12 @@ function run {
     # Check for errors and normal end
 
     normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" && ! -s error.log ]]; then
-        printf "ERROR: Neko did not end normally.\n" >> error.log
+    if [[ -z "$normal_end" && ! -s ./error.log ]]; then
+        printf "ERROR: Neko did not end normally.\n" >>error.log
+        return 1
     fi
 
-    if [ -s "error.log" ]; then
+    if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
         return 1
@@ -222,5 +84,159 @@ function run {
 
     # ------------------------------------------------------------------------ #
     # Clean up the results
-    cleanup
+    cleanup 2>error.log || return 1
+
+    if [ -s ./error.log ]; then
+        printf "ERROR: An error occurred during cleanup.\n"
+        printf "See error.log for details.\n"
+        return 1
+    fi
+}
+
+# ============================================================================ #
+# Define the prepare function
+
+function prepare {
+    # ------------------------------------------------------------------------ #
+    # Report the Job environment if it exists
+
+    if [ ! -z "$SLURM_JOB_NAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "SLURM Job: %s\n" $SLURM_JOB_NAME
+        printf "=%.0s" {1..80} && printf "\n"
+
+        printf "Job ID: %s\n" $SLURM_JOB_ID
+        printf "Job Node: %s\n" $SLURM_JOB_NODELIST
+        printf "Job Partition: %s\n" $SLURM_JOB_PARTITION
+        printf "Job Account: %s\n" $SLURM_JOB_ACCOUNT
+        printf "Job Time: %s\n" $SLURM_JOB_TIME
+        printf "Job Memory: %s\n" $SLURM_JOB_MEMORY
+        printf "Job CPUs: %s\n" $SLURM_JOB_CPUS_PER_NODE
+        printf "Job GPUs: %s\n" $SLURM_JOB_GPUS
+        printf "Job QOS: %s\n" $SLURM_JOB_QOS
+        printf "Job Reservation: %s\n" $SLURM_JOB_RESERVATION
+        printf "Job Work Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output Directory: %s\n" $SLURM_SUBMIT_DIR
+        printf "Job Output File: %s\n" $SLURM_JOB_NAME
+        printf "Job Error File: %s\n" $SLURM_JOB_NAME
+
+    elif [ ! -z "$LSB_JOBNAME" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "LSF10 Job: %s\n" $LSB_JOBNAME
+        printf "=%.0s" {1..80} && printf "\n"
+
+        printf "Job ID: %s\n" $LSB_JOBID
+        printf "Job CPUs: %s\n" $LSB_DJOB_NUMPROC
+    fi
+
+    [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
+    if [ ! -z "$(which module 2>>/dev/null)" ]; then
+        printf "\nModules:\n"
+        module list 2>&1
+    fi
+
+    # ------------------------------------------------------------------------ #
+    # Ensure the environment is set up
+
+    [ -z "$NEKO_DIR" ] && NEKO_DIR="$MAIN_DIR/external/neko"
+    if [ -z "$JSON_FORTRAN_DIR" ]; then
+        JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
+    fi
+
+    JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
+        -exec test -f '{}'/libjsonfortran.so \; -print)
+    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export PATH="$NEKO_DIR/bin:$PATH"
+
+    # ------------------------------------------------------------------------ #
+    # Run preparation if it exists
+
+    if [ -f "prepare.sh" ]; then
+        printf "=%.0s" {1..80} && printf "\n"
+        printf "Running user provided preparation script.\n"
+        printf "=%.0s" {1..80} && printf "\n"
+
+        ./prepare.sh
+
+    fi
+
+    # ------------------------------------------------------------------------ #
+    # Find the Neko executable
+
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Finding Neko executable.\n"
+    printf "=%.0s" {1..80} && printf "\n"
+
+    if [ -f ./neko ]; then
+        printf "Using user provided Neko executable.\n"
+        neko=$(realpath ./neko)
+
+    elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
+        printf "Building user Neko based on the following files\n"
+        for f in $(ls *.f90); do printf "\t- %s\n" $f; done
+
+        $NEKO_DIR/bin/makeneko *.f90
+        neko=$(realpath ./neko)
+
+    else
+        printf "Using default Neko executable.\n"
+        neko=$(realpath $NEKO_DIR/bin/neko)
+    fi
+
+    if [ ! -f "$neko" ]; then
+        printf "ERROR: Neko executable not found." >&2
+        return 1
+    fi
+    export neko
+}
+
+# ============================================================================ #
+# Define the cleanup function
+
+function cleanup {
+
+    # If the error log is not empty, print the error and return
+    if [ -s ./error.log ]; then
+        printf "ERROR: An error occurred during execution.\n"
+        printf "See error.log for details.\n"
+        return 1
+    fi
+
+    # ------------------------------------------------------------------------ #
+    # Move the results to the results folder
+    results=$RPATH/$example
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Moving files to results folder: \n\t$results\n\n"
+
+    # Remove the results folder if it exists and create a new one
+    mkdir -p $results && rm -fr $results/*
+
+    # Move all the nek5000 files to the results folder and compress them.
+    for nek in $(find ./ -name "*.nek5000"); do
+        printf "Archiving:  %s\n" $nek
+
+        base=${nek%.*}
+        field=$(ls $base.f*)
+        mkdir -p $results/$base
+        mv -t $results/$base $nek $field
+    done
+    printf "\n"
+
+    # Move all files which are not the error or executable files to the log
+    # folder
+    find ./ -type f \
+        -not -name "error.log" \
+        -not -name "neko" \
+        -not -name "output.log" \
+        -not -name "*.chkp" \
+        -not -name "*.smod" \
+        -exec mv -t $results {} +
+
+    # Remove all but the log files
+    find ./ -type f -not -name "error.log" -not -name "output.log" -delete
+
+    # Clear the output file to indicate successful completion
+    cp -ft $results output.log
+    rm -f output.log
+    touch output.log
 }
