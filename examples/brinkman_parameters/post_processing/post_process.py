@@ -1,4 +1,46 @@
+"""
+Post process the experiments in the brinkman_parameters folder.
+
+This script reads the experiments in the brinkman_parameters folder and
+post-processes them. The post-processing includes the following steps:
+
+1. Read the experiment file.
+2. Loop through each case in the experiment.
+3. For each case, read the data files and calculate the lift and drag
+    coefficients.
+4. Plot the lift and drag coefficients.
+5. Save the plots in the plots folder.
+
+The script uses the following functions from the functions module:
+
+- experiment_reader: Reads the experiment file.
+- read_force_torque: Reads the force and torque data from the log file.
+- surface_integral_lift_and_drag: Calculates the lift and drag coefficients
+    using the surface integrals method.
+
+The script uses the following functions from the metrics module:
+
+- plot_force_measure: Plots the lift and drag coefficients.
+- finalize_plot_force_measure: Finalizes the lift and drag plot.
+
+The script uses the following functions from the experiments module:
+
+- wake: Calculates the wake deficit.
+- plot_a_wake_line: Plots the wake deficit.
+- finalize_plot_a_wake_line: Finalizes the wake plot.
+
+The script saves the plots in the plots folder.
+
+The script also uses the following parameters:
+
+- verbose: A boolean variable to control the verbosity of the output. If True,
+    the script prints more information. If False, the script prints less
+    information. The default value is False. You can change the value of this
+    variable by passing the -v flag when running the script.
+"""
+
 import os
+import sys
 
 # Local imports
 from metrics import *
@@ -18,6 +60,12 @@ plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
 cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
 #cache_dir = os.path.join(root_dir, "results", "only_stats", "brinkman_parameters", "cache")
+
+# Read commandline input to determine if we want verbose output
+verbose = False
+if len(sys.argv) > 1:
+    if sys.argv[1] == "-v":
+        verbose = True
 
 # ============================================================================ #
 # Post process the experiments
@@ -114,16 +162,17 @@ for file in experiment_files:
         try:
             wake_line = wake(case_file_path, plot_params, cache_dir)
             wake_line["name"] = case["name"]
-            plot_a_wake_line(wake_line, plot_params, ax_wake, fig_wake, color, '-')
+            plot_a_wake_line(wake_line, plot_params, ax_wake, fig_wake, color,
+                             '-')
         except Exception as e:
             print("Error in statistics case:", case["name"])
             print("\t", e)
         # -------------------------------------------------------------------- #
         # for processing the stats files, I guess we could also use the cache.
 
-
         # Force using surface integrals (meshed case)
         # -------------------------------------------------------------------- #
+        if verbose: print("\t\t- Working on force")
         if method == "meshed":
             file_name = os.path.join(case_file_path, 'cylinder.log')
             try:
@@ -166,9 +215,14 @@ for file in experiment_files:
 
         # Using the rings
         # -------------------------------------------------------------------- #
+        if verbose: print("\t\t- Working on force rings")
+
         for circle in plot_params["force_ring_radii"]:
 
             try:
+                if verbose:
+                    print("\t\t\t- Working on Lift and Drag for ring:", circle)
+
                 # Lift and Drag
                 # ------------------------------------------------------------ #
                 file_name = os.path.join(case_file_path,
@@ -194,6 +248,9 @@ for file in experiment_files:
 
                 # separation angle
                 # --------------------------------------------------------#
+                if verbose:
+                    print("\t\t\t- Working on separation angles for:", circle)
+
                 sep_angle = inflection_benchmark(file_name, cache_dir)
                 # here we would have some plotting, but for now lets just
                 # generate the pickle files
@@ -220,23 +277,37 @@ for file in experiment_files:
         # -------------------------------------------------------------------- #
         # for processing the stats files, I guess we could also use the cache.
 
+    # ------------------------------------------------------------------------ #
+    if verbose: print("\t- Finalizing force plot")
+
     # here we would finalize all the plots
     os.path.exists(plots_dir) or os.makedirs(plots_dir)
     output_filename = os.path.join(plots_dir,
                                    experiment_name + '_lift_and_drag.png')
     finalize_plot_force_measure(plot_params, fig_LD, ax_LD, output_filename)
+
+    # ------------------------------------------------------------------------ #
+    if verbose: print("\t- Finalizing wake plot")
+
     os.path.exists(plots_dir) or os.makedirs(plots_dir)
     output_filename = os.path.join(plots_dir,
                                    experiment_name + '_wake_line.png')
     finalize_plot_a_wake_line(plot_params, ax_wake, fig_wake, output_filename)
+
+    # ------------------------------------------------------------------------ #
     # and we could plot curves based on tabulated data
+
+    print("\t- Plots specific to :", experiment_name)
+
     if experiment_name == "Filter_radius":
+
         output_filename = os.path.join(plots_dir, experiment_name)
         ax, fig = plot_study(experiment_tabulated,
-                   x_axis_variable="radius",
-                   line_axis_variable="method")
+                             x_axis_variable="radius",
+                             line_axis_variable="method")
         # extract just the meshed case
         case_file_path = os.path.join(cases_dir, "meshed_mesh_4_re_200")
+
         # extract the forces
         file_name = os.path.join(case_file_path, 'cylinder.log')
         force_measure = read_force_torque(file_name, cache_dir)
@@ -245,39 +316,55 @@ for file in experiment_files:
         sep_angle = inflection_benchmark(file_name, cache_dir)
         mean_Str = np.mean(sep_angle['max_freq'])
         theta = np.rad2deg(np.max(sep_angle['bias']))
-        ax[0].plot([0.01,0.1],[means["fx_tot"],means["fx_tot"]], 
-            linestyle = '--', color = 'k', label = "meshed reference")
-        ax[0].legend() 
-        ax[1].plot([0.01,0.1],[theta, theta], linestyle = '--', color = 'k', 
-            label = "meshed reference")
-        ax[1].legend() 
-        ax[2].plot([0.01,0.1],[mean_Str, mean_Str], linestyle = '--', 
-            color = 'k', label = "meshed reference")
-        ax[2].legend() 
+
+        # plot the reference lines
+        ax[0].plot([0.01, 0.1], [means["fx_tot"], means["fx_tot"]],
+                   linestyle='--',
+                   color='k',
+                   label="meshed reference")
+        ax[0].legend()
+        ax[1].plot([0.01, 0.1], [theta, theta],
+                   linestyle='--',
+                   color='k',
+                   label="meshed reference")
+        ax[1].legend()
+        ax[2].plot([0.01, 0.1], [mean_Str, mean_Str],
+                   linestyle='--',
+                   color='k',
+                   label="meshed reference")
+        ax[2].legend()
         fig.savefig(output_filename)
-    if experiment_name == "Re_study":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        ax, fig =  plot_study(experiment_tabulated,
-                   x_axis_variable="Re",
-                   line_axis_variable="method")
-        fig.savefig(output_filename)
-    if experiment_name == "Mesh_study":
-        output_filename = os.path.join(plots_dir, experiment_name)
-        ax, fig = plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method")
-        fig.savefig(output_filename)
-    if experiment_name == "Report_mesh_study_Re200":
+
+    elif experiment_name == "Re_study":
+
         output_filename = os.path.join(plots_dir, experiment_name)
         ax, fig = plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method")
+                             x_axis_variable="Re",
+                             line_axis_variable="method")
         fig.savefig(output_filename)
-    if experiment_name == "Report_mesh_study_Re1000":
+
+    elif experiment_name == "Mesh_study":
+
         output_filename = os.path.join(plots_dir, experiment_name)
         ax, fig = plot_study(experiment_tabulated,
-                   x_axis_variable="mesh",
-                   line_axis_variable="method")
+                             x_axis_variable="mesh",
+                             line_axis_variable="method")
+        fig.savefig(output_filename)
+
+    elif experiment_name == "Report_mesh_study_Re200":
+
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig = plot_study(experiment_tabulated,
+                             x_axis_variable="mesh",
+                             line_axis_variable="method")
+        fig.savefig(output_filename)
+
+    elif experiment_name == "Report_mesh_study_Re1000":
+
+        output_filename = os.path.join(plots_dir, experiment_name)
+        ax, fig = plot_study(experiment_tabulated,
+                             x_axis_variable="mesh",
+                             line_axis_variable="method")
         fig.savefig(output_filename)
 
 print("All experiments processed.")
