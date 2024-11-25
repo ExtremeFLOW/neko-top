@@ -71,7 +71,7 @@ for test in ${tests[@]}; do
 
         # If more than one file exists
         if [[ ${#file[@]} -gt 2 ]]; then
-            file+=" $LPATH/$test/output.log"
+            file+="$LPATH/$test/output.log"
         fi
 
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
@@ -100,7 +100,8 @@ for test in ${tests[@]}; do
                 if [[ "$stat" == "Running:" && ! -z "$progress" ]]; then
                     printf ' [%7s ]' "$progress"
                 fi
-                if [ $(basename $f) = "output.log" ]; then
+
+                if [[ $(basename $f) == "output.log" || ${#file[@]} -lt 2 ]]; then
                     printf " %s\n" "$test"
                 else
                     printf " %s\n" "$test/$(basename $f)"
