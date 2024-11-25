@@ -343,9 +343,7 @@ for case in ${example_list[@]}; do
         -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
-    for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
-        ln -fs $file $log
-    done
+    find $EPATH/$case_dir -name "*.nmsh" -exec ln -fs {} $log \;
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh
