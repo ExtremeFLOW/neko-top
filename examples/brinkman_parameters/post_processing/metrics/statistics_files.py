@@ -119,7 +119,7 @@ def generate_wake_lines(msh, fld, wake_positions, y_lims, n_pts):
 
     # This sets up the probes interpolation
     probes = Probes(comm, probes = xyz, msh = msh, point_interpolator_type='multiple_point_legendre_numpy', \
-                             max_pts=256, find_points_comm_pattern='point_to_point')
+                             max_pts=256, find_points_comm_pattern='point_to_point', write_coords=False)
     # here we actually probe
     probes.interpolate_from_field_list(0, [fld.registry['u']], comm, write_data=False)
     # package them nicely
@@ -205,7 +205,7 @@ def calculate_forces(msh, fld, ring_radii, n_points, Re):
     
     # This sets up the probes interpolation
     ring_probes = Probes(comm, probes = xyz, msh = msh, point_interpolator_type='multiple_point_legendre_numpy', \
-                             max_pts=256, find_points_comm_pattern='point_to_point', output_fname='/tmp/probes.csv')
+                             max_pts=256, find_points_comm_pattern='point_to_point', write_coords=False)
     
     # here we actually probe
     ring_probes.interpolate_from_field_list(0, [dudx], comm, write_data=False)
