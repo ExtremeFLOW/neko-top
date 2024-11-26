@@ -30,7 +30,7 @@ contains
     type(field_t), intent(inout) :: u, v, w, p
     type(field_t), pointer :: brinkman, mapped_brinkman
     type(field_t), pointer :: work
-    integer :: temp_indices
+    integer :: temp_indices(2)
 
     integer :: ntot
     real(kind=rp) :: leakage, lift, drag
@@ -50,35 +50,15 @@ contains
        ! I think that's quite clever!
 
        ntot = u%dof%size()
-       call neko_scratch_registry%request_field(work, temp_indices)
+       call neko_scratch_registry%request_field(work, temp_indices(1))
        call field_col3(work, mapped_brinkman, u)
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          drag = device_glsc2(work%x_d, coef%B_d, ntot)
-       else
-          drag = glsc2(work%x, coef%B, ntot)
-       end if
-
+       drag = glsc2(work%x, coef%B, ntot)
        call field_col3(work, mapped_brinkman, v)
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          lift = device_glsc2(work%x_d, coef%B_d, ntot)
-       else
-          lift = glsc2(work%x, coef%B, ntot)
-       end if
+       lift = glsc2(work%x, coef%B, ntot)
        call neko_scratch_registry%relinquish_field(temp_indices)
 
        ! calculate the leakage
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(u%x, u%x_d, u%size(), &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(v%x, v%x_d, v%size(), &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(w%x, w%x_d, w%size(), &
-               HOST_TO_DEVICE, sync = .false.)
-          call device_memcpy(brinkman%x, brinkman%x_d, brinkman%size(), &
-               HOST_TO_DEVICE, sync = .true.)
-       end if
-
-       leakage = leak(brinkman%x, u%x, v%x, w%x, coef%B, ntot)
+       leakage = leak(brinkman%x, u%x, v%x, w%x, coef%b, ntot)
        if (pe_rank .eq. 0) then
           print *, 'Leakage = ', leakage, ',  ', t
           print *, 'Lift = ', lift, ',  ', t
@@ -120,12 +100,12 @@ contains
 
     ntot = u%dof%size()
     do i = 1, ntot
-       u%x(i,1,1,1) = 1.0_rp
+       u%x(i,1,1,1) = sqrt(1.0_rp - 0.1_rp**2)
        w%x(i,1,1,1) = 0.0_rp
 
        ! just to break the symmetry and induce shedding quicker
        if (abs(u%dof%y(i,1,1,1)) .lt. 4.0_rp) then
-          v%x(i,1,1,1) = 0.01_rp
+          v%x(i,1,1,1) = 0.1_rp
        else
           v%x(i,1,1,1) = 0.0_rp
        end if
@@ -142,13 +122,6 @@ contains
        call cfill_mask(v%x, 0.0_rp, v%size(), zone%mask, zone%size)
        call cfill_mask(w%x, 0.0_rp, w%size(), zone%mask, zone%size)
     end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync = .true.)
-    end if
-
   end subroutine user_ic
 
 

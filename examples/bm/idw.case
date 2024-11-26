@@ -5,11 +5,13 @@
         "output_at_end": false,
         "output_boundary": true,
         "output_checkpoints": false,
-        "end_time": 1.0,
-        "timestep": 2.5e-3,
-        "variable_timestep": true,
-        "target_cfl": 0.4,
-        "max_timestep": 1.0E-2,
+
+        "end_time": 0.01,
+        "timestep": 1.00E-03,
+        "adapt_timestep": true,
+        "max_timestep": 1.00E-03,
+
+        "target_cfl": 0.5,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -17,9 +19,11 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200.0,
+            "Re": 200,
             "initial_condition": {
-                "type": "user",
+                "type": "uniform",
+                "value": [ 1.0, 0.0, 0.0 ]
+
             },
             "inflow_condition": {
                 "type": "uniform",
@@ -41,19 +45,19 @@
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
-            "output_control": "nsamples",
-            "output_value": 250,
+            "output_control": "tsteps",
+            "output_value": 1,
             "boundary_types": [
                 "v",
                 "o+dong",
                 "on",
-                "on"
+                "on",
             ],
             "source_terms": [
                 {
                     "type": "idw",
                     "rmax": 2.0,
-                    "power_parameter": 1.0,
+                    "power_parameter": 2.0,
                     "one_sided": true,
                     "objects": [
                         {
@@ -68,8 +72,7 @@
                         }
                     ]
                 }
-            ],
-
+            ]
         },
         "point_zones": [
             {
@@ -113,7 +116,6 @@
                 "field": "v",
                 "direction": "y"
             },
-
             // Statistics
             {
                 "type": "fluid_stats",
@@ -121,7 +123,7 @@
                 "compute_value": 5,
                 "output_control": "simulationtime",
                 "output_value": 50,
-                "start_time": 150.0,
+                "start_time": 50.0,
                 "set_of_stats": "basic"
             },
             // one BL (45 degrees)
