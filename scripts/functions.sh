@@ -4,11 +4,11 @@
 # Define the run function
 
 function run {
-    set -e
+    set +e # Do not exit on error
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
-    prepare 2>error.log || return 1
+    prepare || return 1
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occured during preparation.\n"
@@ -21,14 +21,12 @@ function run {
 
     printf "=%.0s" {1..80} && printf "\n"
     printf "Running example: %s.\n" $example
-
-    # Run the example
     printf "=%.0s" {1..80} && printf "\n"
-    printf "Executing Neko.\n\n"
 
+    # Find the case file and define the log file
     casefile=($(find . -name "*.case"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
-        printf "ERROR: No case file found.\n"
+        printf "ERROR: No case file found.\n" >error.log
         return 1
     elif [[ ${#casefile[@]} -eq 1 ]]; then
         casefile=${casefile[0]}
@@ -36,13 +34,16 @@ function run {
     else
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
-    printf "See $logfile for the status output.\n"
+
+    # Run the example
+    printf "Executing Neko.\n"
+    printf "See $logfile for the status output.\n\n"
 
     if [ -f "run.sh" ]; then
-        { time ./run.sh 1>$logfile 2>error.log; } 2>&1
+        { time ./run.sh 1>$logfile; } 2>&1
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
-            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.log
+            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile
         } 2>&1
     else
         # Look for the number of cores to use
@@ -60,7 +61,7 @@ function run {
 
         # ncores=1
 
-        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log); } 2>&1
+        { time $(mpirun -n $ncores $neko $casefile 1>$logfile); } 2>&1
     fi
 
     # ------------------------------------------------------------------------ #
@@ -84,7 +85,7 @@ function run {
 
     # ------------------------------------------------------------------------ #
     # Clean up the results
-    cleanup 2>error.log || return 1
+    cleanup || return 1
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during cleanup.\n"

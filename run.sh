@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit with nonzero exit code if anything fails
+set +e # Do not exit on error
 # ============================================================================ #
 # Define the help function
 function help() {
