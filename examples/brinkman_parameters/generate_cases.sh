@@ -110,7 +110,7 @@ make_a_case() {
 
                                 if [ $method == "brinkman" ]; then
                                     # Compute the expected timestep, in exponential notation
-                                    dt=$(echo "scale=10; 0.25 / ($chi)" | bc)
+                                    dt=$(echo "scale=10; ($(printf "%f" $dt_mesh)*100) / $chi" | bc)
                                     # Compute min of the two
                                     dt_mesh=$(printf "%f" $dt_mesh)
                                     [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
