@@ -297,7 +297,7 @@ for file in experiment_files:
     # ------------------------------------------------------------------------ #
     # and we could plot curves based on tabulated data
 
-    print("\t- Plots specific to :", experiment_name)
+    if verbose: print("\t- Plots specific to :", experiment_name)
 
     if experiment_name == "Filter_radius":
 
