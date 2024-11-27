@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit with nonzero exit code if anything fails
+set +e # Do not exit on error
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -310,7 +310,6 @@ trap 'handler' SIGINT
 
 # ============================================================================ #
 # Run the examples
-set +e # Do not exit on error during execution
 full_start=$(date +%s.%N)
 QUEUE=""
 
@@ -361,9 +360,7 @@ for case in ${example_list[@]}; do
         -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
-    for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
-        ln -fs $file $log
-    done
+    find $EPATH/$case_dir -name "*.nmsh" -exec ln -fs {} $log \;
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh
