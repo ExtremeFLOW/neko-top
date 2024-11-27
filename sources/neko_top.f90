@@ -65,10 +65,6 @@ contains
     design_params = simulation_component_user_settings('design', comp_subdict)
     call topopt_components%add_user_simcomp(design, design_params)
 
-    call topopt_components%finalize()
-
-    call neko_log%end()
-
     call neko_log%end()
   end subroutine neko_top_init
 
