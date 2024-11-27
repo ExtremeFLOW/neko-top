@@ -165,9 +165,9 @@ function run {
     printf "=%.0s" {1..80} && printf "\n"
     printf "Executing Neko.\n\n"
 
-    casefile=($(find . -name "*.case"))
+    casefile=($(find . -name "*.case" -or -name "*.json"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
-        printf "ERROR: No case file found.\n"
+        printf >&2 "ERROR: No case file found.\n"
         return 1
     elif [[ ${#casefile[@]} -eq 1 ]]; then
         casefile=${casefile[0]}
