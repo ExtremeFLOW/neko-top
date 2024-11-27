@@ -308,6 +308,7 @@ for file in experiment_files:
                    label="meshed reference")
         ax[2].legend()
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Re_study":
 
@@ -316,6 +317,7 @@ for file in experiment_files:
                              x_axis_variable="Re",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Mesh_study":
 
@@ -324,6 +326,7 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Report_mesh_study_Re200":
 
@@ -332,6 +335,7 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Report_mesh_study_Re1000":
 
@@ -340,5 +344,6 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
 print("All experiments processed.")
