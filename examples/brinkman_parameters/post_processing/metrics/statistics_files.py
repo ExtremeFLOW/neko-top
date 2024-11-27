@@ -151,6 +151,7 @@ def finalize_plot_a_wake_line(plot_params, ax, fig, output_filename):
         ax[i].set_ylim(y_lims)
     ax[len(wake_positions)-1].legend()
     fig.savefig(output_filename)
+    plt.close(fig)
 
 def calculate_forces(msh, fld, ring_radii, n_points, Re):
     from mpi4py import MPI #equivalent to the use of MPI_init() in C

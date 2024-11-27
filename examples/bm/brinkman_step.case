@@ -3,14 +3,14 @@
     "case": {
         "mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh",
         "output_at_end": false,
-        "output_boundary": true,
+        "output_boundary": false,
         "output_checkpoints": false,
         "end_time": 0.01,
         "timestep": 2.50e-03,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
-            "dealias": false
+            "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
@@ -54,13 +54,13 @@
                             "type": "boundary_mesh",
                             "name": "data/surfaces/cylinder.stl",
                             "distance_transform": {
-                                "type": "step",
-                                "value": 0.0
+                                "type": "smooth_step",
+                                "value": 0.1
                             },
                             "mesh_transform": {
                                 "type": "bounding_box",
                                 "box_min": [ -0.5, -0.5, 0.001 ],
-                                "box_max": [ 0.5, 0.5, 1.001 ],
+                                "box_max": [ 0.5, 0.5, 0.501 ],
                                 "keep_aspect_ratio": false
                             }
                         }
@@ -69,10 +69,10 @@
                         "limits": [ 0.0, 100 ],
                         "penalty": 1.0,
                     },
-                    "filter": {
-                        "type": "PDE",
-                        "radius": 0.05
-                    }
+                    // "filter": {
+                    //     "type": "PDE",
+                    //     "radius": 0.1
+                    // }
                 }
             ]
         },

@@ -57,6 +57,7 @@ def plot_metric(experiment: list[dict],
                 "fig_dir and fig_name must be provided to save the figure.")
 
         fig.savefig(os.path.join(fig_dir, fig_name))
+        plt.close(fig)
 
 
 # ============================================================================ #

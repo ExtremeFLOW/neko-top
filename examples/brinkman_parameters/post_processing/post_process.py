@@ -53,19 +53,14 @@ root_dir = os.path.abspath(os.path.join(current_dir, "../../.."))
 experiments_dir = os.path.join(root_dir, "examples", "brinkman_parameters",
                                "experiments")
 cases_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cases")
-#cases_dir = os.path.join(root_dir, "results", "only_stats","brinkman_parameters", "cases")
 
 # Create logs and plots folders in the experiments directory if they don't exist
 plots_dir = os.path.abspath(os.path.join(current_dir, "../", "plots"))
 tables_dir = os.path.abspath(os.path.join(current_dir, "../", "tables"))
 cache_dir = os.path.join(root_dir, "results", "brinkman_parameters", "cache")
-#cache_dir = os.path.join(root_dir, "results", "only_stats", "brinkman_parameters", "cache")
 
 # Read commandline input to determine if we want verbose output
-verbose = False
-if len(sys.argv) > 1:
-    if sys.argv[1] == "-v":
-        verbose = True
+verbose = any([arg == "-v" or arg == "--verbose" for arg in sys.argv])
 
 # ============================================================================ #
 # Post process the experiments
@@ -192,27 +187,6 @@ for file in experiment_files:
                 print("Error in case:", case["name"])
                 print("\t", e)
 
-        # Force using rho * u (brinkman case)
-        # fuck this one...
-        # -------------------------------------------------------------------- #
-        # if method == "brinkman":
-        #     file_name = os.path.join(case_file_path, 'cylinder.log')
-        #     try:
-        #         force_measure = read_brinkman_force(file_name, cache_dir)
-        #         plot_force_measure(force_measure, fig_LD, ax_LD)
-        #         means, amps = compress_to_data_point(force_measure,
-        #                                              plot_params)
-        #         data_point = {
-        #             "mean": means,
-        #             "amp": amps,
-        #             "name": "brinkman_force"
-        #         }
-        #         data_points.append(data_point)
-        #         del force_measure
-        #     except Exception as e:
-        #         print("Error in case:", case["name"])
-        #         print("\t", e)
-
         # Using the rings
         # -------------------------------------------------------------------- #
         if verbose: print("\t\t- Working on force rings")
@@ -297,7 +271,7 @@ for file in experiment_files:
     # ------------------------------------------------------------------------ #
     # and we could plot curves based on tabulated data
 
-    print("\t- Plots specific to :", experiment_name)
+    if verbose: print("\t- Plots specific to :", experiment_name)
 
     if experiment_name == "Filter_radius":
 
@@ -334,6 +308,7 @@ for file in experiment_files:
                    label="meshed reference")
         ax[2].legend()
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Re_study":
 
@@ -342,6 +317,7 @@ for file in experiment_files:
                              x_axis_variable="Re",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Mesh_study":
 
@@ -350,6 +326,7 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Report_mesh_study_Re200":
 
@@ -358,6 +335,7 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
     elif experiment_name == "Report_mesh_study_Re1000":
 
@@ -366,5 +344,6 @@ for file in experiment_files:
                              x_axis_variable="mesh",
                              line_axis_variable="method")
         fig.savefig(output_filename)
+        plt.close(fig)
 
 print("All experiments processed.")

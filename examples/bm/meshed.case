@@ -1,11 +1,11 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/brinkman_parameters/meshed_M3.nmsh",
+        "mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh",
         "output_at_end": false,
         "output_boundary": true,
         "output_checkpoints": false,
-        "end_time": 1.0,
+        "end_time": 0.01,
         "timestep": 2.5e-3,
         "variable_timestep": true,
         "target_cfl": 0.4,

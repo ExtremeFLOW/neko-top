@@ -4,7 +4,7 @@
 # Define the run function
 
 function run {
-    set -e
+    set +e # Do not exit on error
 
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
@@ -21,14 +21,12 @@ function run {
 
     printf "=%.0s" {1..80} && printf "\n"
     printf "Running example: %s.\n" $example
-
-    # Run the example
     printf "=%.0s" {1..80} && printf "\n"
-    printf "Executing Neko.\n\n"
 
-    casefile=($(find . -name "*.case"))
+    # Find the case file and define the log file
+    casefile=($(find . -name "*.case" -or -name "*.json"))
     if [[ ${#casefile[@]} -eq 0 ]]; then
-        printf "ERROR: No case file found.\n"
+        printf >&2 "ERROR: No case file found.\n"
         return 1
     elif [[ ${#casefile[@]} -eq 1 ]]; then
         casefile=${casefile[0]}
@@ -36,14 +34,21 @@ function run {
     else
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
+
+    # Run the example
+    printf "Executing Neko.\n"
     printf "See $logfile for the status output.\n"
 
     if [ -f "run.sh" ]; then
-        { time ./run.sh 1>$logfile 2>error.log; } 2>&1
+        {
+            time ./run.sh 1>$logfile 2>error.log
+        } 2>&1
+
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         {
             time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.log
         } 2>&1
+
     else
         # Look for the number of cores to use
         if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
@@ -60,27 +65,27 @@ function run {
 
         # ncores=1
 
-        { time $(mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log); } 2>&1
-    fi
-
-    # ------------------------------------------------------------------------ #
-    # Check for errors and normal end
-
-    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" && ! -s ./error.log ]]; then
-        printf "ERROR: Neko did not end normally.\n" >>error.log
-        return 1
+        {
+            time mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log
+        } 2>&1
     fi
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
         return 1
-    else
-        printf "=%.0s" {1..80} && printf "\n"
-        printf "Example concluded.\n"
-        printf "=%.0s" {1..80} && printf "\n"
     fi
+
+    # ------------------------------------------------------------------------ #
+    # Check for errors and normal end
+
+    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
+    if [[ -z "$normal_end" ]]; then
+        printf >&2 "ERROR: Neko did not end normally.\n"
+        return 1
+    fi
+
+    printf "\nExample concluded.\n"
 
     # ------------------------------------------------------------------------ #
     # Clean up the results
@@ -184,7 +189,7 @@ function prepare {
     fi
 
     if [ ! -f "$neko" ]; then
-        printf "ERROR: Neko executable not found." >&2
+        printf >&2 "ERROR: Neko executable not found."
         return 1
     fi
     export neko
@@ -195,10 +200,8 @@ function prepare {
 
 function cleanup {
 
-    # If the error log is not empty, print the error and return
     if [ -s ./error.log ]; then
-        printf "ERROR: An error occurred during execution.\n"
-        printf "See error.log for details.\n"
+        printf >&2 "ERROR: Will not clean up due to errors.\n"
         return 1
     fi
 
@@ -206,28 +209,34 @@ function cleanup {
     # Move the results to the results folder
     results=$RPATH/$example
     printf "=%.0s" {1..80} && printf "\n"
-    printf "Moving files to results folder: \n\t$results\n\n"
+    printf "Cleaning up the results.\n"
+    printf "=%.0s" {1..80} && printf "\n"
+    printf "Files will be moved to results folder: \n\t$results\n\n"
 
     # Remove the results folder if it exists and create a new one
-    mkdir -p $results && rm -fr $results/*
+    [ -d $results ] && rm -fr $results/*
+    mkdir -p $results
 
-    # Move all the nek5000 files to the results folder and compress them.
+    # Move all the nek5000 files to the results folder.
+    printf "Archiving nek5000 files.\n"
     for nek in $(find ./ -name "*.nek5000"); do
-        printf "Archiving:  %s\n" $nek
+        printf "\t- %s\n" $(basename $nek)
 
-        base=${nek%.*}
-        field=$(ls $base.f*)
-        mkdir -p $results/$base
-        mv -t $results/$base $nek $field
+        basename=$(basename $nek)
+        directory=$(dirname $nek)
+        pattern=${basename%.*}
+
+        mkdir -p $results/$pattern
+        mv -t $results/$pattern $nek $directory/$pattern.f*
     done
     printf "\n"
 
     # Move all files which are not the error or executable files to the log
     # folder
     find ./ -type f \
+        -not -name "output.log" \
         -not -name "error.log" \
         -not -name "neko" \
-        -not -name "output.log" \
         -not -name "*.chkp" \
         -not -name "*.smod" \
         -exec mv -t $results {} +
@@ -235,8 +244,18 @@ function cleanup {
     # Remove all but the log files
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
 
+    # ------------------------------------------------------------------------ #
+    # Last minute checks
+
+    if [ -s ./error.log ]; then
+        printf >&2 "ERROR: An error occurred during clean-up.\n"
+        return 1
+    fi
+
+    # ------------------------------------------------------------------------ #
     # Clear the output file to indicate successful completion
+    printf "Clean-up concluded.\n"
+    printf "=%.0s" {1..80} && printf "\n"
     cp -ft $results output.log
-    rm -f output.log
-    touch output.log
+    printf "" >output.log
 }
