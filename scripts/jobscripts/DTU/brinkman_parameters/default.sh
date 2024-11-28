@@ -17,7 +17,7 @@
 #BSUB -q "hpc"
 
 # Ask for n cores placed on R host.
-#BSUB -n 72
+#BSUB -n 96
 #BSUB -R "span[ptile=24]"
 # #BSUB -gpu "num=1:mode=exclusive_process"
 
@@ -28,7 +28,7 @@
 #BSUB -M 5GB
 
 # Time specifications (hh:mm)
-#BSUB -W 12:00
+#BSUB -W 24:00
 
 # -- Notification options
 
