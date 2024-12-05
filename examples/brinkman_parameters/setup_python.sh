@@ -1,6 +1,6 @@
 # Clone git repository pyNekTools
 
-ROOT_FOLDER=$(realpath $(dirname $0))
+ROOT_FOLDER=$(realpath $(dirname $0)/../..)
 
 # Activate the virtual environment
 if [ ! -d $ROOT_FOLDER/.venv ]; then
