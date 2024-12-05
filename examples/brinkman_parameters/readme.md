@@ -1,9 +1,14 @@
 # Parameter study for Brinkman flow around a cylinder
 
-We need to fill the readme with our notes and ideas along the way. Additionally
-we need to give instructions on how to run the simulation and how to postprocess
-the results.
+To run this example please execute the following commands from the root of
+Neko-TOP:
+
+```bash
+./data/brinkman_parameters/meshing_periodic.sh
+./examples/brinkman_parameters/generate_cases.sh
+./run.sh brinkman_parameters
+```
 
 ## Neko
 
-We need the `feature/martins_implicit_forcing` branch of Neko.
+We need the `feature/brinkman_study` branch of Neko.
