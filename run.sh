@@ -283,7 +283,6 @@ function Submit() {
         if [ ! -z "$(bjobs -J $1 2>/dev/null)" ]; then
             bkill -J $1 1>/dev/null 2>/dev/null
         fi
-
         bsub -J $1 -env "all" <job_script.sh
 
     elif [ $CLUSTER == "MN5" ]; then
@@ -340,7 +339,7 @@ for case in ${example_list[@]}; do
     fi
 
     export log=$LPATH/$example && mkdir -p $log
-    [ "$CLEAN" == true ] && rm -fr $log/*
+    [ "$CLEAN" = true ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
