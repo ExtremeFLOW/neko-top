@@ -21,7 +21,12 @@
 ##
 #rea2nbin brink_cyl.re2 immersed_M1.nmsh
 
-[ -z "$NEKO_DIR" ] && NEKO_DIR=../../external/neko
+CURRENT_DIR=$(pwd)
+SCRIPT_ROOT=$(realpath $(dirname $0))
+NEKOTOP_ROOT=$(realpath $SCRIPT_ROOT/../..)
+
+[ -z "$NEKO_DIR" ] && NEKO_DIR=$NEKOTOP_ROOT/external/neko
+[ -z "$JSONFORTRAN_DIR" ] && JSONFORTRAN_DIR=$NEKOTOP_ROOT/external/json-fortran
 
 if [ ! -f $NEKO_DIR/contrib/gmsh2nek/gmsh2nek ]; then
     echo "gmsh2nek not found in $NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
@@ -36,6 +41,9 @@ if [ ! -f $NEKO_DIR/bin/rea2nbin ]; then
 fi
 
 export PATH=$NEKO_DIR/bin:$NEKO_DIR/contrib/gmsh2nek:$PATH
+export LD_LIBRARY_PATH=$JSONFORTRAN_DIR/lib:$LD_LIBRARY_PATH
+
+cd $SCRIPT_ROOT
 
 ## Immersed meshed
 gmsh -0 immersed_M1.geo
@@ -124,5 +132,7 @@ EOF
 #
 rea2nbin brink_cyl.re2 meshed_M4.nmsh
 
-mv *.nmsh ../data_local/brinkman_parameters/
+mv *.nmsh $NEKOTOP_ROOT/data_local/brinkman_parameters/
 rm *.re2 *.geo_unrolled *.msh
+
+cd $CURRENT_DIR
