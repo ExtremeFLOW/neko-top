@@ -1,6 +1,7 @@
 # Clone git repository pyNekTools
 
 ROOT_FOLDER=$(realpath $(dirname $0)/../..)
+CURRENT_DIR=$(pwd)
 
 # Activate the virtual environment
 if [ ! -d $ROOT_FOLDER/.venv ]; then
@@ -17,3 +18,4 @@ git clone --depth=1 git@github.com:ExtremeFLOW/pyNekTools.git $ROOT_FOLDER/exter
 cd $ROOT_FOLDER/external/pyNekTools
 python3 -m pip install -r requirements.txt
 python3 -m pip install .
+cd $CURRENT_DIR
