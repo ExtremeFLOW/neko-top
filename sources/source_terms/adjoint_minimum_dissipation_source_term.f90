@@ -102,8 +102,8 @@ contains
        json, fields, coef)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(field_list_t), intent(inout), target :: fields
-    type(coef_t), intent(inout), target :: coef
+    type(field_list_t), intent(in), target :: fields
+    type(coef_t), intent(in), target :: coef
 
     ! we shouldn't be initializing this from JSON
     ! maybe throw an error?
