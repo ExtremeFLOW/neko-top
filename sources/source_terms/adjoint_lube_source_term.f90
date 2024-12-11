@@ -92,8 +92,8 @@ contains
   subroutine adjoint_lube_source_term_init_from_json(this, json, fields, coef)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(field_list_t), intent(inout), target :: fields
-    type(coef_t), intent(inout), target :: coef
+    type(field_list_t), intent(in), target :: fields
+    type(coef_t), intent(in), target :: coef
     ! real(kind=rp), allocatable :: values(:)
     ! real(kind=rp) :: start_time, end_time
 
