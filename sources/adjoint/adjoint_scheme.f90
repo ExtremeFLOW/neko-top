@@ -129,6 +129,7 @@ module adjoint_scheme
      integer :: vel_projection_activ_step
      !> Steps to activate projection for ksp_pr
      integer :: pr_projection_activ_step
+     logical :: strict_convergence = .false.
      !> No-slip wall for velocity
      type(no_slip_wall_t) :: bc_wall
      !> Dirichlet inflow for velocity
@@ -726,6 +727,10 @@ contains
        call neko_log%end_section()
     end if
 
+    ! Strict convergence for the velocity solver
+    call json_get_or_default(params, 'case.fluid.strict_convergence', &
+         this%strict_convergence, .false.)
+    
     ! Assign velocity fields
     call neko_field_registry%add_field(this%dm_Xh, 'u_adj')
     call neko_field_registry%add_field(this%dm_Xh, 'v_adj')
