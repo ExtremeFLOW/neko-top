@@ -38,16 +38,14 @@ function run {
     # Run the example
     printf "Executing Neko.\n"
     printf "See $logfile for the status output.\n"
+    export NEKO_LOG_FILE=$logfile
 
+    TIME_START=$(date +%s)
     if [ -f "run.sh" ]; then
-        {
-            time ./run.sh 1>$logfile 2>error.log
-        } 2>&1
+        ./run.sh 2>error.log
 
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
-        {
-            time srun --gpu-bind=single:1 $neko $casefile 1>$logfile 2>error.log
-        } 2>&1
+        srun --gpu-bind=single:1 $neko $casefile 2>error.log
 
     else
         # Look for the number of cores to use
@@ -63,21 +61,21 @@ function run {
             ncores=$((nsockets * ncores))
         fi
 
-        # ncores=1
+        ncores=1
 
-        {
-            time mpirun -n $ncores $neko $casefile 1>$logfile 2>error.log
-        } 2>&1
+        mpirun -n $ncores $neko $casefile 2>error.log
+
     fi
+    TIME_END=$(date +%s)
+
+    # ------------------------------------------------------------------------ #
+    # Check for errors and normal end
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
         return 1
     fi
-
-    # ------------------------------------------------------------------------ #
-    # Check for errors and normal end
 
     normal_end=$(tail -n 10 $logfile | grep "Normal end.")
     if [[ -z "$normal_end" ]]; then
@@ -86,6 +84,9 @@ function run {
     fi
 
     printf "\nExample concluded.\n"
+    TIME_DIFF=$((TIME_END - TIME_START))
+    printf "Execution time: %02d:%02d:%02d\n" \
+        $((TIME_DIFF / 3600)) $((TIME_DIFF % 3600 / 60)) $((TIME_DIFF % 60))
 
     # ------------------------------------------------------------------------ #
     # Clean up the results
