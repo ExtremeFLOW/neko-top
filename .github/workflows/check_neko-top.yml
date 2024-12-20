@@ -58,6 +58,7 @@ jobs:
         with:
           json-fortran-dir: ${{ steps.setup-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
+          compiler-flags: "-w"
 
       - name: Setup pFUnit
         id: setup-pfunit

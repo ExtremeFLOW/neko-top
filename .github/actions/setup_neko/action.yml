@@ -112,9 +112,15 @@ runs:
     - name: Cleanup
       if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
       run: |
-        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
-          rm -rf ${{ inputs.working-dir }}
+        echo "INSTALL_DIR: $INSTALL_DIR"
+        echo "WORKING_DIR: $WORKING_DIR"
+
+        if [ $(echo "$INSTALL_DIR" | grep -q "$WORKING_DIR") ]; then
+          rm -rf $WORKING_DIR
         fi
 
     - name: Set output
