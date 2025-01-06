@@ -42,8 +42,7 @@ module PDE_filter
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory, &
        krylov_solver_destroy
   use precon, only: pc_t, precon_factory, precon_destroy
-  use bc, only: bc_list_add, bc_list_t, bc_list_apply_scalar, bc_list_init, &
-       bc_list_free
+  use bc_list, only: bc_list_t
   use neumann, only: neumann_t
   use profiler, only: profiler_start_region, profiler_end_region
   use gather_scatter, only: gs_t, GS_OP_ADD
@@ -62,6 +61,7 @@ module PDE_filter
   use sx_jacobi, only: sx_jacobi_t
   use hsmg, only: hsmg_t
   use utils, only: neko_error
+  use device_math, only: device_cfill, device_col3
   implicit none
   private
 
@@ -159,7 +159,7 @@ contains
     ! Create list with just Neumann bcs
 
     ! init the list
-    call bc_list_init(this%bclst_filt)
+    call this%bclst_filt%init()
 
     ! Mark ALL the BCs as Neumann, regardless of what's prescribed
     bc_labels_all_neuman = 'o'
@@ -170,7 +170,7 @@ contains
     call this%filter_bcs%finalize_neumann(0.0_rp)
 
     ! add them to the filter BCs
-    call bc_list_add(this%bclst_filt, this%filter_bcs)
+    call this%bclst_filt%append(this%filter_bcs)
 
 
     ! Setup backend dependent Ax routines
@@ -200,7 +200,7 @@ contains
 
     call this%filter_bcs%free()
 
-    call bc_list_free(this%bclst_filt)
+    call this%bclst_filt%free()
 
     call this%free_base()
 
@@ -248,7 +248,7 @@ contains
     ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
     ! set BCs
-    call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
+    call this%bclst_filt%apply_scalar(RHS%x, n)
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
@@ -332,7 +332,7 @@ contains
     call field_copy(dF_dX_in, dF_dX_out)
 
     ! set BCs
-    call bc_list_apply_scalar(this%bclst_filt, RHS%x, n)
+    call this%bclst_filt%apply_scalar(RHS%x, n)
 
     ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
