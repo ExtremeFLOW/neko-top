@@ -86,6 +86,7 @@ module minimum_dissipation_objective_function
   ! |\mathbf{u}|^2 d \Omega $
   type, public, extends(objective_function_t) :: &
        minimum_dissipation_objective_function_t
+
      real(kind=rp) :: K, dissipation, lube_value
      logical :: if_lube
 

@@ -10,12 +10,10 @@ program usrneko
   use source_term_handler, only: source_term_handler_t
   use topopt_design, only: topopt_design_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use objective_function, only: objective_function_t
-  use field, only:field_t
+  use field, only: field_t
   use scratch_registry, only : neko_scratch_registry
   use num_types, only : rp
   use field_math, only: field_rzero, field_rone, field_cmult
-  use volume_constraint, only: volume_constraint_t
   use fld_file_output, only : fld_file_output_t
   use steady_state_problem, only : steady_state_problem_t
   use mma, only: mma_t

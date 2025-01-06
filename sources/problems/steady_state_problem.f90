@@ -42,10 +42,7 @@ module steady_state_problem
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
-  use objective_function, only: objective_function_t
-  use minimum_dissipation_objective_function, only: &
-       minimum_dissipation_objective_function_t
-  use volume_constraint, only: volume_constraint_t
+  use objective_function, only: objective_function_t, objective_function_factory
   use fld_file_output, only: fld_file_output_t
   use steady_simcomp, only: steady_simcomp_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
@@ -70,8 +67,8 @@ module steady_state_problem
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
-     type(minimum_dissipation_objective_function_t) :: objective_function
-     type(volume_constraint_t) :: volume_constraint
+     class(objective_function_t), allocatable :: objective_function
+     class(objective_function_t), allocatable :: volume_constraint
 
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
@@ -234,10 +231,12 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call this%objective_function%init(design, this%simulation)
+    call objective_function_factory(this%objective_function, &
+         'minimum_dissipation', design, this%simulation)
     ! volume constraint
     this%m = 1
-    call this%volume_constraint%init(design, this%simulation)
+    call objective_function_factory(this%volume_constraint, &
+         'volume_constraint', design, this%simulation)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -334,8 +333,7 @@ contains
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
-         this%volume_constraint%objective_function_value, &
-         this%volume_constraint%volume
+         this%volume_constraint%objective_function_value
 
 
     ! TODO

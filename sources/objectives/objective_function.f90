@@ -39,10 +39,13 @@ module objective_function
   use dofmap, only: dofmap_t
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
+  use utils, only: neko_error
   implicit none
   private
 
-  type, abstract, public :: objective_function_t
+  public :: objective_function_t, objective_function_factory
+
+  type, abstract :: objective_function_t
      !> objective function value
      real(kind=rp), public :: objective_function_value
      ! it may also be nice to have a list of the objective function value
@@ -118,7 +121,12 @@ module objective_function
      procedure(objective_function_free), pass(this), deferred :: free
   end type objective_function_t
 
+  ! -------------------------------------------------------------------------- !
+  ! Interfaces for the derived types, these are the constructors for the
+  ! different types of objective functions.
   abstract interface
+
+     !> Initialize the objective function
      subroutine objective_function_init(this, design, simulation)
        import objective_function_t, topopt_design_t, simulation_t
        class(objective_function_t), intent(inout) :: this
@@ -128,17 +136,21 @@ module objective_function
        ! these should all be `class(design_variable)` in the future
        type(topopt_design_t), intent(inout) :: design
      end subroutine objective_function_init
-  end interface
 
-  abstract interface
+     !> Destructor
+     subroutine objective_function_free(this)
+       import objective_function_t
+       class(objective_function_t), intent(inout) :: this
+     end subroutine objective_function_free
+
+     !> Compute the objective function
      subroutine objective_function_compute(this, design)
        import objective_function_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
        type(topopt_design_t), intent(in) :: design
      end subroutine objective_function_compute
-  end interface
 
-  abstract interface
+     !> Compute the sensitivity
      subroutine sensitivity_compute(this, design)
        import objective_function_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
@@ -146,15 +158,20 @@ module objective_function
      end subroutine sensitivity_compute
   end interface
 
-  abstract interface
-     subroutine objective_function_free(this)
-       import objective_function_t
-       class(objective_function_t), intent(inout) :: this
-     end subroutine objective_function_free
+  ! -------------------------------------------------------------------------- !
+  ! Explicit interfaces
+
+  interface
+     !> Factory function
+     module subroutine objective_function_factory(object, type, design, simulation)
+       class(objective_function_t), allocatable, intent(inout) :: object
+       character(len=*), intent(in) :: type
+       type(topopt_design_t), intent(inout) :: design
+       type(simulation_t), target, intent(inout) :: simulation
+     end subroutine objective_function_factory
   end interface
 
 contains
-
 
   subroutine objective_function_init_base(this, dm_Xh, if_mask, mask_name)
     class(objective_function_t), target, intent(inout) :: this
