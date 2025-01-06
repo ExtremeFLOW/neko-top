@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `minimum_dissipation_objective_function_t` type.
+!> Implements the `minimum_dissipation_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -60,7 +60,7 @@
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module minimum_dissipation_objective_function
+module minimum_dissipation
   use num_types, only : rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
@@ -68,7 +68,7 @@ module minimum_dissipation_objective_function
   use scratch_registry, only : neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
        adjoint_minimum_dissipation_source_term_t
-  use objective_function, only : objective_function_t
+  use base_functional, only : functional_t
   use simulation, only : simulation_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -84,8 +84,8 @@ module minimum_dissipation_objective_function
   !> An objective function corresponding to minimum dissipation
   ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   ! |\mathbf{u}|^2 d \Omega $
-  type, public, extends(objective_function_t) :: &
-       minimum_dissipation_objective_function_t
+  type, public, extends(functional_t) :: &
+       minimum_dissipation_t
 
      real(kind=rp) :: K, dissipation, lube_value
      logical :: if_lube
@@ -102,27 +102,23 @@ module minimum_dissipation_objective_function
 
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => &
-          minimum_dissipation_objective_function_init
+     procedure, pass(this) :: init => minimum_dissipation_init
      !> Destructor.
-     procedure, pass(this) :: free => &
-          minimum_dissipation_objective_function_free
+     procedure, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
-     procedure, pass(this) :: compute => &
-          minimum_dissipation_objective_function_compute
-     !> Computes the sensitivity with respect to the coefficent $\chi$.
+     procedure, pass(this) :: compute => minimum_dissipation_compute
+     !> Computes the sensitivity with respect to the coefficient $\chi$.
      procedure, pass(this) :: compute_sensitivity => &
-          minimum_dissipation_objective_function_compute_sensitivity
-  end type minimum_dissipation_objective_function_t
+          minimum_dissipation_compute_sensitivity
+  end type minimum_dissipation_t
 
 contains
   !> The common constructor using a JSON object.
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_objective_function_init(this, &
-       design, simulation)
-    class(minimum_dissipation_objective_function_t), intent(inout) :: this
+  subroutine minimum_dissipation_init(this, design, simulation)
+    class(minimum_dissipation_t), intent(inout) :: this
     type(simulation_t), target, intent(inout) :: simulation
     type(topopt_design_t), intent(inout) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
@@ -144,7 +140,7 @@ contains
     if_mask = .false.
     objective_location_zone_name = "objective_location"
 
-    call this%init_base(this%fluid%dm_Xh, if_mask, objective_location_zone_name)
+    call this%init_base(design, if_mask, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
@@ -173,24 +169,24 @@ contains
        call this%adjoint%source_term%add_source_term(lube_term)
     end if
 
-  end subroutine minimum_dissipation_objective_function_init
+  end subroutine minimum_dissipation_init
 
 
   !> Destructor.
-  subroutine minimum_dissipation_objective_function_free(this)
-    class(minimum_dissipation_objective_function_t), intent(inout) :: this
+  subroutine minimum_dissipation_free(this)
+    class(minimum_dissipation_t), intent(inout) :: this
     ! TODO
     ! you probably need to deallocate the source term!
 
     call this%free_base()
-  end subroutine minimum_dissipation_objective_function_free
+  end subroutine minimum_dissipation_free
 
   !> Compute the objective function.
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_objective_function_compute(this, design)
-    class(minimum_dissipation_objective_function_t), intent(inout) :: this
+  subroutine minimum_dissipation_compute(this, design)
+    class(minimum_dissipation_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
@@ -242,38 +238,37 @@ contains
        else
           this%lube_value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
        end if
-       this%objective_function_value = this%dissipation &
-            + 0.5*this%K*this%lube_value
+       this%value = this%dissipation + 0.5*this%K*this%lube_value
     else
-       this%objective_function_value = this%dissipation
+       this%value = this%dissipation
     end if
 
     ! scale everything
-    this%objective_function_value = this%objective_function_value*this%obj_scale
+    this%value = this%value*this%obj_scale
 
     !TODO
     ! GPUS
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine minimum_dissipation_objective_function_compute
+  end subroutine minimum_dissipation_compute
 
   !> compute the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
-  subroutine minimum_dissipation_objective_function_compute_sensitivity(this, &
+  subroutine minimum_dissipation_compute_sensitivity(this, &
        design)
-    class(minimum_dissipation_objective_function_t), intent(inout) :: this
+    class(minimum_dissipation_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     type(field_t), pointer :: lube_contribution
     integer :: temp_indices(1)
 
 
     ! here it should just be an inner product between the forward and adjoint
-    call field_col3(this%sensitivity_to_coefficient, this%fluid%u, this%adjoint%u_adj)
-    call field_addcol3(this%sensitivity_to_coefficient, this%fluid%v, this%adjoint%v_adj)
-    call field_addcol3(this%sensitivity_to_coefficient, this%fluid%w, this%adjoint%w_adj)
+    call field_col3(this%sensitivity, this%fluid%u, this%adjoint%u_adj)
+    call field_addcol3(this%sensitivity, this%fluid%v, this%adjoint%v_adj)
+    call field_addcol3(this%sensitivity, this%fluid%w, this%adjoint%w_adj)
     ! but negative
-    call field_cmult(this%sensitivity_to_coefficient, -1.0_rp)
+    call field_cmult(this%sensitivity, -1.0_rp)
 
     ! if we have the lube term we also get an extra term in the sensitivity
     ! K*u^2
@@ -289,16 +284,16 @@ contains
        call field_addcol3(lube_contribution, this%fluid%v, this%fluid%v)
        call field_addcol3(lube_contribution, this%fluid%w, this%fluid%w)
        ! fuck be careful with these scalaing!
-       call field_add2s2(this%sensitivity_to_coefficient, lube_contribution, &
+       call field_add2s2(this%sensitivity, lube_contribution, &
             this%K*this%obj_scale)
        call neko_scratch_registry%relinquish_field(temp_indices)
     end if
 
     ! I don't actually think you scale the sensitivity...
     ! because the adjoint field is already scaled
-    !call field_cmult(this%sensitivity_to_coefficient, this%obj_scale)
+    !call field_cmult(this%sensitivity, this%obj_scale)
 
 
-  end subroutine minimum_dissipation_objective_function_compute_sensitivity
+  end subroutine minimum_dissipation_compute_sensitivity
 
-end module minimum_dissipation_objective_function
+end module minimum_dissipation

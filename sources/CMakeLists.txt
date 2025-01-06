@@ -54,9 +54,9 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
         # Objective functions
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/bcknd/minimum_dissipation_objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/base_functional.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/base_functional_factory.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/bcknd/minimum_dissipation.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/objectives/bcknd/volume_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90

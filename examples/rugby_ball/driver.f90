@@ -130,16 +130,16 @@ program usrneko
      ! only have the size of the mask, not the full size.
      if (design%if_mask) then
         call mask_exterior_const(&
-             problem%volume_constraint%sensitivity_to_coefficient, &
+             problem%volume_constraint%sensitivity, &
              design%optimization_domain, 0.0_rp)
      end if
 
      ! now we have the optimizer act on the design field.
 
-     fval(1) = problem%volume_constraint%objective_function_value
+     fval(1) = problem%volume_constraint%value
      associate(x => design%design_indicator%x, &
           df0dx => design%sensitivity%x, &
-          dfdx => problem%volume_constraint%sensitivity_to_coefficient%x)
+          dfdx => problem%volume_constraint%sensitivity%x)
        ! TODO
        ! reshape everything and use the propper "update"
 

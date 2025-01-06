@@ -42,7 +42,7 @@ module steady_state_problem
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
-  use objective_function, only: objective_function_t, objective_function_factory
+  use base_functional, only: functional_t, functional_factory
   use fld_file_output, only: fld_file_output_t
   use steady_simcomp, only: steady_simcomp_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
@@ -67,8 +67,8 @@ module steady_state_problem
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
-     class(objective_function_t), allocatable :: objective_function
-     class(objective_function_t), allocatable :: volume_constraint
+     class(functional_t), allocatable :: objective_function
+     class(functional_t), allocatable :: volume_constraint
 
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
@@ -231,11 +231,11 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call objective_function_factory(this%objective_function, &
+    call functional_factory(this%objective_function, &
          'minimum_dissipation', design, this%simulation)
     ! volume constraint
     this%m = 1
-    call objective_function_factory(this%volume_constraint, &
+    call functional_factory(this%volume_constraint, &
          'volume_constraint', design, this%simulation)
 
     ! init the sampler
@@ -264,10 +264,8 @@ contains
     call this%output%fields%assign(8, this%simulation%adjoint_case%scheme%w_adj)
     call this%output%fields%assign(9, this%simulation%adjoint_case%scheme%p_adj)
     call this%output%fields%assign(10, design%brinkman_amplitude)
-    call this%output%fields%assign_to_field(11, &
-         this%objective_function%sensitivity_to_coefficient)
-    call this%output%fields%assign_to_field(12, &
-         this%volume_constraint%sensitivity_to_coefficient)
+    call this%output%fields%assign_to_field(11, this%objective_function%sensitivity)
+    call this%output%fields%assign_to_field(12, this%volume_constraint%sensitivity)
     call this%output%fields%assign(13, design%sensitivity)
     ! TODO
     ! I still haven't done the design%sensitivity as a field list!
@@ -319,7 +317,7 @@ contains
     call this%simulation%run()
 
     ! TODO
-    ! In the future, the objective_function_t will potentially include
+    ! In the future, the functional_t will potentially include
     ! simulation components so that we can
     ! accumulate the objective function during the run...
     ! here, we just compute it on the last step
@@ -331,9 +329,9 @@ contains
     call this%volume_constraint%compute(design)
 
     print *, 'OBJECTIVE FUNCTION', &
-         this%objective_function%objective_function_value
+         this%objective_function%value
     print *, 'VOLUME CONSTRAINT', &
-         this%volume_constraint%objective_function_value
+         this%volume_constraint%value
 
 
     ! TODO
@@ -354,7 +352,7 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
-    ! again, in the future, the objective_function_t will potentially include
+    ! again, in the future, the functional_t will potentially include
     ! simulation components so that we can
     ! accumulate the sensitivity during the run...
     ! here, we just compute it on the last step
@@ -375,8 +373,7 @@ contains
     ! it would be nice to visualize this
 
     ! do the adjoint mapping
-    call design%map_backward(&
-         this%objective_function%sensitivity_to_coefficient)
+    call design%map_backward( this%objective_function%sensitivity)
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
 

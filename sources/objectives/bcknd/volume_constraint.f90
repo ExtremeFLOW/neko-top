@@ -58,7 +58,7 @@ module volume_constraint
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use objective_function, only : objective_function_t
+  use base_functional, only : functional_t
   use simulation, only : simulation_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -72,7 +72,7 @@ module volume_constraint
   private
 
   !> A constraint on the volume of the design.
-  type, public, extends(objective_function_t) :: volume_constraint_t
+  type, public, extends(functional_t) :: volume_constraint_t
 
      !> whether it is minimum or maximum volume
      ! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
@@ -144,7 +144,7 @@ contains
     n = design%design_indicator%size()
     if (design%if_mask) then
        ! init the base
-       call this%init_base(this%fluid%dm_Xh, design%if_mask, &
+       call this%init_base(design, design%if_mask, &
             design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
@@ -159,7 +159,7 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(this%fluid%dm_Xh, design%if_mask)
+       call this%init_base(design)
 
        ! point to the volume of the domain
        this%volume_domain = this%fluid%c_xh%volume
@@ -207,10 +207,10 @@ contains
     ! then we need to check min or max
     if (this%is_max) then
        ! max volume
-       this%objective_function_value = this%volume - this%v_max
+       this%value = this%volume - this%v_max
     else
        ! min volume
-       this%objective_function_value = -this%volume + this%v_max
+       this%value = -this%volume + this%v_max
     end if
 
 
@@ -228,15 +228,15 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
 
-    call field_rone(this%sensitivity_to_coefficient)
+    call field_rone(this%sensitivity)
 
     if (this%is_max) then
        ! max volume
-       call field_cmult(this%sensitivity_to_coefficient, &
+       call field_cmult(this%sensitivity, &
             1.0_rp / this%volume_domain)
     else
        ! min volume
-       call field_cmult(this%sensitivity_to_coefficient, &
+       call field_cmult(this%sensitivity, &
             -1.0_rp / this%volume_domain)
     end if
 

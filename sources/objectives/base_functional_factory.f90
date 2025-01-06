@@ -31,18 +31,20 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 
 !> Submodule for the objective function factory
-submodule (objective_function) objective_function_factory_mod
+submodule (base_functional) functional_factory_mod
 
   use utils, only: neko_type_error
   use volume_constraint, only: volume_constraint_t
-  use minimum_dissipation_objective_function, only: minimum_dissipation_objective_function_t
+  use minimum_dissipation, only: minimum_dissipation_t
   use topopt_design, only: topopt_design_t
   use simulation, only: simulation_t
 
   implicit none
 
   character(len=80), parameter :: KNOWN_TYPES(2) = [ character(len=80) :: &
-       'minimum_dissipation', 'volume_constraint']
+       'minimum_dissipation', &
+       'volume_constraint' &
+       ]
 
 
 contains
@@ -56,23 +58,23 @@ contains
   !! @param type The type of the objective function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine objective_function_factory(object, type, design, simulation)
-    class(objective_function_t), allocatable, intent(inout) :: object
+  module subroutine functional_factory(object, type, design, simulation)
+    class(functional_t), allocatable, intent(inout) :: object
     character(len=*), intent(in) :: type
     type(topopt_design_t), intent(inout) :: design
     type(simulation_t), target, intent(inout) :: simulation
 
     select case(type)
       case('minimum_dissipation')
-       allocate(minimum_dissipation_objective_function_t::object)
+       allocate(minimum_dissipation_t::object)
       case('volume_constraint')
        allocate(volume_constraint_t::object)
       case default
-       call neko_type_error('objective_function', type, KNOWN_TYPES)
+       call neko_type_error('functional', type, KNOWN_TYPES)
 
     end select
 
     call object%init(design, simulation)
-  end subroutine objective_function_factory
+  end subroutine functional_factory
 
-end submodule objective_function_factory_mod
+end submodule functional_factory_mod
