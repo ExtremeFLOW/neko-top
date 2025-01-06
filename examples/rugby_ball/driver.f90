@@ -49,7 +49,7 @@ program usrneko
   real(kind=rp), allocatable :: x_switch(:)
   character(len=256) :: case_file
   integer :: argc, ierr
-  logical :: mpi_is_initialized
+  ! logical :: mpi_is_initialized
 
   !> parameters from the case file
   type(json_file) :: parameters

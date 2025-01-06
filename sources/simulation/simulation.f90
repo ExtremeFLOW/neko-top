@@ -42,10 +42,6 @@ module simulation
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
-  use objective_function, only: objective_function_t
-  use minimum_dissipation_objective_function, only: &
-       minimum_dissipation_objective_function_t
-  use volume_constraint, only: volume_constraint_t
   use fld_file_output, only: fld_file_output_t
   use steady_simcomp, only: steady_simcomp_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t

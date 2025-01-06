@@ -34,8 +34,7 @@
 module objective_function
   use num_types, only: rp, dp
   use field, only: field_t
-  use fluid_scheme, only: fluid_scheme_t
-  use adjoint_scheme, only: adjoint_scheme_t
+  use simulation, only: simulation_t
   use topopt_design, only: topopt_design_t
   use dofmap, only: dofmap_t
   use point_zone_registry, only: neko_point_zone_registry
@@ -98,12 +97,12 @@ module objective_function
      ! this will REALLY need to be modified in the future...
      ! in a steady case, we just need to compute it on the last step
      ! in an unsteady case this will be a time integral
-     ! so for now it's a proceedure.
+     ! so for now it's a procedure.
      ! But it the future it may be a simulation component that will be
      ! appended to the fluid.
      !
      ! TODO
-     ! this will need to be deffered in some way
+     ! this will need to be deferred in some way
      ! the init reads the JSON
      ! (or maybe we pass what objective function we have externally)
      ! based on the objective we have, we
@@ -112,8 +111,7 @@ module objective_function
      !> Compute the sensitivity
      ! again, right now this is just a procedure, but for unsteady cases this
      ! may require simulation components for time integrals.
-     procedure(sensitivity_compute), pass(this), &
-          deferred :: compute_sensitivity
+     procedure(sensitivity_compute), pass(this), deferred :: compute_sensitivity
 
      procedure(objective_function_init), pass(this), deferred :: init
      !> Destructor
@@ -121,13 +119,11 @@ module objective_function
   end type objective_function_t
 
   abstract interface
-     subroutine objective_function_init(this, design, fluid, adjoint)
-       import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
-            topopt_design_t
+     subroutine objective_function_init(this, design, simulation)
+       import objective_function_t, topopt_design_t, simulation_t
        class(objective_function_t), intent(inout) :: this
        ! these ones are inout because we may need to append source terms etc
-       class(fluid_scheme_t), intent(inout) :: fluid
-       class(adjoint_scheme_t), intent(inout) :: adjoint
+       type(simulation_t), target, intent(inout) :: simulation
        ! TODO
        ! these should all be `class(design_variable)` in the future
        type(topopt_design_t), intent(inout) :: design
@@ -135,22 +131,18 @@ module objective_function
   end interface
 
   abstract interface
-     subroutine objective_function_compute(this, design, fluid)
-       import objective_function_t, fluid_scheme_t, topopt_design_t
+     subroutine objective_function_compute(this, design)
+       import objective_function_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
-       class(fluid_scheme_t), intent(in) :: fluid
-       type(topopt_design_t), intent(inout) :: design
+       type(topopt_design_t), intent(in) :: design
      end subroutine objective_function_compute
   end interface
 
   abstract interface
-     subroutine sensitivity_compute(this, design, fluid, adjoint)
-       import objective_function_t, fluid_scheme_t, adjoint_scheme_t, &
-            topopt_design_t
+     subroutine sensitivity_compute(this, design)
+       import objective_function_t, topopt_design_t
        class(objective_function_t), intent(inout) :: this
-       class(fluid_scheme_t), intent(in) :: fluid
-       class(adjoint_scheme_t), intent(in) :: adjoint
-       type(topopt_design_t), intent(inout) :: design
+       type(topopt_design_t), intent(in) :: design
      end subroutine sensitivity_compute
   end interface
 
@@ -179,7 +171,7 @@ contains
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => &
-       neko_point_zone_registry%get_point_zone(mask_name)
+            neko_point_zone_registry%get_point_zone(mask_name)
     end if
 
   end subroutine objective_function_init_base

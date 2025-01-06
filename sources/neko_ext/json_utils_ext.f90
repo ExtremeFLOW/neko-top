@@ -60,10 +60,10 @@ contains
     character(len=*), intent(in) :: filename
     type(json_file) :: case_params
 
-    integer :: pe_rank, ierr, length, argc
+    integer :: pe_rank, ierr, length
     character(len=:), allocatable :: json_buffer
-    character(len=4) :: suffix
-    logical :: mpi_is_initialized
+    ! character(len=4) :: suffix
+    ! logical :: mpi_is_initialized
 
     pe_rank = 0
     call MPI_Comm_rank(MPI_COMM_WORLD, pe_rank, ierr)

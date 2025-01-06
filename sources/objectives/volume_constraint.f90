@@ -59,6 +59,7 @@ module volume_constraint
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
   use objective_function, only : objective_function_t
+  use simulation, only : simulation_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
@@ -87,6 +88,8 @@ module volume_constraint
      !> volume of the optimization domain
      real(kind=rp) :: volume_domain
 
+     class(fluid_scheme_t), pointer :: fluid
+
 
    contains
      !> The common constructor using a JSON object.
@@ -105,10 +108,9 @@ contains
   !! @param design the design
   !! @param fluid the fluid scheme
   !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_init(this, design, fluid, adjoint)
+  subroutine volume_constraint_init(this, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(inout) :: fluid
-    class(adjoint_scheme_t), intent(inout) :: adjoint
+    type(simulation_t), target, intent(inout) :: simulation
     type(topopt_design_t), intent(inout) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -136,12 +138,14 @@ contains
     this%is_max = .false.
     this%v_max = 0.2
 
+    this%fluid => simulation%neko_case%fluid
+
     ! Now we can extract the mask/if_mask from the design
     n = design%design_indicator%size()
     if (design%if_mask) then
        ! init the base
-       call this%init_base(fluid%dm_Xh, design%if_mask, &
-       design%optimization_domain%name)
+       call this%init_base(this%fluid%dm_Xh, design%if_mask, &
+            design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
        call neko_scratch_registry%request_field(work , temp_indices(1))
@@ -149,16 +153,16 @@ contains
        if (neko_bcknd_device .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume_domain = glsc2_mask(work%x, fluid%c_xh%B, &
+          this%volume_domain = glsc2_mask(work%x, this%fluid%c_xh%B, &
                n, this%mask%mask, this%mask%size)
        end if
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(fluid%dm_Xh, design%if_mask)
+       call this%init_base(this%fluid%dm_Xh, design%if_mask)
 
        ! point to the volume of the domain
-       this%volume_domain = fluid%c_xh%volume
+       this%volume_domain = this%fluid%c_xh%volume
     end if
 
   end subroutine volume_constraint_init
@@ -174,10 +178,9 @@ contains
   !> The computation of the constraint.
   !! @param design the design
   !! @param fluid the fluid scheme
-  subroutine volume_constraint_compute(this, design, fluid)
+  subroutine volume_constraint_compute(this, design)
     class(volume_constraint_t), intent(inout) :: this
-    class(fluid_scheme_t), intent(in) :: fluid
-    type(topopt_design_t), intent(inout) :: design
+    type(topopt_design_t), intent(in) :: design
     integer n
 
     n = design%design_indicator%size()
@@ -188,14 +191,14 @@ contains
        if (neko_bcknd_device .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2_mask(design%design_indicator%x, fluid%c_xh%B, &
+          this%volume = glsc2_mask(design%design_indicator%x, this%fluid%c_xh%B, &
                n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n)
+          this%volume = glsc2(design%design_indicator%x, this%fluid%c_xh%B, n)
        end if
     end if
 
@@ -221,11 +224,9 @@ contains
   !! @param design the design
   !! @param fluid the fluid scheme
   !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_compute_sensitivity(this, design, fluid, adjoint)
+  subroutine volume_constraint_compute_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
-    type(topopt_design_t), intent(inout) :: design
-    class(fluid_scheme_t), intent(in) :: fluid
-    class(adjoint_scheme_t), intent(in) :: adjoint
+    type(topopt_design_t), intent(in) :: design
 
     call field_rone(this%sensitivity_to_coefficient)
 
