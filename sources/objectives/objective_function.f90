@@ -159,8 +159,8 @@ contains
   subroutine objective_function_init_base(this, dm_Xh, if_mask, mask_name)
     class(objective_function_t), target, intent(inout) :: this
     type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
+    logical, intent(in), optional :: if_mask
     character(len=*), intent(in), optional :: mask_name
-    logical, intent(in) :: if_mask
     ! not sure what we need here yet
 
     ! initialize sensitivity field
@@ -168,10 +168,15 @@ contains
     ! Think about field lists in the future!
     call this%sensitivity_to_coefficient%init(dm_Xh, "design_indicator")
 
-    this%if_mask = if_mask
+    if (present(if_mask)) this%if_mask = if_mask
+    if (.not. present(if_mask)) this%if_mask = .false.
+
     if (this%if_mask) then
-       this%mask => &
-            neko_point_zone_registry%get_point_zone(mask_name)
+       if (.not. present(mask_name)) then
+          call neko_error('Mask name not provided')
+       end if
+
+       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
     end if
 
   end subroutine objective_function_init_base
