@@ -35,8 +35,8 @@ module base_functional
   use num_types, only: rp, dp
   use field, only: field_t
   use simulation, only: simulation_t
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
-  use dofmap, only: dofmap_t
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use utils, only: neko_error
@@ -62,10 +62,10 @@ module base_functional
      !> Sensitivity field
      type(field_t) :: sensitivity
 
-     !> A mask for where the objective function is evaluated
-     class(point_zone_t), pointer :: mask
      !> containing a mask?
      logical :: if_mask
+     !> A mask for where the objective function is evaluated
+     class(point_zone_t), pointer :: mask
 
    contains
      !> Initializers of the base class
@@ -92,13 +92,10 @@ module base_functional
 
      !> Initialize the objective function
      subroutine functional_init(this, design, simulation)
-       import functional_t, topopt_design_t, simulation_t
+       import functional_t, design_t, simulation_t
        class(functional_t), intent(inout) :: this
-       ! these ones are inout because we may need to append source terms etc
        type(simulation_t), target, intent(inout) :: simulation
-       ! TODO
-       ! these should all be `class(design_variable)` in the future
-       type(topopt_design_t), intent(inout) :: design
+       class(design_t), intent(in) :: design
      end subroutine functional_init
 
      !> Destructor
@@ -109,16 +106,16 @@ module base_functional
 
      !> Compute the objective function
      subroutine functional_compute(this, design)
-       import functional_t, topopt_design_t
+       import functional_t, design_t
        class(functional_t), intent(inout) :: this
-       type(topopt_design_t), intent(in) :: design
+       class(design_t), intent(in) :: design
      end subroutine functional_compute
 
      !> Compute the sensitivity
      subroutine functional_sensitivity(this, design)
-       import functional_t, topopt_design_t
+       import functional_t, design_t
        class(functional_t), intent(inout) :: this
-       type(topopt_design_t), intent(in) :: design
+       class(design_t), intent(in) :: design
      end subroutine functional_sensitivity
   end interface
 
@@ -130,12 +127,13 @@ module base_functional
      module subroutine functional_factory(object, type, design, simulation)
        class(functional_t), allocatable, intent(inout) :: object
        character(len=*), intent(in) :: type
-       type(topopt_design_t), intent(inout) :: design
+       class(design_t), intent(in) :: design
        type(simulation_t), target, intent(inout) :: simulation
      end subroutine functional_factory
   end interface
 
 contains
+
   ! -------------------------------------------------------------------------- !
   ! Implementations for the base class
 
@@ -145,12 +143,17 @@ contains
   !! @param[optional] mask_name The name design the mask
   subroutine functional_init_base(this, design, if_mask, mask_name)
     class(functional_t), target, intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    class(design_t), intent(in) :: design
     logical, intent(in), optional :: if_mask
     character(len=*), intent(in), optional :: mask_name
 
     this%value = 0.0_rp
-    call this%sensitivity%init(design%design_indicator%dof)
+    select type(design)
+      type is (topopt_design_t)
+       call this%sensitivity%init(design%design_indicator%dof)
+      class default
+       call neko_error('Unknown design type')
+    end select
 
     if (present(if_mask)) this%if_mask = if_mask
     if (.not. present(if_mask)) this%if_mask = .false.

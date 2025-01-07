@@ -41,7 +41,7 @@ contains
     type(json_value), pointer :: child
     logical :: valid
 
-    nullify(child)
+    if (associated(child)) nullify(child)
 
     valid = .false.
     call json%get(key, child, valid)
@@ -52,7 +52,8 @@ contains
 
     call output%initialize()
     call output%add(child)
-    nullify(child)
+
+    if (associated(child)) nullify(child)
 
   end subroutine json_get_subdict
 

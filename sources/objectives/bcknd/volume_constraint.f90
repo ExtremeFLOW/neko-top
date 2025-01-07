@@ -65,6 +65,7 @@ module volume_constraint
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
   use field_math, only: field_rone, field_cmult
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
@@ -73,6 +74,7 @@ module volume_constraint
 
   !> A constraint on the volume of the design.
   type, public, extends(functional_t) :: volume_constraint_t
+     private
 
      !> whether it is minimum or maximum volume
      ! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
@@ -90,16 +92,15 @@ module volume_constraint
 
      class(fluid_scheme_t), pointer :: fluid
 
-
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => volume_constraint_init
+     procedure, public, pass(this) :: init => volume_constraint_init
      !> Destructor.
-     procedure, pass(this) :: free => volume_constraint_free
+     procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute => volume_constraint_compute
+     procedure, public, pass(this) :: compute => volume_constraint_compute
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute_sensitivity => &
+     procedure, public, pass(this) :: compute_sensitivity => &
           volume_constraint_compute_sensitivity
   end type volume_constraint_t
 
@@ -111,10 +112,18 @@ contains
   subroutine volume_constraint_init(this, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
     type(simulation_t), target, intent(inout) :: simulation
-    type(topopt_design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
+    type(topopt_design_t), pointer :: topopt_design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer :: n
+
+    select type (design)
+      type is (topopt_design_t)
+       topopt_design => design
+      class default
+       call neko_error('Volume constraint only works with topopt_design')
+    end select
 
     ! TODO
     ! I don't think there's much to init here
@@ -141,16 +150,16 @@ contains
     this%fluid => simulation%neko_case%fluid
 
     ! Now we can extract the mask/if_mask from the design
-    n = design%design_indicator%size()
-    if (design%if_mask) then
+    n = topopt_design%design_indicator%size()
+    if (topopt_design%if_mask) then
        ! init the base
-       call this%init_base(design, design%if_mask, &
-            design%optimization_domain%name)
+       call this%init_base(topopt_design, topopt_design%if_mask, &
+            topopt_design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
        call neko_scratch_registry%request_field(work , temp_indices(1))
        call field_rone(work)
-       if (neko_bcknd_device .eq. 1) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
           this%volume_domain = glsc2_mask(work%x, this%fluid%c_xh%B, &
@@ -159,7 +168,7 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(design)
+       call this%init_base(topopt_design)
 
        ! point to the volume of the domain
        this%volume_domain = this%fluid%c_xh%volume
@@ -180,25 +189,33 @@ contains
   !! @param fluid the fluid scheme
   subroutine volume_constraint_compute(this, design)
     class(volume_constraint_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    class(design_t), intent(in) :: design
+    type(topopt_design_t), pointer :: topopt_design
     integer n
 
-    n = design%design_indicator%size()
+    select type (design)
+      type is (topopt_design_t)
+       topopt_design => design
+      class default
+       call neko_error('Volume constraint only works with topopt_design')
+    end select
+
+    n = topopt_design%design_indicator%size()
     ! TODO
     ! in the future we should be using the mapped design varaible
     !corresponding to this constraint!!!
-    if (design%if_mask) then
-       if (neko_bcknd_device .eq. 1) then
+    if (topopt_design%if_mask) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2_mask(design%design_indicator%x, this%fluid%c_xh%B, &
+          this%volume = glsc2_mask(topopt_design%design_indicator%x, this%fluid%c_xh%B, &
                n, this%mask%mask, this%mask%size)
        end if
     else
-       if (neko_bcknd_device .eq. 1) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2(design%design_indicator%x, this%fluid%c_xh%B, n)
+          this%volume = glsc2(topopt_design%design_indicator%x, this%fluid%c_xh%B, n)
        end if
     end if
 
@@ -226,7 +243,7 @@ contains
   !! @param adjoint the adjoint scheme
   subroutine volume_constraint_compute_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    class(design_t), intent(in) :: design
 
     call field_rone(this%sensitivity)
 

@@ -73,19 +73,21 @@ module minimum_dissipation
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
   use math, only : glsc2
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
+  use utils, only: neko_error
   implicit none
   private
 
   !> An objective function corresponding to minimum dissipation
   ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   ! |\mathbf{u}|^2 d \Omega $
-  type, public, extends(functional_t) :: &
-       minimum_dissipation_t
+  type, public, extends(functional_t) :: minimum_dissipation_t
+     private
 
      real(kind=rp) :: K, dissipation, lube_value
      logical :: if_lube
@@ -102,17 +104,19 @@ module minimum_dissipation
 
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => minimum_dissipation_init
+     procedure, public, pass(this) :: init => minimum_dissipation_init
      !> Destructor.
-     procedure, pass(this) :: free => minimum_dissipation_free
+     procedure, public, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
-     procedure, pass(this) :: compute => minimum_dissipation_compute
+     procedure, public, pass(this) :: compute => minimum_dissipation_compute
      !> Computes the sensitivity with respect to the coefficient $\chi$.
-     procedure, pass(this) :: compute_sensitivity => &
+     procedure, public, pass(this) :: compute_sensitivity => &
           minimum_dissipation_compute_sensitivity
+
   end type minimum_dissipation_t
 
 contains
+
   !> The common constructor using a JSON object.
   !! @param design the design.
   !! @param fluid the fluid scheme.
@@ -120,7 +124,7 @@ contains
   subroutine minimum_dissipation_init(this, design, simulation)
     class(minimum_dissipation_t), intent(inout) :: this
     type(simulation_t), target, intent(inout) :: simulation
-    type(topopt_design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
     type(adjoint_lube_source_term_t) :: lube_term
     character(len=:), allocatable :: objective_location_zone_name
@@ -153,7 +157,6 @@ contains
     ! append adjoint forcing term based on objective function
     call this%adjoint%source_term%add_source_term(adjoint_forcing)
 
-
     ! if we have the lube term we need to initialize and append that too
     if (this%if_lube) then
        ! TODO
@@ -171,14 +174,14 @@ contains
 
   end subroutine minimum_dissipation_init
 
-
   !> Destructor.
   subroutine minimum_dissipation_free(this)
     class(minimum_dissipation_t), intent(inout) :: this
-    ! TODO
-    ! you probably need to deallocate the source term!
-
     call this%free_base()
+
+    if (associated(this%fluid)) nullify(this%fluid)
+    if (associated(this%adjoint)) nullify( this%adjoint)
+
   end subroutine minimum_dissipation_free
 
   !> Compute the objective function.
@@ -187,11 +190,19 @@ contains
   !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_compute(this, design)
     class(minimum_dissipation_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    class(design_t), intent(in) :: design
+    type(topopt_design_t), pointer :: topopt_design
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
     integer n
+
+    select type (design)
+      type is (topopt_design_t)
+       topopt_design => design
+      class default
+       call neko_error('Minimum dissipation only works with topopt_design')
+    end select
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
@@ -229,9 +240,9 @@ contains
        ! I feel like every objective function should have internal pointers to
        ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
        ! (the whole design, so we get all the coeffients)
-       call field_col3(objective_field, this%fluid%u, design%brinkman_amplitude)
-       call field_addcol3(objective_field, this%fluid%v, design%brinkman_amplitude)
-       call field_addcol3(objective_field, this%fluid%w, design%brinkman_amplitude)
+       call field_col3(objective_field, this%fluid%u, topopt_design%brinkman_amplitude)
+       call field_addcol3(objective_field, this%fluid%v, topopt_design%brinkman_amplitude)
+       call field_addcol3(objective_field, this%fluid%w, topopt_design%brinkman_amplitude)
        if (this%if_mask) then
           this%lube_value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
                n, this%mask%mask, this%mask%size)
@@ -255,10 +266,9 @@ contains
 
   !> compute the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
-  subroutine minimum_dissipation_compute_sensitivity(this, &
-       design)
+  subroutine minimum_dissipation_compute_sensitivity(this, design)
     class(minimum_dissipation_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    class(design_t), intent(in) :: design
     type(field_t), pointer :: lube_contribution
     integer :: temp_indices(1)
 

@@ -132,7 +132,7 @@ contains
     end if
 
     ! ------------------------------------------------------------------------ !
-    ! Reset the "freeze" paramter of the flow
+    ! Reset the "freeze" parameter of the flow
     ! ------------------------------------------------------------------------ !
 
     call json_get_or_default(neko_case%params, &

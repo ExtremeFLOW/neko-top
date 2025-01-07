@@ -159,7 +159,7 @@ program usrneko
        ! (and also prints out some norms to make the trial and error and
        ! bit easier)
 
-       call problem%write(real(optimization_iteration, rp))
+       call problem%write(optimization_iteration)
 
        !call optimizer%mma_update_cpu( &
        !     optimization_iteration, x, df0dx, fval, dfdx)

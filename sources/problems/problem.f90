@@ -169,11 +169,11 @@ contains
   end subroutine problem_free_base
 
   !> Sample the fields/design.
-  subroutine problem_write(this, t)
+  subroutine problem_write(this, idx)
     class(problem_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: idx
 
-    call this%output%sample(t)
+    call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
 
 end module problem

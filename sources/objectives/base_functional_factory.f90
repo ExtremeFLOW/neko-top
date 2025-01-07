@@ -32,20 +32,20 @@
 
 !> Submodule for the objective function factory
 submodule (base_functional) functional_factory_mod
-
+  use design, only: design_t
   use utils, only: neko_type_error
+  use simulation, only: simulation_t
+
+  ! Import the objective function types
   use volume_constraint, only: volume_constraint_t
   use minimum_dissipation, only: minimum_dissipation_t
-  use topopt_design, only: topopt_design_t
-  use simulation, only: simulation_t
 
   implicit none
 
-  character(len=80), parameter :: KNOWN_TYPES(2) = [ character(len=80) :: &
+  !> Known function types
+  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
        'minimum_dissipation', &
-       'volume_constraint' &
-       ]
-
+       'volume_constraint']
 
 contains
 
@@ -61,17 +61,16 @@ contains
   module subroutine functional_factory(object, type, design, simulation)
     class(functional_t), allocatable, intent(inout) :: object
     character(len=*), intent(in) :: type
-    type(topopt_design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
 
-    select case(type)
+    select case(trim(type))
       case('minimum_dissipation')
        allocate(minimum_dissipation_t::object)
       case('volume_constraint')
        allocate(volume_constraint_t::object)
       case default
        call neko_type_error('functional', type, KNOWN_TYPES)
-
     end select
 
     call object%init(design, simulation)
