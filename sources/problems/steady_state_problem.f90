@@ -343,8 +343,6 @@ contains
     ! time anyway...
     !
 
-    call this%simulation%reset()
-
   end subroutine steady_state_problem_compute_topopt
 
   !> The computation of the sensitivity if we have a `topopt_design_t`.
@@ -373,7 +371,7 @@ contains
     ! it would be nice to visualize this
 
     ! do the adjoint mapping
-    call design%map_backward( this%objective_function%sensitivity)
+    call design%map_backward(this%objective_function%sensitivity)
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
 
@@ -390,7 +388,6 @@ contains
     ! way readable for MMA
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
-
 
   ! ========================================================================== !
   ! Simple getters
