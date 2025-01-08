@@ -32,7 +32,7 @@
 
 !> Implements the `base_functional_t` type.
 module base_functional
-  use num_types, only: rp, dp
+  use num_types, only: rp
   use field, only: field_t
   use simulation, only: simulation_t
   use design, only: design_t
@@ -165,4 +165,3 @@ contains
   end subroutine functional_free_base
 
 end module base_functional
-
