@@ -58,7 +58,7 @@ module volume_constraint
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
-  use base_functional, only : functional_t
+  use constraint, only : constraint_t
   use simulation, only : simulation_t
   use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
@@ -73,7 +73,7 @@ module volume_constraint
   private
 
   !> A constraint on the volume of the design.
-  type, public, extends(functional_t) :: volume_constraint_t
+  type, public, extends(constraint_t) :: volume_constraint_t
      private
 
      !> whether it is minimum or maximum volume

@@ -42,7 +42,8 @@ module steady_state_problem
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
-  use base_functional, only: functional_t, functional_factory
+  use objective, only: objective_t, objective_factory
+  use constraint, only: constraint_t, constraint_factory
   use fld_file_output, only: fld_file_output_t
   use steady_simcomp, only: steady_simcomp_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
@@ -67,8 +68,8 @@ module steady_state_problem
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
-     class(functional_t), allocatable :: objective_function
-     class(functional_t), allocatable :: volume_constraint
+     class(objective_t), allocatable :: objective_function
+     class(constraint_t), allocatable :: volume_constraint
 
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
@@ -231,12 +232,12 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call functional_factory(this%objective_function, &
+    call objective_factory(this%objective_function, &
          'minimum_dissipation', design, this%simulation)
     ! volume constraint
     this%m = 1
-    call functional_factory(this%volume_constraint, &
-         'volume_constraint', design, this%simulation)
+    call constraint_factory(this%volume_constraint, &
+         'volume', design, this%simulation)
 
     ! init the sampler
     !---------------------------------------------------------

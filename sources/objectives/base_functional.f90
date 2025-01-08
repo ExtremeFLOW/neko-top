@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-!> Implements the `functional_t` type.
+!> Implements the `base_functional_t` type.
 module base_functional
   use num_types, only: rp, dp
   use field, only: field_t
@@ -43,8 +43,6 @@ module base_functional
   implicit none
   private
 
-  public :: functional_t, functional_factory
-
   !> The base functional type
   !!
   !! This is the base class for objectives and constraints alike.
@@ -55,7 +53,7 @@ module base_functional
   !! terms that are required for the adjoint problem, any source terms
   !! simulation components that are required to evaluate the base functional. All of
   !! which should be prepared in the `init` method.
-  type, abstract :: functional_t
+  type, abstract, public :: base_functional_t
 
      !> Value of the base_functional
      real(kind=rp) :: value
@@ -83,7 +81,7 @@ module base_functional
      !> Compute the sensitivity
      procedure(functional_sensitivity), pass(this), deferred :: &
           compute_sensitivity
-  end type functional_t
+  end type base_functional_t
 
   ! -------------------------------------------------------------------------- !
   ! Interfaces for the derived types, these are the constructors for the
@@ -92,44 +90,32 @@ module base_functional
 
      !> Initialize the objective function
      subroutine functional_init(this, design, simulation)
-       import functional_t, design_t, simulation_t
-       class(functional_t), intent(inout) :: this
+       import base_functional_t, design_t, simulation_t
+       class(base_functional_t), intent(inout) :: this
        type(simulation_t), target, intent(inout) :: simulation
        class(design_t), intent(in) :: design
      end subroutine functional_init
 
      !> Destructor
      subroutine functional_free(this)
-       import functional_t
-       class(functional_t), intent(inout) :: this
+       import base_functional_t
+       class(base_functional_t), intent(inout) :: this
      end subroutine functional_free
 
      !> Compute the objective function
      subroutine functional_compute(this, design)
-       import functional_t, design_t
-       class(functional_t), intent(inout) :: this
+       import base_functional_t, design_t
+       class(base_functional_t), intent(inout) :: this
        class(design_t), intent(in) :: design
      end subroutine functional_compute
 
      !> Compute the sensitivity
      subroutine functional_sensitivity(this, design)
-       import functional_t, design_t
-       class(functional_t), intent(inout) :: this
+       import base_functional_t, design_t
+       class(base_functional_t), intent(inout) :: this
        class(design_t), intent(in) :: design
      end subroutine functional_sensitivity
-  end interface
 
-  ! -------------------------------------------------------------------------- !
-  ! Explicit interfaces
-
-  interface
-     !> Factory function
-     module subroutine functional_factory(object, type, design, simulation)
-       class(functional_t), allocatable, intent(inout) :: object
-       character(len=*), intent(in) :: type
-       class(design_t), intent(in) :: design
-       type(simulation_t), target, intent(inout) :: simulation
-     end subroutine functional_factory
   end interface
 
 contains
@@ -142,7 +128,7 @@ contains
   !! @param[optional] if_mask Whether the base_functional is masked
   !! @param[optional] mask_name The name design the mask
   subroutine functional_init_base(this, design, if_mask, mask_name)
-    class(functional_t), target, intent(inout) :: this
+    class(base_functional_t), target, intent(inout) :: this
     class(design_t), intent(in) :: design
     logical, intent(in), optional :: if_mask
     character(len=*), intent(in), optional :: mask_name
@@ -170,7 +156,7 @@ contains
 
   !> Free the base class
   subroutine functional_free_base(this)
-    class(functional_t), target, intent(inout) :: this
+    class(base_functional_t), target, intent(inout) :: this
 
     if (associated(this%mask)) nullify(this%mask)
 

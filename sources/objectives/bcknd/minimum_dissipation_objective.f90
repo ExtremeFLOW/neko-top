@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `minimum_dissipation_t` type.
+!> Implements the `minimum_dissipation_objective_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -60,19 +60,19 @@
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module minimum_dissipation
-  use num_types, only : rp
+module minimum_dissipation_objective
+  use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
   use operators, only: grad
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
        adjoint_minimum_dissipation_source_term_t
-  use base_functional, only : functional_t
-  use simulation, only : simulation_t
-  use fluid_scheme, only : fluid_scheme_t
-  use adjoint_scheme, only : adjoint_scheme_t
-  use math, only : glsc2
+  use objective, only: objective_t
+  use simulation, only: simulation_t
+  use fluid_scheme, only: fluid_scheme_t
+  use adjoint_scheme, only: adjoint_scheme_t
+  use math, only: glsc2
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
@@ -86,34 +86,34 @@ module minimum_dissipation
   !> An objective function corresponding to minimum dissipation
   ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   ! |\mathbf{u}|^2 d \Omega $
-  type, public, extends(functional_t) :: minimum_dissipation_t
+  type, public, extends(objective_t):: minimum_dissipation_objective_t
      private
 
-     real(kind=rp) :: K, dissipation, lube_value
-     logical :: if_lube
+     real(kind=rp):: K, dissipation, lube_value
+     logical:: if_lube
 
-     class(fluid_scheme_t), pointer :: fluid
-     class(adjoint_scheme_t), pointer :: adjoint
+     class(fluid_scheme_t), pointer:: fluid
+     class(adjoint_scheme_t), pointer:: adjoint
 
      ! TODO
      ! this is just for testing!
      ! actually rescaling the adjoint is a bit more involved,
      ! and we have to be careful of the brinkman term
      !> A scaling factor
-     real(kind=rp) :: obj_scale
+     real(kind=rp):: obj_scale
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init => minimum_dissipation_init
+     procedure, public, pass(this):: init => minimum_dissipation_init
      !> Destructor.
-     procedure, public, pass(this) :: free => minimum_dissipation_free
+     procedure, public, pass(this):: free => minimum_dissipation_free
      !> Computes the value of the objective function.
-     procedure, public, pass(this) :: compute => minimum_dissipation_compute
+     procedure, public, pass(this):: compute => minimum_dissipation_compute
      !> Computes the sensitivity with respect to the coefficient $\chi$.
-     procedure, public, pass(this) :: compute_sensitivity => &
+     procedure, public, pass(this):: compute_sensitivity => &
           minimum_dissipation_compute_sensitivity
 
-  end type minimum_dissipation_t
+  end type minimum_dissipation_objective_t
 
 contains
 
@@ -122,13 +122,13 @@ contains
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_init(this, design, simulation)
-    class(minimum_dissipation_t), intent(inout) :: this
-    type(simulation_t), target, intent(inout) :: simulation
-    class(design_t), intent(in) :: design
-    type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
-    type(adjoint_lube_source_term_t) :: lube_term
-    character(len=:), allocatable :: objective_location_zone_name
-    logical :: if_mask
+    class(minimum_dissipation_objective_t), intent(inout):: this
+    type(simulation_t), target, intent(inout):: simulation
+    class(design_t), intent(in):: design
+    type(adjoint_minimum_dissipation_source_term_t):: adjoint_forcing
+    type(adjoint_lube_source_term_t):: lube_term
+    character(len=:), allocatable:: objective_location_zone_name
+    logical:: if_mask
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
@@ -176,7 +176,7 @@ contains
 
   !> Destructor.
   subroutine minimum_dissipation_free(this)
-    class(minimum_dissipation_t), intent(inout) :: this
+    class(minimum_dissipation_objective_t), intent(inout):: this
     call this%free_base()
 
     if (associated(this%fluid)) nullify(this%fluid)
@@ -189,12 +189,12 @@ contains
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_compute(this, design)
-    class(minimum_dissipation_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design
-    type(field_t), pointer :: wo1, wo2, wo3
-    type(field_t), pointer :: objective_field
-    integer :: temp_indices(4)
+    class(minimum_dissipation_objective_t), intent(inout):: this
+    class(design_t), intent(in):: design
+    type(topopt_design_t), pointer:: topopt_design
+    type(field_t), pointer:: wo1, wo2, wo3
+    type(field_t), pointer:: objective_field
+    integer:: temp_indices(4)
     integer n
 
     select type (design)
@@ -267,10 +267,10 @@ contains
   !> compute the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
   subroutine minimum_dissipation_compute_sensitivity(this, design)
-    class(minimum_dissipation_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(field_t), pointer :: lube_contribution
-    integer :: temp_indices(1)
+    class(minimum_dissipation_objective_t), intent(inout):: this
+    class(design_t), intent(in):: design
+    type(field_t), pointer:: lube_contribution
+    integer:: temp_indices(1)
 
 
     ! here it should just be an inner product between the forward and adjoint
@@ -306,4 +306,4 @@ contains
 
   end subroutine minimum_dissipation_compute_sensitivity
 
-end module minimum_dissipation
+end module minimum_dissipation_objective

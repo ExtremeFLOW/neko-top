@@ -30,50 +30,44 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-!> Submodule for the objective function factory
-submodule (base_functional) functional_factory_mod
-  use design, only: design_t
-  use utils, only: neko_type_error
+!> Implements the `objective_t` type.
+module objective
+  use base_functional, only: base_functional_t
   use simulation, only: simulation_t
-
-  ! Import the objective function types
-  use volume_constraint, only: volume_constraint_t
-  use minimum_dissipation, only: minimum_dissipation_t
-
+  use design, only: design_t
   implicit none
+  private
 
-  !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
-       'minimum_dissipation', &
-       'volume_constraint']
+  public :: objective_t, objective_factory
+
+  !> The base functional type
+  !!
+  !! This is the base class for objectives and constraints alike.
+  !! A base functional should be able to evaluate itself and its sensitivity
+  !! with respect to the design variables.
+  !!
+  !! The base functional is also responsible for managing the adjoint forcing
+  !! terms that are required for the adjoint problem, any source terms
+  !! simulation components that are required to evaluate the base functional. All of
+  !! which should be prepared in the `init` method.
+  type, abstract, extends(base_functional_t) :: objective_t
+
+  end type objective_t
+
+  ! -------------------------------------------------------------------------- !
+  ! Explicit interfaces
+
+  interface
+     !> Factory function
+     module subroutine objective_factory(object, type, design, simulation)
+       class(objective_t), allocatable, intent(inout) :: object
+       character(len=*), intent(in) :: type
+       class(design_t), intent(in) :: design
+       type(simulation_t), target, intent(inout) :: simulation
+     end subroutine objective_factory
+  end interface
 
 contains
 
-  ! -------------------------------------------------------------------------- !
-  ! Factory function
+end module objective
 
-  !> Factory function
-  !! Allocates and initializes an objective function object
-  !! @param object The objective function object to be created
-  !! @param type The type of the objective function
-  !! @param design The design object
-  !! @param simulation The simulation object
-  module subroutine functional_factory(object, type, design, simulation)
-    class(functional_t), allocatable, intent(inout) :: object
-    character(len=*), intent(in) :: type
-    class(design_t), intent(in) :: design
-    type(simulation_t), target, intent(inout) :: simulation
-
-    select case(trim(type))
-      case('minimum_dissipation')
-       allocate(minimum_dissipation_t::object)
-      case('volume_constraint')
-       allocate(volume_constraint_t::object)
-      case default
-       call neko_type_error('functional', type, KNOWN_TYPES)
-    end select
-
-    call object%init(design, simulation)
-  end subroutine functional_factory
-
-end submodule functional_factory_mod
