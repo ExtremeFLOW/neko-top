@@ -30,8 +30,29 @@ In the future, this should also contain filters $\rho \mapsto \tilde{\rho}
 to the sensitivity to the design variable $\frac{\partial F}{\partial \chi}
  \mapsto \frac{\partial F}{\partial \rho}$
 
-## `optimizer`
-Currently we only consider MMA and topology optimization.
+## Optimizer
+
+A generic type, optimizer, has been added. Currently, only the `mma_optimizer` 
+is supported, and all required parameters for the MMA solver are specified in 
+the JSON case file.
+
+### New Parameters
+1. **Scaling**  
+   Based on the [Svanberg MMA Method](https://people.kth.se/~krille/mmagcmma.pdf), MMA performs optimally
+   when function values are between 1 and 100. To achieve this:
+   - If `auto_scale` is set to `true` in the case file:
+     - The objective value is scaled at each iteration to 
+	   match the specified `scale` parameter value. The derivatives are also 
+	   scaled accordingly. (variable scaling factor)
+   - If `auto_scale` is set to `false`:
+     - The objective value and its derivatives are multiplied by the `scale` 
+	   parameter value before being passed to the optimizer. (constant scaling
+	   factor)
+2. **Impact of Scaling**  
+   Note that these scaling operations affect only the optimizer's internal 
+   computations. The original values of the objective function and its 
+   derivatives remain unchanged.
+
 
 ## `problem`
 This contains a way to evaluate an optimization problem, ie, all objective
