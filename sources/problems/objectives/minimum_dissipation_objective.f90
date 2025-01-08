@@ -86,7 +86,7 @@ module minimum_dissipation_objective
   !> An objective function corresponding to minimum dissipation
   ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   ! |\mathbf{u}|^2 d \Omega $
-  type, public, extends(objective_t):: minimum_dissipation_objective_t
+  type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
      real(kind=rp):: K, dissipation, lube_value
