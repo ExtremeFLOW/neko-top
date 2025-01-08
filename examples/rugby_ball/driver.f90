@@ -3,7 +3,9 @@ program usrneko
   use case, only: case_t
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
-
+  use utils, only: neko_error
+  use json_module, only: json_file
+  use json_utils_ext, only: read_case
 
   ! here are all the extra things i'll add to "problem"
   use source_term, only: source_term_t

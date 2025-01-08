@@ -33,25 +33,16 @@
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
 module simulation
-  use num_types, only: rp, sp
-  use problem, only: problem_t
+  use case, only: case_t
+  use neko, only: neko_init, neko_finalize, neko_solve
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use simulation_adjoint, only: solve_adjoint
-  use neko, only: neko_init, neko_finalize, neko_solve
-  use case, only: case_t
-  use design, only: design_t
-  use topopt_design, only: topopt_design_t
-  use json_file_module, only: json_file
   use fld_file_output, only: fld_file_output_t
   use steady_simcomp, only: steady_simcomp_t
-  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use json_utils_ext, only: json_key_fallback, json_get_subdict
-  use json_value_module, only: json_value
-  use utils, only: neko_error
-  use user_intf, only: simulation_component_user_settings
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset
   use field_math, only: field_rzero
+  use json_file_module, only: json_file
   use json_utils, only: json_extract_item
   implicit none
   private

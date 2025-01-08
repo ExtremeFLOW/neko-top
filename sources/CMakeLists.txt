@@ -42,6 +42,7 @@ target_sources(neko-top
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
