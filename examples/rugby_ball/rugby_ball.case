@@ -51,6 +51,8 @@
                 "max_iterations": 800
             },
             "boundary_types": [ "v", "v", "sym", "sym" ],
+            "output_control": "tsteps",
+            "output_value": 50000000
         },
         "simulation_components": [
             {
