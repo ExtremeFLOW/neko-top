@@ -201,6 +201,15 @@ program usrneko
      optimization_iteration = optimization_iteration + 1
      call design%map_forward()
 
+     call reset(problem%simulation%neko_case)
+     ! TODO
+     ! reset for the adjoint
+     call field_rzero(problem%simulation%adjoint_case%scheme%u_adj)
+     call field_rzero(problem%simulation%adjoint_case%scheme%v_adj)
+     call field_rzero(problem%simulation%adjoint_case%scheme%w_adj)
+
+     ! don't forget to unfreeze the fluid!
+     problem%simulation%neko_case%fluid%freeze = .false.
   end do
 !------------------------------------------------------------------------------
 
