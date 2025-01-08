@@ -50,21 +50,9 @@ contains
   subroutine mma_optimizer_init(this, prob)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), target, intent(inout) :: prob
-    real(kind=rp), allocatable :: xmax(:), xmin(:)
-
 
     ! Associate the problem with the optimizer
     this%prob => prob
-
-    !setting xmax, xmin using neko_scratch_registry
-    allocate(xmax(prob%design%design_indicator%size()))
-    allocate(xmin(prob%design%design_indicator%size()))
-    xmin=0_rp
-    xmax=1_rp
-
-    !>scaling fval and dfdx
-    this%scale = 100
-    this%auto_scale = .true.
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
@@ -73,12 +61,12 @@ contains
       ! Now we know prob is of type steady_state_problem_t, assign the pointer
       this%steady_state_prob => prob
       print *, "Initializing mma_optimizer with steady_state_problem_t."
-      ! mma_init_json(this, x, n, m, a0, a, c, d, xmin, xmax, json)
+      ! mma_init_json( x, n, json, auto_scale, scale)
       call this%mma%init_json( prob%design%design_indicator%x, &
-        prob%design%design_indicator%size(), 1, 1.0_rp, [0.0_rp], [100.0_rp], &
-        [0.0_rp], xmin, xmax, prob%C%params)
-
-
+        prob%design%design_indicator%size(), prob%C%params, this%scale, &
+        this%auto_scale)
+      print *, "scale = ", this%scale
+      print *, "auto_scale = ", this%auto_scale   
     class default
       !Unknown problem
       call neko_error('Unknown problem type in the mma_optimizer_init')
@@ -166,13 +154,6 @@ contains
       else
         scalingfactor = abs(this%scale)
       end if
-      ! call cmult(dfdx, 100.0_rp, n)
-      ! fval(1) = fval(1)*100.0_rp
-
-      ! mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
-      ! call this%mma%mma_update_cpu( iter, x, df0dx, &
-      !   reshape([fval*100.0_rp],[this%mma%get_m()]) , dfdx*100.0_rp)
-
 
       if (NEKO_BCKND_DEVICE .eq. 0) then
         call this%mma%mma_update_cpu( iter, x, df0dx, &
@@ -181,9 +162,6 @@ contains
         write(stderr, *) "Device not supported in mma_optimizer.f90."
         error stop
       end if
-      ! call this%mma%update( iter, x, df0dx, &
-      !   reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
-
 
       call this%steady_state_prob%compute()
       call this%steady_state_prob%compute_sensitivity()

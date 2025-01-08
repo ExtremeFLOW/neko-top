@@ -19,7 +19,7 @@ module optimizer
         !! to the optimizer.
         !! (if auto_scale then fval=scale else fval=scale*fval)
         !! When auto_scale is true, we use an adaptable scale for
-        !! fval and dfdx in every iteration (variable scale)
+        !! fval and dfdx in every iteration (variable scale factors)
         
         real(kind=rp) :: scale
         logical :: auto_scale

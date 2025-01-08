@@ -1,10 +1,4 @@
 program usrneko
-  ! use neko, only: neko_init, neko_solve, neko_finalize
-  ! use case, only: case_t
-  ! use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
-  ! use simulation_adjoint, only: solve_adjoint
-
-  ! use optimizer, only : optimizer_t
   use mma_optimizer, only : mma_optimizer_t 
   use steady_state_problem, only : steady_state_problem_t
   use topopt_design, only: topopt_design_t
@@ -38,12 +32,9 @@ program usrneko
   tolerance = 1.0e-3_rp
   max_iter = 100
   call optimizer%run(tolerance,max_iter)
-!------------------------------------------------------------------------------
 
-  ! deallocate(x_switch)
   call problem%free()
   call design%free()
-  ! TODO
   call optimizer%free()
 
 end program usrneko

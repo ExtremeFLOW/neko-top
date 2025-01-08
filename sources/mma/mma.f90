@@ -129,7 +129,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json(this, x, n, m, a0, a, c, d, xmin, xmax, json)
+  subroutine mma_init_json(this, x, n, json, scale, auto_scale)!, m, a0, a, c, d, xmin, xmax, json)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -141,10 +141,10 @@ contains
     ! unnecessary extera computation of KKT norms for the   !
     ! initial design.                                       !
     ! ----------------------------------------------------- !
-
     class(mma_t), intent(inout) :: this
-    integer, intent(in) :: n, m
+    integer, intent(in) :: n
     real(kind=rp), intent(in), dimension(n) :: x
+    type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -152,18 +152,22 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
-    real(kind=rp), intent(in), dimension(m) :: a, c, d
-    real(kind=rp), intent(in) :: a0
-    type(json_file), intent(inout) :: json
+    integer :: m
+    real(kind=rp), dimension(n) :: xmax, xmin
+    real(kind=rp), allocatable :: a(:), c(:), d(:)
+
+    !! For reading the values from json and then set the value for the arrays
+    real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
 
     integer :: max_iter
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
     character(len=:), allocatable :: backend
 
+    !! Read the scaling info for fval and dfdx from json 
+    real(kind=rp), intent(out) :: scale
+    logical, intent(out) :: auto_scale
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
-
     ! based on the Cpp Code by Niels
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
@@ -175,6 +179,27 @@ contains
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
     call json_get_or_default(json, 'mma.backend', backend, 'cpu')
+
+    call json_get_or_default(json, 'mma.m', m, 1)
+    call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
+    call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
+    call json_get_or_default(json, 'mma.a0', a0, 1.0_rp)
+    call json_get_or_default(json, 'mma.a', a_const, 0.0_rp)
+    call json_get_or_default(json, 'mma.c', c_const, 100.0_rp)
+    call json_get_or_default(json, 'mma.d', d_const, 0.0_rp)
+
+    call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
+    call json_get_or_default(json, 'mma.auto_scale', auto_scale, .true.)
+
+
+    allocate(a(m))
+    allocate(c(m))
+    allocate(d(m))
+    a= a_const
+    c= c_const
+    d= d_const
+    xmin = xmin_const
+    xmax = xmax_const
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parsed parameters
