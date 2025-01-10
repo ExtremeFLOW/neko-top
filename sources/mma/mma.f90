@@ -86,6 +86,7 @@ module mma
      procedure, public, pass(this) :: get_m => mma_get_m
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
+     procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
      !> Interface for generating the approximation sub problem
      generic :: gensub => mma_gensub_cpu
@@ -454,7 +455,7 @@ contains
   end subroutine mma_free
 
   ! ========================================================================== !
-  ! Getters and setters
+  !>Getters and setters
 
   pure function mma_get_n(this) result(n)
     class(mma_t), intent(in) :: this
@@ -479,6 +480,13 @@ contains
     real(kind=rp) :: residunorm
     residunorm = this%residunorm
   end function mma_get_residunorm
+
+  pure function mma_get_max_iter(this) result(max_iter_value)
+    class(mma_t), intent(in) :: this
+    integer :: max_iter_value
+    max_iter_value = this%max_iter
+  end function mma_get_max_iter
+
 
 end module mma
 

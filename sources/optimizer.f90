@@ -43,11 +43,10 @@ module optimizer
 
     !> Interface for running the optimization loop
     abstract interface
-        subroutine optimizer_run(this,tolerance,max_iter)
+        subroutine optimizer_run(this,tolerance)
             import optimizer_t, rp
             class(optimizer_t), intent(inout) :: this
             real(kind=rp), intent(in) :: tolerance
-            integer, intent(in) :: max_iter
         end subroutine optimizer_run
     end interface
 

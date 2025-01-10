@@ -74,9 +74,9 @@ contains
   end subroutine mma_optimizer_init
 
   ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, tolerance, max_iter)
+  subroutine mma_optimizer_run(this, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
-    integer, intent(in) :: max_iter
+    integer :: max_iter
     real(kind=rp), intent(in) :: tolerance
     integer :: iter, rank, ierr, nglobal
     real(kind=rp) :: scalingfactor
@@ -85,14 +85,14 @@ contains
     type(csv_file_t) :: opt_outputf
     type(matrix_t) :: opt_data
 
-
+    max_iter = this%mma%get_max_iter()
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     !>initializing the scaling factor
     scalingfactor = 1_rp
-
+    print *, "max_iter for the optimization loop= ", max_iter
     call opt_data%init(max_iter+1,6)
 
     !check if there is a drived type for prob
