@@ -130,7 +130,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json(this, x, n, json, scale, auto_scale)!, m, a0, a, c, d, xmin, xmax, json)
+  subroutine mma_init_json(this, x, n, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
