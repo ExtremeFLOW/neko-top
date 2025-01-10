@@ -12,8 +12,7 @@ module optimizer
 
     !> Abstract optimizer class.
     type, abstract, public :: optimizer_t
-        !> Pointer to the problem that the optimizer will work on
-        class(problem_t), pointer :: prob
+
         !> Scaling fval and dfdx.
         !! Note that the values are not updated but they are scaled when passed 
         !! to the optimizer.
@@ -37,15 +36,16 @@ module optimizer
         subroutine optimizer_init(this, prob)
             import optimizer_t, problem_t
             class(optimizer_t), intent(inout) :: this
-            class(problem_t), target, intent(inout) :: prob
+            class(problem_t), intent(inout) :: prob
         end subroutine optimizer_init
     end interface
 
     !> Interface for running the optimization loop
     abstract interface
-        subroutine optimizer_run(this,tolerance)
-            import optimizer_t, rp
+        subroutine optimizer_run(this, prob, tolerance)
+            import optimizer_t, problem_t, rp
             class(optimizer_t), intent(inout) :: this
+            class(problem_t), intent(inout) :: prob
             real(kind=rp), intent(in) :: tolerance
         end subroutine optimizer_run
     end interface
