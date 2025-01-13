@@ -3,7 +3,6 @@ program usrneko
   use steady_state_problem, only : steady_state_problem_t
   use topopt_design, only: topopt_design_t
   use num_types, only : rp
-  
   use mask_ops, only: mask_exterior_const
 
   real(kind=rp) :: tolerance
