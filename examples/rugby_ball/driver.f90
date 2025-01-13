@@ -1,5 +1,5 @@
 program usrneko
-  use mma_optimizer, only : mma_optimizer_t 
+  use mma_optimizer, only : mma_optimizer_t
   use steady_state_problem, only : steady_state_problem_t
   use topopt_design, only: topopt_design_t
   use num_types, only : rp
