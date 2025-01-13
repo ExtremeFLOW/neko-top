@@ -106,7 +106,7 @@ contains
 
     !>initializing the scaling factor
     scalingfactor = 1_rp
-    print *, "max_iter for the optimization loop= ", max_iter
+    print *, "max_iter for the optimization loop = ", max_iter
     call opt_data%init(max_iter+1,6)
 
     call prob%compute()
