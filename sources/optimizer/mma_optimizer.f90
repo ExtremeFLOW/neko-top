@@ -113,23 +113,23 @@ contains
         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     !>initializing the scaling factor
-    scalingfactor = 1_rp
+    scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
     call opt_data%init(max_iter+1,6)
 
     call prob%compute()
     print *, "initial objective function value = " , &
       prob%volume_constraint%objective_function_value
-    print *, "size(prob%design%design_indicator%x)=", &
+    print *, "size(prob%design%design_indicator%x) = ", &
       size(prob%design%design_indicator%x)
     print *, "size(&
-      &prob%volume_constraint%sensitivity_to_coefficient%x)=",&
+      &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
       size(&
      prob%volume_constraint%sensitivity_to_coefficient%x)
           
 
     !Writing the optimization data in a separate file
-    open(1368, file="optimization_data.txt", status="replace")
+    open(1368, file = "optimization_data.txt", status = "replace")
 
     ! Loop to write labeled integer and real values
 
