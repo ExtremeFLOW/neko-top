@@ -196,9 +196,9 @@ contains
     allocate(a(m))
     allocate(c(m))
     allocate(d(m))
-    a= a_const
-    c= c_const
-    d= d_const
+    a = a_const
+    c = c_const
+    d = d_const
     xmin = xmin_const
     xmax = xmax_const
 
