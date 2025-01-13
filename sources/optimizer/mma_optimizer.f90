@@ -110,7 +110,7 @@ contains
     call opt_data%init(max_iter+1,6)
 
     call prob%compute()
-    print *, "initial objective function value=" , &
+    print *, "initial objective function value = " , &
       prob%volume_constraint%objective_function_value
     print *, "size(prob%design%design_indicator%x)=", &
       size(prob%design%design_indicator%x)
