@@ -286,10 +286,10 @@ contains
     call this%objective_function%compute(this%design, this%C%fluid)
     call this%volume_constraint%compute(this%design, this%C%fluid)
     print *, 'OBJECTIVE FUNCTION', &
-         this%objective_function%objective_function_value
+          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
-         this%volume_constraint%objective_function_value, &
-         this%volume_constraint%volume
+          this%volume_constraint%objective_function_value, &
+          this%volume_constraint%volume
 
 
     ! TODO

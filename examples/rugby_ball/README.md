@@ -30,8 +30,29 @@ In the future, this should also contain filters $\rho \mapsto \tilde{\rho}
 to the sensitivity to the design variable $\frac{\partial F}{\partial \chi}
  \mapsto \frac{\partial F}{\partial \rho}$
 
-## `optimizer`
-Currently we only consider MMA and topology optimization.
+## Optimizer
+
+A generic type, optimizer, has been added. Currently, only the `mma_optimizer` 
+is supported, and all required parameters for the MMA solver are specified in 
+the JSON case file.
+
+### New Parameters
+1. **Scaling**  
+   Based on the [Svanberg MMA Method](https://people.kth.se/~krille/mmagcmma.pdf), MMA performs optimally
+   when function values are between 1 and 100. To achieve this:
+   - If `auto_scale` is set to `true` in the case file:
+     - The objective value is scaled at each iteration to 
+	   match the specified `scale` parameter value. The derivatives are also 
+	   scaled accordingly. (variable scaling factor)
+   - If `auto_scale` is set to `false`:
+     - The objective value and its derivatives are multiplied by the `scale` 
+	   parameter value before being passed to the optimizer. (constant scaling
+	   factor)
+2. **Impact of Scaling**  
+   Note that these scaling operations affect only the optimizer's internal 
+   computations. The original values of the objective function and its 
+   derivatives remain unchanged.
+
 
 ## `problem`
 This contains a way to evaluate an optimization problem, ie, all objective
@@ -123,7 +144,7 @@ objective functions and constraints that we require a fluid simulation.
 This level of abstraction/objected oriented thinking is beyond me, but I'm 
 sure we'll require some refactoring to make this right.
 
-### Masks :white_check_mark:
+### Masks
 This one is rather simple, just including masks on objective functions and 
 masks on the optimization domain. We could then compute volume based on the 
 optimization domain, not the computation domain.
@@ -133,7 +154,7 @@ suggested Tim. In `Nek5000` we filled up arrays the size of the mesh with
 booleans. That's rather light, and we could still use all the point zone 
 functionality to initialize these masks.
 
-### incorporate the PDE filters :white_check_mark:
+### incorporate the PDE filters
 We already have a branch in Neko where we did the PDE filters. Either we PR 
 that in neko, so it can be used with the standard Brinkman term there, or we 
 just migrate everything to neko-top. 
