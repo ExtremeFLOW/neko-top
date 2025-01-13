@@ -455,7 +455,7 @@ contains
   end subroutine mma_free
 
   ! ========================================================================== !
-  !>Getters and setters
+  ! Getters and setters
 
   pure function mma_get_n(this) result(n)
     class(mma_t), intent(in) :: this
