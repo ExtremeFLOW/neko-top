@@ -205,7 +205,7 @@ contains
     do i = 1, n
        if (sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
             (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2) .lt. 0.16_rp) then
+            - 0.5_rp)**2) .lt. 0.25_rp) then
           this%design_indicator%x(i,1,1,1) = 1.0_rp
        end if
     end do
