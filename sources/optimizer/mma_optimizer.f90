@@ -21,9 +21,6 @@ module mma_optimizer
   use mask_ops, only: mask_exterior_const
 
 
-  use csv_file, only: csv_file_t
-  use matrix, only: matrix_t
-
   implicit none
   private
   public :: mma_optimizer_t
@@ -61,8 +58,7 @@ contains
     ! Check the type of the problem using select type
     select type (prob)
     type is (steady_state_problem_t)
-      ! Now we know prob is of type steady_state_problem_t, assign the pointer
-      ! this%steady_state_prob => prob
+      ! Now we know prob is of type steady_state_problem_t
       print *, "Initializing mma_optimizer with steady_state_problem_t."
       ! mma_init_json( x, n, json, auto_scale, scale)
       call this%mma%init_json( prob%design%design_indicator%x, &
@@ -102,11 +98,6 @@ contains
     integer :: iter, rank, ierr, nglobal
     real(kind=rp) :: scalingfactor
 
-    character(len=1024) :: header_line
-    type(csv_file_t) :: opt_outputf
-    type(matrix_t) :: opt_data
-
-
     max_iter = this%mma%get_max_iter()
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
@@ -115,7 +106,6 @@ contains
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
-    call opt_data%init(max_iter+1,6)
 
     call prob%compute()
     print *, "initial objective function value = " , &
@@ -131,8 +121,6 @@ contains
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
-    ! Loop to write labeled integer and real values
-
     associate(x => prob%design%design_indicator%x, &
       f0val => &
         prob%objective_function%objective_function_value, &
@@ -143,20 +131,17 @@ contains
       dfdx => &
         prob%volume_constraint%sensitivity_to_coefficient%x)
 
+    ! Write n, m, and tolerance in the first line of optimization_data.txt
+    write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
+      nglobal, this%mma%get_m(), tolerance
 
- 
-    write(1368, '("n =", I10, ", m=", I10)') nglobal, this%mma%get_m()
-    write(1368, '("iter =", I3, ", f0val=", ES25.17, &
-      & ", fval(1) =", ES25.17, ", KKTmax =", ES25.17, ", tolerance =", ES25.17,&
-      & ", KKTnorm2 =", ES25.17)') 0, f0val, fval, &
-      & this%mma%get_residumax(), tolerance, this%mma%get_residunorm()
+    ! Write the header for the remaining data
+    write(1368, '(A)') "iter, f0val, fval(1), KKTmax, KKTnorm2, scalingfactor"
 
-    opt_data%x(1,1) = 0
-    opt_data%x(1,2) = f0val
-    opt_data%x(1,3) = fval
-    opt_data%x(1,4) = this%mma%get_residumax()
-    opt_data%x(1,5) = this%mma%get_residunorm()
-
+    ! Write the data row-by-row
+    write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", & 
+      & ES25.17, ",", ES25.17)') 0, f0val, fval, this%mma%get_residumax(), &
+      this%mma%get_residunorm(), scalingfactor
 
     do iter = 1, max_iter
       if (this%mma%get_residumax() .lt. tolerance) exit
@@ -190,24 +175,13 @@ contains
         ',  KKTmax =', this%mma%get_residumax(), ', KKTnorm2 =',&
         this%mma%get_residunorm()
 
-      write(1368, '("iter =", I3, ", f0val =", ES25.17, &
-        & ", fval(1) =", ES25.17, ", KKTmax =", ES25.17, &
-        & ", KKTnorm2 =", ES25.17, ", scalingfactor =", ES25.17)') iter, &
-        f0val, fval, this%mma%get_residumax(), this%mma%get_residunorm(), &
-        scalingfactor
-      ! Flush the buffer to write the data during the run
+      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", & 
+        & ES25.17, ",", ES25.17)') iter, f0val, fval, &
+        this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+        ! Flush the buffer to write the data during the run
       flush(1368)
 
-
-      opt_data%x(iter+1,1) = iter
-      opt_data%x(iter+1,2) = f0val
-      opt_data%x(iter+1,3) = fval
-      opt_data%x(iter+1,4) = this%mma%get_residumax()
-      opt_data%x(iter+1,5) = this%mma%get_residunorm()
-      opt_data%x(iter+1,6) = scalingfactor
-
       call prob%sample(real(iter, rp))
-
 
       call prob%design%map_forward()
       call reset(prob%C)
@@ -222,14 +196,6 @@ contains
 
 
     close(1368)
-
-    write(header_line, '(A,A,I10,A,I10)') "iter, f0val, fval1, KKTmax, " , &
-      "KKTnorm2, Scalingfactor, n = ", &
-      nglobal, ", m =", this%mma%get_m()
-    call opt_outputf%init("optimization_data.csv")
-    call opt_outputf%set_header(header_line)
-    call opt_outputf%write(opt_data)
-
 
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
