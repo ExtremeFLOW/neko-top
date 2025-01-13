@@ -121,7 +121,7 @@ contains
           
 
     !Writing the optimization data in a separate file
-    open(1368, file="optimization_data.txt", status="replace")
+    open(1368, file = "optimization_data.txt", status = "replace")
 
     ! Loop to write labeled integer and real values
 
