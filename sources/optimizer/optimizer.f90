@@ -14,7 +14,7 @@ module optimizer
     type, abstract, public :: optimizer_t
 
         !> Scaling fval and dfdx.
-        !! Note that the values are not updated but they are scaled when passed 
+        !! Note that the values are not updated but they are scaled when passed
         !! to the optimizer.
         !! (if auto_scale then fval=scale else fval=scale*fval)
         !! When auto_scale is true, we use an adaptable scale for
