@@ -112,7 +112,7 @@ contains
     call prob%compute()
     print *, "initial objective function value = " , &
       prob%volume_constraint%objective_function_value
-    print *, "size(prob%design%design_indicator%x)=", &
+    print *, "size(prob%design%design_indicator%x) = ", &
       size(prob%design%design_indicator%x)
     print *, "size(&
       &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
