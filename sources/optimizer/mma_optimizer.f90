@@ -105,7 +105,7 @@ contains
         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     !>initializing the scaling factor
-    scalingfactor = 1_rp
+    scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
     call opt_data%init(max_iter+1,6)
 
