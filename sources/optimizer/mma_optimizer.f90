@@ -59,7 +59,7 @@ contains
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
-    select type(prob)
+    select type (prob)
     type is (steady_state_problem_t)
       ! Now we know prob is of type steady_state_problem_t, assign the pointer
       ! this%steady_state_prob => prob
@@ -69,7 +69,7 @@ contains
         prob%design%design_indicator%size(), prob%C%params, this%scale, &
         this%auto_scale)
       print *, "scale = ", this%scale
-      print *, "auto_scale = ", this%auto_scale   
+      print *, "auto_scale = ", this%auto_scale
     class default
       !Unknown problem
       call neko_error('Unknown problem type in the mma_optimizer_init')
@@ -83,7 +83,7 @@ contains
     real(kind=rp), intent(in) :: tolerance
     
     ! Check the type of the problem using select type
-    select type(prob)
+    select type (prob)
     type is (steady_state_problem_t)
       ! Now we know prob is of type steady_state_problem_t, call the run_ss
       call this%run_ss(prob, tolerance)
@@ -145,10 +145,10 @@ contains
 
 
  
-    write(1368, '("n=", I10, ", m=", I10)') nglobal, this%mma%get_m()
-    write(1368, '("iter=", I3, ", f0val=", ES25.17, &
-      & ", fval(1)=", ES25.17, ", KKTmax=", ES25.17, ", tolerance=", ES25.17,&
-      & ", KKTnorm2=", ES25.17)') 0, f0val, fval, &
+    write(1368, '("n =", I10, ", m=", I10)') nglobal, this%mma%get_m()
+    write(1368, '("iter =", I3, ", f0val=", ES25.17, &
+      & ", fval(1) =", ES25.17, ", KKTmax =", ES25.17, ", tolerance =", ES25.17,&
+      & ", KKTnorm2 =", ES25.17)') 0, f0val, fval, &
       & this%mma%get_residumax(), tolerance, this%mma%get_residunorm()
 
     opt_data%x(1,1) = 0
@@ -183,16 +183,16 @@ contains
           prob%design%optimization_domain, 0.0_rp)
       end if
 
-      call this%mma%KKT(x,df0dx,reshape([fval],[this%mma%get_m()]),dfdx)
+      call this%mma%KKT(x, df0dx, reshape([fval], [this%mma%get_m()]), dfdx)
 
-      print *, 'iter=', iter,&
-        '-------,f0val= ', f0val, ',   fval= ', fval, &
-        ',  KKTmax=', this%mma%get_residumax(), ', KKTnorm2=',&
+      print *, 'iter =', iter,&
+        '-------, f0val = ', f0val, ',   fval = ', fval, &
+        ',  KKTmax =', this%mma%get_residumax(), ', KKTnorm2 =',&
         this%mma%get_residunorm()
 
-      write(1368, '("iter=", I3, ", f0val=", ES25.17, &
-        & ", fval(1)=", ES25.17, ", KKTmax=", ES25.17, &
-        & ", KKTnorm2=", ES25.17, ", scalingfactor=", ES25.17)') iter, &
+      write(1368, '("iter =", I3, ", f0val =", ES25.17, &
+        & ", fval(1) =", ES25.17, ", KKTmax =", ES25.17, &
+        & ", KKTnorm2 =", ES25.17, ", scalingfactor =", ES25.17)') iter, &
         f0val, fval, this%mma%get_residumax(), this%mma%get_residunorm(), &
         scalingfactor
       ! Flush the buffer to write the data during the run
@@ -223,9 +223,9 @@ contains
 
     close(1368)
 
-    write(header_line, '(A,A,I10,A,I10)') "iter,f0val,fval1,KKTmax,KKTnorm2,", &
-      "Scalingfactor,n=",&
-      nglobal, ", m=", this%mma%get_m()
+    write(header_line, '(A,A,I10,A,I10)') "iter, f0val, fval1, KKTmax, " , &
+      "KKTnorm2, Scalingfactor, n = ", &
+      nglobal, ", m =", this%mma%get_m()
     call opt_outputf%init("optimization_data.csv")
     call opt_outputf%set_header(header_line)
     call opt_outputf%write(opt_data)

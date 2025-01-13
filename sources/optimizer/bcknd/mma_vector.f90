@@ -176,7 +176,7 @@ contains
     globaltmp_m = 0.0_rp
     call MPI_Allreduce(this%bi, globaltmp_m, this%m, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%bi= globaltmp_m - fval
+    this%bi = globaltmp_m - fval
 
   end subroutine mma_gensub_vector
 
@@ -607,17 +607,17 @@ contains
     ! Save the new design
     this%xold2 = this%xold1
     this%xold1 = designx
-    designx= x
+    designx = x
 
     !update the parameters of the MMA object nesessary to compute KKT residu
-    this%y= y
+    this%y = y
     this%z = z
-    this%lambda= lambda
+    this%lambda = lambda
     this%zeta = zeta
-    this%xsi= xsi
-    this%eta= eta
-    this%mu= mu
-    this%s= s
+    this%xsi = xsi
+    this%eta = eta
+    this%mu = mu
+    this%s = s
 
   end subroutine mma_subsolve_dpip_vector
 

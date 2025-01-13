@@ -614,9 +614,10 @@ contains
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
 
-    rex(:) = df0dx + matmul(transpose(dfdx), this%lambda%x(:)) - this%xsi%x(:) + &
-         this%eta%x(:)
-    rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - this%mu%x(:)
+    rex(:) = df0dx + matmul(transpose(dfdx), this%lambda%x(:)) - &
+          this%xsi%x(:) + this%eta%x(:)
+    rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - &
+          this%mu%x(:)
     rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
 
     relambda(:) = fval - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)

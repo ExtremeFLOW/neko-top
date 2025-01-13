@@ -164,7 +164,7 @@ contains
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
     character(len=:), allocatable :: backend
 
-    !! Read the scaling info for fval and dfdx from json 
+    !! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
     logical, intent(out) :: auto_scale
     ! ------------------------------------------------------------------------ !
