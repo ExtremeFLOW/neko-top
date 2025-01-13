@@ -115,7 +115,7 @@ contains
     print *, "size(prob%design%design_indicator%x)=", &
       size(prob%design%design_indicator%x)
     print *, "size(&
-      &prob%volume_constraint%sensitivity_to_coefficient%x)=",&
+      &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
       size(&
      prob%volume_constraint%sensitivity_to_coefficient%x)
           
