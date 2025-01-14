@@ -1,5 +1,7 @@
 !> Defines MMA factory for the mma_t
 submodule (mma) mma_fctry
+  use mma, only : mma_t
+  use mma_cpu, only : mma_cpu_t
   use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX
   ! use pnpn_res_device, only : pnpn_prs_res_device_t, pnpn_vel_res_device_t
   ! use pnpn_res_cpu, only : pnpn_prs_res_cpu_t, pnpn_vel_res_cpu_t
@@ -21,6 +23,7 @@ contains
     if (NEKO_BCKND_SX .eq. 1) then
     else if (NEKO_BCKND_DEVICE .eq. 1) then
     else
+      allocate(mma_cpu_t::object)
     end if
 
     ! if (NEKO_BCKND_SX .eq. 1) then

@@ -32,6 +32,7 @@ module mma_optimizer
   ! Concrete type for MMA optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
+<<<<<<< HEAD
      type(mma_t) :: mma
      type(topopt_design_t), pointer :: design
 
@@ -48,6 +49,23 @@ module mma_optimizer
      procedure :: init => mma_optimizer_init
      procedure :: run => mma_optimizer_run
      procedure :: free => mma_optimizer_free
+=======
+      ! type(mma_t) :: mma
+      class(mma_t), allocatable :: mma
+      !> Scaling fval and dfdx.
+      !! Note that the values are not updated but they are scaled when passed
+      !! to the optimizer.
+      !! (if auto_scale then fval=scale else fval=scale*fval)
+      !! When auto_scale is true, we use an adaptable scale for
+      !! fval and dfdx in every iteration (variable scale factors)
+      real(kind=rp) :: scale
+      logical :: auto_scale
+  contains
+      ! Override the deferred methods
+      procedure :: init => mma_optimizer_init
+      procedure :: run => mma_optimizer_run
+      procedure :: free => mma_optimizer_free
+>>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
 
      procedure, pass(this) :: run_ss => mma_optimizer_run_steady_state_prob
   end type mma_optimizer_t
@@ -64,6 +82,7 @@ contains
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
+<<<<<<< HEAD
     select type (problem)
       type is (steady_state_problem_t)
 
@@ -79,6 +98,22 @@ contains
       class default
 
        call neko_error('Unknown problem type in the mma_optimizer_init')
+=======
+    select type (prob)
+    type is (steady_state_problem_t)
+      ! Now we know prob is of type steady_state_problem_t
+      print *, "Initializing mma_optimizer with steady_state_problem_t."
+      ! mma_init_json( x, n, json, auto_scale, scale)
+      call mma_factory(this%mma)
+      call this%mma%init_json( prob%design%design_indicator%x, &
+        prob%design%design_indicator%size(), prob%C%params, this%scale, &
+        this%auto_scale)
+      print *, "scale = ", this%scale
+      print *, "auto_scale = ", this%auto_scale
+    class default
+      !Unknown problem
+      call neko_error('Unknown problem type in the mma_optimizer_init')
+>>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
     end select
 
   end subroutine mma_optimizer_init
@@ -151,12 +186,22 @@ contains
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
 
+<<<<<<< HEAD
          !Scaling
          if (this%auto_scale .eqv. .true.) then
             scalingfactor = abs(this%scale/constraint_value%x(1))
          else
             scalingfactor = abs(this%scale)
          end if
+=======
+      if (NEKO_BCKND_DEVICE .eq. 0) then
+        call this%mma%update( iter, x, df0dx, &
+          reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
+      else
+        write(stderr, *) "Device not supported in mma_optimizer.f90."
+        error stop
+      end if
+>>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
 
          if (NEKO_BCKND_DEVICE .eq. 0) then
             call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
