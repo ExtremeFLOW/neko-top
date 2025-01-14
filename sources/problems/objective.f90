@@ -38,7 +38,7 @@ module objective
   implicit none
   private
 
-  public :: objective_t, objective_factory
+  public :: objective_t, objective_factory, objective_wrapper_t
 
   !> The base functional type
   !!
@@ -54,11 +54,18 @@ module objective
 
   end type objective_t
 
+  !> Wrapper for objectives for use in lists.
+  type :: objective_wrapper_t
+     class(objective_t), allocatable :: objective
+   contains
+     procedure, pass(this) :: free => objective_wrapper_free
+  end type objective_wrapper_t
+
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
   interface
-     !> Factory function
+     !> Factory function interface
      module subroutine objective_factory(object, type, design, simulation)
        class(objective_t), allocatable, intent(inout) :: object
        character(len=*), intent(in) :: type
@@ -68,6 +75,15 @@ module objective
   end interface
 
 contains
+
+  !> Free the objective wrapper.
+  subroutine objective_wrapper_free(this)
+    class(objective_wrapper_t), intent(inout) :: this
+    if (allocated(this%objective)) then
+       call this%objective%free()
+       deallocate(this%objective)
+    end if
+  end subroutine objective_wrapper_free
 
 end module objective
 

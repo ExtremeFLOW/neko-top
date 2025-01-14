@@ -69,6 +69,7 @@ module volume_constraint
   use topopt_design, only: topopt_design_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   implicit none
   private
 
@@ -98,10 +99,11 @@ module volume_constraint
      !> Destructor.
      procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
-     procedure, public, pass(this) :: compute => volume_constraint_compute
+     procedure, public, pass(this) :: update_value => &
+          volume_constraint_update_value
      !> Computes the source term and adds the result to `fields`.
-     procedure, public, pass(this) :: compute_sensitivity => &
-          volume_constraint_compute_sensitivity
+     procedure, public, pass(this) :: update_sensitivity => &
+          volume_constraint_update_sensitivity
   end type volume_constraint_t
 
 contains
@@ -134,10 +136,10 @@ contains
 
     ! f_i(x) - a_i*z - y_i - f_i_max <= 0,
 
-    ! so we compute
+    ! so we update_value
     ! f_i(x) - f_i_max
 
-    ! when we compute the value of the constraint
+    ! when we update_value the value of the constraint
     !
     ! But I actually think it's better to include the mins and max's
     ! in MMA it's self.
@@ -187,7 +189,7 @@ contains
   !> The computation of the constraint.
   !! @param design the design
   !! @param fluid the fluid scheme
-  subroutine volume_constraint_compute(this, design)
+  subroutine volume_constraint_update_value(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(topopt_design_t), pointer :: topopt_design
@@ -235,28 +237,60 @@ contains
     ! GPU
 
 
-  end subroutine volume_constraint_compute
+  end subroutine volume_constraint_update_value
 
   !> The computation of the sensitivity.
   !! @param design the design
   !! @param fluid the fluid scheme
   !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_compute_sensitivity(this, design)
+  subroutine volume_constraint_update_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
+    type(field_t), pointer :: work
+    integer, dimension(1) :: temp_indices
 
-    call field_rone(this%sensitivity)
+    this%sensitivity = 1.0_rp
 
     if (this%is_max) then
        ! max volume
-       call field_cmult(this%sensitivity, &
-            1.0_rp / this%volume_domain)
+       this%sensitivity = this%sensitivity * ( 1.0_rp / this%volume_domain)
     else
        ! min volume
-       call field_cmult(this%sensitivity, &
-            -1.0_rp / this%volume_domain)
+       this%sensitivity = this%sensitivity * (-1.0_rp / this%volume_domain)
     end if
 
-  end subroutine volume_constraint_compute_sensitivity
+
+    ! TODO
+    ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
+    ! the only design variables entering MMA are those within the mask.
+    ! This way you get the correct N etc.
+
+    ! Look into the `masked_red_copy` function that Martin implemented.
+    ! That function will copy from one array to another, but the target
+    ! only have the size of the mask, not the full size.
+
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call copy(work%x, this%sensitivity%x, this%sensitivity%size())
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(work%x, work%x_d, this%sensitivity%size(), &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
+
+    if (this%if_mask) then
+       call mask_exterior_const(&
+            work, &
+            this%mask, 0.0_rp)
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(work%x, work%x_d, this%sensitivity%size(), &
+            DEVICE_TO_HOST, sync = .true.)
+    end if
+
+    call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine volume_constraint_update_sensitivity
 
 end module volume_constraint

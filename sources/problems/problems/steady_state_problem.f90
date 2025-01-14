@@ -55,6 +55,9 @@ module steady_state_problem
   use neko_ext, only: reset
   use field_math, only: field_rzero
   use simulation, only: simulation_t
+  use field, only: field_t
+  use scratch_registry, only: neko_scratch_registry
+  use math, only: copy
   implicit none
   private
 
@@ -253,7 +256,7 @@ contains
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
     ! Allocate the output type
-    call this%output%init(sp, 'optimization', 13)
+    call this%output%init(sp, 'optimization', 10)
     call this%output%fields%assign(1, this%simulation%neko_case%fluid%p)
     call this%output%fields%assign(2, this%simulation%neko_case%fluid%u)
     call this%output%fields%assign(3, this%simulation%neko_case%fluid%v)
@@ -265,9 +268,9 @@ contains
     call this%output%fields%assign(8, this%simulation%adjoint_case%scheme%w_adj)
     call this%output%fields%assign(9, this%simulation%adjoint_case%scheme%p_adj)
     call this%output%fields%assign(10, design%brinkman_amplitude)
-    call this%output%fields%assign_to_field(11, this%objective_function%sensitivity)
-    call this%output%fields%assign_to_field(12, this%volume_constraint%sensitivity)
-    call this%output%fields%assign(13, design%sensitivity)
+    ! call this%output%fields%assign_to_field(11, this%objective_function%sensitivity)
+    ! call this%output%fields%assign_to_field(12, this%volume_constraint%sensitivity)
+    ! call this%output%fields%assign(13, design%sensitivity)
     ! TODO
     ! I still haven't done the design%sensitivity as a field list!
     ! so it will eventually be
@@ -326,8 +329,8 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%compute(design)
-    call this%volume_constraint%compute(design)
+    call this%objective_function%update_value(design)
+    call this%volume_constraint%update_value(design)
 
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%value
@@ -350,6 +353,8 @@ contains
   subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
+    type(field_t), pointer :: objective_sensitivity
+    integer, dimension(1) :: temp_indices
 
     ! again, in the future, the functional_t will potentially include
     ! simulation components so that we can
@@ -365,14 +370,20 @@ contains
     ! TODO
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
-    ! objectives%compute_sensitivity()
+    ! objectives%update_sensitivity()
     ! and it would cycled through the list.
-    call this%objective_function%compute_sensitivity(design)
-    call this%volume_constraint%compute_sensitivity(design)
+    call this%objective_function%update_sensitivity(design)
+    call this%volume_constraint%update_sensitivity(design)
     ! it would be nice to visualize this
 
+    call neko_scratch_registry%request_field(objective_sensitivity, &
+         temp_indices(1))
+    call copy(objective_sensitivity%x, this%objective_function%sensitivity%x, &
+         objective_sensitivity%size())
+
+
     ! do the adjoint mapping
-    call design%map_backward(this%objective_function%sensitivity)
+    call design%map_backward(objective_sensitivity)
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
 

@@ -6,6 +6,8 @@ program usrneko
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils_ext, only: read_case
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use neko_config, only: NEKO_BCKND_DEVICE
 
   ! here are all the extra things i'll add to "problem"
   use source_term, only: source_term_t
@@ -49,6 +51,11 @@ program usrneko
   real(kind=rp), allocatable :: x_switch(:)
   character(len=256) :: case_file
   integer :: argc, ierr
+
+  type(field_t), pointer :: work
+  integer, dimension(1) :: temp_indice
+  integer :: siz
+
   ! logical :: mpi_is_initialized
 
   !> parameters from the case file
@@ -122,6 +129,15 @@ program usrneko
      ! in this case it's MMA so we need gradient information
      call problem%compute_sensitivity(design)
 
+     siz = problem%volume_constraint%sensitivity%size()
+     call neko_scratch_registry%request_field(work, temp_indice(1))
+     call copy(work%x, problem%volume_constraint%sensitivity%x, siz)
+
+     if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_memcpy(work%x, work%x_d, siz, &
+             HOST_TO_DEVICE, sync = .true.)
+     end if
+
      ! TODO
      ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
      ! the only design variables entering MMA are those within the mask.
@@ -132,9 +148,17 @@ program usrneko
      ! only have the size of the mask, not the full size.
      if (design%if_mask) then
         call mask_exterior_const(&
-             problem%volume_constraint%sensitivity, &
+             work, &
              design%optimization_domain, 0.0_rp)
      end if
+
+     if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_memcpy(work%x, work%x_d, siz, &
+             DEVICE_TO_HOST, sync = .true.)
+     end if
+
+     call copy(problem%volume_constraint%sensitivity%x, work%x, siz)
+     call neko_scratch_registry%relinquish_field(temp_indice)
 
      ! now we have the optimizer act on the design field.
 

@@ -72,7 +72,9 @@ module minimum_dissipation_objective
   use simulation, only: simulation_t
   use fluid_scheme, only: fluid_scheme_t
   use adjoint_scheme, only: adjoint_scheme_t
-  use math, only: glsc2
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: glsc2, copy
+  use device_math, only: device_copy
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
@@ -108,10 +110,11 @@ module minimum_dissipation_objective
      !> Destructor.
      procedure, public, pass(this):: free => minimum_dissipation_free
      !> Computes the value of the objective function.
-     procedure, public, pass(this):: compute => minimum_dissipation_compute
+     procedure, public, pass(this):: update_value => &
+          minimum_dissipation_update_value
      !> Computes the sensitivity with respect to the coefficient $\chi$.
-     procedure, public, pass(this):: compute_sensitivity => &
-          minimum_dissipation_compute_sensitivity
+     procedure, public, pass(this):: update_sensitivity => &
+          minimum_dissipation_update_sensitivity
 
   end type minimum_dissipation_objective_t
 
@@ -188,13 +191,13 @@ contains
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_compute(this, design)
-    class(minimum_dissipation_objective_t), intent(inout):: this
-    class(design_t), intent(in):: design
-    type(topopt_design_t), pointer:: topopt_design
-    type(field_t), pointer:: wo1, wo2, wo3
-    type(field_t), pointer:: objective_field
-    integer:: temp_indices(4)
+  subroutine minimum_dissipation_update_value(this, design)
+    class(minimum_dissipation_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(topopt_design_t), pointer :: topopt_design
+    type(field_t), pointer :: wo1, wo2, wo3
+    type(field_t), pointer :: objective_field
+    integer :: temp_indices(4)
     integer n
 
     select type (design)
@@ -209,7 +212,7 @@ contains
     call neko_scratch_registry%request_field(wo3, temp_indices(3))
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
 
-    ! compute the objective function.
+    ! update_value the objective function.
     call grad(wo1%x, wo2%x, wo3%x, this%fluid%u%x, this%fluid%C_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
@@ -262,23 +265,24 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine minimum_dissipation_compute
+  end subroutine minimum_dissipation_update_value
 
-  !> compute the sensitivity of the objective function with respect to $\chi$
+  !> update_value the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
-  subroutine minimum_dissipation_compute_sensitivity(this, design)
+  subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout):: this
     class(design_t), intent(in):: design
-    type(field_t), pointer:: lube_contribution
-    integer:: temp_indices(1)
+    type(field_t), pointer:: lube_contribution, work
+    integer:: temp_indices(2)
 
+    call neko_scratch_registry%request_field(work, temp_indices(1))
 
     ! here it should just be an inner product between the forward and adjoint
-    call field_col3(this%sensitivity, this%fluid%u, this%adjoint%u_adj)
-    call field_addcol3(this%sensitivity, this%fluid%v, this%adjoint%v_adj)
-    call field_addcol3(this%sensitivity, this%fluid%w, this%adjoint%w_adj)
+    call field_col3(work, this%fluid%u, this%adjoint%u_adj)
+    call field_addcol3(work, this%fluid%v, this%adjoint%v_adj)
+    call field_addcol3(work, this%fluid%w, this%adjoint%w_adj)
     ! but negative
-    call field_cmult(this%sensitivity, -1.0_rp)
+    call field_cmult(work, -1.0_rp)
 
     ! if we have the lube term we also get an extra term in the sensitivity
     ! K*u^2
@@ -289,21 +293,27 @@ contains
 
     if (this%if_lube) then
        call neko_scratch_registry%request_field(lube_contribution, &
-            temp_indices(1))
+            temp_indices(2))
        call field_col3(lube_contribution, this%fluid%u, this%fluid%u)
        call field_addcol3(lube_contribution, this%fluid%v, this%fluid%v)
        call field_addcol3(lube_contribution, this%fluid%w, this%fluid%w)
        ! fuck be careful with these scalaing!
-       call field_add2s2(this%sensitivity, lube_contribution, &
+       call field_add2s2(work, lube_contribution, &
             this%K*this%obj_scale)
-       call neko_scratch_registry%relinquish_field(temp_indices)
     end if
 
     ! I don't actually think you scale the sensitivity...
     ! because the adjoint field is already scaled
     !call field_cmult(this%sensitivity, this%obj_scale)
 
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
+    else
+       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+    end if
 
-  end subroutine minimum_dissipation_compute_sensitivity
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine minimum_dissipation_update_sensitivity
 
 end module minimum_dissipation_objective

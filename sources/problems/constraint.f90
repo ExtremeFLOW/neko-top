@@ -38,7 +38,7 @@ module constraint
   implicit none
   private
 
-  public :: constraint_t, constraint_factory
+  public :: constraint_t, constraint_factory, constraint_wrapper_t
 
   !> The base functional type
   !!
@@ -54,11 +54,18 @@ module constraint
 
   end type constraint_t
 
+  !> Wrapper for constraints for use in lists.
+  type :: constraint_wrapper_t
+     class(constraint_t), allocatable :: constraint
+   contains
+     procedure, pass(this) :: free => constraint_wrapper_free
+  end type constraint_wrapper_t
+
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
   interface
-     !> Factory function
+     !> Factory function interface
      module subroutine constraint_factory(object, type, design, simulation)
        class(constraint_t), allocatable, intent(inout) :: object
        character(len=*), intent(in) :: type
@@ -68,6 +75,15 @@ module constraint
   end interface
 
 contains
+
+  !> Free the constraint wrapper.
+  subroutine constraint_wrapper_free(this)
+    class(constraint_wrapper_t), intent(inout) :: this
+    if (allocated(this%constraint)) then
+       call this%constraint%free()
+       deallocate(this%constraint)
+    end if
+  end subroutine constraint_wrapper_free
 
 end module constraint
 

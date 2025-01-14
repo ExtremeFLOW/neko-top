@@ -33,7 +33,7 @@
 !> Implements the `base_functional_t` type.
 module base_functional
   use num_types, only: rp
-  use field, only: field_t
+  use vector, only: vector_t
   use simulation, only: simulation_t
   use design, only: design_t
   use topopt_design, only: topopt_design_t
@@ -58,7 +58,7 @@ module base_functional
      !> Value of the base_functional
      real(kind=rp) :: value
      !> Sensitivity field
-     type(field_t) :: sensitivity
+     type(vector_t) :: sensitivity
 
      !> containing a mask?
      logical :: if_mask
@@ -75,12 +75,11 @@ module base_functional
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
-
-     !> Compute the objective function
-     procedure(functional_compute), pass(this), deferred :: compute
-     !> Compute the sensitivity
-     procedure(functional_sensitivity), pass(this), deferred :: &
-          compute_sensitivity
+     !> Update the value of the function
+     procedure(functional_update_value), pass(this), deferred :: update_value
+     !> Update the sensitivity of the function
+     procedure(functional_update_sensitivity), pass(this), deferred :: &
+          update_sensitivity
   end type base_functional_t
 
   ! -------------------------------------------------------------------------- !
@@ -103,18 +102,18 @@ module base_functional
      end subroutine functional_free
 
      !> Compute the objective function
-     subroutine functional_compute(this, design)
+     subroutine functional_update_value(this, design)
        import base_functional_t, design_t
        class(base_functional_t), intent(inout) :: this
        class(design_t), intent(in) :: design
-     end subroutine functional_compute
+     end subroutine functional_update_value
 
      !> Compute the sensitivity
-     subroutine functional_sensitivity(this, design)
+     subroutine functional_update_sensitivity(this, design)
        import base_functional_t, design_t
        class(base_functional_t), intent(inout) :: this
        class(design_t), intent(in) :: design
-     end subroutine functional_sensitivity
+     end subroutine functional_update_sensitivity
 
   end interface
 
@@ -136,7 +135,7 @@ contains
     this%value = 0.0_rp
     select type(design)
       type is (topopt_design_t)
-       call this%sensitivity%init(design%design_indicator%dof)
+       call this%sensitivity%init(design%design_indicator%size())
       class default
        call neko_error('Unknown design type')
     end select
