@@ -67,8 +67,8 @@ module problem
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
-     class(objective_t), allocatable :: objective_function
-     class(constraint_t), allocatable :: volume_constraint
+     class(objective_t), public, allocatable :: objective_function
+     class(constraint_t), public, allocatable :: volume_constraint
 
      !> An output sampler for the problem. This should probably be an output
      !! controller at some point intead.
