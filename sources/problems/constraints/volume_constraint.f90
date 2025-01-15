@@ -69,7 +69,6 @@ module volume_constraint
   use topopt_design, only: topopt_design_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   implicit none
   private
 
@@ -246,8 +245,6 @@ contains
   subroutine volume_constraint_update_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work
-    integer, dimension(1) :: temp_indices
 
     this%sensitivity = 1.0_rp
 
@@ -268,28 +265,11 @@ contains
     ! Look into the `masked_red_copy` function that Martin implemented.
     ! That function will copy from one array to another, but the target
     ! only have the size of the mask, not the full size.
-
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-    call copy(work%x, this%sensitivity%x, this%sensitivity%size())
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(work%x, work%x_d, this%sensitivity%size(), &
-            HOST_TO_DEVICE, sync = .true.)
-    end if
-
     if (this%if_mask) then
        call mask_exterior_const(&
-            work, &
+            this%sensitivity, &
             this%mask, 0.0_rp)
     end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(work%x, work%x_d, this%sensitivity%size(), &
-            DEVICE_TO_HOST, sync = .true.)
-    end if
-
-    call copy(this%sensitivity%x, work%x, this%sensitivity%size())
-    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine volume_constraint_update_sensitivity
 
