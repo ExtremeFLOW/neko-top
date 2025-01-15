@@ -318,7 +318,8 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
-    call this%simulation%run()
+    call this%simulation%run_forward()
+    call this%simulation%run_backward()
 
     ! TODO
     ! In the future, the functional_t will potentially include

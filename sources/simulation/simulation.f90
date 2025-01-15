@@ -59,7 +59,9 @@ module simulation
      !> Free the simulation
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
-     procedure, pass(this) :: run => simulation_run
+     procedure, pass(this) :: run_forward => simulation_run_forward
+     !> Run the simulation
+     procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
   end type simulation_t
@@ -98,15 +100,22 @@ contains
   end subroutine simulation_free
 
   !> Run the simulation
-  subroutine simulation_run(this)
+  subroutine simulation_run_forward(this)
     class(simulation_t), intent(inout) :: this
 
     ! run the primal
     call neko_solve(this%neko_case)
+
+  end subroutine simulation_run_forward
+
+  !> Run the simulation
+  subroutine simulation_run_backward(this)
+    class(simulation_t), intent(inout) :: this
+
     ! run the adjoint
     call solve_adjoint(this%adjoint_case)
 
-  end subroutine simulation_run
+  end subroutine simulation_run_backward
 
   !> Reset the simulation
   subroutine simulation_reset(this)
