@@ -99,6 +99,9 @@ module steady_state_problem
 
      !> Generic compute function.
      procedure, pass(this) :: compute => steady_state_problem_compute
+     !> Generic compute function for sensitivity.
+     procedure, pass(this) :: compute_sensitivity => &
+          steady_state_problem_compute_sensitivity
 
      !> Computes the value of the objective and all constraints.
      !> ie, a forward simulation
@@ -106,7 +109,7 @@ module steady_state_problem
           steady_state_problem_compute_topopt
      !> Computes the first order gradient of the objective function and
      ! all the constraints, and stores them in the design.
-     procedure, pass(this) :: compute_sensitivity => &
+     procedure, pass(this) :: compute_sensitivity_topopt => &
           steady_state_problem_compute_sensitivity_topopt
      ! but we could point to more depending on what design is coming in
 
@@ -312,6 +315,20 @@ contains
     end select
 
   end subroutine steady_state_problem_compute
+
+  !> The computation of the objective function and constraints.
+  subroutine steady_state_problem_compute_sensitivity(this, design)
+    class(steady_state_problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    select type (design)
+      type is (topopt_design_t)
+       call this%compute_sensitivity_topopt(design)
+      class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_compute_sensitivity
 
   !> Here we compute all the objectives and constraints
   subroutine steady_state_problem_compute_topopt(this, design)
