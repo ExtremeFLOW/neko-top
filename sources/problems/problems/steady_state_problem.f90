@@ -71,11 +71,6 @@ module steady_state_problem
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
 
-     !> Number of design variables.
-     integer :: n
-     !> Number of constraints.
-     integer :: m
-
 
    contains
      !> The common constructor using a JSON object.
@@ -107,12 +102,6 @@ module steady_state_problem
           steady_state_problem_compute_sensitivity_topopt
      ! but we could point to more depending on what design is coming in
 
-     !> Return the number of design variables.
-     procedure, pass(this) :: get_n => problem_get_num_design_variables
-
-     !> Return the number of constraints.
-     procedure, pass(this) :: get_m => problem_get_num_constraints
-
   end type steady_state_problem_t
 
 contains
@@ -121,8 +110,8 @@ contains
   subroutine steady_state_problem_init(this)
     class(steady_state_problem_t), intent(inout) :: this
 
-    call this%init_base()
     call this%simulation%init()
+    call this%init_base(this%simulation%neko_case%fluid%dm_Xh%size(), 1, 1)
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
@@ -242,7 +231,6 @@ contains
     call objective_factory(objective_function, &
          'minimum_dissipation', design, this%simulation)
     ! volume constraint
-    this%m = 1
     call constraint_factory(volume_constraint, &
          'volume', design, this%simulation)
 
@@ -434,22 +422,4 @@ contains
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
 
-  ! ========================================================================== !
-  ! Simple getters
-
-  !> Return the number of design variables.
-  pure function problem_get_num_design_variables(this) result(n)
-    class(steady_state_problem_t), intent(in) :: this
-    integer :: n
-
-    n = this%n
-  end function problem_get_num_design_variables
-
-  !> Return the number of constraints.
-  pure function problem_get_num_constraints(this) result(m)
-    class(steady_state_problem_t), intent(in) :: this
-    integer :: m
-
-    m = this%m
-  end function problem_get_num_constraints
 end module steady_state_problem

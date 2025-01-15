@@ -55,6 +55,13 @@ module problem
   type, abstract, public :: problem_t
      private
 
+     !> The number of design variables
+     integer :: n_design
+     !> Number of objectives in the problem
+     integer :: n_objectives
+     !> Number of constraints in the problem
+     integer :: n_constraints
+
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
@@ -123,6 +130,13 @@ module problem
      !  procedure, pass(this), public :: get_constraint_sensitivities => &
      !       problem_get_constraint_sensitivities
 
+
+     !> Return the number of design variables.
+     procedure, pass(this) :: get_n_design => problem_get_num_design_variables
+     !> Return the number of objectives.
+     procedure, pass(this) :: get_n_objectives => problem_get_num_objectives
+     !> Return the number of constraints.
+     procedure, pass(this) :: get_n_constraints => problem_get_num_constraints
   end type problem_t
 
   ! -------------------------------------------------------------------------- !
@@ -200,8 +214,13 @@ contains
   ! Base class methods
 
   !> Constructor for the base class
-  subroutine problem_init_base(this)
+  subroutine problem_init_base(this, n_design, n_objectives, n_constraints)
     class(problem_t), intent(inout) :: this
+    integer, intent(in) :: n_design, n_objectives, n_constraints
+
+    this%n_design = n_design
+    this%n_objectives = n_objectives
+    this%n_constraints = n_constraints
   end subroutine problem_init_base
 
   subroutine problem_free_base(this)
@@ -266,6 +285,31 @@ contains
 
   end subroutine problem_get_constraint_values
 
+  ! -------------------------------------------------------------------------- !
+  ! Simple getters
 
+  !> Return the number of design variables.
+  pure function problem_get_num_design_variables(this) result(n)
+    class(problem_t), intent(in) :: this
+    integer :: n
+
+    n = this%n_design
+  end function problem_get_num_design_variables
+
+  !> Return the number of objectives.
+  pure function problem_get_num_objectives(this) result(n)
+    class(problem_t), intent(in) :: this
+    integer :: n
+
+    n = this%n_objectives
+  end function problem_get_num_objectives
+
+  !> Return the number of constraints.
+  pure function problem_get_num_constraints(this) result(n)
+    class(problem_t), intent(in) :: this
+    integer :: n
+
+    n = this%n_constraints
+  end function problem_get_num_constraints
 
 end module problem

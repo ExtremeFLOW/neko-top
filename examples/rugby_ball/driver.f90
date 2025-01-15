@@ -98,7 +98,7 @@ program usrneko
   call field_rone (wo2)
   ! obviously do this properly in the future...
   n = design%size()
-  m = problem%get_m()
+  m = problem%get_n_constraints()
 
   call optimizer%init_json(design%design_indicator%x, n, &
   !    m, a0         a_i          c_i           d_i
