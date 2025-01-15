@@ -48,7 +48,7 @@ module design
      procedure, pass(this), public :: init_base => design_init
 
      !> Return the number of design variables
-     procedure, pass(this), public :: get_n => design_get_n
+     procedure, pass(this), public :: size => design_size
 
   end type design_t
 
@@ -62,10 +62,10 @@ contains
   end subroutine design_init
 
   !> Return the number of design variables
-  pure function design_get_n(this) result(n)
+  pure function design_size(this) result(n)
     class(design_t), intent(in) :: this
     integer :: n
     n = this%n
-  end function design_get_n
+  end function design_size
 
 end module design
