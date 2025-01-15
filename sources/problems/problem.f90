@@ -67,8 +67,8 @@ module problem
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
      ! for now, I'm hardcoding these two
-     class(objective_t), public, allocatable :: objective_function
-     class(constraint_t), public, allocatable :: volume_constraint
+     class(objective_t), allocatable :: objective_function
+     class(constraint_t), allocatable :: volume_constraint
 
      !> An output sampler for the problem. This should probably be an output
      !! controller at some point intead.
@@ -104,6 +104,14 @@ module problem
 
      !> Sample the problem
      procedure, pass(this), public :: write => problem_write
+
+     !> Add an objective to the list.
+     procedure, pass(this), public :: add_objective => problem_add_objective
+     !> Add a constraint to the list.
+     procedure, pass(this), public :: add_constraint => problem_add_constraint
+
+     ! ----------------------------------------------------------------------- !
+     ! Updater methods
 
      !> Update the objective function
      procedure, pass(this) :: update_objectives => &
@@ -236,6 +244,23 @@ contains
     call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
 
+  !> Add an objective to the list.
+  subroutine problem_add_objective(this, objective)
+    class(problem_t), intent(inout) :: this
+    class(objective_t), allocatable, intent(inout) :: objective
+
+    call move_alloc(objective, this%objective_function)
+
+  end subroutine problem_add_objective
+
+  !> Add an objective to the list.
+  subroutine problem_add_constraint(this, constraint)
+    class(problem_t), intent(inout) :: this
+    class(constraint_t), allocatable, intent(inout) :: constraint
+
+    call move_alloc(constraint, this%volume_constraint)
+
+  end subroutine problem_add_constraint
 
   ! -------------------------------------------------------------------------- !
   ! Updater methods
@@ -280,9 +305,10 @@ contains
 
   subroutine problem_get_constraint_values(this, values)
     class(problem_t), intent(inout) :: this
-    real(kind=rp), intent(out) :: values
+    type(vector_t), intent(out) :: values
 
-    values = this%volume_constraint%value
+    call values%init(this%n_constraints)
+    values%x(1) = this%volume_constraint%value
 
   end subroutine problem_get_constraint_values
 

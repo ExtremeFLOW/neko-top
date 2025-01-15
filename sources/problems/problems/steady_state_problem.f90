@@ -234,8 +234,8 @@ contains
     call constraint_factory(volume_constraint, &
          'volume', design, this%simulation)
 
-    call move_alloc(objective_function, this%objective_function)
-    call move_alloc(volume_constraint, this%volume_constraint)
+    call this%add_objective(objective_function)
+    call this%add_constraint(volume_constraint)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -328,7 +328,7 @@ contains
     type(topopt_design_t), intent(inout) :: design
 
     real(kind=rp) :: objective_value
-    real(kind=rp) :: constraint_value
+    type(vector_t) :: constraint_value
 
     call this%simulation%run_forward()
 
@@ -348,10 +348,8 @@ contains
     call this%get_objective_value(objective_value)
     call this%get_constraint_values(constraint_value)
 
-    print *, 'OBJECTIVE FUNCTION', &
-         objective_value
-    print *, 'VOLUME CONSTRAINT', &
-         constraint_value
+    print *, 'OBJECTIVE FUNCTION', objective_value
+    print *, 'VOLUME CONSTRAINT', constraint_value%x(1)
 
 
     ! TODO
@@ -369,7 +367,10 @@ contains
   subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
-    type(field_t), pointer :: objective_sensitivity
+
+    type(vector_t) :: objective_sensitivity
+
+    type(field_t), pointer :: objective_sensitivity_field
     integer, dimension(1) :: temp_indices
 
     call this%simulation%run_backward()
@@ -394,16 +395,18 @@ contains
     call this%update_objective_sensitivities(design)
     call this%update_constraint_sensitivities(design)
 
+    call this%get_objective_sensitivities(objective_sensitivity)
+
     ! it would be nice to visualize this
 
-    call neko_scratch_registry%request_field(objective_sensitivity, &
+    call neko_scratch_registry%request_field(objective_sensitivity_field, &
          temp_indices(1))
-    call copy(objective_sensitivity%x, this%objective_function%sensitivity%x, &
-         objective_sensitivity%size())
+    call copy(objective_sensitivity_field%x, objective_sensitivity%x, &
+         this%get_n_design())
 
 
     ! do the adjoint mapping
-    call design%map_backward(objective_sensitivity)
+    call design%map_backward(objective_sensitivity_field)
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
 
