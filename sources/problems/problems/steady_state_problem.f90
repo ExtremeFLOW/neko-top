@@ -58,6 +58,7 @@ module steady_state_problem
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
   use math, only: copy
+  use vector, only: vector_t
   implicit none
   private
 
@@ -338,6 +339,9 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
+    real(kind=rp) :: objective_value
+    real(kind=rp) :: constraint_value
+
     call this%simulation%run_forward()
 
     ! TODO
@@ -353,10 +357,13 @@ contains
     call this%update_objectives(design)
     call this%update_constraints(design)
 
+    call this%get_objective_value(objective_value)
+    call this%get_constraint_values(constraint_value)
+
     print *, 'OBJECTIVE FUNCTION', &
-         this%objective_function%value
+         objective_value
     print *, 'VOLUME CONSTRAINT', &
-         this%volume_constraint%value
+         constraint_value
 
 
     ! TODO
@@ -412,6 +419,7 @@ contains
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
 
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
     ! TODO
     ! you've done this very incorrectly for the future,

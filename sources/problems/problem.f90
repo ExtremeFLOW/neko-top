@@ -38,6 +38,8 @@ module problem
   use design, only: design_t
   use utils, only: neko_error
 
+  use vector, only: vector_t
+
   use objective, only: objective_t
   use constraint, only: constraint_t
 
@@ -108,14 +110,18 @@ module problem
      procedure, pass(this) :: update_constraint_sensitivities => &
           problem_update_constraint_sensitivities
 
-     !  !> Get the objective function value
-     !  procedure, pass(this) :: get_objective_value
-     !  !> Get the volume constraint value
-     !  procedure, pass(this) :: get_constraint_value
-     !  !> Get the objective sensitivities
-     !  procedure, pass(this) :: get_objective_sensitivities
-     !  !> Get the volume constraint sensitivities
-     !  procedure, pass(this) :: get_constraint_sensitivities
+     !> Evaluate the objective.
+     procedure, pass(this), public :: get_objective_value => &
+          problem_get_objective_value
+     !> Evaluate the constraints.
+     procedure, pass(this), public :: get_constraint_values => &
+          problem_get_constraint_values
+     !  !> Evaluate the sensitivity of the objective.
+     !  procedure, pass(this), public :: get_objective_sensitivities => &
+     !       problem_get_objective_sensitivities
+     !  !> Evaluate the sensitivity of the constraints.
+     !  procedure, pass(this), public :: get_constraint_sensitivities => &
+     !       problem_get_constraint_sensitivities
 
   end type problem_t
 
@@ -244,6 +250,21 @@ contains
 
   ! -------------------------------------------------------------------------- !
   ! Getter methods
+
+  subroutine problem_get_objective_value(this, value)
+    class(problem_t), intent(inout) :: this
+    real(kind=rp), intent(out) :: value
+
+    value = this%objective_function%value
+  end subroutine problem_get_objective_value
+
+  subroutine problem_get_constraint_values(this, values)
+    class(problem_t), intent(inout) :: this
+    real(kind=rp), intent(out) :: values
+
+    values = this%volume_constraint%value
+
+  end subroutine problem_get_constraint_values
 
 
 
