@@ -339,7 +339,6 @@ contains
     type(topopt_design_t), intent(inout) :: design
 
     call this%simulation%run_forward()
-    call this%simulation%run_backward()
 
     ! TODO
     ! In the future, the functional_t will potentially include
@@ -350,8 +349,9 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%update_value(design)
-    call this%volume_constraint%update_value(design)
+
+    call this%update_objectives(design)
+    call this%update_constraints(design)
 
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%value
@@ -377,6 +377,8 @@ contains
     type(field_t), pointer :: objective_sensitivity
     integer, dimension(1) :: temp_indices
 
+    call this%simulation%run_backward()
+
     ! again, in the future, the functional_t will potentially include
     ! simulation components so that we can
     ! accumulate the sensitivity during the run...
@@ -393,8 +395,10 @@ contains
     ! and constraints, such that this would be a
     ! objectives%update_sensitivity()
     ! and it would cycled through the list.
-    call this%objective_function%update_sensitivity(design)
-    call this%volume_constraint%update_sensitivity(design)
+
+    call this%update_objective_sensitivities(design)
+    call this%update_constraint_sensitivities(design)
+
     ! it would be nice to visualize this
 
     call neko_scratch_registry%request_field(objective_sensitivity, &
