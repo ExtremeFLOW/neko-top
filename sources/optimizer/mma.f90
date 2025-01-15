@@ -49,6 +49,8 @@ module mma
     ! Add interfaces to the abstract type procedure
     procedure(mma_init), pass(this), deferred :: init
     procedure(mma_update), pass(this), deferred :: update
+    procedure(mma_KKT), pass(this), deferred :: KKT
+    procedure(mma_free), pass(this), deferred :: free
 
     ! Deferred methods for accessing properties of concrete types of mma_t
     procedure(get_n), public, deferred :: get_n
@@ -83,6 +85,19 @@ module mma
       real(kind=rp), dimension(this%m), intent(in) :: fval
       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     end subroutine mma_update
+
+    subroutine mma_KKT(this, x, df0dx, fval, dfdx)
+      import mma_t, rp
+      class(mma_t), intent(inout) :: this
+      real(kind=rp), dimension(this%n), intent(in) :: x
+      real(kind=rp), dimension(this%m), intent(in) :: fval
+      real(kind=rp), dimension(this%n), intent(in) :: df0dx
+      real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    end subroutine mma_KKT
+    subroutine mma_free(this)
+      import mma_t
+      class(mma_t), intent(inout) :: this
+    end subroutine mma_free
   end interface
 
   abstract interface
@@ -130,7 +145,7 @@ module mma
   
   contains 
 
-  subroutine mma_init_json( x, n, json, scale, auto_scale)
+  subroutine mma_init_json( mma, x, n, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -143,7 +158,7 @@ module mma
     ! initial design.                                       !
     ! ----------------------------------------------------- !
     class(mma_t), allocatable :: mma
-    ! class(pnpn_prs_res_t), allocatable :: prs_res
+
     integer, intent(in) :: n
     integer, intent(in) :: m
     real(kind=rp), intent(in), dimension(n) :: x
@@ -169,8 +184,8 @@ module mma
     real(kind=rp), intent(out) :: scale
     logical, intent(out) :: auto_scale
     ! ------------------------------------------------------------------------ !
-    ! Assign defaults if nothing is parsed
-    ! based on the Cpp Code by Niels
+    ! Read data from json file
+    ! Default value for epsimin is based on the Cpp Code by Niels
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
@@ -201,15 +216,10 @@ module mma
     d = d_const
     xmin = xmin_const
     xmax = xmax_const
-
-
-    ! calling the mma_factory(mma) to set the drived type for mma
-    call mma_factory(mma)
     ! ------------------------------------------------------------------------ !
-    ! Initialize the MMA object with the parsed parameters
+    ! Initialize the MMA object with the parameters read from json
     call mma%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, backend)
-
   end subroutine mma_init_json
 
 

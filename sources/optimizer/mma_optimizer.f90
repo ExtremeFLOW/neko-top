@@ -1,7 +1,7 @@
 module mma_optimizer
   use optimizer, only: optimizer_t
   use steady_state_problem, only : steady_state_problem_t
-  use mma, only: mma_t
+  use mma, only: mma_t, mma_factory
   use problem, only: problem_t
   use topopt_design, only: topopt_design_t
   use num_types, only : rp
@@ -103,9 +103,10 @@ contains
     type is (steady_state_problem_t)
       ! Now we know prob is of type steady_state_problem_t
       print *, "Initializing mma_optimizer with steady_state_problem_t."
-      ! mma_init_json( x, n, json, auto_scale, scale)
+      ! calling the mma_factory(mma) to set the drived type for mma (backend)
       call mma_factory(this%mma)
-      call this%mma%init_json( prob%design%design_indicator%x, &
+      ! mma_init_json( mma_t, x, n, json, auto_scale, scale)
+      call this%mma%init_json( this%mma, prob%design%design_indicator%x, &
         prob%design%design_indicator%size(), prob%C%params, this%scale, &
         this%auto_scale)
       print *, "scale = ", this%scale

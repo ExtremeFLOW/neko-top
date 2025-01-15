@@ -45,8 +45,8 @@ module mma_cpu
      procedure, pass(this) :: mma_init_attributes_cpu
 
 
-     procedure, public, pass(this) :: free => mma_free
-     procedure, public, pass(this) :: KKT => mma_KKT
+     procedure, public, pass(this) :: free => mma_free_cpu
+     procedure, public, pass(this) :: KKT => mma_KKT_cpu
      !> Interface for updating the MMA
      procedure, public :: update => mma_update_cpu
      procedure, pass(this) :: mma_update_cpu
@@ -68,6 +68,8 @@ module mma_cpu
   end type mma_cpu_t
 
 contains
+
+
   subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
        max_iter, epsimin, asyinit, asyincr, asydecr, backend)
     ! ----------------------------------------------------- !
@@ -104,8 +106,6 @@ contains
     this%n = n
     this%m = m
 
-    ! allocate(this%x(n))
-    ! this%x = x
     call this%xold1%init(n)
     call this%xold2%init(n)
     this%xold1%x = x
@@ -208,48 +208,9 @@ contains
     this%is_updated = .true.
   end subroutine mma_update_cpu
 
-  subroutine mma_KKT(this, x, df0dx, fval, dfdx)
-    ! ----------------------------------------------------- !
-    ! Compute the KKT condition right hand side for a given !
-    ! design x and set the max and norm values of the       !
-    ! residue of KKT system to this%residumax and           !
-    ! this%residunorm.                                      !
-    !                                                       !
-    ! The left hand sides of the KKT conditions are computed!
-    ! for the following nonlinear programming problem:      !
-    ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
-    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
-    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
-    !                                                       !
-    !                                                       !
-    ! Note that before calling this function, the function  !
-    ! values (f0val, fval, dfdx, ...) should be updated     !
-    ! using the new x values.                               !
-    ! ----------------------------------------------------- !
-    class(mma_cpu_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-
-    if (.not. this%is_initialized) then
-       write(stderr, *) "The MMA object is not initialized."
-       error stop
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 0) then
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
-    else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
-    end if
-
-  end subroutine mma_KKT
 
   !> Deallocate the MMA object.
-  subroutine mma_free(this)
+  subroutine mma_free_cpu(this)
 
     class(mma_cpu_t), intent(inout) :: this
 
@@ -282,7 +243,7 @@ contains
     this%is_initialized = .false.
     this%is_updated = .false.
 
-  end subroutine mma_free
+  end subroutine mma_free_cpu
 
   ! ========================================================================== !
   ! Getters and setters
