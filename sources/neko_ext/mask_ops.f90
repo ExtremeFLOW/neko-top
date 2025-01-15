@@ -39,12 +39,18 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only : neko_scratch_registry
   use field_math, only: field_cfill, field_copy
-  use math, only: masked_copy
-  use device_math, only: device_masked_copy
+  use math, only: masked_copy, copy
+  use device_math, only: device_masked_copy, device_copy
+  use vector, only: vector_t
   implicit none
 
   private
   public :: mask_exterior_const, mask_exterior_fld
+
+  interface mask_exterior_const
+     module procedure mask_exterior_const_vec
+     module procedure mask_exterior_const_fld
+  end interface mask_exterior_const
 
 contains
 
@@ -52,7 +58,42 @@ contains
   !! @param[in,out] fld The field being masked
   !! @param[in,out] The mask being applied.
   !! @param[in] The value to be filled
-  subroutine mask_exterior_const(fld, mask, const)
+  subroutine mask_exterior_const_vec(vec, mask, const)
+    type(vector_t), intent(inout) :: vec
+    class(point_zone_t), intent(inout) :: mask
+    real(kind=rp), intent(in) :: const
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    integer :: i
+
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    ! fill background fld
+    call field_cfill(work, const)
+
+    ! copy the fld in the masked region
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call neko_error('GPU not supported for masks yet')
+    else
+       call masked_copy(work%x, vec%x, mask%mask, work%size(), mask%size)
+    end if
+
+    ! copy over
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(vec%x_d, work%x_d, work%size())
+    else
+       call copy(vec%x, work%x, work%size())
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine mask_exterior_const_vec
+
+  !> @brief Force everything outside the mask to be a constant value
+  !! @param[in,out] fld The field being masked
+  !! @param[in,out] The mask being applied.
+  !! @param[in] The value to be filled
+  subroutine mask_exterior_const_fld(fld, mask, const)
     type(field_t), intent(inout) :: fld
     class(point_zone_t), intent(inout) :: mask
     real(kind=rp), intent(in) :: const
@@ -67,7 +108,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet') 
+       call neko_error('GPU not supported for masks yet')
     else
        do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
@@ -79,7 +120,7 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine mask_exterior_const
+  end subroutine mask_exterior_const_fld
 
   !> @brief Force everything outside the mask to be a background field
   !! @param[in,out] fld The field being masked
@@ -100,7 +141,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet') 
+       call neko_error('GPU not supported for masks yet')
     else
        do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
