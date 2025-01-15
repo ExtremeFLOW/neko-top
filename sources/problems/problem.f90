@@ -38,6 +38,9 @@ module problem
   use design, only: design_t
   use utils, only: neko_error
 
+  use objective, only: objective_t
+  use constraint, only: constraint_t
+
   implicit none
   private
 
@@ -49,6 +52,13 @@ module problem
   ! evaluate the problem.
   type, abstract, public :: problem_t
      private
+
+     !> TODO
+     ! we need a `objective_list` which is allocatable and contains a factory
+     ! to fill itself up with from the JSON
+     ! for now, I'm hardcoding these two
+     class(objective_t), public, allocatable :: objective_function
+     class(constraint_t), public, allocatable :: volume_constraint
 
      !> An output sampler for the problem. This should probably be an output
      !! controller at some point intead.
@@ -66,11 +76,13 @@ module problem
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
 
-
      !> Evaluate the optimization problem.
      !! This is the main function that evaluates the problem. It should be
      !! implemented in the derived classes.
      procedure(problem_compute), pass(this), public, deferred :: compute
+
+     ! ----------------------------------------------------------------------- !
+     ! Base class methods
 
      !> Constructor for the base class
      procedure, pass(this) :: init_base => problem_init_base
@@ -82,6 +94,28 @@ module problem
 
      !> Sample the problem
      procedure, pass(this), public :: write => problem_write
+
+     !> Update the objective function
+     procedure, pass(this) :: update_objectives => &
+          problem_update_objectives
+     !> Update the volume constraint
+     procedure, pass(this) :: update_constraints => &
+          problem_update_constraints
+     !> Update the objective sensitivities
+     procedure, pass(this) :: update_objective_sensitivities => &
+          problem_update_objective_sensitivities
+     !> Update the constraint sensitivities
+     procedure, pass(this) :: update_constraint_sensitivities => &
+          problem_update_constraint_sensitivities
+
+     !  !> Get the objective function value
+     !  procedure, pass(this) :: get_objective_value
+     !  !> Get the volume constraint value
+     !  procedure, pass(this) :: get_constraint_value
+     !  !> Get the objective sensitivities
+     !  procedure, pass(this) :: get_objective_sensitivities
+     !  !> Get the volume constraint sensitivities
+     !  procedure, pass(this) :: get_constraint_sensitivities
 
   end type problem_t
 
@@ -175,5 +209,42 @@ contains
 
     call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
+
+
+  ! -------------------------------------------------------------------------- !
+  ! Updater methods
+
+  subroutine problem_update_objectives(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%objective_function%update_value(design)
+  end subroutine problem_update_objectives
+
+  subroutine problem_update_constraints(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%volume_constraint%update_value(design)
+  end subroutine problem_update_constraints
+
+  subroutine problem_update_objective_sensitivities(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%objective_function%update_sensitivity(design)
+  end subroutine problem_update_objective_sensitivities
+
+  subroutine problem_update_constraint_sensitivities(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%volume_constraint%update_sensitivity(design)
+  end subroutine problem_update_constraint_sensitivities
+
+  ! -------------------------------------------------------------------------- !
+  ! Getter methods
+
+
 
 end module problem
