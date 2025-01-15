@@ -39,6 +39,7 @@ module problem
   use utils, only: neko_error
 
   use vector, only: vector_t
+  use matrix, only: matrix_t
 
   use objective, only: objective_t
   use constraint, only: constraint_t
@@ -123,12 +124,12 @@ module problem
      !> Evaluate the constraints.
      procedure, pass(this), public :: get_constraint_values => &
           problem_get_constraint_values
-     !  !> Evaluate the sensitivity of the objective.
-     !  procedure, pass(this), public :: get_objective_sensitivities => &
-     !       problem_get_objective_sensitivities
-     !  !> Evaluate the sensitivity of the constraints.
-     !  procedure, pass(this), public :: get_constraint_sensitivities => &
-     !       problem_get_constraint_sensitivities
+     !> Evaluate the sensitivity of the objective.
+     procedure, pass(this), public :: get_objective_sensitivities => &
+          problem_get_objective_sensitivities
+     !> Evaluate the sensitivity of the constraints.
+     procedure, pass(this), public :: get_constraint_sensitivities => &
+          problem_get_constraint_sensitivities
 
 
      !> Return the number of design variables.
@@ -284,6 +285,28 @@ contains
     values = this%volume_constraint%value
 
   end subroutine problem_get_constraint_values
+
+  subroutine problem_get_objective_sensitivities(this, sensitivities)
+    class(problem_t), intent(inout) :: this
+    type(vector_t), intent(out) :: sensitivities
+
+    call sensitivities%init(this%n_design)
+
+    sensitivities = this%objective_function%sensitivity
+  end subroutine problem_get_objective_sensitivities
+
+  subroutine problem_get_constraint_sensitivities(this, sensitivities)
+    class(problem_t), intent(inout) :: this
+    type(matrix_t), intent(out) :: sensitivities
+    integer :: i
+
+    call sensitivities%init(this%n_design, this%n_constraints)
+
+    do i = 1, this%n_constraints
+       sensitivities%x(:, i) = this%volume_constraint%sensitivity%x
+    end do
+
+  end subroutine problem_get_constraint_sensitivities
 
   ! -------------------------------------------------------------------------- !
   ! Simple getters
