@@ -200,6 +200,7 @@ contains
     integer :: temp_indices(4)
     integer n
 
+    topopt_design => null()
     select type (design)
       type is (topopt_design_t)
        topopt_design => design

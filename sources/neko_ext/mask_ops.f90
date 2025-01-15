@@ -64,7 +64,6 @@ contains
     real(kind=rp), intent(in) :: const
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    integer :: i
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 

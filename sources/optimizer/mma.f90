@@ -170,6 +170,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
     ! based on the Cpp Code by Niels
+    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
@@ -181,7 +182,6 @@ contains
 
     call json_get_or_default(json, 'mma.backend', backend, 'cpu')
 
-    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
     call json_get_or_default(json, 'mma.a0', a0, 1.0_rp)
