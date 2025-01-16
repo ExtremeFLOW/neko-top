@@ -35,6 +35,7 @@ module objective
   use base_functional, only: base_functional_t
   use simulation, only: simulation_t
   use design, only: design_t
+  use num_types, only: rp
   implicit none
   private
 
@@ -51,7 +52,7 @@ module objective
   !! simulation components that are required to evaluate the base functional. All of
   !! which should be prepared in the `init` method.
   type, abstract, extends(base_functional_t) :: objective_t
-
+     real(kind=rp) :: weight = 1.0_rp
   end type objective_t
 
   !> Wrapper for objectives for use in lists.

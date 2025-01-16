@@ -55,6 +55,7 @@ module problem
   ! evaluate the problem.
   type, abstract, public :: problem_t
      private
+
      !> The number of design variables
      integer :: n_design
      !> Number of objectives in the problem
@@ -392,7 +393,9 @@ contains
 
     objective_value = 0.0_rp
     do i = 1, this%n_objectives
-       objective_value = objective_value + this%objective_list(i)%objective%value
+       objective_value = objective_value + &
+            this%objective_list(i)%objective%weight * &
+            this%objective_list(i)%objective%value
     end do
 
   end subroutine problem_get_objective_value
