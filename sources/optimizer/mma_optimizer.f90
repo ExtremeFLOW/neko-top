@@ -127,14 +127,6 @@ contains
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-    print *, "initial objective function value = " , &
-         objective_value
-    print *, "size(this%design%design_indicator%x) = ", &
-         size(this%design%design_indicator%x)
-    print *, "size(constraint_sensitivities%x) = ", &
-         size(constraint_sensitivities%x)
-
-
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
@@ -145,15 +137,18 @@ contains
            nglobal, this%mma%get_m(), tolerance
 
       ! Write the header for the remaining data
-      write(1368, '(A)') "iter, objective_value, constraint_value%x(1), KKTmax, KKTnorm2, scalingfactor"
+      write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
+           &KKTnorm2, scalingfactor"
 
       ! Write the data row-by-row
       write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-           & ES25.17, ",", ES25.17)') 0, objective_value, constraint_value%x, this%mma%get_residumax(), &
-           this%mma%get_residunorm(), scalingfactor
+           & ES25.17, ",", ES25.17)') &
+           0, objective_value, constraint_value%x, &
+           this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
 
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
+
          !Scaling
          if (this%auto_scale .eqv. .true.) then
             scalingfactor = abs(this%scale/constraint_value%x(1))
@@ -163,7 +158,7 @@ contains
 
          if (NEKO_BCKND_DEVICE .eq. 0) then
             call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
-                 reshape([constraint_value%x*scalingfactor], [this%mma%get_m()]), &
+                 constraint_value%x * scalingfactor, &
                  constraint_sensitivities%x*scalingfactor)
          else
             write(stderr, *) "Device not supported in mma_optimizer.f90."
@@ -181,12 +176,6 @@ contains
          call this%mma%KKT(x, objective_sensitivities%x, &
               reshape([constraint_value%x], [this%mma%get_m()]), &
               constraint_sensitivities%x)
-
-         print *, 'iter =', iter,&
-              '-------, objective_value = ', objective_value, &
-              ',   constraint_value%x = ', constraint_value%x, &
-              ',  KKTmax =', this%mma%get_residumax(), ', KKTnorm2 =',&
-              this%mma%get_residunorm()
 
          write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
               & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
@@ -213,6 +202,12 @@ contains
 
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
+
+
+    call constraint_value%free()
+    call objective_sensitivities%free()
+    call constraint_sensitivities%free()
+
   end subroutine mma_optimizer_run_steady_state_prob
 
   ! Free resources associated with the MMA optimizer
