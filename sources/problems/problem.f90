@@ -84,7 +84,6 @@ module problem
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
 
-
      !> Evaluate the optimization problem.
      !! This is the main function that evaluates the problem. It should be
      !! implemented in the derived classes.
@@ -241,13 +240,13 @@ contains
   ! Base class methods
 
   !> Constructor for the base class
-  subroutine problem_init_base(this, n_design, n_objectives, n_constraints)
+  subroutine problem_init_base(this, n_design)
     class(problem_t), intent(inout) :: this
-    integer, intent(in) :: n_design, n_objectives, n_constraints
+    integer, intent(in) :: n_design
 
     this%n_design = n_design
-    this%n_objectives = n_objectives
-    this%n_constraints = n_constraints
+    this%n_objectives = 0
+    this%n_constraints = 0
 
   end subroutine problem_init_base
 
