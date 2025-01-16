@@ -194,13 +194,12 @@ contains
   subroutine minimum_dissipation_update_value(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design
+    type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
     integer n
 
-    topopt_design => null()
     select type (design)
       type is (topopt_design_t)
        topopt_design => design

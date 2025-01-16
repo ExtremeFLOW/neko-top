@@ -37,25 +37,24 @@ module problem
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use utils, only: neko_error
-
+  use objective, only: objective_t, objective_wrapper_t
+  use constraint, only: constraint_t, constraint_wrapper_t
   use vector, only: vector_t
   use matrix, only: matrix_t
-
-  use objective, only: objective_t
-  use constraint, only: constraint_t
+  use device, only: device_memcpy, HOST_TO_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE
 
   implicit none
   private
 
   !> implements the problem type.
   ! Currently very abstract, could include unsteady problems etc.
-  ! Also, dependingo on the type of optimizer used, we may require
+  ! Also, depending on the type of optimizer used, we may require
   ! different functionality.
   ! Right now, all that is required in base class is to init and
   ! evaluate the problem.
   type, abstract, public :: problem_t
      private
-
      !> The number of design variables
      integer :: n_design
      !> Number of objectives in the problem
@@ -63,12 +62,10 @@ module problem
      !> Number of constraints in the problem
      integer :: n_constraints
 
-     !> TODO
-     ! we need a `objective_list` which is allocatable and contains a factory
-     ! to fill itself up with from the JSON
-     ! for now, I'm hardcoding these two
-     class(objective_t), public, allocatable :: objective_function
-     class(constraint_t), public, allocatable :: volume_constraint
+     !> The objective of the problem
+     class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
+     !> The constraints of the problem
+     class(constraint_wrapper_t), allocatable, dimension(:) :: constraint_list
 
      !> An output sampler for the problem. This should probably be an output
      !! controller at some point intead.
@@ -86,10 +83,17 @@ module problem
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
 
+
      !> Evaluate the optimization problem.
      !! This is the main function that evaluates the problem. It should be
      !! implemented in the derived classes.
      procedure(problem_compute), pass(this), public, deferred :: compute
+
+     !> Evaluate the sensitivity of the optimization problem.
+     !! This is the main function that evaluates the problem sensitivity to the
+     !! design. It should be implemented in the derived classes.
+     procedure(problem_compute_sensitivity), pass(this), public, deferred :: &
+          compute_sensitivity
 
      ! ----------------------------------------------------------------------- !
      ! Base class methods
@@ -111,7 +115,7 @@ module problem
      procedure, pass(this), public :: add_constraint => problem_add_constraint
 
      ! ----------------------------------------------------------------------- !
-     ! Updater methods
+     ! Internal Updater methods
 
      !> Update the objective function
      procedure, pass(this) :: update_objectives => &
@@ -126,19 +130,21 @@ module problem
      procedure, pass(this) :: update_constraint_sensitivities => &
           problem_update_constraint_sensitivities
 
-     !> Evaluate the objective.
+     ! ----------------------------------------------------------------------- !
+     ! Public Getters
+
+     !> Return the objective.
      procedure, pass(this), public :: get_objective_value => &
           problem_get_objective_value
-     !> Evaluate the constraints.
+     !> Return the constraints.
      procedure, pass(this), public :: get_constraint_values => &
           problem_get_constraint_values
-     !> Evaluate the sensitivity of the objective.
+     !> Return the sensitivity of the objective.
      procedure, pass(this), public :: get_objective_sensitivities => &
           problem_get_objective_sensitivities
-     !> Evaluate the sensitivity of the constraints.
+     !> Return the sensitivity of the constraints.
      procedure, pass(this), public :: get_constraint_sensitivities => &
           problem_get_constraint_sensitivities
-
 
      !> Return the number of design variables.
      procedure, pass(this) :: get_n_design => problem_get_num_design_variables
@@ -146,6 +152,7 @@ module problem
      procedure, pass(this) :: get_n_objectives => problem_get_num_objectives
      !> Return the number of constraints.
      procedure, pass(this) :: get_n_constraints => problem_get_num_constraints
+
   end type problem_t
 
   ! -------------------------------------------------------------------------- !
@@ -210,6 +217,16 @@ module problem
 
      end subroutine problem_compute
 
+     !> Compute the problem
+     subroutine problem_compute_sensitivity(this, design)
+       import problem_t
+       import design_t
+
+       class(problem_t), intent(inout) :: this
+       class(design_t), intent(inout) :: design
+
+     end subroutine problem_compute_sensitivity
+
      !> Destructor
      subroutine problem_free(this)
        import problem_t
@@ -230,10 +247,28 @@ contains
     this%n_design = n_design
     this%n_objectives = n_objectives
     this%n_constraints = n_constraints
+
   end subroutine problem_init_base
 
   subroutine problem_free_base(this)
     class(problem_t), intent(inout) :: this
+    integer :: i
+
+    ! Free the objective list
+    if (allocated(this%objective_list)) then
+       do i = 1, size(this%objective_list)
+          call this%objective_list(i)%free()
+       end do
+       deallocate(this%objective_list)
+    end if
+
+    ! Free the constraint list
+    if (allocated(this%constraint_list)) then
+       do i = 1, size(this%constraint_list)
+          call this%constraint_list(i)%free()
+       end do
+       deallocate(this%constraint_list)
+    end if
   end subroutine problem_free_base
 
   !> Sample the fields/design.
@@ -244,97 +279,180 @@ contains
     call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
 
+  ! -------------------------------------------------------------------------- !
+  ! Handling constraints and objectives
+
   !> Add an objective to the list.
   subroutine problem_add_objective(this, objective)
     class(problem_t), intent(inout) :: this
     class(objective_t), allocatable, intent(inout) :: objective
+    class(objective_wrapper_t), allocatable, dimension(:) :: temp_list
+    integer :: i, n
 
-    call move_alloc(objective, this%objective_function)
+    n = 0
+    if (allocated(this%objective_list)) then
+       n = size(this%objective_list)
+       call move_alloc(this%objective_list, temp_list)
+       allocate(this%objective_list(n + 1))
+       if (allocated(temp_list)) then
+          do i = 1, n
+             call move_alloc(temp_list(i)%objective, &
+                  this%objective_list(i)%objective)
+          end do
+       end if
+    else
+       allocate(this%objective_list(1))
+    end if
 
+    call move_alloc(objective, this%objective_list(n + 1)%objective)
+    this%n_objectives = n + 1
   end subroutine problem_add_objective
 
   !> Add an objective to the list.
   subroutine problem_add_constraint(this, constraint)
     class(problem_t), intent(inout) :: this
     class(constraint_t), allocatable, intent(inout) :: constraint
+    class(constraint_wrapper_t), allocatable, dimension(:) :: temp_list
+    integer :: i, n
 
-    call move_alloc(constraint, this%volume_constraint)
+    n = 0
+    if (allocated(this%constraint_list)) then
+       n = size(this%constraint_list)
+       call move_alloc(this%constraint_list, temp_list)
+       allocate(this%constraint_list(n + 1))
+       if (allocated(temp_list)) then
+          do i = 1, n
+             call move_alloc(temp_list(i)%constraint, &
+                  this%constraint_list(i)%constraint)
+          end do
+       end if
+    else
+       allocate(this%constraint_list(1))
+    end if
 
+    call move_alloc(constraint, this%constraint_list(n + 1)%constraint)
+    this%n_constraints = n + 1
   end subroutine problem_add_constraint
 
   ! -------------------------------------------------------------------------- !
-  ! Updater methods
+  ! Update the objectives and constraints
 
+  !> Update the objectives.
   subroutine problem_update_objectives(this, design)
     class(problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
+    integer :: i
 
-    call this%objective_function%update_value(design)
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%update_value(design)
+    end do
   end subroutine problem_update_objectives
 
+  !> Update the constraints.
   subroutine problem_update_constraints(this, design)
     class(problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
+    integer :: i
 
-    call this%volume_constraint%update_value(design)
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%update_value(design)
+    end do
   end subroutine problem_update_constraints
 
+  !> Update the sensitivity of the objectives.
   subroutine problem_update_objective_sensitivities(this, design)
     class(problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
+    integer :: i
 
-    call this%objective_function%update_sensitivity(design)
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%update_sensitivity(design)
+    end do
   end subroutine problem_update_objective_sensitivities
 
+  !> Update the sensitivity of the constraints.
   subroutine problem_update_constraint_sensitivities(this, design)
     class(problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
+    class(design_t), intent(in) :: design
+    integer :: i
 
-    call this%volume_constraint%update_sensitivity(design)
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%update_sensitivity(design)
+    end do
   end subroutine problem_update_constraint_sensitivities
 
   ! -------------------------------------------------------------------------- !
-  ! Getter methods
+  ! Problem part getters
 
-  subroutine problem_get_objective_value(this, value)
+  !> Construct and get the objective.
+  subroutine problem_get_objective_value(this, objective_value)
     class(problem_t), intent(inout) :: this
-    real(kind=rp), intent(out) :: value
+    real(kind=rp), intent(out) :: objective_value
+    integer :: i
 
-    value = this%objective_function%value
+    objective_value = 0.0_rp
+    do i = 1, this%n_objectives
+       objective_value = objective_value + this%objective_list(i)%objective%value
+    end do
+
   end subroutine problem_get_objective_value
 
-  subroutine problem_get_constraint_values(this, values)
+  !> Construct and get the constraints.
+  subroutine problem_get_constraint_values(this, constraint_value)
     class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: values
+    type(vector_t), intent(out) :: constraint_value
+    integer :: i
 
-    call values%init(this%n_constraints)
-    values%x(1) = this%volume_constraint%value
+    call constraint_value%init(this%n_constraints)
+
+    do i = 1, this%n_constraints
+       constraint_value%x(i) = this%constraint_list(i)%constraint%value
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(constraint_value%x, constraint_value%x_d, &
+            this%n_constraints, HOST_TO_DEVICE, sync = .true.)
+    end if
 
   end subroutine problem_get_constraint_values
 
-  subroutine problem_get_objective_sensitivities(this, sensitivities)
+  !> Construct and get the sensitivity of the objective.
+  subroutine problem_get_objective_sensitivities(this, sensitivity)
     class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: sensitivities
-
-    call sensitivities%init(this%n_design)
-
-    sensitivities = this%objective_function%sensitivity
-  end subroutine problem_get_objective_sensitivities
-
-  subroutine problem_get_constraint_sensitivities(this, sensitivities)
-    class(problem_t), intent(inout) :: this
-    type(matrix_t), intent(out) :: sensitivities
+    type(vector_t), intent(out) :: sensitivity
     integer :: i
 
-    call sensitivities%init(this%n_design, this%n_constraints)
+    call sensitivity%init(this%n_design)
+
+    do i = 1, this%n_objectives
+       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
+    end do
+
+  end subroutine problem_get_objective_sensitivities
+
+  !> Construct and get the sensitivity of the constraints.
+  subroutine problem_get_constraint_sensitivities(this, sensitivity)
+    class(problem_t), intent(inout) :: this
+    type(matrix_t), intent(out) :: sensitivity
+    integer :: i, j
+
+    call sensitivity%init(this%n_design, this%n_constraints)
 
     do i = 1, this%n_constraints
-       sensitivities%x(:, i) = this%volume_constraint%sensitivity%x
+       do j = 1, this%n_design
+          sensitivity%x(j, i) = &
+               this%constraint_list(i)%constraint%sensitivity%x(j)
+       end do
     end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(sensitivity%x, sensitivity%x_d, &
+            this%n_design * this%n_constraints, HOST_TO_DEVICE, sync = .true.)
+    end if
 
   end subroutine problem_get_constraint_sensitivities
 
-  ! -------------------------------------------------------------------------- !
+  ! ========================================================================== !
   ! Simple getters
 
   !> Return the number of design variables.

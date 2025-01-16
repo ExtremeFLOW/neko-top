@@ -59,6 +59,7 @@ module steady_state_problem
   use scratch_registry, only: neko_scratch_registry
   use math, only: copy
   use vector, only: vector_t
+  use matrix, only: matrix_t
   implicit none
   private
 
@@ -93,7 +94,7 @@ module steady_state_problem
           steady_state_problem_compute_sensitivity
 
      !> Computes the value of the objective and all constraints.
-     !> ie, a forward simulation
+     !! ie, a forward simulation
      procedure, pass(this) :: compute_topopt => &
           steady_state_problem_compute_topopt
      !> Computes the first order gradient of the objective function and
@@ -240,7 +241,7 @@ contains
     ! init the sampler
     !---------------------------------------------------------
     ! TODO
-    ! obviously when we do the mappings properly, to many coeficients, we'll
+    ! obviously when we do the mappings properly, to many coefficients, we'll
     ! also have to modify this
     ! for now:
     ! - forward (p,u,v,w)                      1,2,3,4           p,vx,vy,vz
@@ -263,15 +264,6 @@ contains
     call this%output%fields%assign(8, this%simulation%adjoint_case%scheme%w_adj)
     call this%output%fields%assign(9, this%simulation%adjoint_case%scheme%p_adj)
     call this%output%fields%assign(10, design%brinkman_amplitude)
-    ! call this%output%fields%assign_to_field(11, this%objective_function%sensitivity)
-    ! call this%output%fields%assign_to_field(12, this%volume_constraint%sensitivity)
-    ! call this%output%fields%assign(13, design%sensitivity)
-    ! TODO
-    ! I still haven't done the design%sensitivity as a field list!
-    ! so it will eventually be
-    ! call this%output%fields%assign(13, design%sensitivity(1))
-    ! call this%output%fields%assign(14, design%sensitivity(2))
-    ! or something to this effect
 
 !------------------------------------------------------------------------------
 ! TODO
@@ -327,39 +319,10 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
-    real(kind=rp) :: objective_value
-    type(vector_t) :: constraint_value
-
     call this%simulation%run_forward()
-
-    ! TODO
-    ! In the future, the functional_t will potentially include
-    ! simulation components so that we can
-    ! accumulate the objective function during the run...
-    ! here, we just compute it on the last step
-    ! TODO
-    ! We would presumable have a list that holds all of objective functions
-    ! and constraints, such that this would be a
-    ! objectives%compute()
 
     call this%update_objectives(design)
     call this%update_constraints(design)
-
-    call this%get_objective_value(objective_value)
-    call this%get_constraint_values(constraint_value)
-
-    print *, 'OBJECTIVE FUNCTION', objective_value
-    print *, 'VOLUME CONSTRAINT', constraint_value%x(1)
-
-
-    ! TODO
-    ! the steady simcomp only works for the forward, we either hardcode
-    ! another one, or we have a forward adjoint flag
-    ! or probably the smartest thing to do would be to accept a list of
-    ! fields in the registry that will be checked...
-    ! anyhow, I don't like the termination condition based on simulation
-    ! time anyway...
-    !
 
   end subroutine steady_state_problem_compute_topopt
 
@@ -374,23 +337,6 @@ contains
     integer, dimension(1) :: temp_indices
 
     call this%simulation%run_backward()
-
-    ! again, in the future, the functional_t will potentially include
-    ! simulation components so that we can
-    ! accumulate the sensitivity during the run...
-    ! here, we just compute it on the last step
-
-    ! TODO
-    ! now that I look at this, we could have easily had design, fluid and
-    ! adjoint passed in on init, and then have
-    ! pointers pointing to what we're reffering to.
-    ! So then compute would take in t and t-step.
-    ! this would probably be smarter than passing the whole thing down!!!
-    ! TODO
-    ! We would presumable have a list that holds all of objective functions
-    ! and constraints, such that this would be a
-    ! objectives%update_sensitivity()
-    ! and it would cycled through the list.
 
     call this%update_objective_sensitivities(design)
     call this%update_constraint_sensitivities(design)
@@ -411,17 +357,6 @@ contains
     ! we somehow need to populate the list
 
     call neko_scratch_registry%relinquish_field(temp_indices)
-
-    ! TODO
-    ! you've done this very incorrectly for the future,
-    ! to do this properly you need:
-    ! - a field list in the design holding sensitivity
-    ! - a list of mappings from rho -> whatever enters the PDE
-    ! - a list of adjoint mappings
-    ! (the only reason this works is because we're considering the volume
-    ! constraint on the unmapped field)
-    ! - a subroutine in design%update that compiles all this stuff into a
-    ! way readable for MMA
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
 
