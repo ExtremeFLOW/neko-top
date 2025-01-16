@@ -40,7 +40,8 @@ module mma_simcomp
   use simulation_component, only: simulation_component_t
   use field, only: field_t
   use logger, only: neko_log
-  use mma, only: mma_t
+  ! use mma, only: mma_t
+  use mma, only: mma_t, mma_factory
   use comm
   implicit none
   private
@@ -63,7 +64,8 @@ module mma_simcomp
      real(kind=rp) :: c_const !< Just some dummy variable to show it working.
      real(kind=rp) :: d_const !< Just some dummy variable to show it working.
 
-     type(mma_t) :: mma !< The actual MMA simulation component.
+     ! type(mma_t) :: mma !< The actual MMA simulation component.
+     class(mma_t), allocatable :: mma
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -99,17 +101,20 @@ contains
     call json_get_or_default(json, "c_const", this%c_const, 1000.0_rp)
     call json_get_or_default(json, "d_const", this%d_const, 1.0_rp)
 
-    call this%init_from_attributes()
+    call this%init_from_attributes(case%params)
   end subroutine simcomp_test_init_from_json
 
   ! Actual constructor.
-  subroutine simcomp_test_init_from_attributes(this)
+  subroutine simcomp_test_init_from_attributes(this, json)
     class(mma_comp_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
 
     real(kind=rp), allocatable ::a(:), c(:), d(:)
     real(kind=rp) :: a0
     integer :: nloc
 
+    real(kind=rp) :: scale
+    logical :: auto_scale
 
     allocate(a(this%m))
     allocate(c(this%m))
@@ -134,8 +139,15 @@ contains
     this%designx%x = 1.0
     this%xmax%x = 10.0_rp
     this%xmin%x = 0.0_rp
-    call this%mma%init(reshape(this%designx%x, [nloc]), &
-         nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
+
+    call mma_factory(this%mma)
+
+    !     call this%mma%init(reshape(this%designx%x, [nloc]), &
+    !          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
+    call this%mma%init_json( this%mma, reshape(this%designx%x, [nloc]), &
+         nloc, json, scale,  auto_scale)
+    print *, "scale = ", scale
+    print *, "auto_scale = ", auto_scale
 
     ! Get the rank of the current process
     ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
