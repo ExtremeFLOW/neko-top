@@ -72,7 +72,6 @@ module steady_state_problem
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
 
-
    contains
      !> The common constructor using a JSON object.
      ! TODO
@@ -94,14 +93,13 @@ module steady_state_problem
           steady_state_problem_compute_sensitivity
 
      !> Computes the value of the objective and all constraints.
-     !! ie, a forward simulation
+     !! ie, a forward simulation.
      procedure, pass(this) :: compute_topopt => &
           steady_state_problem_compute_topopt
      !> Computes the first order gradient of the objective function and
-     ! all the constraints, and stores them in the design.
+     !! all constraints, ie, an adjoint simulation.
      procedure, pass(this) :: compute_sensitivity_topopt => &
           steady_state_problem_compute_sensitivity_topopt
-     ! but we could point to more depending on what design is coming in
 
   end type steady_state_problem_t
 
@@ -112,7 +110,7 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
 
     call this%simulation%init()
-    call this%init_base(this%simulation%neko_case%fluid%dm_Xh%size(), 1, 1)
+    call this%init_base(this%simulation%neko_case%fluid%dm_Xh%size())
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints

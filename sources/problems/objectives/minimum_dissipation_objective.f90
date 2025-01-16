@@ -147,7 +147,7 @@ contains
     if_mask = .false.
     objective_location_zone_name = "objective_location"
 
-    call this%init_base(design, if_mask, objective_location_zone_name)
+    call this%init_base(design%size(), if_mask, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation

@@ -154,7 +154,7 @@ contains
     n = topopt_design%design_indicator%size()
     if (topopt_design%if_mask) then
        ! init the base
-       call this%init_base(topopt_design, topopt_design%if_mask, &
+       call this%init_base(topopt_design%size(), topopt_design%if_mask, &
             topopt_design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
@@ -169,7 +169,7 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(topopt_design)
+       call this%init_base(topopt_design%size())
 
        ! point to the volume of the domain
        this%volume_domain = this%fluid%c_xh%volume

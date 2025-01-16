@@ -123,22 +123,17 @@ contains
   ! Implementations for the base class
 
   !> Initialize the base class
-  !! @param design The design variable
+  !! @param design_size The number of design variables
   !! @param[optional] if_mask Whether the base_functional is masked
   !! @param[optional] mask_name The name design the mask
-  subroutine functional_init_base(this, design, if_mask, mask_name)
+  subroutine functional_init_base(this, design_size, if_mask, mask_name)
     class(base_functional_t), target, intent(inout) :: this
-    class(design_t), intent(in) :: design
+    integer, intent(in) :: design_size
     logical, intent(in), optional :: if_mask
     character(len=*), intent(in), optional :: mask_name
 
     this%value = 0.0_rp
-    select type(design)
-      type is (topopt_design_t)
-       call this%sensitivity%init(design%design_indicator%size())
-      class default
-       call neko_error('Unknown design type')
-    end select
+    call this%sensitivity%init(design_size)
 
     if (present(if_mask)) this%if_mask = if_mask
     if (.not. present(if_mask)) this%if_mask = .false.
