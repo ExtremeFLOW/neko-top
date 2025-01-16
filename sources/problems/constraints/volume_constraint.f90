@@ -114,7 +114,7 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(simulation_t), target, intent(inout) :: simulation
     class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design
+    type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer :: n
@@ -191,7 +191,7 @@ contains
   subroutine volume_constraint_update_value(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design
+    type(topopt_design_t), pointer :: topopt_design => null()
     integer n
 
     select type (design)
