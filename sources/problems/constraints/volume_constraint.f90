@@ -69,6 +69,7 @@ module volume_constraint
   use topopt_design, only: topopt_design_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
+  use json_module, only: json_file
   implicit none
   private
 
@@ -94,7 +95,7 @@ module volume_constraint
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init => volume_constraint_init
+     procedure, public, pass(this) :: init_json => volume_constraint_init
      !> Destructor.
      procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
@@ -110,8 +111,9 @@ contains
   !! @param design the design
   !! @param fluid the fluid scheme
   !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_init(this, design, simulation)
+  subroutine volume_constraint_init(this, json, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
+    type(json_file), intent(in) :: json
     type(simulation_t), target, intent(inout) :: simulation
     class(design_t), intent(in) :: design
     type(topopt_design_t), pointer :: topopt_design => null()
@@ -150,11 +152,11 @@ contains
 
     this%fluid => simulation%neko_case%fluid
 
-    ! Now we can extract the mask/if_mask from the design
+    ! Now we can extract the mask/has_mask from the design
     n = topopt_design%design_indicator%size()
     if (topopt_design%if_mask) then
        ! init the base
-       call this%init_base(topopt_design%size(), topopt_design%if_mask, &
+       call this%init_base(topopt_design%size(), &
             topopt_design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
@@ -169,7 +171,7 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(topopt_design%size())
+       call this%init_base(topopt_design%size(), "")
 
        ! point to the volume of the domain
        this%volume_domain = this%fluid%c_xh%volume
@@ -265,10 +267,8 @@ contains
     ! Look into the `masked_red_copy` function that Martin implemented.
     ! That function will copy from one array to another, but the target
     ! only have the size of the mask, not the full size.
-    if (this%if_mask) then
-       call mask_exterior_const(&
-            this%sensitivity, &
-            this%mask, 0.0_rp)
+    if (this%has_mask) then
+       call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
     end if
 
   end subroutine volume_constraint_update_sensitivity

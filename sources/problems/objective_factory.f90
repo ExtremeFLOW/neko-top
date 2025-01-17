@@ -35,6 +35,7 @@ submodule (objective) objective_factory_mod
   use design, only: design_t
   use utils, only: neko_type_error
   use simulation, only: simulation_t
+  use json_module, only: json_file
 
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
@@ -61,6 +62,7 @@ contains
     character(len=*), intent(in) :: type
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+    type(json_file) :: json
 
     select case(trim(type))
       case('minimum_dissipation')
@@ -69,7 +71,7 @@ contains
        call neko_type_error('Objective', type, KNOWN_TYPES)
     end select
 
-    call object%init(design, simulation)
+    call object%init_json(json, design, simulation)
   end subroutine objective_factory
 
 end submodule objective_factory_mod

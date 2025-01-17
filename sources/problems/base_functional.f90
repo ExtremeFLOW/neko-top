@@ -30,16 +30,14 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-!> Implements the `base_functional_t` type.
+!> Defines the abstract the `base_functional_t` type.
 module base_functional
-  use num_types, only: rp
-  use vector, only: vector_t
-  use simulation, only: simulation_t
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
-  use point_zone_registry, only: neko_point_zone_registry
+  use json_module, only: json_file
+  use num_types, only: rp
   use point_zone, only: point_zone_t
-  use utils, only: neko_error
+  use simulation, only: simulation_t
+  use vector, only: vector_t
   implicit none
   private
 
@@ -51,8 +49,8 @@ module base_functional
   !!
   !! The base functional is also responsible for managing the adjoint forcing
   !! terms that are required for the adjoint problem, any source terms
-  !! simulation components that are required to evaluate the base functional. All of
-  !! which should be prepared in the `init` method.
+  !! simulation components that are required to evaluate the base functional.
+  !! All of which should be prepared in the `init` method.
   type, abstract, public :: base_functional_t
 
      !> Value of the base_functional
@@ -60,18 +58,18 @@ module base_functional
      !> Sensitivity field
      type(vector_t) :: sensitivity
 
-     !> containing a mask?
-     logical :: if_mask
+     !> containing a mask
+     logical :: has_mask
      !> A mask for where the objective function is evaluated
-     class(point_zone_t), pointer :: mask
+     class(point_zone_t), pointer :: mask => null()
 
    contains
-     !> Initializers of the base class
-     procedure, pass(this) :: init_base => functional_init_base
-     procedure, pass(this) :: free_base => functional_free_base
+
+     ! ----------------------------------------------------------------------- !
+     ! Derived class interfaces
 
      !> Constructor
-     procedure(functional_init), pass(this), deferred :: init
+     procedure(functional_init), pass(this), deferred :: init_json
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
@@ -83,16 +81,18 @@ module base_functional
   end type base_functional_t
 
   ! -------------------------------------------------------------------------- !
-  ! Interfaces for the derived types, these are the constructors for the
-  ! different types of objective functions.
+  ! Interface specifications for the derived types, these are the constructors
+  ! for the different types of objective functions.
+
   abstract interface
 
      !> Initialize the objective function
-     subroutine functional_init(this, design, simulation)
-       import base_functional_t, design_t, simulation_t
+     subroutine functional_init(this, json, design, simulation)
+       import base_functional_t, design_t, simulation_t, json_file
        class(base_functional_t), intent(inout) :: this
-       type(simulation_t), target, intent(inout) :: simulation
+       type(json_file), intent(in) :: json
        class(design_t), intent(in) :: design
+       type(simulation_t), target, intent(inout) :: simulation
      end subroutine functional_init
 
      !> Destructor
@@ -116,46 +116,5 @@ module base_functional
      end subroutine functional_update_sensitivity
 
   end interface
-
-contains
-
-  ! -------------------------------------------------------------------------- !
-  ! Implementations for the base class
-
-  !> Initialize the base class
-  !! @param design_size The number of design variables
-  !! @param[optional] if_mask Whether the base_functional is masked
-  !! @param[optional] mask_name The name design the mask
-  subroutine functional_init_base(this, design_size, if_mask, mask_name)
-    class(base_functional_t), target, intent(inout) :: this
-    integer, intent(in) :: design_size
-    logical, intent(in), optional :: if_mask
-    character(len=*), intent(in), optional :: mask_name
-
-    this%value = 0.0_rp
-    call this%sensitivity%init(design_size)
-
-    if (present(if_mask)) this%if_mask = if_mask
-    if (.not. present(if_mask)) this%if_mask = .false.
-
-    if (this%if_mask) then
-       if (.not. present(mask_name)) then
-          call neko_error('Mask name not provided')
-       end if
-
-       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
-    end if
-
-  end subroutine functional_init_base
-
-  !> Free the base class
-  subroutine functional_free_base(this)
-    class(base_functional_t), target, intent(inout) :: this
-
-    if (associated(this%mask)) nullify(this%mask)
-
-    call this%sensitivity%free()
-
-  end subroutine functional_free_base
 
 end module base_functional

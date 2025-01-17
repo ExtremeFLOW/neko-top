@@ -36,6 +36,7 @@ module objective
   use simulation, only: simulation_t
   use design, only: design_t
   use num_types, only: rp
+  use point_zone_registry, only: neko_point_zone_registry
   implicit none
   private
 
@@ -53,6 +54,14 @@ module objective
   !! which should be prepared in the `init` method.
   type, abstract, extends(base_functional_t) :: objective_t
      real(kind=rp) :: weight = 1.0_rp
+
+   contains
+
+     !> Initialize the base class
+     procedure, pass(this) :: init_base => objective_init_base
+     !> Free the base class
+     procedure, pass(this) :: free_base => objective_free_base
+
   end type objective_t
 
   !> Wrapper for objectives for use in lists.
@@ -65,8 +74,8 @@ module objective
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
+  !> Factory function interface
   interface
-     !> Factory function interface
      module subroutine objective_factory(object, type, design, simulation)
        class(objective_t), allocatable, intent(inout) :: object
        character(len=*), intent(in) :: type
@@ -76,6 +85,47 @@ module objective
   end interface
 
 contains
+
+  ! -------------------------------------------------------------------------- !
+  ! Implementations for the base class
+
+  !> Initialize the objective base class.
+  !! @param design_size The number of design variables.
+  !! @param weight The weight of the objective function.
+  !! @param[optional] mask_name The name design the mask.
+  subroutine objective_init_base(this, design_size, weight, mask_name)
+    class(objective_t), intent(inout) :: this
+    integer, intent(in) :: design_size
+    real(kind=rp), intent(in) :: weight
+    character(len=*), intent(in), optional :: mask_name
+
+    this%value = 0.0_rp
+    call this%sensitivity%init(design_size)
+
+    this%weight = weight
+
+    this%has_mask = .false.
+    if (trim(mask_name) .ne. "") then
+       this%has_mask = .true.
+       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+    end if
+
+  end subroutine objective_init_base
+
+  !> Free the base class
+  subroutine objective_free_base(this)
+    class(objective_t), target, intent(inout) :: this
+
+    this%value = 0.0_rp
+    call this%sensitivity%free()
+    this%weight = 1.0_rp
+    this%has_mask = .false.
+    if (associated(this%mask)) nullify(this%mask)
+
+  end subroutine objective_free_base
+
+  ! -------------------------------------------------------------------------- !
+  ! Implementations for the wrapper
 
   !> Free the objective wrapper.
   subroutine objective_wrapper_free(this)

@@ -35,6 +35,8 @@ module constraint
   use base_functional, only: base_functional_t
   use simulation, only: simulation_t
   use design, only: design_t
+  use num_types, only: rp
+  use point_zone_registry, only: neko_point_zone_registry
   implicit none
   private
 
@@ -42,7 +44,7 @@ module constraint
 
   !> The base functional type
   !!
-  !! This is the base class for objectives and constraints alike.
+  !! This is the base class for constraints and constraints alike.
   !! A base functional should be able to evaluate itself and its sensitivity
   !! with respect to the design variables.
   !!
@@ -51,6 +53,17 @@ module constraint
   !! simulation components that are required to evaluate the base functional. All of
   !! which should be prepared in the `init` method.
   type, abstract, extends(base_functional_t) :: constraint_t
+
+   contains
+     ! ----------------------------------------------------------------------- !
+     ! Interfaces for the base class
+     ! Note that the split of the subroutine and a generic is necessary to
+     ! allow the derived types to override the base initializer and destructor.
+
+     !> Initializers of the base class
+     procedure, pass(this) :: init_base => constraint_init_base
+     !> Destructor of the base class
+     procedure, pass(this) :: free_base => constraint_free_base
 
   end type constraint_t
 
@@ -64,8 +77,8 @@ module constraint
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
+  !> Factory function interface
   interface
-     !> Factory function interface
      module subroutine constraint_factory(object, type, design, simulation)
        class(constraint_t), allocatable, intent(inout) :: object
        character(len=*), intent(in) :: type
@@ -75,6 +88,43 @@ module constraint
   end interface
 
 contains
+
+  ! -------------------------------------------------------------------------- !
+  ! Implementations for the base class
+
+  !> Initialize the base class.
+  !! @param design_size The number of design variables.
+  !! @param weight The weight of the constraint function.
+  !! @param[optional] mask_name The name design the mask.
+  subroutine constraint_init_base(this, design_size, mask_name)
+    class(constraint_t), intent(inout) :: this
+    integer, intent(in) :: design_size
+    character(len=*), intent(in) :: mask_name
+
+    this%value = 0.0_rp
+    call this%sensitivity%init(design_size)
+
+    this%has_mask = .false.
+    if (trim(mask_name) .ne. "") then
+       this%has_mask = .true.
+       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+    end if
+
+  end subroutine constraint_init_base
+
+  !> Free the base class
+  subroutine constraint_free_base(this)
+    class(constraint_t), target, intent(inout) :: this
+
+    this%value = 0.0_rp
+    call this%sensitivity%free()
+    this%has_mask = .false.
+    if (associated(this%mask)) nullify(this%mask)
+
+  end subroutine constraint_free_base
+
+  ! -------------------------------------------------------------------------- !
+  ! Implementations for the wrapper
 
   !> Free the constraint wrapper.
   subroutine constraint_wrapper_free(this)

@@ -82,6 +82,7 @@ module minimum_dissipation_objective
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
   use utils, only: neko_error
+  use json_module, only: json_file
   implicit none
   private
 
@@ -91,29 +92,29 @@ module minimum_dissipation_objective
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
-     real(kind=rp):: K, dissipation, lube_value
-     logical:: if_lube
+     real(kind=rp) :: K, dissipation, lube_value
+     logical :: if_lube
 
-     class(fluid_scheme_t), pointer:: fluid
-     class(adjoint_scheme_t), pointer:: adjoint
+     class(fluid_scheme_t), pointer :: fluid
+     class(adjoint_scheme_t), pointer :: adjoint
 
      ! TODO
      ! this is just for testing!
      ! actually rescaling the adjoint is a bit more involved,
      ! and we have to be careful of the brinkman term
      !> A scaling factor
-     real(kind=rp):: obj_scale
+     real(kind=rp) :: obj_scale
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this):: init => minimum_dissipation_init
+     procedure, public, pass(this) :: init_json => minimum_dissipation_init
      !> Destructor.
-     procedure, public, pass(this):: free => minimum_dissipation_free
+     procedure, public, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
-     procedure, public, pass(this):: update_value => &
+     procedure, public, pass(this) :: update_value => &
           minimum_dissipation_update_value
      !> Computes the sensitivity with respect to the coefficient $\chi$.
-     procedure, public, pass(this):: update_sensitivity => &
+     procedure, public, pass(this) :: update_sensitivity => &
           minimum_dissipation_update_sensitivity
 
   end type minimum_dissipation_objective_t
@@ -124,30 +125,32 @@ contains
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_init(this, design, simulation)
-    class(minimum_dissipation_objective_t), intent(inout):: this
-    type(simulation_t), target, intent(inout):: simulation
-    class(design_t), intent(in):: design
-    type(adjoint_minimum_dissipation_source_term_t):: adjoint_forcing
-    type(adjoint_lube_source_term_t):: lube_term
-    character(len=:), allocatable:: objective_location_zone_name
-    logical:: if_mask
+  subroutine minimum_dissipation_init(this, json, design, simulation)
+    class(minimum_dissipation_objective_t), intent(inout) :: this
+    type(json_file), intent(in) :: json
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+
+    type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
+    type(adjoint_lube_source_term_t) :: lube_term
+    character(len=:), allocatable :: objective_location_zone_name
+    logical :: has_mask
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
     this%if_lube = .true.
     this%K = 1.0_rp
     this%obj_scale = 1.0_rp
-    !this%obj_scale = 0.00000001_rp
 
     this%fluid => simulation%neko_case%fluid
     this%adjoint => simulation%adjoint_case%scheme
 
     ! mask would also be read from JSON... I'm hard coding
-    if_mask = .false.
-    objective_location_zone_name = "objective_location"
+    has_mask = .false.
+    ! objective_location_zone_name = "objective_location"
+    objective_location_zone_name = ""
 
-    call this%init_base(design%size(), if_mask, objective_location_zone_name)
+    call this%init_base(design%size(), 1.0_rp, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
@@ -155,7 +158,7 @@ contains
     call adjoint_forcing%init_from_components( &
          this%adjoint%f_adj_x, this%adjoint%f_adj_y, this%adjoint%f_adj_z, &
          this%fluid%u, this%fluid%v, this%fluid%w, this%obj_scale, &
-         this%mask, this%if_mask, &
+         this%mask, this%has_mask, &
          this%adjoint%c_Xh)
     ! append adjoint forcing term based on objective function
     call this%adjoint%source_term%add_source_term(adjoint_forcing)
@@ -169,7 +172,7 @@ contains
             this%adjoint%f_adj_x, this%adjoint%f_adj_y, this%adjoint%f_adj_z, design, &
             this%k*this%obj_scale, &
             this%fluid%u, this%fluid%v, this%fluid%w, &
-            this%mask, this%if_mask, &
+            this%mask, this%has_mask, &
             this%adjoint%c_Xh)
        ! append adjoint forcing term based on objective function
        call this%adjoint%source_term%add_source_term(lube_term)
@@ -179,7 +182,7 @@ contains
 
   !> Destructor.
   subroutine minimum_dissipation_free(this)
-    class(minimum_dissipation_objective_t), intent(inout):: this
+    class(minimum_dissipation_objective_t), intent(inout) :: this
     call this%free_base()
 
     if (associated(this%fluid)) nullify(this%fluid)
@@ -230,7 +233,7 @@ contains
 
     ! integrate the field
     n = wo1%size()
-    if (this%if_mask) then
+    if (this%has_mask) then
        this%dissipation = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
             n, this%mask%mask, this%mask%size)
     else
@@ -246,7 +249,7 @@ contains
        call field_col3(objective_field, this%fluid%u, topopt_design%brinkman_amplitude)
        call field_addcol3(objective_field, this%fluid%v, topopt_design%brinkman_amplitude)
        call field_addcol3(objective_field, this%fluid%w, topopt_design%brinkman_amplitude)
-       if (this%if_mask) then
+       if (this%has_mask) then
           this%lube_value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
                n, this%mask%mask, this%mask%size)
        else
@@ -270,10 +273,10 @@ contains
   !> update_value the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
   subroutine minimum_dissipation_update_sensitivity(this, design)
-    class(minimum_dissipation_objective_t), intent(inout):: this
-    class(design_t), intent(in):: design
-    type(field_t), pointer:: lube_contribution, work
-    integer:: temp_indices(2)
+    class(minimum_dissipation_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(field_t), pointer :: lube_contribution, work
+    integer :: temp_indices(2)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
