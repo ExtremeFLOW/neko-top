@@ -39,12 +39,14 @@ submodule (objective) objective_factory_mod
 
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
+  use lube_term_objective, only: lube_term_objective_t
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(1) = [ character(len=25) :: &
-       'minimum_dissipation']
+  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
+       "minimum_dissipation", &
+       "lube_term"]
 
 contains
 
@@ -65,10 +67,13 @@ contains
     type(json_file) :: json
 
     select case(trim(type))
-      case('minimum_dissipation')
+      case("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)
+      case("lube_term")
+       allocate(lube_term_objective_t::object)
+
       case default
-       call neko_type_error('Objective', type, KNOWN_TYPES)
+       call neko_type_error("Objective", type, KNOWN_TYPES)
     end select
 
     call object%init_json(json, design, simulation)

@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `minimum_dissipation_objective_t` type.
+!> Implements the `lube_term_objective_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -60,7 +60,7 @@
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module minimum_dissipation_objective
+module lube_term_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
@@ -89,7 +89,7 @@ module minimum_dissipation_objective
   !> An objective function corresponding to minimum dissipation
   ! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   ! |\mathbf{u}|^2 d \Omega $
-  type, public, extends(objective_t) :: minimum_dissipation_objective_t
+  type, public, extends(objective_t) :: lube_term_objective_t
      private
 
      real(kind=rp) :: K, dissipation, lube_value
@@ -107,17 +107,17 @@ module minimum_dissipation_objective
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => minimum_dissipation_init
+     procedure, public, pass(this) :: init_json => lube_term_init
      !> Destructor.
-     procedure, public, pass(this) :: free => minimum_dissipation_free
+     procedure, public, pass(this) :: free => lube_term_free
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
-          minimum_dissipation_update_value
+          lube_term_update_value
      !> Computes the sensitivity with respect to the coefficient $\chi$.
      procedure, public, pass(this) :: update_sensitivity => &
-          minimum_dissipation_update_sensitivity
+          lube_term_update_sensitivity
 
-  end type minimum_dissipation_objective_t
+  end type lube_term_objective_t
 
 contains
 
@@ -125,8 +125,8 @@ contains
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_init(this, json, design, simulation)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine lube_term_init(this, json, design, simulation)
+    class(lube_term_objective_t), intent(inout) :: this
     type(json_file), intent(in) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -138,7 +138,7 @@ contains
 
     ! here we would read from the JSON (or have something passed in)
     ! about the lube term
-    this%if_lube = .false.
+    this%if_lube = .true.
     this%K = 1.0_rp
     this%obj_scale = 1.0_rp
 
@@ -161,7 +161,7 @@ contains
          this%mask, this%has_mask, &
          this%adjoint%c_Xh)
     ! append adjoint forcing term based on objective function
-    call this%adjoint%source_term%add_source_term(adjoint_forcing)
+    ! call this%adjoint%source_term%add_source_term(adjoint_forcing)
 
     ! if we have the lube term we need to initialize and append that too
     if (this%if_lube) then
@@ -178,24 +178,24 @@ contains
        call this%adjoint%source_term%add_source_term(lube_term)
     end if
 
-  end subroutine minimum_dissipation_init
+  end subroutine lube_term_init
 
   !> Destructor.
-  subroutine minimum_dissipation_free(this)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine lube_term_free(this)
+    class(lube_term_objective_t), intent(inout) :: this
     call this%free_base()
 
     if (associated(this%fluid)) nullify(this%fluid)
     if (associated(this%adjoint)) nullify( this%adjoint)
 
-  end subroutine minimum_dissipation_free
+  end subroutine lube_term_free
 
   !> Compute the objective function.
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_update_value(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine lube_term_update_value(this, design)
+    class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: wo1, wo2, wo3
@@ -255,7 +255,7 @@ contains
        else
           this%lube_value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
        end if
-       this%value = this%dissipation + 0.5*this%K*this%lube_value
+       this%value = 0.5*this%K*this%lube_value
     else
        this%value = this%dissipation
     end if
@@ -268,12 +268,12 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine minimum_dissipation_update_value
+  end subroutine lube_term_update_value
 
   !> update_value the sensitivity of the objective function with respect to $\chi$
   !! @param design the design.
-  subroutine minimum_dissipation_update_sensitivity(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine lube_term_update_sensitivity(this, design)
+    class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: lube_contribution, work
     integer :: temp_indices(2)
@@ -301,8 +301,7 @@ contains
        call field_addcol3(lube_contribution, this%fluid%v, this%fluid%v)
        call field_addcol3(lube_contribution, this%fluid%w, this%fluid%w)
        ! fuck be careful with these scalaing!
-       call field_add2s2(work, lube_contribution, &
-            this%K*this%obj_scale)
+       call field_cmult(lube_contribution, this%K*this%obj_scale)
     end if
 
     ! I don't actually think you scale the sensitivity...
@@ -310,13 +309,13 @@ contains
     !call field_cmult(this%sensitivity, this%obj_scale)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
+       call device_copy(this%sensitivity%x_d, lube_contribution%x_d, this%sensitivity%size())
     else
-       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+       call copy(this%sensitivity%x, lube_contribution%x, this%sensitivity%size())
     end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine minimum_dissipation_update_sensitivity
+  end subroutine lube_term_update_sensitivity
 
-end module minimum_dissipation_objective
+end module lube_term_objective

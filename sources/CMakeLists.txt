@@ -59,6 +59,7 @@ target_sources(neko-top
 
         # List of specific problems, objectives and constraints
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
 

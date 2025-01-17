@@ -229,11 +229,17 @@ contains
     ! minimum dissipation objective function
     call objective_factory(objective_function, &
          'minimum_dissipation', design, this%simulation)
+    call this%add_objective(objective_function)
+    ! And the lube term objective function
+    call objective_factory(objective_function, &
+         'lube_term', design, this%simulation)
+    call this%add_objective(objective_function)
+
+
     ! volume constraint
     call constraint_factory(volume_constraint, &
          'volume', design, this%simulation)
 
-    call this%add_objective(objective_function)
     call this%add_constraint(volume_constraint)
 
     ! init the sampler
