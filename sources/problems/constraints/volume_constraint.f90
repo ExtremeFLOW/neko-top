@@ -113,7 +113,7 @@ contains
   !! @param adjoint the adjoint scheme
   subroutine volume_constraint_init(this, json, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
-    type(json_file), intent(in) :: json
+    type(json_file), intent(inout) :: json
     type(simulation_t), target, intent(inout) :: simulation
     class(design_t), intent(in) :: design
     type(topopt_design_t), pointer :: topopt_design => null()

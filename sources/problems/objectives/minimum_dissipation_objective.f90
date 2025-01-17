@@ -117,7 +117,7 @@ contains
   !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_init(this, json, design, simulation)
     class(minimum_dissipation_objective_t), intent(inout) :: this
-    type(json_file), intent(in) :: json
+    type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
 

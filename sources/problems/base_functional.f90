@@ -90,7 +90,7 @@ module base_functional
      subroutine functional_init(this, json, design, simulation)
        import base_functional_t, design_t, simulation_t, json_file
        class(base_functional_t), intent(inout) :: this
-       type(json_file), intent(in) :: json
+       type(json_file), intent(inout) :: json
        class(design_t), intent(in) :: design
        type(simulation_t), target, intent(inout) :: simulation
      end subroutine functional_init
