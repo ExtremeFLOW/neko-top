@@ -1,4 +1,4 @@
-! Copyright (c) 2023, The Neko Authors
+! Copyright (c) 2024-25, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -92,18 +92,8 @@ module minimum_dissipation_objective
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
-     real(kind=rp) :: K, dissipation, lube_value
-     logical :: if_lube
-
      class(fluid_scheme_t), pointer :: fluid
      class(adjoint_scheme_t), pointer :: adjoint
-
-     ! TODO
-     ! this is just for testing!
-     ! actually rescaling the adjoint is a bit more involved,
-     ! and we have to be careful of the brinkman term
-     !> A scaling factor
-     real(kind=rp) :: obj_scale
 
    contains
      !> The common constructor using a JSON object.
@@ -132,21 +122,11 @@ contains
     type(simulation_t), target, intent(inout) :: simulation
 
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
-    type(adjoint_lube_source_term_t) :: lube_term
     character(len=:), allocatable :: objective_location_zone_name
-    logical :: has_mask
-
-    ! here we would read from the JSON (or have something passed in)
-    ! about the lube term
-    this%if_lube = .false.
-    this%K = 1.0_rp
-    this%obj_scale = 1.0_rp
 
     this%fluid => simulation%neko_case%fluid
     this%adjoint => simulation%adjoint_case%scheme
 
-    ! mask would also be read from JSON... I'm hard coding
-    has_mask = .false.
     ! objective_location_zone_name = "objective_location"
     objective_location_zone_name = ""
 
@@ -157,26 +137,11 @@ contains
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
          this%adjoint%f_adj_x, this%adjoint%f_adj_y, this%adjoint%f_adj_z, &
-         this%fluid%u, this%fluid%v, this%fluid%w, this%obj_scale, &
+         this%fluid%u, this%fluid%v, this%fluid%w, this%weight, &
          this%mask, this%has_mask, &
          this%adjoint%c_Xh)
     ! append adjoint forcing term based on objective function
     call this%adjoint%source_term%add_source_term(adjoint_forcing)
-
-    ! if we have the lube term we need to initialize and append that too
-    if (this%if_lube) then
-       ! TODO
-       ! make this allocatable and only allocate it if needed!
-       ! or is that allready what's happening? Tim, y/n?
-       call lube_term%init_from_components(&
-            this%adjoint%f_adj_x, this%adjoint%f_adj_y, this%adjoint%f_adj_z, design, &
-            this%k*this%obj_scale, &
-            this%fluid%u, this%fluid%v, this%fluid%w, &
-            this%mask, this%has_mask, &
-            this%adjoint%c_Xh)
-       ! append adjoint forcing term based on objective function
-       call this%adjoint%source_term%add_source_term(lube_term)
-    end if
 
   end subroutine minimum_dissipation_init
 
@@ -186,7 +151,7 @@ contains
     call this%free_base()
 
     if (associated(this%fluid)) nullify(this%fluid)
-    if (associated(this%adjoint)) nullify( this%adjoint)
+    if (associated(this%adjoint)) nullify(this%adjoint)
 
   end subroutine minimum_dissipation_free
 
@@ -197,18 +162,10 @@ contains
   subroutine minimum_dissipation_update_value(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: wo1, wo2, wo3
     type(field_t), pointer :: objective_field
     integer :: temp_indices(4)
     integer n
-
-    select type (design)
-      type is (topopt_design_t)
-       topopt_design => design
-      class default
-       call neko_error('Minimum dissipation only works with topopt_design')
-    end select
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
@@ -234,34 +191,11 @@ contains
     ! integrate the field
     n = wo1%size()
     if (this%has_mask) then
-       this%dissipation = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
+       this%value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
             n, this%mask%mask, this%mask%size)
     else
-       this%dissipation = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
+       this%value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
     end if
-
-    if (this%if_lube) then
-       ! it's becoming so stupid to pass the whole fluid and adjoint and
-       ! design through
-       ! I feel like every objective function should have internal pointers to
-       ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
-       ! (the whole design, so we get all the coeffients)
-       call field_col3(objective_field, this%fluid%u, topopt_design%brinkman_amplitude)
-       call field_addcol3(objective_field, this%fluid%v, topopt_design%brinkman_amplitude)
-       call field_addcol3(objective_field, this%fluid%w, topopt_design%brinkman_amplitude)
-       if (this%has_mask) then
-          this%lube_value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
-               n, this%mask%mask, this%mask%size)
-       else
-          this%lube_value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
-       end if
-       this%value = this%dissipation + 0.5*this%K*this%lube_value
-    else
-       this%value = this%dissipation
-    end if
-
-    ! scale everything
-    this%value = this%value*this%obj_scale
 
     !TODO
     ! GPUS
@@ -275,8 +209,8 @@ contains
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: lube_contribution, work
-    integer :: temp_indices(2)
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
@@ -286,28 +220,6 @@ contains
     call field_addcol3(work, this%fluid%w, this%adjoint%w_adj)
     ! but negative
     call field_cmult(work, -1.0_rp)
-
-    ! if we have the lube term we also get an extra term in the sensitivity
-    ! K*u^2
-    ! TODO
-    ! omfg be so careful with non-dimensionalization etc
-    ! I bet this is scaled a smidge wrong (ie, track if it's 1/2 or not etc)
-    ! do this later
-
-    if (this%if_lube) then
-       call neko_scratch_registry%request_field(lube_contribution, &
-            temp_indices(2))
-       call field_col3(lube_contribution, this%fluid%u, this%fluid%u)
-       call field_addcol3(lube_contribution, this%fluid%v, this%fluid%v)
-       call field_addcol3(lube_contribution, this%fluid%w, this%fluid%w)
-       ! fuck be careful with these scalaing!
-       call field_add2s2(work, lube_contribution, &
-            this%K*this%obj_scale)
-    end if
-
-    ! I don't actually think you scale the sensitivity...
-    ! because the adjoint field is already scaled
-    !call field_cmult(this%sensitivity, this%obj_scale)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
