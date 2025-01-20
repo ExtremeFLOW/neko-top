@@ -70,6 +70,7 @@ module volume_constraint
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
   use json_module, only: json_file
+  use json_utils, only: json_get_or_default
   implicit none
   private
 
@@ -95,7 +96,10 @@ module volume_constraint
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => volume_constraint_init
+     procedure, public, pass(this) :: init_json => volume_constraint_init_json
+     !> The direct initializer from attributes.
+     procedure, public, pass(this) :: init_from_attributes => &
+          volume_constraint_init_attributes
      !> Destructor.
      procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
@@ -107,15 +111,43 @@ module volume_constraint
   end type volume_constraint_t
 
 contains
+
   !> The common constructor using a JSON object.
-  !! @param design the design
-  !! @param fluid the fluid scheme
-  !! @param adjoint the adjoint scheme
-  subroutine volume_constraint_init(this, json, design, simulation)
+  !! @param json the JSON object.
+  !! @param design the design.
+  !! @param simulation the simulation.
+  subroutine volume_constraint_init_json(this, json, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(simulation_t), target, intent(inout) :: simulation
     class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+
+    character(len=:), allocatable :: mask_name
+    logical :: is_max
+    real(kind=rp) :: limit
+
+    call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "is_max", is_max, .false.)
+    call json_get(json, "limit", limit)
+
+    call this%init_from_attributes(design, simulation, mask_name, is_max, limit)
+  end subroutine volume_constraint_init_json
+
+  !> The direct initializer from attributes.
+  !! @param design the design.
+  !! @param simulation the simulation.
+  !! @param mask_name the name of the mask.
+  !! @param is_max whether it is a maximum volume constraint.
+  !! @param limit the maximum volume.
+  subroutine volume_constraint_init_attributes(this, design, simulation, &
+       mask_name, is_max, limit)
+    class(volume_constraint_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+    character(len=*), intent(in) :: mask_name
+    logical, intent(in) :: is_max
+    real(kind=rp), intent(in) :: limit
+
     type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -127,6 +159,15 @@ contains
       class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
+
+    ! Initialize the base class
+    call this%init_base(design%size(), mask_name)
+
+    ! Store the attributes
+    this%is_max = is_max
+    this%volume = limit
+
+    this%fluid => simulation%neko_case%fluid
 
     ! TODO
     ! I don't think there's much to init here
@@ -153,8 +194,8 @@ contains
     this%fluid => simulation%neko_case%fluid
 
     ! Now we can extract the mask/has_mask from the design
-    n = topopt_design%design_indicator%size()
-    if (topopt_design%if_mask) then
+    n = design%size()
+    if (this%has_mask) then
        ! init the base
        call this%init_base(topopt_design%size(), &
             topopt_design%optimization_domain%name)
@@ -171,13 +212,13 @@ contains
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
        ! init the base
-       call this%init_base(topopt_design%size(), "")
+       call this%init_base(design%size(), "")
 
        ! point to the volume of the domain
        this%volume_domain = this%fluid%c_xh%volume
     end if
 
-  end subroutine volume_constraint_init
+  end subroutine volume_constraint_init_attributes
 
 
   !> Destructor.
@@ -203,11 +244,11 @@ contains
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
-    n = topopt_design%design_indicator%size()
+    n = design%size()
     ! TODO
     ! in the future we should be using the mapped design varaible
     !corresponding to this constraint!!!
-    if (topopt_design%if_mask) then
+    if (this%has_mask) then
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else

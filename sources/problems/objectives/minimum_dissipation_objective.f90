@@ -83,6 +83,7 @@ module minimum_dissipation_objective
   use math_ext, only: glsc2_mask
   use utils, only: neko_error
   use json_module, only: json_file
+  use json_utils, only: json_get_or_default
   implicit none
   private
 
@@ -97,7 +98,10 @@ module minimum_dissipation_objective
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => minimum_dissipation_init
+     procedure, public, pass(this) :: init_json => minimum_dissipation_init_json
+     !> The direct initializer from attributes.
+     procedure, public, pass(this) :: init_from_attributes => &
+          minimum_dissipation_init_attributes
      !> Destructor.
      procedure, public, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
@@ -115,22 +119,40 @@ contains
   !! @param design the design.
   !! @param fluid the fluid scheme.
   !! @param adjoint the fluid adjoint.
-  subroutine minimum_dissipation_init(this, json, design, simulation)
+  subroutine minimum_dissipation_init_json(this, json, design, simulation)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+    character(len=:), allocatable :: mask_name
+    real(kind=rp) :: weight
+
+    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    call json_get_or_default(json, "mask_name", mask_name, "")
+
+    call this%init_from_attributes(design, simulation, weight, mask_name)
+  end subroutine minimum_dissipation_init_json
+
+!> The actual constructor.
+!! @param design the design.
+!! @param simulation the simulation.
+!! @param weight the weight of the objective function.
+!! @param mask_name the name of the mask.
+  subroutine minimum_dissipation_init_attributes(this, design, simulation, &
+       weight, mask_name)
+    class(minimum_dissipation_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+    real(kind=rp), intent(in) :: weight
+    character(len=*), intent(in) :: mask_name
 
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
-    character(len=:), allocatable :: objective_location_zone_name
 
+    call this%init_base(design%size(), weight, mask_name)
+
+    ! Save the simulation and design
     this%fluid => simulation%neko_case%fluid
     this%adjoint => simulation%adjoint_case%scheme
-
-    ! objective_location_zone_name = "objective_location"
-    objective_location_zone_name = ""
-
-    call this%init_base(design%size(), 1.0_rp, objective_location_zone_name)
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
@@ -143,7 +165,7 @@ contains
     ! append adjoint forcing term based on objective function
     call this%adjoint%source_term%add_source_term(adjoint_forcing)
 
-  end subroutine minimum_dissipation_init
+  end subroutine minimum_dissipation_init_attributes
 
   !> Destructor.
   subroutine minimum_dissipation_free(this)
@@ -173,17 +195,17 @@ contains
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
 
     ! update_value the objective function.
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%u%x, this%fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%fluid%u%x, this%fluid%c_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%v%x, this%fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%fluid%v%x, this%fluid%c_Xh)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%w%x, this%fluid%C_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%fluid%w%x, this%fluid%c_Xh)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
@@ -191,10 +213,10 @@ contains
     ! integrate the field
     n = wo1%size()
     if (this%has_mask) then
-       this%value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
+       this%value = glsc2_mask(objective_field%x, this%fluid%c_Xh%b, &
             n, this%mask%mask, this%mask%size)
     else
-       this%value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
+       this%value = glsc2(objective_field%x, this%fluid%c_Xh%b, n)
     end if
 
     !TODO

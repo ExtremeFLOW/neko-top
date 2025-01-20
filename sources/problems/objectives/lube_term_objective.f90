@@ -135,7 +135,7 @@ contains
     real(kind=rp) :: weight, K
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
-    call json_get_or_default(json, "mask", mask_name, "")
+    call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "K", K, 1.0_rp)
 
     call this%init_from_attributes(design, simulation, weight, mask_name, K)
@@ -144,6 +144,8 @@ contains
   !> The actual constructor.
   !! @param design the design.
   !! @param simulation the simulation.
+  !! @param weight the weight of the objective function.
+  !! @param mask_name the name of the mask.
   !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
        mask_name, K)

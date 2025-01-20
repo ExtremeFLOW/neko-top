@@ -97,7 +97,9 @@
         "constraints": [
             {
                 "type": "volume",
-                // "mask_name": "optimization_domain"
+                "mask_name": "optimization_domain",
+                "limit": 0.2,
+                "is_max": false
             }
         ],
     },
