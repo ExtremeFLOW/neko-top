@@ -185,9 +185,6 @@ module mma
     logical, intent(out) :: auto_scale
     ! ------------------------------------------------------------------------ !
     ! Read data from json file
-    ! Default value for epsimin is based on the Cpp Code by Niels
-    call json_get_or_default(json, 'mma.epsimin', epsimin, &
-         1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
 
     ! Following parameters are set based on eq.3.8:--------
