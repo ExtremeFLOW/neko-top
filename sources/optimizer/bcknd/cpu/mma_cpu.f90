@@ -20,9 +20,7 @@ module mma_cpu
 
   type, public, extends(mma_t) :: mma_cpu_t
    private
-     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
-     residumax, residunorm
-     integer :: max_iter
+     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
@@ -50,13 +48,6 @@ module mma_cpu
      !> Interface for updating the MMA
      procedure, public :: update => mma_update_cpu
      procedure, pass(this) :: mma_update_cpu
-
-     ! Getters for the MMA object
-     procedure, public, pass(this) :: get_n => mma_get_n
-     procedure, public, pass(this) :: get_m => mma_get_m
-     procedure, public, pass(this) :: get_residumax => mma_get_residumax
-     procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
-     procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
      !> Interface for generating the approximation sub problem
      generic :: gensub => mma_gensub_cpu
@@ -245,43 +236,8 @@ contains
 
   end subroutine mma_free_cpu
 
-  ! ========================================================================== !
-  ! Getters and setters
-
-  pure function mma_get_n(this) result(n)
-    class(mma_cpu_t), intent(in) :: this
-    integer :: n
-    n = this%n
-  end function mma_get_n
-
-  pure function mma_get_m(this) result(m)
-    class(mma_cpu_t), intent(in) :: this
-    integer :: m
-    m = this%m
-  end function mma_get_m
-
-  pure function mma_get_residumax(this) result(residumax)
-    class(mma_cpu_t), intent(in) :: this
-    real(kind=rp) :: residumax
-    residumax = this%residumax
-  end function mma_get_residumax
-
-  pure function mma_get_residunorm(this) result(residunorm)
-    class(mma_cpu_t), intent(in) :: this
-    real(kind=rp) :: residunorm
-    residunorm = this%residunorm
-  end function mma_get_residunorm
-
-  pure function mma_get_max_iter(this) result(max_iter_value)
-    class(mma_cpu_t), intent(in) :: this
-    integer :: max_iter_value
-    max_iter_value = this%max_iter
-  end function mma_get_max_iter
-
-
-
   !! private internal subroutines
-  module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
+  subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
     ! the lower and upper asymtotes and the other necessary !

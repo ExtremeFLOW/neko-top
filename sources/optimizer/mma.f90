@@ -41,10 +41,16 @@ module mma
 
   !> Abstract type to compute pressure residual
   type, public, abstract :: mma_t
-    integer :: n, m
+    integer :: n, m, max_iter
+    real(kind=rp) :: residumax, residunorm
    contains
     !> Interface for initializing the MMA object
     procedure, public, nopass :: init_json => mma_init_json
+    procedure, public, pass(this) :: get_n => mma_get_n
+    procedure, public, pass(this) :: get_m => mma_get_m
+    procedure, public, pass(this) :: get_residumax => mma_get_residumax
+    procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
+    procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
     ! Add interfaces to the abstract type procedure
     procedure(mma_init), pass(this), deferred :: init
@@ -52,12 +58,6 @@ module mma
     procedure(mma_KKT), pass(this), deferred :: KKT
     procedure(mma_free), pass(this), deferred :: free
 
-    ! Deferred methods for accessing properties of concrete types of mma_t
-    procedure(get_n), public, deferred :: get_n
-    procedure(get_m), public, deferred :: get_m
-    procedure(get_residumax), public, deferred :: get_residumax
-    procedure(get_residunorm), public, deferred :: get_residunorm
-    procedure(get_max_iter), public, deferred :: get_max_iter
 
   end type mma_t
 
@@ -100,37 +100,6 @@ module mma
     end subroutine mma_free
   end interface
 
-  abstract interface
-    pure function get_n(this) result(n)
-      import mma_t
-      class(mma_t), intent(in) :: this
-      integer :: n
-    end function get_n
-
-    pure function get_m(this) result(m)
-      import mma_t
-      class(mma_t), intent(in) :: this
-      integer :: m
-    end function get_m
-
-    pure function get_residumax(this) result(residumax)
-      import mma_t, rp
-      class(mma_t), intent(in) :: this
-      real(kind=rp) :: residumax
-    end function get_residumax
-
-    pure function get_residunorm(this) result(residunorm)
-      import mma_t, rp
-      class(mma_t), intent(in) :: this
-      real(kind=rp) :: residunorm
-    end function get_residunorm
-
-    pure function get_max_iter(this) result(max_iter_value)
-      import mma_t
-      class(mma_t), intent(in) :: this
-      integer :: max_iter_value
-    end function get_max_iter
-  end interface
 
   interface
 
@@ -219,6 +188,37 @@ module mma
          max_iter, epsimin, asyinit, asyincr, asydecr, backend)
   end subroutine mma_init_json
 
+  ! ========================================================================== !
+  ! Getters and setters
+  pure function mma_get_n(this) result(n)
+    class(mma_t), intent(in) :: this
+    integer :: n
+    n = this%n
+  end function mma_get_n
+
+  pure function mma_get_m(this) result(m)
+    class(mma_t), intent(in) :: this
+    integer :: m
+    m = this%m
+  end function mma_get_m
+
+    pure function mma_get_residumax(this) result(residumax)
+    class(mma_t), intent(in) :: this
+    real(kind=rp) :: residumax
+    residumax = this%residumax
+  end function mma_get_residumax
+
+  pure function mma_get_residunorm(this) result(residunorm)
+    class(mma_t), intent(in) :: this
+    real(kind=rp) :: residunorm
+    residunorm = this%residunorm
+  end function mma_get_residunorm
+
+  pure function mma_get_max_iter(this) result(max_iter_value)
+    class(mma_t), intent(in) :: this
+    integer :: max_iter_value
+    max_iter_value = this%max_iter
+  end function mma_get_max_iter
 
 end module mma
 
