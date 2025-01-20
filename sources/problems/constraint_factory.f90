@@ -32,10 +32,8 @@
 
 !> Submodule for the objective function factory
 submodule (constraint) constraint_factory_mod
-  use design, only: design_t
+  use json_utils, only: json_get
   use utils, only: neko_type_error
-  use simulation, only: simulation_t
-  use json_module, only: json_file
 
   ! Import the constraint function types
   use volume_constraint, only: volume_constraint_t
@@ -44,7 +42,7 @@ submodule (constraint) constraint_factory_mod
 
   !> Known function types
   character(len=25), parameter :: KNOWN_TYPES(1) = [ character(len=25) :: &
-       'volume']
+       "volume"]
 
 contains
 
@@ -57,18 +55,24 @@ contains
   !! @param type The type of the objective function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine constraint_factory(object, type, design, simulation)
+  module subroutine constraint_factory(object, json, design, simulation)
     class(constraint_t), allocatable, intent(inout) :: object
-    character(len=*), intent(in) :: type
+    type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
-    type(json_file) :: json
+    character(len=:), allocatable :: type
 
+    if (allocated(object)) then
+       call object%free()
+       deallocate(object)
+    end if
+
+    call json_get(json, "type", type)
     select case(trim(type))
-      case('volume')
+      case("volume")
        allocate(volume_constraint_t::object)
       case default
-       call neko_type_error('Constraint', type, KNOWN_TYPES)
+       call neko_type_error("Constraint", type, KNOWN_TYPES)
     end select
 
     call object%init_json(json, design, simulation)

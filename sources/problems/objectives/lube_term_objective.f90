@@ -83,6 +83,7 @@ module lube_term_objective
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
+  use logger, only: neko_log
   implicit none
   private
 

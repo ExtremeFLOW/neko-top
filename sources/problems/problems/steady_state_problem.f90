@@ -66,9 +66,6 @@ module steady_state_problem
   !> To compute a steady state problem
   type, public, extends(problem_t) :: steady_state_problem_t
 
-     !> The simulation
-     type(simulation_t) :: simulation
-
      !> a steady simulation component to append to the forward
      type(steady_simcomp_t) :: steady_comp
 
@@ -149,8 +146,8 @@ contains
     ! we need a `objective_list` which is allocatable and contains a factory
     ! to fill itself up with from the JSON
     ! for now, I'm hardcoding these two
-    class(objective_t), allocatable :: objective_function
-    class(constraint_t), allocatable :: volume_constraint
+    ! class(objective_t), allocatable :: objective_function
+    ! class(constraint_t), allocatable :: volume_constraint
 
     ! init the design
     call design%init(this%simulation%neko_case%params, this%simulation%neko_case%fluid%c_Xh)
@@ -226,21 +223,12 @@ contains
     ! where we can have a list of them.
     !
     ! for this test we'll have 2
-    ! minimum dissipation objective function
-    call objective_factory(objective_function, &
-         'minimum_dissipation', design, this%simulation)
-    call this%add_objective(objective_function)
-    ! And the lube term objective function
-    call objective_factory(objective_function, &
-         'lube_term', design, this%simulation)
-    call this%add_objective(objective_function)
 
+    ! minimum dissipation objective function
+    call this%read_objectives(this%simulation%neko_case%params, design)
 
     ! volume constraint
-    call constraint_factory(volume_constraint, &
-         'volume', design, this%simulation)
-
-    call this%add_constraint(volume_constraint)
+    call this%read_constraints(this%simulation%neko_case%params, design)
 
     ! init the sampler
     !---------------------------------------------------------

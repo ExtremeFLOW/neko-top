@@ -37,6 +37,7 @@ module objective
   use design, only: design_t
   use num_types, only: rp
   use point_zone_registry, only: neko_point_zone_registry
+  use json_module, only: json_file
   implicit none
   private
 
@@ -76,9 +77,9 @@ module objective
 
   !> Factory function interface
   interface
-     module subroutine objective_factory(object, type, design, simulation)
+     module subroutine objective_factory(object, json, design, simulation)
        class(objective_t), allocatable, intent(inout) :: object
-       character(len=*), intent(in) :: type
+       type(json_file), intent(inout) :: json
        class(design_t), intent(in) :: design
        type(simulation_t), target, intent(inout) :: simulation
      end subroutine objective_factory

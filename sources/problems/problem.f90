@@ -37,12 +37,16 @@ module problem
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use utils, only: neko_error
-  use objective, only: objective_t, objective_wrapper_t
-  use constraint, only: constraint_t, constraint_wrapper_t
+  use objective, only: objective_t, objective_wrapper_t, objective_factory
+  use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
   use device, only: device_memcpy, HOST_TO_DEVICE
   use neko_config, only: NEKO_BCKND_DEVICE
+  use json_module, only: json_file
+  use json_utils, only: json_extract_item, json_get
+  use simulation, only: simulation_t
+  use logger, only: neko_log
 
   implicit none
   private
@@ -55,6 +59,9 @@ module problem
   ! evaluate the problem.
   type, abstract, public :: problem_t
      private
+
+     !> The simulation
+     type(simulation_t), public :: simulation
 
      !> The number of design variables
      integer :: n_design
@@ -102,6 +109,12 @@ module problem
      procedure, pass(this) :: init_base => problem_init_base
      !> Destructor for the base class
      procedure, pass(this) :: free_base => problem_free_base
+
+     !> Read objective json-file.
+     procedure, pass(this), public :: read_objectives => problem_read_objectives
+     !> Read constraint json-file.
+     procedure, pass(this), public :: read_constraints => &
+          problem_read_constraints
 
      ! ----------------------------------------------------------------------- !
      ! Actual methods
@@ -281,6 +294,74 @@ contains
 
   ! -------------------------------------------------------------------------- !
   ! Handling constraints and objectives
+
+  !> Read the objective from a json file.
+  subroutine problem_read_objectives(this, json, design)
+    class(problem_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    class(design_t), intent(in) :: design
+    class(objective_t), allocatable :: objective
+
+    ! A single objective term as its own json_file.
+    character(len=:), allocatable :: path, type
+    type(json_file) :: objective_json
+    integer :: n_objectives, i
+
+    call neko_log%section("Reading objectives")
+
+    ! Get the number of objectives.
+    path = "optimization.objectives"
+    call json%info(path, n_children = n_objectives)
+
+    ! Grab a single json entry and create a constraint from it.
+    do i = 1, n_objectives
+       call json_extract_item(json, path, i, objective_json)
+       call json_get(objective_json, "type", type)
+       call neko_log%message(type)
+
+       call objective_factory(objective, objective_json, design, &
+            this%simulation)
+       call this%add_objective(objective)
+
+    end do
+
+    call neko_log%end_section()
+
+  end subroutine problem_read_objectives
+
+  !> Read the constraint from a json file.
+  subroutine problem_read_constraints(this, json, design)
+    class(problem_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    class(design_t), intent(in) :: design
+    class(constraint_t), allocatable :: constraint
+
+    ! A single constraint term as its own json_file.
+    character(len=:), allocatable :: path, type
+    type(json_file) :: constraint_json
+    integer :: n_constraints, i
+
+    call neko_log%section("Reading constraints")
+
+    ! Get the number of constraints.
+    path = "optimization.constraints"
+    call json%info(path, n_children = n_constraints)
+
+    ! Grab a single json entry and create a constraint from it.
+    do i = 1, n_constraints
+       call json_extract_item(json, path, i, constraint_json)
+       call json_get(constraint_json, "type", type)
+       call neko_log%message(type)
+
+       call constraint_factory(constraint, constraint_json, design, &
+            this%simulation)
+       call this%add_constraint(constraint)
+
+    end do
+
+    call neko_log%end_section()
+
+  end subroutine problem_read_constraints
 
   !> Add an objective to the list.
   subroutine problem_add_objective(this, objective)

@@ -32,10 +32,8 @@
 
 !> Submodule for the objective function factory
 submodule (objective) objective_factory_mod
-  use design, only: design_t
+  use json_utils, only: json_get
   use utils, only: neko_type_error
-  use simulation, only: simulation_t
-  use json_module, only: json_file
 
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
@@ -59,13 +57,19 @@ contains
   !! @param type The type of the objective function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine objective_factory(object, type, design, simulation)
+  module subroutine objective_factory(object, json, design, simulation)
     class(objective_t), allocatable, intent(inout) :: object
-    character(len=*), intent(in) :: type
+    type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
-    type(json_file) :: json
+    character(len=:), allocatable :: type
 
+    if (allocated(object)) then
+       call object%free()
+       deallocate(object)
+    end if
+
+    call json_get(json, "type", type)
     select case(trim(type))
       case("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)

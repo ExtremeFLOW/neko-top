@@ -81,6 +81,26 @@
             }
         ]
     },
+    "optimization": {
+        "objectives": [
+            {
+                "type": "minimum_dissipation",
+                "weight": 1.0
+            },
+            {
+                "type": "lube_term",
+                "weight": 1.0,
+                // "mask_name": "optimization_domain",
+                "K": 1.0
+            }
+        ],
+        "constraints": [
+            {
+                "type": "volume",
+                // "mask_name": "optimization_domain"
+            }
+        ],
+    },
     "mma": {
         "max_iter": 100,
         "asyinit": 0.5,
