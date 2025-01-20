@@ -79,20 +79,16 @@ module volume_constraint
      private
 
      !> whether it is minimum or maximum volume
-     ! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
-     ! is_max = .true. , 	ie V < V_max  		=>		  V - V_max < 0
-     ! TODO
-     ! this can be done smarter with parameters
+     !! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
+     !! is_max = .true. , 	ie V < V_max  		=>		  V - V_max < 0
      logical :: is_max
      !> Maximum (or minimum) volume
-     ! maximum volume prescribed
-     real(kind=rp) :: v_max
-     !> current volume
-     real(kind=rp) :: volume
-     !> volume of the optimization domain
+     real(kind=rp) :: limit
+     !> Volume of the optimization domain
      real(kind=rp) :: volume_domain
 
-     class(fluid_scheme_t), pointer :: fluid
+     !> Pointer to the SEM field.
+     class(coef_t), pointer :: c_Xh => null()
 
    contains
      !> The common constructor using a JSON object.
@@ -138,7 +134,7 @@ contains
   !! @param simulation the simulation.
   !! @param mask_name the name of the mask.
   !! @param is_max whether it is a maximum volume constraint.
-  !! @param limit the maximum volume.
+  !! @param limit The volume limit value.
   subroutine volume_constraint_init_attributes(this, design, simulation, &
        mask_name, is_max, limit)
     class(volume_constraint_t), intent(inout) :: this
@@ -148,78 +144,37 @@ contains
     logical, intent(in) :: is_max
     real(kind=rp), intent(in) :: limit
 
-    type(topopt_design_t), pointer :: topopt_design => null()
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    integer :: n
-
-    select type (design)
-      type is (topopt_design_t)
-       topopt_design => design
-      class default
-       call neko_error('Volume constraint only works with topopt_design')
-    end select
 
     ! Initialize the base class
     call this%init_base(design%size(), mask_name)
 
     ! Store the attributes
     this%is_max = is_max
-    this%volume = limit
-
-    this%fluid => simulation%neko_case%fluid
-
-    ! TODO
-    ! I don't think there's much to init here
-    ! maybe we should include a fmax in here,
-    ! ie, if we want f_i(x) < f_i_max
-    ! with the MMA notation, this is
-    ! f_i(x) - a_i*z - y_i <= f_i_max,
-
-    ! f_i(x) - a_i*z - y_i - f_i_max <= 0,
-
-    ! so we update_value
-    ! f_i(x) - f_i_max
-
-    ! when we update_value the value of the constraint
-    !
-    ! But I actually think it's better to include the mins and max's
-    ! in MMA it's self.
-    !
-    ! anyway...
-    ! here we hard code for now
-    this%is_max = .false.
-    this%v_max = 0.2
-
-    this%fluid => simulation%neko_case%fluid
+    this%limit = limit
+    this%c_Xh => simulation%neko_case%fluid%c_Xh
 
     ! Now we can extract the mask/has_mask from the design
-    n = design%size()
     if (this%has_mask) then
-       ! init the base
-       call this%init_base(topopt_design%size(), &
-            topopt_design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
-       call neko_scratch_registry%request_field(work , temp_indices(1))
+       call neko_scratch_registry%request_field(work, temp_indices(1))
        call field_rone(work)
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume_domain = glsc2_mask(work%x, this%fluid%c_xh%B, &
-               n, this%mask%mask, this%mask%size)
+          this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
+               design%size(), this%mask%mask, this%mask%size)
        end if
+
        call neko_scratch_registry%relinquish_field(temp_indices)
     else
-       ! init the base
-       call this%init_base(design%size(), "")
-
-       ! point to the volume of the domain
-       this%volume_domain = this%fluid%c_xh%volume
+       this%volume_domain = this%c_Xh%volume
     end if
 
   end subroutine volume_constraint_init_attributes
-
 
   !> Destructor.
   subroutine volume_constraint_free(this)
@@ -235,7 +190,7 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(topopt_design_t), pointer :: topopt_design => null()
-    integer n
+    real(kind=rp) :: volume
 
     select type (design)
       type is (topopt_design_t)
@@ -244,40 +199,33 @@ contains
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
-    n = design%size()
-    ! TODO
-    ! in the future we should be using the mapped design varaible
-    !corresponding to this constraint!!!
+    ! in the future we should be using the mapped design variable
+    ! corresponding to this constraint!!!
     if (this%has_mask) then
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2_mask(topopt_design%design_indicator%x, this%fluid%c_xh%B, &
-               n, this%mask%mask, this%mask%size)
+          volume = glsc2_mask(topopt_design%design_indicator%x, &
+               this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
        end if
+
     else
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_error('GPU not supported volume constraint')
        else
-          this%volume = glsc2(topopt_design%design_indicator%x, this%fluid%c_xh%B, n)
+          volume = glsc2(topopt_design%design_indicator%x, &
+               this%c_Xh%B, design%size())
        end if
+
     end if
 
-    this%volume = this%volume/this%volume_domain
+    ! Compute the distance to the target volume
+    this%value = this%limit - volume / this%volume_domain
 
-    ! then we need to check min or max
-    if (this%is_max) then
-       ! max volume
-       this%value = this%volume - this%v_max
-    else
-       ! min volume
-       this%value = -this%volume + this%v_max
-    end if
-
-
-    ! TODo
-    ! GPU
-
+    ! Invert the sign if it is a maximum constraint
+    if (this%is_max) this%value = - ( this%value )
 
   end subroutine volume_constraint_update_value
 
@@ -289,16 +237,11 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-    this%sensitivity = 1.0_rp
+    ! Sensitivity is just a constant
+    this%sensitivity = 1.0_rp / this%volume_domain
 
-    if (this%is_max) then
-       ! max volume
-       this%sensitivity = this%sensitivity * ( 1.0_rp / this%volume_domain)
-    else
-       ! min volume
-       this%sensitivity = this%sensitivity * (-1.0_rp / this%volume_domain)
-    end if
-
+    ! Invert the sign if it is a maximum constraint
+    if (.not. this%is_max) this%sensitivity = (-1.0_rp) * this%sensitivity
 
     ! TODO
     ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
