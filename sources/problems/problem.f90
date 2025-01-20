@@ -1,5 +1,5 @@
 !> @file problem.f90
-!! @Copyright (c) 2023, The Neko Authors
+!! @Copyright (c) 2024-2025, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -218,7 +218,6 @@ module problem
        ! - Then coming here and intializing the impact of the design on the fluid
        !
      end subroutine problem_init_design
-
 
      !> Compute the problem
      subroutine problem_compute(this, design)

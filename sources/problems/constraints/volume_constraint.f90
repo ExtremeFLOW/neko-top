@@ -104,6 +104,10 @@ module volume_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
+
+     !> Computes the volume of the topopt_design.
+     procedure, private, pass(this) :: compute_volume
+
   end type volume_constraint_t
 
 contains
@@ -144,6 +148,7 @@ contains
     logical, intent(in) :: is_max
     real(kind=rp), intent(in) :: limit
 
+    real(kind=rp) :: volume
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
@@ -174,6 +179,30 @@ contains
        this%volume_domain = this%c_Xh%volume
     end if
 
+    ! ------------------------------------------------------------------------ !
+    ! Initialize the value of constraint
+
+    ! Compute the volume of the design
+    volume = this%compute_volume(design)
+
+    ! Compute the distance to the target volume
+    this%value = this%limit - volume / this%volume_domain
+
+    ! Invert the sign if it is a maximum constraint
+    if (this%is_max) this%value = - ( this%value )
+
+    ! ------------------------------------------------------------------------ !
+    ! Initialize the sensitivity value
+
+    this%sensitivity = 1.0_rp / this%volume_domain
+
+    ! Invert the sign if it is a maximum constraint
+    if (.not. this%is_max) this%sensitivity = (-1.0_rp) * this%sensitivity
+
+    if (this%has_mask) then
+       call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
+    end if
+
   end subroutine volume_constraint_init_attributes
 
   !> Destructor.
@@ -189,37 +218,9 @@ contains
   subroutine volume_constraint_update_value(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(topopt_design_t), pointer :: topopt_design => null()
     real(kind=rp) :: volume
 
-    select type (design)
-      type is (topopt_design_t)
-       topopt_design => design
-      class default
-       call neko_error('Volume constraint only works with topopt_design')
-    end select
-
-    ! in the future we should be using the mapped design variable
-    ! corresponding to this constraint!!!
-    if (this%has_mask) then
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
-       else
-          volume = glsc2_mask(topopt_design%design_indicator%x, &
-               this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
-       end if
-
-    else
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
-       else
-          volume = glsc2(topopt_design%design_indicator%x, &
-               this%c_Xh%B, design%size())
-       end if
-
-    end if
+    volume = this%compute_volume(design)
 
     ! Compute the distance to the target volume
     this%value = this%limit - volume / this%volume_domain
@@ -237,24 +238,64 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-    ! Sensitivity is just a constant
-    this%sensitivity = 1.0_rp / this%volume_domain
-
-    ! Invert the sign if it is a maximum constraint
-    if (.not. this%is_max) this%sensitivity = (-1.0_rp) * this%sensitivity
-
-    ! TODO
-    ! Abbas, don't just mask the sensitivity like I'm doing here, make sure
-    ! the only design variables entering MMA are those within the mask.
-    ! This way you get the correct N etc.
-
-    ! Look into the `masked_red_copy` function that Martin implemented.
-    ! That function will copy from one array to another, but the target
-    ! only have the size of the mask, not the full size.
-    if (this%has_mask) then
-       call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
-    end if
+    ! Sensitivity is just a constant so it should not be updated
 
   end subroutine volume_constraint_update_sensitivity
+
+
+  ! ========================================================================== !
+  ! The actual volume computations for different types of designs
+
+
+  !> Computes the volume of the design.
+  !!
+  !! Automatically select which design type, or throw an error.
+  !! @param design the design.
+  function compute_volume(this, design) result(volume)
+    class(volume_constraint_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp) :: volume
+
+    volume = 0.0_rp
+    select type (design)
+      type is (topopt_design_t)
+       volume = volume_topopt_design(this, design)
+
+      class default
+       call neko_error('Volume constraint only works with topopt_design')
+    end select
+
+  end function compute_volume
+
+  !> Computes the volume of the topopt_design.
+  !! @param design the design.
+  function volume_topopt_design(this, design) result(volume)
+    class(volume_constraint_t), intent(inout) :: this
+    type(topopt_design_t), intent(in) :: design
+    real(kind=rp) :: volume
+
+    ! in the future we should be using the mapped design variable
+    ! corresponding to this constraint!!!
+    if (this%has_mask) then
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_error('GPU not supported volume constraint')
+       else
+          volume = glsc2_mask(design%design_indicator%x, &
+               this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
+       end if
+
+    else
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_error('GPU not supported volume constraint')
+       else
+          volume = glsc2(design%design_indicator%x, &
+               this%c_Xh%B, design%size())
+       end if
+
+    end if
+
+  end function volume_topopt_design
 
 end module volume_constraint
