@@ -1,5 +1,5 @@
 !> @file problem.f90
-!! @Copyright (c) 2024-2025, The Neko-TOP Authors
+!! @copyright (c) 2024-2025, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -31,12 +31,11 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 
-!>
+!> Module for handling the optimization problem.
 module problem
   use num_types, only: rp
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
-  use utils, only: neko_error
   use objective, only: objective_t, objective_wrapper_t, objective_factory
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
@@ -51,32 +50,32 @@ module problem
   implicit none
   private
 
-  !> implements the problem type.
-  ! Currently very abstract, could include unsteady problems etc.
-  ! Also, depending on the type of optimizer used, we may require
-  ! different functionality.
-  ! Right now, all that is required in base class is to init and
-  ! evaluate the problem.
+  !> The abstract problem type.
+  !!
+  !! This module defines the `problem_t` type which is the main interface for
+  !! the optimization problem. The problem is defined by a set of objectives and
+  !! constraints that are evaluated based on the design variables. The problem
+  !! also handles the output of the problem and the simulation.
   type, abstract, public :: problem_t
      private
 
-     !> The simulation
+     !> The simulation.
      type(simulation_t), public :: simulation
 
-     !> The number of design variables
+     !> The number of design variables.
      integer :: n_design
-     !> Number of objectives in the problem
+     !> Number of objectives in the problem.
      integer :: n_objectives
-     !> Number of constraints in the problem
+     !> Number of constraints in the problem.
      integer :: n_constraints
 
-     !> The objective of the problem
+     !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
-     !> The constraints of the problem
+     !> The constraints of the problem.
      class(constraint_wrapper_t), allocatable, dimension(:) :: constraint_list
 
      !> An output sampler for the problem. This should probably be an output
-     !! controller at some point intead.
+     !! controller at some point instead.
      type(fld_file_output_t), public :: output
 
    contains
@@ -84,9 +83,9 @@ module problem
      ! ----------------------------------------------------------------------- !
      ! Interfaces
 
-     !> Constructor for physics of the problem
+     !> Constructor for physics of the problem.
      procedure(problem_init), pass(this), public, deferred :: init
-     !> Additional constructor specific to a design
+     !> Additional constructor specific to a design.
      procedure(problem_init_design), pass(this), public, deferred :: init_design
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
@@ -105,9 +104,9 @@ module problem
      ! ----------------------------------------------------------------------- !
      ! Base class methods
 
-     !> Constructor for the base class
+     !> Constructor for the base class.
      procedure, pass(this) :: init_base => problem_init_base
-     !> Destructor for the base class
+     !> Destructor for the base class.
      procedure, pass(this) :: free_base => problem_free_base
 
      !> Read objective json-file.
@@ -119,7 +118,7 @@ module problem
      ! ----------------------------------------------------------------------- !
      ! Actual methods
 
-     !> Sample the problem
+     !> Sample the problem.
      procedure, pass(this), public :: write => problem_write
 
      !> Add an objective to the list.
@@ -130,16 +129,16 @@ module problem
      ! ----------------------------------------------------------------------- !
      ! Internal Updater methods
 
-     !> Update the objective function
+     !> Update the objective function.
      procedure, pass(this) :: update_objectives => &
           problem_update_objectives
-     !> Update the volume constraint
+     !> Update the volume constraint.
      procedure, pass(this) :: update_constraints => &
           problem_update_constraints
-     !> Update the objective sensitivities
+     !> Update the objective sensitivities.
      procedure, pass(this) :: update_objective_sensitivities => &
           problem_update_objective_sensitivities
-     !> Update the constraint sensitivities
+     !> Update the constraint sensitivities.
      procedure, pass(this) :: update_constraint_sensitivities => &
           problem_update_constraint_sensitivities
 
@@ -175,14 +174,14 @@ module problem
      !> Constructor for physics of the problem.
      !! This is the main constructor for a problem. This should be defined in
      !! the derived types to initialize the problem. This is based on the
-     !! abstract design type, We suggest that a swticth statement is used to
+     !! abstract design type, We suggest that a switch statement is used to
      !! initialize the problem based on the design type.
      subroutine problem_init(this)
        import problem_t
        class(problem_t), intent(inout) :: this
      end subroutine problem_init
 
-     !> Additional constructor based on a design
+     !> Additional constructor based on a design.
      subroutine problem_init_design(this, design)
        import problem_t, design_t
        class(problem_t), intent(inout) :: this
@@ -202,24 +201,26 @@ module problem
        ! - levelset
        ! - etc
        !
-       ! BUT, for density based topology optimization, because we get all our mesh
-       ! info etc from neko, our design representation is based on the fluid.
-       ! (of course this isn't 100% true, it's just the dofmap. We could define
-       ! our design on a different set of basis functions too... but I guess that
-       ! is rather far out of scope now...)
+       ! BUT, for density based topology optimization, because we get all our
+       ! mesh info etc from neko, our design representation is based on the
+       ! fluid. (of course this isn't 100% true, it's just the dofmap. We could
+       ! define our design on a different set of basis functions too... but I
+       ! guess that is rather far out of scope now...)
        !
        ! So it's sort of coupled both ways.. :/
        !
-       ! Tim you may need to untagle this, for now I dont see an option other than
+       ! Tim you may need to untangle this, for now I don't see an option other
+       ! than
        ! - initialising the fluid first.
        !
        ! - The initializing the design
        !
-       ! - Then coming here and intializing the impact of the design on the fluid
+       ! - Then coming here and initializing the impact of the design on the
+       !   fluid
        !
      end subroutine problem_init_design
 
-     !> Compute the problem
+     !> Compute the problem.
      subroutine problem_compute(this, design)
        import problem_t
        import design_t
@@ -229,7 +230,7 @@ module problem
 
      end subroutine problem_compute
 
-     !> Compute the problem
+     !> Compute the problem.
      subroutine problem_compute_sensitivity(this, design)
        import problem_t
        import design_t
@@ -248,7 +249,7 @@ module problem
 
 contains
 
-  ! -------------------------------------------------------------------------- !
+  ! ========================================================================== !
   ! Base class methods
 
   !> Constructor for the base class
@@ -262,6 +263,7 @@ contains
 
   end subroutine problem_init_base
 
+  !> Destructor for the base class
   subroutine problem_free_base(this)
     class(problem_t), intent(inout) :: this
     integer :: i
@@ -291,7 +293,7 @@ contains
     call this%output%sample(real(idx, kind=rp))
   end subroutine problem_write
 
-  ! -------------------------------------------------------------------------- !
+  ! ========================================================================== !
   ! Handling constraints and objectives
 
   !> Read the objective from a json file.
@@ -414,7 +416,7 @@ contains
     this%n_constraints = n + 1
   end subroutine problem_add_constraint
 
-  ! -------------------------------------------------------------------------- !
+  ! ========================================================================== !
   ! Update the objectives and constraints
 
   !> Update the objectives.
@@ -477,7 +479,7 @@ contains
     end do
   end subroutine problem_update_constraint_sensitivities
 
-  ! -------------------------------------------------------------------------- !
+  ! ========================================================================== !
   ! Problem part getters
 
   !> Construct and get the objective.
