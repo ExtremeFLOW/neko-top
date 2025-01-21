@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-!> Submodule for the objective function factory
+!> Submodule for the constraint function factory
 submodule (constraint) constraint_factory_mod
   use json_utils, only: json_get
   use utils, only: neko_type_error
@@ -50,9 +50,9 @@ contains
   ! Factory function
 
   !> Factory function
-  !! Allocates and initializes an objective function object
-  !! @param object The objective function object to be created
-  !! @param type The type of the objective function
+  !! Allocates and initializes an constraint function object
+  !! @param object The constraint function object to be created
+  !! @param type The type of the constraint function
   !! @param design The design object
   !! @param simulation The simulation object
   module subroutine constraint_factory(object, json, design, simulation)
