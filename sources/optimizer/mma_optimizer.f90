@@ -70,8 +70,10 @@ contains
        print *, "Initializing mma_optimizer with steady_state_problem_t."
 
        call this%mma%init_json(design%design_indicator%x, &
-            design%design_indicator%size(), problem%simulation%neko_case%params, this%scale, &
+            problem%get_n_design(), problem%get_n_constraints(), &
+            problem%simulation%neko_case%params, this%scale, &
             this%auto_scale)
+
        print *, "scale = ", this%scale
        print *, "auto_scale = ", this%auto_scale
       class default

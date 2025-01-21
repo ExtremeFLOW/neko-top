@@ -130,7 +130,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json(this, x, n, json, scale, auto_scale)
+  subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -144,6 +144,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n
+    integer, intent(in) :: m
     real(kind=rp), intent(in), dimension(n) :: x
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
@@ -153,7 +154,6 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    integer :: m
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), allocatable :: a(:), c(:), d(:)
 
@@ -170,7 +170,6 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
     ! based on the Cpp Code by Niels
-    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
