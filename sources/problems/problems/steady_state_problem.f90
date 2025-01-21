@@ -71,8 +71,6 @@ module steady_state_problem
 
    contains
      !> The common constructor using a JSON object.
-     ! TODO
-     ! we need to sort out the case file
      procedure, pass(this) :: init => steady_state_problem_init
 
      !> Constructor of a generic design problem.
@@ -88,15 +86,6 @@ module steady_state_problem
      !> Generic compute function for sensitivity.
      procedure, pass(this) :: compute_sensitivity => &
           steady_state_problem_compute_sensitivity
-
-     !> Computes the value of the objective and all constraints.
-     !! ie, a forward simulation.
-     procedure, pass(this) :: compute_topopt => &
-          steady_state_problem_compute_topopt
-     !> Computes the first order gradient of the objective function and
-     !! all constraints, ie, an adjoint simulation.
-     procedure, pass(this) :: compute_sensitivity_topopt => &
-          steady_state_problem_compute_sensitivity_topopt
 
   end type steady_state_problem_t
 
@@ -273,8 +262,6 @@ contains
 
     call this%free_base()
     call this%simulation%free()
-    ! TODO
-    ! probably also objective functions etc
 
   end subroutine steady_state_problem_free
 
@@ -283,12 +270,10 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
 
-    select type (design)
-      type is (topopt_design_t)
-       call this%compute_topopt(design)
-      class default
-       call neko_error('Only topopt_design_t is supported for now')
-    end select
+    call this%simulation%run_forward()
+
+    call this%update_objectives(design)
+    call this%update_constraints(design)
 
   end subroutine steady_state_problem_compute
 
@@ -299,24 +284,12 @@ contains
 
     select type (design)
       type is (topopt_design_t)
-       call this%compute_sensitivity_topopt(design)
+       call steady_state_problem_compute_sensitivity_topopt(this, design)
       class default
        call neko_error('Only topopt_design_t is supported for now')
     end select
 
   end subroutine steady_state_problem_compute_sensitivity
-
-  !> Here we compute all the objectives and constraints
-  subroutine steady_state_problem_compute_topopt(this, design)
-    class(steady_state_problem_t), intent(inout) :: this
-    type(topopt_design_t), intent(inout) :: design
-
-    call this%simulation%run_forward()
-
-    call this%update_objectives(design)
-    call this%update_constraints(design)
-
-  end subroutine steady_state_problem_compute_topopt
 
   !> The computation of the sensitivity if we have a `topopt_design_t`.
   subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
@@ -341,7 +314,6 @@ contains
          temp_indices(1))
     call copy(objective_sensitivity_field%x, objective_sensitivity%x, &
          this%get_n_design())
-
 
     ! do the adjoint mapping
     call design%map_backward(objective_sensitivity_field)
