@@ -24,7 +24,7 @@ module mma_cpu
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     character(len=:), allocatable :: backend
+     character(len=:), allocatable :: backnd
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -62,7 +62,7 @@ contains
 
 
   subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, backend)
+       max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -77,7 +77,8 @@ contains
 
     class(mma_cpu_t), intent(inout) :: this
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
+    ! real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -90,7 +91,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), allocatable, intent(in), optional :: backend
+    character(len=:), allocatable, intent(in), optional :: backnd
 
     call this%free()
 
@@ -99,8 +100,8 @@ contains
 
     call this%xold1%init(n)
     call this%xold2%init(n)
-    this%xold1%x = x
-    this%xold2%x = x
+    this%xold1%x = x%x
+    this%xold2%x = x%x
 
     call this%alpha%init(n)
     call this%beta%init(n)
@@ -137,8 +138,8 @@ contains
     this%xmax%x = xmax
     this%xmin%x = xmin
 
-    this%low%x(:) = minval(x)
-    this%upp%x(:) = maxval(x)
+    this%low%x(:) = minval(x%x)
+    this%upp%x(:) = maxval(x%x)
 
     !setting KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
@@ -156,7 +157,7 @@ contains
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
 
-    if (.not. present(backend)) this%backend = 'cpu'
+    if (.not. present(backnd)) this%backnd = 'cpu'
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -164,7 +165,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-    if (present(backend)) this%backend = backend
+    if (present(backnd)) this%backnd = backnd
 
     !the object is correctly initialized
     this%is_initialized = .true.
@@ -180,10 +181,12 @@ contains
     ! ----------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
     integer, intent(in) :: iter
-    real(kind=rp), dimension(this%n), intent(inout) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+     ! real(kind=rp), dimension(this%n), intent(inout) :: x
+     ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
+     ! real(kind=rp), dimension(this%m), intent(in) :: fval
+     ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    type(vector_t) :: x, df0dx, fval
+    type(matrix_t) :: dfdx
 
     if (.not. this%is_initialized) then
        write(stderr, *) "The MMA object is not initialized."
@@ -237,60 +240,62 @@ contains
   end subroutine mma_free_cpu
 
   !! private internal subroutines
-  subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
+  subroutine mma_gensub_cpu(this, iter, xdesign, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
     ! the lower and upper asymtotes and the other necessary !
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+     !     real(kind=rp), dimension(this%n), intent(in) :: x
+     !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
+     !     real(kind=rp), dimension(this%m), intent(in) :: fval
+     !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    type(vector_t) :: xdesign, df0dx, fval
+    type(matrix_t) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
     real(kind=rp), dimension(this%m) :: globaltmp_m
 
     if (iter .lt. 3) then
        do j = 1, this%n
-          this%low%x(j) = x(j) - this%asyinit * (this%xmax%x(j) - &
+          this%low%x(j) = xdesign%x(j) - this%asyinit * (this%xmax%x(j) - &
                this%xmin%x(j))
-          this%upp%x(j) = x(j) + this%asyinit * (this%xmax%x(j) - &
+          this%upp%x(j) = xdesign%x(j) + this%asyinit * (this%xmax%x(j) - &
                this%xmin%x(j))
        end do
     else
        !Move asymptotes low and upp
        do j = 1, this%n
-          if ((x(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
+          if ((xdesign%x(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
                .lt. 0) then
-             this%low%x(j) = x(j) - &
+             this%low%x(j) = xdesign%x(j) - &
                   this%asydecr * (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + &
+             this%upp%x(j) = xdesign%x(j) + &
                   this%asydecr * (this%upp%x(j) - this%xold1%x(j))
 
-          else if ((x(j) - this%xold1%x(j))* &
+          else if ((xdesign%x(j) - this%xold1%x(j))* &
                (this%xold1%x(j) - this%xold2%x(j)) .gt. 0) then
-             this%low%x(j) = x(j) - &
+             this%low%x(j) = xdesign%x(j) - &
                   this%asyincr * (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + &
+             this%upp%x(j) = xdesign%x(j) + &
                   this%asyincr * (this%upp%x(j) - this%xold1%x(j))
           else
-             this%low%x(j) = x(j) - (this%xold1%x(j) - this%low%x(j))
-             this%upp%x(j) = x(j) + (this%upp%x(j) - this%xold1%x(j))
+             this%low%x(j) = xdesign%x(j) - (this%xold1%x(j) - this%low%x(j))
+             this%upp%x(j) = xdesign%x(j) + (this%upp%x(j) - this%xold1%x(j))
           end if
 
           ! setting a minimum and maximum for the low and upp
           ! asymptotes (eq3.9)
           this%low%x(j) = max(this%low%x(j), &
-               x(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
+               xdesign%x(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
           this%low%x(j) = min(this%low%x(j), &
-               x(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               xdesign%x(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
 
           this%upp%x(j) = min(this%upp%x(j), &
-               x(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
+               xdesign%x(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
           this%upp%x(j) = max(this%upp%x(j), &
-               x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               xdesign%x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
        end do
     end if
     ! we can move alpha and beta out of the following loop if needed as:
@@ -306,35 +311,35 @@ contains
        ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
        ! eq (2.8) and (2.9)
        this%alpha%x(j) = max(this%xmin%x(j), this%low%x(j) + &
-            0.1_rp*(x(j)- this%low%x(j)), &
-            x(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
+            0.1_rp*(xdesign%x(j)- this%low%x(j)), &
+            xdesign%x(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
        this%beta%x(j) = min(this%xmax%x(j), this%upp%x(j) - &
-            0.1*(this%upp%x(j) - x(j)), &
-            x(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
+            0.1*(this%upp%x(j) - xdesign%x(j)), &
+            xdesign%x(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
 
        !Calculate p0j, q0j, pij, qij
        !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
-       this%p0j%x(j) = (this%upp%x(j) - x(j))**2 * &
-            (1.001_rp*max(df0dx(j),0.0_rp) + &
-            0.001_rp*max(-df0dx(j),0.0_rp) + &
+       this%p0j%x(j) = (this%upp%x(j) - xdesign%x(j))**2 * &
+            (1.001_rp*max(df0dx%x(j),0.0_rp) + &
+            0.001_rp*max(-df0dx%x(j),0.0_rp) + &
             (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
-       this%q0j%x(j) = (x(j) - this%low%x(j))**2 * &
-            (0.001_rp*max(df0dx(j),0.0_rp) + &
-            1.001_rp*max(-df0dx(j),0.0_rp) + &
+       this%q0j%x(j) = (xdesign%x(j) - this%low%x(j))**2 * &
+            (0.001_rp*max(df0dx%x(j),0.0_rp) + &
+            1.001_rp*max(-df0dx%x(j),0.0_rp) + &
             (0.00001_rp/(max(0.00001_rp, &
             (this%xmax%x(j) - this%xmin%x(j))))))
 
        do i = 1, this%m
-          this%pij%x(i,j) = (this%upp%x(j) - x(j))**2 * &
-               (1.001_rp*max(dfdx(i,j),0.0_rp) + &
-               0.001_rp*max(-dfdx(i,j),0.0_rp) + &
+          this%pij%x(i,j) = (this%upp%x(j) - xdesign%x(j))**2 * &
+               (1.001_rp*max(dfdx%x(i,j),0.0_rp) + &
+               0.001_rp*max(-dfdx%x(i,j),0.0_rp) + &
                (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
-          this%qij%x(i,j) = (x(j) - this%low%x(j))**2 * &
-               (0.001_rp*max(dfdx(i, j), 0.0_rp) + &
-               1.001_rp*max(-dfdx(i, j), 0.0_rp) + &
+          this%qij%x(i,j) = (xdesign%x(j) - this%low%x(j))**2 * &
+               (0.001_rp*max(dfdx%x(i, j), 0.0_rp) + &
+               1.001_rp*max(-dfdx%x(i, j), 0.0_rp) + &
                (0.00001_rp/(max(0.00001_rp, &
                (this%xmax%x(j) - this%xmin%x(j))))))
        end do
@@ -346,8 +351,8 @@ contains
        !MPI: here this%n is the global n
        do j = 1, this%n
           this%bi%x(i) = this%bi%x(i) + &
-               this%pij%x(i,j) / (this%upp%x(j) - x(j)) + &
-               this%qij%x(i,j) / (x(j) - this%low%x(j))
+               this%pij%x(i,j) / (this%upp%x(j) - xdesign%x(j)) + &
+               this%qij%x(i,j) / (xdesign%x(j) - this%low%x(j))
        end do
     end do
 
@@ -411,7 +416,7 @@ contains
     globaltmp_m = 0.0_rp
     call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%bi%x = globaltmp_m - fval
+    this%bi%x = globaltmp_m - fval%x
 
   end subroutine mma_gensub_cpu
 
@@ -426,7 +431,8 @@ contains
     ! decrease in the residue.                                !
     ! ------------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(inout) :: designx
+    ! real(kind=rp), dimension(this%n), intent(inout) :: designx
+    type(vector_t) :: designx
     !Note that there is a local dummy "x" in this subroutine, thus, we call
     !the current design "designx" instead of just "x"
     integer :: i, j, k, iter, ggdumiter, itto, ierr
@@ -795,8 +801,8 @@ contains
 
     ! Save the new design
     this%xold2 = this%xold1
-    this%xold1%x = designx
-    designx = x
+    this%xold1%x = designx%x
+    designx%x = x
 
     !update the parameters of the MMA object nesessary to compute KKT residu
     this%y%x = y
@@ -831,11 +837,13 @@ contains
     ! using the new x values.                               !
     ! ----------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
+     !     real(kind=rp), dimension(this%n), intent(in) :: x
 
-    real(kind=rp), dimension(this%m), intent(in) :: fval
-    real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+     !     real(kind=rp), dimension(this%m), intent(in) :: fval
+     !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
+     !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    type(vector_t), intent(in) :: x, df0dx, fval
+    type(matrix_t), intent(in) :: dfdx
 
     real(kind=rp) :: rez, rezeta
     real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
@@ -846,15 +854,15 @@ contains
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
 
-    rex(:) = df0dx + matmul(transpose(dfdx), this%lambda%x(:)) - &
+    rex(:) = df0dx%x + matmul(transpose(dfdx%x), this%lambda%x(:)) - &
           this%xsi%x(:) + this%eta%x(:)
     rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - &
           this%mu%x(:)
     rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
 
-    relambda(:) = fval - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
-    rexsi(:) = this%xsi%x(:)*(x(:) - this%xmin%x(:))
-    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x(:))
+    relambda(:) = fval%x - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
+    rexsi(:) = this%xsi%x(:)*(x%x(:) - this%xmin%x(:))
+    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x%x(:))
     remu(:) = this%mu%x(:)*this%y%x(:)
     rezeta = this%zeta*this%z
     res(:) = this%lambda%x(:)*this%s%x(:)

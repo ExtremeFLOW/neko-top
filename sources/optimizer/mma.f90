@@ -36,6 +36,9 @@ module mma
   use num_types, only: rp
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+
   implicit none
   private
 
@@ -63,36 +66,41 @@ module mma
 
   abstract interface
     subroutine mma_init(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, backend)
-      import mma_t, rp
+       max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+      import mma_t, rp, vector_t
       class(mma_t), intent(inout) :: this
       integer, intent(in) :: n, m
-      real(kind=rp), intent(in), dimension(n) :: x
+      ! real(kind=rp), intent(in), dimension(n) :: x
+      type(vector_t), intent(in) :: x
       real(kind=rp), intent(in), dimension(n) :: xmax, xmin
       real(kind=rp), intent(in), dimension(m) :: a, c, d
       real(kind=rp), intent(in) :: a0
       integer, intent(in), optional :: max_iter
       real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-      character(len=:), allocatable, intent(in), optional :: backend
+      character(len=:), allocatable, intent(in), optional :: backnd
     end subroutine mma_init
 
     subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
-      import mma_t, rp
+      import mma_t, rp, matrix_t, vector_t
       class(mma_t), intent(inout) :: this
       integer, intent(in) :: iter
-      real(kind=rp), dimension(this%n), intent(inout) :: x
-      real(kind=rp), dimension(this%n), intent(in) :: df0dx
-      real(kind=rp), dimension(this%m), intent(in) :: fval
-      real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+      ! real(kind=rp), dimension(this%n), intent(inout) :: x
+      ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
+      ! real(kind=rp), dimension(this%m), intent(in) :: fval
+      ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+      type(vector_t) :: x, df0dx, fval
+      type(matrix_t) :: dfdx
     end subroutine mma_update
 
     subroutine mma_KKT(this, x, df0dx, fval, dfdx)
-      import mma_t, rp
+      import mma_t, rp, vector_t, matrix_t
       class(mma_t), intent(inout) :: this
-      real(kind=rp), dimension(this%n), intent(in) :: x
-      real(kind=rp), dimension(this%m), intent(in) :: fval
-      real(kind=rp), dimension(this%n), intent(in) :: df0dx
-      real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+      ! real(kind=rp), dimension(this%n), intent(in) :: x
+      ! real(kind=rp), dimension(this%m), intent(in) :: fval
+      ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
+      ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+      type(vector_t), intent(in) :: x, df0dx, fval
+      type(matrix_t), intent(in) :: dfdx
     end subroutine mma_KKT
     subroutine mma_free(this)
       import mma_t
@@ -129,8 +137,8 @@ module mma
     class(mma_t), allocatable :: mma
 
     integer, intent(in) :: n
-    integer, intent(in) :: m
-    real(kind=rp), intent(in), dimension(n) :: x
+    ! real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
@@ -147,7 +155,7 @@ module mma
 
     integer :: max_iter
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), allocatable :: backend
+    character(len=:), allocatable :: backnd
 
     !! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
@@ -161,7 +169,7 @@ module mma
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
-    call json_get_or_default(json, 'mma.backend', backend, 'cpu')
+    call json_get_or_default(json, 'mma.backend', backnd, 'cpu')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -185,7 +193,7 @@ module mma
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
     call mma%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr, backend)
+         max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
   end subroutine mma_init_json
 
   ! ========================================================================== !

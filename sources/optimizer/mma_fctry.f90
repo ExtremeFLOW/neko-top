@@ -22,6 +22,7 @@ contains
 
     if (NEKO_BCKND_SX .eq. 1) then
     else if (NEKO_BCKND_DEVICE .eq. 1) then
+      print *,"mma_device_t is set as the mma_t drived type in mma_factory!"
     else
       allocate(mma_cpu_t::object)
       print *,"mma_cpu_t is set as the mma_t drived type in mma_factory!"
