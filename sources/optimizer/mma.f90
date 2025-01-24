@@ -70,8 +70,8 @@ module mma
       import mma_t, rp, vector_t
       class(mma_t), intent(inout) :: this
       integer, intent(in) :: n, m
-      ! real(kind=rp), intent(in), dimension(n) :: x
-      type(vector_t), intent(in) :: x
+      real(kind=rp), intent(in), dimension(n) :: x
+      ! type(vector_t), intent(in) :: x
       real(kind=rp), intent(in), dimension(n) :: xmax, xmin
       real(kind=rp), intent(in), dimension(m) :: a, c, d
       real(kind=rp), intent(in) :: a0
@@ -84,22 +84,22 @@ module mma
       import mma_t, rp, matrix_t, vector_t
       class(mma_t), intent(inout) :: this
       integer, intent(in) :: iter
-      ! real(kind=rp), dimension(this%n), intent(inout) :: x
+      real(kind=rp), dimension(this%n), intent(inout) :: x
       ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
       ! real(kind=rp), dimension(this%m), intent(in) :: fval
       ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-      type(vector_t) :: x, df0dx, fval
+      type(vector_t) :: df0dx, fval
       type(matrix_t) :: dfdx
     end subroutine mma_update
 
     subroutine mma_KKT(this, x, df0dx, fval, dfdx)
       import mma_t, rp, vector_t, matrix_t
       class(mma_t), intent(inout) :: this
-      ! real(kind=rp), dimension(this%n), intent(in) :: x
+      real(kind=rp), dimension(this%n), intent(in) :: x
       ! real(kind=rp), dimension(this%m), intent(in) :: fval
       ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
       ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-      type(vector_t), intent(in) :: x, df0dx, fval
+      type(vector_t), intent(in) :: df0dx, fval
       type(matrix_t), intent(in) :: dfdx
     end subroutine mma_KKT
     subroutine mma_free(this)
@@ -122,7 +122,7 @@ module mma
   
   contains 
 
-  subroutine mma_init_json( mma, x, n, json, scale, auto_scale)
+  subroutine mma_init_json( mma, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -136,9 +136,9 @@ module mma
     ! ----------------------------------------------------- !
     class(mma_t), allocatable :: mma
 
-    integer, intent(in) :: n
-    ! real(kind=rp), intent(in), dimension(n) :: x
-    type(vector_t), intent(in) :: x
+    integer, intent(in) :: n, m
+    real(kind=rp), intent(in), dimension(n) :: x
+    ! type(vector_t), intent(in) :: x
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !

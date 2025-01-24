@@ -32,24 +32,6 @@ module mma_optimizer
   ! Concrete type for MMA optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
-<<<<<<< HEAD
-     type(mma_t) :: mma
-     type(topopt_design_t), pointer :: design
-
-     !> Scaling constraint_value%x and constraint_sensitivities%x.
-     !! Note that the values are not updated but they are scaled when passed
-     !! to the optimizer.
-     !! (if auto_scale then constraint_value%x=scale else constraint_value%x=scale*constraint_value%x)
-     !! When auto_scale is true, we use an adaptable scale for
-     !! constraint_value%x and constraint_sensitivities%x in every iteration (variable scale factors)
-     real(kind=rp) :: scale
-     logical :: auto_scale
-   contains
-     ! Override the deferred methods
-     procedure :: init => mma_optimizer_init
-     procedure :: run => mma_optimizer_run
-     procedure :: free => mma_optimizer_free
-=======
       ! type(mma_t) :: mma
       class(mma_t), allocatable :: mma
       !> Scaling fval and dfdx.
@@ -65,7 +47,6 @@ module mma_optimizer
       procedure :: init => mma_optimizer_init
       procedure :: run => mma_optimizer_run
       procedure :: free => mma_optimizer_free
->>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
 
      procedure, pass(this) :: run_ss => mma_optimizer_run_steady_state_prob
   end type mma_optimizer_t
@@ -76,19 +57,16 @@ contains
   subroutine mma_optimizer_init(this, problem, design)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
-    type(topopt_design_t), target, intent(in) :: design
-
-    this%design => design
+    type(topopt_design_t), intent(inout) :: design
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
-<<<<<<< HEAD
     select type (problem)
       type is (steady_state_problem_t)
 
        print *, "Initializing mma_optimizer with steady_state_problem_t."
 
-       call this%mma%init_json(design%design_indicator%x, &
+       call this%mma%init_json(this%mma, design%design_indicator%x, &
             problem%get_n_design(), problem%get_n_constraints(), &
             problem%simulation%neko_case%params, this%scale, &
             this%auto_scale)
@@ -98,46 +76,31 @@ contains
       class default
 
        call neko_error('Unknown problem type in the mma_optimizer_init')
-=======
-    select type (prob)
-    type is (steady_state_problem_t)
-      ! Now we know prob is of type steady_state_problem_t
-      print *, "Initializing mma_optimizer with steady_state_problem_t."
-      ! calling the mma_factory(mma) to set the drived type for mma (backend)
-      call mma_factory(this%mma)
-      ! mma_init_json( mma_t, x, n, json, auto_scale, scale)
-      call this%mma%init_json( this%mma, prob%design%design_indicator%x, &
-        prob%design%design_indicator%size(), prob%C%params, this%scale, &
-        this%auto_scale)
-      print *, "scale = ", this%scale
-      print *, "auto_scale = ", this%auto_scale
-    class default
-      !Unknown problem
-      call neko_error('Unknown problem type in the mma_optimizer_init')
->>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
     end select
 
   end subroutine mma_optimizer_init
 
   ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, problem, tolerance)
+  subroutine mma_optimizer_run(this, problem, design, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
+    type(topopt_design_t), intent(inout) :: design
     real(kind=rp), intent(in) :: tolerance
 
     ! Check the type of the problem using select type
     select type (problem)
       type is (steady_state_problem_t)
-       call this%run_ss(problem, tolerance)
+       call this%run_ss(problem, design, tolerance)
 
       class default
        call neko_error('Unknown problem type in the mma_optimizer_run')
     end select
   end subroutine mma_optimizer_run
 
-  subroutine mma_optimizer_run_steady_state_prob(this, problem, tolerance)
+  subroutine mma_optimizer_run_steady_state_prob(this, problem, design, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
     class(steady_state_problem_t), intent(inout) :: problem
+    type(topopt_design_t), intent(inout) :: design
     real(kind=rp), intent(in) :: tolerance
     integer :: max_iter
     integer :: iter, ierr, nglobal
@@ -157,8 +120,8 @@ contains
     scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
 
-    call problem%compute(this%design)
-    call problem%compute_sensitivity(this%design)
+    call problem%compute(design)
+    call problem%compute_sensitivity(design)
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -168,7 +131,7 @@ contains
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
-    associate(x => this%design%design_indicator%x)
+    associate(x => design%design_indicator%x)
 
       ! Write n, m, and tolerance in the first line of optimization_data.txt
       write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
@@ -187,43 +150,32 @@ contains
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
 
-<<<<<<< HEAD
          !Scaling
          if (this%auto_scale .eqv. .true.) then
             scalingfactor = abs(this%scale/constraint_value%x(1))
          else
             scalingfactor = abs(this%scale)
          end if
-=======
-      if (NEKO_BCKND_DEVICE .eq. 0) then
-        call this%mma%update( iter, x, df0dx, &
-          reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
-      else
-        write(stderr, *) "Device not supported in mma_optimizer.f90."
-        error stop
-      end if
->>>>>>> 886d5e1 (First update of the optimizer structure for various backend devices.)
 
          if (NEKO_BCKND_DEVICE .eq. 0) then
-            call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
-                 constraint_value%x * scalingfactor, &
-                 constraint_sensitivities%x*scalingfactor)
+            call this%mma%update( iter, x, objective_sensitivities, &
+                 constraint_value%vector_cmult_left(scalingfactor), &
+                 constraint_sensitivities%matrix_cmult_left(scalingfactor))
          else
             write(stderr, *) "Device not supported in mma_optimizer.f90."
             error stop
          end if
 
-         call problem%compute(this%design)
-         call problem%compute_sensitivity(this%design)
+         call problem%compute(design)
+         call problem%compute_sensitivity(design)
 
          call problem%get_objective_value(objective_value)
          call problem%get_constraint_values(constraint_value)
          call problem%get_objective_sensitivities(objective_sensitivities)
          call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-         call this%mma%KKT(x, objective_sensitivities%x, &
-              reshape([constraint_value%x], [this%mma%get_m()]), &
-              constraint_sensitivities%x)
+         call this%mma%KKT(x, objective_sensitivities, &
+              constraint_value, constraint_sensitivities)
 
          write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
               & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
@@ -234,7 +186,7 @@ contains
 
          call problem%write(iter)
 
-         call this%design%map_forward()
+         call design%map_forward()
          call reset(problem%simulation%neko_case)
          ! TODO
          ! reset for the adjoint

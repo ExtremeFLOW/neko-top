@@ -29,16 +29,17 @@ module optimizer
        import optimizer_t, problem_t, topopt_design_t
        class(optimizer_t), intent(inout) :: this
        class(problem_t), intent(inout) :: problem
-       type(topopt_design_t), target, intent(in) :: design
+       type(topopt_design_t), intent(inout) :: design
      end subroutine optimizer_init
   end interface
 
   !> Interface for running the optimization loop
   abstract interface
-     subroutine optimizer_run(this, problem, tolerance)
-       import optimizer_t, problem_t, rp
+     subroutine optimizer_run(this, problem, design, tolerance)
+       import optimizer_t, problem_t, rp, topopt_design_t
        class(optimizer_t), intent(inout) :: this
        class(problem_t), intent(inout) :: problem
+       type(topopt_design_t), intent(inout) :: design
        real(kind=rp), intent(in) :: tolerance
      end subroutine optimizer_run
   end interface
