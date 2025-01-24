@@ -104,11 +104,10 @@
         ],
     },
     "mma": {
-        "max_iter": 100,
+        "max_iter": 15,
         "asyinit": 0.5,
         "asyincr": 1.2,
         "asydecr": 0.7,
-        "m": 1,
         "scale": 1.0,
         "auto_scale": false,
         "xmin": 0.0,

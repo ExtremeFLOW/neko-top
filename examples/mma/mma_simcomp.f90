@@ -41,6 +41,8 @@ module mma_simcomp
   use field, only: field_t
   use logger, only: neko_log
   ! use mma, only: mma_t
+  use vector, only: vector_t
+  use matrix, only: matrix_t
   use mma, only: mma_t, mma_factory
   use comm
   implicit none
@@ -145,7 +147,8 @@ contains
     !     call this%mma%init(reshape(this%designx%x, [nloc]), &
     !          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
     call this%mma%init_json( this%mma, reshape(this%designx%x, [nloc]), &
-         nloc, json, scale,  auto_scale)
+         nloc, this%m, json, scale,  auto_scale)
+
     print *, "scale = ", scale
     print *, "auto_scale = ", auto_scale
 
@@ -193,27 +196,34 @@ contains
     real(kind=rp) :: start_time, end_time
     real(kind=rp), dimension(this%mma%get_n()) :: x
 
-    real(kind=rp), dimension(this%mma%get_m()) :: fval
-    real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
+     !     real(kind=rp), dimension(this%mma%get_m()) :: fval
+     !     real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
     real(kind=rp) :: f0val
-    real(kind=rp), dimension(this%mma%get_n()) :: df0dx
-    ! character(len = 50) :: filename
+     !     real(kind=rp), dimension(this%mma%get_n()) :: df0dx
+    type(vector_t) :: df0dx
+    type(vector_t) :: fval
+    type(matrix_t) :: dfdx
+
     real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
-    ! real(kind=rp), dimension(4320,4) :: all_stuff
+
+
     real(kind=rp), allocatable :: all_stuff(:,:)
     integer, allocatable :: nloc_all(:)
 
     L = 0.0_rp
+    call df0dx%init(this%mma%get_n())
+    call fval%init(this%mma%get_m())
+    call dfdx%init(this%mma%get_m(),this%mma%get_n())
 
 
     call cpu_time(start_time)
     ! call write_field_to_vector(this%designx,x,this%mma%get_n())
     x = reshape(this%designx%x, [this%mma%get_n()])
     call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
-         f0val, df0dx, fval, dfdx)
+         f0val, df0dx%x, fval%x, dfdx%x)
 
     print *, 'iter = ', 0,&
-         '-------, f0val = ', f0val, ',   fval = ', fval
+         '-------, f0val = ', f0val, ',   fval = ', fval%x
 
     stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
     stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
@@ -264,12 +274,12 @@ contains
        this%designx%x = reshape(x,shape(this%designx%x))
 
        call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
-            f0val, df0dx, fval, dfdx)
+            f0val, df0dx%x, fval%x, dfdx%x)
        call this%mma%KKT(x, df0dx, fval, dfdx)
 
        if (rank .eq. 0) then
           print *, 'iter = ', iter,&
-               '-------,f0val = ', f0val, ',   fval = ', fval(1), &
+               '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
                ',  KKTmax = ', this%mma%get_residumax(), &
                ', KKTnorm2 = ', this%mma%get_residunorm()
        end if
