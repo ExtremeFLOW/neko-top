@@ -190,10 +190,13 @@ module mma
     d = d_const
     xmin = xmin_const
     xmax = xmax_const
+    ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
+    call mma_factory(mma)
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
     call mma%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+
   end subroutine mma_init_json
 
   ! ========================================================================== !
