@@ -51,6 +51,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
 
         # List of specific problems, objectives and constraints
