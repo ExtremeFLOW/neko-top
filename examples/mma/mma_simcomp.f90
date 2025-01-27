@@ -45,6 +45,7 @@ module mma_simcomp
   use matrix, only: matrix_t
   use mma, only: mma_t, mma_factory
   use comm
+  use device
   implicit none
   private
 
@@ -142,7 +143,7 @@ contains
     this%xmax%x = 10.0_rp
     this%xmin%x = 0.0_rp
 
-    call mma_factory(this%mma)
+    !  call mma_factory(this%mma)
 
     !     call this%mma%init(reshape(this%designx%x, [nloc]), &
     !          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
@@ -218,6 +219,7 @@ contains
 
     call cpu_time(start_time)
     ! call write_field_to_vector(this%designx,x,this%mma%get_n())
+    x = 1.0_rp
     x = reshape(this%designx%x, [this%mma%get_n()])
     call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
          f0val, df0dx%x, fval%x, dfdx%x)
@@ -265,59 +267,60 @@ contains
        call write_stuff_vtk(all_stuff, nglobal, "stuff_init.vtk")
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     
+    call this%mma%update(iter, x, df0dx, fval, dfdx)
+
+!     ! The optimization loop
+!     do iter = 1, 100 !10
+!        call this%mma%update(iter, x, df0dx, fval, dfdx)
+!        ! print *,"first"
+!        this%designx%x = reshape(x,shape(this%designx%x))
+
+!        call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
+!             f0val, df0dx%x, fval%x, dfdx%x)
+!        call this%mma%KKT(x, df0dx, fval, dfdx)
+
+!        if (rank .eq. 0) then
+!           print *, 'iter = ', iter,&
+!                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
+!                ',  KKTmax = ', this%mma%get_residumax(), &
+!                ', KKTnorm2 = ', this%mma%get_residunorm()
+!        end if
+
+!        ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
+!        ! if (this%mma%residumax .lt. this%tol) exit
+!        if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
+!     end do
+
+!     ! print *, "f0val = ", f0val, "fval = ", fval
+
+!     call cpu_time(end_time)
+
+!     print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
+!     print *, "this%designx%x is updated"
 
 
-    ! The optimization loop
-    do iter = 1, 100 !10
-       call this%mma%update(iter, x, df0dx, fval, dfdx)
-       ! print *,"first"
-       this%designx%x = reshape(x,shape(this%designx%x))
+!     stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+!     stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+!     stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+!     stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
 
-       call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
-            f0val, df0dx%x, fval%x, dfdx%x)
-       call this%mma%KKT(x, df0dx, fval, dfdx)
-
-       if (rank .eq. 0) then
-          print *, 'iter = ', iter,&
-               '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
-               ',  KKTmax = ', this%mma%get_residumax(), &
-               ', KKTnorm2 = ', this%mma%get_residunorm()
-       end if
-
-       ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
-       ! if (this%mma%residumax .lt. this%tol) exit
-       if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
-    end do
-
-    ! print *, "f0val = ", f0val, "fval = ", fval
-
-    call cpu_time(end_time)
-
-    print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
-    print *, "this%designx%x is updated"
-
-
-    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
-    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
-    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
-    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
-
-    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
-         0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
-         0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
-         0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
-         0, neko_comm, ierr)
-    ! Only root process writes the file
-    if (rank .eq. 0) then
-       call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
-    end if
+!     call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
+!          all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
+!          0, neko_comm, ierr)
+!     call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
+!          all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
+!          0, neko_comm, ierr)
+!     call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
+!          all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
+!          0, neko_comm, ierr)
+!     call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
+!          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
+!          0, neko_comm, ierr)
+!     ! Only root process writes the file
+!     if (rank .eq. 0) then
+!        call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
+!     end if
 
   end subroutine simcomp_test_compute
 

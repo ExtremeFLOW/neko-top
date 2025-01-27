@@ -114,8 +114,9 @@ module mma
      !> Factory for the mma_t
      !! @details Only selects the compute backend.
      !! @param object The object to be allocated by the factory.
-     module subroutine mma_factory(object)
+     module subroutine mma_factory(object, backnd)
        class(mma_t), allocatable, intent(inout) :: object
+       character(len=:), allocatable :: backnd
      end subroutine mma_factory
   end interface
   public :: mma_factory
@@ -191,7 +192,8 @@ module mma
     xmin = xmin_const
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
-    call mma_factory(mma)
+    print *,"Initializing MMA backend to >>> ", backnd
+    call mma_factory(mma,backnd)
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
     call mma%init(x, n, m, a0, a, c, d, xmin, xmax, &

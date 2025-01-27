@@ -81,6 +81,7 @@
     }, 
     "mma": {
     	"max_iter": 100,
+    	"backend": "cuda",
     	"asyinit": 0.5,
     	"asyincr": 1.2,
     	"asydecr": 0.7,
