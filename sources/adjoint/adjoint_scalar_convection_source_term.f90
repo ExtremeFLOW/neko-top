@@ -87,8 +87,8 @@ contains
        json, fields, coef)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(field_list_t), intent(inout), target :: fields
-    type(coef_t), intent(inout), target :: coef
+    type(field_list_t), intent(in), target :: fields
+    type(coef_t), intent(in), target :: coef
 
     ! this is a bit weird... because I don't think this should come from the
     ! JSON.

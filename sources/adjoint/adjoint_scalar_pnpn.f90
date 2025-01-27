@@ -44,8 +44,7 @@ module adjoint_scalar_pnpn
   use dirichlet, only : dirichlet_t
   use neumann, only : neumann_t
   use field, only : field_t
-  use bc, only : bc_list_t, bc_list_init, bc_list_free, bc_list_apply_scalar, &
-       bc_list_add
+  use bc_list, only : bc_list_t
   use mesh, only : mesh_t
   use checkpoint, only : chkp_t
   use coefs, only : coef_t
@@ -219,8 +218,8 @@ contains
     call this%bc_res%finalize()
     call this%bc_res%set_g(0.0_rp)
 
-    call bc_list_init(this%bclst_ds)
-    call bc_list_add(this%bclst_ds, this%bc_res)
+    call this%bclst_ds%init()
+    call this%bclst_ds%append(this%bc_res)
 
 
     ! Intialize projection space
@@ -285,7 +284,7 @@ contains
     !Deallocate scalar field
     call this%scheme_free()
 
-    call bc_list_free(this%bclst_ds)
+    call this%bclst_ds%free()
     call this%proj_s%free()
 
     call this%s_res%free()
@@ -367,7 +366,7 @@ contains
 
 
       ! Apply Neumann boundary conditions
-      call bc_list_apply_scalar(this%bclst_neumann, this%f_Xh%x, dm_Xh%size())
+      call this%bclst_neumann%apply_scalar(this%f_Xh%x, dm_Xh%size())
 
       ! Add the advection operators to the right-hans-side.
       ! HARRY
@@ -397,8 +396,7 @@ contains
       !! occurs between elements. i.e. we do not apply gsop here like in Nek5000
       call this%field_dir_bc%update(this%field_dir_bc%field_list, &
            this%field_dirichlet_bcs, this%c_Xh, t, tstep, "scalar")
-      call bc_list_apply_scalar(this%bclst_dirichlet, &
-           this%s_adj%x, this%dm_Xh%size())
+      call this%bclst_dirichlet%apply_scalar(this%s_adj%x, this%dm_Xh%size())
 
 
       ! Update material properties if necessary
@@ -414,7 +412,7 @@ contains
 
 
       ! Apply a 0-valued Dirichlet boundary conditions on the ds.
-      call bc_list_apply_scalar(this%bclst_ds, s_res%x, dm_Xh%size())
+      call this%bclst_ds%apply_scalar(s_res%x, dm_Xh%size())
 
       call profiler_end_region('Scalar_residual', 20)
 
