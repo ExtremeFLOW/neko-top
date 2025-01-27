@@ -34,40 +34,29 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/simulation_adjoint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/steady_state_problem.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
-        # Problem setup
-        # Components for the objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
-
-        # List of specific problems, objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_scheme.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_pnpn.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_convection_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/minimum_dissipation_objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/volume_constraint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/scalar_mixing_objective_function.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
@@ -76,6 +65,71 @@ target_sources(neko-top
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
+
+
+
+
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_case.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_output.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_ic.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_source_term.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/simulation_adjoint.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
+
+        # # Problem setup
+        # # Components for the objectives and constraints
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective_factory.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
+
+        # # List of specific problems, objectives and constraints
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/objectives/lube_term_objective.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/objectives/minimum_dissipation_objective_function.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_scheme.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_pnpn.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scalar_convection_source_term.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
+
+        # ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
+        # # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
 )
 
 # ============================================================================ #
