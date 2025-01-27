@@ -179,7 +179,7 @@ contains
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => &
-       neko_point_zone_registry%get_point_zone(mask_name)
+            neko_point_zone_registry%get_point_zone(mask_name)
     end if
 
   end subroutine objective_function_init_base
