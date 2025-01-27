@@ -6,7 +6,7 @@ program usrneko
   use mask_ops, only: mask_exterior_const
 
   real(kind=rp) :: tolerance
-  ! integer :: max_iter
+  integer :: max_iter
 
   !> a problem type
   type(steady_state_problem_t) :: problem
@@ -16,13 +16,16 @@ program usrneko
   type(mma_optimizer_t) :: optimizer
 
   ! init the problem (base)
-  call problem%init()
+  call problem%init_base()
+
+  ! init the design
+  call design%init(problem%C%params, problem%C%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)
 
   ! init the optimizer
-  call optimizer%init(problem, design)
+  call optimizer%init(problem)
 
 
   tolerance = 1.0e-3_rp
