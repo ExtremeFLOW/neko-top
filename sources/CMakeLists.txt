@@ -42,8 +42,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
@@ -51,8 +49,11 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
 
         # List of specific problems, objectives and constraints
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
