@@ -51,7 +51,7 @@ module PDE_filter
   use field_registry, only: neko_field_registry
   use mapping, only: mapping_t
   use scratch_registry, only: neko_scratch_registry
-  use field_math, only: field_copy
+  use field_math, only: field_copy, field_add3
   use coefs, only: coef_t
   use logger, only: neko_log, LOG_SIZE
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -61,7 +61,7 @@ module PDE_filter
   use sx_jacobi, only: sx_jacobi_t
   use hsmg, only: hsmg_t
   use utils, only: neko_error
-  use device_math, only: device_cfill, device_col3
+  use device_math, only: device_cfill, device_subcol3, device_cmult
   implicit none
   private
 
@@ -78,9 +78,7 @@ module PDE_filter
      class(ksp_t), allocatable :: ksp_filt
      !> Filter Preconditioner
      class(pc_t), allocatable :: pc_filt
-     !> They will all be Neumann conditions.
-     type(neumann_t) :: filter_bcs
-     !> Filter boundary conditions
+     !> Filter boundary conditions (they will all be Neumann, so empty)
      type(bc_list_t) :: bclst_filt
 
      ! Inputs from the user
@@ -133,8 +131,8 @@ contains
     this%r = 0.01
     this%abstol_filt = 0.0000000001_rp
     this%ksp_max_iter = 200
-    this%ksp_solver = "gmres"
-    this%precon_type_filt = "ident"
+    this%ksp_solver = "cg"
+    this%precon_type_filt = "jacobi"
 
     call this%init_base(json, coef)
     call PDE_filter_init_from_attributes(this, coef)
@@ -146,32 +144,11 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     integer :: n
-    character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
-         bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
-
-
 
     n = this%coef%dof%size()
 
-    ! initialize the filter BCs
-    call this%filter_bcs%init_base(this%coef)
-
-    ! Create list with just Neumann bcs
-
-    ! init the list
+    ! init the bc list (all Neuman BCs, will remain empty)
     call this%bclst_filt%init()
-
-    ! Mark ALL the BCs as Neumann, regardless of what's prescribed
-    bc_labels_all_neuman = 'o'
-    call this%filter_bcs%mark_zones_from_list(coef%msh%labeled_zones,&
-         'o', bc_labels_all_neuman)
-
-    ! set the flux to zero
-    call this%filter_bcs%finalize_neumann(0.0_rp)
-
-    ! add them to the filter BCs
-    call this%bclst_filt%append(this%filter_bcs)
-
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%Ax, full_formulation = .false.)
@@ -181,24 +158,30 @@ contains
          this%ksp_max_iter, this%abstol_filt)
 
     ! set up preconditioner
-    call filter_precon_factory(this%pc_filt, this%ksp_filt, &
-         this%coef, this%coef%dof, this%coef%gs_h, this%bclst_filt, &
-         this%precon_type_filt)
+    call filter_precon_factory(this%pc_filt, this%ksp_filt, &                      
+                                      this%coef, this%coef%dof, &
+                                      this%coef%gs_h, &      
+                                      this%bclst_filt, this%precon_type_filt)
 
   end subroutine PDE_filter_init_from_attributes
 
   !> Destructor.
   subroutine PDE_filter_free(this)
     class(PDE_filter_t), intent(inout) :: this
+
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
 
-    call krylov_solver_destroy(this%ksp_filt)
-
-    call precon_destroy(this%pc_filt)
-
-    call this%filter_bcs%free()
+    if (allocated(this%ksp_filt)) then                                               
+       call krylov_solver_destroy(this%ksp_filt)                                     
+       deallocate(this%ksp_filt)                                                     
+    end if                                                                      
+                                                                                
+    if (allocated(this%pc_filt)) then                                                
+       call precon_destroy(this%pc_filt)                                             
+       deallocate(this%pc_filt)                                                      
+    end if                    
 
     call this%bclst_filt%free()
 
@@ -214,12 +197,23 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
     integer :: n, i
-    type(field_t), pointer :: RHS
+    type(field_t), pointer :: RHS, d_X_out
     character(len=LOG_SIZE) :: log_buf
-    integer :: temp_indices(1)
+    integer :: temp_indices(2)
 
     n = this%coef%dof%size()
     call neko_scratch_registry%request_field(RHS, temp_indices(1))
+    call neko_scratch_registry%request_field(d_X_out, temp_indices(2))
+    ! in a similar fasion to pressure/velocity, we will solve for d_X_out.
+
+    ! to improve convergence, we use X_in as an initial guess for X_out.
+    ! so X_out = X_in + d_X_in.
+
+    ! Defining the operator A = -r^2 \nabla^2 + I
+    ! the system changes from:
+    ! A (X_out) = X_in
+    ! to
+    ! A (d_X_out) = X_in - A(X_in)
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -227,37 +221,50 @@ contains
        ! I think this is correct but I've never tested it
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
-       call device_col3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
           this%coef%h1(i,1,1,1) = this%r**2
           ! ax_helm includes the mass matrix in h2
           this%coef%h2(i,1,1,1) = 1.0_rp
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = X_in%x(i,1,1,1)*this%coef%B(i,1,1,1)
        end do
     end if
     this%coef%ifh2 = .true.
 
-    ! This is a good idea from Niels' email!
-    ! copy the unfiltered design as an initial guess for the filtered design
-    ! to improved convergence
-    call field_copy(X_out, X_in)
+    ! compute the A(X_in) component of the RHS 
+    ! (note, to be safe with the inout intent we first copy X_in to the
+    !  temporary d_X_out)
+    call field_copy(d_X_out, X_in)
+    call this%Ax%compute(RHS%x, d_X_out%x, this%coef, this%coef%msh, &
+        this%coef%Xh)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_subcol3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
+       call device_cmult(RHS%x_d, -1.0_rp, n)
+    else
+       do i = 1, n
+          ! mass matrix should be included here
+          RHS%x(i,1,1,1) = X_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
+              - RHS%x(i,1,1,1)
+       end do
+    end if
 
     ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
+
     ! set BCs
     call this%bclst_filt%apply_scalar(RHS%x, n)
 
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
     this%ksp_results(1) = &
-         this%ksp_filt%solve(this%Ax, X_out, RHS%x, n, this%coef, &
+         this%ksp_filt%solve(this%Ax, d_X_out, RHS%x, n, this%coef, &
          this%bclst_filt, this%coef%gs_h)
 
     call profiler_end_region
 
+    ! add result
+    call field_add3(X_out, X_in, d_X_out)
     ! update preconditioner (needed?)
     call this%pc_filt%update()
 
@@ -301,13 +308,14 @@ contains
     type(field_t), intent(in) :: df_dX_out
     type(field_t), intent(inout) :: df_dX_in
     integer :: n, i
-    type(field_t), pointer :: RHS
-    integer :: temp_indices(1)
+    type(field_t), pointer :: RHS, delta ! I'm so sorry for this notation..
+    integer :: temp_indices(2)
     character(len=LOG_SIZE) :: log_buf
 
     n = this%coef%dof%size()
 
     call neko_scratch_registry%request_field(RHS, temp_indices(1))
+    call neko_scratch_registry%request_field(delta, temp_indices(2))
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -315,33 +323,48 @@ contains
        ! I think this is correct but I've never tested it
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
-       call device_col3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d, n)
     else
        do i = 1, n
           ! h1 is already negative in its definition
           this%coef%h1(i,1,1,1) = this%r**2
           ! ax_helm includes the mass matrix in h2
           this%coef%h2(i,1,1,1) = 1.0_rp
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = dF_dX_out%x(i,1,1,1) * this%coef%B(i,1,1,1)
        end do
     end if
     this%coef%ifh2 = .true.
 
-    ! Same trick as before
-    call field_copy(dF_dX_in, dF_dX_out)
+    ! compute the A(dF_dX_out) component of the RHS 
+    ! (note, to be safe with the inout intent we first copy dF_dX_out to the
+    !  temporary delta)
+    call field_copy(delta, dF_dX_out)
+    call this%Ax%compute(RHS%x, delta%x, this%coef, this%coef%msh, &
+        this%coef%Xh)
 
-    ! set BCs
-    call this%bclst_filt%apply_scalar(RHS%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_subcol3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d, n)
+       call device_cmult(RHS%x_d, -1.0_rp, n)
+    else
+       do i = 1, n
+          ! mass matrix should be included here
+          RHS%x(i,1,1,1) = dF_dX_out%x(i,1,1,1) * this%coef%B(i,1,1,1) &
+              - RHS%x(i,1,1,1)
+       end do
+    end if
 
     ! gather scatter
     call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
+    ! set BCs
+    call this%bclst_filt%apply_scalar(RHS%x, n)
+
     ! Solve Helmholtz equation
     call profiler_start_region('filter solve')
     this%ksp_results(1) = &
-         this%ksp_filt%solve(this%Ax, dF_dX_in, RHS%x, n, this%coef, &
+         this%ksp_filt%solve(this%Ax, delta, RHS%x, n, this%coef, &
          this%bclst_filt, this%coef%gs_h)
+
+    ! add result
+    call field_add3(dF_dX_in, dF_dX_out, delta)
 
     call profiler_end_region
 
@@ -367,8 +390,8 @@ contains
     implicit none
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
-    type(coef_t), target, intent(inout) :: coef
-    type(dofmap_t), target, intent(inout) :: dof
+    type(coef_t), target, intent(in) :: coef
+    type(dofmap_t), target, intent(in) :: dof
     type(gs_t), target, intent(inout) :: gs
     type(bc_list_t), target, intent(inout) :: bclst
     character(len=*) :: pctype
@@ -398,6 +421,5 @@ contains
     call ksp%set_pc(pc)
 
   end subroutine filter_precon_factory
-
 
 end module PDE_filter
