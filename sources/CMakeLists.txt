@@ -39,29 +39,19 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
+
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/steady_state_problem.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
-        # Problem setup
-        # Components for the objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
-
-        # List of specific problems, objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/minimum_dissipation_objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/volume_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
