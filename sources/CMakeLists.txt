@@ -43,7 +43,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/topopt_design.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/steady_state_problem.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
@@ -53,8 +52,11 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/minimum_dissipation_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/objectives/volume_constraint.f90
+
+        # List of specific problems, objectives and constraints
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 

@@ -141,7 +141,7 @@ contains
     if (design%if_mask) then
        ! init the base
        call this%init_base(fluid%dm_Xh, design%if_mask, &
-       design%optimization_domain%name)
+            design%optimization_domain%name)
 
        ! calculate the volume of the optimization domain
        call neko_scratch_registry%request_field(work , temp_indices(1))
