@@ -45,6 +45,8 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/steady_state_problem.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
+
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
