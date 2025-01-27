@@ -134,7 +134,7 @@ contains
     ! anyway...
     ! here we hard code for now
     this%is_max = .false.
-    this%v_max = 0.2
+    this%v_max = 0.2_rp
 
     ! Now we can extract the mask/if_mask from the design
     n = design%design_indicator%size()
