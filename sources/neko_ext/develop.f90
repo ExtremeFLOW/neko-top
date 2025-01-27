@@ -208,7 +208,7 @@ contains
 
     ! Allocate the nodes array
     if (allocated(nodes) .and. size(nodes, 2) .eq. N_nodes) then
-       nodes = 0.0_rp
+       nodes = 0.0
     else if (.not. allocated(nodes)) then
        allocate (nodes(3, N_nodes))
     else
