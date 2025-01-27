@@ -1,0 +1,321 @@
+#!/bin/bash
+# This script generates the cases for the Brinkman parameters study.
+# The script is organized in the following way:
+# 1) Define the function make_a_case, which generates the cases for a given
+#    experiment.
+# 2) Define the experiments, which are a set of cases with different parameters.
+# 3) Call make_a_case for each experiment.
+
+export ROOT_FOLDER=$(realpath $(dirname $0))
+
+make_a_case() {
+    # 1) Name of the experiment
+    experiment_name=$1
+
+    # inputs:
+    # 2) Boundary method
+    local -n _method_list=$2
+    # 3) mesh_list
+    local -n _mesh_list=$3
+    # 4) Re_list
+    local -n _Re_list=$4
+    # 5) chi_list
+    local -n _chi_list=$5
+    # 6) radius_list
+    local -n _radius_list=$6
+    # 7) rmax_list
+    local -n _rmax_list=$7
+    # 8) rpower_list
+    local -n _rpower_list=$8
+
+    # Define the location of the case
+    folder=$(realpath $ROOT_FOLDER/cases)
+    mkdir -p $folder $ROOT_FOLDER/experiments
+
+    # Create the experiment file and write the header
+    experiment_file=$ROOT_FOLDER/experiments/$experiment_name.csv
+    [ -f $experiment_file ] && rm $experiment_file
+    echo "name,method,mesh,Re,chi,radius,rmax,rpower" >>$experiment_file
+
+    # Loop over all the parameters
+    echo "Generating cases for $experiment_name"
+    cases=()
+    for method in "${_method_list[@]}"; do
+        for mesh in "${_mesh_list[@]}"; do
+            for Re in "${_Re_list[@]}"; do
+                for chi in "${_chi_list[@]}"; do
+                    for radius in "${_radius_list[@]}"; do
+                        for rmax in "${_rmax_list[@]}"; do
+                            for rpower in "${_rpower_list[@]}"; do
+
+                                # Build the name of the experiment
+                                name=""
+
+                                # If there is only one value in the list, don't
+                                # include it in the name
+                                name+=${method}_
+                                name+=mesh_${mesh}_
+                                name+=re_${Re//./-}_
+
+                                # Case specific parameters
+                                if [ "$method" == "brinkman" ]; then
+                                    name+=chi_${chi//./-}_
+                                    name+=radius_${radius//./-}_
+                                    rmax=-
+                                    rpower=-
+                                elif [ "$method" == "idw" ]; then
+                                    chi=-
+                                    radius=-
+                                    name+=rmax_${rmax//./-}_
+                                    name+=rpower_${rpower//./-}_
+                                else
+                                    chi=-
+                                    radius=-
+                                    rmax=-
+                                    rpower=-
+                                fi
+                                name=${name%_}
+
+                                # Check if the case already exists
+                                for c in "${cases[@]}"; do
+                                    [ "$c" == "$name" ] && continue 2
+                                done
+                                cases+=($name)
+                                printf "\t - $name\n"
+
+                                # Write the experiment to the experiment file
+                                echo "$name,$method,$mesh,$Re,$chi,$radius,$rmax,$rpower" >>$experiment_file
+
+                                # Create directory and copy the default files
+                                [ -d $folder/$name ] && continue
+                                mkdir -p $folder/$name
+                                cp -t $folder/$name $ROOT_FOLDER/default_case/cylinder.f90
+
+                                casefile=$folder/$name/cylinder.case
+                                if [ -f $ROOT_FOLDER/default_case/$method.template ]; then
+                                    cp $ROOT_FOLDER/default_case/$method.template $casefile
+                                else
+                                    echo "Method not recognized"
+                                    rm -fr $folder/$name
+                                    exit 1
+                                fi
+
+                                # Set the timestep based on which mesh wass chosen
+                                case $mesh in
+                                2) dt_mesh="2.50E-03" ;;
+                                3) dt_mesh="2.00E-03" ;;
+                                4) dt_mesh="1.13E-03" ;;
+                                *) dt_mesh="0" ;;
+                                esac
+
+                                if [ $method == "brinkman" ]; then
+                                    # Compute the expected timestep, in exponential notation
+                                    dt=$(echo "scale=10; ($(printf "%f" $dt_mesh)*100) / $chi" | bc)
+                                    # Compute min of the two
+                                    dt_mesh=$(printf "%f" $dt_mesh)
+                                    [ $(echo "$dt > $dt_mesh" | bc) -eq 1 ] && dt=$dt_mesh
+                                    dt=$(printf "%.2e" $dt)
+                                else
+                                    # Use the meshed timestep directly
+                                    dt=$dt_mesh
+                                fi
+
+                                # Locate the pattern and replace it
+                                if [ $method == "meshed" ]; then
+                                    mesh_pattern='"mesh_file": "data_local/brinkman_parameters/meshed_M2.nmsh"'
+                                    mesh_replacement='"mesh_file": "data_local/brinkman_parameters/meshed_M'$mesh'.nmsh"'
+                                else
+                                    mesh_pattern='"mesh_file": "data_local/brinkman_parameters/immersed_M2.nmsh"'
+                                    mesh_replacement='"mesh_file": "data_local/brinkman_parameters/immersed_M'$mesh'.nmsh"'
+                                fi
+
+                                re_pattern='"Re": 200.0'
+                                re_replacement='"Re": '$Re
+
+                                chi_pattern='"limits": \[ 0.0, 100.0 \]'
+                                chi_replacement='"limits": \[ 0.0, '$chi' \]'
+
+                                radius_pattern='"radius": 0.05'
+                                radius_replacement='"radius": '$radius
+
+                                rmax_pattern='"rmax": 1.0'
+                                rmax_replacement='"rmax": '$rmax
+
+                                rpower_pattern='"power_parameter": 1.0'
+                                rpower_replacement='"power_parameter": '$rpower
+
+                                timestep_pattern='"timestep": 2.5e-3'
+                                timestep_replacement='"timestep": '$dt
+
+                                sed -i "s#$mesh_pattern#$mesh_replacement#" $casefile
+                                sed -i "s#$re_pattern#$re_replacement#" $casefile
+                                sed -i "s#$chi_pattern#$chi_replacement#" $casefile
+                                sed -i "s#$radius_pattern#$radius_replacement#" $casefile
+                                sed -i "s#$rmax_pattern#$rmax_replacement#" $casefile
+                                sed -i "s#$rpower_pattern#$rpower_replacement#" $casefile
+                                sed -i "s#$timestep_pattern#$timestep_replacement#" $casefile
+                            done
+                        done
+                    done
+                done
+            done
+        done
+    done
+}
+
+# Clear the experiments folder and the cases folder
+rm -fr $ROOT_FOLDER/experiments $ROOT_FOLDER/cases
+
+# CASES
+# ---------------------------------------------------------------------------- #
+case_name="Implementation"
+
+method_list=("brinkman")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1" "100" "1000")
+radius_list=("0.05")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Filter_radius"
+
+method_list=("brinkman" "idw")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0" "0.01" "0.05" "0.1")
+rmax_list=("0.0" "1.0" "2.0" "5.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Re_study"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2")
+Re_list=("200" "400" "1000" "2000" "3900")
+chi_list=("1000")
+radius_list=("0.1" "0.01")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Mesh_study"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("200" "1000")
+chi_list=("1000")
+radius_list=("0.1" "0.01")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="IDW_study"
+
+method_list=("idw")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0.1")
+rmax_list=("1.0" "1.5" "2.0" "2.5" "3.0")
+rpower_list=("1.0" "1.5" "2.0" "2.5" "3.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+# Cases that would visually be nice in the deliverable
+# They're all based on parameters in the previous studies so hopefully
+# this is just for plotting, and requires no additional calculations.
+# ---------------------------------------------------------------------------- #
+case_name="report_brinkman_filter_radius"
+
+method_list=("brinkman")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0" "0.01" "0.05" "0.1")
+rmax_list=("0.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #
+case_name="report_idw_rmax"
+
+method_list=("idw")
+mesh_list=("2")
+Re_list=("200")
+chi_list=("1000")
+radius_list=("0")
+rmax_list=("0.0" "1.0" "2.0" "5.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #
+case_name="Report_mesh_study_Re200"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("200")
+chi_list=("1000")
+# this would be the one I really want
+radius_list=("0.01")
+# these will arrive faster
+# radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+
+# ---------------------------------------------------------------------------- #
+case_name="Report_mesh_study_Re1000"
+
+method_list=("brinkman" "meshed" "idw")
+mesh_list=("2" "3" "4")
+Re_list=("1000")
+chi_list=("1000")
+# this would be the one I really want
+radius_list=("0.01")
+# these will arrive faster
+# radius_list=("0.1")
+rmax_list=("1.0")
+rpower_list=("1.0")
+
+make_a_case $case_name \
+    method_list mesh_list Re_list \
+    chi_list radius_list \
+    rmax_list rpower_list
+# ---------------------------------------------------------------------------- #

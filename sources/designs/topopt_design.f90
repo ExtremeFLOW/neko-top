@@ -44,12 +44,13 @@ module topopt_design
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
+  use design, only: design_t
 
   implicit none
   private
 
   !> A topology optimization design variable
-  type, public :: topopt_design_t
+  type, extends(design_t), public :: topopt_design_t
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
@@ -133,6 +134,7 @@ module topopt_design
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
      type(RAMP_mapping_t) :: mapping
+
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
@@ -188,6 +190,7 @@ contains
     type(coef_t), intent(inout) :: coef
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
+
     ! init the fields
     call this%design_indicator%init(coef%dof, "design_indicator")
     call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
@@ -285,7 +288,7 @@ contains
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)
 
-
+    call this%init_base(n)
   end subroutine topopt_design_init
 
 

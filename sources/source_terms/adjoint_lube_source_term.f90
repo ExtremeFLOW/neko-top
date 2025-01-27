@@ -49,11 +49,13 @@ module adjoint_lube_source_term
   use source_term, only : source_term_t
   use coefs, only : coef_t
   use field, only: field_t
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
   use field_math, only: field_addcol3, field_copy, field_cmult
   use scratch_registry, only : neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -92,8 +94,8 @@ contains
   subroutine adjoint_lube_source_term_init_from_json(this, json, fields, coef)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    type(field_list_t), intent(inout), target :: fields
-    type(coef_t), intent(inout), target :: coef
+    type(field_list_t), intent(in), target :: fields
+    type(coef_t), intent(in), target :: coef
     ! real(kind=rp), allocatable :: values(:)
     ! real(kind=rp) :: start_time, end_time
 
@@ -117,12 +119,12 @@ contains
        coef)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
-    type(field_list_t) :: fields
-    type(coef_t) :: coef
+    class(design_t), intent(in), target :: design
+    class(point_zone_t), intent(in), target :: mask
+    type(coef_t), intent(in) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    type(topopt_design_t), intent(in), target :: design
-    class(point_zone_t), intent(in), target :: mask
+    type(field_list_t) :: fields
     logical :: if_mask
     real(kind=rp) :: K
     type(field_t), intent(in), target :: u, v, w
@@ -150,9 +152,14 @@ contains
     this%v => v
     this%w => w
 
-    this%chi => design%brinkman_amplitude
-    this%K = K
+    select type(design)
+      type is (topopt_design_t)
+       this%chi => design%brinkman_amplitude
+      class default
+       call neko_error('Unknown design type')
+    end select
 
+    this%K = K
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => mask

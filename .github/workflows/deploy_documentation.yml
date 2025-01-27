@@ -1,12 +1,12 @@
 name: Deploy documentation to Pages
 
-# Runs on pull requests targeting the main branch and when the pull request is
-# closed. This allows us to build the documentation and deploy it to GitHub
-# Pages when the pull request is merged.
+# Runs on every push to the develop branch. Since the develop branch is
+# protected, only pull requests can be merged into it. This ensures that the
+# documentation is only built and deployed when a pull request is merged.
 on:
-  pull_request_target:
-    branches: ["main"]
-    types: [closed]
+  push:
+    branches:
+      - "develop"
 
 # Allow only one concurrent deployment, skipping runs queued between the run
 # in-progress and latest queued. We do not wish to waste time on old runs if a
@@ -18,12 +18,12 @@ concurrency:
 jobs:
   build:
     name: Build documentation
-    if: github.event.pull_request.merged == true
-
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: develop
 
       - name: Setup system cached
         uses: awalsh128/cache-apt-pkgs-action@latest
@@ -43,7 +43,6 @@ jobs:
 
   deploy:
     name: Deploy documentation
-    if: github.event.pull_request.merged == true
     needs: build
 
     environment:

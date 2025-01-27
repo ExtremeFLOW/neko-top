@@ -1,7 +1,6 @@
 {
     "version": 1.0,
-    "case":
-    {
+    "case": {
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
@@ -52,7 +51,7 @@
             },
             "boundary_types": [ "v", "v", "sym", "sym" ],
             "output_control": "tsteps",
-            "output_value": 50000000,
+            "output_value": 50000000
         },
         "simulation_components": [
             {
@@ -63,7 +62,7 @@
                 "compute_value": 1
             }
         ],
-     "point_zones": [
+        "point_zones": [
             {
                 "name": "optimization_domain",
                 "geometry": "box",
@@ -77,10 +76,46 @@
                 ],
                 "z_bounds": [
                     -1.0,
-                     1.0,
+                    1.0,
                 ],
-           }
-                 ]
-
+            }
+        ]
+    },
+    "optimization": {
+        "objectives": [
+            {
+                "type": "minimum_dissipation",
+                "weight": 1.0
+            },
+            {
+                "type": "lube_term",
+                "weight": 1.0,
+                // "mask_name": "optimization_domain",
+                "K": 1.0
+            }
+        ],
+        "constraints": [
+            {
+                "type": "volume",
+                "mask_name": "optimization_domain",
+                "limit": 0.2,
+                "is_max": false
+            }
+        ],
+    },
+    "mma": {
+        "max_iter": 100,
+        "asyinit": 0.5,
+        "asyincr": 1.2,
+        "asydecr": 0.7,
+        "m": 1,
+        "scale": 1.0,
+        "auto_scale": false,
+        "xmin": 0.0,
+        "xmax": 1.0,
+        "a0": 1.0,
+        "a": 0.0,
+        "c": 100.0,
+        "d": 0.0
     }
 }

@@ -71,7 +71,7 @@ for test in ${tests[@]}; do
 
         # If more than one file exists
         if [[ ${#file[@]} -gt 2 ]]; then
-            file+=" $LPATH/$test/output.log"
+            file+="$LPATH/$test/output.log"
         fi
 
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
@@ -90,7 +90,7 @@ for test in ${tests[@]}; do
                     stat="Running:"
                     progress=$(
                         tail -n 100 "${f%.*}.log" |        # Get the last 1000 lines
-                            grep 't = ' "${f%.*}.log" |    # Get all timestamps
+                            grep '^\s*t = ' |              # Get all timestamps
                             tail -n 1 |                    # Get the last line
                             sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                             xargs                          # Trim whitespace
@@ -98,9 +98,10 @@ for test in ${tests[@]}; do
                 fi
                 printf '\t\e[1;33m%-12s\e[m' "$stat"
                 if [[ "$stat" == "Running:" && ! -z "$progress" ]]; then
-                    printf ' [%7s]' "$progress"
+                    printf ' [%7s ]' "$progress"
                 fi
-                if [ $(basename $f) = "output.log" ]; then
+
+                if [[ $(basename $f) == "output.log" || ${#file[@]} -lt 2 ]]; then
                     printf " %s\n" "$test"
                 else
                     printf " %s\n" "$test/$(basename $f)"

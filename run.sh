@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit with nonzero exit code if anything fails
+set +e # Do not exit on error
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -16,6 +16,8 @@ function help() {
     echo -e "  file. The examples folder is searched for the specified pattern."
     echo -e "  If multiple matching case files are found, then all of them are"
     echo -e "  run."
+    echo -e "  Please note: Cases are in fact json files. We support regular"
+    echo -e "  json files, json files hidden under the '.case' filename."
     echo -e ""
     echo -e "  See Readme for additional details."
     echo -e ""
@@ -28,6 +30,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
     printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
+    printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
 
     printf "\n\e[4mAvailable case files:\e[0m\n"
     for case in $(find $EPATH -name "*.case" 2>/dev/null); do
@@ -46,10 +49,11 @@ NEKO=false
 DELETE=false
 CLUSTER=""
 DRY=false
+RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run
-OPT="a,c,h,n,s:,d"
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
+OPT="a,c,h,n,s:,d,r"
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -65,6 +69,7 @@ while true; do
     "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
     "-s" | "--submit") CLUSTER="$2" && shift 2 ;; # Submit to the queue
     "--dry-run") DRY=true && shift ;;             # Dry run
+    "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
 
     # End of options
     "--") shift && break ;;
@@ -122,12 +127,14 @@ for in in $@; do
     matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
     matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
     matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
+    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.json"))
 
     for match in ${matches[@]}; do
         file_list=()
         if [ -d $match ]; then
             file_list=($(find $match -name "run.sh" 2>/dev/null))
             file_list+=($(find $match -name "*.case" 2>/dev/null))
+            file_list+=($(find $match -name "*.json" 2>/dev/null))
         fi
         if [ -f $match ]; then
             file_list+=($match)
@@ -150,6 +157,7 @@ done
 if [ "$ALL" == true ]; then
     file_list=($(find $EPATH -name "run.sh" 2>/dev/null))
     file_list+=($(find $EPATH -name "*.case" 2>/dev/null))
+    file_list+=($(find $EPATH -name "*.json" 2>/dev/null))
 
     example_list=()
     for file in ${file_list[@]}; do
@@ -189,27 +197,50 @@ done
 for i in ${!example_list[@]}; do
     example=${example_list[$i]}
     parent=$(dirname ${example%/*.*})
-    while [[ $parent != "." &&
-        -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case')" ]]; do
-        parent=$(dirname $parent)
+    while [ $parent != "." ]; do
+
+        if [[ ! -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case' -or -name '*.json')" ]]; then
+
+            printf >&2 "\e[1;31mInvalid example file:\e[m\n"
+            printf >&2 "$EPATH/$example\n"
+            printf >&2 "\tNested examples are not allowed.\n"
+            printf >&2 "\tMove the $example file to the root of example suite\n"
+            if [[ ${example: -5} == ".case" || ${example: -5} == ".json" ]]; then
+                printf >&2 "\tor create a run.sh file in the parent folder.\n"
+            fi
+
+            unset example_list[$i]
+
+            parent="."
+        else
+            parent=$(dirname $parent)
+        fi
     done
 
-    if [ $parent != "." ]; then
-
-        printf >&2 "\e[1;31mInvalid example file:\e[m\n"
-        printf >&2 "$EPATH/$example\n"
-        printf <&2 "\tNested examples are not allowed.\n"
-        printf <&2 "\tMove the $example file to the root of example suite\n"
-        if [ ${example: -5} == ".case" ]; then
-            printf >&2 "\tor create a run.sh file in the parent folder.\n"
-        fi
-
-        unset example_list[$i]
-    fi
 done
 
 # Remove duplicates and check for nested examples
 example_list=($(echo "${example_list[@]}" | tr ' ' '\n' | sort -u))
+
+# If multiple examples with same name and  different file extensions are found
+# we stop the execution and print an error message.
+for example in ${example_list[@]}; do
+
+    matches=($(
+        find $EPATH -wholename "$EPATH/${example%.*}.json" \
+            -or -wholename "$EPATH/${example%.*}.case"
+    ))
+
+    if [ ${#matches[@]} -gt 1 ]; then
+        printf >&2 "\e[1;31mInvalid example file:\e[m ${example%.*}\n"
+        printf >&2 "\tMultiple examples with the same name found.\n"
+        printf >&2 "\tPlease remove the duplicates.\n"
+        for match in ${matches[@]}; do
+            printf >&2 "\t- ${match#$EPATH/}\n"
+        done
+        exit 1
+    fi
+done
 
 # Check if any examples were found, if not, exit.
 if [ -z $example_list ]; then
@@ -249,6 +280,10 @@ function Submit() {
     cd $LPATH/$example
     if [ $CLUSTER == "DTU" ]; then
         export BSUB_QUIET=Y
+        if [ ! -z "$(bjobs -J $1 2>/dev/null)" ]; then
+            bkill -J $1 1>/dev/null 2>/dev/null
+        fi
+
         bsub -J $1 -env "all" <job_script.sh
 
     elif [ $CLUSTER == "MN5" ]; then
@@ -282,7 +317,6 @@ trap 'handler' SIGINT
 
 # ============================================================================ #
 # Run the examples
-set +e # Do not exit on error during execution
 full_start=$(date +%s.%N)
 QUEUE=""
 
@@ -295,13 +329,18 @@ for case in ${example_list[@]}; do
     # Define the name of the current exampel, if there are multiple cases in the
     # same folder, we add the case name to the example name.
     example=$case_dir
-    if [[ ${case: -5} == ".case" &&
-        $(find $EPATH/$case_dir -name "*.case" | wc -l) > 1 ]]; then
+
+    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 
+    if [ "$RERUN" == false ] && [ -d "$RPATH/$example" ]; then
+        printf '\t%-12s %-s\n' "Skipped:" "$example"
+        continue
+    fi
+
     export log=$LPATH/$example && mkdir -p $log
-    [ "$CLEAN" = true ] && rm -fr $log/*
+    [ "$CLEAN" == true ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
@@ -311,6 +350,9 @@ for case in ${example_list[@]}; do
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
+    elif [ -f "$log/output.log" ]; then
+        printf '\t%-12s %-s\n' "Skipping:" "$example"
+        continue
     fi
 
     # Remove old output and error files
@@ -318,21 +360,22 @@ for case in ${example_list[@]}; do
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
-    if [ ${case: -3} == ".sh" ]; then
-        find $EPATH/$case_dir -name "*.case" -exec cp -ft $log {} +
+    if [ $case == "run.sh" ]; then
+        find $EPATH/$case_dir -name "*.case" -or -name "*.json" \
+            -exec cp -ft $log {} +
     elif [ ${case: -5} == ".case" ]; then
+        cp -ft $log $EPATH/$case
+    elif [ ${case: -5} == ".json" ]; then
         cp -ft $log $EPATH/$case
     fi
 
     # Copy all data from the case folder to the log folder
     find $EPATH/$case_dir/* -maxdepth 0 \
-        -not -name "*.case" -and -not -name "*.nmsh" \
+        -not -name "*.case" -and -not -name "*.json" -and -not -name "*.nmsh" \
         -exec rsync -r {} $log \;
 
     # Create symbolic links to the mesh files to avoid copying massive files
-    for file in $(find $EPATH/$case_dir -name "*.nmsh" 2>/dev/null); do
-        ln -fs $file $log
-    done
+    find $EPATH/$case_dir -name "*.nmsh" -exec ln -fs {} $log \;
 
     # Copy the job script to the log folder
     cp -f $SPATH/functions.sh $log/functions.sh
