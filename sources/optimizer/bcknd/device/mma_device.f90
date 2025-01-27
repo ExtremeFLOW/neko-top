@@ -206,6 +206,12 @@ contains
        error stop
     end if
     
+
+    ! update the device pointer for the input vector_t and matrix_t
+    call device_memcpy_r1(df0dx%x, df0dx%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy_r1(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy_r2(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)
+
     call xdesign%init(this%n)
     call device_memcpy_r1(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
     
@@ -287,6 +293,7 @@ contains
      integer :: i, j, ierr
      type(vector_t) :: globaltmp_m
 
+
      call globaltmp_m%init(this%m)
      if (iter .lt. 3) then
           call device_add3s2(this%low%x_d,this%xmax%x_d,this%xmin%x_d,-this%asyinit,this%asyinit,this%n)
@@ -314,7 +321,7 @@ contains
      call device_memcpy(this%pij%x, this%pij%x_d, this%n*this%m, DEVICE_TO_HOST, sync=.true.)
      call device_memcpy(this%qij%x, this%qij%x_d, this%n*this%m, DEVICE_TO_HOST, sync=.true.)
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     !!!!!cpu gpu transfer part
+     !!!!!cpu gpu transfer and global sum
      globaltmp_m%x=0.0_rp
      call device_memcpy_r1(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
      call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, &
@@ -325,8 +332,6 @@ contains
      call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
 
      print *, "gpu bi=",this%bi%x
-     ! call cuda_mpisum(this%bi%x_d, this%m)
-     ! call device_sub2(this%bi%x_d, fval%x_d, this%m)
      call globaltmp_m%free()
   end subroutine mma_gensub_device
 
