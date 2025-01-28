@@ -68,7 +68,7 @@ contains
        print *, "Initializing mma_optimizer with steady_state_problem_t."
        ! mma_init_json( x, n, json, auto_scale, scale)
        call this%mma%init_json(this%design%design_indicator%x, &
-            this%design%design_indicator%size(), problem%C%params, this%scale, &
+            this%design%design_indicator%size(), problem%simulation%neko_case%params, this%scale, &
             this%auto_scale)
        print *, "scale = ", this%scale
        print *, "auto_scale = ", this%auto_scale
@@ -190,13 +190,13 @@ contains
          call problem%sample(real(iter, rp))
 
          call this%design%map_forward()
-         call reset(problem%C)
+         call reset(problem%simulation%neko_case)
          ! TODO
          ! reset for the adjoint
-         call field_rzero(problem%adj%scheme%u_adj)
-         call field_rzero(problem%adj%scheme%v_adj)
-         call field_rzero(problem%adj%scheme%w_adj)
-         problem%C%fluid%freeze = .false.
+         call field_rzero(problem%simulation%adjoint_case%scheme%u_adj)
+         call field_rzero(problem%simulation%adjoint_case%scheme%v_adj)
+         call field_rzero(problem%simulation%adjoint_case%scheme%w_adj)
+         problem%simulation%neko_case%fluid%freeze = .false.
       end do
     end associate
 

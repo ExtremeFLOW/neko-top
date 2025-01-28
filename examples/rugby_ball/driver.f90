@@ -19,7 +19,7 @@ program usrneko
   call problem%init()
 
   ! init the design
-  call design%init(problem%C%params, problem%C%fluid%c_Xh)
+  call design%init(problem%simulation%neko_case%params, problem%simulation%neko_case%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)

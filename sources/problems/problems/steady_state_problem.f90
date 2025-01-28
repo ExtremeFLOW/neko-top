@@ -60,11 +60,6 @@ module steady_state_problem
   !> To compute a steady state problem
   type, public, extends(problem_t) :: steady_state_problem_t
 
-     !> and primal case
-     type(case_t), pointer, public :: C
-     !> and adjoint case
-     type(adjoint_case_t), pointer, public :: adj
-
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
@@ -120,14 +115,9 @@ contains
     ! initialize the simulation
     call this%simulation%init()
 
-    ! initialize the primal
-    this%C => this%simulation%neko_case
-    ! initialize the adjoint
-    this%adj => this%simulation%adjoint_case
-
     ! append a steady state simcomp
-    ! this%C%usr%init_user_simcomp => steady_state_simcomp
-    ! call user_setup(this%C%usr)
+    ! this%simulation%neko_case%usr%init_user_simcomp => steady_state_simcomp
+    ! call user_setup(this%simulation%neko_case%usr)
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
     ! and objectives. NOTE, perhaps we'll just populate the list but not
@@ -163,22 +153,29 @@ contains
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
-         this%C%fluid%f_x, this%C%fluid%f_y, this%C%fluid%f_z, &
+         this%simulation%neko_case%fluid%f_x, &
+         this%simulation%neko_case%fluid%f_y, &
+         this%simulation%neko_case%fluid%f_z, &
          design, &
-         this%C%fluid%u, this%C%fluid%v, this%C%fluid%w, &
-         this%C%fluid%c_Xh)
+         this%simulation%neko_case%fluid%u, &
+         this%simulation%neko_case%fluid%v, &
+         this%simulation%neko_case%fluid%w, &
+         this%simulation%neko_case%fluid%c_Xh)
     ! append brinkman source term to the forward problem
-    call this%C%fluid%source_term%add(forward_brinkman)
+    call this%simulation%neko_case%fluid%source_term%add(forward_brinkman)
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
-         this%adj%scheme%f_adj_x, this%adj%scheme%f_adj_y, &
-         this%adj%scheme%f_adj_z, &
+         this%simulation%adjoint_case%scheme%f_adj_x, &
+         this%simulation%adjoint_case%scheme%f_adj_y, &
+         this%simulation%adjoint_case%scheme%f_adj_z, &
          design, &
-         this%adj%scheme%u_adj, this%adj%scheme%v_adj, this%adj%scheme%w_adj, &
-         this%adj%scheme%c_Xh)
+         this%simulation%adjoint_case%scheme%u_adj, &
+         this%simulation%adjoint_case%scheme%v_adj, &
+         this%simulation%adjoint_case%scheme%w_adj, &
+         this%simulation%adjoint_case%scheme%c_Xh)
     ! append brinkman source term based on design
-    call this%adj%scheme%source_term%add(adjoint_brinkman)
+    call this%simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
 
     ! TODO
     ! Note, Tim, while you're reading this I'm sure you can already see we need
@@ -226,9 +223,13 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
-    call this%objective_function%init(design, this%C%fluid, this%adj%scheme)
+    call this%objective_function%init(design, &
+         this%simulation%neko_case%fluid, &
+         this%simulation%adjoint_case%scheme)
     ! volume constraint
-    call this%volume_constraint%init(design, this%C%fluid, this%adj%scheme)
+    call this%volume_constraint%init(design, &
+         this%simulation%neko_case%fluid, &
+         this%simulation%adjoint_case%scheme)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -244,16 +245,16 @@ contains
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
     call this%output%init(sp, 'optimization', 13)
-    call this%output%fields%assign(1, this%C%fluid%p)
-    call this%output%fields%assign(2, this%C%fluid%u)
-    call this%output%fields%assign(3, this%C%fluid%v)
-    call this%output%fields%assign(4, this%C%fluid%w)
+    call this%output%fields%assign(1, this%simulation%neko_case%fluid%p)
+    call this%output%fields%assign(2, this%simulation%neko_case%fluid%u)
+    call this%output%fields%assign(3, this%simulation%neko_case%fluid%v)
+    call this%output%fields%assign(4, this%simulation%neko_case%fluid%w)
     ! I don't know why these ones need assign_to_field?
     call this%output%fields%assign_to_field(5, design%design_indicator)
-    call this%output%fields%assign(6, this%adj%scheme%u_adj)
-    call this%output%fields%assign(7, this%adj%scheme%v_adj)
-    call this%output%fields%assign(8, this%adj%scheme%w_adj)
-    call this%output%fields%assign(9, this%adj%scheme%p_adj)
+    call this%output%fields%assign(6, this%simulation%adjoint_case%scheme%u_adj)
+    call this%output%fields%assign(7, this%simulation%adjoint_case%scheme%v_adj)
+    call this%output%fields%assign(8, this%simulation%adjoint_case%scheme%w_adj)
+    call this%output%fields%assign(9, this%simulation%adjoint_case%scheme%p_adj)
     call this%output%fields%assign_to_field(10, design%brinkman_amplitude)
     call this%output%fields%assign_to_field(11, &
          this%objective_function%sensitivity_to_coefficient)
@@ -280,8 +281,8 @@ contains
   !> Destructor.
   subroutine steady_state_problem_free(this)
     class(steady_state_problem_t), intent(inout) :: this
-    call adjoint_free(this%adj)
-    call neko_finalize(this%C)
+    call adjoint_free(this%simulation%adjoint_case)
+    call neko_finalize(this%simulation%neko_case)
     ! TODO
     ! probably also objective functions etc
 
@@ -292,7 +293,7 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
     type(topopt_design_t), intent(inout) :: design
 
-    call neko_solve(this%C)
+    call neko_solve(this%simulation%neko_case)
     ! TODO
     ! In the future, the objective_function_t will potentially include
     ! simulation components so that we can
@@ -302,8 +303,8 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%compute(design, this%C%fluid)
-    call this%volume_constraint%compute(design, this%C%fluid)
+    call this%objective_function%compute(design, this%simulation%neko_case%fluid)
+    call this%volume_constraint%compute(design, this%simulation%neko_case%fluid)
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
@@ -328,7 +329,7 @@ contains
   subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
     class(topopt_design_t), intent(inout) :: design
-    call solve_adjoint(this%adj)
+    call solve_adjoint(this%simulation%adjoint_case)
 
     ! again, in the future, the objective_function_t will potentially include
     ! simulation components so that we can
@@ -347,9 +348,9 @@ contains
     ! objectives%compute_sensitivity()
     ! and it would cycled through the list.
     call this%objective_function%compute_sensitivity(&
-         design, this%C%fluid, this%adj%scheme)
+         design, this%simulation%neko_case%fluid, this%simulation%adjoint_case%scheme)
     call this%volume_constraint%compute_sensitivity(&
-         design, this%C%fluid, this%adj%scheme)
+         design, this%simulation%neko_case%fluid, this%simulation%adjoint_case%scheme)
     ! it would be nice to visualize this
 
     ! do the adjoint mapping
