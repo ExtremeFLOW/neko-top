@@ -39,6 +39,7 @@ module steady_state_problem
   use simulation_adjoint, only: solve_adjoint
   use neko, only: neko_init, neko_finalize, neko_solve
   use case, only: case_t
+  use design, only: design_t
   use topopt_design, only: topopt_design_t
   use json_file_module, only: json_file
   use minimum_dissipation_objective_function, only: &
@@ -59,12 +60,12 @@ module steady_state_problem
   !> To compute a steady state problem
   type, public, extends(problem_t) :: steady_state_problem_t
 
-     type(simulation_t), public :: simulation
-
      !> and primal case
      type(case_t), pointer, public :: C
      !> and adjoint case
      type(adjoint_case_t), pointer, public :: adj
+
+     type(topopt_design_t), pointer :: design
 
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
@@ -90,10 +91,11 @@ module steady_state_problem
 
    contains
      !> The common constructor using a JSON object.
-     ! TODO
-     ! we need to sort out the case file
-     procedure, pass(this) :: init_base => steady_state_problem_init_base
-     procedure, pass(this) :: init_design => &
+     procedure, pass(this) :: init => steady_state_problem_init
+
+     !> Constructor of a generic design problem.
+     procedure, pass(this) :: init_design => steady_state_problem_init_design
+     procedure, pass(this) :: init_design_topopt => &
           steady_state_problem_init_design_topopt
      ! but we could point to more depending on what design comes in
      !> Destructor.
@@ -112,8 +114,9 @@ module steady_state_problem
   end type steady_state_problem_t
 
 contains
+
   !> The constructor for the base problem.
-  subroutine steady_state_problem_init_base(this)
+  subroutine steady_state_problem_init(this)
     class(steady_state_problem_t), target, intent(inout) :: this
 
     ! initialize the simulation
@@ -133,7 +136,23 @@ contains
     ! initialize them yet! As they may depend on the design.
 
 
-  end subroutine steady_state_problem_init_base
+  end subroutine steady_state_problem_init
+
+  !> The constructor of a generic design problem.
+  !! @params this: The problem to initialize.
+  !! @params design: The design to initialize the problem with.
+  subroutine steady_state_problem_init_design(this, design)
+    class(steady_state_problem_t), intent(inout) :: this
+    class(design_t), target, intent(inout) :: design
+
+    select type(design)
+      type is(topopt_design_t)
+       call this%init_design_topopt(design)
+      class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_init_design
 
   !> The constructor if a `topopt_design_t` is passed
   ! again, this is the only type of design we have so far...

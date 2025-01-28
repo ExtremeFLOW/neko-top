@@ -1,30 +1,69 @@
+!> @file problem.f90
+!! @copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+
+!> Module for handling the optimization problem.
 module problem
   use num_types, only: rp
-  use topopt_design, only: topopt_design_t
+  use design, only: design_t
+  use simulation, only: simulation_t
 
   implicit none
   private
 
-  !> implements the problem type.
-  ! Currently very abstract, could include unsteady problems etc.
-  ! Also, dependingo on the type of optimizer used, we may require
-  ! different functionality.
-  ! Right now, all that is required in base class is to init and
-  ! evaluate the problem.
+  !> The abstract problem type.
+  !!
+  !! This module defines the `problem_t` type which is the main interface for
+  !! the optimization problem. The problem is defined by a set of objectives and
+  !! constraints that are evaluated based on the design variables. The problem
+  !! also handles the output of the problem and the simulation.
   type, abstract, public :: problem_t
-     !> pointer to the design
-     ! TODO
-     ! should be abstract!
-     ! class(design_variable_t), pointer :: design
-     type(topopt_design_t), pointer :: design
+     private
+
+     !> The simulation.
+     type(simulation_t), public :: simulation
 
    contains
-     !> Constructor for physics of the problem
-     procedure(problem_init_base), pass(this), deferred :: init_base
-     !> Additional constructor specific to a design
-     procedure(problem_init_design), pass(this), deferred :: init_design
+
+     ! ----------------------------------------------------------------------- !
+     ! Interfaces
+
+     !> Constructor for physics of the problem.
+     procedure(problem_init), pass(this), public, deferred :: init
+     !> Additional constructor specific to a design.
+     procedure(problem_init_design), pass(this), public, deferred :: init_design
      !> Destructor.
-     procedure(problem_free), pass(this), deferred :: free
+     procedure(problem_free), pass(this), deferred, public :: free
+
      !> Evaluate the optimization problem.
      procedure(problem_compute), pass(this), deferred :: compute
      !> Sample the problem
@@ -34,22 +73,22 @@ module problem
 
   !> Constructor for physics of the problem
   abstract interface
-     subroutine problem_init_base(this)
+     subroutine problem_init(this)
        import problem_t
        class(problem_t), target, intent(inout) :: this
-     end subroutine problem_init_base
+     end subroutine problem_init
   end interface
 
   !> Additional constructor based on a design
   abstract interface
      subroutine problem_init_design(this, design)
-       import problem_t, topopt_design_t
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        ! class(design_variable_t), intent(in) :: design
-       ! we also only have the `topopt_design_t` but this should take the more
+       ! we also only have the `design_t` but this should take the more
        ! abstract `design_variable_t` and initialize differently according to
        ! the type entering here.
-       type(topopt_design_t), target, intent(inout) :: design
+       class(design_t), target, intent(inout) :: design
 
        ! This is confusing to me..
        ! The `problem` and the `design` seem very coupled in my mind.

@@ -16,7 +16,7 @@ program usrneko
   type(mma_optimizer_t) :: optimizer
 
   ! init the problem (base)
-  call problem%init_base()
+  call problem%init()
 
   ! init the design
   call design%init(problem%C%params, problem%C%fluid%c_Xh)
