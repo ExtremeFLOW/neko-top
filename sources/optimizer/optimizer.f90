@@ -24,19 +24,19 @@ module optimizer
 
   !> Interface for optimizer initialization
   abstract interface
-     subroutine optimizer_init(this, prob)
+     subroutine optimizer_init(this, problem)
        import optimizer_t, problem_t
        class(optimizer_t), intent(inout) :: this
-       class(problem_t), intent(inout) :: prob
+       class(problem_t), intent(inout) :: problem
      end subroutine optimizer_init
   end interface
 
   !> Interface for running the optimization loop
   abstract interface
-     subroutine optimizer_run(this, prob, tolerance)
+     subroutine optimizer_run(this, problem, tolerance)
        import optimizer_t, problem_t, rp
        class(optimizer_t), intent(inout) :: this
-       class(problem_t), intent(inout) :: prob
+       class(problem_t), intent(inout) :: problem
        real(kind=rp), intent(in) :: tolerance
      end subroutine optimizer_run
   end interface

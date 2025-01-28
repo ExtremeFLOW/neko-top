@@ -50,19 +50,19 @@ module mma_optimizer
 contains
 
   !> Initialize the MMA optimizer, associate it with a specific problem
-  subroutine mma_optimizer_init(this, prob)
+  subroutine mma_optimizer_init(this, problem)
     class(mma_optimizer_t), intent(inout) :: this
-    class(problem_t), intent(inout) :: prob
+    class(problem_t), intent(inout) :: problem
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
-    select type (prob)
+    select type (problem)
       type is (steady_state_problem_t)
-       ! Now we know prob is of type steady_state_problem_t
+       ! Now we know problem is of type steady_state_problem_t
        print *, "Initializing mma_optimizer with steady_state_problem_t."
        ! mma_init_json( x, n, json, auto_scale, scale)
-       call this%mma%init_json( prob%design%design_indicator%x, &
-            prob%design%design_indicator%size(), prob%C%params, this%scale, &
+       call this%mma%init_json(problem%design%design_indicator%x, &
+            problem%design%design_indicator%size(), problem%C%params, this%scale, &
             this%auto_scale)
        print *, "scale = ", this%scale
        print *, "auto_scale = ", this%auto_scale
@@ -73,26 +73,26 @@ contains
   end subroutine mma_optimizer_init
 
   ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, prob, tolerance)
+  subroutine mma_optimizer_run(this, problem, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
-    class(problem_t), intent(inout) :: prob
+    class(problem_t), intent(inout) :: problem
     real(kind=rp), intent(in) :: tolerance
 
     ! Check the type of the problem using select type
-    select type (prob)
+    select type (problem)
       type is (steady_state_problem_t)
-       ! Now we know prob is of type steady_state_problem_t, call the run_ss
-       call this%run_ss(prob, tolerance)
-       ! steady_state_prob => prob
+       ! Now we know problem is of type steady_state_problem_t, call the run_ss
+       call this%run_ss(problem, tolerance)
+       ! steady_state_prob => problem
       class default
        !Unknown problem
        call neko_error('Unknown problem type in the mma_optimizer_run')
     end select
   end subroutine mma_optimizer_run
 
-  subroutine mma_optimizer_run_steady_state_prob(this, prob, tolerance)
+  subroutine mma_optimizer_run_steady_state_prob(this, problem, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
-    class(steady_state_problem_t), intent(inout) :: prob
+    class(steady_state_problem_t), intent(inout) :: problem
     real(kind=rp), intent(in) :: tolerance
     integer :: max_iter
     integer :: iter, rank, ierr, nglobal
@@ -107,29 +107,29 @@ contains
     scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
 
-    call prob%compute()
+    call problem%compute()
     print *, "initial objective function value = " , &
-         prob%volume_constraint%objective_function_value
-    print *, "size(prob%design%design_indicator%x) = ", &
-         size(prob%design%design_indicator%x)
+         problem%volume_constraint%objective_function_value
+    print *, "size(problem%design%design_indicator%x) = ", &
+         size(problem%design%design_indicator%x)
     print *, "size(&
-         &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
+         &problem%volume_constraint%sensitivity_to_coefficient%x) = ",&
          size(&
-         prob%volume_constraint%sensitivity_to_coefficient%x)
+         problem%volume_constraint%sensitivity_to_coefficient%x)
 
 
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
-    associate(x => prob%design%design_indicator%x, &
+    associate(x => problem%design%design_indicator%x, &
          f0val => &
-         prob%objective_function%objective_function_value, &
+         problem%objective_function%objective_function_value, &
          fval => &
-         prob%volume_constraint%objective_function_value, &
+         problem%volume_constraint%objective_function_value, &
          df0dx => &
-         prob%design%sensitivity%x, &
+         problem%design%sensitivity%x, &
          dfdx => &
-         prob%volume_constraint%sensitivity_to_coefficient%x)
+         problem%volume_constraint%sensitivity_to_coefficient%x)
 
       ! Write n, m, and tolerance in the first line of optimization_data.txt
       write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
@@ -160,12 +160,12 @@ contains
             error stop
          end if
 
-         call prob%compute()
-         call prob%compute_sensitivity()
-         if (prob%design%if_mask) then
+         call problem%compute()
+         call problem%compute_sensitivity()
+         if (problem%design%if_mask) then
             call mask_exterior_const(&
-                 prob%volume_constraint%sensitivity_to_coefficient, &
-                 prob%design%optimization_domain, 0.0_rp)
+                 problem%volume_constraint%sensitivity_to_coefficient, &
+                 problem%design%optimization_domain, 0.0_rp)
          end if
 
          call this%mma%KKT(x, df0dx, reshape([fval], [this%mma%get_m()]), dfdx)
@@ -181,16 +181,16 @@ contains
          ! Flush the buffer to write the data during the run
          flush(1368)
 
-         call prob%sample(real(iter, rp))
+         call problem%sample(real(iter, rp))
 
-         call prob%design%map_forward()
-         call reset(prob%C)
+         call problem%design%map_forward()
+         call reset(problem%C)
          ! TODO
          ! reset for the adjoint
-         call field_rzero(prob%adj%scheme%u_adj)
-         call field_rzero(prob%adj%scheme%v_adj)
-         call field_rzero(prob%adj%scheme%w_adj)
-         prob%C%fluid%freeze = .false.
+         call field_rzero(problem%adj%scheme%u_adj)
+         call field_rzero(problem%adj%scheme%v_adj)
+         call field_rzero(problem%adj%scheme%w_adj)
+         problem%C%fluid%freeze = .false.
       end do
     end associate
 
