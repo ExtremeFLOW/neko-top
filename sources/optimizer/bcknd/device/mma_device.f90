@@ -207,11 +207,6 @@ contains
     end if
     
 
-    ! update the device pointer for the input vector_t and matrix_t
-    call device_memcpy_r1(df0dx%x, df0dx%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy_r1(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy_r2(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)
-
     call xdesign%init(this%n)
     call device_memcpy_r1(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
     
@@ -221,15 +216,22 @@ contains
      !     print *, "xdesign%x(1)=", xdesign%x(1)
      !     call device_memcpy_r1(xdesign%x, xdesign%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
      !     print *, "xdesign%x(1)=", xdesign%x(1)
-
+    ! generate a convex approximation of the problem
     call this%gensub(iter, xdesign, df0dx, fval, dfdx)
-    print *, "gensub done!"
+    !     print *, "gensub done!"
+    !solve the approximation problem using interior point method
+    call this%subsolve(xdesign)
+    ! update the design vector x on the host
+    call device_memcpy_r1(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync=.false.)
+
+    !     print *, "subsolve done!"
      !     ! generate a convex approximation of the problem
      !     call this%gensub(iter, x, df0dx, fval, dfdx)
 
      !     !solve the approximation problem using interior point method
      !     call this%subsolve(x)
-
+     ! !!!!!!!    call mma_KKT_device(this, x, df0dx, fval, dfdx)
+    
     this%is_updated = .true.
   end subroutine mma_update_device
 
@@ -335,648 +337,461 @@ contains
      call globaltmp_m%free()
   end subroutine mma_gensub_device
 
-
-  !! private internal subroutines
-!   subroutine mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
-!     ! ----------------------------------------------------- !
-!     ! Generate the approximation sub problem by computing   !
-!     ! the lower and upper asymtotes and the other necessary !
-!     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
-!     ! ----------------------------------------------------- !
-!     class(mma_device_t), intent(inout) :: this
-!      !     real(kind=rp), dimension(this%n), intent(in) :: x
-!      !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
-!      !     real(kind=rp), dimension(this%m), intent(in) :: fval
-!      !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-!     real(kind=rp), dimension(this%n), intent(in) :: xdesign
-!     type(vector_t) :: df0dx, fval
-!     type(matrix_t) :: dfdx
-!     integer, intent(in) :: iter
-!     integer :: i, j, ierr
-!     real(kind=rp), dimension(this%m) :: globaltmp_m
-
-!     if (iter .lt. 3) then
-!        do j = 1, this%n
-!           this%low%x(j) = xdesign(j) - this%asyinit * (this%xmax%x(j) - &
-!                this%xmin%x(j))
-!           this%upp%x(j) = xdesign(j) + this%asyinit * (this%xmax%x(j) - &
-!                this%xmin%x(j))
-!        end do
-!     else
-!        !Move asymptotes low and upp
-!        do j = 1, this%n
-!           if ((xdesign(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
-!                .lt. 0) then
-!              this%low%x(j) = xdesign(j) - &
-!                   this%asydecr * (this%xold1%x(j) - this%low%x(j))
-!              this%upp%x(j) = xdesign(j) + &
-!                   this%asydecr * (this%upp%x(j) - this%xold1%x(j))
-
-!           else if ((xdesign(j) - this%xold1%x(j))* &
-!                (this%xold1%x(j) - this%xold2%x(j)) .gt. 0) then
-!              this%low%x(j) = xdesign(j) - &
-!                   this%asyincr * (this%xold1%x(j) - this%low%x(j))
-!              this%upp%x(j) = xdesign(j) + &
-!                   this%asyincr * (this%upp%x(j) - this%xold1%x(j))
-!           else
-!              this%low%x(j) = xdesign(j) - (this%xold1%x(j) - this%low%x(j))
-!              this%upp%x(j) = xdesign(j) + (this%upp%x(j) - this%xold1%x(j))
-!           end if
-
-!           ! setting a minimum and maximum for the low and upp
-!           ! asymptotes (eq3.9)
-!           this%low%x(j) = max(this%low%x(j), &
-!                xdesign(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
-!           this%low%x(j) = min(this%low%x(j), &
-!                xdesign(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
-
-!           this%upp%x(j) = min(this%upp%x(j), &
-!                xdesign(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
-!           this%upp%x(j) = max(this%upp%x(j), &
-!                xdesign(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
-!        end do
-!     end if
-!     ! we can move alpha and beta out of the following loop if needed as:
-!     ! this%alpha = max(this%xmin, this%low + &
-!     !     0.1*(this%x- this%low), this%x - 0.5*(this%xmax - this%xmin))
-!     ! this%beta = min(this%xmax, this%upp -  &
-!     !     0.1*(this%upp - this%x), this%x + 0.5*(this%xmax - this%xmin))
-!     do j = 1, this%n
-!        ! set the the bounds and coefficients for the approximation
-!        ! the move bounds (alpha and beta )are slightly more restrictive
-!        ! than low and upp. This is done based on eq(3.6)--eq(3.10).
-!        ! also check
-!        ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
-!        ! eq (2.8) and (2.9)
-!        this%alpha%x(j) = max(this%xmin%x(j), this%low%x(j) + &
-!             0.1_rp*(xdesign(j)- this%low%x(j)), &
-!             xdesign(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
-!        this%beta%x(j) = min(this%xmax%x(j), this%upp%x(j) - &
-!             0.1*(this%upp%x(j) - xdesign(j)), &
-!             xdesign(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
-
-!        !Calculate p0j, q0j, pij, qij
-!        !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
-!        this%p0j%x(j) = (this%upp%x(j) - xdesign(j))**2 * &
-!             (1.001_rp*max(df0dx%x(j),0.0_rp) + &
-!             0.001_rp*max(-df0dx%x(j),0.0_rp) + &
-!             (0.00001_rp/(max(0.00001_rp, &
-!             (this%xmax%x(j) - this%xmin%x(j))))))
-
-!        this%q0j%x(j) = (xdesign(j) - this%low%x(j))**2 * &
-!             (0.001_rp*max(df0dx%x(j),0.0_rp) + &
-!             1.001_rp*max(-df0dx%x(j),0.0_rp) + &
-!             (0.00001_rp/(max(0.00001_rp, &
-!             (this%xmax%x(j) - this%xmin%x(j))))))
-
-!        do i = 1, this%m
-!           this%pij%x(i,j) = (this%upp%x(j) - xdesign(j))**2 * &
-!                (1.001_rp*max(dfdx%x(i,j),0.0_rp) + &
-!                0.001_rp*max(-dfdx%x(i,j),0.0_rp) + &
-!                (0.00001_rp/(max(0.00001_rp, &
-!                (this%xmax%x(j) - this%xmin%x(j))))))
-!           this%qij%x(i,j) = (xdesign(j) - this%low%x(j))**2 * &
-!                (0.001_rp*max(dfdx%x(i, j), 0.0_rp) + &
-!                1.001_rp*max(-dfdx%x(i, j), 0.0_rp) + &
-!                (0.00001_rp/(max(0.00001_rp, &
-!                (this%xmax%x(j) - this%xmin%x(j))))))
-!        end do
-!     end do
-
-!     !computing bi as defined in page 5
-!     this%bi%x = 0.0_rp
-!     do i = 1, this%m
-!        !MPI: here this%n is the global n
-!        do j = 1, this%n
-!           this%bi%x(i) = this%bi%x(i) + &
-!                this%pij%x(i,j) / (this%upp%x(j) - xdesign(j)) + &
-!                this%qij%x(i,j) / (xdesign(j) - this%low%x(j))
-!        end do
-!     end do
-
-
-!     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!     !!!!Showing that for double precision, bi will be different when!!!!!!!!
-!     !!!!!!!!!!!computed in parallel compare to sequential!!!!!!!!!!!!!!!!!!!
-!     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!     ! this%bi%x = 0.0_rp
-!     ! longbi = 0.0
-!     ! do i = 1, this%m
-!     !     !MPI: here this%n is the global n
-!     !     do j = 1, this%n
-!     !         this%bi%x(i) = this%bi%x(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !         longbi(i) = longbi(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !     end do
-!     ! end do
-!     ! print *, "bi =  ", this%bi%x, "this%n = ", this%n
-!     ! print *, "longbi =  ", longbi
-!     ! ierr = 2160
-!     ! longbi = 0.0
-!     ! this%bi%x = 0.0
-!     ! do i = 1, this%m
-!     !     do j = 1, ierr
-!     !         this%bi%x(i) = this%bi%x(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !         longbi(i) = longbi(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !     end do
-!     ! end do
-!     ! print *, "bi =  ", this%bi%x, "first batch(1-ierr)"
-!     ! print *, "longbi =  ", longbi, "first batch(1-ierr)"
-!     ! longbiglobal = longbi
-!     ! longbi = 0.0
-!     ! globaltmp_m = this%bi
-!     ! this%bi%x = 0.0
-!     ! do i = 1, this%m
-!     !     do j = ierr+1, this%n
-!     !         this%bi%x(i) = this%bi%x(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !         longbi(i) = longbi(i) + &
-!     !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-!     !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-!     !     end do
-!     ! end do
-!     ! print *, "bi =  ", this%bi%x, "second batch(ierr+1:end)"
-!     ! print *, "longbi =  ", longbi, "second batch(ierr+1:end)"
-!     ! print *, "bi =  ", this%bi+globaltmp_m, "first + second"
-!     ! print *, "longbi =  ", longbi+longbiglobal, "first + second"
-!     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
-!     globaltmp_m = 0.0_rp
-!     call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
-!          mpi_real_precision, mpi_sum, neko_comm, ierr)
-!     this%bi%x = globaltmp_m - fval%x
-
-!   end subroutine mma_gensub_device
-
   subroutine mma_subsolve_dpip_device(this, designx)
-    ! ------------------------------------------------------- !
-    ! Dual-primal interior point method using Newton's step   !
-    ! to solve MMA sub problem.                               !
-    ! A Backtracking Line Search approach is used to compute  !
-    ! the step size; starting with the full Newton's step     !
-    ! (delta = 1) and deviding by 2 until we have a step size !
-    ! that leads to a feasible point while ensuring a         !
-    ! decrease in the residue.                                !
-    ! ------------------------------------------------------- !
-    class(mma_device_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(inout) :: designx
-    ! type(vector_t) :: designx
-    !Note that there is a local dummy "x" in this subroutine, thus, we call
-    !the current design "designx" instead of just "x"
-    integer :: i, j, k, iter, ggdumiter, itto, ierr
-    real(kind=rp) :: epsi, residumax, residunorm, &
-         z, zeta, rez, rezeta, &
-         delz, dz, dzeta, &
-         steg, dummy_one, zold, zetaold, newresidu
-    real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
-         rey, relambda, remu, res, &
-         dely, dellambda, &
-         dy, dlambda, ds, dmu, &
-         yold, lambdaold, sold, muold, &
-         globaltmp_m
-    real(kind=rp), dimension(this%n) :: x, xsi, eta, &
-         rex, rexsi, reeta, &
-         delx, diagx, dx, dxsi, deta, &
-         xold, xsiold, etaold
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
-    real(kind=rp), dimension(2*this%n+4*this%m+2) :: xx, dxx
+     class(mma_device_t), intent(inout) :: this
+     type(vector_t), intent(in) :: designx
+     integer :: i, j, k, iter, ggdumiter, itto, ierr
+     real(kind=rp) :: epsi, residumax, residunorm, &
+     z, zeta, rez, rezeta, &
+     delz, dz, dzeta, &
+     steg, dummy_one, zold, zetaold, newresidu
+     type(vector_t) :: y, lambda, s, mu, &   !!!m
+     rey, relambda, remu, res, &
+     dely, dellambda, &
+     dy, dlambda, ds, dmu, &
+     yold, lambdaold, sold, muold
+     type(vector_t) :: globaltmp_m
 
-    real(kind=rp), dimension(this%m, this%n) :: GG
-    real(kind=rp), dimension(this%m+1) :: bb
-    real(kind=rp), dimension(this%m+1, this%m+1) :: AA
-    real(kind=rp), dimension(this%m, this%m) :: globaltmp_mm
+     type(vector_t) :: x, xsi, eta, & !!!!!n
+     rex, rexsi, reeta, &
+     delx, diagx, dx, dxsi, deta, &
+     xold, xsiold, etaold
+     real(kind=rp) :: residu
+     real(kind=rp) :: residu_small
+     real(kind=rp) :: ratio_xx_dxx
+     type(vector_t) :: bb
+     type(matrix_t) :: GG
+     type(matrix_t) :: AA
+     type(matrix_t) :: globaltmp_mm
 
-    ! using DGESV( N, NRHS, A, LDA, IPIV, B, LDB, INFO ) in lapack to solve
-    ! the linear system which needs the following parameters
-    integer :: info
-    integer, dimension(this%m+1) :: ipiv
+     integer :: info
+     integer, dimension(this%m+1) :: ipiv
+     real(kind=rp) :: re_xstuff_squ_global
 
-    real(kind=rp) :: re_xstuff_squ_global
+     integer :: nglobal
 
-    integer :: nglobal
-
-    ! intial value for the parameters in the subsolve based on
-    ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
-    dummy_one = 1.0_rp
-    epsi = 1.0_rp !100
-    x(:) = 0.5_rp*(this%alpha%x(:)+this%beta%x(:))
-    y(:) = 1.0_rp
-    z = 1.0_rp
-    zeta = 1.0_rp
-    lambda(:) = 1.0_rp
-    s(:) = 1.0_rp
-    xsi(:) = max(1.0_rp, 1.0_rp/(x(:) - this%alpha%x(:)))
-    eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
-    mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
-
-    do while (epsi .gt. 0.9*this%epsimin)
-       ! calculating residuals based on
-       ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
-       ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
-       rex(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-            lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-            (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-            lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-            xsi(:) + eta(:)
-
-       call MPI_Allreduce(this%n, nglobal, 1, &
-            MPI_INTEGER, mpi_sum, neko_comm, ierr)
-
-       !!!! computing without matmul and transpose
-       ! rex = 0.0_rp
-       ! do j = 1, this%n
-       !     do i = 1, this%m
-       !         rex(j) = rex(j) + this%pij%x(i,j) * &
-       !             lambda(i)/(this%upp%x(j) - x(j))**2 - &
-       !             this%qij%x(i,j) * lambda(i)/(x(j) - this%low%x(j))**2
-       !     end do
-       !     rex(j) = rex(j) + this%p0j%x(j)/(this%upp%x(j) - x(j))**2 &
-       !                     - this%q0j%x(j)/(x(j) - this%low%x(j))**2 &
-       !                     - xsi(j)  + eta(j)
-       ! end do
+     real(kind=rp) :: cons
 
 
-       rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
-       rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
-
-       ! relambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:))) + &
-       !         matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-       !         this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
-       relambda = 0.0_rp
-       do i = 1, this%m
-          do j = 1, this%n !this n is global
-             ! Accumulate sums for relambda (the term gi(x))
-             relambda(i) = relambda(i) + &
-                  this%pij%x(i,j)/(this%upp%x(j) - x(j)) &
-                  + this%qij%x(i,j)/(x(j) - this%low%x(j))
-          end do
-       end do
+     call globaltmp_m%init(this%m)
+     call globaltmp_mm%init(this%m, this%m)
 
 
-       globaltmp_m = 0.0_rp
-       call MPI_Allreduce(relambda, globaltmp_m, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       relambda = globaltmp_m - this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
+     call y%init(this%m)
+     call lambda%init(this%m)
+     call s%init(this%m)
+     call mu%init(this%m)
+     call rey%init(this%m)
+     call relambda%init(this%m)
+     call remu%init(this%m)
+     call res%init(this%m)
+     call dely%init(this%m)
+     call dellambda%init(this%m)
+     call dy%init(this%m)
+     call dlambda%init(this%m)
+     call ds%init(this%m)
+     call dmu%init(this%m)
+     call yold%init(this%m)
+     call lambdaold%init(this%m)
+     call sold%init(this%m)
+     call muold%init(this%m)
+     call x%init(this%n)
+     call xsi%init(this%n)
+     call eta%init(this%n)
+     call rex%init(this%n)
+     call rexsi%init(this%n)
+     call reeta%init(this%n)
+     call delx%init(this%n)
+     call diagx%init(this%n)
+     call dx%init(this%n)
+     call dxsi%init(this%n)
+     call deta%init(this%n)
+     call xold%init(this%n)
+     call xsiold%init(this%n)
+     call etaold%init(this%n)
+     call bb%init(this%m+1)
+
+     call GG%init(this%m, this%n)
+     call AA%init(this%m+1, this%m+1)
+     dummy_one = 1.0_rp
+     epsi = 1.0_rp !100
+     call device_add3s2(x%x_d,this%alpha%x_d,this%beta%x_d,0.5_rp,0.5_rp,this%n)
+     call device_cfill(y%x_d,1.0_rp,this%m)
+     z = 1.0_rp
+     zeta = 1.0_rp
+     call device_cfill(lambda%x_d,1.0_rp,this%m)
+     call device_cfill(s%x_d,1.0_rp,this%m)
+     call device_mma_max(xsi%x_d,x%x_d,this%alpha%x_d,this%n)
+     call device_mma_max(eta%x_d,this%beta%x_d,x%x_d,this%n)
+     call device_max2(mu%x_d,1.0_rp,this%c%x_d,0.5_rp, this%m)
+     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+
+     outer: do while (epsi .gt. 0.9*this%epsimin)
+          ! calculating residuals based on
+          ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
+          ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
+          call device_rex(rex%x_d,  x%x_d,  this%low%x_d, this%upp%x_d,  this%pij%x_d, this%p0j%x_d,&
+          this%qij%x_d, this%q0j%x_d, lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m) 
+          call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
+          call device_col3(rey%x_d, this%d%x_d, y%x_d, this%m)
+          call device_add2(rey%x_d, this%c%x_d, this%m)
+          call device_sub2(rey%x_d, lambda%x_d, this%m)
+          call device_sub2(rey%x_d, mu%x_d, this%m)
+          rez = this%a0 - zeta - device_lcsc2(lambda%x_d, this%a%x_d, this%m)
+          call device_cfill(relambda%x_d, 0.0_rp, this%m)
+          call device_relambda(relambda%x_d, x%x_d,  this%upp%x_d, this%low%x_d, this%pij%x_d, this%qij%x_d,  this%n, this%m)
+          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+
+          globaltmp_m%x = 0.0_rp
+          call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+          call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+          call device_add3s2(relambda%x_d, globaltmp_m%x_d, this%a%x_d, 1.0_rp, -z, this%m)
+          call device_sub2(relambda%x_d, y%x_d, this%m)
+          call device_add2(relambda%x_d, s%x_d, this%m)
+          call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+
+          call device_sub3(rexsi%x_d,x%x_d,this%alpha%x_d,this%n)
+          call device_col2(rexsi%x_d,xsi%x_d,this%n)
+          call device_cadd(rexsi%x_d,-epsi,this%n)
+
+          call device_sub3(reeta%x_d,this%beta%x_d,x%x_d,this%n)
+          call device_col2(reeta%x_d,eta%x_d,this%n)
+          call device_cadd(reeta%x_d,-epsi,this%n)
 
 
-       rexsi(:) = xsi(:)*(x(:) - this%alpha%x(:)) - epsi
-       reeta(:) = eta(:)*(this%beta%x(:) - x(:)) - epsi
-       remu(:) = mu(:)*y(:) - epsi
-       rezeta = zeta*z - epsi
-       res(:) = lambda(:)*s(:) - epsi
+          !call device_sub2cons2(rexsi%x_d,xsi%x_d,x%x_d,this%alpha%x_d,epsi,this%n)
+          !call device_sub2cons2(reeta%x_d,eta%x_d,this%beta%x_d,x%x_d,epsi,this%n)
+          call device_col3(remu%x_d, mu%x_d, y%x_d, this%m)
+          call device_cadd(remu%x_d, -epsi, this%m)
 
-       residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-       residumax = 0.0_rp
+          rezeta= zeta*z -epsi
 
-       call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
-            mpi_real_precision, mpi_max, neko_comm, ierr)
+          call device_col3(res%x_d, lambda%x_d, s%x_d, this%m)
+          call device_cadd(res%x_d, -epsi, this%m)
 
-       re_xstuff_squ_global = 0.0_rp
-       call MPI_Allreduce(norm2(rex)**2+norm2(rexsi)**2+norm2(reeta)**2,&
-            re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum,&
-            neko_comm, ierr)
-       residu_small = [rey, rez, relambda, &
-            remu, rezeta, res]
-       residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+          cons=0.0_rp
+          cons=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, &
+          device_maxval(relambda%x_d, this%m),device_maxval(rexsi%x_d,this%n), device_maxval(reeta%x_d,this%n), &
+          device_maxval(remu%x_d, this%m), rezeta, device_maxval(res%x_d, this%m)])
+          residumax = 0.0_rp
+          call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, mpi_max, neko_comm, ierr)
+
+          re_xstuff_squ_global = 0.0_rp
+          cons = device_norm(rex%x_d,this%n) + device_norm(rexsi%x_d,this%n)+device_norm(reeta%x_d,this%n)
+          call MPI_Allreduce(cons, re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum,&
+          neko_comm, ierr)
+          cons=device_norm(rey%x_d,this%m)+rez**2+device_norm(relambda%x_d,this%m)+device_norm(remu%x_d,this%m)+&
+          rezeta**2+device_norm(res%x_d,this%m)
+          residunorm = sqrt(cons + re_xstuff_squ_global)
 
 
-       do iter = 1, this%max_iter !ittt
-          if (iter .gt. (this%max_iter -2)) then
-             ! print *, "The mma inner loop seems not to converge"
-             ! print *, "residumax = ", residumax, "for epsi = ", epsi, &
-             !         ", ittt  = ", iter, "out of ", this%max_iter
-          end if
-          !Check the condition
-          if (residumax .lt. epsi) exit
 
-          delx = 0.0_rp
-          do j = 1, this%n
-             do i = 1, this%m
-                delx(j) = delx(j) + this%pij%x(i,j) * &
-                     lambda(i)/(this%upp%x(j) - x(j))**2 &
-                     - this%qij%x(i,j) * lambda(i)/(x(j) - this%low%x(j))**2
-             end do
-             delx(j) = delx(j) + this%p0j%x(j)/(this%upp%x(j) - x(j))**2 &
-                  - this%q0j%x(j)/(x(j) - this%low%x(j))**2 &
-                  - epsi/(x(j) - this%alpha%x(j)) &
-                  + epsi/(this%beta%x(j) - x(j))
-          end do
-          dely = this%c%x + this%d%x*y - lambda - epsi/y
-          delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
+          do iter = 1, this%max_iter !ittt
+               if (iter .gt. (this%max_iter -2)) then
+                    !print *, "The mma inner loop seems not to converge"
+                    ! print *, "residumax = ", residumax, "for epsi = ", epsi, &
+                    !         ", ittt  = ", iter, "out of ", this%max_iter
+               end if
+               if (residumax .lt. epsi) exit
+               call device_delx(delx%x_d, x%x_d, this%low%x_d, this%upp%x_d,  this%pij%x_d,  this%qij%x_d,  &
+               this%p0j%x_d, this%q0j%x_d, this%alpha%x_d,  this%beta%x_d, lambda%x_d, epsi, this%n, this%m)
 
-          dellambda(:) = 0.0_rp
-          do i = 1, this%m
-             do j = 1, this%n !this n is global
-                ! Accumulate sums for dellambda (the term gi(x))
-                dellambda(i) = dellambda(i) + &
-                     this%pij%x(i,j)/(this%upp%x(j) - x(j)) &
-                     + this%qij%x(i,j)/(x(j) - this%low%x(j))
-             end do
-          end do
 
-          globaltmp_m = 0.0_rp
-          call MPI_Allreduce(dellambda, globaltmp_m, this%m, &
+               call device_col3(dely%x_d, this%d%x_d, y%x_d, this%m)
+               call device_add2(dely%x_d, this%c%x_d, this%m)
+               call device_sub2(dely%x_d, lambda%x_d, this%m)
+               call device_add2inv2(dely%x_d, y%x_d, -epsi, this%m)
+               delz = this%a0 - device_lcsc2(lambda%x_d, this%a%x_d, this%m) - epsi/z
+               call device_cfill(dellambda%x_d, 0.0_rp, this%m)
+               call device_relambda(dellambda%x_d, x%x_d,  this%upp%x_d, this%low%x_d, this%pij%x_d, this%qij%x_d,  this%n, this%m)
+               call device_memcpy(dellambda%x, dellambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+
+               globaltmp_m%x = 0.0_rp
+               call MPI_Allreduce(dellambda%x, globaltmp_m%x, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-          dellambda = globaltmp_m - this%a%x*z - y - this%bi%x + epsi/lambda
+               call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+               call device_add3s2(dellambda%x_d, globaltmp_m%x_d, this%a%x_d, 1.0_rp, -z, this%m)
 
-          ! delx(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-          !     lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-          !     (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-          !     lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-          !     epsi/(x(:) - this%alpha%x(:)) + epsi/(this%beta%x(:) - x(:))
+               call device_sub2(dellambda%x_d, y%x_d, this%m)
+               call device_sub2(dellambda%x_d, this%bi%x_d, this%m)
+               call device_add2inv2(dellambda%x_d, lambda%x_d, epsi, this%m)
 
-          ! dely(:) =  this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - epsi/y(:)
-          ! delz = this%a0 - dot_product(lambda(:), this%a%x(:)) - epsi/z
-          ! dellambda(:) = matmul(this%pij%x(:,:),1.0/(this%upp%x(:) - x(:)))+&
-          !     matmul(this%qij%x(:,:), 1.0/(x(:) - this%low%x(:))) - &
-          !     this%a%x(:)*z - y(:) - this%bi%x(:) + epsi/lambda(:)
-
-          do ggdumiter = 1, this%m
-             GG(ggdumiter, :) = this%pij%x(ggdumiter,:)/ &
-                  (this%upp%x(:) - x(:))**2 - &
-                  this%qij%x(ggdumiter,:)/(x(:) - this%low%x(:))**2
-          end do
-
-          diagx(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-               lambda(:)))/(this%upp%x(:) - x(:))**3 + &
-               (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-               lambda(:)))/(x(:) - this%low%x(:))**3 )
-          diagx(:) = 2.0_rp*diagx(:) + xsi(:)/(x(:) - this%alpha%x(:)) + &
-               eta(:)/(this%beta%x(:)- x(:))
+               call device_GG(GG%x_d,  x%x_d,  this%low%x_d,  this%upp%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m)
 
 
-          !Here we only consider the case m<n in the matlab code
-          !assembling the right hand side matrix based on eq(5.20)
-          ! bb = [dellambda + dely(:)/(this%d%x(:) + &
-          !         (mu(:)/y(:))) - matmul(GG,delx/diagx), delz ]
-          !!!!!!!!!!!!!!for MPI computation of bb!!!!!!!!!!!!!!!!!!!!!!!!!
-          bb = 0.0_rp
-          do i = 1, this%m
-             do j = 1, this%n ! this n is global
-                bb(i) = bb(i) + GG(i, j) * (delx(j) / diagx(j))
-             end do
-          end do
-          globaltmp_m = 0.0_rp
-          call MPI_Allreduce(bb(1:this%m), globaltmp_m, this%m, &
+               call device_diagx(diagx%x_d, x%x_d, xsi%x_d, this%low%x_d, this%upp%x_d, this%p0j%x_d, this%q0j%x_d,  this%pij%x_d,&
+               this%qij%x_d,  this%alpha%x_d, this%beta%x_d,  eta%x_d, lambda%x_d, this%n, this%m)
+
+               call device_bb(bb%x_d, GG%x_d, delx%x_d,diagx%x_d,this%n,this%m)
+               call device_memcpy(bb%x, bb%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+
+               globaltmp_m%x = 0.0_rp
+               call MPI_Allreduce(bb%x(1:this%m), globaltmp_m%x, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
-          bb(1:this%m) = globaltmp_m
+               call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
 
-          bb(1:this%m) = dellambda + dely/(this%d%x + (mu/y)) - bb(1:this%m)
-          bb(this%m +1) = delz
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! !assembling the coefficients matrix AA based on eq(5.20)
-          ! AA(1:this%m,1:this%m) =  &
-          ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
-          ! !update diag(AA)
-          ! AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
-          !     mma_diag(s(:)/lambda(:) + 1.0/(this%d%x(:) + (mu(:)/y(:))))
+               call device_updatebb(bb%x_d, dellambda%x_d, dely%x_d, this%d%x_d,mu%x_d, y%x_d, delz, this%m)
 
-          AA = 0.0_rp
-          !Direct computation of the matrix multiplication
-          !(for better performance)
-          do i = 1, this%m
-             do j = 1, this%m
-                ! Compute the (i, j) element of AA
-                do k = 1, this%n !this n is global
-                   AA(i, j) = AA(i, j) + GG(i, k) * &
-                        (1.0_rp / diagx(k)) * GG(j, k)
-                end do
-             end do
-          end do
-
-          globaltmp_mm = 0.0_rp
-          call MPI_Allreduce(AA(1:this%m, 1:this%m), globaltmp_mm, &
+               call device_cfill(AA%x_d, 0.0_rp, (this%m+1) * (this%m+1) )
+               call device_AA(AA%x_d, GG%x_d,  diagx%x_d, this%n, this%m) 
+               call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), DEVICE_TO_HOST, sync=.true.)
+               globaltmp_mm%x = 0.0_rp
+               call MPI_Allreduce(AA%x(1:this%m, 1:this%m), globaltmp_mm%x, &
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-          AA(1:this%m,1:this%m) = globaltmp_mm
-          do i = 1, this%m
-             !update the diag AA
-             AA(i, i) = AA(i, i) + (s(i) / lambda(i) + &
-                  1.0_rp / (this%d%x(i) + mu(i) / y(i)))
-          end do
-
-          AA(1:this%m, this%m+1) = this%a%x(:)
-          AA(this%m+1, 1:this%m) = this%a%x(:)
-          AA(this%m+1, this%m+1) = -zeta/z
+               call device_memcpy(globaltmp_mm%x, globaltmp_mm%x_d, (this%m) * (this%m), HOST_TO_DEVICE, sync=.true.)
+               call device_updateAA(AA%x_d, globaltmp_mm%x_d, s%x_d, &
+                    lambda%x_d, this%d%x_d, mu%x_d, y%x_d, this%a%x_d, zeta,z, this%m)
+               call device_memcpy(AA%x, AA%x_d, (this%m+1)*(this%m+1), DEVICE_TO_HOST, sync=.true.)
 
 
 
+               call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, sync=.true.)
+               call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, info)
+               if (info .ne. 0) then
+               write(stderr, *) "DGESV failed to solve the linear system in MMA."
+               write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
+               error stop
+               end if
+               call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, sync=.true.)
 
-          call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
-          ! if info! = 0 then DGESV is failed.
-          if (info .ne. 0) then
-             write(stderr, *) "DGESV failed to solve the linear system in MMA."
-             write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
-             error stop
-          end if
+               call device_copy(dlambda%x_d, bb%x_d, this%m)
+               dz = bb%x(this%m + 1)
 
-          dlambda = bb(1:this%m)
-          dz = bb(this%m + 1)
-          ! based on eq(5.19)
-          dx = -delx/diagx - matmul(transpose(GG), dlambda)/diagx
+               call device_dx(dx%x_d, delx%x_d, diagx%x_d, GG%x_d, dlambda%x_d, this%n, this%m)
+               call device_dy(dy%x_d, dely%x_d, dlambda%x_d, this%d%x_d, mu%x_d, y%x_d, this%m)
+               call device_dxsi(dxsi%x_d, xsi%x_d, dx%x_d, x%x_d, this%alpha%x_d, epsi, this%n) 
+               call device_deta(deta%x_d, eta%x_d, dx%x_d, x%x_d, this%beta%x_d, epsi, this%n)
 
-          dy = (-dely+dlambda)/(this%d%x(:) + (mu(:)/y(:)))
-          dxsi = -xsi + (epsi-dx*xsi(:))/(x(:) - this%alpha%x(:))
-          deta = -eta + (epsi+dx*eta(:))/(this%beta%x(:) - x(:))
-          dmu = -mu + (epsi-mu*dy(:))/y(:)
-          dzeta = -zeta + (epsi-zeta*dz)/z
-          ds = -s + (epsi-dlambda*s(:))/lambda(:)
 
-          !2*this%n+4*this%m+2
-          dxx = [dy, dz, dlambda, dxsi, deta, dmu, dzeta, ds]
-          xx = [y, z, lambda, xsi, eta, mu, zeta, s]
-          steg = maxval([dummy_one, -1.01*dxx/xx, -1.01*dx/ &
-               (x(:) - this%alpha%x(:)), 1.01*dx/(this%beta%x(:) - x(:))])
-          steg = 1.0_rp/steg
 
-          call MPI_Allreduce(steg, steg, 1, &
+
+               call device_col3(dmu%x_d, mu%x_d, dy%x_d, this%m)
+               call device_cmult(dmu%x_d, -1.0_rp, this%m)
+               call device_cadd(dmu%x_d, epsi, this%m)
+               call device_invcol2(dmu%x_d, y%x_d, this%m)
+               call device_sub2(dmu%x_d, mu%x_d, this%m)
+
+               dzeta = -zeta + (epsi-zeta*dz)/z
+               call device_col3(ds%x_d, dlambda%x_d, s%x_d, this%m)
+               call device_cmult(ds%x_d, -1.0_rp, this%m)
+               call device_cadd(ds%x_d, epsi, this%m)
+               call device_invcol2(ds%x_d, lambda%x_d, this%m)
+               call device_sub2(ds%x_d, s%x_d, this%m)
+
+
+               steg = maxval([dummy_one, device_maxval2(dy%x_d, y%x_d, -1.01_rp, this%m),&
+               -1.01_rp*dz/z,device_maxval2(dlambda%x_d, lambda%x_d, -1.01_rp, this%m),&
+               device_maxval2(dxsi%x_d, xsi%x_d, -1.01_rp, this%n), &
+               device_maxval2(deta%x_d, eta%x_d, -1.01_rp, this%n), &
+               device_maxval2(dmu%x_d, mu%x_d, -1.01_rp, this%m), &
+               device_maxval2(ds%x_d, s%x_d, -1.01_rp, this%m), &
+               device_maxval3(dx%x_d, x%x_d, this%alpha%x_d,-1.01_rp, this%n), &
+               device_maxval3(dx%x_d, this%beta%x_d,x%x_d, 1.01_rp, this%n),-1.01_rp*dzeta/zeta])
+               steg = 1.0_rp/steg
+               call MPI_Allreduce(steg, steg, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
-          xold = x
-          yold = y
-          zold = z
-          lambdaold = lambda
-          xsiold = xsi
-          etaold = eta
-          muold = mu
-          zetaold = zeta
-          sold = s
 
-          !The innermost loop to determine the suitable step length
-          !using the Backtracking Line Search approach
-          newresidu = 2.0_rp*residunorm
-          itto = 0
-          do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
-             itto = itto + 1
-             !update the variables
-             x = xold + steg*dx
-             y = yold + steg*dy
-             z = zold + steg*dz
-             lambda = lambdaold + steg*dlambda
-             xsi = xsiold + steg*dxsi
-             eta = etaold + steg*deta
-             mu = muold + steg*dmu
-             zeta = zetaold + steg*dzeta
-             s = sold + steg*ds
-             !recompute the newresidu to see if this stepsize improves
-             !the residue
-             rex(:) = ((this%p0j%x(:) + matmul(transpose(this%pij%x(:,:)), &
-                  lambda(:)))/(this%upp%x(:) - x(:))**2 - &
-                  (this%q0j%x(:) + matmul(transpose(this%qij%x(:,:)), &
-                  lambda(:)))/(x(:) - this%low%x(:))**2 ) - &
-                  xsi(:) + eta(:)
-             rey(:) = this%c%x(:) + this%d%x(:)*y(:) - lambda(:) - mu(:)
-             rez = this%a0 - zeta - dot_product(lambda(:), this%a%x(:))
-             ! relambda(:) = matmul(this%pij%x(:,:),1.0/&
-             !         (this%upp%x(:) - x(:))) + matmul(this%qij%x(:,:), &
-             !         1.0/(x(:) - this%low%x(:))) - this%a%x(:)*z - &
-             !         y(:) + s(:) - this%bi%x(:)
-             relambda = 0.0_rp
-             do i = 1, this%m
-                do j = 1, this%n !this n is global
-                   ! Accumulate sums for relambda (the term gi(x))
-                   relambda(i) = relambda(i) + &
-                        this%pij%x(i,j)/(this%upp%x(j) - x(j)) &
-                        + this%qij%x(i,j)/(x(j) - this%low%x(j))
-                end do
-             end do
-             globaltmp_m = 0.0_rp
-             call MPI_Allreduce(relambda, globaltmp_m, this%m, &
-                  mpi_real_precision, mpi_sum, neko_comm, ierr)
-             relambda = globaltmp_m
+               call device_copy(xold%x_d,x%x_d,this%n)
+               call device_copy(yold%x_d,y%x_d,this%m)
+               zold = z
+               call device_copy(lambdaold%x_d,lambda%x_d,this%m)
+               call device_copy(xsiold%x_d,xsi%x_d,this%n)
+               call device_copy(etaold%x_d,eta%x_d,this%n)
+               call device_copy(muold%x_d,mu%x_d,this%m)
+               zetaold = zeta
+               call device_copy(sold%x_d,s%x_d,this%m)
+               newresidu = 2.0*residunorm
+               itto = 0
+               do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
+                    itto = itto + 1
+                    call device_add3s2(x%x_d,xold%x_d,dx%x_d,1.0_rp,steg,this%n)
+                    call device_add3s2(y%x_d,yold%x_d,dy%x_d,1.0_rp,steg,this%m)
+                    z = zold + steg*dz
+                    call device_add3s2(lambda%x_d,lambdaold%x_d,dlambda%x_d,1.0_rp,steg,this%m)
+
+                    call device_add3s2(xsi%x_d,xsiold%x_d,dxsi%x_d, 1.0_rp, steg, this%n)
+                    call device_add3s2(eta%x_d,etaold%x_d,deta%x_d, 1.0_rp, steg, this%n)
+
+                    call device_add3s2(mu%x_d,muold%x_d,dmu%x_d,1.0_rp,steg,this%m)
+
+                    zeta = zetaold + steg*dzeta
+
+                    call device_add3s2(s%x_d,sold%x_d,ds%x_d,1.0_rp,steg,this%m)
+
+                    !recompute the newresidu to see if this stepsize improves
+                    !the residue
+                    call device_rex(rex%x_d,  x%x_d,  this%low%x_d, this%upp%x_d,  this%pij%x_d, this%p0j%x_d,this%qij%x_d, &
+                    this%q0j%x_d, lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m) 
+
+                    call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+                    call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+                    call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+                    call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
 
 
-             relambda = relambda - this%a%x(:)*z - y(:) + s(:) - this%bi%x(:)
 
-             rexsi(:) = xsi(:)*(x(:) - this%alpha%x(:)) - epsi
-             reeta(:) = eta(:)*(this%beta%x(:) - x(:)) - epsi
-             remu(:) = mu(:)*y(:) - epsi
-             rezeta = zeta*z - epsi
-             res(:) = lambda(:)*s(:) - epsi
+                    call device_col3(rey%x_d, this%d%x_d, y%x_d, this%m)
+                    call device_add2(rey%x_d, this%c%x_d, this%m)
+                    call device_sub2(rey%x_d, lambda%x_d, this%m)
+                    call device_sub2(rey%x_d, mu%x_d, this%m)
 
-             residu = [rex, rey, rez, relambda, &
-                  rexsi, reeta, remu, rezeta, res]
+                    rez = this%a0 - zeta - device_lcsc2(lambda%x_d, this%a%x_d, this%m)
 
-             re_xstuff_squ_global = 0.0_rp
-             call MPI_Allreduce(norm2(rex)**2 + &
-                  norm2(rexsi)**2+norm2(reeta)**2, re_xstuff_squ_global, &
-                  1, mpi_real_precision, mpi_sum, neko_comm, ierr)
-             residu_small = [rey, rez, relambda, &
-                  remu, rezeta, res]
-             newresidu = sqrt(norm2(residu_small)**2 + &
-                  re_xstuff_squ_global)
+                    call device_cfill(relambda%x_d, 0.0_rp, this%m)
+                    call device_relambda(relambda%x_d, x%x_d,  this%upp%x_d, this%low%x_d, this%pij%x_d, this%qij%x_d,& 
+                    this%n, this%m)
+                    call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
 
-             steg = steg/2.0_rp
+                    globaltmp_m%x= 0.0_rp
+                    call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, &
+                         mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+                    call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+
+
+
+                    call device_add3s2(relambda%x_d, globaltmp_m%x_d, this%a%x_d, 1.0_rp, -z, this%m)
+                    call device_sub2(relambda%x_d, y%x_d, this%m)
+                    call device_add2(relambda%x_d, s%x_d, this%m)
+                    call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+
+
+                    call device_sub3(rexsi%x_d,x%x_d,this%alpha%x_d,this%n)
+                    call device_col2(rexsi%x_d,xsi%x_d,this%n)
+                    call device_cadd(rexsi%x_d,-epsi,this%n)
+
+                    call device_sub3(reeta%x_d,this%beta%x_d,x%x_d,this%n)
+                    call device_col2(reeta%x_d,eta%x_d,this%n)
+                    call device_cadd(reeta%x_d,-epsi,this%n)
+
+                    call device_col3(remu%x_d, mu%x_d, y%x_d, this%m)
+                    call device_cadd(remu%x_d, -epsi, this%m)
+
+                    rezeta = zeta*z - epsi
+
+
+                    call device_col3(res%x_d, lambda%x_d, s%x_d, this%m)
+                    call device_cadd(res%x_d, -epsi, this%m)
+
+                    re_xstuff_squ_global = 0.0_rp
+                    cons = device_norm(rex%x_d,this%n) + device_norm(rexsi%x_d,this%n)+device_norm(reeta%x_d,this%n);
+                    call MPI_Allreduce(cons, re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum,&
+                         neko_comm, ierr)
+
+                    cons=device_norm(rey%x_d,this%m)+rez**2+device_norm(relambda%x_d,this%m)+device_norm(remu%x_d,this%m)+&
+                    rezeta**2+device_norm(res%x_d,this%m)
+                    newresidu = sqrt(cons+ re_xstuff_squ_global)
+
+                    steg = steg/2.0_rp
+
+                    cons=0.0_rp
+                    cons=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, &
+                    device_maxval(relambda%x_d, this%m),device_maxval(rexsi%x_d,this%n), device_maxval(reeta%x_d,this%n), &
+                    device_maxval(remu%x_d, this%m), rezeta, device_maxval(res%x_d, this%m)])
+                    !exit outer
+               end do
+               residunorm = newresidu
+               residumax = 0.0_rp
+               call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, mpi_max, neko_comm, ierr)
+               steg = 2.0_rp*steg
+               !print *, "gpu iter = ", iter, "epsi = ", epsi, &
+               !   "steg = ", steg, "residunorm = ",residunorm, &
+               !     "residumax = ",residumax
           end do
+          epsi = 0.1_rp * epsi
+     end do outer
+     call device_copy(this%xold2%x_d,this%xold1%x_d,this%n)
+     call device_copy(this%xold1%x_d,designx%x_d,this%n)
+     call device_copy(designx%x_d,x%x_d,this%n)
+     call device_copy(this%y%x_d,y%x_d,this%m)
+     this%z = z
+     call device_copy(this%lambda%x_d,lambda%x_d,this%m)
 
-          residunorm = newresidu
-          residumax = 0.0_rp
-          call MPI_Allreduce(maxval(abs(residu)), residumax, 1, &
-               mpi_real_precision, mpi_max, neko_comm, ierr)
 
-          !correct the step size for the extra devision by 2 in the final
-          !loop
-          steg = 2*steg
-
-          ! print *,"Processor ",pe_rank, "iter = ", iter, "epsi = ", epsi, &
-          !     "steg = ", steg, "residunorm = ",residunorm, &
-          !       "residumax = ",residumax
-       end do
-       epsi = 0.1_rp*epsi
-
-    end do
-
-    ! Save the new design
-    this%xold2 = this%xold1
-    this%xold1%x = designx
-    designx = x
-
-    !update the parameters of the MMA object nesessary to compute KKT residu
-    this%y%x = y
-    this%z = z
-    this%lambda%x = lambda
-    this%zeta = zeta
-    this%xsi%x = xsi
-    this%eta%x = eta
-    this%mu%x = mu
-    this%s%x = s
-
+     this%zeta = zeta
+     call device_copy(this%xsi%x_d,xsi%x_d,this%n)
+     call device_copy(this%eta%x_d,eta%x_d,this%n)
+     call device_copy(this%mu%x_d,mu%x_d,this%m)
+     call device_copy(this%s%x_d,s%x_d,this%m)
+     !print *, "I am in mma_subsolve_dpip_gpu"
   end subroutine mma_subsolve_dpip_device
 
   subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
-    ! ----------------------------------------------------- !
-    ! Compute the KKT condition right hand side for a given !
-    ! design x and set the max and norm values of the       !
-    ! residue of KKT system to this%residumax and           !
-    ! this%residunorm.                                      !
-    !                                                       !
-    ! The left hand sides of the KKT conditions are computed!
-    ! for the following nonlinear programming problem:      !
-    ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
-    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
-    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
-    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
-    !                                                       !
-    !                                                       !
-    ! Note that before calling this function, the function  !
-    ! values (f0val, fval, dfdx, ...) should be updated     !
-    ! using the new x values.                               !
-    ! ----------------------------------------------------- !
-    class(mma_device_t), intent(inout) :: this
-     !     real(kind=rp), dimension(this%n), intent(in) :: x
+     class(mma_device_t), intent(inout) :: this
+     real(kind=rp), dimension(this%n), intent(in) :: x
+     type(vector_t), intent(in) :: fval
+     type(vector_t), intent(in) :: df0dx
+     type(matrix_t), intent(in) :: dfdx
+     
+     type(vector_t) :: designx
+     real(kind=rp) :: rez, rezeta
+     type(vector_t) :: rey, relambda, remu, res
+     type(vector_t) :: rex, rexsi, reeta
+     real(kind=rp) ::residu_val !!!(3*this%n+4*this%m+2)
+     real(kind=rp), dimension(4*this%m+2) ::residu_small !!!(4*this%m+2)
+     integer :: ierr
+     real(kind=rp) :: re_xstuff_squ_global
+     real(kind=rp) :: globaltemp_norm
 
-     !     real(kind=rp), dimension(this%m), intent(in) :: fval
-     !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
-     !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+     ! create a vector type x to have a c_ptr to point to the array designx
+     call designx%init(this%n)
+     designx%x = x
+     call device_memcpy_r1(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
 
-    real(kind=rp) :: rez, rezeta
-    real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
-    real(kind=rp), dimension(this%n) :: rex, rexsi, reeta
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
 
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
-    integer :: ierr
-    real(kind=rp) :: re_xstuff_squ_global
+     call rey%init(this%m)
+     call relambda%init(this%m)
+     call remu%init(this%m)
+     call res%init(this%m)
 
-    rex(:) = df0dx%x + matmul(transpose(dfdx%x), this%lambda%x(:)) - &
-          this%xsi%x(:) + this%eta%x(:)
-    rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - &
-          this%mu%x(:)
-    rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
+     call rex%init(this%n)
+     call rexsi%init(this%n)
+     call reeta%init(this%n)
 
-    relambda(:) = fval%x - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)
-    rexsi(:) = this%xsi%x(:)*(x(:) - this%xmin%x(:))
-    reeta(:) = this%eta%x(:)*(this%xmax%x(:) - x(:))
-    remu(:) = this%mu%x(:)*this%y%x(:)
-    rezeta = this%zeta*this%z
-    res(:) = this%lambda%x(:)*this%s%x(:)
+     call device_kkt_rex(rex%x_d,  df0dx%x_d,  dfdx%x_d, this%xsi%x_d, this%eta%x_d, this%lambda%x_d, this%n, this%m)
 
-    residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+     call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
+     call device_add2(rey%x_d, this%c%x_d, this%m)
+     call device_sub2(rey%x_d, this%lambda%x_d, this%m)
+     call device_sub2(rey%x_d, this%mu%x_d, this%m)
 
-    call MPI_Allreduce(maxval(abs(residu)), this%residumax, 1, &
-         mpi_real_precision, mpi_max, neko_comm, ierr)
+     rez = this%a0 - this%zeta - device_lcsc2(this%lambda%x_d, this%a%x_d,this%m)
 
-    call MPI_Allreduce(norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2, &
-         re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum, neko_comm, ierr)
+     call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp,-this%z, this%m)
+     call device_sub2(relambda%x_d, this%y%x_d, this%m)
+     call device_add2(relambda%x_d, this%s%x_d, this%m)
 
-    residu_small = [rey, rez, relambda, remu, rezeta, res]
 
-    this%residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+     call device_sub3(rexsi%x_d, designx%x_d, this%xmin%x_d, this%n)
+     call device_col2(rexsi%x_d, this%xsi%x_d, this%n)
 
+     call device_sub3(reeta%x_d, this%xmax%x_d, designx%x_d, this%n)
+     call device_col2(reeta%x_d, this%eta%x_d, this%n)
+
+     call device_col3(remu%x_d,this%mu%x_d,this%y%x_d,this%m)
+
+     rezeta = this%zeta*this%z
+
+     call device_col3(res%x_d,this%lambda%x_d,this%s%x_d,this%m)
+
+     residu_val=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, device_maxval(relambda%x_d, this%m), &
+     device_maxval(rexsi%x_d,this%n), device_maxval(reeta%x_d,this%n), device_maxval(remu%x_d, this%m), rezeta, &
+     device_maxval(res%x_d, this%m)])
+     !residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+
+     call MPI_Allreduce(residu_val, this%residumax, 1, &
+     mpi_real_precision, mpi_max, neko_comm, ierr)
+
+     globaltemp_norm=device_norm(rex%x_d,this%n)+device_norm(rexsi%x_d,this%n)+device_norm(reeta%x_d,this%n)
+     call MPI_Allreduce(globaltemp_norm, &
+     re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum, neko_comm, ierr)
+     this%residunorm = sqrt(device_norm(rey%x_d,this%m)+rez**2+device_norm(relambda%x_d,this%m)+&
+     device_norm(remu%x_d,this%m)+rezeta**2+device_norm(res%x_d,this%m) + re_xstuff_squ_global)
   end subroutine mma_KKT_device
+
 end module mma_device
