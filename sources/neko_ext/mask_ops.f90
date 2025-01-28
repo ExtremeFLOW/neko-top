@@ -39,8 +39,9 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only : neko_scratch_registry
   use field_math, only: field_cfill, field_copy
-  use math, only: masked_copy
-  use device_math, only: device_masked_copy
+  use device_math, only: device_copy
+  use device_math_ext, only: device_copy_mask, device_cadd_mask
+  use math_ext, only: copy_mask
   implicit none
 
   private
@@ -67,11 +68,13 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet') 
+        call device_copy(work%x_d, fld%x_d, fld%size())
+        call device_cadd_mask(work%x_d, 4.0_rp, fld%size(), mask%mask_d, &
+            mask%size)
+        call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+            mask%size)
     else
-       do i = 1, mask%size
-          work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
-       end do
+        call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over
@@ -100,11 +103,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet') 
+        call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+            mask%size)
     else
-       do i = 1, mask%size
-          work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
-       end do
+        call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over
