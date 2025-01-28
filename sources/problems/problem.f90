@@ -35,6 +35,7 @@
 module problem
   use num_types, only: rp
   use design, only: design_t
+  use topopt_design, only: topopt_design_t
   use simulation, only: simulation_t
 
   implicit none
@@ -129,9 +130,10 @@ module problem
 
   !> Compute
   abstract interface
-     subroutine problem_compute(this)
-       import problem_t
+     subroutine problem_compute(this, design)
+       import problem_t, topopt_design_t
        class(problem_t), intent(inout) :: this
+       type(topopt_design_t), intent(inout) :: design
 
      end subroutine problem_compute
   end interface

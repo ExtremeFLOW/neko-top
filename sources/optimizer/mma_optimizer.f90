@@ -31,6 +31,8 @@ module mma_optimizer
 
      type(mma_t) :: mma
 
+     type(topopt_design_t), pointer :: design
+
      !> Scaling fval and dfdx.
      !! Note that the values are not updated but they are scaled when passed
      !! to the optimizer.
@@ -56,6 +58,8 @@ contains
     class(problem_t), intent(inout) :: problem
     type(topopt_design_t), target, intent(in) :: design
 
+    this%design => design
+
     ! Initialize MMA solver
     ! Check the type of the problem using select type
     select type (problem)
@@ -63,8 +67,8 @@ contains
        ! Now we know problem is of type steady_state_problem_t
        print *, "Initializing mma_optimizer with steady_state_problem_t."
        ! mma_init_json( x, n, json, auto_scale, scale)
-       call this%mma%init_json(problem%design%design_indicator%x, &
-            problem%design%design_indicator%size(), problem%C%params, this%scale, &
+       call this%mma%init_json(this%design%design_indicator%x, &
+            this%design%design_indicator%size(), problem%C%params, this%scale, &
             this%auto_scale)
        print *, "scale = ", this%scale
        print *, "auto_scale = ", this%auto_scale
@@ -109,11 +113,11 @@ contains
     scalingfactor = 1.0_rp
     print *, "max_iter for the optimization loop = ", max_iter
 
-    call problem%compute()
+    call problem%compute(this%design)
     print *, "initial objective function value = " , &
          problem%volume_constraint%objective_function_value
-    print *, "size(problem%design%design_indicator%x) = ", &
-         size(problem%design%design_indicator%x)
+    print *, "size(this%design%design_indicator%x) = ", &
+         size(this%design%design_indicator%x)
     print *, "size(&
          &problem%volume_constraint%sensitivity_to_coefficient%x) = ",&
          size(&
@@ -123,13 +127,13 @@ contains
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
-    associate(x => problem%design%design_indicator%x, &
+    associate(x => this%design%design_indicator%x, &
          f0val => &
          problem%objective_function%objective_function_value, &
          fval => &
          problem%volume_constraint%objective_function_value, &
          df0dx => &
-         problem%design%sensitivity%x, &
+         this%design%sensitivity%x, &
          dfdx => &
          problem%volume_constraint%sensitivity_to_coefficient%x)
 
@@ -162,12 +166,12 @@ contains
             error stop
          end if
 
-         call problem%compute()
-         call problem%compute_sensitivity()
-         if (problem%design%if_mask) then
+         call problem%compute(this%design)
+         call problem%compute_sensitivity(this%design)
+         if (this%design%if_mask) then
             call mask_exterior_const(&
                  problem%volume_constraint%sensitivity_to_coefficient, &
-                 problem%design%optimization_domain, 0.0_rp)
+                 this%design%optimization_domain, 0.0_rp)
          end if
 
          call this%mma%KKT(x, df0dx, reshape([fval], [this%mma%get_m()]), dfdx)
@@ -185,7 +189,7 @@ contains
 
          call problem%sample(real(iter, rp))
 
-         call problem%design%map_forward()
+         call this%design%map_forward()
          call reset(problem%C)
          ! TODO
          ! reset for the adjoint

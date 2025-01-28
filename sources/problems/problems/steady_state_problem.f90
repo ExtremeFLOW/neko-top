@@ -65,8 +65,6 @@ module steady_state_problem
      !> and adjoint case
      type(adjoint_case_t), pointer, public :: adj
 
-     type(topopt_design_t), pointer :: design
-
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
      ! to fill itself up with from the JSON
@@ -162,9 +160,6 @@ contains
     type(topopt_design_t), target, intent(inout) :: design
 
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
-
-    ! Point the design to your own design
-    this%design => design
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -293,8 +288,9 @@ contains
   end subroutine steady_state_problem_free
 
   !> Here we compute all the objectives and constraints
-  subroutine steady_state_problem_compute(this)
+  subroutine steady_state_problem_compute(this, design)
     class(steady_state_problem_t), intent(inout) :: this
+    type(topopt_design_t), intent(inout) :: design
 
     call neko_solve(this%C)
     ! TODO
@@ -306,8 +302,8 @@ contains
     ! We would presumable have a list that holds all of objective functions
     ! and constraints, such that this would be a
     ! objectives%compute()
-    call this%objective_function%compute(this%design, this%C%fluid)
-    call this%volume_constraint%compute(this%design, this%C%fluid)
+    call this%objective_function%compute(design, this%C%fluid)
+    call this%volume_constraint%compute(design, this%C%fluid)
     print *, 'OBJECTIVE FUNCTION', &
          this%objective_function%objective_function_value
     print *, 'VOLUME CONSTRAINT', &
@@ -329,8 +325,9 @@ contains
   end subroutine steady_state_problem_compute
 
   !> The computation of the sensitivity if we have a `topopt_design_t`.
-  subroutine steady_state_problem_compute_sensitivity_topopt(this)
+  subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
     class(steady_state_problem_t), intent(inout) :: this
+    class(topopt_design_t), intent(inout) :: design
     call solve_adjoint(this%adj)
 
     ! again, in the future, the objective_function_t will potentially include
@@ -350,13 +347,13 @@ contains
     ! objectives%compute_sensitivity()
     ! and it would cycled through the list.
     call this%objective_function%compute_sensitivity(&
-         this%design, this%C%fluid, this%adj%scheme)
+         design, this%C%fluid, this%adj%scheme)
     call this%volume_constraint%compute_sensitivity(&
-         this%design, this%C%fluid, this%adj%scheme)
+         design, this%C%fluid, this%adj%scheme)
     ! it would be nice to visualize this
 
     ! do the adjoint mapping
-    call this%design%map_backward(&
+    call design%map_backward(&
          this%objective_function%sensitivity_to_coefficient)
     ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
     ! we somehow need to populate the list
