@@ -52,16 +52,19 @@ module steady_state_problem
   use utils, only: neko_error
   use user_intf, only: simulation_component_user_settings
   use simcomp_executor, only: neko_simcomps
+  use simulation, only: simulation_t
   implicit none
   private
 
   !> To compute a steady state problem
   type, public, extends(problem_t) :: steady_state_problem_t
 
+     type(simulation_t), public :: simulation
+
      !> and primal case
-     type(case_t), public :: C
+     type(case_t), pointer, public :: C
      !> and adjoint case
-     type(adjoint_case_t), public :: adj
+     type(adjoint_case_t), pointer, public :: adj
 
      !> TODO
      ! we need a `objective_list` which is allocatable and contains a factory
@@ -111,18 +114,19 @@ module steady_state_problem
 contains
   !> The constructor for the base problem.
   subroutine steady_state_problem_init_base(this)
-    class(steady_state_problem_t), intent(inout) :: this
+    class(steady_state_problem_t), target, intent(inout) :: this
 
-    ! append a steady state simcomp
-    this%C%usr%init_user_simcomp => steady_state_simcomp
-    ! call user_setup(this%C%usr)
-
+    ! initialize the simulation
+    call this%simulation%init()
 
     ! initialize the primal
-    call neko_init(this%C)
+    this%C => this%simulation%neko_case
     ! initialize the adjoint
-    call adjoint_init(this%adj, this%C)
+    this%adj => this%simulation%adjoint_case
 
+    ! append a steady state simcomp
+    ! this%C%usr%init_user_simcomp => steady_state_simcomp
+    ! call user_setup(this%C%usr)
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
     ! and objectives. NOTE, perhaps we'll just populate the list but not

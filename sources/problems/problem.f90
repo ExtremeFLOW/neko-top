@@ -36,9 +36,7 @@ module problem
   abstract interface
      subroutine problem_init_base(this)
        import problem_t
-       class(problem_t), intent(inout) :: this
-
-
+       class(problem_t), target, intent(inout) :: this
      end subroutine problem_init_base
   end interface
 
