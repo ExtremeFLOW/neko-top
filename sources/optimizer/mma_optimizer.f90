@@ -5,6 +5,7 @@ module mma_optimizer
   use problem, only: problem_t
   use num_types, only : rp
   use utils, only : neko_error
+  use topopt_design, only: topopt_design_t
 
   !only to print nglobal when running in parallel
   use comm, only: neko_comm
@@ -50,9 +51,10 @@ module mma_optimizer
 contains
 
   !> Initialize the MMA optimizer, associate it with a specific problem
-  subroutine mma_optimizer_init(this, problem)
+  subroutine mma_optimizer_init(this, problem, design)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
+    type(topopt_design_t), target, intent(in) :: design
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type

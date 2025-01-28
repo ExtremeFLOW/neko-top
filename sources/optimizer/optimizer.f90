@@ -6,6 +6,7 @@ module optimizer
   !-----------------------------------------------------------!
 
   use problem, only: problem_t
+  use topopt_design, only: topopt_design_t
   use num_types, only : rp
   implicit none
   private
@@ -24,10 +25,11 @@ module optimizer
 
   !> Interface for optimizer initialization
   abstract interface
-     subroutine optimizer_init(this, problem)
-       import optimizer_t, problem_t
+     subroutine optimizer_init(this, problem, design)
+       import optimizer_t, problem_t, topopt_design_t
        class(optimizer_t), intent(inout) :: this
        class(problem_t), intent(inout) :: problem
+       type(topopt_design_t), target, intent(in) :: design
      end subroutine optimizer_init
   end interface
 

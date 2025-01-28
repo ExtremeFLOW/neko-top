@@ -25,7 +25,7 @@ program usrneko
   call problem%init_design(design)
 
   ! init the optimizer
-  call optimizer%init(problem)
+  call optimizer%init(problem, design)
 
 
   tolerance = 1.0e-3_rp
