@@ -10,7 +10,7 @@ module mma_optimizer
   use comm, only: neko_comm
   use mpi_f08, only: MPI_INTEGER, mpi_sum, MPI_Allreduce
 
-  
+
   use neko_config, only: NEKO_BCKND_DEVICE
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -28,23 +28,23 @@ module mma_optimizer
   ! Concrete type for MMA optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
-      type(mma_t) :: mma
+     type(mma_t) :: mma
 
-      !> Scaling fval and dfdx.
-      !! Note that the values are not updated but they are scaled when passed
-      !! to the optimizer.
-      !! (if auto_scale then fval=scale else fval=scale*fval)
-      !! When auto_scale is true, we use an adaptable scale for
-      !! fval and dfdx in every iteration (variable scale factors)
-      real(kind=rp) :: scale
-      logical :: auto_scale
-  contains
-      ! Override the deferred methods
-      procedure :: init => mma_optimizer_init
-      procedure :: run => mma_optimizer_run
-      procedure :: free => mma_optimizer_free
+     !> Scaling fval and dfdx.
+     !! Note that the values are not updated but they are scaled when passed
+     !! to the optimizer.
+     !! (if auto_scale then fval=scale else fval=scale*fval)
+     !! When auto_scale is true, we use an adaptable scale for
+     !! fval and dfdx in every iteration (variable scale factors)
+     real(kind=rp) :: scale
+     logical :: auto_scale
+   contains
+     ! Override the deferred methods
+     procedure :: init => mma_optimizer_init
+     procedure :: run => mma_optimizer_run
+     procedure :: free => mma_optimizer_free
 
-      procedure, pass(this) :: run_ss => mma_optimizer_run_steady_state_prob
+     procedure, pass(this) :: run_ss => mma_optimizer_run_steady_state_prob
   end type mma_optimizer_t
 
 contains
@@ -57,18 +57,18 @@ contains
     ! Initialize MMA solver
     ! Check the type of the problem using select type
     select type (prob)
-    type is (steady_state_problem_t)
-      ! Now we know prob is of type steady_state_problem_t
-      print *, "Initializing mma_optimizer with steady_state_problem_t."
-      ! mma_init_json( x, n, json, auto_scale, scale)
-      call this%mma%init_json( prob%design%design_indicator%x, &
-        prob%design%design_indicator%size(), prob%C%params, this%scale, &
-        this%auto_scale)
-      print *, "scale = ", this%scale
-      print *, "auto_scale = ", this%auto_scale
-    class default
-      !Unknown problem
-      call neko_error('Unknown problem type in the mma_optimizer_init')
+      type is (steady_state_problem_t)
+       ! Now we know prob is of type steady_state_problem_t
+       print *, "Initializing mma_optimizer with steady_state_problem_t."
+       ! mma_init_json( x, n, json, auto_scale, scale)
+       call this%mma%init_json( prob%design%design_indicator%x, &
+            prob%design%design_indicator%size(), prob%C%params, this%scale, &
+            this%auto_scale)
+       print *, "scale = ", this%scale
+       print *, "auto_scale = ", this%auto_scale
+      class default
+       !Unknown problem
+       call neko_error('Unknown problem type in the mma_optimizer_init')
     end select
   end subroutine mma_optimizer_init
 
@@ -77,16 +77,16 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: prob
     real(kind=rp), intent(in) :: tolerance
-    
+
     ! Check the type of the problem using select type
     select type (prob)
-    type is (steady_state_problem_t)
-      ! Now we know prob is of type steady_state_problem_t, call the run_ss
-      call this%run_ss(prob, tolerance)
-      ! steady_state_prob => prob
-    class default
-      !Unknown problem
-      call neko_error('Unknown problem type in the mma_optimizer_run')
+      type is (steady_state_problem_t)
+       ! Now we know prob is of type steady_state_problem_t, call the run_ss
+       call this%run_ss(prob, tolerance)
+       ! steady_state_prob => prob
+      class default
+       !Unknown problem
+       call neko_error('Unknown problem type in the mma_optimizer_run')
     end select
   end subroutine mma_optimizer_run
 
@@ -101,7 +101,7 @@ contains
     max_iter = this%mma%get_max_iter()
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
-        MPI_INTEGER, mpi_sum, neko_comm, ierr)
+         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
@@ -109,89 +109,89 @@ contains
 
     call prob%compute()
     print *, "initial objective function value = " , &
-      prob%volume_constraint%objective_function_value
+         prob%volume_constraint%objective_function_value
     print *, "size(prob%design%design_indicator%x) = ", &
-      size(prob%design%design_indicator%x)
+         size(prob%design%design_indicator%x)
     print *, "size(&
-      &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
-      size(&
-     prob%volume_constraint%sensitivity_to_coefficient%x)
-          
+         &prob%volume_constraint%sensitivity_to_coefficient%x) = ",&
+         size(&
+         prob%volume_constraint%sensitivity_to_coefficient%x)
+
 
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
     associate(x => prob%design%design_indicator%x, &
-      f0val => &
-        prob%objective_function%objective_function_value, &
-      fval => &
-        prob%volume_constraint%objective_function_value, &
-      df0dx => &
-        prob%design%sensitivity%x, &
-      dfdx => &
-        prob%volume_constraint%sensitivity_to_coefficient%x)
+         f0val => &
+         prob%objective_function%objective_function_value, &
+         fval => &
+         prob%volume_constraint%objective_function_value, &
+         df0dx => &
+         prob%design%sensitivity%x, &
+         dfdx => &
+         prob%volume_constraint%sensitivity_to_coefficient%x)
 
-    ! Write n, m, and tolerance in the first line of optimization_data.txt
-    write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-      nglobal, this%mma%get_m(), tolerance
+      ! Write n, m, and tolerance in the first line of optimization_data.txt
+      write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
+           nglobal, this%mma%get_m(), tolerance
 
-    ! Write the header for the remaining data
-    write(1368, '(A)') "iter, f0val, fval(1), KKTmax, KKTnorm2, scalingfactor"
+      ! Write the header for the remaining data
+      write(1368, '(A)') "iter, f0val, fval(1), KKTmax, KKTnorm2, scalingfactor"
 
-    ! Write the data row-by-row
-    write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", & 
-      & ES25.17, ",", ES25.17)') 0, f0val, fval, this%mma%get_residumax(), &
-      this%mma%get_residunorm(), scalingfactor
+      ! Write the data row-by-row
+      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
+           & ES25.17, ",", ES25.17)') 0, f0val, fval, this%mma%get_residumax(), &
+           this%mma%get_residunorm(), scalingfactor
 
-    do iter = 1, max_iter
-      if (this%mma%get_residumax() .lt. tolerance) exit
-      !Scaling
-      if (this%auto_scale .eqv. .true.) then
-        scalingfactor = abs(this%scale/fval)
-      else
-        scalingfactor = abs(this%scale)
-      end if
+      do iter = 1, max_iter
+         if (this%mma%get_residumax() .lt. tolerance) exit
+         !Scaling
+         if (this%auto_scale .eqv. .true.) then
+            scalingfactor = abs(this%scale/fval)
+         else
+            scalingfactor = abs(this%scale)
+         end if
 
-      if (NEKO_BCKND_DEVICE .eq. 0) then
-        call this%mma%mma_update_cpu( iter, x, df0dx, &
-          reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
-      else
-        write(stderr, *) "Device not supported in mma_optimizer.f90."
-        error stop
-      end if
+         if (NEKO_BCKND_DEVICE .eq. 0) then
+            call this%mma%mma_update_cpu( iter, x, df0dx, &
+                 reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
+         else
+            write(stderr, *) "Device not supported in mma_optimizer.f90."
+            error stop
+         end if
 
-      call prob%compute()
-      call prob%compute_sensitivity()
-      if (prob%design%if_mask) then
-        call mask_exterior_const(&
-          prob%volume_constraint%sensitivity_to_coefficient, &
-          prob%design%optimization_domain, 0.0_rp)
-      end if
+         call prob%compute()
+         call prob%compute_sensitivity()
+         if (prob%design%if_mask) then
+            call mask_exterior_const(&
+                 prob%volume_constraint%sensitivity_to_coefficient, &
+                 prob%design%optimization_domain, 0.0_rp)
+         end if
 
-      call this%mma%KKT(x, df0dx, reshape([fval], [this%mma%get_m()]), dfdx)
+         call this%mma%KKT(x, df0dx, reshape([fval], [this%mma%get_m()]), dfdx)
 
-      print *, 'iter =', iter,&
-        '-------, f0val = ', f0val, ',   fval = ', fval, &
-        ',  KKTmax =', this%mma%get_residumax(), ', KKTnorm2 =',&
-        this%mma%get_residunorm()
+         print *, 'iter =', iter,&
+              '-------, f0val = ', f0val, ',   fval = ', fval, &
+              ',  KKTmax =', this%mma%get_residumax(), ', KKTnorm2 =',&
+              this%mma%get_residunorm()
 
-      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", & 
-        & ES25.17, ",", ES25.17)') iter, f0val, fval, &
-        this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
-        ! Flush the buffer to write the data during the run
-      flush(1368)
+         write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
+              & ES25.17, ",", ES25.17)') iter, f0val, fval, &
+              this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+         ! Flush the buffer to write the data during the run
+         flush(1368)
 
-      call prob%sample(real(iter, rp))
+         call prob%sample(real(iter, rp))
 
-      call prob%design%map_forward()
-      call reset(prob%C)
-      ! TODO
-      ! reset for the adjoint
-      call field_rzero(prob%adj%scheme%u_adj)
-      call field_rzero(prob%adj%scheme%v_adj)
-      call field_rzero(prob%adj%scheme%w_adj)
-      prob%C%fluid%freeze = .false.
-    end do
+         call prob%design%map_forward()
+         call reset(prob%C)
+         ! TODO
+         ! reset for the adjoint
+         call field_rzero(prob%adj%scheme%u_adj)
+         call field_rzero(prob%adj%scheme%v_adj)
+         call field_rzero(prob%adj%scheme%w_adj)
+         prob%C%fluid%freeze = .false.
+      end do
     end associate
 
 
