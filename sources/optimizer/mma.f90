@@ -40,6 +40,7 @@ module mma
   use matrix, only: matrix_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use mpi_f08, only: MPI_Comm_rank, MPI_COMM_WORLD
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -170,6 +171,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
     ! based on the Cpp Code by Niels
+    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
@@ -181,7 +183,6 @@ contains
 
     call json_get_or_default(json, 'mma.backend', backend, 'cpu')
 
-    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
     call json_get_or_default(json, 'mma.a0', a0, 1.0_rp)
@@ -239,6 +240,7 @@ contains
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     character(len=:), allocatable, intent(in), optional :: backend
+    integer :: rank, ierr
 
     call this%free()
 
@@ -318,6 +320,21 @@ contains
 
     !the object is correctly initialized
     this%is_initialized = .true.
+
+    ! MMA parameters
+
+    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    if (rank .eq. 0) then
+       write(*,*) "MMA Initialized with the following parameters:"
+       write(*,*) "n = ", this%n
+       write(*,*) "m = ", this%m
+       write(*,*) "epsimin = ", this%epsimin
+       write(*,*) "max_iter = ", this%max_iter
+       write(*,*) "asyincr = ", this%asyincr
+       write(*,*) "asydecr = ", this%asydecr
+       write(*,*) "backend = ", this%backend
+    end if
+
   end subroutine mma_init_attributes
 
   subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
