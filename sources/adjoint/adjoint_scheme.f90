@@ -37,13 +37,15 @@ module adjoint_scheme
   use neko_config, only: NEKO_BCKND_DEVICE
   use checkpoint, only: chkp_t
   use mean_flow, only: mean_flow_t
-  use num_types, only: rp
+  use num_types, only: rp, i8
   use comm, only: NEKO_COMM
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
   use space, only: space_t, GLL
   use dofmap, only: dofmap_t
-  use krylov, only: ksp_t, krylov_solver_factory, krylov_solver_destroy
+  use zero_dirichlet, only: zero_dirichlet_t
+  use krylov, only: ksp_t, krylov_solver_factory, krylov_solver_destroy, &
+       KSP_MAX_ITER
   use coefs, only: coef_t
   use usr_inflow, only: usr_inflow_t, usr_inflow_eval
   use dirichlet, only: dirichlet_t
@@ -53,28 +55,33 @@ module adjoint_scheme
   use sx_jacobi, only: sx_jacobi_t
   use device_jacobi, only: device_jacobi_t
   use hsmg, only: hsmg_t
+  use phmg, only : phmg_t
   use precon, only: pc_t, precon_factory, precon_destroy
   use fluid_stats, only: fluid_stats_t
   use bc, only: bc_t
   use bc_list, only: bc_list_t
-  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBL_LEN, NEKO_MSH_MAX_ZLBLS
-  use math, only: cfill, add2s2
+  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
+  use math, only: cfill, add2s2, glsum
   use device_math, only: device_cfill, device_add2s2
   use time_scheme_controller, only: time_scheme_controller_t
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only: neko_field_registry
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
+       json_extract_item
   use json_module, only: json_file, json_core, json_value
   use scratch_registry, only: scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
        user_material_properties
-  use utils, only: neko_error
+  use utils, only: neko_error, neko_warning
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
-  use field_math, only: field_cfill
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
+  use field_math, only: field_cfill, field_add2s2
+  use wall_model_bc, only : wall_model_bc_t
+  use shear_stress, only : shear_stress_t
+  use gradient_jump_penalty, only : gradient_jump_penalty_t
 
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
   use json_utils_ext, only: json_key_fallback
   implicit none
   private
@@ -129,9 +136,9 @@ module adjoint_scheme
      logical :: strict_convergence
      !> Gradient jump panelty
      logical :: if_gradient_jump_penalty
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_u
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_v
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_w
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_u_adj
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_v_adj
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_w_adj
 
      ! List of boundary conditions for pressure
      type(bc_list_t) :: bcs_prs
@@ -198,6 +205,10 @@ module adjoint_scheme
      !> Update variable material properties
      procedure, pass(this) :: update_material_properties => &
           adjoint_scheme_update_material_properties
+     !> Linear solver factory, wraps a KSP constructor
+     procedure, nopass :: solver_factory => adjoint_scheme_solver_factory
+     !> Preconditioner factory
+     procedure, pass(this) :: precon_factory_ => adjoint_scheme_precon_factory
   end type adjoint_scheme_t
 
 
@@ -287,13 +298,10 @@ contains
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     logical, intent(in) :: kspv_init
-    type(dirichlet_t) :: bdry_mask
     character(len=LOG_SIZE) :: log_buf
-    real(kind=rp), allocatable :: real_vec(:)
-    real(kind=rp) :: real_val, kappa, B, z0
+    real(kind=rp) :: real_val
     logical :: logical_val
-    integer :: integer_val, ierr
-    type(json_file) :: wm_json
+    integer :: integer_val
     character(len=:), allocatable :: string_val1, string_val2
     real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
@@ -699,7 +707,7 @@ contains
        call neko_log%message(log_buf)
        call this%solver_factory(this%ksp_vel, this%dm_Xh%size(), &
             string_val1, integer_val, real_val, logical_val)
-       call this%precon_factory(this%pc_vel, this%ksp_vel, &
+       call this%precon_factory_(this%pc_vel, this%ksp_vel, &
             this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_vel, string_val2)
        call neko_log%end_section()
     end if
@@ -742,11 +750,11 @@ contains
                'case.fluid.gradient_jump_penalty.scaling_exponent',&
                GJP_param_b, 4.0_rp)
        end if
-       call this%gradient_jump_penalty_u%init(params, this%dm_Xh, this%c_Xh, &
+       call this%gradient_jump_penalty_u_adj%init(params, this%dm_Xh, this%c_Xh, &
             GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_v%init(params, this%dm_Xh, this%c_Xh, &
+       call this%gradient_jump_penalty_v_adj%init(params, this%dm_Xh, this%c_Xh, &
             GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_w%init(params, this%dm_Xh, this%c_Xh, &
+       call this%gradient_jump_penalty_w_adj%init(params, this%dm_Xh, this%c_Xh, &
             GJP_param_a, GJP_param_b)
     end if
 
@@ -860,7 +868,7 @@ contains
   !      write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
   !      call neko_log%message(log_buf)
 
-  !      call fluid_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
+  !      call adjoint_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
   !           solver_type, integer_val, abs_tol)
   !      call adjoint_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
   !           this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
@@ -945,9 +953,9 @@ contains
 
     ! Free gradient jump penalty
     if (this%if_gradient_jump_penalty .eqv. .true.) then
-       call this%gradient_jump_penalty_u%free()
-       call this%gradient_jump_penalty_v%free()
-       call this%gradient_jump_penalty_w%free()
+       call this%gradient_jump_penalty_u_adj%free()
+       call this%gradient_jump_penalty_v_adj%free()
+       call this%gradient_jump_penalty_w_adj%free()
     end if
 
   end subroutine adjoint_scheme_free
@@ -1010,13 +1018,13 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    call this%bcs_prs%apply(this%p_adj%, t, tstep)
+    call this%bcs_prs%apply(this%p_adj, t, tstep)
 
   end subroutine adjoint_scheme_bc_apply_prs
 
   !> Initialize a linear solver
   !! @note Currently only supporting Krylov solvers
-  subroutine fluid_scheme_solver_factory(ksp, n, solver, &
+  subroutine adjoint_scheme_solver_factory(ksp, n, solver, &
        max_iter, abstol, monitor)
     class(ksp_t), allocatable, target, intent(inout) :: ksp
     integer, intent(in), value :: n
@@ -1028,7 +1036,7 @@ contains
     call krylov_solver_factory(ksp, n, solver, max_iter, abstol, &
          monitor = monitor)
 
-  end subroutine fluid_scheme_solver_factory
+  end subroutine adjoint_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
   subroutine adjoint_scheme_precon_factory(this, pc, ksp, coef, dof, gs, bclst, &

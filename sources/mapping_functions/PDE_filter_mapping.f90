@@ -146,8 +146,8 @@ contains
     integer :: n, i
     type(neumann_t) :: filter_bc
     real(kind=rp) :: flux = 0.0_rp
-    character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
-         bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
+    ! character(len=NEKO_MSH_MAX_ZLBL_LEN) :: &
+    !      bc_labels_all_neuman(NEKO_MSH_MAX_ZLBLS)
 
     ! set the number of dofs
     n = this%coef%dof%size()
