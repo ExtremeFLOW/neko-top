@@ -62,7 +62,7 @@ fi
 # Generate mesh and run case
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 1 0 1 0 1 $Nx $Ny $Nz .false. .true. .true.
+genmeshbox 0 1 0 1 0 1 $Nx $Ny $Nz .false. .false. .true.
 
 # End of file
 # ============================================================================ #
