@@ -39,8 +39,7 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only : neko_scratch_registry
   use field_math, only: field_cfill, field_copy
-  use device_math, only: device_copy
-  use device_math_ext, only: device_copy_mask, device_cadd_mask
+  use device_math_ext, only: device_copy_mask
   use math_ext, only: copy_mask
   implicit none
 
@@ -68,9 +67,6 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_copy(work%x_d, fld%x_d, fld%size())
-        call device_cadd_mask(work%x_d, 4.0_rp, fld%size(), mask%mask_d, &
-            mask%size)
         call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
             mask%size)
     else
