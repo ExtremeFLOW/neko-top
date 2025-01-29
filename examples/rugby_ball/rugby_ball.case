@@ -19,6 +19,13 @@
                     0.0, 0.0, 0.0
                 ]
             },
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 0, 0, 0 ],
+                    "zone_indices": [ 1, 2, 3, 4 ]
+                }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
@@ -69,12 +76,12 @@
                 "name": "optimization_domain",
                 "geometry": "box",
                 "x_bounds": [
-                    0.3,
-                    0.7,
+                    0.2,
+                    0.8,
                 ],
                 "y_bounds": [
-                    0.3,
-                    0.7,
+                    0.2,
+                    0.8,
                 ],
                 "z_bounds": [
                     -1.0,

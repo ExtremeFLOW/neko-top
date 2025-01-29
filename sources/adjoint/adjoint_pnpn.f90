@@ -48,7 +48,7 @@ module adjoint_pnpn
   ! use adjoint_volflow, only: adjoint_volflow_t
   use adjoint_scheme, only: adjoint_scheme_t
   use device_mathops, only: device_opcolv, device_opadd2cm
-  ! use adjoint_aux, only: adjoint_step_info
+  use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
   use projection, only: projection_t
   use device, only: device_memcpy, HOST_TO_DEVICE
@@ -1035,7 +1035,7 @@ contains
          !       this%ksp_vel%max_iter)
       end if
 
-      ! call adjoint_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
+      call fluid_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
 
       call this%scratch%relinquish_field(temp_indices)
 

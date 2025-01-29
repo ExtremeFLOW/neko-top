@@ -80,25 +80,27 @@ contains
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
     character(len=:), allocatable :: type
-    integer :: zone_index, i, j, k
+    integer :: i, j, k
+    integer, allocatable :: zone_indices(:)
 
     call json_get(json, "type", type)
 
     select case (trim(type))
       case ("outflow", "normal_outflow")
        allocate(zero_dirichlet_t::object)
+
       case ("outflow+dong", "normal_outflow+dong")
        allocate(dong_outflow_t::object)
+
       case ("user_pressure")
        allocate(field_dirichlet_t::object)
-       select type(obj => object)
-         type is(field_dirichlet_t)
+       select type (obj => object)
+         type is (field_dirichlet_t)
           obj%update => user%user_dirichlet_update
           call json%add("field_name", scheme%p_adj%name)
        end select
+
       case default
-       ! Check if the type is known since not all bc types require modifications
-       ! to the pressure
        do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
           if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
        end do
@@ -106,18 +108,23 @@ contains
             ADJOINT_PNPN_KNOWN_BCS)
     end select
 
-    call json_get(json, "zone_index", zone_index)
+    call json_get(json, "zone_indices", zone_indices)
     call object%init(coef, json)
-    call object%mark_zone(coef%msh%labeled_zones(zone_index))
+
+    do i = 1, size(zone_indices)
+       call object%mark_zone(coef%msh%labeled_zones(zone_indices(i)))
+    end do
     call object%finalize()
 
     ! All pressure bcs are currently strong, so for all of them we
     ! mark with value 1 in the mesh
-    do j = 1, scheme%msh%nelv
-       do k = 1, 2 * scheme%msh%gdim
-          if (scheme%msh%facet_type(k,j) .eq. -zone_index) then
-             scheme%msh%facet_type(k, j) = 1
-          end if
+    do i = 1, size(zone_indices)
+       do j = 1, scheme%msh%nelv
+          do k = 1, 2 * scheme%msh%gdim
+             if (scheme%msh%facet_type(k,j) .eq. -zone_indices(i)) then
+                scheme%msh%facet_type(k, j) = 1
+             end if
+          end do
        end do
     end do
   end subroutine pressure_bc_factory
@@ -135,61 +142,71 @@ contains
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
     character(len=:), allocatable :: type
-    integer :: zone_index, i, j, k
+    integer :: i, j, k
+    integer, allocatable :: zone_indices(:)
 
     call json_get(json, "type", type)
 
-    if (trim(type) .eq. "symmetry") then
+    select case (trim(type))
+      case ("symmetry")
        allocate(symmetry_t::object)
-    else if (trim(type) .eq. "velocity_value") then
+      case ("velocity_value")
        allocate(inflow_t::object)
-    else if (trim(type) .eq. "no_slip") then
+      case ("no_slip")
        allocate(zero_dirichlet_t::object)
-    else if (trim(type) .eq. "normal_outflow" .or. &
-         trim(type) .eq. "normal_outflow+dong") then
+      case ("normal_outflow", "normal_outflow+dong")
        allocate(non_normal_t::object)
-    else if (trim(type) .eq. "blasius_profile") then
+      case ("blasius_profile")
        allocate(blasius_t::object)
-    else if (trim(type) .eq. "shear_stress") then
+      case ("shear_stress")
        allocate(shear_stress_t::object)
-    else if (trim(type) .eq. "wall_model") then
+      case ("wall_model")
        allocate(wall_model_bc_t::object)
        ! Kind of hack, but maybe OK? The thing is, we need the nu for
        ! initing the wall model, and forcing the user duplicate that there
        ! would be a nightmare.
        call json%add("nu", scheme%mu / scheme%rho)
-    else if (trim(type) .eq. "user_velocity") then
+
+      case ("user_velocity")
        allocate(field_dirichlet_vector_t::object)
-       select type(obj => object)
-         type is(field_dirichlet_vector_t)
+       select type (obj => object)
+         type is (field_dirichlet_vector_t)
           obj%update => user%user_dirichlet_update
        end select
-    else if (trim(type) .eq. "user_velocity_pointwise") then
-       allocate(usr_inflow_t::object)
-       select type(obj => object)
-         type is(usr_inflow_t)
-          call obj%set_eval(user%fluid_user_if)
-       end select
-    else
-       do i=1, size(ADJOINT_PNPN_KNOWN_BCS)
+
+       ! case ("user_velocity_pointwise")
+       !  allocate(usr_inflow_t::object)
+       !  select type (obj => object)
+       !    type is (usr_inflow_t)
+       !     call obj%set_eval(user%adjoint_user_if)
+       !     call obj%validate()
+       !  end select
+
+      case default
+       do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
           if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
        end do
        call neko_type_error("adjoint_pnpn boundary conditions", type, &
             ADJOINT_PNPN_KNOWN_BCS)
-    end if
+    end select
 
-    call json_get(json, "zone_index", zone_index)
+    call json_get(json, "zone_indices", zone_indices)
     call object%init(coef, json)
-    call object%mark_zone(coef%msh%labeled_zones(zone_index))
+    do i = 1, size(zone_indices)
+       call object%mark_zone(coef%msh%labeled_zones(zone_indices(i)))
+    end do
     call object%finalize()
 
     ! Exclude these two because they are bcs for the residual, not velocity
-    if (type .ne. "normal_outflow" .and. type .ne. "normal_outflow+dong") then
-       do j = 1, scheme%msh%nelv
-          do k = 1, 2 * scheme%msh%gdim
-             if (scheme%msh%facet_type(k,j) .eq. -zone_index) then
-                scheme%msh%facet_type(k, j) = 2
-             end if
+    if (trim(type) .ne. "normal_outflow" .and. &
+         trim(type) .ne. "normal_outflow+dong") then
+       do i = 1, size(zone_indices)
+          do j = 1, scheme%msh%nelv
+             do k = 1, 2 * scheme%msh%gdim
+                if (scheme%msh%facet_type(k,j) .eq. -zone_indices(i)) then
+                   scheme%msh%facet_type(k, j) = 2
+                end if
+             end do
           end do
        end do
     end if
