@@ -412,8 +412,10 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 0) then
        call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
-       write(stderr, *) "Device not supported for MMA."
-       error stop
+       ! obviously change this when GPU MMA comes in...
+       ! write(stderr, *) "Device not supported for MMA."
+       ! error stop
+       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     end if
 
   end subroutine mma_KKT

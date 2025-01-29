@@ -19,6 +19,7 @@ module mma_optimizer
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
 
   implicit none
@@ -97,6 +98,8 @@ contains
     integer :: max_iter
     integer :: iter, rank, ierr, nglobal
     real(kind=rp) :: scalingfactor
+    integer :: n
+
 
     max_iter = this%mma%get_max_iter()
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
@@ -156,8 +159,39 @@ contains
         call this%mma%mma_update_cpu( iter, x, df0dx, &
           reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
       else
-        write(stderr, *) "Device not supported in mma_optimizer.f90."
-        error stop
+        ! just for now so we can test, do a few memcopies and run on CPU
+        ! this will ultimately be replaced by GPU MMA
+        n = prob%design%design_indicator%dof%size()
+        call device_memcpy(prob%design%design_indicator%x, &
+            prob%design%design_indicator%x_d, &
+            n, &
+            DEVICE_TO_HOST, sync = .false.)
+        call device_memcpy(prob%design%sensitivity%x, &
+            prob%design%sensitivity%x_d, &
+            n, &
+            DEVICE_TO_HOST, sync = .false.)
+        call device_memcpy(prob%volume_constraint%sensitivity_to_coefficient%x, &
+            prob%volume_constraint%sensitivity_to_coefficient%x_d, &
+            n, &
+            DEVICE_TO_HOST, sync = .false.)
+
+        call this%mma%mma_update_cpu( iter, x, df0dx, &
+          reshape([fval*scalingfactor],[this%mma%get_m()]) , dfdx*scalingfactor)
+
+        call device_memcpy(prob%design%design_indicator%x, &
+            prob%design%design_indicator%x_d, &
+            n, &
+            HOST_TO_DEVICE, sync = .false.)
+        call device_memcpy(prob%design%sensitivity%x, &
+            prob%design%sensitivity%x_d, &
+            n, &
+            HOST_TO_DEVICE, sync = .false.)
+        call device_memcpy(prob%volume_constraint%sensitivity_to_coefficient%x, &
+            prob%volume_constraint%sensitivity_to_coefficient%x_d, &
+            n, &
+            HOST_TO_DEVICE, sync = .false.)
+        ! write(stderr, *) "Device not supported in mma_optimizer.f90."
+        ! error stop
       end if
 
       call prob%compute()

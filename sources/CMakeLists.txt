@@ -12,6 +12,8 @@ add_library(neko-top STATIC)
 # Add the local neko extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 
+# Add the mapping extension library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
@@ -46,7 +48,7 @@ target_sources(neko-top
 
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/linear_mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
+        # ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions/PDE_filter_mapping.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/objectives/objective_function.f90

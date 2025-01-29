@@ -44,6 +44,8 @@ module topopt_design
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
   implicit none
   private
@@ -209,6 +211,13 @@ contains
           this%design_indicator%x(i,1,1,1) = 1.0_rp
        end if
     end do
+
+    ! again this will be handled better in the future...
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_memcpy(this%design_indicator%x, &
+            this%design_indicator%x_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
+    end if
 
     ! TODO, of course when we move all of Tim's stuff for initialization of
     ! the initial design field we'll be reading things properly from the JSON.
