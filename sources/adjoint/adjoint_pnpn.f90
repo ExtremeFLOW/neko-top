@@ -79,7 +79,7 @@ module adjoint_pnpn
   use operators, only: ortho
   use vector, only: vector_t
   use device_math, only: device_vlsc3
-  use math, only: vlsc3
+  use math, only: vlsc3, cmult
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
@@ -1036,7 +1036,7 @@ contains
          !       this%ksp_vel%max_iter)
       end if
 
-      call fluid_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
+      ! call adjoint_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
 
       call this%scratch%relinquish_field(temp_indices)
 
