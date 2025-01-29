@@ -45,14 +45,8 @@ module adjoint_scheme
   use dofmap, only: dofmap_t
   use krylov, only: ksp_t, krylov_solver_factory, krylov_solver_destroy
   use coefs, only: coef_t
-  use wall, only: no_slip_wall_t
-  use inflow, only: inflow_t
   use usr_inflow, only: usr_inflow_t, usr_inflow_eval
-  use blasius, only: blasius_t
   use dirichlet, only: dirichlet_t
-  use dong_outflow, only: dong_outflow_t
-  use symmetry, only: symmetry_t
-  use non_normal, only: non_normal_t
   use field_dirichlet, only: field_dirichlet_t
   use field_dirichlet_vector, only: field_dirichlet_vector_t
   use jacobi, only: jacobi_t
@@ -130,30 +124,16 @@ module adjoint_scheme
      !> Steps to activate projection for ksp_pr
      integer :: pr_projection_activ_step
      logical :: strict_convergence = .false.
-     !> No-slip wall for velocity
-     type(no_slip_wall_t) :: bc_wall
-     !> Dirichlet inflow for velocity
-     class(bc_t), allocatable :: bc_inflow
+     !> Gradient jump panelty
+     logical :: if_gradient_jump_penalty
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_u
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_v
+     type(gradient_jump_penalty_t) :: gradient_jump_penalty_w
 
-     ! Attributes for field dirichlet BCs
-     !> User-computed Dirichlet velocity condition
-     type(field_dirichlet_vector_t) :: user_field_bc_vel
-     !> User-computed Dirichlet pressure condition
-     type(field_dirichlet_t) :: user_field_bc_prs
-     !> Dirichlet pressure condition
-     type(dirichlet_t) :: bc_prs
-     !> Dong outflow condition
-     type(dong_outflow_t) :: bc_dong
-     !> Symmetry plane for velocity
-     type(symmetry_t) :: bc_sym
-     !> List of velocity conditions
-     type(bc_list_t) :: bclst_vel
-     !> List of pressure conditions
-     type(bc_list_t) :: bclst_prs
-     !> Boundary markings
-     type(field_t) :: bdry
-     !> Parameters
-     type(json_file), pointer :: params
+     ! List of boundary conditions for pressure
+     type(bc_list_t) :: bcs_prs
+     ! List of boundary conditions for velocity
+     type(bc_list_t) :: bcs_vel
      !> Mesh
      type(mesh_t), pointer :: msh => null()
      !> Checkpoint
@@ -715,7 +695,7 @@ contains
        call neko_log%message(log_buf)
        call fluid_scheme_solver_factory(this%ksp_vel, this%dm_Xh%size(), &
             string_val1, integer_val, real_val)
-       call fluid_scheme_precon_factory(this%pc_vel, this%ksp_vel, &
+       call adjoint_scheme_precon_factory(this%pc_vel, this%ksp_vel, &
             this%c_Xh, this%dm_Xh, this%gs_Xh, this%bclst_vel, string_val2)
        call neko_log%end_section()
     end if
@@ -878,7 +858,7 @@ contains
 
        call fluid_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
             solver_type, integer_val, abs_tol)
-       call fluid_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
+       call adjoint_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
             this%c_Xh, this%dm_Xh, this%gs_Xh, this%bclst_prs, precon_type)
 
        call neko_log%end_section()
@@ -897,24 +877,9 @@ contains
   subroutine adjoint_scheme_free(this)
     class(adjoint_scheme_t), intent(inout) :: this
 
-    call this%bdry%free()
-
-    if (allocated(this%bc_inflow)) then
-       call this%bc_inflow%free()
-    end if
-
-    call this%bc_wall%free()
-    call this%bc_sym%free()
-
     !
     ! Free everything related to field_dirichlet BCs
     !
-    call this%user_field_bc_prs%field_bc%free()
-    call this%user_field_bc_prs%free()
-    call this%user_field_bc_vel%bc_u%field_bc%free()
-    call this%user_field_bc_vel%bc_v%field_bc%free()
-    call this%user_field_bc_vel%bc_w%field_bc%free()
-    call this%user_field_bc_vel%free()
 
     call this%Xh%free()
 
@@ -938,21 +903,13 @@ contains
        deallocate(this%pc_prs)
     end if
 
-    if (allocated(this%bc_labels)) then
-       deallocate(this%bc_labels)
-    end if
-
     call this%source_term%free()
 
     call this%gs_Xh%free()
 
     call this%c_Xh%free()
 
-    call this%bclst_vel%free()
-
     call this%scratch%free()
-
-    nullify(this%params)
 
     nullify(this%u_adj)
     nullify(this%v_adj)
@@ -982,6 +939,12 @@ contains
 
     call this%mu_field%free()
 
+    ! Free gradient jump penalty
+    if (this%if_gradient_jump_penalty .eqv. .true.) then
+       call this%gradient_jump_penalty_u%free()
+       call this%gradient_jump_penalty_v%free()
+       call this%gradient_jump_penalty_w%free()
+    end if
 
   end subroutine adjoint_scheme_free
 
@@ -1013,39 +976,10 @@ contains
        call neko_error('No Krylov solver for pressure defined')
     end if
 
-    if (.not. associated(this%params)) then
-       call neko_error('No parameters defined')
-    end if
-
-    if (allocated(this%bc_inflow)) then
-       select type (ip => this%bc_inflow)
-         type is (usr_inflow_t)
-          call ip%validate
-       end select
-    end if
-
     !
     ! Setup checkpoint structure (if everything is fine)
     !
     call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-
-    !
-    ! Setup mean flow fields if requested
-    !
-    ! HARRY
-    ! damn this one is confusing again because it belongs to case not fluid
-    ! I could envision a time we would want to calculate the statistics for the
-    ! forward and adjoint separately
-    ! I bet we're going to get killed in the field registry here :/
-    ! if (this%params%valid_path('case.statistics')) then
-    !    call json_get_or_default(this%params, 'case.statistics.enabled',&
-    !         logical_val, .true.)
-    !    if (logical_val) then
-    !       call this%mean%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
-    !       call this%stats%init(this%c_Xh, this%mean%u, &
-    !            this%mean%v, this%mean%w, this%mean%p)
-    !    end if
-    ! end if
 
   end subroutine adjoint_scheme_validate
 
@@ -1089,12 +1023,13 @@ contains
   end subroutine fluid_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine fluid_scheme_precon_factory(pc, ksp, coef, dof, gs, bclst, &
+  subroutine adjoint_scheme_precon_factory(this, pc, ksp, coef, dof, gs, bclst, &
        pctype)
+    class(adjoint_scheme_t), intent(inout) :: this
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
-    type(coef_t), target, intent(inout) :: coef
-    type(dofmap_t), target, intent(inout) :: dof
+    type(coef_t), target, intent(in) :: coef
+    type(dofmap_t), target, intent(in) :: dof
     type(gs_t), target, intent(inout) :: gs
     type(bc_list_t), target, intent(inout) :: bclst
     character(len=*) :: pctype
@@ -1119,24 +1054,13 @@ contains
        else
           call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst)
        end if
+      type is (phmg_t)
+       call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst)
     end select
 
     call ksp%set_pc(pc)
 
-  end subroutine fluid_scheme_precon_factory
-
-  !> Initialize a user defined inflow condition
-  subroutine adjoint_scheme_set_usr_inflow(this, usr_eval)
-    class(adjoint_scheme_t), intent(inout) :: this
-    procedure(usr_inflow_eval) :: usr_eval
-
-    select type (bc_if => this%bc_inflow)
-      type is (usr_inflow_t)
-       call bc_if%set_eval(usr_eval)
-      class default
-       call neko_error("Not a user defined inflow condition")
-    end select
-  end subroutine adjoint_scheme_set_usr_inflow
+  end subroutine adjoint_scheme_precon_factory
 
   !> Compute CFL
   ! TODO
@@ -1164,6 +1088,9 @@ contains
          this%Xh, this%c_Xh, this%msh%nelv, this%msh%gdim)
 
   end function adjoint_compute_cfl
+
+  ! ========================================================================== !
+  ! Todo: This section need to be moved
 
   !> Set boundary types for the diagnostic output.
   !! @param params The JSON case file.
@@ -1237,23 +1164,21 @@ contains
 
   end subroutine adjoint_scheme_set_bc_type_output
 
+  ! End of section to be moved
+  ! ========================================================================== !
+
+
   !> Update the values of `mu_field` if necessary.
   subroutine adjoint_scheme_update_material_properties(this)
     class(adjoint_scheme_t), intent(inout) :: this
     type(field_t), pointer :: nut
     integer :: n
 
+    this%mu_field = this%mu
     if (this%variable_material_properties) then
        nut => neko_field_registry%get_field(this%nut_field_name)
        n = nut%size()
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_cfill(this%mu_field%x_d, this%mu, n)
-          call device_add2s2(this%mu_field%x_d, nut%x_d, this%rho, n)
-       else
-          call cfill(this%mu_field%x, this%mu, n)
-          call add2s2(this%mu_field%x, nut%x, this%rho, n)
-       end if
+       call field_add2s2(this%mu_field, nut, this%rho, n)
     end if
 
   end subroutine adjoint_scheme_update_material_properties
@@ -1269,10 +1194,6 @@ contains
     ! A local pointer that is needed to make Intel happy
     procedure(user_material_properties), pointer :: dummy_mp_ptr
     real(kind=rp) :: dummy_lambda, dummy_cp
-
-    ! TODO
-    ! this is all just copied from fluid... not sure what to do here!
-    ! but we'll have to return to this if we do the DNS forward RANS adjoint
 
     dummy_mp_ptr => dummy_user_material_properties
 

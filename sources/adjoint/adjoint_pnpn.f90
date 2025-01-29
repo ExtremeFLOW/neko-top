@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Linearized Navier Stokes solver based on Pn/Pn formulation.
+!> Adjoint Pn/Pn formulation.
 module adjoint_pnpn
   use num_types, only: rp, dp
   use krylov, only: ksp_monitor_t
@@ -84,49 +84,108 @@ module adjoint_pnpn
 
 
   type, public, extends(adjoint_scheme_t) :: adjoint_pnpn_t
+
+     !> The right-hand sides in the linear solves.
      type(field_t) :: p_res, u_res, v_res, w_res
 
+     !> The unknowns in the linear solves, i.e. the solution increments with
+     !! respect to the previous time-step.
      type(field_t) :: dp, du, dv, dw
-
-     ! Coupled Helmholz operator for velocity
-     class(ax_t), allocatable :: Ax_vel
-     ! Helmholz operator for pressure
-     class(ax_t), allocatable :: Ax_prs
 
      type(field_t), pointer :: u_b => null() !< x-component of baseflow velocity
      type(field_t), pointer :: v_b => null() !< y-component of baseflow Velocity
      type(field_t), pointer :: w_b => null() !< z-component of baseflow Velocity
      type(field_t), pointer :: p_b => null() !< Baseflow pressure
 
+     !
+     ! Implicit operators, i.e. the left-hand-side of the Helmholz problem.
+     !
+
+     ! Coupled Helmholz operator for velocity
+     class(ax_t), allocatable :: Ax_vel
+     ! Helmholz operator for pressure
+     class(ax_t), allocatable :: Ax_prs
+
+     !
+     ! Projections for solver speed-up
+     !
+
+     !> Pressure projection
      type(projection_t) :: proj_prs
+     !> X velocity projection
      type(projection_t) :: proj_u
+     !> Y velocity projection
      type(projection_t) :: proj_v
+     !> Z velocity projection
      type(projection_t) :: proj_w
 
-     type(facet_normal_t) :: bc_prs_surface !< Surface term in pressure rhs
-     type(facet_normal_t) :: bc_sym_surface !< Surface term in pressure rhs
-     type(dirichlet_t) :: bc_vel_res !< Dirichlet condition vel. res.
-     type(dirichlet_t) :: bc_field_dirichlet_p !< Dirichlet condition vel. res.
-     type(dirichlet_t) :: bc_field_dirichlet_u !< Dirichlet condition vel. res.
-     type(dirichlet_t) :: bc_field_dirichlet_v !< Dirichlet condition vel. res.
-     type(dirichlet_t) :: bc_field_dirichlet_w !< Dirichlet condition vel. res.
-     type(non_normal_t) :: bc_vel_res_non_normal !< Dirichlet condition vel. res
+     !
+     ! Special Karniadakis scheme boundary conditions in the pressure equation
+     !
+
+     !> Surface term in pressure rhs. Masks all strong velocity bcs.
+     type(facet_normal_t) :: bc_prs_surface
+     !> Surface term in pressure rhs. Masks symmetry bcs.
+     type(facet_normal_t) :: bc_sym_surface
+
+     !
+     ! Boundary conditions and  lists for residuals and solution increments
+     !
+
+     !> A dummy bc for marking strong velocity bcs. Used for vel_res.
+     type(zero_dirichlet_t) :: bc_vel_res
+     !> A dummy bc for marking strong velocity bcs. Used for du.
+     type(zero_dirichlet_t) :: bc_du
+     !> A dummy bc for marking strong velocity bcs. Used for dv.
+     type(zero_dirichlet_t) :: bc_dv
+     !> A dummy bc for marking strong velocity bcs. Used for dw.
+     type(zero_dirichlet_t) :: bc_dw
+     !> A dummy bc for marking strong pressure bcs. Used for dp.
+     type(zero_dirichlet_t) :: bc_dp
+
+     !> Dirichlet condition vel. res.
+     type(dirichlet_t) :: bc_vel_res
+     !> Dirichlet condition vel. res.
+     type(dirichlet_t) :: bc_field_dirichlet_p
+     !> Dirichlet condition vel. res.
+     type(dirichlet_t) :: bc_field_dirichlet_u
+     !> Dirichlet condition vel. res.
+     type(dirichlet_t) :: bc_field_dirichlet_v
+     !> Dirichlet condition vel. res.
+     type(dirichlet_t) :: bc_field_dirichlet_w
+     !> Dirichlet condition vel. res
+     type(non_normal_t) :: bc_vel_res_non_normal
+
+     !> Lists for holding the corresponding dummy bc, e.g. bclst_du holds bc_du
      type(bc_list_t) :: bclst_vel_res
      type(bc_list_t) :: bclst_du
      type(bc_list_t) :: bclst_dv
      type(bc_list_t) :: bclst_dw
      type(bc_list_t) :: bclst_dp
 
+
+     ! Checker for wether we have a strong pressure bc. If not, the pressure
+     ! is demeaned at every time step.
+     logical :: prs_dirichlet = .false.
+
+
+     ! The advection operator.
      class(advection_adjoint_t), allocatable :: adv
+
+     ! Time OIFS interpolation scheme for advection.
+     logical :: oifs
 
      ! Time variables
      type(field_t) :: abx1, aby1, abz1
      type(field_t) :: abx2, aby2, abz2
 
-     !> Pressure residual
+     ! Advection terms for the oifs method
+     type(field_t) :: advx, advy, advz
+
+     !> Pressure residual equation for computing `p_res`.
      class(pnpn_prs_res_t), allocatable :: prs_res
 
-     !> Velocity residual
+     !> Velocity residual equation for computing `u_res`, `v_res`, `w_res`.
      class(pnpn_vel_res_t), allocatable :: vel_res
 
      !> Summation of AB/BDF contributions
@@ -137,6 +196,9 @@ module adjoint_pnpn
 
      !> Contributions to F from lagged BD terms
      class(rhs_maker_bdf_t), allocatable :: makebdf
+
+     !> Contributions to the RHS from the OIFS method
+     class(rhs_maker_oifs_t), allocatable :: makeoifs
 
      !> Adjust flow volume
      type(fluid_volflow_t) :: vol_flow
@@ -163,14 +225,58 @@ module adjoint_pnpn
      type(file_t) :: file_output
 
    contains
-     procedure, pass(this) :: init => adjoint_pnpn_init
-     procedure, pass(this) :: free => adjoint_pnpn_free
-     procedure, pass(this) :: step => adjoint_pnpn_step
-     procedure, pass(this) :: restart => adjoint_pnpn_restart
+     !> Constructor.
+     procedure, pass(this) :: init => fluid_pnpn_init
+     !> Destructor.
+     procedure, pass(this) :: free => fluid_pnpn_free
+     !> Perform a single time-step of the scheme.
+     procedure, pass(this) :: step => fluid_pnpn_step
+     !> Restart from a previous solution.
+     procedure, pass(this) :: restart => fluid_pnpn_restart
+     !> Set up boundary conditions.
+     procedure, pass(this) :: setup_bcs => fluid_pnpn_setup_bcs
+     !> Write a field with boundary condition specifications.
+     procedure, pass(this) :: write_boundary_conditions => &
+          fluid_pnpn_write_boundary_conditions
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
+
   end type adjoint_pnpn_t
+
+  interface
+     !> Boundary condition factory for pressure.
+     !! @details Will mark a mesh zone for the bc and finalize.
+     !! @param[inout] object The object to be allocated.
+     !! @param[in] scheme The `scalar_pnpn` scheme.
+     !! @param[inout] json JSON object for initializing the bc.
+     !! @param[in] coef SEM coefficients.
+     !! @param[in] user The user interface.
+     module subroutine pressure_bc_factory(object, scheme, json, coef, user)
+       class(bc_t), pointer, intent(inout) :: object
+       type(fluid_pnpn_t), intent(in) :: scheme
+       type(json_file), intent(inout) :: json
+       type(coef_t), intent(in) :: coef
+       type(user_t), intent(in) :: user
+     end subroutine pressure_bc_factory
+  end interface
+
+  interface
+     !> Boundary condition factory for velocity
+     !! @details Will mark a mesh zone for the bc and finalize.
+     !! @param[inout] object The object to be allocated.
+     !! @param[in] scheme The `scalar_pnpn` scheme.
+     !! @param[inout] json JSON object for initializing the bc.
+     !! @param[in] coef SEM coefficients.
+     !! @param[in] user The user interface.
+     module subroutine velocity_bc_factory(object, scheme, json, coef, user)
+       class(bc_t), pointer, intent(inout) :: object
+       type(fluid_pnpn_t), intent(in) :: scheme
+       type(json_file), intent(inout) :: json
+       type(coef_t), intent(in) :: coef
+       type(user_t), intent(in) :: user
+     end subroutine velocity_bc_factory
+  end interface
 
 contains
 
@@ -181,7 +287,7 @@ contains
     type(json_file), target, intent(inout) :: params
     type(user_t), intent(in) :: user
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
-    character(len=20), parameter :: scheme = 'Perturbation (Pn/Pn)'
+    character(len=20), parameter :: scheme = 'Adjoint (Pn/Pn)'
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -190,7 +296,7 @@ contains
     call this%free()
 
     ! Initialize base class
-    call this%scheme_init(msh, lx, params, .true., .true., scheme, user)
+    call this%init_base(msh, lx, params, scheme, user, .true.)
 
     if (this%variable_material_properties .eqv. .true.) then
        ! Setup backend dependent Ax routines
@@ -225,6 +331,9 @@ contains
     ! Setup backend depenent contributions to F from lagged BD terms
     call rhs_maker_bdf_fctry(this%makebdf)
 
+    ! Setup backend dependent summations of the OIFS method
+    call rhs_maker_oifs_fctry(this%makeoifs)
+
     ! Initialize variables specific to this plan
     associate(Xh_lx => this%Xh%lx, Xh_ly => this%Xh%ly, Xh_lz => this%Xh%lz, &
          dm_Xh => this%dm_Xh, nelv => this%msh%nelv)
@@ -239,19 +348,21 @@ contains
       call this%abx2%init(dm_Xh, "abx2")
       call this%aby2%init(dm_Xh, "aby2")
       call this%abz2%init(dm_Xh, "abz2")
-      this%abx1 = 0.0_rp
-      this%aby1 = 0.0_rp
-      this%abz1 = 0.0_rp
-      this%abx2 = 0.0_rp
-      this%aby2 = 0.0_rp
-      this%abz2 = 0.0_rp
-
-      call this%du%init(dm_Xh, 'du')
-      call this%dv%init(dm_Xh, 'dv')
-      call this%dw%init(dm_Xh, 'dw')
-      call this%dp%init(dm_Xh, 'dp')
-
+      call this%advx%init(dm_Xh, "advx")
+      call this%advy%init(dm_Xh, "advy")
+      call this%advz%init(dm_Xh, "advz")
     end associate
+
+    call this%du%init(this%dm_Xh, 'du')
+    call this%dv%init(this%dm_Xh, 'dv')
+    call this%dw%init(this%dm_Xh, 'dw')
+    call this%dp%init(this%dm_Xh, 'dp')
+
+    ! Set up boundary conditions
+    call this%setup_bcs(user, params)
+
+    ! ======================================================================= !
+    ! Todo: This should be moved to the setup_bcs routine
 
     ! Initialize velocity surface terms in pressure rhs
     call this%bc_prs_surface%init_base(this%c_Xh)
@@ -352,8 +463,14 @@ contains
     call this%bclst_dw%append(this%bc_vel_res)
     call this%bclst_dw%append(this%bc_field_dirichlet_w)
 
-    !Intialize projection space thingy
+    ! End of section to be moved
+    ! ======================================================================= !
 
+    ! Check if we need to output boundaries
+    call json_get_or_default(params, 'case.output_boundary', found, .false.)
+    if (found) call this%write_boundary_conditions()
+
+    ! Intialize projection space
     if (this%variable_material_properties .and. &
          this%vel_projection_dim .gt. 0) then
        call neko_error("Velocity projection not available for full stress &
@@ -375,7 +492,15 @@ contains
     ! Add lagged term to checkpoint
     call this%chkp%add_lag(this%ulag, this%vlag, this%wlag)
 
-    call advection_adjoint_factory(this%adv, params, this%c_Xh)
+    ! Determine the time-interpolation scheme
+    call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
+
+    ! Initialize the advection factory
+    call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
+    call advection_adjoint_factory(this%adv, params, this%c_Xh, &
+         this%ulag, this%vlag, this%wlag, &
+         this%chkp%dtlag, this%chkp%tlag, time_scheme, &
+         .not. advection)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
        call this%vol_flow%init(this%dm_Xh, params)
@@ -412,26 +537,63 @@ contains
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
 
+    ! Setup pressure solver
+    call neko_log%section("Pressure solver")
+
+    call json_get_or_default(params, &
+         'case.fluid.pressure_solver.max_iterations', &
+         solver_maxiter, 800)
+    call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
+    call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
+         precon_type)
+    call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
+         abs_tol)
+    call json_get_or_default(params, 'case.fluid.velocity_solver.monitor', &
+         monitor, .false.)
+    call neko_log%message('Type       : ('// trim(solver_type) // &
+         ', ' // trim(precon_type) // ')')
+    write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
+    call neko_log%message(log_buf)
+
+    call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
+         solver_type, solver_maxiter, abs_tol, monitor)
+    call this%precon_factory_(this%pc_prs, this%ksp_prs, &
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
+
+    call neko_log%end_section()
+
   end subroutine adjoint_pnpn_init
 
   subroutine adjoint_pnpn_restart(this, dtlag, tlag)
     class(adjoint_pnpn_t), target, intent(inout) :: this
     real(kind=rp) :: dtlag(10), tlag(10)
-    integer :: i, n
+    type(field_t) :: u_temp, v_temp, w_temp
+    integer :: i, j, n
 
     n = this%u_adj%dof%size()
-    ! Make sure that continuity is maintained (important for interpolation)
-    ! Do not do this for lagged rhs
-    ! (derivatives are not necessairly coninous across elements)
-    call col2(this%u_adj%x, this%c_Xh%mult, this%u_adj%dof%size())
-    call col2(this%v_adj%x, this%c_Xh%mult, this%u_adj%dof%size())
-    call col2(this%w_adj%x, this%c_Xh%mult, this%u_adj%dof%size())
-    call col2(this%p_adj%x, this%c_Xh%mult, this%u_adj%dof%size())
-    do i = 1, this%ulag%size()
-       call col2(this%ulag%lf(i)%x, this%c_Xh%mult, this%u_adj%dof%size())
-       call col2(this%vlag%lf(i)%x, this%c_Xh%mult, this%u_adj%dof%size())
-       call col2(this%wlag%lf(i)%x, this%c_Xh%mult, this%u_adj%dof%size())
-    end do
+    if (allocated(this%chkp%previous_mesh%elements) .or. &
+         this%chkp%previous_Xh%lx .ne. this%Xh%lx) then
+       associate(u => this%u, v => this%v, w => this%w, p => this%p, &
+            c_Xh => this%c_Xh, ulag => this%ulag, vlag => this%vlag, &
+            wlag => this%wlag)
+         do concurrent (j = 1:n)
+            u_adj%x(j,1,1,1) = u_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            v_adj%x(j,1,1,1) = v_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            w_adj%x(j,1,1,1) = w_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            p_adj%x(j,1,1,1) = p_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+         end do
+         do i = 1, this%ulag%size()
+            do concurrent (j = 1:n)
+               ulag%lf(i)%x(j,1,1,1) = ulag%lf(i)%x(j,1,1,1) &
+                    * c_Xh%mult(j,1,1,1)
+               vlag%lf(i)%x(j,1,1,1) = vlag%lf(i)%x(j,1,1,1) &
+                    * c_Xh%mult(j,1,1,1)
+               wlag%lf(i)%x(j,1,1,1) = wlag%lf(i)%x(j,1,1,1) &
+                    * c_Xh%mult(j,1,1,1)
+            end do
+         end do
+       end associate
+    end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
@@ -471,23 +633,35 @@ contains
               w%dof%size(), HOST_TO_DEVICE, sync = .false.)
          call device_memcpy(this%abz2%x, this%abz2%x_d, &
               w%dof%size(), HOST_TO_DEVICE, sync = .false.)
+         call device_memcpy(this%advx%x, this%advx%x_d, &
+              w%dof%size(), HOST_TO_DEVICE, sync = .false.)
+         call device_memcpy(this%advy%x, this%advy%x_d, &
+              w%dof%size(), HOST_TO_DEVICE, sync = .false.)
+         call device_memcpy(this%advz%x, this%advz%x_d, &
+              w%dof%size(), HOST_TO_DEVICE, sync = .false.)
        end associate
     end if
 
+    ! Make sure that continuity is maintained (important for interpolation)
+    ! Do not do this for lagged rhs
+    ! (derivatives are not necessairly coninous across elements)
 
-    call this%gs_Xh%op(this%u_adj, GS_OP_ADD)
-    call this%gs_Xh%op(this%v_adj, GS_OP_ADD)
-    call this%gs_Xh%op(this%w_adj, GS_OP_ADD)
-    call this%gs_Xh%op(this%p_adj, GS_OP_ADD)
+    if (allocated(this%chkp%previous_mesh%elements) &
+         .or. this%chkp%previous_Xh%lx .ne. this%Xh%lx) then
+       call this%gs_Xh%op(this%u_adj, GS_OP_ADD)
+       call this%gs_Xh%op(this%v_adj, GS_OP_ADD)
+       call this%gs_Xh%op(this%w_adj, GS_OP_ADD)
+       call this%gs_Xh%op(this%p_adj, GS_OP_ADD)
 
-    do i = 1, this%ulag%size()
-       call this%gs_Xh%op(this%ulag%lf(i), GS_OP_ADD)
-       call this%gs_Xh%op(this%vlag%lf(i), GS_OP_ADD)
-       call this%gs_Xh%op(this%wlag%lf(i), GS_OP_ADD)
-    end do
+       do i = 1, this%ulag%size()
+          call this%gs_Xh%op(this%ulag%lf(i), GS_OP_ADD)
+          call this%gs_Xh%op(this%vlag%lf(i), GS_OP_ADD)
+          call this%gs_Xh%op(this%wlag%lf(i), GS_OP_ADD)
+       end do
+    end if
 
     !! If we would decide to only restart from lagged fields instead of asving
-    ! abx1, aby1 etc.
+    !! abx1, aby1 etc.
     !! Observe that one also needs to recompute the focing at the old time steps
     !u_temp = this%ulag%lf(2)
     !v_temp = this%vlag%lf(2)
@@ -577,6 +751,10 @@ contains
     call this%aby2%free()
     call this%abz2%free()
 
+    call this%advx%free()
+    call this%advy%free()
+    call this%advz%free()
+
     if (allocated(this%Ax_vel)) then
        deallocate(this%Ax_vel)
     end if
@@ -605,6 +783,10 @@ contains
        deallocate(this%makebdf)
     end if
 
+    if (allocated(this%makeoifs)) then
+       deallocate(this%makeoifs)
+    end if
+
     call this%vol_flow%free()
 
   end subroutine adjoint_pnpn_free
@@ -617,10 +799,10 @@ contains
   !! @param dt_controller timestep controller
   subroutine adjoint_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
     class(adjoint_pnpn_t), target, intent(inout) :: this
-    real(kind=rp), intent(inout) :: t
-    integer, intent(inout) :: tstep
+    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: dt
-    type(time_scheme_controller_t), intent(inout) :: ext_bdf
+    type(time_scheme_controller_t), intent(in) :: ext_bdf
     type(time_step_controller_t), intent(in) :: dt_controller
     ! number of degrees of freedom
     integer :: n
@@ -667,6 +849,20 @@ contains
       ! Compute the source terms
       call this%source_term%compute(t, tstep)
 
+      ! Add Neumann bc contributions to the RHS
+      call this%bcs_vel%apply_vector(f_x%x, f_y%x, f_z%x, &
+           this%dm_Xh%size(), t, tstep, strong = .false.)
+
+      ! Compute the grandient jump penalty term
+      if (this%if_gradient_jump_penalty .eqv. .true.) then
+         call this%gradient_jump_penalty_u%compute(u, v, w, u)
+         call this%gradient_jump_penalty_v%compute(u, v, w, v)
+         call this%gradient_jump_penalty_w%compute(u, v, w, w)
+         call this%gradient_jump_penalty_u%perform(f_x)
+         call this%gradient_jump_penalty_v%perform(f_y)
+         call this%gradient_jump_penalty_w%perform(f_z)
+      end if
+
       ! Pre-multiply the source terms with the mass matrix.
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_opcolv(f_x%x_d, f_y%x_d, f_z%x_d, c_Xh%B_d, msh%gdim, n)
@@ -674,44 +870,58 @@ contains
          call opcolv(f_x%x, f_y%x, f_z%x, c_Xh%B, msh%gdim, n)
       end if
 
-      ! Add the advection operators to the right-hand-side.
+      if (oifs) then
+         ! Add the advection operators to the right-hand-side.
+         call this%adv%compute(u, v, w, &
+              this%advx, this%advy, this%advz, &
+              Xh, this%c_Xh, dm_Xh%size(), dt)
 
-      call this%adv%compute_adjoint(u, v, w, u_b, v_b, w_b, &
-           f_x, f_y, f_z, &
-           Xh, this%c_Xh, dm_Xh%size())
+         ! At this point the RHS contains the sum of the advection operator and
+         ! additional source terms, evaluated using the velocity field from the
+         ! previous time-step. Now, this value is used in the explicit time
+         ! scheme to advance both terms in time.
+         call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
+              this%abx2, this%aby2, this%abz2, &
+              f_x%x, f_y%x, f_z%x, &
+              rho, ext_bdf%advection_coeffs, n)
 
-      ! At this point the RHS contains the sum of the advection operator and
-      ! additional source terms, evaluated using the velocity field from the
-      ! previous time-step. Now, this value is used in the explicit time
-      ! scheme to advance both terms in time.
-      call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
-           this%abx2, this%aby2, this%abz2, &
-           f_x%x, f_y%x, f_z%x, &
-           rho, ext_bdf%advection_coeffs, n)
+         ! Now, the source terms from the previous time step are added to the RHS.
+         call makeoifs%compute_fluid(this%advx%x, this%advy%x, this%advz%x, &
+              f_x%x, f_y%x, f_z%x, &
+              rho, dt, n)
+      else
+         call this%adv%compute_adjoint(u, v, w, u_b, v_b, w_b, &
+              f_x, f_y, f_z, &
+              Xh, this%c_Xh, dm_Xh%size())
 
-      ! Add the RHS contributions coming from the BDF scheme.
-      call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-           u, v, w, c_Xh%B, rho, dt, &
-           ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+         ! At this point the RHS contains the sum of the advection operator and
+         ! additional source terms, evaluated using the velocity field from the
+         ! previous time-step. Now, this value is used in the explicit time
+         ! scheme to advance both terms in time.
+         call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
+              this%abx2, this%aby2, this%abz2, &
+              f_x%x, f_y%x, f_z%x, &
+              rho, ext_bdf%advection_coeffs, n)
+
+         ! Add the RHS contributions coming from the BDF scheme.
+         call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
+              u, v, w, c_Xh%B, rho, dt, &
+              ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      end if
 
       call ulag%update()
       call vlag%update()
       call wlag%update()
 
-      !> We assume that no change of boundary conditions
-      !! occurs between elements. I.e. we do not apply gsop here like in Nek5000
-      !> Apply the user dirichlet boundary condition
-      call this%user_field_bc_vel%update(this%user_field_bc_vel%field_list, &
-           this%user_field_bc_vel%bc_list, this%c_Xh, t, tstep, "fluid")
-
-      call this%bc_apply_vel(t, tstep)
+      call this%bc_apply_vel(t, tstep, strong = .true.)
       call this%bc_apply_prs(t, tstep)
 
       ! Update material properties if necessary
       call this%update_material_properties()
 
-      ! Compute pressure.
-      call profiler_start_region('Pressure residual', 18)
+      ! Compute pressure residual.
+      call profiler_start_region('Pressure_residual', 18)
+
       call prs_res%compute(p, p_res,&
            u, v, w, &
            u_e, v_e, w_e, &
@@ -721,28 +931,38 @@ contains
            Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
            mu_field, rho_field)
 
+      ! De-mean the pressure residual when no strong pressure boundaries present
+      if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
+
       call gs_Xh%op(p_res, GS_OP_ADD)
+      ! Set the residual to zero at strong pressure boundaries.
       call this%bclst_dp%apply_scalar(p_res%x, p%dof%size(), t, tstep)
-      call profiler_end_region
+      call profiler_end_region('Pressure_residual', 18)
+
 
       call this%proj_prs%pre_solving(p_res%x, tstep, c_Xh, n, dt_controller, &
            'Pressure')
 
       call this%pc_prs%update()
-      call profiler_start_region('Pressure solve', 3)
-      ksp_results(1) = &
-           this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, this%bclst_dp, &
-           gs_Xh)
 
-      call profiler_end_region
+      call profiler_start_region('Pressure_solve', 3)
+
+      ! Solve for the pressure increment.
+      ksp_results(1) = &
+           this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, this%bclst_dp, gs_Xh)
+
+
+      call profiler_end_region('Pressure_solve', 3)
 
       call this%proj_prs%post_solving(dp%x, Ax_prs, c_Xh, &
            this%bclst_dp, gs_Xh, n, tstep, dt_controller)
 
+      ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
+      if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
 
-      ! Compute velocity.
-      call profiler_start_region('Velocity residual', 19)
+      ! Compute velocity residual.
+      call profiler_start_region('Velocity_residual', 19)
       call vel_res%compute(Ax_vel, u, v, w, &
            u_res, v_res, w_res, &
            p, &
@@ -755,23 +975,11 @@ contains
       call gs_Xh%op(v_res, GS_OP_ADD)
       call gs_Xh%op(w_res, GS_OP_ADD)
 
-      call this%bclst_vel_res%apply_vector(&
-           u_res%x, v_res%x, w_res%x, dm_Xh%size(),&
-           t, tstep)
+      ! Set residual to zero at strong velocity boundaries.
+      call this%bclst_vel_res%apply(u_res, v_res, w_res, t, tstep)
 
-      !We should implement a bc that takes three field_bcs and implements
-      ! vector_apply
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call this%bc_field_dirichlet_u%apply_scalar_dev(u_res%x_d, t, tstep)
-         call this%bc_field_dirichlet_v%apply_scalar_dev(v_res%x_d, t, tstep)
-         call this%bc_field_dirichlet_w%apply_scalar_dev(w_res%x_d, t, tstep)
-      else
-         call this%bc_field_dirichlet_u%apply_scalar(u_res%x, n, t, tstep)
-         call this%bc_field_dirichlet_v%apply_scalar(v_res%x, n, t, tstep)
-         call this%bc_field_dirichlet_w%apply_scalar(w_res%x, n, t, tstep)
-      end if
 
-      call profiler_end_region
+      call profiler_end_region('Velocity_residual', 19)
 
       call this%proj_u%pre_solving(u_res%x, tstep, c_Xh, n, dt_controller)
       call this%proj_v%pre_solving(v_res%x, tstep, c_Xh, n, dt_controller)
@@ -779,11 +987,12 @@ contains
 
       call this%pc_vel%update()
 
-      call profiler_start_region("Velocity solve", 4)
+      call profiler_start_region("Velocity_solve", 4)
       ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
            u_res%x, v_res%x, w_res%x, n, c_Xh, &
-           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh)
-      call profiler_end_region
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
+           this%ksp_vel%max_iter)
+      call profiler_end_region("Velocity_solve", 4)
 
       call this%proj_u%post_solving(du%x, Ax_vel, c_Xh, &
            this%bclst_du, gs_Xh, n, tstep, dt_controller)
@@ -801,8 +1010,8 @@ contains
 
       if (this%forced_flow_rate) then
          call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
-              c_Xh, gs_Xh, ext_bdf, rho, mu,&
-              dt, this%bclst_dp, this%bclst_du, this%bclst_dv, &
+              c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
+              this%bclst_dp, this%bclst_du, this%bclst_dv, &
               this%bclst_dw, this%bclst_vel_res, Ax_vel, Ax_prs, this%ksp_prs, &
               this%ksp_vel, this%pc_prs, this%pc_vel, this%ksp_prs%max_iter, &
               this%ksp_vel%max_iter)
@@ -813,11 +1022,10 @@ contains
       call this%scratch%relinquish_field(temp_indices)
 
     end associate
-    call profiler_end_region
+    call profiler_end_region('Fluid', 1)
 
     ! Compute the norm of the field and determine if we should do a rescale.
-    ! HARRY
-    ! TODO
+    ! TODO: HARRY
     ! we need to discuss this rescaling in the context of topology optimization
     ! vs stability analysis,
     ! for now I'm commenting this out
@@ -825,10 +1033,366 @@ contains
 
   end subroutine adjoint_pnpn_step
 
-  subroutine rescale_fluid(fluid_data, scale)
-    use neko_config, only: NEKO_BCKND_DEVICE
-    implicit none
+  ! ========================================================================== !
+  ! Todo: The following functions related to boundary conditions must be verified
 
+
+  !> Sets up the boundary condition for the scheme.
+  !! @param user The user interface.
+  subroutine fluid_pnpn_setup_bcs(this, user, params)
+    class(fluid_pnpn_t), intent(inout) :: this
+    type(user_t), target, intent(in) :: user
+    type(json_file), intent(inout) :: params
+    integer :: i, n_bcs, zone_index, j, zone_size, global_zone_size, ierr
+    class(bc_t), pointer :: bc_i
+    type(json_core) :: core
+    type(json_value), pointer :: bc_object
+    type(json_file) :: bc_subdict
+    logical :: found
+    ! Monitor which boundary zones have been marked
+    logical, allocatable :: marked_zones(:)
+    integer, allocatable :: zone_indices(:)
+
+    ! Lists for the residuals and solution increments
+    call this%bclst_vel_res%init()
+    call this%bclst_du%init()
+    call this%bclst_dv%init()
+    call this%bclst_dw%init()
+    call this%bclst_dp%init()
+
+    call this%bc_vel_res%init_from_components(this%c_Xh)
+    call this%bc_du%init_from_components(this%c_Xh)
+    call this%bc_dv%init_from_components(this%c_Xh)
+    call this%bc_dw%init_from_components(this%c_Xh)
+    call this%bc_dp%init_from_components(this%c_Xh)
+
+    ! Special PnPn boundary conditions for pressure
+    call this%bc_prs_surface%init_from_components(this%c_Xh)
+    call this%bc_sym_surface%init_from_components(this%c_Xh)
+
+    ! Populate bcs_vel and bcs_prs based on the case file
+    if (params%valid_path('case.fluid.boundary_conditions')) then
+       call params%info('case.fluid.boundary_conditions', n_children = n_bcs)
+       call params%get_core(core)
+       call params%get('case.fluid.boundary_conditions', bc_object, found)
+
+       !
+       ! Velocity bcs
+       !
+       call this%bcs_vel%init(n_bcs)
+
+       allocate(marked_zones(size(this%msh%labeled_zones)))
+       marked_zones = .false.
+
+       do i = 1, n_bcs
+          ! Create a new json containing just the subdict for this bc
+          call json_extract_item(core, bc_object, i, bc_subdict)
+
+          call json_get(bc_subdict, "zone_indices", zone_indices)
+
+          ! Check that we are not trying to assing a bc to zone, for which one
+          ! has already been assigned and that the zone has more than 0 size
+          ! in the mesh.
+          do j = 1, size(zone_indices)
+             zone_size = this%msh%labeled_zones(zone_indices(j))%size
+             call MPI_Allreduce(zone_size, global_zone_size, 1, &
+                  MPI_INTEGER, MPI_MAX, NEKO_COMM, ierr)
+
+             if (global_zone_size .eq. 0) then
+                write(error_unit, '(A, A, I0, A, A, I0, A)') "*** ERROR ***: ",&
+                     "Zone index ", zone_indices(j), &
+                     " is invalid as this zone has 0 size, meaning it ", &
+                     "does not in the mesh. Check fluid boundary condition ", &
+                     i, "."
+                error stop
+             end if
+
+             if (marked_zones(zone_indices(j)) .eqv. .true.) then
+                write(error_unit, '(A, A, I0, A, A, A, A)') "*** ERROR ***: ", &
+                     "Zone with index ", zone_indices(j), &
+                     " has already been assigned a boundary condition. ", &
+                     "Please check your boundary_conditions entry for the ", &
+                     "fluid and make sure that each zone index appears only ", &
+                     "in a single boundary condition."
+                error stop
+             else
+                marked_zones(zone_indices(j)) = .true.
+             end if
+          end do
+
+          bc_i => null()
+          call velocity_bc_factory(bc_i, this, bc_subdict, this%c_Xh, user)
+
+          ! Not all bcs require an allocation for velocity in particular,
+          ! so we check.
+          if (associated(bc_i)) then
+
+             ! We need to treat mixed bcs separately because they are by
+             ! convention marked weak and currently contain nested
+             ! bcs, some of which are strong.
+             select type (bc_i)
+               type is (symmetry_t)
+                ! Symmetry has 3 internal bcs, but only one actually contains
+                ! markings.
+                ! Symmetry's apply_scalar doesn't do anything, so we need to mark
+                ! individual nested bcs to the du,dv,dw, whereas the vel_res can
+                ! just get symmetry as a whole, because on this list we call
+                ! apply_vector.
+                ! Additionally we have to mark the special surface bc for p.
+                call this%bclst_vel_res%append(bc_i)
+                call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
+                call this%bc_dv%mark_facets(bc_i%bc_y%marked_facet)
+                call this%bc_dw%mark_facets(bc_i%bc_z%marked_facet)
+
+                call this%bcs_vel%append(bc_i)
+
+                call this%bc_sym_surface%mark_facets(bc_i%marked_facet)
+               type is (non_normal_t)
+                ! This is a bc for the residuals and increments, not the
+                ! velocity itself. So, don't append to bcs_vel
+                call this%bclst_vel_res%append(bc_i)
+                call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
+                call this%bc_dv%mark_facets(bc_i%bc_y%marked_facet)
+                call this%bc_dw%mark_facets(bc_i%bc_z%marked_facet)
+               type is (shear_stress_t)
+                ! Same as symmetry
+                call this%bclst_vel_res%append(bc_i%symmetry)
+                call this%bclst_du%append(bc_i%symmetry%bc_x)
+                call this%bclst_dv%append(bc_i%symmetry%bc_y)
+                call this%bclst_dw%append(bc_i%symmetry%bc_z)
+
+                call this%bcs_vel%append(bc_i)
+               type is (wall_model_bc_t)
+                ! Same as symmetry
+                call this%bclst_vel_res%append(bc_i%symmetry)
+                call this%bclst_du%append(bc_i%symmetry%bc_x)
+                call this%bclst_dv%append(bc_i%symmetry%bc_y)
+                call this%bclst_dw%append(bc_i%symmetry%bc_z)
+
+                call this%bcs_vel%append(bc_i)
+               class default
+
+                ! For the default case we use our dummy zero_dirichlet bcs to
+                ! mark the same faces as in ordinary velocity dirichlet
+                ! conditions.
+                ! Additionally we mark the special PnPn pressure  bc.
+                if (bc_i%strong .eqv. .true.) then
+                   call this%bc_vel_res%mark_facets(bc_i%marked_facet)
+                   call this%bc_du%mark_facets(bc_i%marked_facet)
+                   call this%bc_dv%mark_facets(bc_i%marked_facet)
+                   call this%bc_dw%mark_facets(bc_i%marked_facet)
+
+                   call this%bc_prs_surface%mark_facets(bc_i%marked_facet)
+                end if
+
+                call this%bcs_vel%append(bc_i)
+             end select
+          end if
+       end do
+
+       ! Make sure all labeled zones with non-zero size have been marked
+       do i = 1, size(this%msh%labeled_zones)
+          if ((this%msh%labeled_zones(i)%size .gt. 0) .and. &
+               (marked_zones(i) .eqv. .false.)) then
+             write(error_unit, '(A, A, I0)') "*** ERROR ***: ", &
+                  "No fluid boundary condition assigned to zone ", i
+             error stop
+          end if
+       end do
+
+       !
+       ! Pressure bcs
+       !
+       call this%bcs_prs%init(n_bcs)
+
+       do i = 1, n_bcs
+          ! Create a new json containing just the subdict for this bc
+          call json_extract_item(core, bc_object, i, bc_subdict)
+          bc_i => null()
+          call pressure_bc_factory(bc_i, this, bc_subdict, this%c_Xh, user)
+
+          ! Not all bcs require an allocation for pressure in particular,
+          ! so we check.
+          if (associated(bc_i)) then
+             call this%bcs_prs%append(bc_i)
+
+             ! Mark strong bcs in the dummy dp bc to force zero change.
+             if (bc_i%strong .eqv. .true.) then
+                call this%bc_dp%mark_facets(bc_i%marked_facet)
+             end if
+
+          end if
+
+       end do
+    end if
+
+    call this%bc_prs_surface%finalize()
+    call this%bc_sym_surface%finalize()
+
+    call this%bc_vel_res%finalize()
+    call this%bc_du%finalize()
+    call this%bc_dv%finalize()
+    call this%bc_dw%finalize()
+    call this%bc_dp%finalize()
+
+    call this%bclst_vel_res%append(this%bc_vel_res)
+    call this%bclst_du%append(this%bc_du)
+    call this%bclst_dv%append(this%bc_dv)
+    call this%bclst_dw%append(this%bc_dw)
+    call this%bclst_dp%append(this%bc_dp)
+
+    ! If we have no strong pressure bcs, we will demean the pressure
+    this%prs_dirichlet = .not. this%bclst_dp%is_empty()
+    call MPI_Allreduce(MPI_IN_PLACE, this%prs_dirichlet, 1, &
+         MPI_LOGICAL, MPI_LOR, NEKO_COMM)
+
+  end subroutine fluid_pnpn_setup_bcs
+
+  !> Write a field with boundary condition specifications
+  subroutine fluid_pnpn_write_boundary_conditions(this)
+    use inflow, only: inflow_t
+    use field_dirichlet, only: field_dirichlet_t
+    use blasius, only: blasius_t
+    use field_dirichlet_vector, only: field_dirichlet_vector_t
+    use usr_inflow, only: usr_inflow_t
+    use dong_outflow, only: dong_outflow_t
+    class(fluid_pnpn_t), target, intent(inout) :: this
+    type(dirichlet_t) :: bdry_mask
+    type(field_t), pointer :: bdry_field
+    type(file_t) :: bdry_file
+    integer :: temp_index, i
+    class(bc_t), pointer :: bci
+    character(len=LOG_SIZE) :: log_buf
+
+    call neko_log%section("Fuid boundary conditions")
+    write(log_buf, '(A)') 'Marking using integer keys in bdry0.f00000'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') 'Condition-value pairs: '
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  no_slip                         = 1'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  velocity_value                  = 2'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  outflow, normal_outflow (+dong) = 3'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  symmetry                        = 4'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  user_velocity_pointwise         = 5'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  periodic                        = 6'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  user_velocity                   = 7'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  user_pressure                   = 8'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  shear_stress                    = 9'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  wall_modelling                  = 10'
+    call neko_log%message(log_buf)
+    write(log_buf, '(A)') '  blasius_profile                 = 11'
+    call neko_log%message(log_buf)
+    call neko_log%end_section()
+
+    call this%scratch%request_field(bdry_field, temp_index)
+    bdry_field = 0.0_rp
+
+
+
+    call bdry_mask%init_from_components(this%c_Xh, 6.0_rp)
+    call bdry_mask%mark_zone(this%msh%periodic)
+    call bdry_mask%finalize()
+    call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+    call bdry_mask%free()
+
+    do i = 1, this%bcs_prs%size()
+       bci => this%bcs_prs%get(i)
+       select type (bc => bci)
+         type is (zero_dirichlet_t)
+          call bdry_mask%init_from_components(this%c_Xh, 3.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (dong_outflow_t)
+          call bdry_mask%init_from_components(this%c_Xh, 3.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (field_dirichlet_t)
+          call bdry_mask%init_from_components(this%c_Xh, 8.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+       end select
+    end do
+
+    do i = 1, this%bcs_vel%size()
+       bci => this%bcs_vel%get(i)
+       select type (bc => bci)
+         type is (zero_dirichlet_t)
+          call bdry_mask%init_from_components(this%c_Xh, 1.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (inflow_t)
+          call bdry_mask%init_from_components(this%c_Xh, 2.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (symmetry_t)
+          call bdry_mask%init_from_components(this%c_Xh, 4.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (usr_inflow_t)
+          call bdry_mask%init_from_components(this%c_Xh, 5.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (field_dirichlet_vector_t)
+          call bdry_mask%init_from_components(this%c_Xh, 7.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (shear_stress_t)
+          call bdry_mask%init_from_components(this%c_Xh, 9.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (wall_model_bc_t)
+          call bdry_mask%init_from_components(this%c_Xh, 10.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+         type is (blasius_t)
+          call bdry_mask%init_from_components(this%c_Xh, 11.0_rp)
+          call bdry_mask%mark_facets(bci%marked_facet)
+          call bdry_mask%finalize()
+          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
+          call bdry_mask%free()
+       end select
+    end do
+
+
+    bdry_file = file_t('boundary_adjoint.fld')
+    call bdry_file%write(bdry_field)
+
+    call this%scratch%relinquish_field(temp_index)
+  end subroutine fluid_pnpn_write_boundary_conditions
+
+  ! End of section to verify
+  ! ========================================================================== !
+
+  subroutine rescale_fluid(fluid_data, scale)
     !> Fluid data
     class(adjoint_pnpn_t), intent(inout) :: fluid_data
     !> Scaling factor
@@ -931,13 +1495,6 @@ contains
   end function norm
 
   function device_norm(x_d, y_d, z_d, B_d, volume, n)
-    use device_math, only: device_vlsc3
-    use comm, only: MPI_REAL_PRECISION
-    use mpi_f08, only: MPI_SUM, MPI_COMM_WORLD, &
-         MPI_IN_PLACE, mpi_allreduce
-
-    implicit none
-
     type(c_ptr), intent(in) :: x_d, y_d, z_d
     type(c_ptr), intent(in) :: B_d
     real(kind=rp), intent(in) :: volume
@@ -961,7 +1518,6 @@ contains
   !! @param tstep The current time-step
   subroutine power_iterations_compute(this, t, tstep)
     class(adjoint_pnpn_t), target, intent(inout) :: this
-
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
