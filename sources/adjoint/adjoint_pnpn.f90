@@ -84,7 +84,7 @@ module adjoint_pnpn
   use, intrinsic :: iso_c_binding, only: c_ptr
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
-       MPI_IN_PLACE, MPI_INTEGER, MPI_LOGICAL, MPI_LOR
+       MPI_INTEGER, MPI_LOGICAL, MPI_LOR
 
   implicit none
   private
@@ -1059,6 +1059,8 @@ contains
   !> Sets up the boundary condition for the scheme.
   !! @param user The user interface.
   subroutine adjoint_pnpn_setup_bcs(this, user, params)
+    use mpi_f08, only: MPI_IN_PLACE
+
     class(adjoint_pnpn_t), intent(inout) :: this
     type(user_t), target, intent(in) :: user
     type(json_file), intent(inout) :: params
@@ -1504,6 +1506,8 @@ contains
   end subroutine rescale_fluid
 
   function norm(x, y, z, B, volume, n)
+    use mpi_f08, only: MPI_IN_PLACE
+
     integer, intent(in) :: n
     real(kind=rp), dimension(n), intent(in) :: x, y, z
     real(kind=rp), dimension(n), intent(in) :: B
@@ -1520,6 +1524,8 @@ contains
   end function norm
 
   function device_norm(x_d, y_d, z_d, B_d, volume, n)
+    use mpi_f08, only: MPI_IN_PLACE
+
     type(c_ptr), intent(in) :: x_d, y_d, z_d
     type(c_ptr), intent(in) :: B_d
     real(kind=rp), intent(in) :: volume
