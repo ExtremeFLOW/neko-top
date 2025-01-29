@@ -52,7 +52,8 @@ module adjoint_pnpn
   use time_scheme_controller, only: time_scheme_controller_t
   use projection, only: projection_t
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use advection_adjoint, only: advection_adjoint_t, advection_adjoint_factory
+  use advection_adjoint, only: advection_adjoint_t
+  use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
   use json_utils, only: json_get, json_get_or_default, json_extract_item
@@ -507,14 +508,12 @@ contains
 
     ! Initialize the advection factory
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
-    call advection_adjoint_factory(this%adv, params, this%c_Xh, &
-         this%ulag, this%vlag, this%wlag, &
-         this%chkp%dtlag, this%chkp%tlag, time_scheme, &
-         .not. advection)
 
-    if (params%valid_path('case.fluid.flow_rate_force')) then
-       !  call this%vol_flow%init(this%dm_Xh, params)
-    end if
+    call advection_adjoint_factory(this%adv, params, this%c_Xh)
+
+    ! if (params%valid_path('case.fluid.flow_rate_force')) then
+    !  call this%vol_flow%init(this%dm_Xh, params)
+    ! end if
 
     ! ------------------------------------------------------------------------ !
     ! Handling the rescaling and baseflow
