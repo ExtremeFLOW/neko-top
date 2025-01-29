@@ -95,7 +95,7 @@ contains
     class(steady_state_problem_t), intent(inout) :: prob
     real(kind=rp), intent(in) :: tolerance
     integer :: max_iter
-    integer :: iter, rank, ierr, nglobal
+    integer :: iter, ierr, nglobal
     real(kind=rp) :: scalingfactor
 
     max_iter = this%mma%get_max_iter()

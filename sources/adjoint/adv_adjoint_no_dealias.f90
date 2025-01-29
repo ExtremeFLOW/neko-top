@@ -117,7 +117,7 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   subroutine adjoint_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, &
-       fy, fz, Xh, coef, n)
+       fy, fz, Xh, coef, n, dt)
     implicit none
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(space_t), intent(inout) :: Xh
@@ -126,6 +126,9 @@ contains
     type(field_t), intent(inout) :: vxb, vyb, vzb
     integer, intent(in) :: n
     type(field_t), intent(inout) :: fx, fy, fz
+    real(kind=rp), intent(in), optional :: dt
+
+
     type(c_ptr) :: fx_d, fy_d, fz_d
     type(c_ptr) :: vx_d, vy_d, vz_d
 
@@ -363,8 +366,7 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   subroutine linear_advection_no_dealias(this, vx, vy, vz, vxb, vyb, vzb, fx, &
-       fy, fz, Xh, coef, n)
-    implicit none
+       fy, fz, Xh, coef, n, dt)
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(space_t), intent(inout) :: Xh
     type(coef_t), intent(inout) :: coef
@@ -372,7 +374,9 @@ contains
     type(field_t), intent(inout) :: vxb, vyb, vzb
     integer, intent(in) :: n
     type(field_t), intent(inout) :: fx, fy, fz
+    real(kind=rp), intent(in), optional :: dt
     type(c_ptr) :: fx_d, fy_d, fz_d
+
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        fx_d = fx%x_d

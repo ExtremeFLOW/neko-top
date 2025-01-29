@@ -94,7 +94,7 @@ contains
        select type(obj => object)
          type is(field_dirichlet_t)
           obj%update => user%user_dirichlet_update
-          call json%add("field_name", scheme%p%name)
+          call json%add("field_name", scheme%p_adj%name)
        end select
       case default
        ! Check if the type is known since not all bc types require modifications
@@ -168,7 +168,7 @@ contains
        allocate(usr_inflow_t::object)
        select type(obj => object)
          type is(usr_inflow_t)
-          call obj%set_eval(user%adjoint_user_if)
+          call obj%set_eval(user%fluid_user_if)
        end select
     else
        do i=1, size(ADJOINT_PNPN_KNOWN_BCS)

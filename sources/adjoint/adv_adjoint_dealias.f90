@@ -233,7 +233,7 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   subroutine compute_adjoint_advection_dealias(this, vx, vy, vz, vxb, vyb, &
-       vzb, fx, fy, fz, Xh, coef, n)
+       vzb, fx, fy, fz, Xh, coef, n, dt)
     !! HARRY added vxb etc for baseflow
     implicit none
     class(adv_lin_dealias_t), intent(inout) :: this
@@ -243,6 +243,7 @@ contains
     type(field_t), intent(inout) :: vxb, vyb, vzb
     type(field_t), intent(inout) :: fx, fy, fz
     integer, intent(in) :: n
+    real(kind=rp), intent(in), optional :: dt
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: tfx, tfy, tfz
 
     ! u and U_b on dealiased mesh (one element)
@@ -477,7 +478,7 @@ contains
   !! @param coef The coefficients of the (Xh, mesh) pair.
   !! @param n Typically the size of the mesh.
   subroutine compute_linear_advection_dealias(this, vx, vy, vz, vxb, vyb, vzb, &
-       fx, fy, fz, Xh, coef, n)
+       fx, fy, fz, Xh, coef, n, dt)
     implicit none
     class(adv_lin_dealias_t), intent(inout) :: this
     type(space_t), intent(inout) :: Xh
@@ -486,6 +487,8 @@ contains
     type(field_t), intent(inout) :: vxb, vyb, vzb
     integer, intent(in) :: n
     type(field_t), intent(inout) :: fx, fy, fz
+    real(kind=rp), intent(in), optional :: dt
+
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: tx, ty, tz
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: txb, tyb, tzb
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: tfx, tfy, tfz

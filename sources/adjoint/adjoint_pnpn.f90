@@ -32,53 +32,59 @@
 !
 !> Adjoint Pn/Pn formulation.
 module adjoint_pnpn
-  use num_types, only: rp, dp
+  use, intrinsic :: iso_fortran_env, only: error_unit
+  use coefs, only: coef_t
+  use symmetry, only: symmetry_t
+  use field_registry, only: neko_field_registry
+  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
+  use num_types, only: rp
   use krylov, only: ksp_monitor_t
-  use pnpn_residual, only: pnpn_prs_res_factory, pnpn_vel_res_factory
-  use pnpn_residual, only: pnpn_prs_res_stress_factory, &
-       pnpn_vel_res_stress_factory
-  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t
-  use ax_product, only: ax_helm_factory
-  use rhs_maker, only: rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
-       rhs_maker_ext_fctry
-  use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t
-  use fluid_volflow, only: fluid_volflow_t
+  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t, &
+       pnpn_prs_res_factory, pnpn_vel_res_factory, &
+       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
+  use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
+       rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
+       rhs_maker_ext_fctry, rhs_maker_oifs_fctry
+  ! use adjoint_volflow, only: adjoint_volflow_t
   use adjoint_scheme, only: adjoint_scheme_t
-  use math, only: col2, cmult, vlsc3
-  use device_math, only: device_cmult
   use device_mathops, only: device_opcolv, device_opadd2cm
-  use fluid_aux, only: fluid_step_info
+  ! use adjoint_aux, only: adjoint_step_info
   use time_scheme_controller, only: time_scheme_controller_t
   use projection, only: projection_t
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use logger, only: neko_log, NEKO_LOG_DEBUG
-  use advection_adjoint, only: advection_adjoint_t
+  use advection_adjoint, only: advection_adjoint_t, advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
-  use json_utils, only: json_get_or_default
+  use json_module, only: json_file, json_core, json_value
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use json_module, only: json_file
-  use advection_adjoint_fctry, only: advection_adjoint_factory
-  use ax_product, only: ax_t
+  use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
   use dirichlet, only: dirichlet_t
+  use shear_stress, only: shear_stress_t
+  use wall_model_bc, only: wall_model_bc_t
   use facet_normal, only: facet_normal_t
   use non_normal, only: non_normal_t
   use mesh, only: mesh_t
   use user_intf, only: user_t
   use time_step_controller, only: time_step_controller_t
-  use gather_scatter, only: gs_t, GS_OP_ADD
+  use gs_ops, only: GS_OP_ADD
   use neko_config, only: NEKO_BCKND_DEVICE
   use mathops, only: opadd2cm, opcolv
   use bc_list, only: bc_list_t
-  use utils, only: neko_error
-  use field_math, only: field_add2
-  use file, only: file_t, fld_file_data_t
-  use field_registry, only: neko_field_registry
-  use comm, only: MPI_REAL_PRECISION
+  use zero_dirichlet, only: zero_dirichlet_t
+  use utils, only: neko_error, neko_type_error
+  use field_math, only: field_add2, field_copy
+  use bc, only: bc_t
+  use file, only: file_t
+  use operators, only: ortho
   use vector, only: vector_t
-  use, intrinsic :: iso_c_binding, only: c_ptr
-  use mpi_f08, only: MPI_SUM, MPI_COMM_WORLD, &
-       MPI_IN_PLACE, mpi_allreduce
+  use device_math, only: device_vlsc3
+  use math, only: vlsc3
   use json_utils_ext, only: json_key_fallback
+  use, intrinsic :: iso_c_binding, only: c_ptr
+  use comm, only: NEKO_COMM, MPI_REAL_PRECISION
+  use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
+       MPI_IN_PLACE, MPI_INTEGER, MPI_LOGICAL, MPI_LOR
 
   implicit none
   private
@@ -190,7 +196,7 @@ module adjoint_pnpn
      class(rhs_maker_oifs_t), allocatable :: makeoifs
 
      !> Adjust flow volume
-     type(fluid_volflow_t) :: vol_flow
+     !  type(fluid_volflow_t) :: vol_flow
 
      ! ======================================================================= !
      ! Addressable attributes
@@ -215,18 +221,18 @@ module adjoint_pnpn
 
    contains
      !> Constructor.
-     procedure, pass(this) :: init => fluid_pnpn_init
+     procedure, pass(this) :: init => adjoint_pnpn_init
      !> Destructor.
-     procedure, pass(this) :: free => fluid_pnpn_free
+     procedure, pass(this) :: free => adjoint_pnpn_free
      !> Perform a single time-step of the scheme.
-     procedure, pass(this) :: step => fluid_pnpn_step
+     procedure, pass(this) :: step => adjoint_pnpn_step
      !> Restart from a previous solution.
-     procedure, pass(this) :: restart => fluid_pnpn_restart
+     procedure, pass(this) :: restart => adjoint_pnpn_restart
      !> Set up boundary conditions.
-     procedure, pass(this) :: setup_bcs => fluid_pnpn_setup_bcs
+     procedure, pass(this) :: setup_bcs => adjoint_pnpn_setup_bcs
      !> Write a field with boundary condition specifications.
      procedure, pass(this) :: write_boundary_conditions => &
-          fluid_pnpn_write_boundary_conditions
+          adjoint_pnpn_write_boundary_conditions
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
@@ -243,7 +249,7 @@ module adjoint_pnpn
      !! @param[in] user The user interface.
      module subroutine pressure_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(fluid_pnpn_t), intent(in) :: scheme
+       type(adjoint_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -260,7 +266,7 @@ module adjoint_pnpn
      !! @param[in] user The user interface.
      module subroutine velocity_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(fluid_pnpn_t), intent(in) :: scheme
+       type(adjoint_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -276,7 +282,13 @@ contains
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
-    character(len=20), parameter :: scheme = 'Adjoint (Pn/Pn)'
+    character(len=15), parameter :: scheme = 'Adjoint (Pn/Pn)'
+    real(kind=rp) :: abs_tol
+    character(len=LOG_SIZE) :: log_buf
+    integer :: solver_maxiter
+    character(len=:), allocatable :: solver_type, precon_type
+    logical :: monitor, found
+    logical :: advection
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -501,7 +513,7 @@ contains
          .not. advection)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
-       call this%vol_flow%init(this%dm_Xh, params)
+       !  call this%vol_flow%init(this%dm_Xh, params)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -565,20 +577,19 @@ contains
   subroutine adjoint_pnpn_restart(this, dtlag, tlag)
     class(adjoint_pnpn_t), target, intent(inout) :: this
     real(kind=rp) :: dtlag(10), tlag(10)
-    type(field_t) :: u_temp, v_temp, w_temp
     integer :: i, j, n
 
     n = this%u_adj%dof%size()
     if (allocated(this%chkp%previous_mesh%elements) .or. &
          this%chkp%previous_Xh%lx .ne. this%Xh%lx) then
-       associate(u => this%u, v => this%v, w => this%w, p => this%p, &
+       associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, p => this%p_adj, &
             c_Xh => this%c_Xh, ulag => this%ulag, vlag => this%vlag, &
             wlag => this%wlag)
          do concurrent (j = 1:n)
-            u_adj%x(j,1,1,1) = u_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            v_adj%x(j,1,1,1) = v_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            w_adj%x(j,1,1,1) = w_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            p_adj%x(j,1,1,1) = p_adj%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            u%x(j,1,1,1) = u%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            v%x(j,1,1,1) = v%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            w%x(j,1,1,1) = w%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
+            p%x(j,1,1,1) = p%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
          end do
          do i = 1, this%ulag%size()
             do concurrent (j = 1:n)
@@ -785,7 +796,7 @@ contains
        deallocate(this%makeoifs)
     end if
 
-    call this%vol_flow%free()
+    ! call this%vol_flow%free()
 
   end subroutine adjoint_pnpn_free
 
@@ -831,7 +842,7 @@ contains
          makeabf => this%makeabf, makebdf => this%makebdf, &
          vel_projection_dim => this%vel_projection_dim, &
          pr_projection_dim => this%pr_projection_dim, &
-         rho => this%rho, mu => this%mu, &
+         rho => this%rho, mu => this%mu, oifs => this%oifs, &
          rho_field => this%rho_field, mu_field => this%mu_field, &
          f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
          if_variable_dt => dt_controller%if_variable_dt, &
@@ -853,12 +864,12 @@ contains
 
       ! Compute the grandient jump penalty term
       if (this%if_gradient_jump_penalty .eqv. .true.) then
-         call this%gradient_jump_penalty_u%compute(u, v, w, u)
-         call this%gradient_jump_penalty_v%compute(u, v, w, v)
-         call this%gradient_jump_penalty_w%compute(u, v, w, w)
-         call this%gradient_jump_penalty_u%perform(f_x)
-         call this%gradient_jump_penalty_v%perform(f_y)
-         call this%gradient_jump_penalty_w%perform(f_z)
+         call this%gradient_jump_penalty_u_adj%compute(u, v, w, u)
+         call this%gradient_jump_penalty_v_adj%compute(u, v, w, v)
+         call this%gradient_jump_penalty_w_adj%compute(u, v, w, w)
+         call this%gradient_jump_penalty_u_adj%perform(f_x)
+         call this%gradient_jump_penalty_v_adj%perform(f_y)
+         call this%gradient_jump_penalty_w_adj%perform(f_z)
       end if
 
       ! ====================================================================== !
@@ -875,24 +886,25 @@ contains
       ! ====================================================================== !
 
       if (oifs) then
-         ! Add the advection operators to the right-hand-side.
-         call this%adv%compute(u, v, w, &
-              this%advx, this%advy, this%advz, &
-              Xh, this%c_Xh, dm_Xh%size(), dt)
+         call neko_error("OIFS not implemented for adjoint")
+         !  ! Add the advection operators to the right-hand-side.
+         !  call this%adv%compute_adjoint(u, v, w, &
+         !       this%advx, this%advy, this%advz, &
+         !       Xh, this%c_Xh, dm_Xh%size(), dt)
 
-         ! At this point the RHS contains the sum of the advection operator and
-         ! additional source terms, evaluated using the velocity field from the
-         ! previous time-step. Now, this value is used in the explicit time
-         ! scheme to advance both terms in time.
-         call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
-              this%abx2, this%aby2, this%abz2, &
-              f_x%x, f_y%x, f_z%x, &
-              rho, ext_bdf%advection_coeffs, n)
+         !  ! At this point the RHS contains the sum of the advection operator and
+         !  ! additional source terms, evaluated using the velocity field from the
+         !  ! previous time-step. Now, this value is used in the explicit time
+         !  ! scheme to advance both terms in time.
+         !  call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
+         !       this%abx2, this%aby2, this%abz2, &
+         !       f_x%x, f_y%x, f_z%x, &
+         !       rho, ext_bdf%advection_coeffs, n)
 
-         ! Now, the source terms from the previous time step are added to the RHS.
-         call makeoifs%compute_fluid(this%advx%x, this%advy%x, this%advz%x, &
-              f_x%x, f_y%x, f_z%x, &
-              rho, dt, n)
+         !  ! Now, the source terms from the previous time step are added to the RHS.
+         !  call makeoifs%compute_fluid(this%advx%x, this%advy%x, this%advz%x, &
+         !       f_x%x, f_y%x, f_z%x, &
+         !       rho, dt, n)
       else
          call this%adv%compute_adjoint(u, v, w, u_b, v_b, w_b, &
               f_x, f_y, f_z, &
@@ -1016,12 +1028,12 @@ contains
       end if
 
       if (this%forced_flow_rate) then
-         call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
-              c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
-              this%bclst_dp, this%bclst_du, this%bclst_dv, &
-              this%bclst_dw, this%bclst_vel_res, Ax_vel, Ax_prs, this%ksp_prs, &
-              this%ksp_vel, this%pc_prs, this%pc_vel, this%ksp_prs%max_iter, &
-              this%ksp_vel%max_iter)
+         !  call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
+         !       c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
+         !       this%bclst_dp, this%bclst_du, this%bclst_dv, &
+         !       this%bclst_dw, this%bclst_vel_res, Ax_vel, Ax_prs, this%ksp_prs, &
+         !       this%ksp_vel, this%pc_prs, this%pc_vel, this%ksp_prs%max_iter, &
+         !       this%ksp_vel%max_iter)
       end if
 
       call fluid_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
@@ -1050,7 +1062,7 @@ contains
     class(adjoint_pnpn_t), intent(inout) :: this
     type(user_t), target, intent(in) :: user
     type(json_file), intent(inout) :: params
-    integer :: i, n_bcs, zone_index, j, zone_size, global_zone_size, ierr
+    integer :: i, n_bcs, j, zone_size, global_zone_size, ierr
     class(bc_t), pointer :: bc_i
     type(json_core) :: core
     type(json_value), pointer :: bc_object
@@ -1262,14 +1274,14 @@ contains
   end subroutine adjoint_pnpn_setup_bcs
 
   !> Write a field with boundary condition specifications
-  subroutine fluid_pnpn_write_boundary_conditions(this)
+  subroutine adjoint_pnpn_write_boundary_conditions(this)
     use inflow, only: inflow_t
     use field_dirichlet, only: field_dirichlet_t
     use blasius, only: blasius_t
     use field_dirichlet_vector, only: field_dirichlet_vector_t
     use usr_inflow, only: usr_inflow_t
     use dong_outflow, only: dong_outflow_t
-    class(fluid_pnpn_t), target, intent(inout) :: this
+    class(adjoint_pnpn_t), target, intent(inout) :: this
     type(dirichlet_t) :: bdry_mask
     type(field_t), pointer :: bdry_field
     type(file_t) :: bdry_file
@@ -1400,7 +1412,7 @@ contains
     call bdry_file%write(bdry_field)
 
     call this%scratch%relinquish_field(temp_index)
-  end subroutine fluid_pnpn_write_boundary_conditions
+  end subroutine adjoint_pnpn_write_boundary_conditions
 
   ! End of section to verify
   ! ========================================================================== !
