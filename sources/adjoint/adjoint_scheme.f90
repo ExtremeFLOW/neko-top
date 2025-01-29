@@ -180,6 +180,10 @@ module adjoint_scheme
      real(kind=rp) :: rho
      !> The variable density field
      type(field_t) :: rho_field
+     !> Global number of GLL points for the fluid (not unique)
+     integer(kind=i8) :: glb_n_points
+     !> Global number of GLL points for the fluid (unique)
+     integer(kind=i8) :: glb_unique_points
      !> Manager for temporary fields
      type(scratch_registry_t) :: scratch
      !> Boundary condition labels (if any)
@@ -187,9 +191,9 @@ module adjoint_scheme
    contains
      !> Constructor for the base type
      procedure, pass(this) :: adjoint_scheme_init_all
-     procedure, pass(this) :: adjoint_scheme_init_common
+     procedure, pass(this) :: adjoint_scheme_init_base
      generic :: scheme_init => adjoint_scheme_init_all, &
-          adjoint_scheme_init_common
+          adjoint_scheme_init_base
      !> Destructor for the base type
      procedure, pass(this) :: scheme_free => adjoint_scheme_free
      !> Validate that all components are properly allocated
@@ -287,9 +291,8 @@ module adjoint_scheme
 contains
 
   !> Initialize common data for the current scheme
-  subroutine adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
+  subroutine adjoint_scheme_init_base(this, msh, lx, params, scheme, user, &
        kspv_init)
-    implicit none
     class(adjoint_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(inout) :: lx
@@ -297,33 +300,16 @@ contains
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     logical, intent(in) :: kspv_init
+    type(dirichlet_t) :: bdry_mask
     character(len=LOG_SIZE) :: log_buf
-    real(kind=rp) :: real_val
+    real(kind=rp), allocatable :: real_vec(:)
+    real(kind=rp) :: real_val, kappa, B, z0
     logical :: logical_val
     integer :: integer_val, ierr
+    type(json_file) :: wm_json
     character(len=:), allocatable :: string_val1, string_val2
+    real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
-
-
-    ! ! -------------------------------------------------------------------
-    ! ! A subdictionary which should be passed into "fluid" or "adjoint" source
-    ! term
-    ! type(json_file) :: fluid_json
-    ! type(json_file) :: adjoint_json
-    ! type(json_file) :: this_json
-    ! type(json_core) :: core
-    ! type(json_value), pointer :: ptr
-    ! character(len=:), allocatable :: buffer
-    ! logical :: found
-
-    ! call params%get("case.fluid", ptr, found)
-    ! call core%print_to_string(ptr, buffer)
-    ! call fluid_json%load_from_string(buffer)
-    ! call params%get("case.adjoint", ptr, found)
-    ! call core%print_to_string(ptr, buffer)
-    ! call adjoint_json%load_from_string(buffer)
-    ! ! -------------------------------------------------------------------
-
 
     !
     ! SEM simulation fundamentals
@@ -346,8 +332,13 @@ contains
     ! Local scratch registry
     this%scratch = scratch_registry_t(this%dm_Xh, 10, 2)
 
-    ! Case parameters
-    this%params => params
+    !
+    ! First section of fluid log
+    !
+
+    call neko_log%section('Adjoint')
+    write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
+    call neko_log%message(log_buf)
 
     !
     ! Material properties
@@ -419,13 +410,6 @@ contains
     !end if
 
 
-    !
-    ! First section of fluid log
-    !
-
-    call neko_log%section('Adjoint scheme')
-    write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
-    call neko_log%message(log_buf)
     if (lx .lt. 10) then
        write(log_buf, '(A, I1)') 'Poly order : ', lx-1
     else if (lx .ge. 10) then
@@ -434,7 +418,12 @@ contains
        write(log_buf, '(A, I3)') 'Poly order : ', lx-1
     end if
     call neko_log%message(log_buf)
-    write(log_buf, '(A, I0)') 'DoFs       : ', this%dm_Xh%size()
+    this%glb_n_points = int(this%msh%glb_nelv, i8)*int(this%Xh%lxyz, i8)
+    this%glb_unique_points = int(glsum(this%c_Xh%mult, this%dm_Xh%size()), i8)
+
+    write(log_buf, '(A, I0)') 'GLL points : ', this%glb_n_points
+    call neko_log%message(log_buf)
+    write(log_buf, '(A, I0)') 'Unique pts.: ', this%glb_unique_points
     call neko_log%message(log_buf)
 
     write(log_buf, '(A,ES13.6)') 'rho        :', this%rho
@@ -442,9 +431,11 @@ contains
     write(log_buf, '(A,ES13.6)') 'mu         :', this%mu
     call neko_log%message(log_buf)
 
-    ! this will be the same for both the forward and adjoint
     call json_get(params, 'case.numerics.dealias', logical_val)
     write(log_buf, '(A, L1)') 'Dealias    : ', logical_val
+    call neko_log%message(log_buf)
+
+    write(log_buf, '(A, L1)') 'LES        : ', this%variable_material_properties
     call neko_log%message(log_buf)
 
     ! hmmmmmm....
@@ -455,6 +446,8 @@ contains
     write(log_buf, '(A, L1)') 'Save bdry  : ', logical_val
     call neko_log%message(log_buf)
 
+    ! ======================================================================== !
+    ! Todo: This section need to be moved
 
     !
     ! Setup velocity boundary conditions
@@ -633,6 +626,9 @@ contains
     ! Check if we need to output boundary types to a separate field
     call adjoint_scheme_set_bc_type_output(this, params)
 
+    ! End of section to be moved
+    ! ======================================================================== !
+
     !
     ! Setup right-hand side fields.
     !
@@ -741,8 +737,41 @@ contains
     call this%vlag%init(this%v_adj, 2)
     call this%wlag%init(this%w_adj, 2)
 
+    ! Initiate gradient jump penalty
+    call json_get_or_default(params, &
+         'case.fluid.gradient_jump_penalty.enabled',&
+         this%if_gradient_jump_penalty, .false.)
 
-  end subroutine adjoint_scheme_init_common
+    if (this%if_gradient_jump_penalty .eqv. .true.) then
+       call neko_error('Gradient jump penalty not implemented for adjoint')
+
+       if ((this%dm_Xh%xh%lx - 1) .eq. 1) then
+          call json_get_or_default(params, &
+               'case.fluid.gradient_jump_penalty.tau',&
+               GJP_param_a, 0.02_rp)
+          GJP_param_b = 0.0_rp
+       else
+          call json_get_or_default(params, &
+               'case.fluid.gradient_jump_penalty.scaling_factor',&
+               GJP_param_a, 0.8_rp)
+          call json_get_or_default(params, &
+               'case.fluid.gradient_jump_penalty.scaling_exponent',&
+               GJP_param_b, 4.0_rp)
+       end if
+       call this%gradient_jump_penalty_u%init(params, this%dm_Xh, this%c_Xh, &
+            GJP_param_a, GJP_param_b)
+       call this%gradient_jump_penalty_v%init(params, this%dm_Xh, this%c_Xh, &
+            GJP_param_a, GJP_param_b)
+       call this%gradient_jump_penalty_w%init(params, this%dm_Xh, this%c_Xh, &
+            GJP_param_a, GJP_param_b)
+    end if
+
+    call neko_log%end_section()
+
+  end subroutine adjoint_scheme_init_base
+
+  ! ========================================================================== !
+  ! Todo: This section need to be moved
 
   !> Initialize all components of the current scheme
   subroutine adjoint_scheme_init_all(this, msh, lx, params, kspv_init, &
@@ -761,7 +790,7 @@ contains
     character(len=:), allocatable :: solver_type, precon_type, json_key
     character(len=LOG_SIZE) :: log_buf
 
-    call adjoint_scheme_init_common(this, msh, lx, params, scheme, user, &
+    call adjoint_scheme_init_base(this, msh, lx, params, scheme, user, &
          kspv_init)
 
     call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
@@ -860,6 +889,9 @@ contains
     call neko_log%end_section()
 
   end subroutine adjoint_scheme_init_all
+
+  ! End of section to be moved
+  ! ========================================================================== !
 
   !> Deallocate a fluid formulation
   subroutine adjoint_scheme_free(this)
