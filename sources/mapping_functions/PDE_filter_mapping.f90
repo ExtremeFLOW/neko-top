@@ -167,7 +167,7 @@ contains
          'o', bc_labels_all_neuman)
 
     ! set the flux to zero
-    call this%filter_bcs%finalize_neumann(0.0_rp)
+    call this%filter_bcs%finalize()
 
     ! add them to the filter BCs
     call this%bclst_filt%append(this%filter_bcs)
