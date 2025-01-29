@@ -31,14 +31,21 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Contains the factory routine for `advection_t` children.
-submodule (advection_adjoint) advection_adjoint_fctry
-  use json_utils, only : json_get, json_get_or_default
+module advection_adjoint_fctry
+  use num_types, only : rp
+  use coefs, only : coef_t
+  use json_utils, only : json_get
+  use json_module, only : json_file
 
   ! Advection and derivatives
+  use advection_adjoint, only : advection_adjoint_t
   use adv_lin_dealias, only : adv_lin_dealias_t
   use adv_lin_no_dealias, only : adv_lin_no_dealias_t
 
-  use utils, only: neko_error
+  implicit none
+  private
+
+  public :: advection_adjoint_factory
 
 contains
 
@@ -46,79 +53,47 @@ contains
   !! @param object Polymorphic object of class \ref advection_t.
   !! @param json The parameter file.
   !! @param coef The coefficients of the (space, mesh) pair.
-  !! @param ulag, vlag, wlag The lagged velocity fields.
-  !! @param dtlag The lagged time steps.
-  !! @param tlag The lagged times.
-  !! @param time_scheme The bdf-ext time scheme used in the method.
-  !! @param use_dummy If true, a dummy zero-valued advection type is allocated.
-  !! @param slag The lagged scalar field. Optional.
-  !! This can be used to kill the advection term.
   !! @note The factory both allocates and initializes `object`.
-  module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, wlag, &
-       dtlag, tlag, time_scheme, use_dummy, slag)
+  subroutine advection_adjoint_factory(object, json, coef)
+    implicit none
     class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
-    type(coef_t), intent(inout), target :: coef
-    type(field_series_t), intent(in), target :: ulag, vlag, wlag
-    real(kind=rp), intent(in), target :: dtlag(10)
-    real(kind=rp), intent(in), target :: tlag(10)
-    type(time_scheme_controller_t), intent(in), target :: time_scheme
-    logical, optional, intent(in) :: use_dummy
-    type(field_series_t), target, optional, intent(in) :: slag
-
-    logical :: dealias, oifs
-    real(kind=rp) :: ctarget
+    type(coef_t), target :: coef
+    logical :: dealias, found
     integer :: lxd, order
+
+    call json_get(json, 'case.numerics.dealias', dealias)
+    call json%get('case.numerics.dealiased_polynomial_order', lxd, found)
+    if (.not. found) then
+       call json_get(json, 'case.numerics.polynomial_order', order)
+       ! Note, assumes odd polynomial order
+       lxd = 3 * (order + 1) / 2
+    end if
 
     ! Free allocatables if necessary
     if (allocated(object)) then
-       call object%free()
+       call object%free
        deallocate(object)
     end if
 
-    ! if (present(use_dummy)) then
-    !    if (use_dummy .eqv. .true.) then
-    !       allocate(adv_dummy_t::object)
-    !       return
-    !    end if
-    ! end if
-
-    ! Read the parameters from the json file
-    call json_get(json, 'case.numerics.dealias', dealias)
-    call json_get(json, 'case.numerics.polynomial_order', order)
-    call json_get_or_default(json, 'case.numerics.oifs', oifs, .false.)
-
-    call json_get_or_default(json, 'case.numerics.dealiased_polynomial_order', &
-         lxd, ( 3 * (order + 1) ) / 2)
-
-    call json_get_or_default(json, 'case.numerics.target_cfl', ctarget, 1.9_rp)
-
-    if (oifs) then
-       call neko_error('OIFS is not supported in the adjoint')
+    if (dealias) then
+       allocate(adv_lin_dealias_t::object)
     else
-       if (dealias) then
-          allocate(adv_lin_dealias_t::object)
-       else
-          allocate(adv_lin_no_dealias_t::object)
-       end if
+       allocate(adv_lin_no_dealias_t::object)
     end if
 
     select type (adv => object)
       type is (adv_lin_dealias_t)
-       call adv%init(lxd, coef)
+       if (lxd .gt. 0) then
+          call adv%init(lxd, coef)
+       else
+          call adv%init(coef%Xh%lx * 3 / 2, coef)
+       end if
       type is (adv_lin_no_dealias_t)
        call adv%init(coef)
-       ! type is (adv_oifs_t)
-       !  if (present(slag)) then
-       !     call adv%init(lxd, coef, ctarget, ulag, vlag, wlag, &
-       !          dtlag, tlag, time_scheme, slag)
-       !  else
-       !     call adv%init(lxd, coef, ctarget, ulag, vlag, wlag, &
-       !          dtlag, tlag, time_scheme)
-       !  end if
     end select
 
   end subroutine advection_adjoint_factory
 
 
-end submodule advection_adjoint_fctry
+end module advection_adjoint_fctry
