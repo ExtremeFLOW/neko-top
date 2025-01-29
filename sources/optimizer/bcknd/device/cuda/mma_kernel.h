@@ -587,17 +587,13 @@ __global__ void kkt_rex_kernel(T* __restrict__ rex, const T* __restrict__ df0dx,
 	const T* __restrict__ eta, const T* __restrict__ lambda, const int n, const int m) {
 	int tj = blockIdx.x * blockDim.x + threadIdx.x;
 	if (tj < n) {
-		rex[tj] = df0dx[tj] - xsi[tj] + eta[tj];
+		rex[tj] = 0.0;
 		for (int i = 0; i < m; i++) {
-			rex[tj] = rex[tj] + dfdx[tj + i * n] * lambda[i];
+			rex[tj] = rex[tj] + dfdx[i + tj*m] * lambda[i];
 		}
+		rex[tj] += df0dx[tj] - xsi[tj] + eta[tj];
 	}
 }
-
-
-
-
-
 
 
 template <typename T>

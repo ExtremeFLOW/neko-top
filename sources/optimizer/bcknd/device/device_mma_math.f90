@@ -90,9 +90,9 @@ module device_mma_math
 #elif HAVE_CUDA
     call mma_gensub3_cuda(x_d, df0dx_d, dfdx_d,low_d, upp_d, min_d,max_d,alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
 #elif HAVE_OPENCL
-  all neko_error('no device backend configured')
+  call neko_error('no device backend configured2')
 #else
-  call neko_error('no device backend configured')
+  call neko_error('no device backend configured3')
 #endif
   end subroutine device_mma_gensub3 
 
@@ -330,7 +330,7 @@ module device_mma_math
 #elif HAVE_CUDA
     call cuda_AA(AA_d, GG_d,  diagx_d, n, m) 
 #elif HAVE_OPENCL
-  all neko_error('no device backend configured')
+  call neko_error('no device backend configured')
 #else
   call neko_error('no device backend configured')
 #endif

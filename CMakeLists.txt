@@ -43,7 +43,15 @@ set(CMAKE_Fortran_STANDARD 2008)
 # Enable devices
 option(DEVICE_TYPE "Enable device support" OFF)
 if (DEVICE_TYPE STREQUAL "CUDA")
-    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    find_program(CMAKE_CUDA_COMPILER NAMES nvcc)
+    if (CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        message(STATUS "CUDA support enabled with nvcc: ${CMAKE_CUDA_COMPILER}")
+        add_definitions(-DHAVE_CUDA)
+    else()
+        message(FATAL_ERROR "CUDA requested but nvcc was not found. Install CUDA or check your PATH.")
+    endif()
 endif()
 
 # ............................................................................ #

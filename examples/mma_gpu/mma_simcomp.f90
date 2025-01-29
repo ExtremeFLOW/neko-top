@@ -291,7 +291,7 @@ contains
         call device_memcpy_r1(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
         call device_memcpy_r2(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
        
-       call this%mma%KKT(x, df0dx, fval, dfdx)
+       call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
        if (rank .eq. 0) then
           print *, 'iter = ', iter,&
