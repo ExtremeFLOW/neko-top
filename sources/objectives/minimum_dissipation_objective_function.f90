@@ -63,7 +63,8 @@
 module minimum_dissipation_objective_function
   use num_types, only : rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
+      field_copy
   use operators, only: grad
   use scratch_registry, only : neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
@@ -77,6 +78,8 @@ module minimum_dissipation_objective_function
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
+  use device_math, only: device_glsc2
+  use neko_config, only : NEKO_BCKND_DEVICE
   implicit none
   private
 
@@ -187,15 +190,16 @@ contains
     class(minimum_dissipation_objective_function_t), intent(inout) :: this
     class(fluid_scheme_t), intent(in) :: fluid
     type(topopt_design_t), intent(inout) :: design
-    type(field_t), pointer :: wo1, wo2, wo3
+    type(field_t), pointer :: wo1, wo2, wo3, work
     type(field_t), pointer :: objective_field
-    integer :: temp_indices(4)
+    integer :: temp_indices(5)
     integer n
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
     call neko_scratch_registry%request_field(wo3, temp_indices(3))
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
+    call neko_scratch_registry%request_field(work , temp_indices(5))
 
     ! compute the objective function.
     call grad(wo1%x, wo2%x, wo3%x, fluid%u%x, fluid%C_Xh)
@@ -215,11 +219,25 @@ contains
 
     ! integrate the field
     n = wo1%size()
+
+
     if (this%if_mask) then
-       this%dissipation = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
-            n, this%mask%mask, this%mask%size)
+        if (neko_bcknd_device .eq. 1) then
+            ! note, this could be done more elagantly by writing device_glsc2_mask
+            call field_copy(work, objective_field)
+            call mask_exterior_const(work, this%mask, 0.0_rp) 
+            this%dissipation = device_glsc2(work%x_d, fluid%c_xh%B_d, n)
+        else
+            this%dissipation = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+                 n, this%mask%mask, this%mask%size)
+        end if
     else
-       this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+        if (neko_bcknd_device .eq. 1) then
+            this%dissipation =  device_glsc2(objective_field%x_d, &
+                fluid%C_Xh%b_d, n)
+        else
+            this%dissipation = glsc2(objective_field%x, fluid%C_Xh%b, n)
+        end if
     end if
 
     if (this%if_lube) then
@@ -232,10 +250,23 @@ contains
        call field_addcol3(objective_field, fluid%v, design%brinkman_amplitude)
        call field_addcol3(objective_field, fluid%w, design%brinkman_amplitude)
        if (this%if_mask) then
-          this%lube_value = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
-               n, this%mask%mask, this%mask%size)
+           if (neko_bcknd_device .eq. 1) then
+               ! note, this could be done more elagantly by writing 
+               ! device_glsc2_mask
+               call field_copy(work, objective_field)
+               call mask_exterior_const(work, this%mask, 0.0_rp) 
+               this%dissipation = device_glsc2(work%x_d, fluid%c_xh%B_d, n)
+           else
+               this%lube_value = glsc2_mask(objective_field%x, fluid%C_Xh%b, &
+                    n, this%mask%mask, this%mask%size)
+           end if
        else
-          this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
+           if (neko_bcknd_device .eq. 1) then
+               this%lube_value = device_glsc2(objective_field%x_d, &
+                   fluid%C_Xh%b_d, n)
+           else
+               this%lube_value = glsc2(objective_field%x, fluid%C_Xh%b, n)
+           end if
        end if
        this%objective_function_value = this%dissipation &
             + 0.5*this%K*this%lube_value
