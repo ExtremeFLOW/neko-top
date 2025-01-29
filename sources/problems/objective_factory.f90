@@ -30,19 +30,21 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-!> Submodule for the constraint function factory
-submodule (constraint) constraint_factory_mod
+!> Submodule for the objective function factory
+submodule (objective) objective_factory_mod
   use json_utils, only: json_get
   use utils, only: neko_type_error
 
-  ! Import the constraint function types
-  use volume_constraint, only: volume_constraint_t
+  ! Import the objective function types
+  use minimum_dissipation_objective, only: minimum_dissipation_objective_t
+  use lube_term_objective, only: lube_term_objective_t
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(1) = [ character(len=25) :: &
-       "volume"]
+  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
+       "minimum_dissipation", &
+       "lube_term"]
 
 contains
 
@@ -50,13 +52,13 @@ contains
   ! Factory function
 
   !> Factory function
-  !! Allocates and initializes an constraint function object
-  !! @param object The constraint function object to be created
-  !! @param type The type of the constraint function
+  !! Allocates and initializes an objective function object
+  !! @param object The objective function object to be created
+  !! @param type The type of the objective function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine constraint_factory(object, json, design, simulation)
-    class(constraint_t), allocatable, intent(inout) :: object
+  module subroutine objective_factory(object, json, design, simulation)
+    class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -69,13 +71,16 @@ contains
 
     call json_get(json, "type", type)
     select case(trim(type))
-      case("volume")
-       allocate(volume_constraint_t::object)
+      case("minimum_dissipation")
+       allocate(minimum_dissipation_objective_t::object)
+      case("lube_term")
+       allocate(lube_term_objective_t::object)
+
       case default
-       call neko_type_error("Constraint", type, KNOWN_TYPES)
+       call neko_type_error("Objective", type, KNOWN_TYPES)
     end select
 
     call object%init_json(json, design, simulation)
-  end subroutine constraint_factory
+  end subroutine objective_factory
 
-end submodule constraint_factory_mod
+end submodule objective_factory_mod

@@ -16,16 +16,16 @@ program usrneko
   type(mma_optimizer_t) :: optimizer
 
   ! init the problem (base)
-  call problem%init()
+  call problem%init_base()
 
   ! init the design
-  call design%init(problem%simulation%neko_case%params, problem%simulation%neko_case%fluid%c_Xh)
+  call design%init(problem%C%params, problem%C%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)
 
   ! init the optimizer
-  call optimizer%init(problem, design)
+  call optimizer%init(problem)
 
 
   tolerance = 1.0e-3_rp

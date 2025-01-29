@@ -6,7 +6,7 @@ program usrneko
   use mask_ops, only: mask_exterior_const
 
   real(kind=rp) :: tolerance
-  integer :: max_iter
+  ! integer :: max_iter
 
   !> a problem type
   type(steady_state_problem_t) :: problem
@@ -17,9 +17,6 @@ program usrneko
 
   ! init the problem (base)
   call problem%init()
-
-  ! init the design
-  call design%init(problem%simulation%neko_case%params, problem%simulation%neko_case%fluid%c_Xh)
 
   ! init the problem, with the design
   call problem%init_design(design)

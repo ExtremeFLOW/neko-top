@@ -40,7 +40,6 @@ module mma
   use matrix, only: matrix_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-  use mpi_f08, only: MPI_Comm_rank, MPI_COMM_WORLD
 
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -131,7 +130,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json(this, x, n, json, scale, auto_scale)
+  subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -145,6 +144,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n
+    integer, intent(in) :: m
     real(kind=rp), intent(in), dimension(n) :: x
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
@@ -154,7 +154,6 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    integer :: m
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), allocatable :: a(:), c(:), d(:)
 
@@ -171,7 +170,6 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
     ! based on the Cpp Code by Niels
-    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.epsimin', epsimin, &
          1.0e-9_rp * sqrt(real(m + n, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
@@ -240,7 +238,6 @@ contains
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     character(len=:), allocatable, intent(in), optional :: backend
-    integer :: rank, ierr
 
     call this%free()
 
@@ -320,21 +317,6 @@ contains
 
     !the object is correctly initialized
     this%is_initialized = .true.
-
-    ! MMA parameters
-
-    call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    if (rank .eq. 0) then
-       write(*,*) "MMA Initialized with the following parameters:"
-       write(*,*) "n = ", this%n
-       write(*,*) "m = ", this%m
-       write(*,*) "epsimin = ", this%epsimin
-       write(*,*) "max_iter = ", this%max_iter
-       write(*,*) "asyincr = ", this%asyincr
-       write(*,*) "asydecr = ", this%asydecr
-       write(*,*) "backend = ", this%backend
-    end if
-
   end subroutine mma_init_attributes
 
   subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
