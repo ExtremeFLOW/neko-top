@@ -63,10 +63,11 @@ module volume_constraint
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
-  use field_math, only: field_rone, field_cmult
+  use field_math, only: field_rone, field_cmult, field_rzero, field_copy
   use topopt_design, only: topopt_design_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
+  use device_math, only: device_glsc2
   implicit none
   private
 
@@ -74,8 +75,8 @@ module volume_constraint
   type, public, extends(objective_function_t) :: volume_constraint_t
 
      !> whether it is minimum or maximum volume
-     ! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
-     ! is_max = .true. , 	ie V < V_max  		=>		  V - V_max < 0
+     ! is_max = .false., ie V > V_min  => -V + V_max < 0
+     ! is_max = .true. , ie V < V_max  =>  V - V_max < 0
      ! TODO
      ! this can be done smarter with parameters
      logical :: is_max
@@ -147,7 +148,8 @@ contains
        call neko_scratch_registry%request_field(work , temp_indices(1))
        call field_rone(work)
        if (neko_bcknd_device .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          call mask_exterior_const(work, this%mask, 0.0_rp) 
+          this%volume_domain = device_glsc2(work%x_d, fluid%c_xh%B_d, n)
        else
           this%volume_domain = glsc2_mask(work%x, fluid%c_xh%B, &
                n, this%mask%mask, this%mask%size)
@@ -179,6 +181,8 @@ contains
     class(fluid_scheme_t), intent(in) :: fluid
     type(topopt_design_t), intent(inout) :: design
     integer n
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
 
     n = design%design_indicator%size()
     ! TODO
@@ -186,14 +190,20 @@ contains
     !corresponding to this constraint!!!
     if (design%if_mask) then
        if (neko_bcknd_device .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          ! note, this could be done more elagantly by writing device_glsc2_mask
+          call neko_scratch_registry%request_field(work , temp_indices(1))
+          call field_copy(work, design%design_indicator)
+          call mask_exterior_const(work, this%mask, 0.0_rp) 
+          this%volume = device_glsc2(work%x_d, fluid%c_xh%B_d, n)
+          call neko_scratch_registry%relinquish_field(temp_indices)
        else
           this%volume = glsc2_mask(design%design_indicator%x, fluid%c_xh%B, &
                n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          this%volume = device_glsc2(design%design_indicator%x_d, &
+              fluid%c_xh%B_d, n)
        else
           this%volume = glsc2(design%design_indicator%x, fluid%c_xh%B, n)
        end if
