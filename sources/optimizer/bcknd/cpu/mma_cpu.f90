@@ -243,8 +243,8 @@ contains
     xsi(:) = max(1.0_rp, 1.0_rp/(x(:) - this%alpha%x(:)))
     eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
     mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
-    iter = 0
-    do while (epsi .gt. 0.9*this%epsimin .and. iter .lt. this%max_iter)
+
+    do while (epsi .gt. max(0.9_rp*this%epsimin, 1.0e-12_rp))
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
@@ -559,7 +559,6 @@ contains
        end do
        epsi = 0.1_rp*epsi
 
-       iter = iter + 1
     end do
 
     ! Save the new design
