@@ -372,111 +372,6 @@ contains
     ! Set up boundary conditions
     call this%setup_bcs(user, params)
 
-    ! ======================================================================= !
-    ! Todo: This should be moved to the setup_bcs routine
-
-    ! ! Initialize velocity surface terms in pressure rhs
-    ! call this%bc_prs_surface%init_base(this%c_Xh)
-    ! call this%bc_prs_surface%mark_zone(msh%inlet)
-    ! call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
-    !      'v', this%bc_labels)
-    ! ! This impacts the rhs of the pressure, need to check what is correct to
-    ! ! add here
-    ! call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
-    !      'd_vel_u', this%bc_labels)
-    ! call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
-    !      'd_vel_v', this%bc_labels)
-    ! call this%bc_prs_surface%mark_zones_from_list(msh%labeled_zones,&
-    !      'd_vel_w', this%bc_labels)
-    ! call this%bc_prs_surface%finalize()
-    ! ! Initialize symmetry surface terms in pressure rhs
-    ! call this%bc_sym_surface%init_base(this%c_Xh)
-    ! call this%bc_sym_surface%mark_zone(msh%sympln)
-    ! call this%bc_sym_surface%mark_zones_from_list(msh%labeled_zones,&
-    !      'sym', this%bc_labels)
-    ! ! Same here, should du, dv, dw be marked here?
-    ! call this%bc_sym_surface%finalize()
-    ! ! Initialize dirichlet bcs for velocity residual
-    ! call this%bc_vel_res_non_normal%init_base(this%c_Xh)
-    ! call this%bc_vel_res_non_normal%mark_zone(msh%outlet_normal)
-    ! call this%bc_vel_res_non_normal%mark_zones_from_list(msh%labeled_zones,&
-    !      'on', this%bc_labels)
-    ! call this%bc_vel_res_non_normal%mark_zones_from_list(msh%labeled_zones,&
-    !      'on+dong', &
-    !      this%bc_labels)
-    ! call this%bc_vel_res_non_normal%finalize()
-    ! call this%bc_vel_res_non_normal%init(this%c_Xh)
-
-    ! call this%bc_field_dirichlet_p%init_base(this%c_Xh)
-    ! call this%bc_field_dirichlet_p%mark_zones_from_list(msh%labeled_zones, &
-    !      'on+dong', this%bc_labels)
-    ! call this%bc_field_dirichlet_p%mark_zones_from_list(msh%labeled_zones, &
-    !      'o+dong', this%bc_labels)
-    ! call this%bc_field_dirichlet_p%mark_zones_from_list(msh%labeled_zones, &
-    !      'd_pres', this%bc_labels)
-    ! call this%bc_field_dirichlet_p%finalize()
-    ! call this%bc_field_dirichlet_p%set_g(0.0_rp)
-    ! call this%bclst_dp%init()
-    ! call this%bclst_dp%append(this%bc_field_dirichlet_p)
-    ! !Add 0 prs bcs
-    ! call this%bclst_dp%append(this%bc_prs)
-
-    ! call this%bc_field_dirichlet_u%init_base(this%c_Xh)
-    ! call this%bc_field_dirichlet_u%mark_zones_from_list( &
-    !      msh%labeled_zones, 'd_vel_u', this%bc_labels)
-    ! call this%bc_field_dirichlet_u%finalize()
-    ! call this%bc_field_dirichlet_u%set_g(0.0_rp)
-
-    ! call this%bc_field_dirichlet_v%init_base(this%c_Xh)
-    ! call this%bc_field_dirichlet_v%mark_zones_from_list(msh%labeled_zones, &
-    !      'd_vel_v', &
-    !      this%bc_labels)
-    ! call this%bc_field_dirichlet_v%finalize()
-    ! call this%bc_field_dirichlet_v%set_g(0.0_rp)
-
-    ! call this%bc_field_dirichlet_w%init_base(this%c_Xh)
-    ! call this%bc_field_dirichlet_w%mark_zones_from_list(msh%labeled_zones, &
-    !      'd_vel_w', &
-    !      this%bc_labels)
-    ! call this%bc_field_dirichlet_w%finalize()
-    ! call this%bc_field_dirichlet_w%set_g(0.0_rp)
-
-    ! call this%bc_vel_res%init_base(this%c_Xh)
-    ! call this%bc_vel_res%mark_zone(msh%inlet)
-    ! call this%bc_vel_res%mark_zone(msh%wall)
-    ! call this%bc_vel_res%mark_zones_from_list(msh%labeled_zones, &
-    !      'v', this%bc_labels)
-    ! call this%bc_vel_res%mark_zones_from_list(msh%labeled_zones, &
-    !      'w', this%bc_labels)
-    ! call this%bc_vel_res%finalize()
-    ! call this%bc_vel_res%set_g(0.0_rp)
-    ! call this%bclst_vel_res%init()
-    ! call this%bclst_vel_res%append(this%bc_vel_res)
-    ! call this%bclst_vel_res%append(this%bc_vel_res_non_normal)
-    ! call this%bclst_vel_res%append(this%bc_sym)
-
-    ! !Initialize bcs for u, v, w velocity components
-    ! call this%bclst_du%init()
-    ! call this%bclst_du%append(this%bc_sym%bc_x)
-    ! call this%bclst_du%append(this%bc_vel_res_non_normal%bc_x)
-    ! call this%bclst_du%append(this%bc_vel_res)
-    ! call this%bclst_du%append(this%bc_field_dirichlet_u)
-
-    ! call this%bclst_dv%init()
-    ! call this%bclst_dv%append(this%bc_sym%bc_y)
-    ! call this%bclst_dv%append(this%bc_vel_res_non_normal%bc_y)
-    ! call this%bclst_dv%append(this%bc_vel_res)
-    ! call this%bclst_dv%append(this%bc_field_dirichlet_v)
-
-    ! call this%bclst_dw%init()
-    ! call this%bclst_dw%append(this%bc_sym%bc_z)
-    ! call this%bclst_dw%append(this%bc_vel_res_non_normal%bc_z)
-    ! call this%bclst_dw%append(this%bc_vel_res)
-    ! call this%bclst_dw%append(this%bc_field_dirichlet_w)
-
-    ! End of section to be moved
-    ! ======================================================================= !
-
     ! Check if we need to output boundaries
     call json_get_or_default(params, 'case.output_boundary', found, .false.)
     if (found) call this%write_boundary_conditions()
@@ -509,11 +404,38 @@ contains
     ! Initialize the advection factory
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
 
+    ! Todo: make sure this actually follow the forward advection factory
     call advection_adjoint_factory(this%adv, params, this%c_Xh)
 
-    ! if (params%valid_path('case.fluid.flow_rate_force')) then
-    !  call this%vol_flow%init(this%dm_Xh, params)
-    ! end if
+    if (params%valid_path('case.fluid.flow_rate_force')) then
+       call neko_error("Flow rate forcing not available for adjoint_pnpn")
+       !  call this%vol_flow%init(this%dm_Xh, params)
+    end if
+
+    ! Setup pressure solver
+    call neko_log%section("Pressure solver")
+
+    call json_get_or_default(params, &
+         'case.fluid.pressure_solver.max_iterations', &
+         solver_maxiter, 800)
+    call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
+    call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
+         precon_type)
+    call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
+         abs_tol)
+    call json_get_or_default(params, 'case.fluid.velocity_solver.monitor', &
+         monitor, .false.)
+    call neko_log%message('Type       : ('// trim(solver_type) // &
+         ', ' // trim(precon_type) // ')')
+    write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
+    call neko_log%message(log_buf)
+
+    call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
+         solver_type, solver_maxiter, abs_tol, monitor)
+    call this%precon_factory_(this%pc_prs, this%ksp_prs, &
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
+
+    call neko_log%end_section()
 
     ! ------------------------------------------------------------------------ !
     ! Handling the rescaling and baseflow
@@ -545,31 +467,6 @@ contains
     this%file_output = file_t(trim(file_name))
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
-
-    ! Setup pressure solver
-    call neko_log%section("Pressure solver")
-
-    call json_get_or_default(params, &
-         'case.fluid.pressure_solver.max_iterations', &
-         solver_maxiter, 800)
-    call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
-    call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
-         precon_type)
-    call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
-         abs_tol)
-    call json_get_or_default(params, 'case.fluid.velocity_solver.monitor', &
-         monitor, .false.)
-    call neko_log%message('Type       : ('// trim(solver_type) // &
-         ', ' // trim(precon_type) // ')')
-    write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
-    call neko_log%message(log_buf)
-
-    call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
-         solver_type, solver_maxiter, abs_tol, monitor)
-    call this%precon_factory_(this%pc_prs, this%ksp_prs, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
-
-    call neko_log%end_section()
 
   end subroutine adjoint_pnpn_init
 
@@ -863,12 +760,13 @@ contains
 
       ! Compute the grandient jump penalty term
       if (this%if_gradient_jump_penalty .eqv. .true.) then
-         call this%gradient_jump_penalty_u_adj%compute(u, v, w, u)
-         call this%gradient_jump_penalty_v_adj%compute(u, v, w, v)
-         call this%gradient_jump_penalty_w_adj%compute(u, v, w, w)
-         call this%gradient_jump_penalty_u_adj%perform(f_x)
-         call this%gradient_jump_penalty_v_adj%perform(f_y)
-         call this%gradient_jump_penalty_w_adj%perform(f_z)
+         call neko_error("Gradient jump penalty not implemented for adjoint")
+         !  call this%gradient_jump_penalty_u_adj%compute(u, v, w, u)
+         !  call this%gradient_jump_penalty_v_adj%compute(u, v, w, v)
+         !  call this%gradient_jump_penalty_w_adj%compute(u, v, w, w)
+         !  call this%gradient_jump_penalty_u_adj%perform(f_x)
+         !  call this%gradient_jump_penalty_v_adj%perform(f_y)
+         !  call this%gradient_jump_penalty_w_adj%perform(f_z)
       end if
 
       ! ====================================================================== !
@@ -1027,6 +925,7 @@ contains
       end if
 
       if (this%forced_flow_rate) then
+         call neko_error('Forced flow rate is not implemented for the adjoint')
          !  call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
          !       c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
          !       this%bclst_dp, this%bclst_du, this%bclst_dv, &
@@ -1053,7 +952,6 @@ contains
 
   ! ========================================================================== !
   ! Todo: The following functions related to boundary conditions must be verified
-
 
   !> Sets up the boundary condition for the scheme.
   !! @param user The user interface.

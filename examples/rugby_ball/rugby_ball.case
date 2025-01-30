@@ -21,9 +21,13 @@
             },
             "boundary_conditions": [
                 {
+                    "type": "no_slip",
+                    "zone_indices": [ 1 ]
+                },
+                {
                     "type": "velocity_value",
                     "value": [ 0, 0, 0 ],
-                    "zone_indices": [ 1, 2 ]
+                    "zone_indices": [ 2 ]
                 }
             ],
         },
