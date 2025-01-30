@@ -44,7 +44,7 @@ set(CMAKE_Fortran_STANDARD 2008)
 option(DEVICE_TYPE "Enable device support" OFF)
 if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
 endif()
 
 # ............................................................................ #
