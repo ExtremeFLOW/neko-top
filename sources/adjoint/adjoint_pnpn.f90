@@ -1023,7 +1023,7 @@ contains
                 write(error_unit, '(A, A, I0, A, A, I0, A)') "*** ERROR ***: ",&
                      "Zone index ", zone_indices(j), &
                      " is invalid as this zone has 0 size, meaning it ", &
-                     "does not in the mesh. Check fluid boundary condition ", &
+                     "does not in the mesh. Check adjoint boundary condition ", &
                      i, "."
                 error stop
              end if
@@ -1033,7 +1033,7 @@ contains
                      "Zone with index ", zone_indices(j), &
                      " has already been assigned a boundary condition. ", &
                      "Please check your boundary_conditions entry for the ", &
-                     "fluid and make sure that each zone index appears only ", &
+                     "adjoint and make sure that each zone index appears only ", &
                      "in a single boundary condition."
                 error stop
              else
@@ -1116,7 +1116,7 @@ contains
           if ((this%msh%labeled_zones(i)%size .gt. 0) .and. &
                (marked_zones(i) .eqv. .false.)) then
              write(error_unit, '(A, A, I0)') "*** ERROR ***: ", &
-                  "No fluid boundary condition assigned to zone ", i
+                  "No adjoint boundary condition assigned to zone ", i
              error stop
           end if
        end do
