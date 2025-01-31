@@ -44,14 +44,6 @@ jobs:
           git fetch --unshallow origin develop
           changes=($(git diff --name-only --diff-filter=d origin/develop))
 
-          printf "Detected fortran changes:\n"
-          for file in ${changes[@]}; do
-            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
-              continue
-            fi
-            printf "\t- $file\n"
-          done
-
           echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
 
       # ---------------------------------------------------------------------- #
@@ -60,7 +52,8 @@ jobs:
 
       - name: Format sources
         env:
-          FINDENT_FLAGS: ${{ vars.FINDENT_FLAGS }}
+          FINDENT_FLAGS: "-Rr -i2 -d3 -f3 -s3 -w3 -t3 -j3 -k5 --ws_remred --indent_ampersand --openmp=0"
+
         run: |
           for file in ${{ steps.get-changed-files.outputs.changed-files }}; do
             if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
