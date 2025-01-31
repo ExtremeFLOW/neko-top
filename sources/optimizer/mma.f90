@@ -155,7 +155,7 @@ contains
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
     real(kind=rp), dimension(n) :: xmax, xmin
-    real(kind=rp), allocatable :: a(:), c(:), d(:)
+    real(kind=rp), dimension(m) :: a, c, d
 
     !! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
@@ -191,10 +191,7 @@ contains
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .true.)
 
-
-    allocate(a(m))
-    allocate(c(m))
-    allocate(d(m))
+    ! Initialize the MMA object with the parsed parameters
     a = a_const
     c = c_const
     d = d_const

@@ -4,7 +4,7 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": false,
+        "output_boundary": true,
         "end_time": 0.1,
         "timestep": 1e-4,
         "numerics": {
@@ -19,21 +19,24 @@
                     0.0, 0.0, 0.0
                 ]
             },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2 ]
+                },
+                // {
+                //     "type": "velocity_value",
+                //     "value": [ 0, 0, 0 ],
+                //     "zone_indices": [ 2 ]
+                // }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
             "Re": 2,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
-            },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -49,7 +52,13 @@
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
-            "boundary_types": [ "v", "v", "sym", "sym" ],
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1, 0, 0 ],
+                    "zone_indices": [ 1, 2 ]
+                }
+            ],
             "output_control": "tsteps",
             "output_value": 50000000
         },
