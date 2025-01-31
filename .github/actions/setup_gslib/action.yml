@@ -4,23 +4,32 @@ description: |
   Note that the GSLib library is pulled from Nek5000's fork of the GSLib
   library.
 
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
 inputs:
   install-dir:
     description: "The directory to install the GSLib library."
     required: false
     default: "/home/runner/pkg/gslib"
+
   working-dir:
     description: "The directory to work in."
     required: false
     default: "/home/runner/tmp/gslib"
+
   os:
     description: "The operating system to use."
     required: false
     default: "${{ runner.os }}"
+
   build-options:
     description: "The build option to use."
     required: false
     default: "--parallel $(nproc)"
+
   version:
     description: "The version of the GSLib library to use."
     required: false
@@ -31,9 +40,15 @@ outputs:
     description: "The directory where the GSLib library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action.
+
 runs:
   using: composite
   steps:
+    # ------------------------------------------------------------------------ #
+    # Setup the cache for the GSLib library and clone the repository.
+
     - name: Cache
       id: cache-gslib
       uses: actions/cache@v4
@@ -52,6 +67,19 @@ runs:
       run: |
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
         cd $WORKING_DIR
+
+    # ------------------------------------------------------------------------ #
+    # Setup the system for building the GSLib library
+
+    - name: Get system cache
+      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        version: 1.0
+
+    # ------------------------------------------------------------------------ #
+    # Configure, build, and install the GSLib library.
 
     - name: Build
       if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
@@ -72,6 +100,9 @@ runs:
       run: |
         cd $WORKING_DIR
         make CC=mpicc DESTDIR=$INSTALL_DIR install
+
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory if necessary and set the output.
 
     - name: Cleanup
       if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}

@@ -2,31 +2,42 @@ name: Setup the pFUnit library
 description: |
   This action sets up the pFUnit library for use in the main workflow.
 
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
 inputs:
   install-dir:
     description: "The directory to install the pFUnit library."
     required: false
     default: "/home/runner/pkg/pfunit"
+
   working-dir:
     description: "The directory to work in."
     required: false
     default: "/home/runner/tmp/pfunit"
+
   os:
     description: "The operating system to use."
     required: false
     default: "${{ runner.os }}"
+
   compiler:
     description: "The compiler to use."
     required: false
     default: "mpif90"
+
   compiler-flags:
     description: "The compiler flag to use."
     required: false
     default: "-O3"
+
   build-options:
     description: "The build option to use."
     required: false
     default: "--parallel $(nproc)"
+
   version:
     description: "The version of the pFUnit library to use."
     required: false
@@ -37,9 +48,18 @@ outputs:
     description: "The directory where the pFUnit library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action.
+#
+# If we have not cached the pFUnit library, we will clone the repository,
+# configure the build, build the library, install the library, and clean up.
+
 runs:
   using: composite
   steps:
+    # ------------------------------------------------------------------------ #
+    # Check the cache and clone the repository if necessary
+
     - name: Cache
       id: cache-pfunit
       uses: actions/cache@v4
@@ -57,6 +77,19 @@ runs:
         VERSION: ${{ inputs.version }}
       run: |
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+
+    # ------------------------------------------------------------------------ #
+    # Setup the system for building the pFUnit library
+
+    - name: Get system cache
+      if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        version: 1.0
+
+    # ------------------------------------------------------------------------ #
+    # Configure, build, install the library
 
     - name: Configure
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
@@ -85,6 +118,9 @@ runs:
         WORKING_DIR: ${{ inputs.working-dir }}
       run: |
         cmake --install $WORKING_DIR/build
+
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory and set the output
 
     - name: Cleanup
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
