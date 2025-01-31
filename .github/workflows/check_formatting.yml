@@ -43,11 +43,10 @@ jobs:
         run: |
           git fetch --unshallow origin develop
           changes=($(git diff --name-only --diff-filter=d origin/develop))
-
           echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
 
       # ---------------------------------------------------------------------- #
-      # Format the source files and check the formatting
+      # Format the changed source files and check for changes
       # ---------------------------------------------------------------------- #
 
       - name: Format sources
