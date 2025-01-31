@@ -13,7 +13,7 @@ on:
 
 jobs:
   check-formatting:
-    name: Formatting
+    name: Check formatting of changed files
     runs-on: ubuntu-latest
     steps:
       # ---------------------------------------------------------------------- #
@@ -35,6 +35,26 @@ jobs:
           pip install -r .github/workflows/extra/requirements-formatting.txt
 
       # ---------------------------------------------------------------------- #
+      # Determine modification of source files
+      # ---------------------------------------------------------------------- #
+
+      - name: Get changed files
+        id: get-changed-files
+        run: |
+          git fetch --unshallow origin develop
+          changes=($(git diff --name-only --diff-filter=d origin/develop))
+
+          printf "Detected fortran changes:\n"
+          for file in ${changes[@]}; do
+            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
+              continue
+            fi
+            printf "\t- $file\n"
+          done
+
+          echo "changed-files=${changes[@]}" >> $GITHUB_OUTPUT
+
+      # ---------------------------------------------------------------------- #
       # Format the source files and check the formatting
       # ---------------------------------------------------------------------- #
 
@@ -42,8 +62,13 @@ jobs:
         env:
           FINDENT_FLAGS: ${{ vars.FINDENT_FLAGS }}
         run: |
-          find sources/ -iname "*.f90" -type f \
-            -exec bash -c 'findent < {} > {}.tmp; mv -f {}.tmp {}' \;
+          for file in ${{ steps.get-changed-files.outputs.changed-files }}; do
+            if [[ ${file: -4} != ".f90" && ${file: -4} != ".F90" ]]; then
+              continue
+            fi
+            findent < $file > $file.tmp
+            mv -f $file.tmp $file
+          done
 
       - name: Check format
         run: |
