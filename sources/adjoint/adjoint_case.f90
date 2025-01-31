@@ -75,18 +75,12 @@ contains
   subroutine adjoint_init_from_json(this, neko_case)
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), target, intent(inout) :: neko_case
-
-    this%case => neko_case
+    real(kind=rp) :: tol
 
     ! Read the tolerance
-    call json_get_or_default(neko_case%params, "tol", this%tol, 1.0e-6_rp)
+    call json_get_or_default(neko_case%params, "tol", tol, 1.0e-6_rp)
 
-    ! Check if the scalar field is allocated
-    if (allocated(neko_case%scalar)) then
-       this%have_scalar = .true.
-    end if
-
-    call adjoint_case_init_common(this, neko_case)
+    call adjoint_init_from_attributes(this, neko_case, tol)
 
   end subroutine adjoint_init_from_json
 
