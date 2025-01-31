@@ -130,7 +130,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json(this, x, n, json, scale, auto_scale)
+  subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -144,6 +144,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n
+    integer, intent(in) :: m
     real(kind=rp), intent(in), dimension(n) :: x
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
@@ -153,9 +154,8 @@ contains
     !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
     !                z >= 0,   y_i >= 0,         i = 1,...,m             !
     ! -------------------------------------------------------------------!
-    integer :: m = 1
     real(kind=rp), dimension(n) :: xmax, xmin
-    real(kind=rp), allocatable :: a(:), c(:), d(:)
+    real(kind=rp), dimension(m) :: a, c, d
 
     !! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
@@ -181,7 +181,6 @@ contains
 
     call json_get_or_default(json, 'mma.backend', backend, 'cpu')
 
-    call json_get_or_default(json, 'mma.m', m, 1)
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
     call json_get_or_default(json, 'mma.a0', a0, 1.0_rp)
@@ -192,10 +191,7 @@ contains
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .true.)
 
-
-    allocate(a(m))
-    allocate(c(m))
-    allocate(d(m))
+    ! Initialize the MMA object with the parsed parameters
     a = a_const
     c = c_const
     d = d_const
