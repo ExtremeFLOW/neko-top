@@ -115,8 +115,12 @@ jobs:
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: openmpi-bin pkg-config liblapack-dev ninja-build
-                    libopenmpi-dev libopenblas-dev
           version: 1.0
+
+      - name: Setup non-cache dependencies
+        shell: bash
+        run: |
+          sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
       # ---------------------------------------------------------------------- #
       # Setup the external dependencies
