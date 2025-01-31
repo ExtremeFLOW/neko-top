@@ -2,35 +2,47 @@ name: Setup the Neko library
 description: |
   This action sets up the Neko library for use in the main workflow.
 
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
 inputs:
   install-dir:
     description: "The directory to install the Neko library."
     required: false
     default: "/home/runner/pkg/neko"
+
   working-dir:
     description: "The directory to work in when compiling Neko."
     required: false
     default: "/home/runner/tmp/neko"
+
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: false
     default: "/home/runner/pkg/json-fortran"
+
   os:
     description: "The operating system to use."
     required: false
     default: "${{ runner.os }}"
+
   compiler:
     description: "The compiler to use."
     required: false
     default: "gfortran"
+
   compiler-flags:
     description: "The compiler flag to use."
     required: false
     default: "-O3"
+
   build-options:
     description: "The build option to use."
     required: false
     default: "-j $(nproc)"
+
   version:
     description: "The version of the Neko library to use."
     required: false
@@ -41,10 +53,14 @@ outputs:
     description: "The directory where the Neko library was installed."
     value: ${{ steps.set-output.outputs.install-dir }}
 
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action. The steps are run in a
+# sequence, where the Cache step is run first. The Set output step runs last.
+
 runs:
   using: composite
   steps:
-    # ........................................................................ #
+    # ------------------------------------------------------------------------ #
     # Cache the Neko library
     #
     # This step caches the Neko library to speed up the workflow.
@@ -71,7 +87,18 @@ runs:
         path: ${{ inputs.install-dir }}
         key: ${{ steps.create-key.outputs.key }}
 
-    # ........................................................................ #
+    # ------------------------------------------------------------------------ #
+    # Setup the system for building the Neko library
+
+    - name: Get system cache
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: autotools-dev automake autoconf openmpi-bin pkg-config \
+          liblapack-dev libopenmpi-dev libopenblas-dev
+        version: 1.0
+
+    # ------------------------------------------------------------------------ #
     # Clone and build the Neko library
     #
     # This step clones the Neko library and builds it.
@@ -104,7 +131,7 @@ runs:
         ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS=$FCFLAGS
         make install ${{ inputs.build-options }}
 
-    # ........................................................................ #
+    # ------------------------------------------------------------------------ #
     # Cleanup and outputs
     #
     # This step cleans up the working directory and sets the output.
