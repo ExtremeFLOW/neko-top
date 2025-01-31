@@ -483,7 +483,7 @@ contains
     eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
     mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
 
-    do while (epsi .gt. 0.9*this%epsimin)
+    do while (epsi .gt. max(0.9_rp*this%epsimin, 1.0e-12_rp))
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
@@ -856,10 +856,12 @@ contains
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
 
+    ! rex(:) = df0dx + matmul(transpose(dfdx), this%lambda%x(:)) - &
+    !     this%xsi%x(:) + this%eta%x(:)
     rex(:) = df0dx%x + matmul(transpose(dfdx%x), this%lambda%x(:)) - &
           this%xsi%x(:) + this%eta%x(:)
     rey(:) = this%c%x(:) + this%d%x(:)*this%y%x(:) - this%lambda%x(:) - &
-          this%mu%x(:)
+         this%mu%x(:)
     rez = this%a0 - this%zeta - dot_product(this%lambda%x(:), this%a%x(:))
 
     relambda(:) = fval%x - this%a%x(:)*this%z - this%y%x(:) + this%s%x(:)

@@ -33,6 +33,8 @@ on:
       - synchronize
       - reopened
       - ready_for_review
+  merge_group:
+    types: [checks_requested]
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other
@@ -41,8 +43,8 @@ on:
 # will store them in a file that the other jobs can read.
 
 env:
-  PFUNIT_VERSION: v4.4.2
-  JSON_FORTRAN_VERSION: 8.3.0
+  PFUNIT_VERSION: main
+  JSON_FORTRAN_VERSION: master
   NEKO_VERSION: develop
 
 # ---------------------------------------------------------------------------- #
@@ -53,6 +55,11 @@ env:
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+# sequence, where the Prepare job is run first. The Linting, Formatting, and
+# Compilation jobs run in parallel, and the Complete job runs last.
 
 jobs:
   prepare:
@@ -85,6 +92,12 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_lint.yml
 
+  check_format:
+    name: Formatting
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_formatting.yml
+
   check_documentation:
     name: Documentation
     needs:
@@ -95,11 +108,18 @@ jobs:
     name: Compilation
     needs:
       - prepare
+      - check_lint
+      - check_format
+      - check_documentation
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+
+  # -------------------------------------------------------------------------- #
+  # Check if all previous jobs passed. If any of the previous jobs failed, the
+  # Complete job will fail and print out the failed jobs.
 
   check_complete:
     if: ${{ always() }}
@@ -107,40 +127,51 @@ jobs:
     needs:
       - prepare
       - check_lint
-      # - check_formatting
+      - check_format
       - check_documentation
       - check_compilation
+
     runs-on: ubuntu-latest
     env:
       draft_status: ${{ needs.prepare.result }}
       flint_status: ${{ needs.check_lint.result }}
+      format_status: ${{ needs.check_format.result }}
       compile_status: ${{ needs.check_compilation.result }}
       documentation_status: ${{ needs.check_documentation.result }}
 
     steps:
-      - name: All checks passed
+      - name: Check status of previous jobs
         run: |
           success=true
           fail=()
+
           if [ "$draft_status" != "success" ]; then
             fail+=("\t- Draft check: $draft_status")
             success=false
           fi
+
           if [ "$flint_status" != "success" ]; then
             fail+=("\t- Linting check: $flint_status")
             success=false
           fi
+
+          if [ "$format_status" != "success" ]; then
+            fail+=("\t- Formatting check: $format_status")
+            success=false
+          fi
+
           if [ "$compile_status" != "success" ]; then
             fail+=("\t- Compilation check: $compile_status")
             success=false
           fi
+
           if [ "$documentation_status" != "success" ]; then
             fail+=("\t- Documentation check: $documentation_status")
             success=false
           fi
 
           if [ "$success" == false ]; then
-            >&2 echo "The following checks failed:"
+            >&2 echo "The following checks did not succeed:"
             for i in "${fail[@]}"; do
               >&2 printf "$i\n"
             done

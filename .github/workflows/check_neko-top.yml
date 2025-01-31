@@ -18,10 +18,92 @@ on:
         required: true
         type: string
 
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+
 jobs:
+
+  # -------------------------------------------------------------------------- #
+  # Define the dependency cache jobs that will be run in this workflow. Each of
+  # these jobs will cache the dependencies for a specific library.
+
+  cache-json-fortran:
+    name: Cache JSON-Fortran
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup json-fortran
+        id: setup-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
+
+  cache-pfunit:
+    name: Cache pFUnit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pFUnit
+        id: setup-pfunit
+        uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ inputs.pfunit-version }}
+
+  cache-gslib:
+    name: Cache GSLib
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup GSLib
+        id: setup-gslib
+        uses: ./.github/actions/setup_gslib
+
+  cache-neko:
+    name: Cache Neko
+    runs-on: ubuntu-latest
+    needs:
+      - cache-json-fortran
+      - cache-pfunit
+      - cache-gslib
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get json-fortran
+        id: get-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
+
+      - name: Setup neko
+        id: setup-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          version: ${{ inputs.neko-version }}
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
+  # This job will build and test the Neko-TOP code.
+  # -------------------------------------------------------------------------- #
+
   neko-top-tests:
     name: Test Neko-TOP
     runs-on: ubuntu-latest
+    needs:
+      - cache-json-fortran
+      - cache-neko
+      - cache-pfunit
+      - cache-gslib
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -34,61 +116,62 @@ jobs:
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: autotools-dev automake autoconf openmpi-bin pkg-config \
-            liblapack-dev
+          packages: openmpi-bin pkg-config liblapack-dev ninja-build
           version: 1.0
 
-      - name: Setup system
+      - name: Setup non-cache dependencies
+        shell: bash
         run: |
-          sudo apt-get install libopenmpi-dev libopenblas-dev
+          sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
       # ---------------------------------------------------------------------- #
       # Setup the external dependencies
       # ---------------------------------------------------------------------- #
 
-      - name: Setup json-fortran
-        id: setup-json-fortran
+      - name: Get json-fortran
+        id: get-json-fortran
         uses: ./.github/actions/setup_json-fortran
         with:
           version: ${{ inputs.json-fortran-version }}
 
-      - name: Setup neko
-        id: setup-neko
+      - name: Get neko
+        id: get-neko
         uses: ./.github/actions/setup_neko
         with:
-          json-fortran-dir: ${{ steps.setup-json-fortran.outputs.install-dir }}
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
-          compiler-flags: "-w"
 
-      - name: Setup pFUnit
-        id: setup-pfunit
+      - name: Get pFUnit
+        id: get-pfunit
         uses: ./.github/actions/setup_pfunit
         with:
           version: ${{ inputs.pfunit-version }}
 
-      - name: Setup GSLib
-        id: setup-gslib
+      - name: Get GSLib
+        id: get-gslib
         uses: ./.github/actions/setup_gslib
 
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
 
-      - name: Configure Neko-TOP
+      - name: Configuration
         env:
-          JSON_FORTRAN_DIR: ${{ steps.setup-json-fortran.outputs.install-dir }}
-          NEKO_DIR: ${{ steps.setup-neko.outputs.install-dir }}
-          PFUNIT_DIR: ${{ steps.setup-pfunit.outputs.install-dir }}
-          GSLIB_DIR: ${{ steps.setup-gslib.outputs.install-dir }}
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+          GSLIB_DIR: ${{ steps.get-gslib.outputs.install-dir }}
         run: |
-          cmake -B build -S . -DCMAKE_BUILD_TYPE=Debug \
+          cmake -B build -S . -G Ninja --fresh \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
             -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
             -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=OFF
 
-      - name: Build Neko-TOP
-        run: cmake --build build --parallel $(nproc)
+      - name: Building
+        run: |
+          cmake --build build --parallel
 
-      - name: Test Neko-TOP
+      - name: Unit tests
         run: |
           ctest --test-dir build --output-on-failure --stop-on-failure
