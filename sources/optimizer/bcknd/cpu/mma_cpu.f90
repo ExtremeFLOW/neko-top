@@ -46,76 +46,69 @@ contains
              this%low%x(j) = x(j) - (this%xold1%x(j) - this%low%x(j))
              this%upp%x(j) = x(j) + (this%upp%x(j) - this%xold1%x(j))
           end if
-
-          ! setting a minimum and maximum for the low and upp
-          ! asymptotes (eq3.9)
-          this%low%x(j) = max(this%low%x(j), &
-               x(j) - 10.0_rp*(this%xmax%x(j) - this%xmin%x(j)))
-          this%low%x(j) = min(this%low%x(j), &
-               x(j) - 0.01_rp*(this%xmax%x(j) - this%xmin%x(j)))
-
-          this%upp%x(j) = min(this%upp%x(j), &
-               x(j) + 10.0_rp*(this%xmax%x(j) - this%xmin%x(j)))
-          this%upp%x(j) = max(this%upp%x(j), &
-               x(j) + 0.01_rp*(this%xmax%x(j) - this%xmin%x(j)))
        end do
+
+       ! Setting a minimum and maximum for the low and upp
+       ! asymptotes (eq3.9)
+       this%low%x = max(this%low%x, x - 10.0_rp * (this%xmax%x - this%xmin%x))
+       this%low%x = min(this%low%x, x - 0.01_rp * (this%xmax%x - this%xmin%x))
+
+       this%upp%x = min(this%upp%x, x + 10.0_rp * (this%xmax%x - this%xmin%x))
+       this%upp%x = max(this%upp%x, x + 0.01_rp * (this%xmax%x - this%xmin%x))
     end if
 
-    ! we can move alpha and beta out of the following loop if needed as:
-    ! this%alpha = max(this%xmin, this%low + &
-    !     0.1*(this%x- this%low), this%x - 0.5*(this%xmax - this%xmin))
-    ! this%beta = min(this%xmax, this%upp -  &
-    !     0.1*(this%upp - this%x), this%x + 0.5*(this%xmax - this%xmin))
+    ! Set the the bounds and coefficients for the approximation
+    ! the move bounds (alpha and beta )are slightly more restrictive
+    ! than low and upp. This is done based on eq(3.6)--eq(3.10).
+    ! also check
+    ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
+    ! eq (2.8) and (2.9)
+    this%alpha%x = max(this%xmin%x, &
+         this%low%x + 0.1_rp * (x - this%low%x), &
+         x - 0.5_rp * (this%xmax%x - this%xmin%x))
+
+    this%beta%x = min(this%xmax%x, &
+         this%upp%x - 0.1_rp * (this%upp%x - x), &
+         x + 0.5_rp * (this%xmax%x - this%xmin%x))
+
+
+    !Calculate p0j, q0j, pij, qij
+    !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
+    this%p0j%x = ( &
+         1.001_rp * max(df0dx, 0.0_rp) &
+         + 0.001_rp * max(-df0dx, 0.0_rp) &
+         + 0.00001_rp / max(this%xmax%x - this%xmin%x, 0.00001_rp) &
+         ) * (this%upp%x - x)**2
+
+    this%q0j%x = ( &
+         0.001_rp * max(df0dx, 0.0_rp) &
+         + 1.001_rp * max(-df0dx, 0.0_rp) &
+         + 0.00001_rp / max(this%xmax%x - this%xmin%x, 0.00001_rp)&
+         ) * (x - this%low%x)**2
 
     do j = 1, this%n
-       ! set the the bounds and coefficients for the approximation
-       ! the move bounds (alpha and beta )are slightly more restrictive
-       ! than low and upp. This is done based on eq(3.6)--eq(3.10).
-       ! also check
-       ! https://comsolyar.com/wp-content/uploads/2020/03/gcmma.pdf
-       ! eq (2.8) and (2.9)
-       this%alpha%x(j) = max(this%xmin%x(j), &
-            this%low%x(j) + 0.1_rp*(x(j) - this%low%x(j)), &
-            x(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
-       this%beta%x(j) = min(this%xmax%x(j), &
-            this%upp%x(j) - 0.1_rp*(this%upp%x(j) - x(j)), &
-            x(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
-
-       !Calculate p0j, q0j, pij, qij
-       !where j = 1,2,...,n and i = 1,2,...,m  (eq(2.3)-eq(2.5))
-       this%p0j%x(j) = ( 1.001_rp * max(df0dx(j), 0.0_rp) &
-            + 0.001_rp * max(-df0dx(j), 0.0_rp) &
-            + 0.00001_rp / max(0.00001_rp, this%xmax%x(j) - this%xmin%x(j))) &
-            * (this%upp%x(j) - x(j))**2
-
-       this%q0j%x(j) = (x(j) - this%low%x(j))**2 * &
-            (0.001_rp*max(df0dx(j),0.0_rp) + &
-            1.001_rp*max(-df0dx(j),0.0_rp) + &
-            (0.00001_rp/(max(0.00001_rp, &
-            (this%xmax%x(j) - this%xmin%x(j))))))
-
        do i = 1, this%m
-          this%pij%x(i,j) = (this%upp%x(j) - x(j))**2 * &
-               (1.001_rp*max(dfdx(i,j),0.0_rp) + &
-               0.001_rp*max(-dfdx(i,j),0.0_rp) + &
-               (0.00001_rp/(max(0.00001_rp, &
-               (this%xmax%x(j) - this%xmin%x(j))))))
-          this%qij%x(i,j) = (x(j) - this%low%x(j))**2 * &
-               (0.001_rp*max(dfdx(i, j), 0.0_rp) + &
-               1.001_rp*max(-dfdx(i, j), 0.0_rp) + &
-               (0.00001_rp/(max(0.00001_rp, &
-               (this%xmax%x(j) - this%xmin%x(j))))))
+          this%pij%x(i, j) = ( &
+               1.001_rp * max(dfdx(i, j), 0.0_rp) &
+               + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
+               + 0.00001_rp / max(this%xmax%x(j) - this%xmin%x(j), 0.00001_rp) &
+               ) * (this%upp%x(j) - x(j))**2
+
+          this%qij%x(i, j) = ( &
+               0.001_rp * max(dfdx(i, j), 0.0_rp) &
+               + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
+               + 0.00001_rp / max(this%xmax%x(j) - this%xmin%x(j), 0.00001_rp) &
+               ) * (x(j) - this%low%x(j))**2
        end do
     end do
 
-    !computing bi as defined in page 5
+    ! Computing bi as defined in page 5
     this%bi%x = 0.0_rp
     do i = 1, this%m
-       !MPI: here this%n is the global n
        do j = 1, this%n
-          this%bi%x(i) = this%bi%x(i) + &
-               this%pij%x(i,j) / (this%upp%x(j) - x(j)) + &
-               this%qij%x(i,j) / (x(j) - this%low%x(j))
+          this%bi%x(i) = this%bi%x(i) &
+               + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
+               + this%qij%x(i, j) / (x(j) - this%low%x(j))
        end do
     end do
 
@@ -148,8 +141,7 @@ contains
          rey, relambda, remu, res, &
          dely, dellambda, &
          dy, dlambda, ds, dmu, &
-         yold, lambdaold, sold, muold, &
-         globaltmp_m
+         yold, lambdaold, sold, muold
     real(kind=rp), dimension(this%n) :: x, xsi, eta, &
          rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, &
@@ -161,7 +153,6 @@ contains
     real(kind=rp), dimension(this%m, this%n) :: GG
     real(kind=rp), dimension(this%m+1) :: bb
     real(kind=rp), dimension(this%m+1, this%m+1) :: AA
-    real(kind=rp), dimension(this%m, this%m) :: globaltmp_mm
 
     ! using DGESV( N, NRHS, A, LDA, IPIV, B, LDB, INFO ) in lapack to solve
     ! the linear system which needs the following parameters
@@ -196,14 +187,15 @@ contains
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
     do while (epsi .gt. minimal_epsilon)
+
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
-       rex = (this%p0j%x + matmul(transpose(this%pij%x), &
-            lambda))/(this%upp%x - x)**2 - &
-            (this%q0j%x + matmul(transpose(this%qij%x), &
-            lambda))/(x - this%low%x)**2 - &
-            xsi + eta
+       rex = (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
+            / (this%upp%x - x)**2 &
+            - (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
+            / (x - this%low%x)**2 &
+            - xsi + eta
 
        rey = this%c%x + this%d%x*y - lambda - mu
        rez = this%a0 - zeta - dot_product(lambda, this%a%x)
@@ -215,9 +207,9 @@ contains
        do i = 1, this%m
           do j = 1, this%n
              ! Accumulate sums for relambda (the term gi(x))
-             relambda(i) = relambda(i) + &
-                  this%pij%x(i,j) / (this%upp%x(j) - x(j)) &
-                  + this%qij%x(i,j) / (x(j) - this%low%x(j))
+             relambda(i) = relambda(i) &
+                  + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
+                  + this%qij%x(i, j) / (x(j) - this%low%x(j))
           end do
        end do
 
@@ -257,30 +249,31 @@ contains
                      + this%pij%x(i,j) * lambda(i) / (this%upp%x(j) - x(j))**2 &
                      - this%qij%x(i,j) * lambda(i) / (x(j) - this%low%x(j))**2
              end do
-             delx(j) = delx(j) &
-                  + this%p0j%x(j) / (this%upp%x(j) - x(j))**2 &
-                  - this%q0j%x(j) / (x(j) - this%low%x(j))**2 &
-                  - epsi / (x(j) - this%alpha%x(j)) &
-                  + epsi / (this%beta%x(j) - x(j))
           end do
 
-          dely = this%c%x + this%d%x*y - lambda - epsi/y
-          delz = this%a0 - dot_product(lambda, this%a%x) - epsi/z
+          delx = delx &
+               + this%p0j%x / (this%upp%x - x)**2 &
+               - this%q0j%x / (x - this%low%x)**2 &
+               - epsi / (x - this%alpha%x) &
+               + epsi / (this%beta%x - x)
+
+          dely = this%c%x + this%d%x * y - lambda - epsi / y
+          delz = this%a0 - dot_product(lambda, this%a%x) - epsi / z
 
           ! Accumulate sums for dellambda (the term gi(x))
           dellambda = 0.0_rp
           do i = 1, this%m
              do j = 1, this%n
-                dellambda(i) = dellambda(i) + &
-                     this%pij%x(i,j)/(this%upp%x(j) - x(j)) &
-                     + this%qij%x(i,j)/(x(j) - this%low%x(j))
+                dellambda(i) = dellambda(i) &
+                     + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
+                     + this%qij%x(i, j) / (x(j) - this%low%x(j))
              end do
           end do
 
           call MPI_Allreduce(MPI_IN_PLACE, dellambda, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-          dellambda = dellambda - this%a%x*z - y - this%bi%x + epsi/lambda
+          dellambda = dellambda - this%a%x*z - y - this%bi%x + epsi / lambda
 
           do ggdumiter = 1, this%m
              GG(ggdumiter, :) = this%pij%x(ggdumiter,:) / (this%upp%x - x)**2 &
@@ -305,17 +298,17 @@ contains
           !!!!!!!!!!!!!!for MPI computation of bb!!!!!!!!!!!!!!!!!!!!!!!!!
           bb = 0.0_rp
           do i = 1, this%m
-             do j = 1, this%n ! this n is global
+             do j = 1, this%n
                 bb(i) = bb(i) + GG(i, j) * (delx(j) / diagx(j))
              end do
           end do
-          globaltmp_m = 0.0_rp
-          call MPI_Allreduce(bb(1:this%m), globaltmp_m, this%m, &
-               mpi_real_precision, mpi_sum, neko_comm, ierr)
-          bb(1:this%m) = globaltmp_m
 
-          bb(1:this%m) = dellambda + dely/(this%d%x + (mu/y)) - bb(1:this%m)
-          bb(this%m +1) = delz
+          call MPI_Allreduce(MPI_IN_PLACE, bb(1:this%m), this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+          bb(1:this%m) = dellambda + dely / (this%d%x + mu / y) - bb(1:this%m)
+          bb(this%m + 1) = delz
+
           !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
           ! !assembling the coefficients matrix AA based on eq(5.20)
           ! AA(1:this%m,1:this%m) =  &
@@ -331,32 +324,29 @@ contains
              do j = 1, this%m
                 ! Compute the (i, j) element of AA
                 do k = 1, this%n !this n is global
-                   AA(i, j) = AA(i, j) + GG(i, k) * &
-                        (1.0_rp / diagx(k)) * GG(j, k)
+                   AA(i, j) = AA(i, j) &
+                        + GG(i, k) * (1.0_rp / diagx(k)) * GG(j, k)
                 end do
              end do
           end do
 
-          globaltmp_mm = 0.0_rp
-          call MPI_Allreduce(AA(1:this%m, 1:this%m), globaltmp_mm, &
+
+          call MPI_Allreduce(MPI_IN_PLACE, AA(1:this%m, 1:this%m), &
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-          AA(1:this%m,1:this%m) = globaltmp_mm
+
           do i = 1, this%m
              !update the diag AA
-             AA(i, i) = AA(i, i) + (s(i) / lambda(i) + &
-                  1.0_rp / (this%d%x(i) + mu(i) / y(i)))
+             AA(i, i) = AA(i, i) &
+                  + s(i) / lambda(i) &
+                  + 1.0_rp / (this%d%x(i) + mu(i) / y(i))
           end do
 
           AA(1:this%m, this%m+1) = this%a%x
           AA(this%m+1, 1:this%m) = this%a%x
           AA(this%m+1, this%m+1) = - zeta/z
 
+          call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
-
-
-          call DGESV(this%m+1, 1, AA, this%m+1, ipiv, bb, this%m+1, info)
-
-          ! if info! = 0 then DGESV is failed.
           if (info .ne. 0) then
              write(stderr, *) "DGESV failed to solve the linear system in MMA."
              write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
@@ -378,12 +368,14 @@ contains
           !2*this%n+4*this%m+2
           dxx = [dy, dz, dlambda, dxsi, deta, dmu, dzeta, ds]
           xx = [y, z, lambda, xsi, eta, mu, zeta, s]
-          steg = maxval([dummy_one, &
+
+          steg = 1.0_rp / maxval([ &
+               dummy_one, &
                -1.01_rp * dxx / xx, &
                -1.01_rp * dx / (x - this%alpha%x), &
-               1.01_rp * dx / (this%beta%x - x)])
+               1.01_rp * dx / (this%beta%x - x) &
+               ])
 
-          steg = 1.0_rp / steg
           call MPI_Allreduce(MPI_IN_PLACE, steg, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
@@ -434,8 +426,8 @@ contains
                 do j = 1, this%n !this n is global
                    ! Accumulate sums for relambda (the term gi(x))
                    relambda(i) = relambda(i) &
-                        + this%pij%x(i,j) / (this%upp%x(j) - x(j)) &
-                        + this%qij%x(i,j) / (x(j) - this%low%x(j))
+                        + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
+                        + this%qij%x(i, j) / (x(j) - this%low%x(j))
                 end do
              end do
 
@@ -451,6 +443,8 @@ contains
              res = lambda * s - epsi
 
              residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+             residu_small = [rey, rez, relambda, remu, rezeta, res]
+
 
              re_xstuff_squ_global = norm2(rex)**2 &
                   + norm2(rexsi)**2 &
@@ -458,9 +452,8 @@ contains
              call MPI_Allreduce(MPI_IN_PLACE, re_xstuff_squ_global, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-             residu_small = [rey, rez, relambda, remu, rezeta, res]
-             newresidu = sqrt(norm2(residu_small)**2 + &
-                  re_xstuff_squ_global)
+
+             newresidu = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
 
              steg = steg / 2.0_rp
           end do
