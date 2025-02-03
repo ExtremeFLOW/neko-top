@@ -488,7 +488,7 @@ contains
 
 
 
-          do iter = 1, this%max_iter !ittt
+          do iter = 1, 100 !this%max_iter !ittt
                if (iter .gt. (this%max_iter -2)) then
                     !print *, "The mma inner loop seems not to converge"
                     ! print *, "residumax = ", residumax, "for epsi = ", epsi, &

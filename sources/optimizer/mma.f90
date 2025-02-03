@@ -182,6 +182,7 @@ module mma
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .true.)
 
+    call json_get_or_default(json, 'mma.epsimin', epsimin, 1.0e-9_rp)
     ! Initialize the MMA object with the parsed parameters
     a = a_const
     c = c_const
