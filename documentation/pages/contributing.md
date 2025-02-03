@@ -3,8 +3,7 @@
 This document describes the guidelines for contributing to Neko-TOP. Neko-TOP is
 a topology optimization code based on the Neko library. As such, the guidelines
 for contributing to Neko-TOP are the same as those for contributing to Neko.
-Please refer to the 
-for more details.
+Please refer to the documentation of [Neko](https://neko.cfd) for more details.
 
 ## Checks for the Pull Request
 
