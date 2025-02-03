@@ -31,14 +31,14 @@ contains
        !Move asymptotes low and upp
        do j = 1, this%n
           if ((x(j) - this%xold1%x(j))*(this%xold1%x(j) - this%xold2%x(j)) &
-               .lt. 0) then
+               .lt. 0.0_rp) then
              this%low%x(j) = x(j) - &
                   this%asydecr * (this%xold1%x(j) - this%low%x(j))
              this%upp%x(j) = x(j) + &
                   this%asydecr * (this%upp%x(j) - this%xold1%x(j))
 
           else if ((x(j) - this%xold1%x(j))* &
-               (this%xold1%x(j) - this%xold2%x(j)) .gt. 0) then
+               (this%xold1%x(j) - this%xold2%x(j)) .gt. 0.0_rp) then
              this%low%x(j) = x(j) - &
                   this%asyincr * (this%xold1%x(j) - this%low%x(j))
              this%upp%x(j) = x(j) + &
@@ -51,14 +51,14 @@ contains
           ! setting a minimum and maximum for the low and upp
           ! asymptotes (eq3.9)
           this%low%x(j) = max(this%low%x(j), &
-               x(j) - 10*(this%xmax%x(j) - this%xmin%x(j)))
+               x(j) - 10.0_rp*(this%xmax%x(j) - this%xmin%x(j)))
           this%low%x(j) = min(this%low%x(j), &
-               x(j) - 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               x(j) - 0.01_rp*(this%xmax%x(j) - this%xmin%x(j)))
 
           this%upp%x(j) = min(this%upp%x(j), &
-               x(j) + 10*(this%xmax%x(j) - this%xmin%x(j)))
+               x(j) + 10.0_rp*(this%xmax%x(j) - this%xmin%x(j)))
           this%upp%x(j) = max(this%upp%x(j), &
-               x(j) + 0.01*(this%xmax%x(j) - this%xmin%x(j)))
+               x(j) + 0.01_rp*(this%xmax%x(j) - this%xmin%x(j)))
        end do
     end if
     ! we can move alpha and beta out of the following loop if needed as:
@@ -77,7 +77,7 @@ contains
             0.1_rp*(x(j)- this%low%x(j)), &
             x(j) - 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
        this%beta%x(j) = min(this%xmax%x(j), this%upp%x(j) - &
-            0.1*(this%upp%x(j) - x(j)), &
+            0.1_rp*(this%upp%x(j) - x(j)), &
             x(j) + 0.5_rp*(this%xmax%x(j) - this%xmin%x(j)))
 
        !Calculate p0j, q0j, pij, qij
@@ -460,8 +460,8 @@ contains
           !2*this%n+4*this%m+2
           dxx = [dy, dz, dlambda, dxsi, deta, dmu, dzeta, ds]
           xx = [y, z, lambda, xsi, eta, mu, zeta, s]
-          steg = maxval([dummy_one, -1.01*dxx/xx, -1.01*dx/ &
-               (x(:) - this%alpha%x(:)), 1.01*dx/(this%beta%x(:) - x(:))])
+          steg = maxval([dummy_one, -1.01_rp*dxx/xx, -1.01_rp*dx/ &
+               (x(:) - this%alpha%x(:)), 1.01_rp*dx/(this%beta%x(:) - x(:))])
           steg = 1.0_rp/steg
 
           call MPI_Allreduce(steg, steg, 1, &
@@ -551,7 +551,7 @@ contains
 
           !correct the step size for the extra devision by 2 in the final
           !loop
-          steg = 2*steg
+          steg = 2.0_rp*steg
 
           ! print *,"Processor ",pe_rank, "iter = ", iter, "epsi = ", epsi, &
           !     "steg = ", steg, "residunorm = ",residunorm, &
