@@ -1,6 +1,6 @@
 submodule (mma) mma_cpu
   use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
-       MPI_Allreduce
+       MPI_Allreduce, MPI_IN_PLACE
   use utils, only: neko_error
   use comm, only: neko_comm, mpi_real_precision
 
@@ -227,6 +227,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
 
     real(kind=rp) :: re_xstuff_squ_global
+    real(kind=rp) :: minimal_epsilon
 
     integer :: nglobal
 
@@ -244,7 +245,13 @@ contains
     eta(:) = max(1.0_rp, 1.0_rp/(this%beta%x(:) - x(:)))
     mu(:) = max(1.0_rp, 0.5_rp*this%c%x(:))
 
-    do while (epsi .gt. max(0.9_rp*this%epsimin, 1.0e-12_rp))
+    ! computing the minimal epsilon based on eq(5.10)
+    minimal_epsilon = max(0.9_rp*this%epsimin, 1.0e-12_rp)
+    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
+
+    do while (epsi .gt. minimal_epsilon)
+
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
