@@ -166,7 +166,9 @@ contains
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
     if (present(backnd)) this%backnd = backnd
-
+    
+    print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
+     ", d=", d, "epsimin =", this%epsimin 
     !the object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_attributes_cpu

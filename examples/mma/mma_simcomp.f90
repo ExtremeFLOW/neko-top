@@ -223,7 +223,11 @@ contains
     x = reshape(this%designx%x, [this%mma%get_n()])
     call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
          f0val, df0dx%x, fval%x, dfdx%x)
-
+    ! update the device pointer
+    call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy_r1(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy_r2(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)   
+    
     print *, 'iter = ', 0,&
          '-------, f0val = ', f0val, ',   fval = ', fval%x
 
@@ -268,59 +272,68 @@ contains
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      
-    call this%mma%update(iter, x, df0dx, fval, dfdx)
+     !     call this%mma%update(iter, x, df0dx, fval, dfdx)
 
-!     ! The optimization loop
-!     do iter = 1, 100 !10
-!        call this%mma%update(iter, x, df0dx, fval, dfdx)
-!        ! print *,"first"
-!        this%designx%x = reshape(x,shape(this%designx%x))
+    ! The optimization loop
+    do iter = 1, this%mma%max_iter !10
+       
+       call this%mma%update(iter, x, df0dx, fval, dfdx)
+       ! print *,"first"
+       this%designx%x = reshape(x,shape(this%designx%x))
 
-!        call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
-!             f0val, df0dx%x, fval%x, dfdx%x)
-!        call this%mma%KKT(x, df0dx, fval, dfdx)
+       call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
+            f0val, df0dx%x, fval%x, dfdx%x)
+       ! update the device pointer
+          !   call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%n, HOST_TO_DEVICE, sync=.false.)
+          !   call device_memcpy_r1(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
+          !   call device_memcpy_r2(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)     
+        call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy_r1(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy_r2(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
+       
+       call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
-!        if (rank .eq. 0) then
-!           print *, 'iter = ', iter,&
-!                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
-!                ',  KKTmax = ', this%mma%get_residumax(), &
-!                ', KKTnorm2 = ', this%mma%get_residunorm()
-!        end if
+       if (rank .eq. 0) then
+          print *, 'iter = ', iter,&
+               '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
+               ',  KKTmax = ', this%mma%get_residumax(), &
+               ', KKTnorm2 = ', this%mma%get_residunorm()
+       end if
 
-!        ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
-!        ! if (this%mma%residumax .lt. this%tol) exit
-!        if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
-!     end do
+       ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
+       ! if (this%mma%residumax .lt. this%tol) exit
+       if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
+    end do
 
-!     ! print *, "f0val = ", f0val, "fval = ", fval
+    ! print *, "f0val = ", f0val, "fval = ", fval
 
-!     call cpu_time(end_time)
+    call cpu_time(end_time)
 
-!     print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
-!     print *, "this%designx%x is updated"
+    print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
+    print *, "this%designx%x is updated"
 
 
-!     stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
-!     stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
-!     stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
-!     stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
+    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
 
-!     call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
-!          all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
-!          0, neko_comm, ierr)
-!     call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
-!          all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
-!          0, neko_comm, ierr)
-!     call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
-!          all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
-!          0, neko_comm, ierr)
-!     call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
-!          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
-!          0, neko_comm, ierr)
-!     ! Only root process writes the file
-!     if (rank .eq. 0) then
-!        call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
-!     end if
+    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
+         0, neko_comm, ierr)
+    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
+         0, neko_comm, ierr)
+    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
+         0, neko_comm, ierr)
+    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
+         0, neko_comm, ierr)
+    ! Only root process writes the file
+    if (rank .eq. 0) then
+       call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
+    end if
 
   end subroutine simcomp_test_compute
 
@@ -386,6 +399,7 @@ contains
     real(kind=rp), dimension(n), intent(inout) :: df0dx
     real(kind=rp), dimension(m), intent(inout) :: fval
     real(kind=rp), dimension(m, n), intent(inout) :: dfdx
+    
 
     real(kind=rp), dimension(n) :: x, coordx
     integer :: ierr, nglobal
