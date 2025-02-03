@@ -26,3 +26,28 @@ passes the test suite.
   repository. Please note that the flint tool is not included in the
   repository. It can be installed by executing `pip install flint` in the
   terminal.
+
+### Formatting and Linting Tools
+
+In order to simplify compliance to the formatting and linting rules the
+following tools can be used:
+
+- [findent](https://pypi.org/project/findent/)
+
+#### findent
+
+This tool can be used to enforce these rules by assigning the following options.
+
+- `-Rr` Auto fill end statements with type of block and name.
+- `-i2` Default indentation.
+- `-d3` Indentation for do loops.
+- `-f3` Indentation for if statements.
+- `-s3` Indentation for select case statements.
+- `-c3` Negative Indentation for case statements.
+- `-w3` Indentation for where statements.
+- `-t3` Indentation for type statements.
+- `-j3` Indentation for interface statements.
+- `-k5` Indentation for continuation lines (-: no change, d: default).
+- `--ws_remred` Remove redundant white space.
+- `--indent_ampersand` Indentation for continuation lines with preceeding &.
+- `--openmp=0` Indentation for OpenMP directives (0: follow the code, 1: flush left).
