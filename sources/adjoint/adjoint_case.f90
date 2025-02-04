@@ -199,7 +199,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-    type is (adjoint_pnpn_t)
+      type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)

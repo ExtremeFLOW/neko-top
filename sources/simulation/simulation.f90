@@ -85,7 +85,7 @@ contains
     call adjoint_init(this%adjoint_case, this%neko_case)
 
     select type(fluid => this%neko_case%fluid)
-    type is (fluid_pnpn_t)
+      type is (fluid_pnpn_t)
        this%fluid_scheme => fluid
 
     end select
