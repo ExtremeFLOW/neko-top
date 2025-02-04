@@ -1,4 +1,4 @@
-# Permeability block example {#permeability_block}
+# Permeability block example {#permeability-block}
 
 The permeability block example is a simple example of a flow through a porous
 media. The example is designed to show how to setup a simple case file and how

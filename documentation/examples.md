@@ -15,8 +15,12 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 
 ## List of examples
 
-1. \subpage permeability_block
+1. \subpage permeability-block
 2. \subpage easy-E
+3. \subpage cylinder-benchmark
+4. \subpage permeability-block
+5. \subpage power-iterations
+6. \subpage rugby-ball
 
 ## Execution of examples
 

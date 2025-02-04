@@ -1,4 +1,4 @@
-# Code structure
+# Code structure {#code-structure}
 \tableofcontents
 
 This page provides an overview of the code structure of the Neko-TOP library. 

@@ -1,4 +1,4 @@
-# Cylinder benchmark case
+# Cylinder benchmark case {#cylinder-benchmark}
 
 This is a simple benchmark case for the immersed boundary method. The case is a
 cylinder in a channel with a flow. The cylinder is fixed and the flow is driven
