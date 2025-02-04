@@ -55,39 +55,39 @@ aim to solve one step of : min F
 
 
 
-  type(case_t) :: C
-  type(adjoint_obj) :: adj
+    type(case_t) :: C
+    type(adjoint_obj) :: adj
 
-  !
-  call init_problem(P)
-  !
-  			call user_setup(C%usr)
-  			call neko_init(C)
+    !
+    call init_problem(P)
+    !
+                call user_setup(C%usr)
+                call neko_init(C)
 
 
-  			call init_problem_from_json(P)
-  				! init design
-  				! init F
-  				 		call adj%init(C)
-  				! init C
-  				! loop all constraints
-  					know C[i]
+                call init_problem_from_json(P)
+                    ! init design
+                    ! init F
+                            call adj%init(C)
+                    ! init C
+                    ! loop all constraints
+                        know C[i]
 
-! compute F and dF/Dx 
-! compute C[i] and dC[i]/dx
-!------------------------
-call solve()
-			"steady"
-  			call neko_solve(C)
-  			call solve_adjoint(adj)
-  			call sensitivity
-  			or 
-  			something else....
-!----------------------
+    ! compute F and dF/Dx 
+    ! compute C[i] and dC[i]/dx
+    !------------------------
+    call solve()
+                "steady"
+                call neko_solve(C)
+                call solve_adjoint(adj)
+                call sensitivity
+                or 
+                something else....
+    !----------------------
 
-  call neko_finalize(C)
+    call neko_finalize(C)
 
-  call mma(P)
+    call mma(P)
 
 
 
