@@ -753,25 +753,25 @@ contains
      call rex%init(this%n)
      call rexsi%init(this%n)
      call reeta%init(this%n)
-! this%lambda%x = 0_rp
-! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
-! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "before Sum of rex: ", sum(rex%x)
+     ! this%lambda%x = 0_rp
+     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "before Sum of rex: ", sum(rex%x)
 
      call device_kkt_rex(rex%x_d,  df0dx%x_d,  dfdx%x_d, this%xsi%x_d, this%eta%x_d, this%lambda%x_d, this%n, this%m)
 
-! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "after Sum of rex: ", sum(rex%x)
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "after Sum of rex: ", sum(rex%x)
 
-! print *, "Sum of df0dx: ", sum(df0dx%x)
-! print *, "Sum of dfdx%x(1,:): ", sum(dfdx%x(1,:))
-! call device_memcpy(this%xsi%x, this%xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of xsi: ", sum(this%xsi%x)
-! call device_memcpy(this%eta%x, this%eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of eta: ", sum(this%eta%x)
-! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of lambda: ", sum(this%lambda%x)
-! print *, "Sum of n, m: ", this%n, this%m
+     ! print *, "Sum of df0dx: ", sum(df0dx%x)
+     ! print *, "Sum of dfdx%x(1,:): ", sum(dfdx%x(1,:))
+     ! call device_memcpy(this%xsi%x, this%xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of xsi: ", sum(this%xsi%x)
+     ! call device_memcpy(this%eta%x, this%eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of eta: ", sum(this%eta%x)
+     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of lambda: ", sum(this%lambda%x)
+     ! print *, "Sum of n, m: ", this%n, this%m
 
      call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
      call device_add2(rey%x_d, this%c%x_d, this%m)
@@ -797,36 +797,36 @@ contains
 
      call device_col3(res%x_d,this%lambda%x_d,this%s%x_d,this%m)
 
-! ! For rex (size: this%n)
-! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of rex: ", sum(rex%x)
+     ! ! For rex (size: this%n)
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rex: ", sum(rex%x)
 
-! ! For rey (size: this%m)
-! call device_memcpy(rey%x, rey%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of rey: ", sum(rey%x)
+     ! ! For rey (size: this%m)
+     ! call device_memcpy(rey%x, rey%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rey: ", sum(rey%x)
 
-! print *, "Sum of rez: ", rez  ! rez is scalar, no need for sum()
+     ! print *, "Sum of rez: ", rez  ! rez is scalar, no need for sum()
 
-! ! For relambda (size: this%m)
-! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of relambda: ", sum(relambda%x)
+     ! ! For relambda (size: this%m)
+     ! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of relambda: ", sum(relambda%x)
 
-! ! For rexsi (size: this%n)
-! call device_memcpy(rexsi%x, rexsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of rexsi: ", sum(rexsi%x)
+     ! ! For rexsi (size: this%n)
+     ! call device_memcpy(rexsi%x, rexsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rexsi: ", sum(rexsi%x)
 
-! ! For reeta (size: this%n)
-! call device_memcpy(reeta%x, reeta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of reeta: ", sum(reeta%x)
+     ! ! For reeta (size: this%n)
+     ! call device_memcpy(reeta%x, reeta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of reeta: ", sum(reeta%x)
 
-! ! For remu (size: this%m)
-! call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of remu: ", sum(remu%x)
+     ! ! For remu (size: this%m)
+     ! call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of remu: ", sum(remu%x)
 
-! print *, "Sum of rezeta: ", rezeta  ! rezeta is scalar, no need for sum()
-! ! For res (size: this%m)
-! call device_memcpy(res%x, res%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-! print *, "Sum of res: ", sum(res%x)
+     ! print *, "Sum of rezeta: ", rezeta  ! rezeta is scalar, no need for sum()
+     ! ! For res (size: this%m)
+     ! call device_memcpy(res%x, res%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of res: ", sum(res%x)
 
 
      residu_val=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, device_maxval(relambda%x_d, this%m), &
