@@ -771,10 +771,7 @@ WARN_AS_ERROR          = FAIL_ON_WARNINGS_PRINT
 
 INPUT                 = @top_srcdir@/documentation \
                         @top_srcdir@/sources \
-                        @top_srcdir@/examples/permeability_block/readme.md \
-                        @top_srcdir@/examples/easy-E/readme.md \
-                        @top_srcdir@/examples/power_iterations/readme.md \
-                        @top_srcdir@/examples/rugby_ball/readme.md
+                        @top_srcdir@/examples
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses
@@ -825,8 +822,7 @@ EXCLUDE_SYMLINKS       = NO
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories for example use the pattern */test/*
 
-EXCLUDE_PATTERNS       = */README.md \
-                         */readme.md
+EXCLUDE_PATTERNS       =
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
