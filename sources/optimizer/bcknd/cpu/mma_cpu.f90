@@ -1,3 +1,36 @@
+! Copyright (c) 2025, The Neko-TOP Authors
+! All rights reserved.
+!
+! Redistribution and use in source and binary forms, with or without
+! modification, are permitted provided that the following conditions
+! are met:
+!
+!   * Redistributions of source code must retain the above copyright
+!     notice, this list of conditions and the following disclaimer.
+!
+!   * Redistributions in binary form must reproduce the above
+!     copyright notice, this list of conditions and the following
+!     disclaimer in the documentation and/or other materials provided
+!     with the distribution.
+!
+!   * Neither the name of the authors nor the names of its
+!     contributors may be used to endorse or promote products derived
+!     from this software without specific prior written permission.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+! POSSIBILITY OF SUCH DAMAGE.
+
+!> Submodule for the CPU implementations related to MMA
 submodule (mma) mma_cpu
   use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
        MPI_Allreduce, MPI_IN_PLACE
@@ -7,11 +40,11 @@ submodule (mma) mma_cpu
 contains
 
   module subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
-    ! ----------------------------------------------------- !
-    ! Generate the approximation sub problem by computing   !
-    ! the lower and upper asymtotes and the other necessary !
-    ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
-    ! ----------------------------------------------------- !
+    ! ------------------------------------------------------ !
+    ! Generate the approximation sub problem by computing    !
+    ! the lower and upper asymptotes and the other necessary !
+    ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).     !
+    ! ------------------------------------------------------ !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
     real(kind=rp), dimension(this%n), intent(in) :: df0dx
@@ -28,7 +61,6 @@ contains
     ! Setup the current asymptotes
 
     associate(low => this%low%x, upp => this%upp%x, &
-         xmin => this%xmin%x, xmax => this%xmax%x, &
          x_1 => this%xold1%x, x_2 => this%xold2%x)
 
       if (iter .lt. 3) then
@@ -84,8 +116,7 @@ contains
 
     associate(p0j => this%p0j%x, q0j => this%q0j%x, &
          pij => this%pij%x, qij => this%qij%x, &
-         low => this%low%x, upp => this%upp%x, &
-         xmin => this%xmin%x, xmax => this%xmax%x)
+         low => this%low%x, upp => this%upp%x)
 
       p0j = ( &
            1.001_rp * max(df0dx, 0.0_rp) &
@@ -147,7 +178,7 @@ contains
     ! to solve MMA sub problem.                               !
     ! A Backtracking Line Search approach is used to compute  !
     ! the step size; starting with the full Newton's step     !
-    ! (delta = 1) and deviding by 2 until we have a step size !
+    ! (delta = 1) and dividing by 2 until we have a step size !
     ! that leads to a feasible point while ensuring a         !
     ! decrease in the residue.                                !
     ! ------------------------------------------------------- !
@@ -155,11 +186,11 @@ contains
     real(kind=rp), dimension(this%n), intent(inout) :: designx
     !Note that there is a local dummy "x" in this subroutine, thus, we call
     !the current design "designx" instead of just "x"
-    integer :: i, j, k, iter, ggdumiter, itto, ierr
-    real(kind=rp) :: epsi, residumax, residunorm, &
+    integer :: i, j, k, iter, i, itto, ierr
+    real(kind=rp) :: epsi, residual_max, residual_norm, &
          z, zeta, rez, rezeta, &
          delz, dz, dzeta, &
-         steg, zold, zetaold, newresidu
+         steg, zold, zetaold, new_residual
     real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
          rey, relambda, remu, res, &
          dely, dellambda, &
@@ -169,9 +200,9 @@ contains
          rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, &
          xold, xsiold, etaold
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
-    real(kind=rp), dimension(2*this%n+4*this%m+2) :: xx, dxx
+    real(kind=rp), dimension(4*this%m + 2) :: residual_small
+    real(kind=rp), dimension(3*this%n + 4*this%m + 2) :: residual
+    real(kind=rp), dimension(2*this%n + 4*this%m + 2) :: xx, dxx
 
     real(kind=rp), dimension(this%m, this%n) :: GG
     real(kind=rp), dimension(this%m+1) :: bb
@@ -189,7 +220,7 @@ contains
     integer :: nglobal
 
     ! ------------------------------------------------------------------------ !
-    ! intial value for the parameters in the subsolve based on
+    ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
 
     epsi = 1.0_rp !100
@@ -238,7 +269,6 @@ contains
          rey = c + d * y - lambda - mu
          rez = a0 - zeta - dot_product(lambda, a)
 
-
          relambda = 0.0_rp
          do i = 1, this%m
             do j = 1, this%n
@@ -266,19 +296,19 @@ contains
        res = lambda * s - epsi
 
        ! Setup vectors of residuals and their norms
-       residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-       residu_small = [rey, rez, relambda, remu, rezeta, res]
+       residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+       residual_small = [rey, rez, relambda, remu, rezeta, res]
 
-       residumax = maxval(abs(residu))
+       residual_max = maxval(abs(residual))
        re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
-       call MPI_Allreduce(MPI_IN_PLACE, residumax, 1, &
+       call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
             mpi_real_precision, mpi_max, neko_comm, ierr)
 
        call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
             1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-       residunorm = sqrt(norm2(residu_small)**2 + re_sq_norm)
+       residual_norm = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
        ! --------------------------------------------------------------------- !
        ! Internal loop
@@ -286,7 +316,7 @@ contains
        do iter = 1, this%max_iter
 
           !Check the condition
-          if (residumax .lt. epsi) exit
+          if (residual_max .lt. epsi) exit
 
           delx = 0.0_rp
           do j = 1, this%n
@@ -321,9 +351,9 @@ contains
 
           dellambda = dellambda - this%a%x*z - y - this%bi%x + epsi / lambda
 
-          do ggdumiter = 1, this%m
-             GG(ggdumiter, :) = this%pij%x(ggdumiter,:) / (this%upp%x - x)**2 &
-                  - this%qij%x(ggdumiter,:) / (x - this%low%x)**2
+          do i = 1, this%m
+             GG(i,:) = this%pij%x(i,:) / (this%upp%x - x)**2 &
+                  - this%qij%x(i,:) / (x - this%low%x)**2
           end do
 
           diagx = &
@@ -375,7 +405,6 @@ contains
                 end do
              end do
           end do
-
 
           call MPI_Allreduce(MPI_IN_PLACE, AA(1:this%m, 1:this%m), &
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -433,18 +462,18 @@ contains
           zetaold = zeta
           sold = s
 
-          !The innermost loop to determine the suitable step length
-          !using the Backtracking Line Search approach
-          newresidu = 2.0_rp * residunorm
+          ! The innermost loop to determine the suitable step length
+          ! using the Backtracking Line Search approach
+          new_residual = 2.0_rp * residual_norm
 
-          ! Share the newresidu and steg values
+          ! Share the new_residual and steg values
           call MPI_Allreduce(MPI_IN_PLACE, steg, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
-          call MPI_Allreduce(MPI_IN_PLACE, newresidu, 1, &
+          call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
           itto = 0
-          do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
+          do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
              itto = itto + 1
 
              ! update the variables
@@ -458,8 +487,8 @@ contains
              zeta = zetaold + steg*dzeta
              s = sold + steg*ds
 
-             !recompute the newresidu to see if this stepsize improves
-             !the residue
+             ! Recompute the new_residual to see if this stepsize improves
+             ! the residue
              rex = (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
                   / (this%upp%x - x)**2 &
                   - (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
@@ -469,10 +498,10 @@ contains
              rey = this%c%x + this%d%x*y - lambda - mu
              rez = this%a0 - zeta - dot_product(lambda, this%a%x)
 
+             ! Accumulate sums for relambda (the term gi(x))
              relambda = 0.0_rp
              do i = 1, this%m
-                do j = 1, this%n !this n is global
-                   ! Accumulate sums for relambda (the term gi(x))
+                do j = 1, this%n
                    relambda(i) = relambda(i) &
                         + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
                         + this%qij%x(i, j) / (x(j) - this%low%x(j))
@@ -490,36 +519,36 @@ contains
              rezeta = zeta * z - epsi
              res = lambda * s - epsi
 
-             residu_small = [rey, rez, relambda, remu, rezeta, res]
+             residual_small = [rey, rez, relambda, remu, rezeta, res]
 
              re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
              call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-             newresidu = sqrt(norm2(residu_small)**2 + re_sq_norm)
+             new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp
           end do
           steg = 2.0_rp * steg ! Correction for the final division by 2
 
-          residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+          residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
 
           ! Update the maximum and norm of the residuals
-          residunorm = newresidu
-          residumax = maxval(abs(residu))
-          call MPI_Allreduce(MPI_IN_PLACE, residumax, 1, &
+          residual_norm = new_residual
+          residual_max = maxval(abs(residual))
+          call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
        end do
 
        epsi = 0.1_rp * epsi
     end do
 
-    ! Save the new design
+    ! Save the new designx
     this%xold2 = this%xold1
     this%xold1%x = designx
     designx = x
 
-    !update the parameters of the MMA object nesessary to compute KKT residu
+    !update the parameters of the MMA object nesessary to compute KKT residual
     this%y%x = y
     this%z = z
     this%lambda%x = lambda
@@ -531,10 +560,11 @@ contains
 
   end subroutine mma_subsolve_dpip_cpu
 
+  !> Implementation of the KKT residual computation for the MMA algorithm.
   subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
-    ! design x and set the max and norm values of the       !
+    ! designx x and set the max and norm values of the       !
     ! residue of KKT system to this%residumax and           !
     ! this%residunorm.                                      !
     !                                                       !
@@ -561,9 +591,9 @@ contains
     real(kind=rp) :: rez, rezeta
     real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
     real(kind=rp), dimension(this%n) :: rex, rexsi, reeta
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residu
+    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residual
 
-    real(kind=rp), dimension(4*this%m+2) :: residu_small
+    real(kind=rp), dimension(4*this%m+2) :: residual_small
     integer :: ierr
     real(kind=rp) :: re_sq_norm
 
@@ -579,10 +609,10 @@ contains
     rezeta = this%zeta * this%z
     res = this%lambda%x * this%s%x
 
-    residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-    residu_small = [rey, rez, relambda, remu, rezeta, res]
+    residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+    residual_small = [rey, rez, relambda, remu, rezeta, res]
 
-    this%residumax = maxval(abs(residu))
+    this%residumax = maxval(abs(residual))
     re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
     call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
@@ -591,7 +621,7 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-    this%residunorm = sqrt(norm2(residu_small)**2 + re_sq_norm)
+    this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
   end subroutine mma_KKT_cpu
 end submodule mma_cpu
