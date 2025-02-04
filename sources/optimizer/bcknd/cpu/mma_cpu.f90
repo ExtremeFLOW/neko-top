@@ -20,6 +20,9 @@ contains
     integer, intent(in) :: iter
     integer :: i, j, ierr
     real(kind=rp) :: asy_factor
+    real(kind=rp), dimension(this%n) :: x_diff
+
+    x_diff = this%xmax%x - this%xmin%x
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -30,8 +33,8 @@ contains
 
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
-         low = x - this%asyinit * (xmax - xmin)
-         upp = x + this%asyinit * (xmax - xmin)
+         low = x - this%asyinit * x_diff
+         upp = x + this%asyinit * x_diff
       else
          do j = 1, this%n
             if ((x(j) - x_1(j)) * (x_1(j) - x_2(j)) .lt. 0.0_rp) then
@@ -49,11 +52,11 @@ contains
 
          ! Setting a minimum and maximum for the low and upp
          ! asymptotes (eq3.9)
-         low = max(low, x - 10.0_rp * (xmax - xmin))
-         low = min(low, x - 0.01_rp * (xmax - xmin))
+         low = max(low, x - 10.0_rp * x_diff)
+         low = min(low, x - 0.01_rp * x_diff)
 
-         upp = min(upp, x + 10.0_rp * (xmax - xmin))
-         upp = max(upp, x + 0.01_rp * (xmax - xmin))
+         upp = min(upp, x + 10.0_rp * x_diff)
+         upp = max(upp, x + 0.01_rp * x_diff)
       end if
 
     end associate
@@ -70,8 +73,8 @@ contains
          xmin => this%xmin%x, xmax => this%xmax%x, &
          low => this%low%x, upp => this%upp%x)
 
-      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*(xmax - xmin))
-      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*(xmax - xmin))
+      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
+      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
 
     end associate
 
@@ -87,13 +90,13 @@ contains
       p0j = ( &
            1.001_rp * max(df0dx, 0.0_rp) &
            + 0.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(xmax - xmin, 0.00001_rp) &
+           + 0.00001_rp / max(x_diff, 0.00001_rp) &
            ) * (upp - x)**2
 
       q0j = ( &
            0.001_rp * max(df0dx, 0.0_rp) &
            + 1.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(xmax - xmin, 0.00001_rp)&
+           + 0.00001_rp / max(x_diff, 0.00001_rp)&
            ) * (x - low)**2
 
       do j = 1, this%n
@@ -101,13 +104,13 @@ contains
             pij(i, j) = ( &
                  1.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(xmax(j) - xmin(j), 0.00001_rp) &
+                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (upp(j) - x(j))**2
 
             qij(i, j) = ( &
                  0.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(xmax(j) - xmin(j), 0.00001_rp) &
+                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (x(j) - low(j))**2
          end do
       end do
@@ -180,7 +183,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
 
     ! Parameters for global communication
-    real(kind=rp) :: re_xstuff_squ_global
+    real(kind=rp) :: re_sq_norm
     real(kind=rp) :: minimal_epsilon
 
     integer :: nglobal
@@ -267,15 +270,15 @@ contains
        residu_small = [rey, rez, relambda, remu, rezeta, res]
 
        residumax = maxval(abs(residu))
-       re_xstuff_squ_global = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+       re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
        call MPI_Allreduce(MPI_IN_PLACE, residumax, 1, &
             mpi_real_precision, mpi_max, neko_comm, ierr)
 
-       call MPI_Allreduce(MPI_IN_PLACE, re_xstuff_squ_global, &
+       call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
             1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-       residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+       residunorm = sqrt(norm2(residu_small)**2 + re_sq_norm)
 
        ! --------------------------------------------------------------------- !
        ! Internal loop
@@ -489,14 +492,11 @@ contains
 
              residu_small = [rey, rez, relambda, remu, rezeta, res]
 
-             re_xstuff_squ_global = norm2(rex)**2 &
-                  + norm2(rexsi)**2 &
-                  + norm2(reeta)**2
-             call MPI_Allreduce(MPI_IN_PLACE, re_xstuff_squ_global, &
+             re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+             call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-
-             newresidu = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+             newresidu = sqrt(norm2(residu_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp
           end do
@@ -565,7 +565,7 @@ contains
 
     real(kind=rp), dimension(4*this%m+2) :: residu_small
     integer :: ierr
-    real(kind=rp) :: re_xstuff_squ_global
+    real(kind=rp) :: re_sq_norm
 
     rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
          - this%xsi%x + this%eta%x
@@ -583,15 +583,15 @@ contains
     residu_small = [rey, rez, relambda, remu, rezeta, res]
 
     this%residumax = maxval(abs(residu))
-    re_xstuff_squ_global = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+    re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
     call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
          mpi_real_precision, mpi_max, neko_comm, ierr)
 
-    call MPI_Allreduce(MPI_IN_PLACE, re_xstuff_squ_global, 1, &
+    call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-    this%residunorm = sqrt(norm2(residu_small)**2 + re_xstuff_squ_global)
+    this%residunorm = sqrt(norm2(residu_small)**2 + re_sq_norm)
 
   end subroutine mma_KKT_cpu
 end submodule mma_cpu
