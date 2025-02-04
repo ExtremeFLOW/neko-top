@@ -33,3 +33,8 @@ flexible and allow for easy extension and modification.
 - [ ] Setup MMA optimizer.
 
 ## Immersed Boundary Method
+
+
+## Components
+
+- \subpage problem
