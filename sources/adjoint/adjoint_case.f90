@@ -124,7 +124,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
-         neko_case%ext_bdf)
+         neko_case%fluid%ext_bdf)
 
     !
     ! Setup scalar scheme
@@ -199,7 +199,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)

@@ -68,7 +68,7 @@ module lube_term_objective
   use scratch_registry, only: neko_scratch_registry
   use objective, only: objective_t
   use simulation, only: simulation_t
-  use fluid_scheme, only: fluid_scheme_t
+  use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_scheme, only: adjoint_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
@@ -165,10 +165,10 @@ contains
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        this%brinkman_amplitude => design%brinkman_amplitude
 
-      class default
+    class default
        call neko_error('Minimum dissipation only works with topopt_design')
     end select
 

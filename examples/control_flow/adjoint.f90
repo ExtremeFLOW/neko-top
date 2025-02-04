@@ -61,9 +61,7 @@ module simcomp_example
        profiler_end_region
   use file, only: file_t
   use num_types, only : rp, sp, dp
-  use fluid_scheme, only : fluid_scheme_factory
   use fluid_pnpn, only : fluid_pnpn_t
-  use fluid_scheme, only : fluid_scheme_t
   use fluid_output, only : fluid_output_t
   use chkp_output, only : chkp_output_t
   use mean_sqr_flow_output, only : mean_sqr_flow_output_t
@@ -196,11 +194,11 @@ contains
     ! same with polynomial order
     call json_get(C%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
-    call this%scheme%init(C%msh, lx, C%params, C%usr, C%ext_bdf)
+    call this%scheme%init(C%msh, lx, C%params, C%usr, C%fluid%ext_bdf)
     ! this%scheme%chkp%tlag => C%tlag
     ! this%scheme%chkp%dtlag => C%dtlag
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        !  f%chkp%abx1 => f%abx1
        !  f%chkp%abx2 => f%abx2
        !  f%chkp%aby1 => f%aby1
@@ -309,7 +307,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
@@ -598,12 +596,12 @@ contains
 
        write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
+       call simulation_settime(t_adj, this%case%dt, this%case%fluid%ext_bdf, &
             this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
-            this%case%ext_bdf, dt_controller)
+            this%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
             'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -615,7 +613,7 @@ contains
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
           call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
-               this%case%ext_bdf, dt_controller)
+               this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &

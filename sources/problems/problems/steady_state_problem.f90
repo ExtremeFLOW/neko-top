@@ -96,7 +96,7 @@ contains
     class(steady_state_problem_t), intent(inout) :: this
 
     call this%simulation%init()
-    call this%init_base(this%simulation%neko_case%fluid%dm_Xh%size())
+    call this%init_base(this%simulation%fluid_scheme%dm_Xh%size())
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
@@ -114,9 +114,9 @@ contains
     class(design_t), target, intent(inout) :: design
 
     select type(design)
-      type is(topopt_design_t)
+    type is(topopt_design_t)
        call this%init_design_topopt(design)
-      class default
+    class default
        call neko_error('Only topopt_design_t is supported for now')
     end select
 
@@ -139,20 +139,20 @@ contains
     ! class(constraint_t), allocatable :: volume_constraint
 
     ! init the design
-    call design%init(this%simulation%neko_case%params, this%simulation%neko_case%fluid%c_Xh)
+    call design%init(this%simulation%neko_case%params, this%simulation%fluid_scheme%c_Xh)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
-         this%simulation%neko_case%fluid%f_x, &
-         this%simulation%neko_case%fluid%f_y, &
-         this%simulation%neko_case%fluid%f_z, &
+         this%simulation%fluid_scheme%f_x, &
+         this%simulation%fluid_scheme%f_y, &
+         this%simulation%fluid_scheme%f_z, &
          design, &
-         this%simulation%neko_case%fluid%u, &
-         this%simulation%neko_case%fluid%v, &
-         this%simulation%neko_case%fluid%w, &
-         this%simulation%neko_case%fluid%c_Xh)
+         this%simulation%fluid_scheme%u, &
+         this%simulation%fluid_scheme%v, &
+         this%simulation%fluid_scheme%w, &
+         this%simulation%fluid_scheme%c_Xh)
     ! append brinkman source term to the forward problem
-    call this%simulation%neko_case%fluid%source_term%add(forward_brinkman)
+    call this%simulation%fluid_scheme%source_term%add(forward_brinkman)
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
@@ -234,10 +234,10 @@ contains
 
     ! Allocate the output type
     call this%output%init(sp, 'optimization', 10)
-    call this%output%fields%assign(1, this%simulation%neko_case%fluid%p)
-    call this%output%fields%assign(2, this%simulation%neko_case%fluid%u)
-    call this%output%fields%assign(3, this%simulation%neko_case%fluid%v)
-    call this%output%fields%assign(4, this%simulation%neko_case%fluid%w)
+    call this%output%fields%assign(1, this%simulation%fluid_scheme%p)
+    call this%output%fields%assign(2, this%simulation%fluid_scheme%u)
+    call this%output%fields%assign(3, this%simulation%fluid_scheme%v)
+    call this%output%fields%assign(4, this%simulation%fluid_scheme%w)
     ! I don't know why these ones need assign_to_field?
     call this%output%fields%assign(5, design%design_indicator)
     call this%output%fields%assign(6, this%simulation%adjoint_case%scheme%u_adj)
@@ -283,9 +283,9 @@ contains
     class(design_t), intent(inout) :: design
 
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        call steady_state_problem_compute_sensitivity_topopt(this, design)
-      class default
+    class default
        call neko_error('Only topopt_design_t is supported for now')
     end select
 
