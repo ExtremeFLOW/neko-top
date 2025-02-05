@@ -84,7 +84,7 @@ contains
 
     ! Reset the external BDF coefficients
     do i = 1, size(neko_case%dtlag)
-       call neko_case%ext_bdf%set_coeffs(neko_case%dtlag)
+       call neko_case%fluid%ext_bdf%set_coeffs(neko_case%dtlag)
     end do
 
     ! Restart the simulation components
