@@ -32,8 +32,7 @@
 
 !> Submodule for the CPU implementations related to MMA
 submodule (mma) mma_cpu
-  use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
-       MPI_Allreduce, MPI_IN_PLACE
+  use mpi_f08, only: MPI_REAL, MPI_IN_PLACE, mpi_min, mpi_max
   use utils, only: neko_error
   use comm, only: neko_comm, mpi_real_precision
 
@@ -215,9 +214,6 @@ contains
 
     ! Parameters for global communication
     real(kind=rp) :: re_sq_norm
-    real(kind=rp) :: minimal_epsilon
-
-    integer :: nglobal
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -234,20 +230,10 @@ contains
     eta = max(1.0_rp, 1.0_rp / (this%beta%x - x))
     mu = max(1.0_rp, 0.5_rp * this%c%x)
 
-    call MPI_Allreduce(this%n, nglobal, 1, &
-         MPI_INTEGER, mpi_sum, neko_comm, ierr)
-
-    ! ------------------------------------------------------------------------ !
-    ! Computing the minimal epsilon and choose the most conservative one
-
-    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
-    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
-         mpi_real_precision, mpi_min, neko_comm, ierr)
-
     ! ------------------------------------------------------------------------ !
     !  The main loop of the dual-primal interior point method.
 
-    do while (epsi .gt. minimal_epsilon)
+    do while (epsi .gt. max(0.9_rp * this%epsimin, 1.0e-12_rp))
 
        ! --------------------------------------------------------------------- !
        ! Calculating residuals based on
