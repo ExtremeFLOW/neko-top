@@ -60,7 +60,6 @@ module volume_constraint
   use scratch_registry, only : neko_scratch_registry
   use constraint, only : constraint_t
   use simulation, only : simulation_t
-  use fluid_scheme, only : fluid_scheme_t
   use adjoint_scheme, only : adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
   use math, only : glsc2
