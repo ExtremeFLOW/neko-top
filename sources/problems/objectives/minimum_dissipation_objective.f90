@@ -70,7 +70,7 @@ module minimum_dissipation_objective
        adjoint_minimum_dissipation_source_term_t
   use objective, only: objective_t
   use simulation, only: simulation_t
-  use fluid_scheme, only: fluid_scheme_t
+  use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_scheme, only: adjoint_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
@@ -93,7 +93,7 @@ module minimum_dissipation_objective
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
-     class(fluid_scheme_t), pointer :: fluid
+     class(fluid_scheme_incompressible_t), pointer :: fluid
      class(adjoint_scheme_t), pointer :: adjoint
 
    contains
@@ -151,7 +151,7 @@ contains
     call this%init_base(design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%fluid => simulation%neko_case%fluid
+    this%fluid => simulation%fluid_scheme
     this%adjoint => simulation%adjoint_case%scheme
 
     ! you will need to init this!
