@@ -118,12 +118,12 @@ contains
 
        ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%ext_bdf, &
+       call simulation_settime(t_adj, this%case%dt, this%case%fluid%ext_bdf, &
             this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Adjoint fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
-            this%case%ext_bdf, dt_controller)
+            this%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
             'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -135,7 +135,7 @@ contains
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
           call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
-               this%case%ext_bdf, dt_controller)
+               this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
                'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
@@ -238,7 +238,7 @@ contains
     !Free the previous mesh, dont need it anymore
     call C%fluid%chkp%previous_mesh%free()
     do i = 1, size(C%dtlag)
-       call C%ext_bdf%set_coeffs(C%dtlag)
+       call C%fluid%ext_bdf%set_coeffs(C%dtlag)
     end do
 
     call C%fluid%restart(C%dtlag, C%tlag)
