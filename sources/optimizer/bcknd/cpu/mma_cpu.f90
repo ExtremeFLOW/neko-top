@@ -249,10 +249,10 @@ contains
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
-     !     real(kind=rp), dimension(this%n), intent(in) :: x
-     !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
-     !     real(kind=rp), dimension(this%m), intent(in) :: fval
-     !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    ! real(kind=rp), dimension(this%n), intent(in) :: x
+    ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    ! real(kind=rp), dimension(this%m), intent(in) :: fval
+    ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     real(kind=rp), dimension(this%n), intent(in) :: xdesign
     type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
@@ -375,68 +375,9 @@ contains
       call MPI_Allreduce(MPI_IN_PLACE, bi, this%m, &
            mpi_real_precision, mpi_sum, neko_comm, ierr)
       bi = bi - fval%x
+
     end associate
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!Showing that for double precision, bi will be different when!!!!!!!!
-    !!!!!!!!!!!computed in parallel compare to sequential!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! this%bi%x = 0.0_rp
-    ! longbi = 0.0
-    ! do i = 1, this%m
-    !     !MPI: here this%n is the global n
-    !     do j = 1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "this%n = ", this%n
-    ! print *, "longbi =  ", longbi
-    ! ierr = 2160
-    ! longbi = 0.0
-    ! this%bi%x = 0.0
-    ! do i = 1, this%m
-    !     do j = 1, ierr
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "first batch(1-ierr)"
-    ! print *, "longbi =  ", longbi, "first batch(1-ierr)"
-    ! longbiglobal = longbi
-    ! longbi = 0.0
-    ! globaltmp_m = this%bi
-    ! this%bi%x = 0.0
-    ! do i = 1, this%m
-    !     do j = ierr+1, this%n
-    !         this%bi%x(i) = this%bi%x(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !         longbi(i) = longbi(i) + &
-    !                     this%pij%x(i,j)/ (this%upp%x(j) - x(j)) + &
-    !                     this%qij%x(i,j)/(x(j) - this%low%x(j))
-    !     end do
-    ! end do
-    ! print *, "bi =  ", this%bi%x, "second batch(ierr+1:end)"
-    ! print *, "longbi =  ", longbi, "second batch(ierr+1:end)"
-    ! print *, "bi =  ", this%bi+globaltmp_m, "first + second"
-    ! print *, "longbi =  ", longbi+longbiglobal, "first + second"
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-
-    !globaltmp_m = 0.0_rp
-    !call MPI_Allreduce(this%bi%x, globaltmp_m, this%m, &
-    !     mpi_real_precision, mpi_sum, neko_comm, ierr)
-    !this%bi%x = globaltmp_m - fval%x
-    !print *, "after this%bi%x(1)=", this%bi%x(1), "this%bi%x(2)=", this%bi%x(2)
   end subroutine mma_gensub_cpu
 
   subroutine mma_subsolve_dpip_cpu(this, designx)
@@ -445,7 +386,7 @@ contains
     ! to solve MMA sub problem.                               !
     ! A Backtracking Line Search approach is used to compute  !
     ! the step size; starting with the full Newton's step     !
-    ! (delta = 1) and deviding by 2 until we have a step size !
+    ! (delta = 1) and dividing by 2 until we have a step size !
     ! that leads to a feasible point while ensuring a         !
     ! decrease in the residue.                                !
     ! ------------------------------------------------------- !
@@ -453,8 +394,8 @@ contains
     class(mma_cpu_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(inout) :: designx
     ! type(vector_t) :: designx
-    !Note that there is a local dummy "x" in this subroutine, thus, we call
-    !the current design "designx" instead of just "x"
+    !! Note that there is a local dummy "x" in this subroutine, thus, we call
+    !! the current design "designx" instead of just "x"
     integer :: i, j, k, iter, itto, ierr
     real(kind=rp) :: epsi, residual_max, residual_norm, &
          z, zeta, rez, rezeta, &
@@ -582,7 +523,7 @@ contains
        ! --------------------------------------------------------------------- !
        ! Internal loop
 
-       do iter = 1, 100 !this%max_iter
+       do iter = 1, this%max_iter
 
           !Check the condition
           if (residual_max .lt. epsi) exit
@@ -829,10 +770,11 @@ contains
 
   end subroutine mma_subsolve_dpip_cpu
 
+  !> Implementation of the KKT residual computation for the MMA algorithm.
   subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
-    ! design x and set the max and norm values of the       !
+    ! designx x and set the max and norm values of the       !
     ! residue of KKT system to this%residumax and           !
     ! this%residunorm.                                      !
     !                                                       !
@@ -850,11 +792,9 @@ contains
     ! using the new x values.                               !
     ! ----------------------------------------------------- !
     class(mma_cpu_t), intent(inout) :: this
-     !     real(kind=rp), dimension(this%n), intent(in) :: x
-
-     !     real(kind=rp), dimension(this%m), intent(in) :: fval
-     !     real(kind=rp), dimension(this%n), intent(in) :: df0dx
-     !     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+     ! real(kind=rp), dimension(this%m), intent(in) :: fval
+     ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
+     ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     real(kind=rp), dimension(this%n), intent(in) :: x
     type(vector_t), intent(in) :: df0dx, fval
     type(matrix_t), intent(in) :: dfdx

@@ -25,7 +25,8 @@ program usrneko
 
 
   tolerance = 1.0e-3_rp
-  call optimizer%run(problem, design, tolerance)
+  max_iter = 100
+  call optimizer%run(problem, design, tolerance, max_iter)
 
   call problem%free()
   call design%free()

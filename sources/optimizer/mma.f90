@@ -38,7 +38,8 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-
+  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
+  
   implicit none
   private
 
@@ -154,15 +155,22 @@ module mma
     !! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
 
-    integer :: max_iter
+    integer :: max_iter, n_global, ierr
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
     character(len=:), allocatable :: backnd
 
     !! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
     logical, intent(out) :: auto_scale
+
+    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
+         MPI_SUM, MPI_COMM_WORLD, ierr)
+
     ! ------------------------------------------------------------------------ !
-    ! Read data from json file
+    ! Assign defaults if nothing is parsed
+    ! based on the Cpp Code by Niels
+    call json_get_or_default(json, 'mma.epsimin', epsimin, &
+         1.0e-9_rp * sqrt(real(m + n_global, rp)))
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
 
     ! Following parameters are set based on eq.3.8:--------
