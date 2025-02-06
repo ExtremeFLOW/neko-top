@@ -19,21 +19,19 @@
                     0.0, 0.0, 0.0
                 ]
             },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2 ]
+                }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
             "Re": 2,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
-            },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -49,7 +47,13 @@
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
-            "boundary_types": [ "v", "v", "sym", "sym" ],
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1, 0, 0 ],
+                    "zone_indices": [ 1, 2 ]
+                }
+            ],
             "output_control": "tsteps",
             "output_value": 50000000
         },
@@ -81,8 +85,29 @@
             }
         ]
     },
+    "optimization": {
+        "objectives": [
+            {
+                "type": "minimum_dissipation",
+                "weight": 1.0
+            },
+            {
+                "type": "lube_term",
+                "weight": 1.0,
+                "K": 1.0
+            }
+        ],
+        "constraints": [
+            {
+                "type": "volume",
+                "mask_name": "optimization_domain",
+                "limit": 0.2,
+                "is_max": false
+            }
+        ],
+    },
     "mma": {
-        "max_iter": 10,
+        "max_iter": 100,
         "asyinit": 0.5,
         "asyincr": 1.2,
         "asydecr": 0.7,

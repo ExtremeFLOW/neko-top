@@ -65,7 +65,7 @@ contains
     ! Initialize MMA solver
     ! Check the type of the problem using select type
     select type (problem)
-      type is (steady_state_problem_t)
+    type is (steady_state_problem_t)
 
        print *, "Initializing mma_optimizer with steady_state_problem_t."
 
@@ -76,7 +76,7 @@ contains
 
        print *, "scale = ", this%scale
        print *, "auto_scale = ", this%auto_scale
-      class default
+    class default
 
        call neko_error('Unknown problem type in the mma_optimizer_init')
     end select
@@ -84,26 +84,28 @@ contains
   end subroutine mma_optimizer_init
 
   ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, problem, tolerance)
+  subroutine mma_optimizer_run(this, problem, tolerance, max_iter)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     real(kind=rp), intent(in) :: tolerance
+    integer, intent(in) :: max_iter
 
     ! Check the type of the problem using select type
     select type (problem)
-      type is (steady_state_problem_t)
-       call this%run_ss(problem, tolerance)
+    type is (steady_state_problem_t)
+       call this%run_ss(problem, tolerance, max_iter)
 
-      class default
+    class default
        call neko_error('Unknown problem type in the mma_optimizer_run')
     end select
   end subroutine mma_optimizer_run
 
-  subroutine mma_optimizer_run_steady_state_prob(this, problem, tolerance)
+  subroutine mma_optimizer_run_steady_state_prob(this, problem, tolerance, &
+       max_iter)
     class(mma_optimizer_t), intent(inout) :: this
     class(steady_state_problem_t), intent(inout) :: problem
     real(kind=rp), intent(in) :: tolerance
-    integer :: max_iter
+    integer, intent(in) :: max_iter
     integer :: iter, ierr, nglobal
     real(kind=rp) :: scalingfactor
 
@@ -112,7 +114,6 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    max_iter = this%mma%get_max_iter()
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
