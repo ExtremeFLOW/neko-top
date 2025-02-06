@@ -63,7 +63,6 @@ module mma_device
      generic :: subsolve => mma_subsolve_dpip_device
      procedure, pass(this) :: mma_subsolve_dpip_device
 
-     procedure, pass(this) :: mma_test_device
   end type mma_device_t
 
 contains
@@ -238,14 +237,6 @@ contains
     
     this%is_updated = .true.
   end subroutine mma_update_device
-
-  !>
-  subroutine mma_test_device(this, xdesign)
-    class(mma_device_t), intent(inout) :: this
-    type(vector_t) :: xdesign
-
-  end subroutine mma_test_device
-
 
   !> Deallocate the MMA object.
   subroutine mma_free_device(this)
