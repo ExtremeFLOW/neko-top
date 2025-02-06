@@ -33,7 +33,7 @@
 module device_math_ext
   use utils, only : neko_error
   use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding
+  use, intrinsic :: iso_c_binding, only : c_ptr, c_int
   implicit none
 
 #ifdef HAVE_HIP
