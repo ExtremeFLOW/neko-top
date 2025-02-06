@@ -3,7 +3,7 @@
 ! ============================================================================ !
 
 program nekotop
-  use neko_top
+  use neko_top, only: neko_top_init, neko_top_solve, neko_top_finalize
   use case, only: case_t
 
   implicit none
