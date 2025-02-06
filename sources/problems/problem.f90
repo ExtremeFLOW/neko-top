@@ -552,11 +552,11 @@ contains
     type(matrix_t), intent(out) :: sensitivity
     integer :: i, j
 
-    call sensitivity%init(this%n_design, this%n_constraints)
+    call sensitivity%init(this%n_constraints, this%n_design)
 
     do i = 1, this%n_constraints
        do j = 1, this%n_design
-          sensitivity%x(j, i) = &
+          sensitivity%x(i, j) = &
                this%constraint_list(i)%constraint%sensitivity%x(j)
        end do
     end do

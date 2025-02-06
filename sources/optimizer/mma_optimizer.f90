@@ -130,23 +130,26 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     !Writing the optimization data in a separate file
-    open(1368, file = "optimization_data.txt", status = "replace")
+    ! open(1368, file = "optimization_data.txt", status = "replace")
 
     associate(x => design%design_indicator%x)
 
-      ! Write n, m, and tolerance in the first line of optimization_data.txt
-      write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-           nglobal, this%mma%get_m(), tolerance
+      ! ! Write n, m, and tolerance in the first line of optimization_data.txt
+      ! write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
+      !      nglobal, this%mma%get_m(), tolerance
 
-      ! Write the header for the remaining data
-      write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
-           &KKTnorm2, scalingfactor"
+      ! ! Write the header for the remaining data
+      ! write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
+      !      &KKTnorm2, scalingfactor"
 
-      ! Write the data row-by-row
-      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-           & ES25.17, ",", ES25.17)') &
-           0, objective_value, constraint_value%x, &
-           this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+      ! ! Write the data row-by-row
+      ! write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
+      !      & ES25.17, ",", ES25.17)') &
+      !      0, objective_value, constraint_value%x, &
+      !      this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+
+      ! write(*, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
+      !     nglobal, this%mma%get_m(), tolerance
 
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
@@ -158,14 +161,18 @@ contains
             scalingfactor = abs(this%scale)
          end if
 
-         if (NEKO_BCKND_DEVICE .eq. 0) then
-            call this%mma%update( iter, x, objective_sensitivities, &
-                 constraint_value%vector_cmult_left(scalingfactor), &
-                 constraint_sensitivities%matrix_cmult_left(scalingfactor))
-         else
-            write(stderr, *) "Device not supported in mma_optimizer.f90."
-            error stop
-         end if
+         call this%mma%update(iter, x, objective_sensitivities, &
+              scalingfactor*constraint_value, &
+              scalingfactor*constraint_sensitivities)
+
+        !  if (NEKO_BCKND_DEVICE .eq. 0) then
+        !     call this%mma%update( iter, x, objective_sensitivities, &
+        !          constraint_value%vector_cmult_left(scalingfactor), &
+        !          constraint_sensitivities%matrix_cmult_left(scalingfactor))
+        !  else
+        !     write(stderr, *) "Device not supported in mma_optimizer.f90."
+        !     error stop
+        !  end if
 
          call problem%compute(design)
          call problem%compute_sensitivity(design)
@@ -178,12 +185,12 @@ contains
          call this%mma%KKT(x, objective_sensitivities, &
               constraint_value, constraint_sensitivities)
 
-         write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-              & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
-              this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+        !  write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
+        !       & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
+        !       this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
 
          ! Flush the buffer to write the data during the run
-         flush(1368)
+        !  flush(1368)
 
          call problem%write(iter)
 
@@ -199,7 +206,7 @@ contains
     end associate
 
 
-    close(1368)
+    ! close(1368)
 
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
