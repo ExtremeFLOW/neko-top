@@ -208,6 +208,8 @@ contains
     real(kind=rp), dimension(this%m+1) :: bb
     real(kind=rp), dimension(this%m+1, this%m+1) :: AA
 
+    real(kind=rp), dimension(this%m) :: work_1, work_2
+
     ! using DGESV in lapack to solve
     ! the linear system which needs the following parameters
     integer :: info
@@ -249,8 +251,11 @@ contains
             a0 => this%a0, a => this%a%x, &
             bi => this%bi%x)
 
-         rex = (p0j + matmul(transpose(pij), lambda)) / (upp - x)**2 &
-              - (q0j + matmul(transpose(qij), lambda)) / (x - low)**2 &
+         work_1 = matmul(transpose(pij), lambda)
+         work_2 = matmul(transpose(qij), lambda)
+
+         rex = (p0j + work_1) / (upp - x)**2 &
+              - (q0j + work_2) / (x - low)**2 &
               - xsi + eta
 
          rey = c + d * y - lambda - mu
@@ -343,11 +348,11 @@ contains
                   - this%qij%x(i,:) / (x - this%low%x)**2
           end do
 
-          diagx = &
-               (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
-               / (this%upp%x - x)**3 &
-               + (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
-               / (x - this%low%x)**3
+          work_1 = matmul(transpose(this%pij%x), lambda)
+          work_2 = matmul(transpose(this%qij%x), lambda)
+
+          diagx = (this%p0j%x + work_1) / (this%upp%x - x)**3 &
+               + (this%q0j%x + work_2) / (x - this%low%x)**3
 
           diagx = 2.0_rp * diagx &
                + xsi / (x - this%alpha%x) &
@@ -474,12 +479,13 @@ contains
              zeta = zetaold + steg*dzeta
              s = sold + steg*ds
 
+             work_1 = matmul(transpose(this%pij%x), lambda)
+             work_2 = matmul(transpose(this%qij%x), lambda)
+
              ! Recompute the new_residual to see if this stepsize improves
              ! the residue
-             rex = (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
-                  / (this%upp%x - x)**2 &
-                  - (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
-                  / (x - this%low%x)**2 &
+             rex = (this%p0j%x + work_1) / (this%upp%x - x)**2 &
+                  - (this%q0j%x + work_2) / (x - this%low%x)**2 &
                   - xsi + eta
 
              rey = this%c%x + this%d%x*y - lambda - mu
