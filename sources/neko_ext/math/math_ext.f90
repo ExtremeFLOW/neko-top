@@ -1,6 +1,7 @@
 module math_ext
   use num_types, only: rp, xp
-  use comm
+  use comm, only: NEKO_COMM, MPI_EXTRA_PRECISION
+  use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_IN_PLACE
   implicit none
 
 contains
@@ -110,7 +111,7 @@ contains
 
   end subroutine sub3_mask
 
-  !> @brief Weighted inner product 
+  !> @brief Weighted inner product
   !! \f$ a^T b \f$ for indices in the mask
   function glsc2_mask(a, b, size, mask, mask_size)
     integer, intent(in) :: size, mask_size

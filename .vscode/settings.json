@@ -1,36 +1,4 @@
 {
-    "fortran.linter.includePaths": [
-        "${workspaceFolder}/build/modules",
-        "${workspaceFolder}/external/neko/**",
-        "${workspaceFolder}/external/json-fortran/**",
-    ],
-    "fortran.fortls.excludeDirectories": [
-        "${workspaceFolder}/build",
-        "${workspaceFolder}/external",
-    ],
-    "fortran.linter.modOutput": "${workspaceFolder}/build/modules",
-    "fortran.linter.compiler": "gfortran",
-    "fortran.linter.compilerPath": "/usr/bin/gfortran",
-    "fortran.linter.extraArgs": [
-        "-Wall",
-        "-Wextra",
-        "-Wpedantic",
-    ],
-    "fortran.formatting.formatter": "findent",
-    "fortran.formatting.findentArgs": [
-        "-Rr", // Auto fill end statements with type of block and name
-        "-i2", // Default indentation
-        "-d3", // Indentation for do loops
-        "-f3", // Indentation for if statements
-        "-s3", // Indentation for select case statements
-        "-w3", // Indentation for where statements
-        "-t3", // Indentation for type statements
-        "-j3", // Indentation for interface statements
-        "-kd", // Indentation for continuation lines (-: no change, d: default)
-        "--ws_remred", // Remove redundant white space
-        "--align_paren", // Align parenthesis across continuation lines
-        "--indent_ampersand", // Indentation for continuation lines with preceeding &
-    ],
     "files.exclude": {
         "**/*.mod": true,
         "**/*.o": true,
@@ -43,15 +11,12 @@
         "${workspaceFolder}/scripts/functions",
         "${workspaceFolder}/scripts/notebook",
     ],
-    "cmake.generator": "Unix Makefiles",
+    "cmake.generator": "Ninja",
     "cmake.ctestArgs": [
         "--output-on-failure",
         "--timeout",
         "60",
     ],
-    "todo-tree.tree.showCountsInTree": true,
-    "todo-tree.tree.showBadges": true,
-    "todo-tree.tree.disableCompactFolders": false,
     "[FortranFreeForm]": {
         "editor.insertSpaces": true,
         "editor.tabSize": 2,

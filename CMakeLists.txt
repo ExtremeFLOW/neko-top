@@ -44,7 +44,7 @@ set(CMAKE_Fortran_STANDARD 2008)
 option(DEVICE_TYPE "Enable device support" OFF)
 if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
 endif()
 
 # ............................................................................ #
@@ -88,6 +88,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
         $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
     )
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")

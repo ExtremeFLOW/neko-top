@@ -143,8 +143,9 @@ contains
   subroutine PDE_filter_init_from_attributes(this, coef)
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
-    integer :: n
+    integer :: n, i
 
+    ! set the number of dofs
     n = this%coef%dof%size()
 
     ! init the bc list (all Neuman BCs, will remain empty)

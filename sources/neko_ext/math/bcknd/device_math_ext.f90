@@ -33,10 +33,10 @@
 module device_math_ext
   use utils, only : neko_error
   use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding
+  use, intrinsic :: iso_c_binding, only : c_ptr, c_int
   implicit none
 
-#ifdef HAVE_HIP
+#if HAVE_HIP
 
 #elif HAVE_CUDA
 
@@ -139,7 +139,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_cadd_mask(a_d, c, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_cadd_mask')
@@ -151,7 +151,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_invcol1_mask(a_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_invcol1_mask')
@@ -164,7 +164,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_col2_mask(a_d, b_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_col2_mask')
@@ -178,7 +178,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_col3_mask')
@@ -192,7 +192,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_sub3_mask')

@@ -32,7 +32,6 @@
 
  ! Implements the `mma_comp_t` type.
 module mma_simcomp
-  use neko_config
   use num_types, only: rp
   use case, only: case_t
   use json_module, only: json_file
@@ -41,7 +40,8 @@ module mma_simcomp
   use field, only: field_t
   use logger, only: neko_log
   use mma, only: mma_t
-  use comm
+  use comm, only: neko_comm, mpi_real_precision
+  use mpi_f08, only: MPI_INTEGER, MPI_Allreduce, MPI_SUM, MPI_COMM_WORLD
   implicit none
   private
 

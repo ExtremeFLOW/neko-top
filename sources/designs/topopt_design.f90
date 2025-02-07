@@ -45,13 +45,14 @@ module topopt_design
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device, only: device_memcpy, HOST_TO_DEVICE
+  use design, only: design_t
 
   implicit none
   private
 
   !> A topology optimization design variable
-  type, public :: topopt_design_t
+  type, extends(design_t), public :: topopt_design_t
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
@@ -135,6 +136,7 @@ module topopt_design
      ! Let's say way have a chain of two mappings
      type(PDE_filter_t) :: filter
      type(RAMP_mapping_t) :: mapping
+
      ! and we need to hold onto a field for the chain of mappings
      type(field_t) :: filtered_design
 
@@ -190,6 +192,7 @@ contains
     type(coef_t), intent(inout) :: coef
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
+
     ! init the fields
     call this%design_indicator%init(coef%dof, "design_indicator")
     call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
@@ -236,7 +239,7 @@ contains
 
 
     ! TODO
-    ! Regarding masks and filters, 
+    ! Regarding masks and filters,
     ! I suppose there are two ways of thinking about it:
     ! 1) Mask first, then filter
     ! 2) filter first, then mask
@@ -294,7 +297,7 @@ contains
     call this%output%fields%assign(2, this%brinkman_amplitude)
     call this%output%fields%assign(3, this%sensitivity)
 
-
+    call this%init_base(n)
   end subroutine topopt_design_init
 
 
@@ -305,7 +308,7 @@ contains
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
        call mask_exterior_const(this%design_indicator, &
-       this%optimization_domain, 0.0_rp)
+            this%optimization_domain, 0.0_rp)
     end if
 
     ! TODO

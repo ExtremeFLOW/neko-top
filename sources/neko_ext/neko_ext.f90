@@ -43,7 +43,7 @@ contains
     real(kind=rp) :: t
     integer :: i
     character(len=:), allocatable :: string_val
-    logical :: has_scalar
+    logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
 
     t = 0.0_rp
@@ -84,7 +84,7 @@ contains
 
     ! Reset the external BDF coefficients
     do i = 1, size(neko_case%dtlag)
-       call neko_case%ext_bdf%set_coeffs(neko_case%dtlag)
+       call neko_case%fluid%ext_bdf%set_coeffs(neko_case%dtlag)
     end do
 
     ! Restart the simulation components
@@ -130,6 +130,15 @@ contains
                neko_case%params)
        end if
     end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Reset the "freeze" parameter of the flow
+    ! ------------------------------------------------------------------------ !
+
+    call json_get_or_default(neko_case%params, &
+         'case.fluid.freeze_flow', freezeflow, .false.)
+
+    neko_case%fluid%freeze = freezeflow
 
   end subroutine reset
 
