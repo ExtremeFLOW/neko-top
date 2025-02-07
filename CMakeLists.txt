@@ -92,10 +92,10 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wsurprising>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Warray-temporaries>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-array-temporaries>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wimplicit-interface>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wfunction-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
 
