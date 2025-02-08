@@ -59,6 +59,9 @@
 !
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
+
+    !TODO
+    ! GPUS
 !
 module minimum_dissipation_objective
   use num_types, only: rp
@@ -233,8 +236,6 @@ contains
             this%value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)        
         end if
     end if
-
-    print *, "DISS VALUE", this%value
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

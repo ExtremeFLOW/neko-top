@@ -252,8 +252,6 @@ contains
     end if
     this%value = 0.5 * this%K * this%value
 
-    print *, " LUBE", this%value
-
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine lube_term_update_value

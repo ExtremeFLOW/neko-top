@@ -70,6 +70,8 @@ module volume_constraint
   use math_ext, only: glsc2_mask
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  ! potentially delete
+  use device, only: device_memcpy, HOST_TO_DEVICE
   implicit none
   private
 

@@ -25,7 +25,6 @@ module mma_optimizer
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
-
   implicit none
   private
   public :: mma_optimizer_t
@@ -117,6 +116,8 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
+    real(kind=rp) :: temp
+
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
@@ -174,6 +175,9 @@ contains
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! just for now so we can test, do a few memcopies and run on CPU
             ! this will ultimately be replaced by GPU MMA
+            !
+            ! actually, on closer inspection of the problem %get functionality
+            ! many of these should already live on the device too.
             call device_memcpy(this%design%design_indicator%x, &
                 this%design%design_indicator%x_d, &
                 this%design%design_indicator%dof%size(), &

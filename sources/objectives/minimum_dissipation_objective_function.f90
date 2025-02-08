@@ -277,9 +277,6 @@ contains
     ! scale everything
     this%objective_function_value = this%objective_function_value*this%obj_scale
 
-    !TODO
-    ! GPUS
-
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_objective_function_compute

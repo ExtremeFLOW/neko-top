@@ -40,12 +40,13 @@ module problem
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get
   use simulation, only: simulation_t
   use logger, only: neko_log
+  use device_math, only: device_copy
 
   implicit none
   private
@@ -554,7 +555,37 @@ contains
 
     call sensitivity%init(this%n_design, this%n_constraints)
 
+    ! DELETE COMMENT AFTER PR
+    ! My expectation is that if we're working on the device then the sensitivity
+    ! of each constraint would exist on the device.
+    !
+    ! I would then also assume we would want the matrix of sensitivities to also
+    ! exist on the device. So that's why I've adjusted in this way.
+    !
+    ! I attempted something along the lines of 
+    !
+    !    do i = 1, this%n_constraints
+    !        call device_copy(sensitivity%x_d(1, i), &
+    !            this%constraint_list(i)%constraint%sensitivity%x_d, &
+    !            this%n_design)
+    !    end do
+    !
+    ! but that obviously didn't work...
+    !
+    ! There must be a more eleagant solution, but I'm going copy them all from
+    ! DEVICE to HOST, and then copy everything back to DEVICE.
+    !
+    ! Obviously this is inefficient, but I couldn't find any DEVICE_TO_DEVICE
+    ! in the neko source, so maybe this is just hard on GPUs?
+    !
+
     do i = 1, this%n_constraints
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+           call device_memcpy( &
+               this%constraint_list(i)%constraint%sensitivity%x, &
+               this%constraint_list(i)%constraint%sensitivity%x_d, &
+               this%n_design, DEVICE_TO_HOST, sync = .true.)
+       end if
        do j = 1, this%n_design
           sensitivity%x(j, i) = &
                this%constraint_list(i)%constraint%sensitivity%x(j)
@@ -565,6 +596,7 @@ contains
        call device_memcpy(sensitivity%x, sensitivity%x_d, &
             this%n_design * this%n_constraints, HOST_TO_DEVICE, sync = .true.)
     end if
+
 
   end subroutine problem_get_constraint_sensitivities
 
