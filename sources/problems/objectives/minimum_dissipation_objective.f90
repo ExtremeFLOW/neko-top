@@ -67,7 +67,7 @@ module minimum_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2 &
-       ,field_copy
+       , field_copy
   use operators, only: grad
   use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &

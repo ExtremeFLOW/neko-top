@@ -119,7 +119,7 @@ contains
     call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #else
-    call neko_error('No device backend configured for device_convex_down_RAMP_mapping_apply')
+    call neko_error('No device backend configured')
 #endif
   end subroutine device_convex_down_RAMP_mapping_apply
 
@@ -136,7 +136,7 @@ contains
     call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else
-    call neko_error('No device backend configured for device_convex_down_RAMP_mapping_apply_backward')
+    call neko_error('No device backend configured')
 #endif
   end subroutine device_convex_down_RAMP_mapping_apply_backward
 
@@ -152,7 +152,7 @@ contains
     call cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #else
-    call neko_error('No device backend configured for device_convex_up_RAMP_mapping_apply')
+    call neko_error('No device backend configured')
 #endif
   end subroutine device_convex_up_RAMP_mapping_apply
 
@@ -169,7 +169,7 @@ contains
     call cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else
-    call neko_error('No device backend configured for device_convex_up_RAMP_mapping_apply_backward')
+    call neko_error('No device backend configured')
 #endif
   end subroutine device_convex_up_RAMP_mapping_apply_backward
 end module device_RAMP_mapping
