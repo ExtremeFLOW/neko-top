@@ -114,9 +114,9 @@ contains
     class(design_t), target, intent(inout) :: design
 
     select type(design)
-    type is(topopt_design_t)
+     type is(topopt_design_t)
        call this%init_design_topopt(design)
-    class default
+     class default
        call neko_error('Only topopt_design_t is supported for now')
     end select
 
