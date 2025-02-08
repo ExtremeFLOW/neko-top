@@ -70,8 +70,6 @@ module volume_constraint
   use math_ext, only: glsc2_mask
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-  ! potentially delete
-  use device, only: device_memcpy, HOST_TO_DEVICE
   implicit none
   private
 
@@ -169,9 +167,9 @@ contains
        call field_rone(work)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call mask_exterior_const(work, this%mask, 0.0_rp) 
+          call mask_exterior_const(work, this%mask, 0.0_rp)
           this%volume_domain = device_glsc2(work%x_d, this%c_xh%B_d, &
-              work%size())
+               work%size())
        else
           this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
                design%size(), this%mask%mask, this%mask%size)
@@ -261,10 +259,10 @@ contains
 
     volume = 0.0_rp
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        volume = volume_topopt_design(this, design)
 
-      class default
+    class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
@@ -286,7 +284,7 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_scratch_registry%request_field(work , temp_indices(1))
           call field_copy(work, design%design_indicator)
-          call mask_exterior_const(work, this%mask, 0.0_rp) 
+          call mask_exterior_const(work, this%mask, 0.0_rp)
           volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
@@ -298,7 +296,7 @@ contains
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
           volume = device_glsc2(design%design_indicator%x_d, &
-              this%c_xh%B_d, design%size())
+               this%c_xh%B_d, design%size())
        else
           volume = glsc2(design%design_indicator%x, &
                this%c_Xh%B, design%size())

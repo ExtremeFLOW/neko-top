@@ -42,7 +42,7 @@ module mask_ops
   use device_math_ext, only: device_copy_mask
   use device_math, only: device_copy
   use math_ext, only: copy_mask
-  use math, only: copy 
+  use math, only: copy
   use vector, only: vector_t
   implicit none
 
@@ -83,7 +83,7 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     if (vec%n .ne. work%size()) then
-        call neko_error('vector and field are of incompatible dimension')
+       call neko_error('vector and field are of incompatible dimension')
     end if
 
     ! fill background fld
@@ -91,7 +91,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_copy_mask(work%x_d, vec%x_d, work%size(), mask%mask_d, &
+       call device_copy_mask(work%x_d, vec%x_d, work%size(), mask%mask_d, &
             mask%size)
     else
        do i = 1, mask%size
@@ -129,10 +129,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
             mask%size)
     else
-        call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
+       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over
@@ -161,10 +161,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
             mask%size)
     else
-        call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
+       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over

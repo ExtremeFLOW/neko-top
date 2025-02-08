@@ -219,7 +219,7 @@ contains
 
     ! again this will be handled better in the future...
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_memcpy(this%design_indicator%x, &
+       call device_memcpy(this%design_indicator%x, &
             this%design_indicator%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
     end if

@@ -41,7 +41,7 @@ module device_RAMP_mapping
 #elif HAVE_CUDA
 
   interface
-     subroutine cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &           
+     subroutine cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply')
        use, intrinsic :: iso_c_binding
@@ -56,7 +56,7 @@ module device_RAMP_mapping
   end interface
 
   interface
-     subroutine cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &           
+     subroutine cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply_backward')
        use, intrinsic :: iso_c_binding
@@ -72,7 +72,7 @@ module device_RAMP_mapping
   end interface
 
   interface
-     subroutine cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &           
+     subroutine cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply')
        use, intrinsic :: iso_c_binding
@@ -87,7 +87,7 @@ module device_RAMP_mapping
   end interface
 
   interface
-     subroutine cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &           
+     subroutine cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply_backward')
        use, intrinsic :: iso_c_binding
@@ -107,8 +107,8 @@ module device_RAMP_mapping
 
 contains
 
-  subroutine device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &          
-          X_out_d, X_in_d, n)
+  subroutine device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+       X_out_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
     real(kind=rp), intent(in) :: q
@@ -116,15 +116,15 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_CUDA
-    call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &          
-          X_out_d, X_in_d, n)
+    call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+         X_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured for device_convex_down_RAMP_mapping_apply')
 #endif
   end subroutine device_convex_down_RAMP_mapping_apply
 
-  subroutine device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &          
-          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
+  subroutine device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+       dF_dX_in_d, dF_dX_out_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
     real(kind=rp), intent(in) :: q
@@ -133,15 +133,15 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_CUDA
-    call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &          
-          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
+    call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+         dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured for device_convex_down_RAMP_mapping_apply_backward')
 #endif
   end subroutine device_convex_down_RAMP_mapping_apply_backward
 
-  subroutine device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &          
-          X_out_d, X_in_d, n)
+  subroutine device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+       X_out_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
     real(kind=rp), intent(in) :: q
@@ -149,15 +149,15 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_CUDA
-    call cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &          
-          X_out_d, X_in_d, n)
+    call cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+         X_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured for device_convex_up_RAMP_mapping_apply')
 #endif
   end subroutine device_convex_up_RAMP_mapping_apply
 
-  subroutine device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &          
-          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
+  subroutine device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+       dF_dX_in_d, dF_dX_out_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
     real(kind=rp), intent(in) :: q
@@ -166,8 +166,8 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_CUDA
-    call cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &          
-          dF_dX_in_d, dF_dX_out_d, X_in_d, n)
+    call cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+         dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured for device_convex_up_RAMP_mapping_apply_backward')
 #endif

@@ -167,10 +167,10 @@ contains
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        this%brinkman_amplitude => design%brinkman_amplitude
 
-      class default
+    class default
        call neko_error('Minimum dissipation only works with topopt_design')
     end select
 
@@ -234,21 +234,21 @@ contains
     call field_addcol3(work, this%w, this%brinkman_amplitude)
 
     if (this%has_mask) then
-       if (neko_bcknd_device .eq. 1) then                                   
-           ! note, this could be done more elagantly by writing             
-           ! device_glsc2_mask                                              
-           call mask_exterior_const(work, this%mask, 0.0_rp)                
-           this%value = device_glsc2(work%x_d, this%B_d, design%size())     
-       else                                                                 
-           this%value = glsc2_mask(work%x, this%B, design%size(), &
-                this%mask%mask, this%mask%size)
-       end if                       
+       if (neko_bcknd_device .eq. 1) then
+          ! note, this could be done more elagantly by writing
+          ! device_glsc2_mask
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+       else
+          this%value = glsc2_mask(work%x, this%B, design%size(), &
+               this%mask%mask, this%mask%size)
+       end if
     else
-       if (neko_bcknd_device .eq. 1) then                                   
-           this%value = device_glsc2(work%x_d, this%B_d, design%size())                                           
-       else                                                                 
-           this%value = glsc2(work%x, this%B, design%size())
-       end if  
+       if (neko_bcknd_device .eq. 1) then
+          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+       else
+          this%value = glsc2(work%x, this%B, design%size())
+       end if
     end if
     this%value = 0.5 * this%K * this%value
 

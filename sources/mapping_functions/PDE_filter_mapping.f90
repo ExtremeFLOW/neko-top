@@ -159,10 +159,10 @@ contains
          this%ksp_max_iter, this%abstol_filt)
 
     ! set up preconditioner
-    call filter_precon_factory(this%pc_filt, this%ksp_filt, &                      
-                                      this%coef, this%coef%dof, &
-                                      this%coef%gs_h, &      
-                                      this%bclst_filt, this%precon_type_filt)
+    call filter_precon_factory(this%pc_filt, this%ksp_filt, &
+         this%coef, this%coef%dof, &
+         this%coef%gs_h, &
+         this%bclst_filt, this%precon_type_filt)
 
   end subroutine PDE_filter_init_from_attributes
 
@@ -174,15 +174,15 @@ contains
        deallocate(this%Ax)
     end if
 
-    if (allocated(this%ksp_filt)) then                                               
-       call krylov_solver_destroy(this%ksp_filt)                                     
-       deallocate(this%ksp_filt)                                                     
-    end if                                                                      
-                                                                                
-    if (allocated(this%pc_filt)) then                                                
-       call precon_destroy(this%pc_filt)                                             
-       deallocate(this%pc_filt)                                                      
-    end if                    
+    if (allocated(this%ksp_filt)) then
+       call krylov_solver_destroy(this%ksp_filt)
+       deallocate(this%ksp_filt)
+    end if
+
+    if (allocated(this%pc_filt)) then
+       call precon_destroy(this%pc_filt)
+       deallocate(this%pc_filt)
+    end if
 
     call this%bclst_filt%free()
 
@@ -232,12 +232,12 @@ contains
     end if
     this%coef%ifh2 = .true.
 
-    ! compute the A(X_in) component of the RHS 
+    ! compute the A(X_in) component of the RHS
     ! (note, to be safe with the inout intent we first copy X_in to the
     !  temporary d_X_out)
     call field_copy(d_X_out, X_in)
     call this%Ax%compute(RHS%x, d_X_out%x, this%coef, this%coef%msh, &
-        this%coef%Xh)
+         this%coef%Xh)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_subcol3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
@@ -246,7 +246,7 @@ contains
        do i = 1, n
           ! mass matrix should be included here
           RHS%x(i,1,1,1) = X_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-              - RHS%x(i,1,1,1)
+               - RHS%x(i,1,1,1)
        end do
     end if
 
@@ -334,12 +334,12 @@ contains
     end if
     this%coef%ifh2 = .true.
 
-    ! compute the A(dF_dX_out) component of the RHS 
+    ! compute the A(dF_dX_out) component of the RHS
     ! (note, to be safe with the inout intent we first copy dF_dX_out to the
     !  temporary delta)
     call field_copy(delta, dF_dX_out)
     call this%Ax%compute(RHS%x, delta%x, this%coef, this%coef%msh, &
-        this%coef%Xh)
+         this%coef%Xh)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_subcol3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d, n)
@@ -348,7 +348,7 @@ contains
        do i = 1, n
           ! mass matrix should be included here
           RHS%x(i,1,1,1) = dF_dX_out%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-              - RHS%x(i,1,1,1)
+               - RHS%x(i,1,1,1)
        end do
     end if
 
@@ -400,13 +400,13 @@ contains
     call precon_factory(pc, pctype)
 
     select type (pcp => pc)
-      type is (jacobi_t)
+    type is (jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (sx_jacobi_t)
+    type is (sx_jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (device_jacobi_t)
+    type is (device_jacobi_t)
        call pcp%init(coef, dof, gs)
-      type is (hsmg_t)
+    type is (hsmg_t)
        if (len_trim(pctype) .gt. 4) then
           if (index(pctype, '+') .eq. 5) then
              call pcp%init(dof%msh, dof%Xh, coef, dof, gs, &

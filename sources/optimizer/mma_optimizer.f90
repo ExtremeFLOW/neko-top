@@ -179,21 +179,21 @@ contains
             ! actually, on closer inspection of the problem %get functionality
             ! many of these should already live on the device too.
             call device_memcpy(this%design%design_indicator%x, &
-                this%design%design_indicator%x_d, &
-                this%design%design_indicator%dof%size(), &
-                DEVICE_TO_HOST, sync = .false.)
+                 this%design%design_indicator%x_d, &
+                 this%design%design_indicator%dof%size(), &
+                 DEVICE_TO_HOST, sync = .false.)
             call device_memcpy(objective_sensitivities%x, &
-                objective_sensitivities%x_d, &
-                objective_sensitivities%n, &
-                DEVICE_TO_HOST, sync = .false.)
+                 objective_sensitivities%x_d, &
+                 objective_sensitivities%n, &
+                 DEVICE_TO_HOST, sync = .false.)
             call device_memcpy(constraint_value%x, &
-                constraint_value%x_d, &
-                constraint_value%n, &
-                DEVICE_TO_HOST, sync = .false.)
+                 constraint_value%x_d, &
+                 constraint_value%n, &
+                 DEVICE_TO_HOST, sync = .false.)
             call device_memcpy(constraint_sensitivities%x, &
-                constraint_sensitivities%x_d, &
-                constraint_sensitivities%n, &
-                DEVICE_TO_HOST, sync = .false.)
+                 constraint_sensitivities%x_d, &
+                 constraint_sensitivities%n, &
+                 DEVICE_TO_HOST, sync = .false.)
             !write(stderr, *) "Device not supported in mma_optimizer.f90."
             !error stop
 
@@ -202,21 +202,21 @@ contains
                  constraint_sensitivities%x*scalingfactor)
 
             call device_memcpy(this%design%design_indicator%x, &
-                this%design%design_indicator%x_d, &
-                this%design%design_indicator%dof%size(), &
-                HOST_TO_DEVICE, sync = .false.)
+                 this%design%design_indicator%x_d, &
+                 this%design%design_indicator%dof%size(), &
+                 HOST_TO_DEVICE, sync = .false.)
             call device_memcpy(objective_sensitivities%x, &
-                objective_sensitivities%x_d, &
-                objective_sensitivities%n, &
-                HOST_TO_DEVICE, sync = .false.)
+                 objective_sensitivities%x_d, &
+                 objective_sensitivities%n, &
+                 HOST_TO_DEVICE, sync = .false.)
             call device_memcpy(constraint_value%x, &
-                constraint_value%x_d, &
-                constraint_value%n, &
-                HOST_TO_DEVICE, sync = .false.)
+                 constraint_value%x_d, &
+                 constraint_value%n, &
+                 HOST_TO_DEVICE, sync = .false.)
             call device_memcpy(constraint_sensitivities%x, &
-                constraint_sensitivities%x_d, &
-                constraint_sensitivities%n, &
-                HOST_TO_DEVICE, sync = .false.)
+                 constraint_sensitivities%x_d, &
+                 constraint_sensitivities%n, &
+                 HOST_TO_DEVICE, sync = .false.)
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! TO BE REPLACED WITH GPU MMA
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
