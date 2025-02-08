@@ -410,13 +410,11 @@ contains
        error stop
     end if
 
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (this%backend == 'cpu') then
        call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
-       ! obviously change this when GPU MMA comes in...
-       ! write(stderr, *) "Device not supported for MMA."
-       ! error stop
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       write(stderr, *) "Device not supported for MMA."
+       error stop
     end if
 
   end subroutine mma_KKT

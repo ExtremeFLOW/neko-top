@@ -126,7 +126,7 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_copy_mask(a_d, b_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_copy_mask')

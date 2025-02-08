@@ -36,7 +36,7 @@
 #define __NEKO_CUDA_MATH_EXT_KERNELS__
 
 /**
- * Device kernel for compy_mask
+ * Device kernel for copy_mask
  */
 template <typename T>
 __global__ void copy_mask_kernel(

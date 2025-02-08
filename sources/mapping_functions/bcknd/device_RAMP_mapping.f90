@@ -36,7 +36,7 @@ module device_RAMP_mapping
   use, intrinsic :: iso_c_binding
   implicit none
 
-#ifdef HAVE_HIP
+#if HAVE_HIP
 
 #elif HAVE_CUDA
 
@@ -115,7 +115,7 @@ contains
     type(c_ptr) :: X_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &          
           X_out_d, X_in_d, n)
 #else
@@ -132,7 +132,7 @@ contains
     type(c_ptr) :: dF_dX_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &          
           dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else
@@ -148,7 +148,7 @@ contains
     type(c_ptr) :: X_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &          
           X_out_d, X_in_d, n)
 #else
@@ -165,7 +165,7 @@ contains
     type(c_ptr) :: dF_dX_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#ifdef HAVE_CUDA
+#if HAVE_CUDA
     call cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &          
           dF_dX_in_d, dF_dX_out_d, X_in_d, n)
 #else

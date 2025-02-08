@@ -132,6 +132,8 @@ contains
     call problem%get_constraint_values(constraint_value)
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    ! zero'th iterations should be written too
+    call problem%write(0)
 
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
@@ -167,6 +169,9 @@ contains
                  constraint_value%x * scalingfactor, &
                  constraint_sensitivities%x*scalingfactor)
          else
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! TO BE REPLACED WITH GPU MMA
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! just for now so we can test, do a few memcopies and run on CPU
             ! this will ultimately be replaced by GPU MMA
             call device_memcpy(this%design%design_indicator%x, &
@@ -187,9 +192,11 @@ contains
                 DEVICE_TO_HOST, sync = .false.)
             !write(stderr, *) "Device not supported in mma_optimizer.f90."
             !error stop
+
             call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
                  constraint_value%x * scalingfactor, &
                  constraint_sensitivities%x*scalingfactor)
+
             call device_memcpy(this%design%design_indicator%x, &
                 this%design%design_indicator%x_d, &
                 this%design%design_indicator%dof%size(), &
@@ -206,6 +213,9 @@ contains
                 constraint_sensitivities%x_d, &
                 constraint_sensitivities%n, &
                 HOST_TO_DEVICE, sync = .false.)
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+            ! TO BE REPLACED WITH GPU MMA
+            !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
          end if
 
          call problem%compute(this%design)

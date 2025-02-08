@@ -67,14 +67,31 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1), i
 
+    ! To be discussed
+    ! From what I understand with this vector/field distinction is that
+    ! ultimately the design will only contain the GLL pts inside the
+    ! the optimization domain, correct?
+    !
+    ! If this is the case, then this function makes no sense since it forces
+    ! the vector and field to be the same size.
+    !
+    ! Alternatively, this vector/field distinction is just to make the types
+    ! compatible with MMA, in which case we can continue how things are here.
+    !
+    ! In any case, it's a bit confusing and we should throw an error if the
+    ! sizes are different
     call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    if (vec%n .ne. work%size()) then
+        call neko_error('vector and field are of incompatible dimension')
+    end if
 
     ! fill background fld
     call field_cfill(work, const)
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_copy_mask(work%x_d, vec%x_d, vec%n, mask%mask_d, &
+        call device_copy_mask(work%x_d, vec%x_d, work%size(), mask%mask_d, &
             mask%size)
     else
        do i = 1, mask%size

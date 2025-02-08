@@ -234,6 +234,8 @@ contains
         end if
     end if
 
+    print *, "DISS VALUE", this%value
+
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_update_value
