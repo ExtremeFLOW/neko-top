@@ -562,7 +562,7 @@ contains
     ! I would then also assume we would want the matrix of sensitivities to also
     ! exist on the device. So that's why I've adjusted in this way.
     !
-    ! I attempted something along the lines of 
+    ! I attempted something along the lines of
     !
     !    do i = 1, this%n_constraints
     !        call device_copy(sensitivity%x_d(1, i), &
@@ -581,7 +581,7 @@ contains
 
     do i = 1, this%n_constraints
        if (NEKO_BCKND_DEVICE .eq. 1) then
-           call device_memcpy( &
+          call device_memcpy( &
                this%constraint_list(i)%constraint%sensitivity%x, &
                this%constraint_list(i)%constraint%sensitivity%x_d, &
                this%n_design, DEVICE_TO_HOST, sync = .true.)
