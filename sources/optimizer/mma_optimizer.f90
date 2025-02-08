@@ -168,6 +168,7 @@ contains
             error stop
          end if
 
+         call this%design%map_forward()
          call problem%compute(this%design)
          call problem%compute_sensitivity(this%design)
 
@@ -189,7 +190,6 @@ contains
 
          call problem%write(iter)
 
-         call this%design%map_forward()
          call reset(problem%simulation%neko_case)
          ! TODO
          ! reset for the adjoint
