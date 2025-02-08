@@ -234,7 +234,7 @@ contains
     ! Initialize the mask
     if (this%if_mask) then
        this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(%
+            neko_point_zone_registry%get_point_zone(&
        optimization_domain_zone_name)
     end if
 
