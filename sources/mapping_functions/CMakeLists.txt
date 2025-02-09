@@ -1,9 +1,15 @@
-# Extend the Neko-TOP target with the math extension module
+# Extend the Neko-TOP target with the mapping functions
+# as well as their "adjoint" (chain rule)
 #
-# This module provides additional math functions for the Neko-TOP target.
+# Currently we only have
+# - linear
+# - RAMP (both convexities)
+# - PDE filter
 #
-# The math extension module is implemented in Fortran and CUDA. The CUDA
-# implementation is only compiled if the CUDAToolkit is available.
+# Possible extensions include
+# - exponential
+# - SIMP
+# - sigmoid/heavyside step
 
 target_sources(neko-top
     PUBLIC
