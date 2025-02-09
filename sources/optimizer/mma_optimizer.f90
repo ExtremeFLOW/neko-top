@@ -148,6 +148,8 @@ contains
            & ES25.17, ",", ES25.17)') &
            0, objective_value, constraint_value%x, &
            this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+      
+      call problem%write(0)
 
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
