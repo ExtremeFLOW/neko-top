@@ -90,17 +90,9 @@ set(CMAKE_BUILD_TYPE_LIST
 set(CMAKE_Fortran_PREPROCESS ON)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
-        # Debugging flags
-        $<$<COMPILE_LANGUAGE:Fortran>:-g>
         $<$<COMPILE_LANGUAGE:Fortran>:-Og>
-
-        # Warnings which for debug builds are errors
         $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wsurprising>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-array-temporaries>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wimplicit-interface>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>

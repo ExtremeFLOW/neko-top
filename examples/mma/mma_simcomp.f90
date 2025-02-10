@@ -41,8 +41,7 @@ module mma_simcomp
   use logger, only: neko_log
   use mma, only: mma_t
   use comm, only: neko_comm, mpi_real_precision
-  use mpi_f08, only: MPI_INTEGER, MPI_Allreduce, MPI_SUM, MPI_COMM_WORLD, &
-       MPI_Comm_size, MPI_Gatherv, MPI_Comm_rank, MPI_Allgather
+  use mpi_f08, only: MPI_INTEGER, MPI_Allreduce, MPI_SUM, MPI_COMM_WORLD
   implicit none
   private
 

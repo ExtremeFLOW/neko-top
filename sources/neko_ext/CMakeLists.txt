@@ -17,5 +17,4 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_ext.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/develop.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/json_utils_ext.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/lapack_interfaces.f90
 )
