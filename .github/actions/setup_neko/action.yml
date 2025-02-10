@@ -90,19 +90,12 @@ runs:
     # ------------------------------------------------------------------------ #
     # Setup the system for building the Neko library
 
-    - name: Get system cache
-      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: autotools-dev automake autoconf openmpi-bin pkg-config \
-          liblapack-dev libopenblas-dev
-        version: 1.0
-
-    - name: Setup non-cache dependencies
+    - name: Install system dependencies
       # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt-get install -y libopenmpi-dev
+        sudo apt install autotools-dev automake autoconf openmpi-bin \
+          pkg-config liblapack-dev libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
     # Clone and build the Neko library
