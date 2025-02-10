@@ -149,6 +149,8 @@ contains
            0, objective_value, constraint_value%x, &
            this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
 
+      call problem%write(0)
+
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
 
@@ -168,6 +170,7 @@ contains
             error stop
          end if
 
+         call this%design%map_forward()
          call problem%compute(this%design)
          call problem%compute_sensitivity(this%design)
 
@@ -189,7 +192,6 @@ contains
 
          call problem%write(iter)
 
-         call this%design%map_forward()
          call reset(problem%simulation%neko_case)
          ! TODO
          ! reset for the adjoint
