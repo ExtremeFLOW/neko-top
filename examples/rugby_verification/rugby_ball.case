@@ -4,7 +4,7 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": true,
+        "output_boundary": false,
         "end_time": 0.1,
         "timestep": 1e-4,
         "numerics": {
@@ -23,12 +23,7 @@
                 {
                     "type": "no_slip",
                     "zone_indices": [ 1, 2 ]
-                },
-                // {
-                //     "type": "velocity_value",
-                //     "value": [ 0, 0, 0 ],
-                //     "zone_indices": [ 2 ]
-                // }
+                }
             ],
         },
         "fluid": {
@@ -99,7 +94,6 @@
             {
                 "type": "lube_term",
                 "weight": 1.0,
-                // "mask_name": "optimization_domain",
                 "K": 1.0
             }
         ],

@@ -63,7 +63,7 @@ contains
     class(point_zone_t), intent(inout) :: mask
     real(kind=rp), intent(in) :: const
     type(field_t), pointer :: work
-    integer :: temp_indices(1)
+    integer :: temp_indices(1), i
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
@@ -74,7 +74,9 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_error('GPU not supported for masks yet')
     else
-       call masked_copy(work%x, vec%x, mask%mask, work%size(), mask%size)
+       do i = 1, mask%size
+          work%x(mask%mask(i), 1, 1, 1) = vec%x(mask%mask(i))
+       end do
     end if
 
     ! copy over

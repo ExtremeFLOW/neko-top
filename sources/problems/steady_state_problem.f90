@@ -113,15 +113,8 @@ contains
   subroutine steady_state_problem_init_base(this)
     class(steady_state_problem_t), intent(inout) :: this
 
-    ! append a steady state simcomp
-    this%C%usr%init_user_simcomp => steady_state_simcomp
-    ! call user_setup(this%C%usr)
-
-
-    ! initialize the primal
-    call neko_init(this%C)
-    ! initialize the adjoint
-    call adjoint_init(this%adj, this%C)
+    call this%simulation%init()
+    call this%init_base(this%simulation%fluid_scheme%dm_Xh%size())
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
@@ -140,6 +133,7 @@ contains
 
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     ! Point the design to your own design
     this%design => design
 
@@ -151,6 +145,30 @@ contains
          this%C%fluid%c_Xh)
     ! append brinkman source term to the forward problem
     call this%C%fluid%source_term%add(forward_brinkman)
+=======
+    !> TODO
+    ! we need a `objective_list` which is allocatable and contains a factory
+    ! to fill itself up with from the JSON
+    ! for now, I'm hardcoding these two
+    ! class(objective_t), allocatable :: objective_function
+    ! class(constraint_t), allocatable :: volume_constraint
+
+    ! init the design
+    call design%init(this%simulation%neko_case%params, this%simulation%fluid_scheme%c_Xh)
+
+    ! init the simple brinkman term for the forward problem
+    call forward_brinkman%init_from_components( &
+         this%simulation%fluid_scheme%f_x, &
+         this%simulation%fluid_scheme%f_y, &
+         this%simulation%fluid_scheme%f_z, &
+         design, &
+         this%simulation%fluid_scheme%u, &
+         this%simulation%fluid_scheme%v, &
+         this%simulation%fluid_scheme%w, &
+         this%simulation%fluid_scheme%c_Xh)
+    ! append brinkman source term to the forward problem
+    call this%simulation%fluid_scheme%source_term%add(forward_brinkman)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
@@ -225,11 +243,20 @@ contains
     ! - sensitivity (dF/d\chi and dC/d\chi)    11, 12            s6,s7
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call this%output%init(sp, 'optimization', 13)
     call this%output%fields%assign(1, this%C%fluid%p)
     call this%output%fields%assign(2, this%C%fluid%u)
     call this%output%fields%assign(3, this%C%fluid%v)
     call this%output%fields%assign(4, this%C%fluid%w)
+=======
+    ! Allocate the output type
+    call this%output%init(sp, 'optimization', 10)
+    call this%output%fields%assign(1, this%simulation%fluid_scheme%p)
+    call this%output%fields%assign(2, this%simulation%fluid_scheme%u)
+    call this%output%fields%assign(3, this%simulation%fluid_scheme%v)
+    call this%output%fields%assign(4, this%simulation%fluid_scheme%w)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
     ! I don't know why these ones need assign_to_field?
     call this%output%fields%assign_to_field(5, design%design_indicator)
     call this%output%fields%assign(6, this%adj%scheme%u_adj)
