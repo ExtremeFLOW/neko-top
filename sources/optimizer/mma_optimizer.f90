@@ -238,8 +238,9 @@ contains
               constraint_sensitivities%x)
 
          write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-              & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
-              this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+              & ES25.17, ",", ES25.17)') iter, objective_value, &
+              constraint_value%x, this%mma%get_residumax(), &
+              this%mma%get_residunorm(), scalingfactor
 
          ! Flush the buffer to write the data during the run
          flush(1368)
