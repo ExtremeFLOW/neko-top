@@ -35,6 +35,7 @@ submodule (mma) mma_cpu
   use mpi_f08, only: MPI_REAL, MPI_IN_PLACE, mpi_min, mpi_max
   use utils, only: neko_error
   use comm, only: neko_comm, mpi_real_precision
+  use lapack_interfaces, only: dgesv
 
 contains
 

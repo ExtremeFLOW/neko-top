@@ -198,7 +198,7 @@ contains
     ! Determine the number of nodes in the facet
     N_nodes = 0
     select type (ele => C%msh%elements(element_id)%e)
-      type is (hex_t)
+    type is (hex_t)
        N_nodes = 4
     end select
 
@@ -217,7 +217,7 @@ contains
 
     ! Get the nodes
     select type (ele => C%msh%elements(element_id)%e)
-      type is (hex_t)
+    type is (hex_t)
        call ele%facet_order(t_hex, facet_id)
        do n = 1, N_nodes
           v = t_hex%x(n)

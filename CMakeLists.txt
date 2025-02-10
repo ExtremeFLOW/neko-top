@@ -90,7 +90,11 @@ set(CMAKE_BUILD_TYPE_LIST
 set(CMAKE_Fortran_PREPROCESS ON)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
+        # Debugging flags
+        $<$<COMPILE_LANGUAGE:Fortran>:-g>
         $<$<COMPILE_LANGUAGE:Fortran>:-Og>
+
+        # Warnings which for debug builds are errors
         $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
