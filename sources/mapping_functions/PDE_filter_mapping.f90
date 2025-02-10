@@ -227,7 +227,6 @@ contains
        this%coef%h1 = this%r**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
-       end do
     end if
     this%coef%ifh2 = .true.
 
