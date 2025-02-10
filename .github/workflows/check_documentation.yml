@@ -11,10 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Setup system
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: git cmake doxygen graphviz
-          version: 1.0
+        shell: bash
+        run: |
+          sudo apt install git cmake doxygen graphviz
 
       - name: Checkout
         uses: actions/checkout@v4
