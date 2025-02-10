@@ -58,7 +58,7 @@ runs:
           gslib-${{ inputs.version }}-${{ inputs.os }}
 
     - name: Clone
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -72,7 +72,7 @@ runs:
     # Setup the system for building the GSLib library
 
     - name: Get system cache
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
@@ -82,7 +82,7 @@ runs:
     # Configure, build, and install the GSLib library.
 
     - name: Build
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -92,7 +92,7 @@ runs:
         make CC=mpicc DESTDIR=$INSTALL_DIR -j
 
     - name: Install
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -105,7 +105,7 @@ runs:
     # Cleanup the working directory if necessary and set the output.
 
     - name: Cleanup
-      if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-gslib.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
