@@ -72,7 +72,7 @@ runs:
         key: json-fortran-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.compiler }}
 
     - name: Clone
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -85,7 +85,7 @@ runs:
     # Setup system dependencies for the JSON-Fortran library.
 
     - name: Setup system dependencies
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: cmake ninja-build ${{ inputs.compiler }}
@@ -95,7 +95,7 @@ runs:
     # Configure, build, and install the JSON-Fortran library.
 
     - name: Configure
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
@@ -111,7 +111,7 @@ runs:
           -DSKIP_DOC_GEN=ON
 
     - name: Build
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -119,7 +119,7 @@ runs:
       run: cmake --build $WORKING_DIR/build --config Release $BUILD_OPTIONS
 
     - name: Install
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -131,7 +131,7 @@ runs:
     # Cleanup and set the output.
 
     - name: Cleanup
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
