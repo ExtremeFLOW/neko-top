@@ -86,10 +86,9 @@ runs:
 
     - name: Setup system dependencies
       # if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
-      uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: cmake ninja-build ${{ inputs.compiler }}
-        version: 1.0
+      shell: bash
+      run: |
+        sudo apt install cmake ninja-build ${{ inputs.compiler }}
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the JSON-Fortran library.
