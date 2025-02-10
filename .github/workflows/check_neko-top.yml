@@ -92,17 +92,18 @@ jobs:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
 
-  # -------------------------------------------------------------------------- #
-  # Define the compilation and testing job that will be run in this workflow.
-  # This job will build and test the Neko-TOP code.
-  # -------------------------------------------------------------------------- #
 
+  # -------------------------------------------------------------------------- #
   # This job will check the documentation.
+
   neko-top-documentation:
     name: Documentation
     uses: ./.github/workflows/check_documentation.yml
 
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
+
   neko-top-debug:
     name: Test Neko-TOP
     runs-on: ubuntu-latest
