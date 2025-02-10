@@ -98,14 +98,8 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_formatting.yml
 
-  check_documentation:
-    name: Documentation
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_documentation.yml
-
-  check_compilation:
-    name: Compilation
+  check_neko-top:
+    name: Neko-TOP Library
     needs:
       - prepare
     uses: ./.github/workflows/check_neko-top.yml
@@ -125,15 +119,14 @@ jobs:
       - prepare
       - check_lint
       - check_format
-      - check_documentation
-      - check_compilation
+      - check_neko-top
 
     runs-on: ubuntu-latest
     env:
       draft_status: ${{ needs.prepare.result }}
       flint_status: ${{ needs.check_lint.result }}
       format_status: ${{ needs.check_format.result }}
-      compile_status: ${{ needs.check_compilation.result }}
+      compile_status: ${{ needs.check_neko-top.result }}
       documentation_status: ${{ needs.check_documentation.result }}
 
     steps:
