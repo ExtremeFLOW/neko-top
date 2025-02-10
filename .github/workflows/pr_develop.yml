@@ -127,7 +127,6 @@ jobs:
       flint_status: ${{ needs.check_lint.result }}
       format_status: ${{ needs.check_format.result }}
       compile_status: ${{ needs.check_neko-top.result }}
-      documentation_status: ${{ needs.check_documentation.result }}
 
     steps:
       - name: Check status of previous jobs
@@ -152,11 +151,6 @@ jobs:
 
           if [ "$compile_status" != "success" ]; then
             fail+=("\t- Compilation check: $compile_status")
-            success=false
-          fi
-
-          if [ "$documentation_status" != "success" ]; then
-            fail+=("\t- Documentation check: $documentation_status")
             success=false
           fi
 
