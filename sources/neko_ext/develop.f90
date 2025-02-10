@@ -60,7 +60,7 @@ contains
     real(kind=rp) :: a
 
     ! Internal variables
-    real(kind=rp), dimension(3) :: v1
+    real(kind=rp), dimension(3) :: v1, e1, e2, tmp
     real(kind=rp) :: cp(3)
     integer :: v
 
@@ -70,7 +70,10 @@ contains
     v1 = vertices(:, 1)
     cp = 0.0
     do v = 2, nv - 1
-       cp = cp + 0.5 * cross((vertices(:, v) - v1), (vertices(:, v + 1) - v1))
+       e1 = (vertices(:, v) - v1)
+       e2 = (vertices(:, v + 1) - v1)
+       tmp = cross(e1, e2)
+       cp = cp + 0.5 * tmp
     end do
 
     a = sqrt(dot(cp, cp))
@@ -286,9 +289,8 @@ contains
     call interpolator%find_points_xyz(facet_centers, N_facets)
     call interpolator%evaluate(temperature_local, neko_case%scalar%s%x)
 
-    temperature_mean = average_weighted( &
-         temperature_local - target_temperature, &
-         facet_area)
+    temperature_local = temperature_local - target_temperature
+    temperature_mean = average_weighted(temperature_local, facet_area)
 
     write (log_buf, '(a,f15.7)') &
          "Outlet area-weighted average temperature deviation: ", &
