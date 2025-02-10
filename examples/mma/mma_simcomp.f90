@@ -40,7 +40,6 @@ module mma_simcomp
   use simulation_component, only: simulation_component_t
   use field, only: field_t
   use logger, only: neko_log
-  ! use mma, only: mma_t
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mma, only: mma_t, mma_factory

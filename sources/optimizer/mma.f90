@@ -39,6 +39,7 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
+  use comm, only : pe_rank
   
   implicit none
   private
@@ -117,7 +118,7 @@ module mma
      !! @param object The object to be allocated by the factory.
      module subroutine mma_factory(object, backnd)
        class(mma_t), allocatable, intent(inout) :: object
-       character(len=:), allocatable :: backnd
+       character(len=:), allocatable, intent(in)  :: backnd
      end subroutine mma_factory
   end interface
   public :: mma_factory
@@ -198,7 +199,9 @@ module mma
     xmin = xmin_const
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
-    print *,"Initializing MMA backend to >>> ", backnd
+    if (pe_rank .eq. 0) then
+       print *,"Initializing MMA backend to >>> ", backnd
+    end if
     call mma_factory(mma,backnd)
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json

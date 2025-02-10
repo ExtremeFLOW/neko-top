@@ -87,19 +87,19 @@
         }
     }, 
     "mma": {
-    	"max_iter": 100,
-    	"backend": "cpu",
-    	"asyinit": 0.5,
-    	"asyincr": 1.2,
-    	"asydecr": 0.7,
-    	"m": 2,
-    	"scale": 1.0,
-    	"auto_scale": false,
-    	"xmin": 0.00,
-    	"xmax": 10.0,
-    	"a0": 1.0,
-    	"a": 0.0,
-    	"c": 10000.0,
-    	"d": 0.0
+        "max_iter": 100,
+        "backend": "cpu",
+        "asyinit": 0.5,
+        "asyincr": 1.2,
+        "asydecr": 0.7,
+        "m": 2,
+        "scale": 1.0,
+        "auto_scale": false,
+        "xmin": 0.00,
+        "xmax": 10.0,
+        "a0": 1.0,
+        "a": 0.0,
+        "c": 10000.0,
+        "d": 0.0
     }
 }
