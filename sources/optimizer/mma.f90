@@ -118,7 +118,7 @@ module mma
      !! @param object The object to be allocated by the factory.
      module subroutine mma_factory(object, backnd)
        class(mma_t), allocatable, intent(inout) :: object
-       character(len=:), allocatable, intent(in)  :: backnd
+       character(len=*), intent(in)  :: backnd
      end subroutine mma_factory
   end interface
   public :: mma_factory
