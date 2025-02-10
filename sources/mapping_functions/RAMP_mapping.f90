@@ -187,14 +187,14 @@ contains
     ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) )
 
     n = X_in%dof%size()
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+            X_out%x_d, X_in%x_d, n)
+    else
        do i = 1, n
           X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
                X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
        end do
-    else
-       call device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
-            X_out%x_d, X_in%x_d, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply
@@ -218,15 +218,15 @@ contains
 
     n = X_in%dof%size()
 
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+    else
        do i = 1, n
           dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
                ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
                dF_dX_out%x(i,1,1,1)
        end do
-    else
-       call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
-            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply_backward
@@ -244,14 +244,14 @@ contains
 
     n = X_in%dof%size()
 
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+            X_out%x_d, X_in%x_d, n)
+    else
        do i = 1, n
           X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
                X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
        end do
-    else
-       call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
-            X_out%x_d, X_in%x_d, n)
     end if
 
 
@@ -276,15 +276,15 @@ contains
 
     n = X_in%dof%size()
 
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+    else
        do i = 1, n
           dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
                ( (X_in%x(i,1,1,1) + q)**2) * &
                dF_dX_out%x(i,1,1,1)
        end do
-    else
-       call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
-            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
     end if
 
   end subroutine convex_up_RAMP_mapping_apply_backward
