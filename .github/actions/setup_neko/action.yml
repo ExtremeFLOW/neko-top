@@ -91,7 +91,7 @@ runs:
     # Setup the system for building the Neko library
 
     - name: Get system cache
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
+      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: autotools-dev automake autoconf openmpi-bin pkg-config \
@@ -99,7 +99,7 @@ runs:
         version: 1.0
 
     - name: Setup non-cache dependencies
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }} && ${{ inputs.os == 'ubuntu-latest' }}
+      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         sudo apt-get install -y libopenmpi-dev
@@ -110,7 +110,7 @@ runs:
     # This step clones the Neko library and builds it.
 
     - name: Clone neko
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -120,7 +120,7 @@ runs:
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
     - name: Configure and install neko
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
@@ -143,7 +143,7 @@ runs:
     # This step cleans up the working directory and sets the output.
 
     - name: Cleanup
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
