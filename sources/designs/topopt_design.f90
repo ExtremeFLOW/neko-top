@@ -206,7 +206,7 @@ contains
     ! for now, make it a cylinder by hand
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
-    call rzero(this%design_indicator%x, this%design_indicator%dof%size())
+    this%design_indicator%x = 0.0_rp
 
     n = this%design_indicator%dof%size()
     do i = 1, n
