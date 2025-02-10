@@ -108,9 +108,6 @@ jobs:
     name: Compilation
     needs:
       - prepare
-      - check_lint
-      - check_format
-      - check_documentation
     uses: ./.github/workflows/check_neko-top.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
