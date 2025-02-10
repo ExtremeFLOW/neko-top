@@ -91,7 +91,7 @@ runs:
     # Setup the system for building the Neko library
 
     - name: Install system dependencies
-      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
         sudo apt install autotools-dev automake autoconf openmpi-bin \
@@ -103,7 +103,7 @@ runs:
     # This step clones the Neko library and builds it.
 
     - name: Clone neko
-      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
@@ -113,7 +113,7 @@ runs:
         git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
 
     - name: Configure and install neko
-      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
@@ -136,7 +136,7 @@ runs:
     # This step cleans up the working directory and sets the output.
 
     - name: Cleanup
-      # if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
+      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
