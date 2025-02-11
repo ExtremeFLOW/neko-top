@@ -124,6 +124,7 @@ CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
+cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build

@@ -51,7 +51,6 @@ endif()
 # Options
 
 option(BUILD_DOCS "Build documentation" OFF)
-option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_TESTING "Build the tests" OFF)
 
 # Advanced options
@@ -204,9 +203,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
 # Build the examples
 # ============================================================================ #
 
-if (BUILD_EXAMPLES)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
 # ============================================================================ #
 # Build the tests
@@ -236,7 +233,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "Current configuration:")
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
-    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
     message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
