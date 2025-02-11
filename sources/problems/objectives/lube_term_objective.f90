@@ -166,7 +166,7 @@ contains
     call this%init_base(design%size(), weight, mask_name)
 
     ! Assign the name to objective
-    this%log_name = "out of plane stresses"
+    this%log_name = log_name 
 
     ! Set the coefficient for the lube term
     this%K = K
