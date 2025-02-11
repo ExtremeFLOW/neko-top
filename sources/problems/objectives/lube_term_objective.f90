@@ -101,7 +101,7 @@ module lube_term_objective
 
      type(field_t), pointer :: u, v, w
      real(kind=rp), pointer :: B(:,:,:,:)
-     type(c_ptr), pointer :: B_d = C_NULL_PTR
+     type(c_ptr) :: B_d = C_NULL_PTR
      type(field_t), pointer :: brinkman_amplitude
 
    contains
@@ -178,7 +178,7 @@ contains
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
     this%B => simulation%neko_case%fluid%c_Xh%B
-    this%B_d => simulation%neko_case%fluid%c_Xh%B_d
+    this%B_d = simulation%neko_case%fluid%c_Xh%B_d
 
     ! if we have the lube term we need to initialize and append that too
 
