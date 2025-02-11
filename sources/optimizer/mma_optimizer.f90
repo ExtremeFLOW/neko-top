@@ -26,6 +26,7 @@ module mma_optimizer
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
+  use json_utils_ext, only: json_get_subdict
 
   implicit none
   private
@@ -70,7 +71,9 @@ contains
     type(simulation_t), intent(in) :: simulation
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
+
     type(vector_t) :: x
+    type(json_file) :: solver_parameters
 
     call x%init(design%size())
 
@@ -83,10 +86,10 @@ contains
 
     print *, "Initializing mma_optimizer with steady_state_problem_t."
 
+    call json_get_subdict(parameters, "optimization.solver", solver_parameters)
     call this%mma%init_json(x%x, &
          design%size(), problem%get_n_constraints(), &
-         parameters, this%scale, &
-         this%auto_scale)
+         solver_parameters, this%scale, this%auto_scale)
 
     call this%init_from_components(problem, design, simulation, &
          max_iterations, tolerance)
