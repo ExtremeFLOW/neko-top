@@ -1,14 +1,14 @@
 module json_utils_ext
-
+  use mpi_f08, only: MPI_Comm_rank, MPI_Initialized, MPI_Bcast, &
+       MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER
   use json_file_module, only: json_file
   use json_value_module, only: json_value
   use utils, only: neko_error, filename_suffix
 
-  use mpi_f08, only: MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER, MPI_Bcast, MPI_Comm_rank
   implicit none
   private
 
-  public :: json_key_fallback, json_get_subdict, read_case
+  public :: json_key_fallback, json_get_subdict, json_read_file
 
 contains
 
@@ -57,32 +57,54 @@ contains
 
   end subroutine json_get_subdict
 
-  function read_case(filename) result(case_params)
+  !> Read a json file taking mpi into account.
+  !! This function reads a json file and broadcasts it to all ranks.
+  !! @params[in] filename The name of the file to read.
+  !! @return The json object.
+  function json_read_file(filename) result(json)
     character(len=*), intent(in) :: filename
-    type(json_file) :: case_params
+    type(json_file) :: json
 
-    integer :: pe_rank, ierr, length
+    logical :: mpi_is_initialized
+    integer :: rank, ierr, length
     character(len=:), allocatable :: json_buffer
-    ! character(len=4) :: suffix
-    ! logical :: mpi_is_initialized
+    character(len=4) :: suffix
 
-    pe_rank = 0
-    call MPI_Comm_rank(MPI_COMM_WORLD, pe_rank, ierr)
+    ! Check if the file is a json or Neko case file.
+    call filename_suffix(filename, suffix)
 
-    if (pe_rank .eq. 0) then
-       call case_params%load_file(filename = trim(filename))
-       call case_params%print_to_string(json_buffer)
-       length = len(json_buffer)
+    if (trim(suffix) .ne. 'json' .and. trim(suffix) .ne. 'case' ) then
+       call neko_error('Invalid case file')
     end if
 
+    ! Initialize the mpi variables.
+    rank = 0
+    mpi_is_initialized = .false.
 
-    call MPI_Bcast(length, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
-    if (pe_rank .ne. 0) allocate(character(len = length) :: json_buffer)
-    call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierr)
-    call case_params%load_from_string(json_buffer)
+    ! Check if MPI is initialized and get the rank if it is.
+    call MPI_Initialized(mpi_is_initialized, ierr)
+    if (mpi_is_initialized) call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+
+    ! Read the json file and broadcast it to all ranks.
+    if (rank .eq. 0) then
+       call json%load_file(filename = trim(filename))
+    end if
+
+    ! Serialize the json object to a string so it can be broadcast.
+    if (mpi_is_initialized) then
+       if (rank .eq. 0) call json%print_to_string(json_buffer)
+
+       length = len(json_buffer)
+       call MPI_Bcast(length, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+
+       if (rank .ne. 0) allocate(character(len=length) :: json_buffer)
+       call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, &
+            ierr)
+    end if
+
+    call json%load_from_string(json_buffer)
     deallocate(json_buffer)
 
-  end function read_case
-
+  end function json_read_file
 
 end module json_utils_ext
