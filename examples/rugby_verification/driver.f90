@@ -1,26 +1,26 @@
 program usrneko
-  use mma_optimizer, only : mma_optimizer_t
-  use steady_state_problem, only: steady_state_problem_t
+  use simulation, only: simulation_t
   use topopt_design, only: topopt_design_t
+  use steady_state_problem, only: steady_state_problem_t
+  use mma_optimizer, only : mma_optimizer_t
 
-  use num_types, only : rp
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init, MPI_Finalize, MPI_Comm_rank, MPI_COMM_WORLD
-
+  use mpi_f08, only: MPI_Init
   implicit none
 
   ! JSON related arguments
   integer :: argc
   type(json_file) :: parameters
   character(len=256) :: parameter_file
-  real(kind=rp) :: tolerance
 
   ! MPI parameters
-  integer :: mpi_rank, ierr, max_iter
+  integer :: ierr
 
+  !> The simulation we are working with
+  type(simulation_t) :: simulation
   !> The problem type
   type(steady_state_problem_t) :: problem
   !> The design type
@@ -32,7 +32,6 @@ program usrneko
   ! Initialize the MPI environment
 
   call MPI_Init(ierr)
-  call MPI_Comm_rank(MPI_COMM_WORLD, mpi_rank, ierr)
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -47,27 +46,22 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
-  ! init the problem (base)
-  call problem%init()
-
-  ! init the problem, with the design
-  call problem%init_design(design)
-
-  ! init the optimizer
-  call optimizer%init(problem, design)
+  call simulation%init(parameters)
+  call design%init(parameters, simulation)
+  call problem%init(parameters, simulation, design)
+  call optimizer%init(parameters, simulation, problem, design)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
 
-  tolerance = 1.0e-3_rp
-  max_iter = 5
-  call optimizer%run(problem, tolerance, max_iter)
+  call optimizer%run(simulation, problem, design)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
+  call optimizer%free()
   call problem%free()
   call design%free()
-  call optimizer%free()
+  call simulation%free()
 
 end program usrneko

@@ -45,7 +45,8 @@ module topopt_design
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use design, only: design_t
-
+  use simulation, only: simulation_t
+  use json_module, only: json_file
   implicit none
   private
 
@@ -184,18 +185,20 @@ module topopt_design
 
 contains
 
-  subroutine topopt_design_init(this, json, coef)
-    class(topopt_design_t), target, intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    type(coef_t), intent(inout) :: coef
+  subroutine topopt_design_init(this, parameters, simulation)
+    class(topopt_design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
 
-    ! init the fields
-    call this%design_indicator%init(coef%dof, "design_indicator")
-    call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
-    call this%sensitivity%init(coef%dof, "sensitivity")
-    call this%filtered_design%init(coef%dof, "filtered_design")
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      ! init the fields
+      call this%design_indicator%init(coef%dof, "design_indicator")
+      call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
+      call this%sensitivity%init(coef%dof, "sensitivity")
+      call this%filtered_design%init(coef%dof, "filtered_design")
+    end associate
 
     ! TODO
     ! this is where we steal basically everything in
@@ -215,7 +218,7 @@ contains
 
     ! TODO, of course when we move all of Tim's stuff for initialization of
     ! the initial design field we'll be reading things properly from the JSON.
-    ! call json_get(json, 'name', optimization_domain_zone_name)
+    ! call json_get(parameters, 'name', optimization_domain_zone_name)
     ! Right now, I'm hardcoding the name of the point zone.
     this%if_mask = .true.
     optimization_domain_zone_name = "optimization_domain"
@@ -267,8 +270,10 @@ contains
     ! parameters etc about filtering and mapping
     ! ie,
     ! call mapper%init(this woud be from JSON)
-    call this%filter%init(json, coef)
-    call this%mapping%init(json, coef)
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      call this%filter%init(parameters, coef)
+      call this%mapping%init(parameters, coef)
+    end associate
 
     ! and then we would map for the first one
     call this%map_forward()
@@ -284,9 +289,9 @@ contains
     ! obviously when we do the mappings properly, to many coeficients,
     ! we'll also have to modify this
     call this%output%init(sp, 'design', 3)
-    call this%output%fields%assign(1, this%design_indicator)
-    call this%output%fields%assign(2, this%brinkman_amplitude)
-    call this%output%fields%assign(3, this%sensitivity)
+    call this%output%fields%assign_to_field(1, this%design_indicator)
+    call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
+    call this%output%fields%assign_to_field(3, this%sensitivity)
 
     call this%init_base(n)
   end subroutine topopt_design_init

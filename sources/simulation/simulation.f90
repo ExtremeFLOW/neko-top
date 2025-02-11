@@ -74,8 +74,9 @@ module simulation
 contains
 
   !> Initialize the simulation
-  subroutine simulation_init(this)
+  subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
 
@@ -92,7 +93,7 @@ contains
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
-    call json_extract_item(this%neko_case%params, &
+    call json_extract_item(parameters, &
          "case.simulation_components", 1, simcomp_settings)
 
     call steady_comp%init(simcomp_settings, this%neko_case)

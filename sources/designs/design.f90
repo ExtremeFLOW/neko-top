@@ -32,6 +32,8 @@
 
  ! Implements the `topopt_design_t` type.
 module design
+  use json_module, only: json_file
+  use simulation, only: simulation_t
   implicit none
   private
 
@@ -44,22 +46,34 @@ module design
 
    contains
 
+     !> Initialize the design
+     procedure(design_init), pass(this), public, deferred :: init
+
      !> Initialize the base design
-     procedure, pass(this), public :: init_base => design_init
+     procedure, pass(this), public :: init_base => design_init_base
 
      !> Return the number of design variables
      procedure, pass(this), public :: size => design_size
 
   end type design_t
 
+  abstract interface
+     subroutine design_init(this, parameters, simulation)
+       import design_t, simulation_t, json_file
+       class(design_t), intent(inout) :: this
+       type(json_file), intent(inout) :: parameters
+       type(simulation_t), intent(inout) :: simulation
+     end subroutine design_init
+  end interface
+
 contains
 
   !> Initialize the base design
-  subroutine design_init(this, n)
+  subroutine design_init_base(this, n)
     class(design_t), intent(inout) :: this
     integer, intent(in) :: n
     this%n = n
-  end subroutine design_init
+  end subroutine design_init_base
 
   !> Return the number of design variables
   pure function design_size(this) result(n)

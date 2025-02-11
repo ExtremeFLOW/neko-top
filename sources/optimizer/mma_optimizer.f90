@@ -6,6 +6,9 @@ module mma_optimizer
   use topopt_design, only: topopt_design_t
   use num_types, only : rp
   use utils, only : neko_error
+  use json_module, only: json_file
+  use simulation, only: simulation_t
+  use design, only: design_t
 
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -33,7 +36,11 @@ module mma_optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
      type(mma_t) :: mma
-     type(topopt_design_t), pointer :: design
+
+     !> Maximum number of iterations
+     integer :: max_iterations
+     !> Tolerance for the optimization loop
+     real(kind=rp) :: tolerance
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! Note that the values are not updated but they are scaled when passed
@@ -55,12 +62,23 @@ module mma_optimizer
 contains
 
   !> Initialize the MMA optimizer, associate it with a specific problem
-  subroutine mma_optimizer_init(this, problem, design)
+  subroutine mma_optimizer_init(this, parameters, simulation, problem, design)
     class(mma_optimizer_t), intent(inout) :: this
-    class(problem_t), intent(inout) :: problem
-    type(topopt_design_t), target, intent(in) :: design
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(in) :: simulation
+    class(problem_t), intent(in) :: problem
+    class(design_t), intent(in) :: design
 
-    this%design => design
+    type(topopt_design_t), pointer :: top_des
+    this%tolerance = 1.0e-3_rp
+
+    top_des => null()
+    select type (design)
+    type is (topopt_design_t)
+       top_des => design
+    class default
+       call neko_error('Unknown design type in the mma_optimizer_init')
+    end select
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
@@ -69,9 +87,9 @@ contains
 
        print *, "Initializing mma_optimizer with steady_state_problem_t."
 
-       call this%mma%init_json(design%design_indicator%x, &
-            problem%get_n_design(), problem%get_n_constraints(), &
-            problem%simulation%neko_case%params, this%scale, &
+       call this%mma%init_json(top_des%design_indicator%x, &
+            design%size(), problem%get_n_constraints(), &
+            parameters, this%scale, &
             this%auto_scale)
 
        print *, "scale = ", this%scale
@@ -84,28 +102,34 @@ contains
   end subroutine mma_optimizer_init
 
   ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, problem, tolerance, max_iter)
+  subroutine mma_optimizer_run(this, simulation, problem, design)
     class(mma_optimizer_t), intent(inout) :: this
+    type(simulation_t), intent(inout) :: simulation
     class(problem_t), intent(inout) :: problem
-    real(kind=rp), intent(in) :: tolerance
-    integer, intent(in) :: max_iter
+    class(design_t), intent(inout) :: design
 
     ! Check the type of the problem using select type
     select type (problem)
     type is (steady_state_problem_t)
-       call this%run_ss(problem, tolerance, max_iter)
+
+       select type (design)
+       type is (topopt_design_t)
+          call this%run_ss(simulation, problem, design)
+       class default
+          call neko_error('Unknown design type in the mma_optimizer_run')
+       end select
 
     class default
        call neko_error('Unknown problem type in the mma_optimizer_run')
     end select
   end subroutine mma_optimizer_run
 
-  subroutine mma_optimizer_run_steady_state_prob(this, problem, tolerance, &
-       max_iter)
+  subroutine mma_optimizer_run_steady_state_prob(this, simulation, problem, design)
     class(mma_optimizer_t), intent(inout) :: this
+    type(simulation_t), intent(inout) :: simulation
     class(steady_state_problem_t), intent(inout) :: problem
-    real(kind=rp), intent(in) :: tolerance
-    integer, intent(in) :: max_iter
+    class(topopt_design_t), intent(inout) :: design
+    integer :: max_iter
     integer :: iter, ierr, nglobal
     real(kind=rp) :: scalingfactor
 
@@ -120,10 +144,14 @@ contains
 
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
+    max_iter = 5
     print *, "max_iter for the optimization loop = ", max_iter
 
-    call problem%compute(this%design)
-    call problem%compute_sensitivity(this%design)
+    call simulation%run_forward()
+    call problem%compute(design)
+
+    call simulation%run_backward()
+    call problem%compute_sensitivity(design)
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -133,11 +161,11 @@ contains
     !Writing the optimization data in a separate file
     open(1368, file = "optimization_data.txt", status = "replace")
 
-    associate(x => this%design%design_indicator%x)
+    associate(x => design%design_indicator%x)
 
       ! Write n, m, and tolerance in the first line of optimization_data.txt
       write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-           nglobal, this%mma%get_m(), tolerance
+           nglobal, this%mma%get_m(), this%tolerance
 
       ! Write the header for the remaining data
       write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
@@ -152,7 +180,7 @@ contains
       call problem%write(0)
 
       do iter = 1, max_iter
-         if (this%mma%get_residumax() .lt. tolerance) exit
+         if (this%mma%get_residumax() .lt. this%tolerance) exit
 
          !Scaling
          if (this%auto_scale .eqv. .true.) then
@@ -162,17 +190,20 @@ contains
          end if
 
          if (NEKO_BCKND_DEVICE .eq. 0) then
-            call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
+            call this%mma%mma_update_cpu(iter, x, objective_sensitivities%x, &
                  constraint_value%x * scalingfactor, &
                  constraint_sensitivities%x*scalingfactor)
+            call design%map_forward()
          else
             write(stderr, *) "Device not supported in mma_optimizer.f90."
             error stop
          end if
 
-         call this%design%map_forward()
-         call problem%compute(this%design)
-         call problem%compute_sensitivity(this%design)
+         call simulation%run_forward()
+         call problem%compute(design)
+
+         call simulation%run_backward()
+         call problem%compute_sensitivity(design)
 
          call problem%get_objective_value(objective_value)
          call problem%get_constraint_values(constraint_value)
@@ -192,13 +223,13 @@ contains
 
          call problem%write(iter)
 
-         call reset(problem%simulation%neko_case)
+         call reset(simulation%neko_case)
          ! TODO
          ! reset for the adjoint
-         call field_rzero(problem%simulation%adjoint_case%scheme%u_adj)
-         call field_rzero(problem%simulation%adjoint_case%scheme%v_adj)
-         call field_rzero(problem%simulation%adjoint_case%scheme%w_adj)
-         problem%simulation%neko_case%fluid%freeze = .false.
+         call field_rzero(simulation%adjoint_case%scheme%u_adj)
+         call field_rzero(simulation%adjoint_case%scheme%v_adj)
+         call field_rzero(simulation%adjoint_case%scheme%w_adj)
+         simulation%neko_case%fluid%freeze = .false.
       end do
     end associate
 
