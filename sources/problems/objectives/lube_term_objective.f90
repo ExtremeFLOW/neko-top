@@ -234,7 +234,7 @@ contains
     call field_addcol3(work, this%w, this%brinkman_amplitude)
 
     if (this%has_mask) then
-       if (neko_bcknd_device .eq. 1) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call mask_exterior_const(work, this%mask, 0.0_rp)
