@@ -21,10 +21,10 @@ program usrneko
 
   !> The simulation we are working with
   type(simulation_t) :: simulation
-  !> The problem type
-  type(steady_state_problem_t) :: problem
   !> The design type
   type(topopt_design_t) :: design
+  !> The problem type
+  type(steady_state_problem_t) :: problem
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: optimizer
 
