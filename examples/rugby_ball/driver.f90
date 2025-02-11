@@ -49,12 +49,12 @@ program usrneko
   call simulation%init(parameters)
   call design%init(parameters, simulation)
   call problem%init(parameters, simulation, design)
-  call optimizer%init(parameters, simulation, problem, design)
+  call optimizer%init(parameters, problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
 
-  call optimizer%run(simulation, problem, design)
+  call optimizer%run(problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components

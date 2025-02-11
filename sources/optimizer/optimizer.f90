@@ -25,7 +25,8 @@ module optimizer
 
    contains
      !> Initialize the optimizer, associate it with a specific problem
-     procedure(optimizer_init), pass(this), public, deferred :: init
+     procedure(optimizer_init_from_json), pass(this), public, deferred :: &
+          init_from_json
      !> Run the optimization loop
      procedure(optimizer_run), pass(this), public, deferred :: run
      !> Free resources.
@@ -42,22 +43,23 @@ module optimizer
 
   abstract interface
      !> Interface for optimizer initialization
-     subroutine optimizer_init(this, parameters, simulation, problem, design)
+     subroutine optimizer_init_from_json(this, parameters, problem, design, &
+          simulation)
        import optimizer_t, json_file, simulation_t, problem_t, design_t
        class(optimizer_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
-       type(simulation_t), intent(in) :: simulation
        class(problem_t), intent(in) :: problem
        class(design_t), intent(in) :: design
-     end subroutine optimizer_init
+       type(simulation_t), intent(in) :: simulation
+     end subroutine optimizer_init_from_json
 
      !> Interface for running the optimization loop
-     subroutine optimizer_run(this, simulation, problem, design)
+     subroutine optimizer_run(this, problem, design, simulation)
        import optimizer_t, simulation_t, problem_t, design_t
        class(optimizer_t), intent(inout) :: this
-       type(simulation_t), intent(inout) :: simulation
        class(problem_t), intent(inout) :: problem
        class(design_t), intent(inout) :: design
+       type(simulation_t), intent(inout) :: simulation
      end subroutine optimizer_run
 
      !> Interface for freeing resources

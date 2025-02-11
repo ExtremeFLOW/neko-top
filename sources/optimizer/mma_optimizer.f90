@@ -7,6 +7,7 @@ module mma_optimizer
   use num_types, only : rp
   use utils, only : neko_error
   use json_module, only: json_file
+  use json_utils, only: json_get_or_default
   use simulation, only: simulation_t
   use design, only: design_t
 
@@ -47,7 +48,11 @@ module mma_optimizer
      logical :: auto_scale
    contains
      ! Override the deferred methods
-     procedure :: init => mma_optimizer_init
+     generic :: init => init_from_json, init_from_components
+     procedure, pass(this) :: init_from_json => mma_optimizer_init_from_json
+     procedure, pass(this) :: init_from_components => &
+          mma_optimizer_init_from_components
+
      procedure :: run => mma_optimizer_run
      procedure :: free => mma_optimizer_free
 
@@ -56,53 +61,68 @@ module mma_optimizer
 
 contains
 
-  !> Initialize the MMA optimizer, associate it with a specific problem
-  subroutine mma_optimizer_init(this, parameters, simulation, problem, design)
+  !> Initialize the MMA optimizer from JSON file
+  subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
+       simulation)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(in) :: simulation
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
+    type(simulation_t), intent(in) :: simulation
+
+    integer :: max_iterations
+    real(kind=rp) :: tolerance
 
     type(topopt_design_t), pointer :: top_des
 
-    call this%init_base(max_iterations = 5, tolerance = 1.0e-3_rp)
+    call json_get_or_default(parameters, "optimizer.max_iterations", &
+         max_iterations, 5)
+    call json_get_or_default(parameters, "optimizer.tolerance", &
+         tolerance, 1.0e-3_rp)
 
     top_des => null()
     select type (design)
     type is (topopt_design_t)
        top_des => design
     class default
-       call neko_error('Unknown design type in the mma_optimizer_init')
+       call neko_error('Unknown design type for MMA Optimizer')
     end select
 
-    ! Initialize MMA solver
-    ! Check the type of the problem using select type
-    select type (problem)
-    type is (steady_state_problem_t)
+    print *, "Initializing mma_optimizer with steady_state_problem_t."
 
-       print *, "Initializing mma_optimizer with steady_state_problem_t."
+    call this%mma%init_json(top_des%design_indicator%x, &
+         design%size(), problem%get_n_constraints(), &
+         parameters, this%scale, &
+         this%auto_scale)
 
-       call this%mma%init_json(top_des%design_indicator%x, &
-            design%size(), problem%get_n_constraints(), &
-            parameters, this%scale, &
-            this%auto_scale)
+    print *, "scale = ", this%scale
+    print *, "auto_scale = ", this%auto_scale
 
-       print *, "scale = ", this%scale
-       print *, "auto_scale = ", this%auto_scale
-    class default
+    call this%init_from_components(problem, design, simulation, &
+         max_iterations, tolerance)
 
-       call neko_error('Unknown problem type in the mma_optimizer_init')
-    end select
+  end subroutine mma_optimizer_init_from_json
 
-  end subroutine mma_optimizer_init
-
-  ! Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, simulation, problem, design)
+  !> Initialize the MMA optimizer from JSON file
+  subroutine mma_optimizer_init_from_components(this, problem, design, &
+       simulation, max_iterations, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
-    type(simulation_t), intent(inout) :: simulation
+    class(problem_t), intent(in) :: problem
+    class(design_t), intent(in) :: design
+    type(simulation_t), intent(in) :: simulation
+    integer, intent(in) :: max_iterations
+    real(kind=rp), intent(in) :: tolerance
+
+    call this%init_base(max_iterations, tolerance)
+
+  end subroutine mma_optimizer_init_from_components
+
+  !> Define the optimization loop for MMA
+  subroutine mma_optimizer_run(this, problem, design, simulation)
+    class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(inout) :: design
+    type(simulation_t), intent(inout) :: simulation
 
     ! Check the type of the problem using select type
     select type (problem)
