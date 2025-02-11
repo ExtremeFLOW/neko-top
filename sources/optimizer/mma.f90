@@ -38,94 +38,124 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
-  use comm, only : pe_rank
-  
+  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
+     mpi_min, mpi_max, MPI_IN_PLACE
+  use comm, only : pe_rank, neko_comm, mpi_real_precision
+  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+  use utils, only: neko_error
+
   implicit none
   private
 
-  !> Abstract type to compute pressure residual
-  type, public, abstract :: mma_t
+  type, public :: mma_t
+    private
     integer :: n, m, max_iter
-    real(kind=rp) :: residumax, residunorm
+    real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, residumax, &
+       residunorm
+    type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
+    logical :: is_initialized = .false.
+    logical :: is_updated = .false.
+    character(len=:), allocatable :: backnd
+
+    ! Internal dummy variables for MMA
+    type(vector_t) :: p0j, q0j
+    type(matrix_t) :: pij, qij
+    type(vector_t) :: bi
+
+    !---nesessary for KKT check after updating df0dx, fval, dfdx --------
+    real(kind=rp) :: z, zeta
+    type(vector_t) :: y, lambda, s, mu
+    type(vector_t) :: xsi, eta
    contains
     !> Interface for initializing the MMA object
-    procedure, public, nopass :: init_json => mma_init_json
+    procedure, public, pass(this) :: init_json => mma_init_json
     procedure, public, pass(this) :: get_n => mma_get_n
     procedure, public, pass(this) :: get_m => mma_get_m
     procedure, public, pass(this) :: get_residumax => mma_get_residumax
     procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
     procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
-    ! Add interfaces to the abstract type procedure
-    procedure(mma_init), pass(this), deferred :: init
-    procedure(mma_update), pass(this), deferred :: update
-    procedure(mma_KKT), pass(this), deferred :: KKT
-    procedure(mma_free), pass(this), deferred :: free
-
+    procedure, public, pass(this) :: init => mma_init_attributes
+    procedure, public, pass(this) :: free => mma_free
+    procedure, public, pass(this) :: KKT => mma_KKT
+    procedure, public, pass(this) :: update => mma_update
 
   end type mma_t
 
-  abstract interface
-    subroutine mma_init(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
-      import mma_t, rp, vector_t
+  interface
+    !! interface for cpu backend module subroutines
+    module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, &
+       xmin,  xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
       class(mma_t), intent(inout) :: this
+        integer, intent(in) :: n, m
+        real(kind=rp), intent(in), dimension(n) :: x
+        real(kind=rp), intent(in), dimension(n) :: xmax, xmin
+        real(kind=rp), intent(in), dimension(m) :: a, c, d
+        real(kind=rp), intent(in) :: a0
+        integer, intent(in), optional :: max_iter
+        real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, &
+           asydecr
+        ! character(len=:), allocatable, intent(in), optional :: backnd
+    end subroutine mma_init_attributes_cpu
+
+    module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
+      class(mma_t), intent(inout) :: this
+      integer, intent(in) :: iter
+      real(kind=rp), dimension(this%n), intent(inout) :: x
+      type(vector_t) :: df0dx, fval
+      type(matrix_t) :: dfdx
+    end subroutine mma_update_cpu
+
+    module subroutine mma_free_cpu(this)
+      class(mma_t), intent(inout) :: this
+    end subroutine mma_free_cpu
+
+    module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+      class(mma_t), intent(inout) :: this
+      real(kind=rp), dimension(this%n), intent(in) :: x
+      type(vector_t), intent(in) :: df0dx, fval
+      type(matrix_t), intent(in) :: dfdx
+    end subroutine mma_KKT_cpu
+
+
+    !! interface for device backend module subroutines
+    module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, &
+       xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+    class(mma_t), intent(inout) :: this
       integer, intent(in) :: n, m
       real(kind=rp), intent(in), dimension(n) :: x
-      ! type(vector_t), intent(in) :: x
       real(kind=rp), intent(in), dimension(n) :: xmax, xmin
       real(kind=rp), intent(in), dimension(m) :: a, c, d
       real(kind=rp), intent(in) :: a0
       integer, intent(in), optional :: max_iter
       real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-      character(len=:), allocatable, intent(in), optional :: backnd
-    end subroutine mma_init
+      ! character(len=:), allocatable, intent(in), optional :: backnd
+    end subroutine mma_init_attributes_device
 
-    subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
-      import mma_t, rp, matrix_t, vector_t
+    module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
       class(mma_t), intent(inout) :: this
       integer, intent(in) :: iter
       real(kind=rp), dimension(this%n), intent(inout) :: x
-      ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
-      ! real(kind=rp), dimension(this%m), intent(in) :: fval
-      ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
       type(vector_t) :: df0dx, fval
       type(matrix_t) :: dfdx
-    end subroutine mma_update
+    end subroutine mma_update_device
 
-    subroutine mma_KKT(this, x, df0dx, fval, dfdx)
-      import mma_t, rp, vector_t, matrix_t
+    module subroutine mma_free_device(this)
+      class(mma_t), intent(inout) :: this
+    end subroutine mma_free_device
+
+    module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
       class(mma_t), intent(inout) :: this
       real(kind=rp), dimension(this%n), intent(in) :: x
-      ! real(kind=rp), dimension(this%m), intent(in) :: fval
-      ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
-      ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
       type(vector_t), intent(in) :: df0dx, fval
       type(matrix_t), intent(in) :: dfdx
-    end subroutine mma_KKT
-    subroutine mma_free(this)
-      import mma_t
-      class(mma_t), intent(inout) :: this
-    end subroutine mma_free
+    end subroutine mma_KKT_device
+
   end interface
-
-
-  interface
-
-     !> Factory for the mma_t
-     !! @details Only selects the compute backend.
-     !! @param object The object to be allocated by the factory.
-     module subroutine mma_factory(object, backnd)
-       class(mma_t), allocatable, intent(inout) :: object
-       character(len=*), intent(in)  :: backnd
-     end subroutine mma_factory
-  end interface
-  public :: mma_factory
   
   contains 
 
-  subroutine mma_init_json( mma, x, n, m, json, scale, auto_scale)
+  subroutine mma_init_json( this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -137,8 +167,9 @@ module mma
     ! unnecessary extera computation of KKT norms for the   !
     ! initial design.                                       !
     ! ----------------------------------------------------- !
-    class(mma_t), allocatable :: mma
-
+    !class(mma_t), allocatable :: mma
+    ! class(mma_t), allocatable, intent(inout) :: this
+    class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
     ! type(vector_t), intent(in) :: x
@@ -158,7 +189,7 @@ module mma
 
     integer :: max_iter, n_global, ierr
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), allocatable :: backnd
+    ! character(len=:), allocatable :: backnd
 
     !! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
@@ -179,7 +210,7 @@ module mma
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
-    call json_get_or_default(json, 'mma.backend', backnd, 'cpu')
+    call json_get_or_default(json, 'mma.backend', this%backnd, 'cpu')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -200,15 +231,106 @@ module mma
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
     if (pe_rank .eq. 0) then
-       print *,"Initializing MMA backend to >>> ", backnd
+       print *,"Initializing MMA backend to >>> ", this%backnd
     end if
-    call mma_factory(mma,backnd)
+    ! call mma_factory(this,backnd)
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
-    call mma%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+    ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
+    !      max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+    call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
+       max_iter, epsimin, asyinit, asyincr, asydecr)
 
   end subroutine mma_init_json
+
+
+  subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
+       max_iter, epsimin, asyinit, asyincr, asydecr)
+    class(mma_t), intent(inout) :: this
+    integer, intent(in) :: n, m
+    real(kind=rp), intent(in), dimension(n) :: x
+    ! type(vector_t), intent(in) :: x
+    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
+    real(kind=rp), intent(in), dimension(m) :: a, c, d
+    real(kind=rp), intent(in) :: a0
+    integer, intent(in), optional :: max_iter
+    real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    ! character(len=:), allocatable, intent(in), optional :: backnd
+    
+    ! Select backend type
+    select case (this%backnd)
+    case ("cpu")
+       call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
+          max_iter, epsimin, asyinit, asyincr, asydecr)
+       if (pe_rank == 0) then
+          print *, "MMA initialized with CPU backend!"
+       end if
+    case ("cuda")
+       call mma_init_attributes_device(this, x, n, m, a0, a, c, d, xmin, xmax, &
+          max_iter, epsimin, asyinit, asyincr, asydecr)
+       if (pe_rank == 0) then
+          print *, "MMA initialized with CUDA backend!"
+       end if
+    case default
+       call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
+          max_iter, epsimin, asyinit, asyincr, asydecr)
+       if (pe_rank == 0) then
+          print *, "Unknown backend, MMA initialized with CPU backend!"
+       end if
+    end select
+
+  end subroutine mma_init_attributes
+
+  subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
+    class(mma_t), intent(inout) :: this
+    integer, intent(in) :: iter
+     real(kind=rp), dimension(this%n), intent(inout) :: x
+    type(vector_t) :: df0dx, fval
+    type(matrix_t) :: dfdx
+
+    ! Select backend type
+    select case (this%backnd )
+    case ("cpu")
+       call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
+    case ("cuda")
+       call mma_update_device(this, iter, x, df0dx, fval, dfdx)
+    case default
+       call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
+    end select
+  end subroutine mma_update
+
+  subroutine mma_free(this)
+    class(mma_t), intent(inout) :: this
+    
+    select case (this%backnd )
+    case ("cpu")
+       call mma_free_cpu(this)
+    case ("cuda")
+       call mma_free_device(this)
+    case default
+       call mma_free_cpu(this)
+    end select
+  end subroutine mma_free
+
+  subroutine mma_KKT(this, x, df0dx, fval, dfdx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: df0dx, fval
+    type(matrix_t), intent(in) :: dfdx
+
+    ! Select backend type
+    select case (this%backnd )
+    case ("cpu")
+       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+    case ("cuda")
+       call mma_KKT_device(this, x, df0dx, fval, dfdx)
+    case default
+       call mma_KKT_cpu(this,x, df0dx, fval, dfdx)
+    end select
+  end subroutine mma_KKT
+
+
+
 
   ! ========================================================================== !
   ! Getters and setters
@@ -224,7 +346,7 @@ module mma
     m = this%m
   end function mma_get_m
 
-    pure function mma_get_residumax(this) result(residumax)
+  pure function mma_get_residumax(this) result(residumax)
     class(mma_t), intent(in) :: this
     real(kind=rp) :: residumax
     residumax = this%residumax

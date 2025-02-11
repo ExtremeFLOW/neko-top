@@ -1,7 +1,7 @@
 module mma_optimizer
   use optimizer, only: optimizer_t
   use steady_state_problem, only : steady_state_problem_t
-  use mma, only: mma_t, mma_factory
+  use mma, only: mma_t
   use problem, only: problem_t
   use topopt_design, only: topopt_design_t
   use num_types, only : rp
@@ -68,7 +68,7 @@ contains
 
        print *, "Initializing mma_optimizer with steady_state_problem_t."
 
-       call this%mma%init_json(this%mma, design%design_indicator%x, &
+       call this%mma%init_json(design%design_indicator%x, &
             problem%get_n_design(), problem%get_n_constraints(), &
             problem%simulation%neko_case%params, this%scale, &
             this%auto_scale)

@@ -42,9 +42,12 @@ module mma_simcomp
   use logger, only: neko_log
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mma, only: mma_t, mma_factory
-  use comm
-  use device
+  use mma, only: mma_t
+
+  use device, only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
+     mpi_min, mpi_max, MPI_IN_PLACE
+  use comm, only : pe_rank, neko_comm, mpi_real_precision
   implicit none
   private
 
@@ -146,7 +149,9 @@ contains
 
     !     call this%mma%init(reshape(this%designx%x, [nloc]), &
     !          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
-    call this%mma%init_json( this%mma, reshape(this%designx%x, [nloc]), &
+    !  call mma_init_json( mma, x, n, m, json, scale, auto_scale)
+
+    call this%mma%init_json( reshape(this%designx%x, [nloc]), &
          nloc, this%m, json, scale,  auto_scale)
 
     print *, "scale = ", scale
@@ -223,9 +228,9 @@ contains
     call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
-    call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy_r1(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy_r2(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)   
+    call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)   
     
     print *, 'iter = ', 0,&
          '-------, f0val = ', f0val, ',   fval = ', fval%x
@@ -274,7 +279,7 @@ contains
      !     call this%mma%update(iter, x, df0dx, fval, dfdx)
 
     ! The optimization loop
-    do iter = 1, this%mma%max_iter !10
+    do iter = 1, 100 !10
        
        call this%mma%update(iter, x, df0dx, fval, dfdx)
        ! print *,"first"
@@ -283,12 +288,12 @@ contains
        call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
             f0val, df0dx%x, fval%x, dfdx%x)
        ! update the device pointer
-          !   call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%n, HOST_TO_DEVICE, sync=.false.)
-          !   call device_memcpy_r1(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
-          !   call device_memcpy_r2(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)     
-        call device_memcpy_r1(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy_r1(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy_r2(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
+          !   call device_memcpy(df0dx%x, df0dx%x_d, this%mma%n, HOST_TO_DEVICE, sync=.false.)
+          !   call device_memcpy(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
+          !   call device_memcpy(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)     
+        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
        
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 

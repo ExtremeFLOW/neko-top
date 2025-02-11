@@ -1,75 +1,94 @@
+! Copyright (c) 2025, The Neko-TOP Authors
+! All rights reserved.
+!
+! Redistribution and use in source and binary forms, with or without
+! modification, are permitted provided that the following conditions
+! are met:
+!
+!   * Redistributions of source code must retain the above copyright
+!     notice, this list of conditions and the following disclaimer.
+!
+!   * Redistributions in binary form must reproduce the above
+!     copyright notice, this list of conditions and the following
+!     disclaimer in the documentation and/or other materials provided
+!     with the distribution.
+!
+!   * Neither the name of the authors nor the names of its
+!     contributors may be used to endorse or promote products derived
+!     from this software without specific prior written permission.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+! POSSIBILITY OF SUCH DAMAGE.
 
+submodule (mma) mma_device
 
-module mma_device
-  use mma, only: mma_t
-
-  ! Inclusions from Neko
-  use num_types, only: rp
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use device
-  use vector, only: vector_t
-  use matrix, only: matrix_t
   use device_math
   use device_mma_math
-  ! Inclusions from external dependencies and standard libraries
-  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
-  use mpi_f08, only: MPI_INTEGER, MPI_REAL, mpi_sum, mpi_min, mpi_max, &
-       MPI_Allreduce
-  use utils, only: neko_error
-  use comm, only: neko_comm, mpi_real_precision
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device_math_ext
+  use device, only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+
   ! for printing the result of kernels and debugging
   use, intrinsic :: iso_c_binding
 
-  use device_math_ext
 
   implicit none
+     !   type, public, extends(mma_t) :: mma_device_t
+     !    private
+     !      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin
+     !      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
+     !      logical :: is_initialized = .false.
+     !      logical :: is_updated = .false.
+     !      character(len=:), allocatable :: backnd
 
-  type, public, extends(mma_t) :: mma_device_t
-   private
-     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin
-     type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
-     logical :: is_initialized = .false.
-     logical :: is_updated = .false.
-     character(len=:), allocatable :: backnd
+     !      ! Internal dummy variables for MMA
+     !      type(vector_t) :: p0j, q0j
+     !      type(matrix_t) :: pij, qij
+     !      type(vector_t) :: bi
 
-     ! Internal dummy variables for MMA
-     type(vector_t) :: p0j, q0j
-     type(matrix_t) :: pij, qij
-     type(vector_t) :: bi
+     !      !---nesessary for KKT check after updating df0dx, fval, dfdx --------
+     !      real(kind=rp) :: z, zeta
+     !      type(vector_t) :: y, lambda, s, mu
+     !      type(vector_t) :: xsi, eta
 
-     !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-     real(kind=rp) :: z, zeta
-     type(vector_t) :: y, lambda, s, mu
-     type(vector_t) :: xsi, eta
+     !     contains
 
-    contains
-
-     !> Interface for initializing the MMA object
-     procedure, public, pass(this) :: init => mma_init_attributes_device
-     procedure, pass(this) :: mma_init_attributes_device
+     !      !> Interface for initializing the MMA object
+     !      procedure, public, pass(this) :: init => mma_init_attributes_device
+     !      procedure, pass(this) :: mma_init_attributes_device
 
 
-     procedure, public, pass(this) :: free => mma_free_device
-     procedure, public, pass(this) :: KKT => mma_KKT_device
-     !> Interface for updating the MMA
-     procedure, public :: update => mma_update_device
-     procedure, pass(this) :: mma_update_device
+     !      procedure, public, pass(this) :: free => mma_free_device
+     !      procedure, public, pass(this) :: KKT => mma_KKT_device
+     !      !> Interface for updating the MMA
+     !      procedure, public :: update => mma_update_device
+     !      procedure, pass(this) :: mma_update_device
 
-     !> Interface for generating the approximation sub problem
-     generic :: gensub => mma_gensub_device
-     procedure, pass(this) :: mma_gensub_device
+     !      !> Interface for generating the approximation sub problem
+     !      generic :: gensub => mma_gensub_device
+     !      procedure, pass(this) :: mma_gensub_device
 
-     !> Interface for solving the dual with an interior point method
-     generic :: subsolve => mma_subsolve_dpip_device
-     procedure, pass(this) :: mma_subsolve_dpip_device
+     !      !> Interface for solving the dual with an interior point method
+     !      generic :: subsolve => mma_subsolve_dpip_device
+     !      procedure, pass(this) :: mma_subsolve_dpip_device
 
-  end type mma_device_t
+     !   end type mma_device_t
 
 contains
 
 
-  subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+  module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, xmin, xmax, &
+       max_iter, epsimin, asyinit, asyincr, asydecr)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -82,7 +101,7 @@ contains
     ! initial design.                                       !
     ! ----------------------------------------------------- !
 
-    class(mma_device_t), intent(inout) :: this
+    class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
     ! type(vector_t), intent(in) :: x
@@ -98,7 +117,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), allocatable, intent(in), optional :: backnd
+!     character(len=:), allocatable, intent(in), optional :: backnd
 
     call this%free()
 
@@ -172,7 +191,7 @@ contains
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
 
-    if (.not. present(backnd)) this%backnd = 'device'
+!     if (.not. present(backnd)) this%backnd = 'device'
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -180,7 +199,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-    if (present(backnd)) this%backnd = backnd
+!     if (present(backnd)) this%backnd = backnd
 
     print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
      ", d=", d, "epsimin =", this%epsimin 
@@ -188,7 +207,7 @@ contains
     this%is_initialized = .true.
   end subroutine mma_init_attributes_device
 
-  subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
+  module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Update the design variable x by solving the convex    !
     ! approximation of the problem.                         !
@@ -196,7 +215,7 @@ contains
     ! This subroutine is called in each iteration of the    !
     ! optimization loop                                     !
     ! ----------------------------------------------------- !
-    class(mma_device_t), intent(inout) :: this
+    class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
      real(kind=rp), dimension(this%n), intent(inout) :: x
      ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
@@ -213,7 +232,7 @@ contains
     
 
     call xdesign%init(this%n)
-    call device_memcpy_r1(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
     
      !     print *, "x(1)=", x(1)
      !     print *, "xdesign%x(1)=", xdesign%x(1)
@@ -222,11 +241,11 @@ contains
      !     call device_memcpy_r1(xdesign%x, xdesign%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
      !     print *, "xdesign%x(1)=", xdesign%x(1)
     ! generate a convex approximation of the problem
-    call this%gensub(iter, xdesign, df0dx, fval, dfdx)
+    call mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
     !solve the approximation problem using interior point method
-    call this%subsolve(xdesign)
+    call mma_subsolve_dpip_device(this, xdesign)
     !update the design vector x on the host
-    call device_memcpy_r1(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync=.false.)
+    call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync=.false.)
 
      !     ! generate a convex approximation of the problem
      !     call this%gensub(iter, x, df0dx, fval, dfdx)
@@ -239,9 +258,9 @@ contains
   end subroutine mma_update_device
 
   !> Deallocate the MMA object.
-  subroutine mma_free_device(this)
+  module subroutine mma_free_device(this)
 
-    class(mma_device_t), intent(inout) :: this
+    class(mma_t), intent(inout) :: this
 
     ! Deallocate the internal vectors
     call this%xold1%free()
@@ -274,13 +293,134 @@ contains
 
   end subroutine mma_free_device
 
+  module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
+     class(mma_t), intent(inout) :: this
+     real(kind=rp), dimension(this%n), intent(in) :: x
+     type(vector_t), intent(in) :: fval, df0dx
+     type(matrix_t), intent(in) :: dfdx
+     
+     type(vector_t) :: designx
+     real(kind=rp) :: rez, rezeta
+     type(vector_t) :: rey, relambda, remu, res
+     type(vector_t) :: rex, rexsi, reeta
+     real(kind=rp) ::residu_val !!!(3*this%n+4*this%m+2)
+     real(kind=rp), dimension(4*this%m+2) ::residu_small !!!(4*this%m+2)
+     integer :: ierr
+     real(kind=rp) :: re_xstuff_squ_global
+     real(kind=rp) :: globaltemp_norm
+
+     ! create a vector type x to have a c_ptr to point to the array designx
+     call designx%init(this%n)
+     designx%x = x
+     call device_memcpy(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+
+
+     call rey%init(this%m)
+     call relambda%init(this%m)
+     call remu%init(this%m)
+     call res%init(this%m)
+
+     call rex%init(this%n)
+     call rexsi%init(this%n)
+     call reeta%init(this%n)
+     ! this%lambda%x = 0_rp
+     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "before Sum of rex: ", sum(rex%x)
+
+     call device_kkt_rex(rex%x_d,  df0dx%x_d,  dfdx%x_d, this%xsi%x_d, this%eta%x_d, this%lambda%x_d, this%n, this%m)
+
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "after Sum of rex: ", sum(rex%x)
+
+     ! print *, "Sum of df0dx: ", sum(df0dx%x)
+     ! print *, "Sum of dfdx%x(1,:): ", sum(dfdx%x(1,:))
+     ! call device_memcpy(this%xsi%x, this%xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of xsi: ", sum(this%xsi%x)
+     ! call device_memcpy(this%eta%x, this%eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of eta: ", sum(this%eta%x)
+     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of lambda: ", sum(this%lambda%x)
+     ! print *, "Sum of n, m: ", this%n, this%m
+
+     call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
+     call device_add2(rey%x_d, this%c%x_d, this%m)
+     call device_sub2(rey%x_d, this%lambda%x_d, this%m)
+     call device_sub2(rey%x_d, this%mu%x_d, this%m)
+
+     rez = this%a0 - this%zeta - device_lcsc2(this%lambda%x_d, this%a%x_d,this%m)
+
+     call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp,-this%z, this%m)
+     call device_sub2(relambda%x_d, this%y%x_d, this%m)
+     call device_add2(relambda%x_d, this%s%x_d, this%m)
+
+
+     call device_sub3(rexsi%x_d, designx%x_d, this%xmin%x_d, this%n)
+     call device_col2(rexsi%x_d, this%xsi%x_d, this%n)
+
+     call device_sub3(reeta%x_d, this%xmax%x_d, designx%x_d, this%n)
+     call device_col2(reeta%x_d, this%eta%x_d, this%n)
+
+     call device_col3(remu%x_d,this%mu%x_d,this%y%x_d,this%m)
+
+     rezeta = this%zeta*this%z
+
+     call device_col3(res%x_d,this%lambda%x_d,this%s%x_d,this%m)
+
+     ! ! For rex (size: this%n)
+     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rex: ", sum(rex%x)
+
+     ! ! For rey (size: this%m)
+     ! call device_memcpy(rey%x, rey%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rey: ", sum(rey%x)
+
+     ! print *, "Sum of rez: ", rez  ! rez is scalar, no need for sum()
+
+     ! ! For relambda (size: this%m)
+     ! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of relambda: ", sum(relambda%x)
+
+     ! ! For rexsi (size: this%n)
+     ! call device_memcpy(rexsi%x, rexsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of rexsi: ", sum(rexsi%x)
+
+     ! ! For reeta (size: this%n)
+     ! call device_memcpy(reeta%x, reeta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of reeta: ", sum(reeta%x)
+
+     ! ! For remu (size: this%m)
+     ! call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of remu: ", sum(remu%x)
+
+     ! print *, "Sum of rezeta: ", rezeta  ! rezeta is scalar, no need for sum()
+     ! ! For res (size: this%m)
+     ! call device_memcpy(res%x, res%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     ! print *, "Sum of res: ", sum(res%x)
+
+
+     residu_val=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, device_maxval(relambda%x_d, this%m), &
+     device_maxval(rexsi%x_d,this%n), device_maxval(reeta%x_d,this%n), device_maxval(remu%x_d, this%m), rezeta, &
+     device_maxval(res%x_d, this%m)])
+     !residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+
+     call MPI_Allreduce(residu_val, this%residumax, 1, &
+     mpi_real_precision, mpi_max, neko_comm, ierr)
+
+     globaltemp_norm=device_norm(rex%x_d,this%n)+device_norm(rexsi%x_d,this%n)+device_norm(reeta%x_d,this%n)
+     call MPI_Allreduce(globaltemp_norm, &
+     re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum, neko_comm, ierr)
+     this%residunorm = sqrt(device_norm(rey%x_d,this%m)+rez**2+device_norm(relambda%x_d,this%m)+&
+     device_norm(remu%x_d,this%m)+rezeta**2+device_norm(res%x_d,this%m) + re_xstuff_squ_global)
+  end subroutine mma_KKT_device
+
   subroutine mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
      ! ----------------------------------------------------- !
      ! Generate the approximation sub problem by computing   !
      ! the lower and upper asymtotes and the other necessary !
      ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
      ! ----------------------------------------------------- !
-     class(mma_device_t), intent(inout) :: this
+     class(mma_t), intent(inout) :: this
      type(vector_t), intent(in) :: x
      type(vector_t), intent(in) :: df0dx
      type(vector_t), intent(in) :: fval
@@ -317,10 +457,10 @@ contains
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      !!!!!cpu gpu transfer and global sum
      globaltmp_m%x=0.0_rp
-     call device_memcpy_r1(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
      call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, &
      mpi_real_precision, mpi_sum, neko_comm, ierr)
-     call device_memcpy_r1(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
+     call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
      call device_sub3(this%bi%x_d,globaltmp_m%x_d, fval%x_d, this%m)
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
@@ -330,7 +470,7 @@ contains
   end subroutine mma_gensub_device
 
   subroutine mma_subsolve_dpip_device(this, designx)
-     class(mma_device_t), intent(inout) :: this
+     class(mma_t), intent(inout) :: this
      type(vector_t), intent(in) :: designx
      integer :: i, j, k, iter, ggdumiter, itto, ierr
      real(kind=rp) :: epsi, residumax, residunorm, &
@@ -713,126 +853,6 @@ contains
      !print *, "I am in mma_subsolve_dpip_gpu"
   end subroutine mma_subsolve_dpip_device
 
-  subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
-     class(mma_device_t), intent(inout) :: this
-     real(kind=rp), dimension(this%n), intent(in) :: x
-     type(vector_t), intent(in) :: fval
-     type(vector_t), intent(in) :: df0dx
-     type(matrix_t), intent(in) :: dfdx
-     
-     type(vector_t) :: designx
-     real(kind=rp) :: rez, rezeta
-     type(vector_t) :: rey, relambda, remu, res
-     type(vector_t) :: rex, rexsi, reeta
-     real(kind=rp) ::residu_val !!!(3*this%n+4*this%m+2)
-     real(kind=rp), dimension(4*this%m+2) ::residu_small !!!(4*this%m+2)
-     integer :: ierr
-     real(kind=rp) :: re_xstuff_squ_global
-     real(kind=rp) :: globaltemp_norm
-
-     ! create a vector type x to have a c_ptr to point to the array designx
-     call designx%init(this%n)
-     designx%x = x
-     call device_memcpy_r1(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
 
 
-     call rey%init(this%m)
-     call relambda%init(this%m)
-     call remu%init(this%m)
-     call res%init(this%m)
-
-     call rex%init(this%n)
-     call rexsi%init(this%n)
-     call reeta%init(this%n)
-     ! this%lambda%x = 0_rp
-     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, HOST_TO_DEVICE, sync=.true.)
-     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "before Sum of rex: ", sum(rex%x)
-
-     call device_kkt_rex(rex%x_d,  df0dx%x_d,  dfdx%x_d, this%xsi%x_d, this%eta%x_d, this%lambda%x_d, this%n, this%m)
-
-     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "after Sum of rex: ", sum(rex%x)
-
-     ! print *, "Sum of df0dx: ", sum(df0dx%x)
-     ! print *, "Sum of dfdx%x(1,:): ", sum(dfdx%x(1,:))
-     ! call device_memcpy(this%xsi%x, this%xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of xsi: ", sum(this%xsi%x)
-     ! call device_memcpy(this%eta%x, this%eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of eta: ", sum(this%eta%x)
-     ! call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of lambda: ", sum(this%lambda%x)
-     ! print *, "Sum of n, m: ", this%n, this%m
-
-     call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
-     call device_add2(rey%x_d, this%c%x_d, this%m)
-     call device_sub2(rey%x_d, this%lambda%x_d, this%m)
-     call device_sub2(rey%x_d, this%mu%x_d, this%m)
-
-     rez = this%a0 - this%zeta - device_lcsc2(this%lambda%x_d, this%a%x_d,this%m)
-
-     call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp,-this%z, this%m)
-     call device_sub2(relambda%x_d, this%y%x_d, this%m)
-     call device_add2(relambda%x_d, this%s%x_d, this%m)
-
-
-     call device_sub3(rexsi%x_d, designx%x_d, this%xmin%x_d, this%n)
-     call device_col2(rexsi%x_d, this%xsi%x_d, this%n)
-
-     call device_sub3(reeta%x_d, this%xmax%x_d, designx%x_d, this%n)
-     call device_col2(reeta%x_d, this%eta%x_d, this%n)
-
-     call device_col3(remu%x_d,this%mu%x_d,this%y%x_d,this%m)
-
-     rezeta = this%zeta*this%z
-
-     call device_col3(res%x_d,this%lambda%x_d,this%s%x_d,this%m)
-
-     ! ! For rex (size: this%n)
-     ! call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of rex: ", sum(rex%x)
-
-     ! ! For rey (size: this%m)
-     ! call device_memcpy(rey%x, rey%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of rey: ", sum(rey%x)
-
-     ! print *, "Sum of rez: ", rez  ! rez is scalar, no need for sum()
-
-     ! ! For relambda (size: this%m)
-     ! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of relambda: ", sum(relambda%x)
-
-     ! ! For rexsi (size: this%n)
-     ! call device_memcpy(rexsi%x, rexsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of rexsi: ", sum(rexsi%x)
-
-     ! ! For reeta (size: this%n)
-     ! call device_memcpy(reeta%x, reeta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of reeta: ", sum(reeta%x)
-
-     ! ! For remu (size: this%m)
-     ! call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of remu: ", sum(remu%x)
-
-     ! print *, "Sum of rezeta: ", rezeta  ! rezeta is scalar, no need for sum()
-     ! ! For res (size: this%m)
-     ! call device_memcpy(res%x, res%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
-     ! print *, "Sum of res: ", sum(res%x)
-
-
-     residu_val=maxval([device_maxval(rex%x_d,this%n), device_maxval(rey%x_d, this%m), rez, device_maxval(relambda%x_d, this%m), &
-     device_maxval(rexsi%x_d,this%n), device_maxval(reeta%x_d,this%n), device_maxval(remu%x_d, this%m), rezeta, &
-     device_maxval(res%x_d, this%m)])
-     !residu = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-
-     call MPI_Allreduce(residu_val, this%residumax, 1, &
-     mpi_real_precision, mpi_max, neko_comm, ierr)
-
-     globaltemp_norm=device_norm(rex%x_d,this%n)+device_norm(rexsi%x_d,this%n)+device_norm(reeta%x_d,this%n)
-     call MPI_Allreduce(globaltemp_norm, &
-     re_xstuff_squ_global, 1, mpi_real_precision, mpi_sum, neko_comm, ierr)
-     this%residunorm = sqrt(device_norm(rey%x_d,this%m)+rez**2+device_norm(relambda%x_d,this%m)+&
-     device_norm(remu%x_d,this%m)+rezeta**2+device_norm(res%x_d,this%m) + re_xstuff_squ_global)
-  end subroutine mma_KKT_device
-
-end module mma_device
+end submodule mma_device
