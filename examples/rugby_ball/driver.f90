@@ -2,7 +2,7 @@ program usrneko
   use simulation, only: simulation_t
   use topopt_design, only: topopt_design_t
   use steady_state_problem, only: steady_state_problem_t
-  use mma_optimizer, only : mma_optimizer_t
+  use optimizer, only : optimizer_t, optimizer_factory
 
   use json_module, only: json_file
   use utils, only: neko_error
@@ -26,7 +26,7 @@ program usrneko
   !> The design type
   type(topopt_design_t) :: design
   !> The optimizer (in this case mma)
-  type(mma_optimizer_t) :: optimizer
+  class(optimizer_t), allocatable :: optimizer
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -49,7 +49,7 @@ program usrneko
   call simulation%init(parameters)
   call design%init(parameters, simulation)
   call problem%init(parameters, design, simulation)
-  call optimizer%init(parameters, problem, design, simulation)
+  call optimizer_factory(optimizer, parameters, problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization

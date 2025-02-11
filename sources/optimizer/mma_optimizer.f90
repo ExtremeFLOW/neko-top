@@ -62,22 +62,15 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
-       simulation)
+       simulation, max_iterations, tolerance)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
     type(simulation_t), intent(in) :: simulation
-
-    integer :: max_iterations
-    real(kind=rp) :: tolerance
-
+    integer, intent(in) :: max_iterations
+    real(kind=rp), intent(in) :: tolerance
     type(vector_t) :: x
-
-    call json_get_or_default(parameters, "optimizer.max_iterations", &
-         max_iterations, 5)
-    call json_get_or_default(parameters, "optimizer.tolerance", &
-         tolerance, 1.0e-3_rp)
 
     call x%init(design%size())
 
