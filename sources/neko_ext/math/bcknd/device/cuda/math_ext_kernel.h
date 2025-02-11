@@ -40,8 +40,8 @@
  */
 template <typename T>
 __global__ void copy_mask_kernel(
-    T* __restrict__ a, T* __restrict__ b, const int size, int* __restrict__ mask,
-    const int mask_size) {
+    T* __restrict__ a, T* __restrict__ b, const int size, 
+    int* __restrict__ mask, const int mask_size) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;

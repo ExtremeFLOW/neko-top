@@ -101,7 +101,7 @@ module lube_term_objective
 
      type(field_t), pointer :: u, v, w
      real(kind=rp), pointer :: B(:,:,:,:)
-     type(c_ptr), pointer :: B_d
+     type(c_ptr), pointer :: B_d = C_NULL_PTR
      type(field_t), pointer :: brinkman_amplitude
 
    contains
