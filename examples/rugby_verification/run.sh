@@ -12,14 +12,16 @@ for i in "${NPROC[@]}"; do
         exit 1
     fi
 
-    if [ ! -f "target_$i.txt" ]; then
+    target=$RPATH/rugby_verification/target_$i.txt
+    echo "Comparing output to reference solution $target"
+    if [ ! -f $target ]; then
         cp optimization_data.txt target_$i.txt
         continue
     fi
 
     # Check if the run was successful and the output is as expected. Compare
     # the output to the reference solution.
-    diff -q target_$i.txt optimization_data.txt
+    diff -q $target optimization_data.txt
     if [ $? -ne 0 ]; then
         echo "Output $i does not match the reference solution. Exiting." >&2
         exit 1
