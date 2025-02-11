@@ -323,7 +323,7 @@ contains
        call device_cfill(this%coef%h1_d, this%r**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
     else
-       ! h1 is already negative in its definition                            
+       ! h1 is already negative in its definition
        this%coef%h1 = this%r**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
