@@ -68,6 +68,7 @@ module problem
      integer :: n_objectives
      !> Number of constraints in the problem.
      integer :: n_constraints
+     !> Format for output log
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
@@ -164,6 +165,11 @@ module problem
      procedure, pass(this) :: get_n_objectives => problem_get_num_objectives
      !> Return the number of constraints.
      procedure, pass(this) :: get_n_constraints => problem_get_num_constraints
+
+     !> Return the logfile header
+     procedure, pass(this) :: get_log_header => problem_get_log_header
+     !> Return the current logfile state
+     procedure, pass(this) :: get_log_state => problem_get_log_state
 
   end type problem_t
 
@@ -595,4 +601,77 @@ contains
     n = this%n_constraints
   end function problem_get_num_constraints
 
+  !> Return the header for the problem.
+  function problem_get_log_header(this) result(buff)
+    class(problem_t), intent(in) :: this
+    character(len=1024) :: buff
+    character(len=50) :: mini_buff 
+    integer :: i
+
+    ! When it comes to multi-objective optimization
+    ! (handled in the way that we do) we want to know the value of each
+    ! objective individually, not just the combined effect.
+    !
+    ! my vision is:
+    !
+    !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
+    !
+    ! And then if we also want things like thie iteration or KKT they can be 
+    ! appended to the begining or end of this by the optimizer.
+    !
+    ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
+    buff = "Total objective function"
+    do i = 1, this%get_n_objectives()
+       mini_buff = ""
+       write(mini_buff, '(", ", A)') this%objective_list(i)%objective%log_name
+       buff = trim(buff)//trim(mini_buff)
+    end do
+
+    do i = 1, this%get_n_constraints()
+       mini_buff = ""
+       write(mini_buff, '(", ", A)') &
+          this%constraint_list(i)%constraint%log_name
+       buff = trim(buff)//trim(mini_buff)
+    end do
+
+  end function problem_get_log_header
+
+  !> Return the log for the current iteration.
+  function problem_get_log_state(this, real_format) result(buff)
+    class(problem_t), intent(in) :: this
+    character(len=*), intent(in) :: real_format
+    character(len=1024) :: buff
+    character(len=50) :: mini_buff 
+    character(len=30) :: formatting 
+    real(kind=rp) :: tmp_real
+    real(kind=rp), allocatable :: tmp_reals
+    integer :: i
+
+    formatting = '(", ",'//trim(real_format)//')' 
+
+    buff = ""
+    mini_buff = ""
+    tmp_real = 0.0_rp
+    do i = 1, this%n_objectives
+       tmp_real = tmp_real + &
+            this%objective_list(i)%objective%weight * &
+            this%objective_list(i)%objective%value
+    end do
+
+    write(mini_buff, formatting) tmp_real 
+    buff = trim(buff)//trim(mini_buff)
+
+    do i = 1, this%get_n_objectives()
+       mini_buff = ""
+       write(mini_buff, formatting) this%objective_list(i)%objective%value
+       buff = trim(buff)//trim(mini_buff)
+    end do
+
+    do i = 1, this%get_n_constraints()
+       mini_buff = ""
+       write(mini_buff, formatting) this%constraint_list(i)%constraint%value
+       buff = trim(buff)//trim(mini_buff)
+    end do
+    
+  end function problem_get_log_state
 end module problem

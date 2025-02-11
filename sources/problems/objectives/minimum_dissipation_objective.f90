@@ -124,13 +124,16 @@ contains
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+    character(len=:), allocatable :: log_name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "log_name", log_name, "Dissipation")
 
-    call this%init_from_attributes(design, simulation, weight, mask_name)
+    call this%init_from_attributes(design, simulation, weight, log_name, &
+       mask_name)
   end subroutine minimum_dissipation_init_json
 
 !> The actual constructor.
@@ -139,16 +142,20 @@ contains
 !! @param weight the weight of the objective function.
 !! @param mask_name the name of the mask.
   subroutine minimum_dissipation_init_attributes(this, design, simulation, &
-       weight, mask_name)
+       weight, log_name, mask_name)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
+    character(len=*), intent(in) :: log_name
     character(len=*), intent(in) :: mask_name
 
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(design%size(), weight, mask_name)
+
+    ! Assign the name to objective
+    this%log_name = log_name
 
     ! Save the simulation and design
     this%fluid => simulation%fluid_scheme

@@ -24,6 +24,8 @@ module mma_optimizer
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
 
+  use comm, only : pe_rank
+
 
   implicit none
   private
@@ -114,6 +116,18 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
+    ! These would all be owned by the logger_t
+    ! ------------------------------------------------------------------------
+    !> format for writing real values in the log file
+    character(len=10) :: real_format 
+    ! logging
+    character(len=1024) :: problem_log ! I assume 1024 is enough?
+    character(len=1024) :: optimization_log ! I assume 1024 is enough?
+    character(len=100) :: log_format 
+    integer :: log_unit
+    ! ------------------------------------------------------------------------
+
+
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
@@ -130,24 +144,43 @@ contains
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
+    ! Should I write a logger_t such that this becomes a logger%init()
+    ! ------------------------------------------------------------------------
     !Writing the optimization data in a separate file
-    open(1368, file = "optimization_data.txt", status = "replace")
+    log_unit = 1368
+    real_format = 'ES25.17' 
+    open(log_unit, file = "optimization_data.txt", status = "replace")
+    log_format = '(I3, A, ", ", '//real_format//', ", ", '//real_format//&
+       ', ", ", '//real_format//')'
+    ! Write n, m, and tolerance in the first line of optimization_data.txt
+    ! do we really want this?
+    if (pe_rank .eq. 0) then
+       write(log_unit, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
+            nglobal, this%mma%get_m(), tolerance
+    end if
+
+    ! Write the header for the remaining data
+    problem_log = problem%get_log_header()
+    optimization_log = 'iter, '//trim(problem_log)//&
+       ', KKTmax, KKTnorm2, scalaing factor'
+    if (pe_rank .eq. 0) then
+       write(log_unit, '(A)') trim(optimization_log)
+    end if
+    ! ------------------------------------------------------------------------
 
     associate(x => this%design%design_indicator%x)
 
-      ! Write n, m, and tolerance in the first line of optimization_data.txt
-      write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-           nglobal, this%mma%get_m(), tolerance
 
-      ! Write the header for the remaining data
-      write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
-           &KKTnorm2, scalingfactor"
-
+      ! Should I write a logger_t such that this becomes a logger%write()
+      ! ----------------------------------------------------------------------
       ! Write the data row-by-row
-      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-           & ES25.17, ",", ES25.17)') &
-           0, objective_value, constraint_value%x, &
-           this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+      problem_log = problem%get_log_state(real_format)
+      write(optimization_log, log_format) 0, trim(problem_log), &
+         this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+      if (pe_rank .eq. 0) then
+         write(1368, '(A)') trim(optimization_log)
+      end if
+      ! ----------------------------------------------------------------------
 
       call problem%write(0)
 
@@ -183,12 +216,18 @@ contains
               reshape([constraint_value%x], [this%mma%get_m()]), &
               constraint_sensitivities%x)
 
-         write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-              & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
-              this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
-
+         ! Write the data row-by-row
+         ! should I implement a logger_t, such that this is a logger%write()
+         ! -------------------------------------------------------------------
+         problem_log = problem%get_log_state(real_format)
+         write(optimization_log, log_format) iter, trim(problem_log), &
+            this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+         if (pe_rank .eq. 0) then
+            write(log_unit, '(A)') trim(optimization_log)
+         end if
          ! Flush the buffer to write the data during the run
-         flush(1368)
+         flush(log_unit)
+         ! -------------------------------------------------------------------
 
          call problem%write(iter)
 
@@ -202,13 +241,10 @@ contains
       end do
     end associate
 
-
-    close(1368)
-
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
 
-
+    close(log_unit)
     call constraint_value%free()
     call objective_sensitivities%free()
     call constraint_sensitivities%free()
