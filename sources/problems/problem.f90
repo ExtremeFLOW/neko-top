@@ -555,30 +555,6 @@ contains
 
     call sensitivity%init(this%n_design, this%n_constraints)
 
-    ! DELETE COMMENT AFTER PR
-    ! My expectation is that if we're working on the device then the sensitivity
-    ! of each constraint would exist on the device.
-    !
-    ! I would then also assume we would want the matrix of sensitivities to also
-    ! exist on the device. So that's why I've adjusted in this way.
-    !
-    ! I attempted something along the lines of
-    !
-    !    do i = 1, this%n_constraints
-    !        call device_copy(sensitivity%x_d(1, i), &
-    !            this%constraint_list(i)%constraint%sensitivity%x_d, &
-    !            this%n_design)
-    !    end do
-    !
-    ! but that obviously didn't work...
-    !
-    ! There must be a more eleagant solution, but I'm going copy them all from
-    ! DEVICE to HOST, and then copy everything back to DEVICE.
-    !
-    ! Obviously this is inefficient, but I couldn't find any DEVICE_TO_DEVICE
-    ! in the neko source, so maybe this is just hard on GPUs?
-    !
-
     do i = 1, this%n_constraints
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_memcpy( &
@@ -596,7 +572,6 @@ contains
        call device_memcpy(sensitivity%x, sensitivity%x_d, &
             this%n_design * this%n_constraints, HOST_TO_DEVICE, sync = .true.)
     end if
-
 
   end subroutine problem_get_constraint_sensitivities
 

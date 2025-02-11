@@ -33,7 +33,7 @@
 module device_RAMP_mapping
   use utils, only : neko_error
   use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding
+  use, intrinsic :: iso_c_binding, only c_ptr, c_int
   implicit none
 
 #if HAVE_HIP
@@ -44,7 +44,6 @@ module device_RAMP_mapping
      subroutine cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply')
-       use, intrinsic :: iso_c_binding
        import c_rp
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -59,7 +58,6 @@ module device_RAMP_mapping
      subroutine cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply_backward')
-       use, intrinsic :: iso_c_binding
        import c_rp
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -75,7 +73,6 @@ module device_RAMP_mapping
      subroutine cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply')
-       use, intrinsic :: iso_c_binding
        import c_rp
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -90,7 +87,6 @@ module device_RAMP_mapping
      subroutine cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply_backward')
-       use, intrinsic :: iso_c_binding
        import c_rp
        real(c_rp) :: f_min
        real(c_rp) :: f_max

@@ -160,9 +160,8 @@ contains
 
     ! set up preconditioner
     call filter_precon_factory(this%pc_filt, this%ksp_filt, &
-         this%coef, this%coef%dof, &
-         this%coef%gs_h, &
-         this%bclst_filt, this%precon_type_filt)
+         this%coef, this%coef%dof, this%coef%gs_h, this%bclst_filt, &
+         this%precon_type_filt)
 
   end subroutine PDE_filter_init_from_attributes
 

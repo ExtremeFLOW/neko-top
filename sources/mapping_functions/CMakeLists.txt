@@ -20,11 +20,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 
-target_include_directories(neko-top
-    PRIVATE
-        ${NEKO_DIR}/src
-)
-
 if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE

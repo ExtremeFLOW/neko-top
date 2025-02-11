@@ -59,9 +59,6 @@
 !
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
-
- !TODO
- ! GPUS
 !
 module minimum_dissipation_objective
   use num_types, only: rp

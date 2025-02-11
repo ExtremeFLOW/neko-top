@@ -167,11 +167,7 @@ contains
             scalingfactor = abs(this%scale)
          end if
 
-         if (NEKO_BCKND_DEVICE .eq. 0) then
-            call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
-                 constraint_value%x * scalingfactor, &
-                 constraint_sensitivities%x*scalingfactor)
-         else
+         if (NEKO_BCKND_DEVICE .eq. 1) then
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! TO BE REPLACED WITH GPU MMA
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -222,6 +218,10 @@ contains
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             ! TO BE REPLACED WITH GPU MMA
             !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+         else
+            call this%mma%mma_update_cpu( iter, x, objective_sensitivities%x, &
+                 constraint_value%x * scalingfactor, &
+                 constraint_sensitivities%x*scalingfactor)
          end if
 
          call this%design%map_forward()
