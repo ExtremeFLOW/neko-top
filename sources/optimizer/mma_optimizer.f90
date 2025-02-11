@@ -72,36 +72,33 @@ contains
     integer :: max_iterations
     real(kind=rp) :: tolerance
 
-    real(kind=rp), dimension(:), allocatable :: x
+    type(vector_t) :: x
 
     call json_get_or_default(parameters, "optimizer.max_iterations", &
          max_iterations, 5)
     call json_get_or_default(parameters, "optimizer.tolerance", &
          tolerance, 1.0e-3_rp)
 
-    if (allocated(x)) deallocate(x)
-    allocate(x(design%size()))
+    call x%init(design%size())
+
     select type (d => design)
     type is (topopt_design_t)
-       call copy(x, d%design_indicator%x, d%size())
+       call copy(x%x, d%design_indicator%x, d%size())
     class default
        call neko_error('Unknown design type for MMA Optimizer')
     end select
 
     print *, "Initializing mma_optimizer with steady_state_problem_t."
 
-    call this%mma%init_json(x, &
+    call this%mma%init_json(x%x, &
          design%size(), problem%get_n_constraints(), &
          parameters, this%scale, &
          this%auto_scale)
 
-    print *, "scale = ", this%scale
-    print *, "auto_scale = ", this%auto_scale
-
     call this%init_from_components(problem, design, simulation, &
          max_iterations, tolerance)
 
-    if (allocated(x)) deallocate(x)
+    call x%free()
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
@@ -125,33 +122,31 @@ contains
     class(design_t), intent(inout) :: design
     type(simulation_t), intent(inout) :: simulation
 
-    real(kind=rp), dimension(:), allocatable :: x
+    type(vector_t) :: x
 
     integer :: iter, ierr, nglobal, n
-    real(kind=rp) :: scalingfactor
+    real(kind=rp) :: scaling_factor
 
     real(kind=rp) :: objective_value
     type(vector_t) :: constraint_value
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    if (allocated(x)) deallocate(x)
-
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
-    if (n .ge. 0) allocate(x(n))
+    call x%init(n)
 
     select type (d => design)
     type is (topopt_design_t)
-       call copy(x, d%design_indicator%x, n)
+       call copy(x%x, d%design_indicator%x, n)
     class default
        call neko_error('Unknown design type for MMA Optimizer')
     end select
 
     !>initializing the scaling factor
-    scalingfactor = 1.0_rp
-    print *, "this%max_iterations for the optimization loop = ", this%max_iterations
+    scaling_factor = 1.0_rp
+    print *, "max_iterations for the optimization loop = ", this%max_iterations
 
     call simulation%run_forward()
     call problem%compute(design)
@@ -182,33 +177,31 @@ contains
     write(1368, '(I4, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
          & ES25.17, ",", ES25.17)') &
          0, objective_value, constraint_value%x, &
-         this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+         this%mma%get_residumax(), this%mma%get_residunorm(), scaling_factor
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
 
        !Scaling
        if (this%auto_scale .eqv. .true.) then
-          scalingfactor = abs(this%scale/constraint_value%x(1))
+          scaling_factor = abs(this%scale/constraint_value%x(1))
        else
-          scalingfactor = abs(this%scale)
+          scaling_factor = abs(this%scale)
        end if
 
-       if (NEKO_BCKND_DEVICE .eq. 0) then
-          call this%mma%mma_update_cpu(iter, x, objective_sensitivities%x, &
-               constraint_value%x * scalingfactor, &
-               constraint_sensitivities%x*scalingfactor)
-       else
-          write(stderr, *) "Device not supported in mma_optimizer.f90."
-          error stop
-       end if
+       ! Scale the constraint value and sensitivities
+       constraint_value = scaling_factor * constraint_value
+       constraint_sensitivities = scaling_factor * constraint_sensitivities
+
+       call this%mma%update(iter, x, objective_sensitivities, &
+            constraint_value, constraint_sensitivities)
 
        select type (d => design)
        type is (topopt_design_t)
 
-          call copy(d%design_indicator%x, x, n)
+          call copy(d%design_indicator%x, x%x, n)
           call d%map_forward()
-          call copy(x, d%design_indicator%x, n)
+          call copy(x%x, d%design_indicator%x, n)
 
        class default
           call neko_error('Unknown design type for MMA Optimizer')
@@ -225,13 +218,12 @@ contains
        call problem%get_objective_sensitivities(objective_sensitivities)
        call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-       call this%mma%KKT(x, objective_sensitivities%x, &
-            reshape([constraint_value%x], [this%mma%get_m()]), &
-            constraint_sensitivities%x)
+       call this%mma%KKT(x%x, objective_sensitivities%x, &
+            constraint_value%x, constraint_sensitivities%x)
 
        write(1368, '(I4, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
             & ES25.17, ",", ES25.17)') iter, objective_value, constraint_value%x, &
-            this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
+            this%mma%get_residumax(), this%mma%get_residunorm(), scaling_factor
 
        ! Flush the buffer to write the data during the run
        flush(1368)
@@ -246,7 +238,6 @@ contains
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
 
-    if (allocated(x)) deallocate(x)
     call constraint_value%free()
     call objective_sensitivities%free()
     call constraint_sensitivities%free()
