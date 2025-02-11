@@ -223,13 +223,7 @@ contains
 
          call problem%write(iter)
 
-         call reset(simulation%neko_case)
-         ! TODO
-         ! reset for the adjoint
-         call field_rzero(simulation%adjoint_case%scheme%u_adj)
-         call field_rzero(simulation%adjoint_case%scheme%v_adj)
-         call field_rzero(simulation%adjoint_case%scheme%w_adj)
-         simulation%neko_case%fluid%freeze = .false.
+         call simulation%reset()
       end do
     end associate
 
