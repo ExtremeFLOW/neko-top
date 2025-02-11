@@ -17,6 +17,11 @@ module optimizer
   type, abstract, public :: optimizer_t
      private
 
+     !> The maximum number of iterations
+     integer, public :: max_iterations
+     !> The tolerance for the optimization loop
+     real(kind=rp), public :: tolerance
+
 
    contains
      !> Initialize the optimizer, associate it with a specific problem
@@ -25,6 +30,11 @@ module optimizer
      procedure(optimizer_run), pass(this), public, deferred :: run
      !> Free resources.
      procedure(optimizer_free), pass(this), public, deferred :: free
+
+     !> The base initializer
+     procedure, pass(this) :: init_base => optimizer_init_base
+
+
   end type optimizer_t
 
   ! -------------------------------------------------------------------------- !
@@ -56,5 +66,18 @@ module optimizer
        class(optimizer_t), intent(inout) :: this
      end subroutine optimizer_free
   end interface
+
+contains
+
+  !> Base initializer for the optimizer
+  subroutine optimizer_init_base(this, max_iterations, tolerance)
+    class(optimizer_t), intent(inout) :: this
+    integer, intent(in) :: max_iterations
+    real(kind=rp), intent(in) :: tolerance
+
+    this%max_iterations = max_iterations
+    this%tolerance = tolerance
+
+  end subroutine optimizer_init_base
 
 end module optimizer

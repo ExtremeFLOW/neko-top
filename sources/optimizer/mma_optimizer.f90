@@ -37,11 +37,6 @@ module mma_optimizer
 
      type(mma_t) :: mma
 
-     !> Maximum number of iterations
-     integer :: max_iterations
-     !> Tolerance for the optimization loop
-     real(kind=rp) :: tolerance
-
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! Note that the values are not updated but they are scaled when passed
      !! to the optimizer.
@@ -70,7 +65,8 @@ contains
     class(design_t), intent(in) :: design
 
     type(topopt_design_t), pointer :: top_des
-    this%tolerance = 1.0e-3_rp
+
+    call this%init_base(max_iterations = 5, tolerance = 1.0e-3_rp)
 
     top_des => null()
     select type (design)
@@ -129,7 +125,6 @@ contains
     type(simulation_t), intent(inout) :: simulation
     class(steady_state_problem_t), intent(inout) :: problem
     class(topopt_design_t), intent(inout) :: design
-    integer :: max_iter
     integer :: iter, ierr, nglobal
     real(kind=rp) :: scalingfactor
 
@@ -144,8 +139,7 @@ contains
 
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
-    max_iter = 5
-    print *, "max_iter for the optimization loop = ", max_iter
+    print *, "this%max_iterations for the optimization loop = ", this%max_iterations
 
     call simulation%run_forward()
     call problem%compute(design)
@@ -179,7 +173,7 @@ contains
 
       call problem%write(0)
 
-      do iter = 1, max_iter
+      do iter = 1, this%max_iterations
          if (this%mma%get_residumax() .lt. this%tolerance) exit
 
          !Scaling
