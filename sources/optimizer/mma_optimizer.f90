@@ -18,7 +18,6 @@ module mma_optimizer
   use comm, only: neko_comm
   use mpi_f08, only: MPI_INTEGER, mpi_sum, MPI_Allreduce
 
-
   use neko_config, only: NEKO_BCKND_DEVICE
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
@@ -27,7 +26,6 @@ module mma_optimizer
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
-
 
   implicit none
   private
@@ -46,7 +44,9 @@ module mma_optimizer
      !! constraint_value%x and constraint_sensitivities%x in every iteration (variable scale factors)
      real(kind=rp) :: scale
      logical :: auto_scale
+
    contains
+
      ! Override the deferred methods
      generic :: init => init_from_json, init_from_components
      procedure, pass(this) :: init_from_json => mma_optimizer_init_from_json
@@ -140,9 +140,7 @@ contains
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
-    if (n .ge. 0) then
-       allocate(x(n))
-    end if
+    if (n .ge. 0) allocate(x(n))
 
     select type (d => design)
     type is (topopt_design_t)
@@ -173,7 +171,7 @@ contains
 
     ! Write n, m, and tolerance in the first line of optimization_data.txt
     write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-         nglobal, this%mma%get_m(), this%tolerance
+         nglobal, problem%get_n_constraints(), this%tolerance
 
     ! Write the header for the remaining data
     write(1368, '(A4, ",", A25, ",", A25, ",", A25, ",", A25, ",", A25)') &
