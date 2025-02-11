@@ -257,10 +257,10 @@ contains
 
     volume = 0.0_rp
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        volume = volume_topopt_design(this, design)
 
-      class default
+    class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
@@ -272,6 +272,8 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     real(kind=rp) :: volume
+
+    volume = 0.0_rp
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!
