@@ -14,6 +14,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 
 # Add the mapping extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
+
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
