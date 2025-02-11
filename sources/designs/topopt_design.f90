@@ -154,8 +154,24 @@ module topopt_design
 
 
    contains
-     !> init (will make this legit at some point)
-     procedure, pass(this) :: init => topopt_design_init
+
+     ! ----------------------------------------------------------------------- !
+     ! Initializations
+
+     !> Initialize the design
+     generic, public :: init => init_from_json, &
+          init_from_components
+     !> Initialize the design from a JSON file
+     procedure, pass(this), public :: init_from_json => &
+          topopt_design_init_from_json
+     !> Initialize the design from components
+     procedure, pass(this), public :: init_from_components => &
+          topopt_design_init_from_components
+
+     !> Add mappings to the design
+     procedure, pass(this) :: add_mapping => topopt_design_add_mapping
+
+
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
      ! and ultimately handle mapping different coeficients!
@@ -185,9 +201,20 @@ module topopt_design
 
 contains
 
-  subroutine topopt_design_init(this, parameters, simulation)
+
+  !> Initialize the design from a JSON file
+  subroutine topopt_design_init_from_json(this, parameters, simulation)
     class(topopt_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+
+    call this%init_from_components(simulation)
+
+  end subroutine topopt_design_init_from_json
+
+
+  subroutine topopt_design_init_from_components(this, simulation)
+    class(topopt_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
@@ -229,9 +256,6 @@ contains
             neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
     end if
 
-
-
-
     ! TODO
     ! Regarding masks and filters,
     ! I suppose there are two ways of thinking about it:
@@ -265,20 +289,6 @@ contains
             this%optimization_domain, 0.0_rp)
     end if
 
-    ! TODO
-    ! we would also need to make a mapping type that reads in
-    ! parameters etc about filtering and mapping
-    ! ie,
-    ! call mapper%init(this woud be from JSON)
-    associate(coef => simulation%neko_case%fluid%c_Xh)
-      call this%filter%init(parameters, coef)
-      call this%mapping%init(parameters, coef)
-    end associate
-
-    ! and then we would map for the first one
-    call this%map_forward()
-
-
     ! a field writer would be nice to output
     ! - design indicator (\rho)
     ! - mapped design (\chi)
@@ -294,7 +304,24 @@ contains
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
     call this%init_base(n)
-  end subroutine topopt_design_init
+  end subroutine topopt_design_init_from_components
+
+  !> Add mappings to the design
+  subroutine topopt_design_add_mapping(this, parameters, simulation)
+    class(topopt_design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+
+    ! Todo: This need to be read from the parameters in the JSON
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      call this%filter%init(parameters, coef)
+      call this%mapping%init(parameters, coef)
+    end associate
+
+    ! and then we would map for the first one
+    call this%map_forward()
+
+  end subroutine topopt_design_add_mapping
 
 
   subroutine topopt_design_map_forward(this)

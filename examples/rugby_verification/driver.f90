@@ -47,7 +47,12 @@ program usrneko
   ! Initialization of the components
 
   call simulation%init(parameters)
+
+  ! Todo: We are currently working on the design.
   call design%init(parameters, simulation)
+  call design%add_mapping(parameters, simulation)
+
+
   call problem%init(parameters, design, simulation)
   call optimizer_factory(optimizer, parameters, problem, design, simulation)
 

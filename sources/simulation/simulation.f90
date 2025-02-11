@@ -49,7 +49,7 @@ module simulation
   implicit none
   private
 
-  type, public :: simulation_t
+  type :: simulation_t
      !> and primal case
      type(case_t), public :: neko_case
      !> and adjoint case
@@ -71,6 +71,7 @@ module simulation
      procedure, pass(this) :: reset => simulation_reset
   end type simulation_t
 
+  public :: simulation_t
 contains
 
   !> Initialize the simulation
@@ -86,7 +87,7 @@ contains
     call adjoint_init(this%adjoint_case, this%neko_case)
 
     select type(fluid => this%neko_case%fluid)
-      type is (fluid_pnpn_t)
+    type is (fluid_pnpn_t)
        this%fluid_scheme => fluid
 
     end select

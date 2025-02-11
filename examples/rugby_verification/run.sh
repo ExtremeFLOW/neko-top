@@ -3,6 +3,7 @@
 # We aim to run on many different numbers of processors. But to avoid edge
 # cases, we will only run on prime numbers.
 NPROC=(7 5 3 2 1)
+NPROC=(7)
 
 for i in "${NPROC[@]}"; do
     echo "Running with $i processors"

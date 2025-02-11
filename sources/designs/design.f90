@@ -39,31 +39,30 @@ module design
 
   !> A topology optimization design variable
   type, abstract, public :: design_t
-     private
 
      !> The number of design variables
-     integer :: n = 0
+     integer, private :: n = 0
 
    contains
 
      !> Initialize the design
-     procedure(design_init), pass(this), public, deferred :: init
+     procedure(design_init_from_json), pass(this), deferred :: init_from_json
 
      !> Initialize the base design
-     procedure, pass(this), public :: init_base => design_init_base
+     procedure, pass(this) :: init_base => design_init_base
 
      !> Return the number of design variables
-     procedure, pass(this), public :: size => design_size
+     procedure, pass(this) :: size => design_size
 
   end type design_t
 
   abstract interface
-     subroutine design_init(this, parameters, simulation)
+     subroutine design_init_from_json(this, parameters, simulation)
        import design_t, simulation_t, json_file
        class(design_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
        type(simulation_t), intent(inout) :: simulation
-     end subroutine design_init
+     end subroutine design_init_from_json
   end interface
 
 contains
