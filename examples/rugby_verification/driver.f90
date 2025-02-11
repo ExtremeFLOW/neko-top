@@ -48,7 +48,7 @@ program usrneko
 
   call simulation%init(parameters)
   call design%init(parameters, simulation)
-  call problem%init(parameters, simulation, design)
+  call problem%init(parameters, design, simulation)
   call optimizer%init(parameters, problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !

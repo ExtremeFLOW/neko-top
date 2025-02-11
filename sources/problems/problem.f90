@@ -169,32 +169,26 @@ module problem
      !! the derived types to initialize the problem. This is based on the
      !! abstract design type, We suggest that a switch statement is used to
      !! initialize the problem based on the design type.
-     subroutine problem_init(this, parameters, simulation, design)
+     subroutine problem_init(this, parameters, design, simulation)
        import problem_t, json_file, simulation_t, design_t
        class(problem_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
-       type(simulation_t), intent(inout) :: simulation
        class(design_t), intent(in) :: design
+       type(simulation_t), intent(inout) :: simulation
      end subroutine problem_init
 
      !> Compute the problem.
      subroutine problem_compute(this, design)
-       import problem_t
-       import design_t
-
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        class(design_t), intent(inout) :: design
-
      end subroutine problem_compute
 
      !> Compute the problem.
      subroutine problem_compute_sensitivity(this, design)
-       import problem_t
-       import design_t
-
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        class(design_t), intent(inout) :: design
-
      end subroutine problem_compute_sensitivity
 
      !> Destructor

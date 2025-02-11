@@ -91,11 +91,11 @@ module steady_state_problem
 contains
 
   !> The constructor for the base problem.
-  subroutine steady_state_problem_init(this, parameters, simulation, design)
+  subroutine steady_state_problem_init(this, parameters, design, simulation)
     class(steady_state_problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
+    type(simulation_t), intent(inout) :: simulation
 
     call this%init_base(design%size())
 
