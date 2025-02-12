@@ -32,7 +32,6 @@
 
  ! Implements the `mma_comp_t` type.
 module mma_simcomp
-  use neko_config
   use num_types, only: rp
   use case, only: case_t
   use json_module, only: json_file
@@ -55,29 +54,21 @@ module mma_simcomp
   ! This is a simple example of a user-defined simulation component.
   type, public, extends(simulation_component_t) :: mma_comp_t
 
-     real(kind=rp) :: tol !< Just some dummy variable to show it working.
-     type(field_t) :: tmp !< Just some dummy field to show it working.
+     !> Design variables defined as a field
+     type(field_t) :: designx 
 
+     !> number of constraints for the optimization problem
+     integer :: m 
 
-     type(field_t) :: designx !< Just some dummy field to show it working.
-     type(field_t) :: xmax !< Just some dummy field to show it working.
-     type(field_t) :: xmin !< Just some dummy field to show it working.
+     real(kind=rp) :: scale
+     logical :: auto_scale
 
-     integer :: m !< Just some dummy variable to show it working.
-     real(kind=rp) :: a0_const !< Just some dummy variable to show it working.
-     real(kind=rp) :: a_const !< Just some dummy variable to show it working.
-     real(kind=rp) :: c_const !< Just some dummy variable to show it working.
-     real(kind=rp) :: d_const !< Just some dummy variable to show it working.
-
-     ! type(mma_t) :: mma !< The actual MMA simulation component.
-     class(mma_t), allocatable :: mma
+     !> The actual MMA object.
+     type(mma_t) :: mma
 
    contains
      ! Constructor from json, wrapping the actual constructor.
      procedure, pass(this) :: init => simcomp_test_init_from_json
-     ! Actual constructor.
-     procedure, pass(this) :: init_from_attributes => &
-          simcomp_test_init_from_attributes
      ! Destructor.
      procedure, pass(this) :: free => simcomp_test_free
      ! Compute the simcomp_test field.
@@ -90,99 +81,26 @@ contains
     class(mma_comp_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
-
-    call this%init_base(json, case)
-
-    call this%tmp%init(case%msh, case%fluid%Xh, "tmp")
-    call this%designx%init(case%msh, case%fluid%Xh, "designx")
-    call this%xmax%init(case%msh, case%fluid%Xh, "xmax")
-    call this%xmin%init(case%msh, case%fluid%Xh, "xmin")
-
-    ! Read the tolerance
-    call json_get_or_default(json, "tol", this%tol, 1.0e-6_rp)
-    call json_get_or_default(json, "m", this%m, 2)
-    call json_get_or_default(json, "a0_const", this%a0_const, 1.0_rp)
-    call json_get_or_default(json, "a_const", this%a_const, 0.0_rp)
-    call json_get_or_default(json, "c_const", this%c_const, 1000.0_rp)
-    call json_get_or_default(json, "d_const", this%d_const, 1.0_rp)
-
-    call this%init_from_attributes(case%params)
-  end subroutine simcomp_test_init_from_json
-
-  ! Actual constructor.
-  subroutine simcomp_test_init_from_attributes(this, json)
-    class(mma_comp_t), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-
-    real(kind=rp), allocatable ::a(:), c(:), d(:)
-    real(kind=rp) :: a0
     integer :: nloc
 
-    real(kind=rp) :: scale
-    logical :: auto_scale
+    call this%init_base(json, case)
+    call this%designx%init(case%msh, case%fluid%Xh, "designx")
 
-    allocate(a(this%m))
-    allocate(c(this%m))
-    allocate(d(this%m))
-
-
-    a0 = this%a0_const
-    a = this%a_const
-    c = this%c_const
-    d = this%d_const
-    ! a0 = 1.0
-    ! a = 0.0
-    ! c = 100000.0
-    ! d = 1000.0
+    call json_get_or_default(json, "m", this%m, 2)
     nloc = this%designx%dof%size()
-    ! print *, "nloc = ", nloc
-    ! call MPI_Allreduce(nloc, nglobal, 1, &
-    !     MPI_INTEGER, mpi_sum, neko_comm, ierr)
-    ! print *, "nglobal = ", nglobal
 
     ! initial design
     this%designx%x = 1.0
-    this%xmax%x = 10.0_rp
-    this%xmin%x = 0.0_rp
-
-    !  call mma_factory(this%mma)
-
-    !     call this%mma%init(reshape(this%designx%x, [nloc]), &
-    !          nloc, this%m, a0, a, c, d, this%xmin%x, this%xmax%x)
-    !  call mma_init_json( mma, x, n, m, json, scale, auto_scale)
 
     call this%mma%init_json( reshape(this%designx%x, [nloc]), &
-         nloc, this%m, json, scale,  auto_scale)
+       nloc, this%m, case%params, this%scale,  this%auto_scale)
+  end subroutine simcomp_test_init_from_json
 
-    print *, "scale = ", scale
-    print *, "auto_scale = ", auto_scale
-
-    ! Get the rank of the current process
-    ! call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
-    ! print *, "************************"
-    ! print *, 'Processor ID (Rank): ', rank, "Max_x = ", &
-    ! maxval(this%designx%dof%x)
-    ! print *, 'Processor ID (Rank): ', rank, "min_x = ", &
-    ! minval(this%designx%dof%x)
-    ! print *, 'Processor ID (Rank): ', rank, "Max_y = ", &
-    ! maxval(this%designx%dof%y)
-    ! print *, 'Processor ID (Rank): ', rank, "min_y = ", &
-    ! minval(this%designx%dof%y)
-    ! print *, 'Processor ID (Rank): ', rank, "Max_z = ", &
-    ! maxval(this%designx%dof%z)
-    ! print *, 'Processor ID (Rank): ', rank, "min_z = ", &
-    ! minval(this%designx%dof%z)
-    ! print *, "************************"
-
-  end subroutine simcomp_test_init_from_attributes
 
   ! Destructor.
   subroutine simcomp_test_free(this)
     class(mma_comp_t), intent(inout) :: this
-
-    call this%tmp%free()
     call this%mma%free()
-
     call this%free_base()
   end subroutine simcomp_test_free
 
@@ -193,20 +111,13 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    real(kind=rp) :: L
-
     integer :: iter, i, ierr, rank, size, nglobal
     integer, allocatable :: recv_counts(:), displs(:)
 
     real(kind=rp) :: start_time, end_time
     real(kind=rp), dimension(this%mma%get_n()) :: x
-
-     !     real(kind=rp), dimension(this%mma%get_m()) :: fval
-     !     real(kind=rp), dimension(this%mma%get_m(),this%mma%get_n()) :: dfdx
     real(kind=rp) :: f0val
-     !     real(kind=rp), dimension(this%mma%get_n()) :: df0dx
-    type(vector_t) :: df0dx
-    type(vector_t) :: fval
+    type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
 
     real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
@@ -215,26 +126,28 @@ contains
     real(kind=rp), allocatable :: all_stuff(:,:)
     integer, allocatable :: nloc_all(:)
 
-    L = 0.0_rp
     call df0dx%init(this%mma%get_n())
     call fval%init(this%mma%get_m())
     call dfdx%init(this%mma%get_m(),this%mma%get_n())
 
 
     call cpu_time(start_time)
-    ! call write_field_to_vector(this%designx,x,this%mma%get_n())
-    x = 1.0_rp
     x = reshape(this%designx%x, [this%mma%get_n()])
-    call func1 (this, this%mma%get_n(), this%mma%get_m(), L, &
+    call func1 (this, this%mma%get_n(), this%mma%get_m(), &
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
-    call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-    call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)   
+    call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
+       HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
+       HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), &
+        HOST_TO_DEVICE, sync=.false.)   
     
-    print *, 'iter = ', 0,&
-         '-------, f0val = ', f0val, ',   fval = ', fval%x
-
+    if (pe_rank .eq. 0) then
+       print *, 'iter = ', 0, &
+          '-------, f0val = ', f0val, ',   fval = ', fval%x
+    end if
+    
     stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
     stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
     stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
@@ -245,7 +158,7 @@ contains
     allocate(recv_counts(size))
     allocate(displs(size))
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
-         MPI_INTEGER, mpi_sum, neko_comm, ierr)
+       MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     allocate(nloc_all(size))
     !!!!Use MPI_Allgather to gather the `nloc` from each process into `nloc_all`
@@ -271,13 +184,10 @@ contains
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
-    if (rank .eq. 0) then
+    if (pe_rank .eq. 0) then
        call write_stuff_vtk(all_stuff, nglobal, "stuff_init.vtk")
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-     
-     !     call this%mma%update(iter, x, df0dx, fval, dfdx)
-
     ! The optimization loop
     do iter = 1, 100 !10
        
@@ -285,31 +195,24 @@ contains
        ! print *,"first"
        this%designx%x = reshape(x,shape(this%designx%x))
 
-       call func1(this, this%mma%get_n(), this%mma%get_m(), L, &
+       call func1(this, this%mma%get_n(), this%mma%get_m(), &
             f0val, df0dx%x, fval%x, dfdx%x)
-       ! update the device pointer
-          !   call device_memcpy(df0dx%x, df0dx%x_d, this%mma%n, HOST_TO_DEVICE, sync=.false.)
-          !   call device_memcpy(fval%x, fval%x_d, this%m, HOST_TO_DEVICE, sync=.false.)
-          !   call device_memcpy(dfdx%x, dfdx%x_d, this%n*this%m, HOST_TO_DEVICE, sync=.false.)     
+       ! update the device pointer 
         call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
         call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
         call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
        
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
-       if (rank .eq. 0) then
+       if (pe_rank .eq. 0) then
           print *, 'iter = ', iter,&
                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
                ',  KKTmax = ', this%mma%get_residumax(), &
                ', KKTnorm2 = ', this%mma%get_residunorm()
        end if
 
-       ! if (this%mma%residunorm .lt. 1.0e-8_rp) exit
-       ! if (this%mma%residumax .lt. this%tol) exit
        if (this%mma%get_residumax() .lt. 1.0e-3_rp) exit
     end do
-
-    ! print *, "f0val = ", f0val, "fval = ", fval
 
     call cpu_time(end_time)
 
@@ -335,7 +238,7 @@ contains
          all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
-    if (rank .eq. 0) then
+    if (pe_rank .eq. 0) then
        call write_stuff_vtk(all_stuff, nglobal, "stuff_final.vtk")
     end if
 
@@ -386,7 +289,7 @@ contains
 
   end subroutine write_stuff_vtk
 
-  subroutine func1 (this, n, m, L, f0val, df0dx, fval, dfdx)
+  subroutine func1 (this, n, m, f0val, df0dx, fval, dfdx)
     ! ----------------------------------------------------------- !
     !  This subroutine calculates function values and gradients   !
     !  for "toy problem 3":                                       !
@@ -398,7 +301,6 @@ contains
     class(mma_comp_t), intent(inout) :: this
 
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in) :: L
     real(kind=rp), intent(inout) :: f0val
     real(kind=rp), dimension(n), intent(inout) :: df0dx
     real(kind=rp), dimension(m), intent(inout) :: fval
@@ -425,7 +327,6 @@ contains
     ! f0val = 0
     ! df0dx = 0
     fval(1) = sum((x-coordx)**2)
-    ! fval(1) = sum(this%designx%x) - this%mma%get_n()*L
     Globalf0val = 0.0_rp
     call MPI_Allreduce(fval(1), Globalf0val, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -434,31 +335,6 @@ contains
     dfdx(1,:) = 2.0_rp * (x - coordx)
     fval(2) = - fval(1)
     dfdx(2,:) = - dfdx(1,:)
-
-
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    ! f0val = sum(this%designx%x)/nglobal
-    ! df0dx = 1.0_rp/nglobal
-    ! Globalf0val = 0.0_rp
-    ! call MPI_Allreduce(f0val, Globalf0val, 1, &
-    !   mpi_real_precision, mpi_sum, neko_comm, ierr)
-    ! f0val = Globalf0val
-
-    ! ! f0val = 0
-    ! ! df0dx = 0
-
-    ! fval(1) = sum(this%designx%x)/nglobal
-    ! ! fval(1) = sum(this%designx%x) - this%mma%get_n()*L
-    ! Globalf0val = 0.0_rp
-    ! call MPI_Allreduce(fval(1), Globalf0val, 1, &
-    !   mpi_real_precision, mpi_sum, neko_comm, ierr)
-    ! fval(1) = Globalf0val
-
-    ! dfdx(1,:) = 1.0_rp/nglobal
-    ! fval(2) = -fval(1)
-    ! dfdx(2,:) = - dfdx(1,:)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   end subroutine func1
 
 end module mma_simcomp

@@ -34,46 +34,6 @@ submodule (mma) mma_cpu
 
   implicit none
 
-     !   type, public, extends(mma_t) :: mma_cpu_t
-     !    private
-     !      real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin
-     !      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
-     !      logical :: is_initialized = .false.
-     !      logical :: is_updated = .false.
-     !      character(len=:), allocatable :: backnd
-
-     !      ! Internal dummy variables for MMA
-     !      type(vector_t) :: p0j, q0j
-     !      type(matrix_t) :: pij, qij
-     !      type(vector_t) :: bi
-
-     !      !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-     !      real(kind=rp) :: z, zeta
-     !      type(vector_t) :: y, lambda, s, mu
-     !      type(vector_t) :: xsi, eta
-
-     !     contains
-
-     !      !> Interface for initializing the MMA object
-     !      procedure, public, pass(this) :: init => mma_init_attributes_cpu
-     !      procedure, pass(this) :: mma_init_attributes_cpu
-
-
-     !      procedure, public, pass(this) :: free => mma_free_cpu
-     !      procedure, public, pass(this) :: KKT => mma_KKT_cpu
-     !      !> Interface for updating the MMA
-     !      procedure, public :: update => mma_update_cpu
-     !      procedure, pass(this) :: mma_update_cpu
-
-     !      !> Interface for generating the approximation sub problem
-     !      generic :: gensub => mma_gensub_cpu
-     !      procedure, pass(this) :: mma_gensub_cpu
-
-     !      !> Interface for solving the dual with an interior point method
-     !      generic :: subsolve => mma_subsolve_dpip_cpu
-     !      procedure, pass(this) :: mma_subsolve_dpip_cpu
-     !   end type mma_cpu_t
-
 contains
 
 
@@ -94,7 +54,6 @@ contains
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
-    ! type(vector_t), intent(in) :: x
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -108,7 +67,6 @@ contains
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
 
-    ! call mma_free_cpu(this)
      call this%free()
 
     this%n = n
@@ -178,10 +136,12 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-!     if (present(backnd)) this%backnd = backnd
     
-    print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
-     ", d=", d, "epsimin =", this%epsimin 
+    if (pe_rank .eq. 0) then
+       print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
+            ", d=", d, "epsimin =", this%epsimin 
+    end if 
+
     !the object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_attributes_cpu
@@ -196,10 +156,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
-     real(kind=rp), dimension(this%n), intent(inout) :: x
-     ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
-     ! real(kind=rp), dimension(this%m), intent(in) :: fval
-     ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
+    real(kind=rp), dimension(this%n), intent(inout) :: x
     type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
 
@@ -276,9 +233,6 @@ contains
     ! using the new x values.                               !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-     ! real(kind=rp), dimension(this%m), intent(in) :: fval
-     ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
-     ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     real(kind=rp), dimension(this%n), intent(in) :: x
     type(vector_t), intent(in) :: df0dx, fval
     type(matrix_t), intent(in) :: dfdx
@@ -332,10 +286,6 @@ contains
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    ! real(kind=rp), dimension(this%n), intent(in) :: x
-    ! real(kind=rp), dimension(this%n), intent(in) :: df0dx
-    ! real(kind=rp), dimension(this%m), intent(in) :: fval
-    ! real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     real(kind=rp), dimension(this%n), intent(in) :: xdesign
     type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
@@ -476,7 +426,6 @@ contains
 
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(inout) :: designx
-    ! type(vector_t) :: designx
     !! Note that there is a local dummy "x" in this subroutine, thus, we call
     !! the current design "designx" instead of just "x"
     integer :: i, j, k, iter, itto, ierr

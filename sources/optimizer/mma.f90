@@ -83,6 +83,7 @@ module mma
   end type mma_t
 
   interface
+    ! ======================================================================== !
     !! interface for cpu backend module subroutines
     module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, &
        xmin,  xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
@@ -95,7 +96,6 @@ module mma
         integer, intent(in), optional :: max_iter
         real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, &
            asydecr
-        ! character(len=:), allocatable, intent(in), optional :: backnd
     end subroutine mma_init_attributes_cpu
 
     module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
@@ -129,7 +129,6 @@ module mma
       real(kind=rp), intent(in) :: a0
       integer, intent(in), optional :: max_iter
       real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-      ! character(len=:), allocatable, intent(in), optional :: backnd
     end subroutine mma_init_attributes_device
 
     module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
@@ -172,7 +171,7 @@ module mma
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
-    ! type(vector_t), intent(in) :: x
+
     type(json_file), intent(inout) :: json
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
@@ -189,7 +188,6 @@ module mma
 
     integer :: max_iter, n_global, ierr
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
-    ! character(len=:), allocatable :: backnd
 
     !! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
@@ -233,7 +231,7 @@ module mma
     if (pe_rank .eq. 0) then
        print *,"Initializing MMA backend to >>> ", this%backnd
     end if
-    ! call mma_factory(this,backnd)
+
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
     ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
@@ -249,13 +247,13 @@ module mma
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
-    ! type(vector_t), intent(in) :: x
+
     real(kind=rp), intent(in), dimension(n) :: xmax, xmin
     real(kind=rp), intent(in), dimension(m) :: a, c, d
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    ! character(len=:), allocatable, intent(in), optional :: backnd
+
     
     ! Select backend type
     select case (this%backnd)
@@ -328,9 +326,6 @@ module mma
        call mma_KKT_cpu(this,x, df0dx, fval, dfdx)
     end select
   end subroutine mma_KKT
-
-
-
 
   ! ========================================================================== !
   ! Getters and setters
