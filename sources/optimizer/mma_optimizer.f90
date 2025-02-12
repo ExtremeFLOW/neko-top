@@ -147,7 +147,7 @@ contains
     call problem%get_all_objective_values(all_objectives)
 
     ! Stamp the fist iteration
-    call mma_logger_assemble_data(log_data, 1, objective_value, &
+    call mma_logger_assemble_data(log_data, 0, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
@@ -156,7 +156,7 @@ contains
 
     associate(x => this%design%design_indicator%x)
 
-      do iter = 2, max_iter
+      do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
 
          !Scaling
