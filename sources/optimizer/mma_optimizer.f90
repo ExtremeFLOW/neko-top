@@ -144,13 +144,13 @@ contains
     ! Write the header
     problem_header = problem%get_log_header()
     optimization_header = 'iter, '//trim(problem_header)//&
-       ', KKTmax, KKTnorm2, scalaing factor'
+         ', KKTmax, KKTnorm2, scalaing factor'
     call this%logger%set_header(trim(optimization_header))
 
     ! Stamp the zeroth iteration
     call mma_logger_assemble_data(log_data, 0, objective_value, &
-       all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
-       problem%get_n_objectives(), problem%get_n_constraints())
+         all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
+         problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
     call problem%write(0)
@@ -192,9 +192,9 @@ contains
 
          ! Stamp the i^th iteration
          call mma_logger_assemble_data(log_data, iter, objective_value, &
-            all_objectives, constraint_value, this%mma%get_residumax(), &
-            this%mma%get_residunorm(), scalingfactor, &
-            problem%get_n_objectives(), problem%get_n_constraints())
+              all_objectives, constraint_value, this%mma%get_residumax(), &
+              this%mma%get_residunorm(), scalingfactor, &
+              problem%get_n_objectives(), problem%get_n_constraints())
          call this%logger%write(log_data)
 
          call problem%write(iter)
@@ -228,8 +228,8 @@ contains
 
   ! package up the log data
   subroutine mma_logger_assemble_data(log_data, iter, objective_value, &
-     all_objectives, constraint_value, residumax, residunorm, scalingfactor, &
-     n, m)
+       all_objectives, constraint_value, residumax, residunorm, scalingfactor, &
+       n, m)
     type(vector_t), intent(out) :: log_data
     integer, intent(in) :: iter
     real(kind=rp), intent(in) ::objective_value

@@ -132,7 +132,7 @@ contains
     call json_get(json, "limit", limit)
 
     call this%init_from_attributes(design, simulation, name, mask_name, &
-       is_max, limit)
+         is_max, limit)
   end subroutine volume_constraint_init_json
 
   !> The direct initializer from attributes.
