@@ -44,8 +44,7 @@ module device_RAMP_mapping
      subroutine cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
        real(c_rp) :: q
@@ -59,8 +58,7 @@ module device_RAMP_mapping
      subroutine cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_down_RAMP_mapping_apply_backward')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
        real(c_rp) :: q
@@ -75,8 +73,7 @@ module device_RAMP_mapping
      subroutine cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
        real(c_rp) :: q
@@ -90,8 +87,7 @@ module device_RAMP_mapping
      subroutine cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
           dF_dX_in_d, dF_dX_out_d, X_in_d, n) &
           bind(c, name = 'cuda_convex_up_RAMP_mapping_apply_backward')
-       use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
        real(c_rp) :: q
