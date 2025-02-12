@@ -63,8 +63,8 @@
 module minimum_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2 &
-       , field_copy
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
+       field_copy
   use operators, only: grad
   use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
@@ -215,7 +215,7 @@ contains
     ! integrate the field
     n = wo1%size()
     if (this%has_mask) then
-       if (neko_bcknd_device .eq. 1) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call field_copy(work, objective_field)
