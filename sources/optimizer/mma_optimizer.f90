@@ -59,8 +59,20 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     type(topopt_design_t), target, intent(in) :: design
+    character(len=1024) :: optimization_header
+    character(len=1024) :: problem_header
 
     this%design => design
+
+    ! Initialize the logger
+    call this%logger%init('optimization_data.csv')
+
+    ! Write the header
+    problem_header = problem%get_log_header()
+    optimization_header = 'iter, '//trim(problem_header)//&
+         ', KKTmax, KKTnorm2, scalaing factor'
+    call this%logger%set_header(trim(optimization_header))
+
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
@@ -112,11 +124,12 @@ contains
 
 
     real(kind=rp) :: objective_value
+    type(vector_t) :: all_objectives
     type(vector_t) :: constraint_value
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    real(kind=rp) :: temp
+    type(vector_t) :: log_data
 
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
@@ -133,29 +146,17 @@ contains
     call problem%get_constraint_values(constraint_value)
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-    ! zero'th iterations should be written too
+    call problem%get_all_objective_values(all_objectives)
+
+    ! Stamp the initial condition
+    call mma_logger_assemble_data(log_data, 0, objective_value, &
+         all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
+         problem%get_n_objectives(), problem%get_n_constraints())
+    call this%logger%write(log_data)
+
     call problem%write(0)
 
-    !Writing the optimization data in a separate file
-    open(1368, file = "optimization_data.txt", status = "replace")
-
     associate(x => this%design%design_indicator%x)
-
-      ! Write n, m, and tolerance in the first line of optimization_data.txt
-      write(1368, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-           nglobal, this%mma%get_m(), tolerance
-
-      ! Write the header for the remaining data
-      write(1368, '(A)') "iter, objective_value, constraint_value, KKTmax, &
-           &KKTnorm2, scalingfactor"
-
-      ! Write the data row-by-row
-      write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-           & ES25.17, ",", ES25.17)') &
-           0, objective_value, constraint_value%x, &
-           this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
-
-      call problem%write(0)
 
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
@@ -232,18 +233,18 @@ contains
          call problem%get_constraint_values(constraint_value)
          call problem%get_objective_sensitivities(objective_sensitivities)
          call problem%get_constraint_sensitivities(constraint_sensitivities)
+         call problem%get_all_objective_values(all_objectives)
 
          call this%mma%KKT(x, objective_sensitivities%x, &
               reshape([constraint_value%x], [this%mma%get_m()]), &
               constraint_sensitivities%x)
 
-         write(1368, '(I3, ",", ES25.17, ",", ES25.17, ",", ES25.17, ",", &
-              & ES25.17, ",", ES25.17)') iter, objective_value, &
-              constraint_value%x, this%mma%get_residumax(), &
-              this%mma%get_residunorm(), scalingfactor
-
-         ! Flush the buffer to write the data during the run
-         flush(1368)
+         ! Stamp the i^th iteration
+         call mma_logger_assemble_data(log_data, iter, objective_value, &
+              all_objectives, constraint_value, this%mma%get_residumax(), &
+              this%mma%get_residunorm(), scalingfactor, &
+              problem%get_n_objectives(), problem%get_n_constraints())
+         call this%logger%write(log_data)
 
          call problem%write(iter)
 
@@ -257,12 +258,8 @@ contains
       end do
     end associate
 
-
-    close(1368)
-
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
-
 
     call constraint_value%free()
     call objective_sensitivities%free()
@@ -278,5 +275,44 @@ contains
     call this%mma%free()
   end subroutine mma_optimizer_free
 
+  ! package up the log data
+  subroutine mma_logger_assemble_data(log_data, iter, objective_value, &
+       all_objectives, constraint_value, residumax, residunorm, scalingfactor, &
+       n, m)
+    type(vector_t), intent(out) :: log_data
+    integer, intent(in) :: iter
+    real(kind=rp), intent(in) ::objective_value
+    type(vector_t), intent(in) :: all_objectives
+    type(vector_t), intent(in) :: constraint_value
+    real(kind=rp), intent(in) :: residumax, residunorm, scalingfactor
+    integer, intent(in) :: n, m
+    integer :: i_tmp1, i_tmp2
+
+    ! initialize the logger data
+    ! iter | tot F | F_1 | .. |F_n | C_1 | ... | C_n | KKT | KKT2 | scale |
+    call log_data%init(5 + n + m)
+
+    ! iteration
+    log_data%x(1) = real(iter, kind=rp)
+
+    ! total objective
+    log_data%x(2) = objective_value
+
+    ! individual objectives
+    i_tmp1 = 3
+    i_tmp2 = i_tmp1 + n - 1
+    log_data%x(i_tmp1 : i_tmp2) = all_objectives%x
+
+    ! constraints
+    i_tmp1 = i_tmp2 + 1
+    i_tmp2 = i_tmp1 + m - 1
+    log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
+
+    ! convergence stuff
+    log_data%x(i_tmp2 + 1) = residumax
+    log_data%x(i_tmp2 + 2) = residunorm
+    log_data%x(i_tmp2 + 3) = scalingfactor
+
+  end subroutine mma_logger_assemble_data
 end module mma_optimizer
 

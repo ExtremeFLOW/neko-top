@@ -134,13 +134,16 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     character(len=:), allocatable :: mask_name
+    character(len=:), allocatable :: name
     real(kind=rp) :: weight, K
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "name", name, "Out of plane stresses")
     call json_get_or_default(json, "K", K, 1.0_rp)
 
-    call this%init_from_attributes(design, simulation, weight, mask_name, K)
+    call this%init_from_attributes(design, simulation, weight, name, &
+         mask_name, K)
   end subroutine lube_term_init_json
 
   !> The actual constructor.
@@ -150,17 +153,21 @@ contains
   !! @param mask_name the name of the mask.
   !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       mask_name, K)
+       name, mask_name, K)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: mask_name
+    character(len=*), intent(in) :: name
     real(kind=rp), intent(in) :: K
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
     call this%init_base(design%size(), weight, mask_name)
+
+    ! Assign the name to objective
+    this%name = name
 
     ! Set the coefficient for the lube term
     this%K = K

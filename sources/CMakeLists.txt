@@ -4,10 +4,19 @@
 # Set CMake Variables.
 
 # Setup the global inclusion for fortran
-set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules)
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
+    CACHE PATH "Fortran module directory")
 include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
 
 add_library(neko-top STATIC)
+
+# Set the output directory of the library.
+set_target_properties(neko-top
+    PROPERTIES
+    OUTPUT_NAME "neko-top"
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include"
+)
 
 # Add the local neko extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
@@ -94,7 +103,7 @@ endif()
 # Specify installation instructions
 
 install(TARGETS neko-top
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}/lib/
+    DESTINATION ${CMAKE_SOURCE_DIR}/lib/
 )
 install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
     DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}
