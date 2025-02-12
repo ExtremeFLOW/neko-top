@@ -23,7 +23,6 @@ module mma_optimizer
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
-  use csv_file, only : csv_file_t
 
 
   implicit none
@@ -35,7 +34,6 @@ module mma_optimizer
 
      type(mma_t) :: mma
      type(topopt_design_t), pointer :: design
-     type(csv_file_t) :: logger
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! Note that the values are not updated but they are scaled when passed
@@ -61,8 +59,20 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     type(topopt_design_t), target, intent(in) :: design
+    character(len=1024) :: optimization_header
+    character(len=1024) :: problem_header
 
     this%design => design
+
+    ! Initialize the logger
+    call this%logger%init('optimization_data.txt')
+
+    ! Write the header
+    problem_header = problem%get_log_header()
+    optimization_header = 'iter, '//trim(problem_header)//&
+         ', KKTmax, KKTnorm2, scalaing factor'
+    call this%logger%set_header(trim(optimization_header))
+
 
     ! Initialize MMA solver
     ! Check the type of the problem using select type
@@ -117,8 +127,6 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    character(len=1024) :: optimization_header
-    character(len=1024) :: problem_header
     type(vector_t) :: log_data
 
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
@@ -138,26 +146,17 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
-    ! Initialize the logger
-    call this%logger%init('optimization_data.txt')
-
-    ! Write the header
-    problem_header = problem%get_log_header()
-    optimization_header = 'iter, '//trim(problem_header)//&
-         ', KKTmax, KKTnorm2, scalaing factor'
-    call this%logger%set_header(trim(optimization_header))
-
-    ! Stamp the zeroth iteration
-    call mma_logger_assemble_data(log_data, 0, objective_value, &
+    ! Stamp the fist iteration
+    call mma_logger_assemble_data(log_data, 1, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
-    call problem%write(0)
+    call problem%write(1)
 
     associate(x => this%design%design_indicator%x)
 
-      do iter = 1, max_iter
+      do iter = 2, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
 
          !Scaling
