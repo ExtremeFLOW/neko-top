@@ -68,7 +68,6 @@ module problem
      integer :: n_objectives
      !> Number of constraints in the problem.
      integer :: n_constraints
-     !> Format for output log
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list

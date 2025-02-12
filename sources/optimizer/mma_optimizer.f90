@@ -148,7 +148,7 @@ contains
     ! ------------------------------------------------------------------------
     !Writing the optimization data in a separate file
     log_unit = 1368
-    real_format = 'ES10.05'
+    real_format = 'ES20.10'
     open(log_unit, file = "optimization_data.txt", status = "replace")
     log_format = '(I3, A, ", ", '//real_format//', ", ", '//real_format//&
        ', ", ", '//real_format//')'
