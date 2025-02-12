@@ -146,13 +146,13 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
-    ! Stamp the fist iteration
+    ! Stamp the initial condition
     call mma_logger_assemble_data(log_data, 0, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
-    call problem%write(1)
+    call problem%write(0)
 
     associate(x => this%design%design_indicator%x)
 
