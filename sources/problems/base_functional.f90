@@ -58,7 +58,7 @@ module base_functional
      !> Sensitivity field
      type(vector_t) :: sensitivity
      !> Name of constraint/objective in the logfile
-     character(len=25) :: log_name
+     character(len=25) :: name
      !> containing a mask
      logical :: has_mask
      !> A mask for where the objective function is evaluated

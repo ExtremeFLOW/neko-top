@@ -23,7 +23,6 @@ module mma_optimizer
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
-
   use csv_file, only : csv_file_t
 
 
@@ -121,13 +120,10 @@ contains
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
     type(vector_t) :: log_data
-    ! ------------------------------------------------------------------------
-
 
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
-
 
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
@@ -141,7 +137,6 @@ contains
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
-
 
     ! Initialize the logger
     call this%logger%init('optimization_data.txt')
@@ -195,7 +190,7 @@ contains
               reshape([constraint_value%x], [this%mma%get_m()]), &
               constraint_sensitivities%x)
 
-         ! Stamp the zeroth iteration
+         ! Stamp the i^th iteration
          call mma_logger_assemble_data(log_data, iter, objective_value, &
             all_objectives, constraint_value, this%mma%get_residumax(), &
             this%mma%get_residunorm(), scalingfactor, &

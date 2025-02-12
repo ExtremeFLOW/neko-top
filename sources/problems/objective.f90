@@ -89,18 +89,14 @@ contains
   !! @param design_size The number of design variables.
   !! @param weight The weight of the objective function.
   !! @param[optional] mask_name The name design the mask.
-  subroutine objective_init_base(this, design_size, weight, log_name, &
-     mask_name)
+  subroutine objective_init_base(this, design_size, weight, mask_name)
     class(objective_t), intent(inout) :: this
     integer, intent(in) :: design_size
     real(kind=rp), intent(in) :: weight
-    character(len=*), intent(in) :: log_name
     character(len=*), intent(in), optional :: mask_name
 
     this%value = 0.0_rp
     call this%sensitivity%init(design_size)
-
-    this%log_name = log_name
 
     this%weight = weight
 

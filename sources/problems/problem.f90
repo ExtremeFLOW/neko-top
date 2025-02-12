@@ -170,8 +170,6 @@ module problem
 
      !> Return the logfile header
      procedure, pass(this) :: get_log_header => problem_get_log_header
-     !> Return the current logfile state
-     procedure, pass(this) :: get_log_state => problem_get_log_state
 
   end type problem_t
 
@@ -648,14 +646,14 @@ contains
     buff = "Total objective function"
     do i = 1, this%get_n_objectives()
        mini_buff = ""
-       write(mini_buff, '(", ", A)') this%objective_list(i)%objective%log_name
+       write(mini_buff, '(", ", A)') this%objective_list(i)%objective%name
        buff = trim(buff)//trim(mini_buff)
     end do
 
     do i = 1, this%get_n_constraints()
        mini_buff = ""
        write(mini_buff, '(", ", A)') &
-            this%constraint_list(i)%constraint%log_name
+            this%constraint_list(i)%constraint%name
        buff = trim(buff)//trim(mini_buff)
     end do
 
