@@ -148,6 +148,9 @@ module problem
      !> Return the objective.
      procedure, pass(this), public :: get_objective_value => &
           problem_get_objective_value
+     !> Return all components of the objective.
+     procedure, pass(this), public :: get_all_objective_values => &
+          problem_get_all_objective_values
      !> Return the constraints.
      procedure, pass(this), public :: get_constraint_values => &
           problem_get_constraint_values
@@ -506,6 +509,29 @@ contains
 
   end subroutine problem_get_objective_value
 
+  !> Construct and get the objective.
+  !!
+  !! This function returns all the indivual objectives comprising the
+  !! objective function
+  !! @param[out] all_objective_values A vector containing all objectives
+  subroutine problem_get_all_objective_values(this, all_objective_values)
+    class(problem_t), intent(inout) :: this
+    type(vector_t), intent(out) :: all_objective_values
+    integer :: i
+
+    call all_objective_values%init(this%n_objectives)
+
+    do i = 1, this%n_objectives
+       all_objective_values%x(i) = this%objective_list(i)%objective%value
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(all_objective_values%x, all_objective_values%x_d, &
+            this%n_objectives, HOST_TO_DEVICE, sync = .true.)
+    end if
+
+  end subroutine problem_get_all_objective_values
+
   !> Construct and get the constraints.
   !!
   !! This function constructs the constraint values from the individual
@@ -634,43 +660,4 @@ contains
     end do
 
   end function problem_get_log_header
-
-  !> Return the log for the current iteration.
-  function problem_get_log_state(this, real_format) result(buff)
-    class(problem_t), intent(in) :: this
-    character(len=*), intent(in) :: real_format
-    character(len=1024) :: buff
-    character(len=50) :: mini_buff
-    character(len=30) :: formatting
-    real(kind=rp) :: tmp_real
-    real(kind=rp), allocatable :: tmp_reals
-    integer :: i
-
-    formatting = '(", ",'//trim(real_format)//')'
-
-    buff = ""
-    mini_buff = ""
-    tmp_real = 0.0_rp
-    do i = 1, this%n_objectives
-       tmp_real = tmp_real + &
-            this%objective_list(i)%objective%weight * &
-            this%objective_list(i)%objective%value
-    end do
-
-    write(mini_buff, formatting) tmp_real
-    buff = trim(buff)//trim(mini_buff)
-
-    do i = 1, this%get_n_objectives()
-       mini_buff = ""
-       write(mini_buff, formatting) this%objective_list(i)%objective%value
-       buff = trim(buff)//trim(mini_buff)
-    end do
-
-    do i = 1, this%get_n_constraints()
-       mini_buff = ""
-       write(mini_buff, formatting) this%constraint_list(i)%constraint%value
-       buff = trim(buff)//trim(mini_buff)
-    end do
-
-  end function problem_get_log_state
 end module problem

@@ -24,7 +24,7 @@ module mma_optimizer
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
 
-  use comm, only : pe_rank
+  use csv_file, only : csv_file_t
 
 
   implicit none
@@ -36,6 +36,7 @@ module mma_optimizer
 
      type(mma_t) :: mma
      type(topopt_design_t), pointer :: design
+     type(csv_file_t) :: logger
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! Note that the values are not updated but they are scaled when passed
@@ -112,25 +113,21 @@ contains
     real(kind=rp) :: scalingfactor
 
     real(kind=rp) :: objective_value
+    type(vector_t) :: all_objectives
     type(vector_t) :: constraint_value
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    ! These would all be owned by the logger_t
-    ! ------------------------------------------------------------------------
-    !> format for writing real values in the log file
-    character(len=10) :: real_format
-    ! logging
-    character(len=1024) :: problem_log ! I assume 1024 is enough?
-    character(len=1024) :: optimization_log ! I assume 1024 is enough?
-    character(len=100) :: log_format
-    integer :: log_unit
+    character(len=1024) :: optimization_header
+    character(len=1024) :: problem_header
+    type(vector_t) :: log_data
     ! ------------------------------------------------------------------------
 
 
     ! call MPI_Comm_rank(neko_comm, rank, ierr)
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
+
 
     !>initializing the scaling factor
     scalingfactor = 1.0_rp
@@ -143,46 +140,27 @@ contains
     call problem%get_constraint_values(constraint_value)
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call problem%get_all_objective_values(all_objectives)
 
-    ! Should I write a logger_t such that this becomes a logger%init()
-    ! ------------------------------------------------------------------------
-    !Writing the optimization data in a separate file
-    log_unit = 1368
-    real_format = 'ES20.10'
-    open(log_unit, file = "optimization_data.txt", status = "replace")
-    log_format = '(I3, A, ", ", '//real_format//', ", ", '//real_format//&
-       ', ", ", '//real_format//')'
-    ! Write n, m, and tolerance in the first line of optimization_data.txt
-    ! do we really want this?
-    if (pe_rank .eq. 0) then
-       write(log_unit, '("n =", I10, ", m =", I10, ", tolerance =", ES25.17)') &
-            nglobal, this%mma%get_m(), tolerance
-    end if
 
-    ! Write the header for the remaining data
-    problem_log = problem%get_log_header()
-    optimization_log = 'iter, '//trim(problem_log)//&
+    ! Initialize the logger
+    call this%logger%init('optimization_data.txt')
+
+    ! Write the header
+    problem_header = problem%get_log_header()
+    optimization_header = 'iter, '//trim(problem_header)//&
        ', KKTmax, KKTnorm2, scalaing factor'
-    if (pe_rank .eq. 0) then
-       write(log_unit, '(A)') trim(optimization_log)
-    end if
-    ! ------------------------------------------------------------------------
+    call this%logger%set_header(trim(optimization_header))
+
+    ! Stamp the zeroth iteration
+    call mma_logger_assemble_data(log_data, 0, objective_value, &
+       all_objectives, constraint_value, 0.0_rp, 0.0_rp, scalingfactor, &
+       problem%get_n_objectives(), problem%get_n_constraints())
+    call this%logger%write(log_data)
+
+    call problem%write(0)
 
     associate(x => this%design%design_indicator%x)
-
-
-      ! Should I write a logger_t such that this becomes a logger%write()
-      ! ----------------------------------------------------------------------
-      ! Write the data row-by-row
-      problem_log = problem%get_log_state(real_format)
-      write(optimization_log, log_format) 0, trim(problem_log), &
-         this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
-      if (pe_rank .eq. 0) then
-         write(1368, '(A)') trim(optimization_log)
-      end if
-      ! ----------------------------------------------------------------------
-
-      call problem%write(0)
 
       do iter = 1, max_iter
          if (this%mma%get_residumax() .lt. tolerance) exit
@@ -211,23 +189,18 @@ contains
          call problem%get_constraint_values(constraint_value)
          call problem%get_objective_sensitivities(objective_sensitivities)
          call problem%get_constraint_sensitivities(constraint_sensitivities)
+         call problem%get_all_objective_values(all_objectives)
 
          call this%mma%KKT(x, objective_sensitivities%x, &
               reshape([constraint_value%x], [this%mma%get_m()]), &
               constraint_sensitivities%x)
 
-         ! Write the data row-by-row
-         ! should I implement a logger_t, such that this is a logger%write()
-         ! -------------------------------------------------------------------
-         problem_log = problem%get_log_state(real_format)
-         write(optimization_log, log_format) iter, trim(problem_log), &
-            this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
-         if (pe_rank .eq. 0) then
-            write(log_unit, '(A)') trim(optimization_log)
-            ! Flush the buffer to write the data during the run
-            flush(log_unit)
-         end if
-         ! -------------------------------------------------------------------
+         ! Stamp the zeroth iteration
+         call mma_logger_assemble_data(log_data, iter, objective_value, &
+            all_objectives, constraint_value, this%mma%get_residumax(), &
+            this%mma%get_residunorm(), scalingfactor, &
+            problem%get_n_objectives(), problem%get_n_constraints())
+         call this%logger%write(log_data)
 
          call problem%write(iter)
 
@@ -244,7 +217,6 @@ contains
     ! Final state after optimization
     print*, "MMA Optimization completed after", iter-1, "iterations."
 
-    close(log_unit)
     call constraint_value%free()
     call objective_sensitivities%free()
     call constraint_sensitivities%free()
@@ -259,5 +231,44 @@ contains
     call this%mma%free()
   end subroutine mma_optimizer_free
 
+  ! package up the log data
+  subroutine mma_logger_assemble_data(log_data, iter, objective_value, &
+     all_objectives, constraint_value, residumax, residunorm, scalingfactor, &
+     n, m)
+    type(vector_t), intent(out) :: log_data
+    integer, intent(in) :: iter
+    real(kind=rp), intent(in) ::objective_value
+    type(vector_t), intent(in) :: all_objectives
+    type(vector_t), intent(in) :: constraint_value
+    real(kind=rp), intent(in) :: residumax, residunorm, scalingfactor
+    integer, intent(in) :: n, m
+    integer :: i_tmp1, i_tmp2
+
+    ! initialize the logger data
+    ! iter | tot F | F_1 | .. |F_n | C_1 | ... | C_n | KKT | KKT2 | scale |
+    call log_data%init(5 + n + m)
+
+    ! iteration
+    log_data%x(1) = real(iter, kind=rp)
+
+    ! total objective
+    log_data%x(2) = objective_value
+
+    ! individual objectives
+    i_tmp1 = 3
+    i_tmp2 = i_tmp1 + n - 1
+    log_data%x(i_tmp1 : i_tmp2) = all_objectives%x
+
+    ! constraints
+    i_tmp1 = i_tmp2 + 1
+    i_tmp2 = i_tmp1 + m - 1
+    log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
+
+    ! convergence stuff
+    log_data%x(i_tmp2 + 1) = residumax
+    log_data%x(i_tmp2 + 2) = residunorm
+    log_data%x(i_tmp2 + 3) = scalingfactor
+
+  end subroutine mma_logger_assemble_data
 end module mma_optimizer
 
