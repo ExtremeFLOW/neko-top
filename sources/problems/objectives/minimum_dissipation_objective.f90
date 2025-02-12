@@ -133,7 +133,7 @@ contains
     call json_get_or_default(json, "log_name", log_name, "Dissipation")
 
     call this%init_from_attributes(design, simulation, weight, log_name, &
-       mask_name)
+         mask_name)
   end subroutine minimum_dissipation_init_json
 
 !> The actual constructor.

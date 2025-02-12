@@ -138,11 +138,11 @@ contains
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "log_name", log_name, &
-       "out of plane stresses")
+         "out of plane stresses")
     call json_get_or_default(json, "K", K, 1.0_rp)
 
     call this%init_from_attributes(design, simulation, weight, log_name, &
-       mask_name, K)
+         mask_name, K)
   end subroutine lube_term_init_json
 
   !> The actual constructor.
@@ -166,7 +166,7 @@ contains
     call this%init_base(design%size(), weight, mask_name)
 
     ! Assign the name to objective
-    this%log_name = log_name 
+    this%log_name = log_name
 
     ! Set the coefficient for the lube term
     this%K = K

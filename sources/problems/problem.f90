@@ -605,7 +605,7 @@ contains
   function problem_get_log_header(this) result(buff)
     class(problem_t), intent(in) :: this
     character(len=1024) :: buff
-    character(len=50) :: mini_buff 
+    character(len=50) :: mini_buff
     integer :: i
 
     ! When it comes to multi-objective optimization
@@ -616,7 +616,7 @@ contains
     !
     !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
     !
-    ! And then if we also want things like thie iteration or KKT they can be 
+    ! And then if we also want things like thie iteration or KKT they can be
     ! appended to the begining or end of this by the optimizer.
     !
     ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
@@ -630,7 +630,7 @@ contains
     do i = 1, this%get_n_constraints()
        mini_buff = ""
        write(mini_buff, '(", ", A)') &
-          this%constraint_list(i)%constraint%log_name
+            this%constraint_list(i)%constraint%log_name
        buff = trim(buff)//trim(mini_buff)
     end do
 
@@ -641,13 +641,13 @@ contains
     class(problem_t), intent(in) :: this
     character(len=*), intent(in) :: real_format
     character(len=1024) :: buff
-    character(len=50) :: mini_buff 
-    character(len=30) :: formatting 
+    character(len=50) :: mini_buff
+    character(len=30) :: formatting
     real(kind=rp) :: tmp_real
     real(kind=rp), allocatable :: tmp_reals
     integer :: i
 
-    formatting = '(", ",'//trim(real_format)//')' 
+    formatting = '(", ",'//trim(real_format)//')'
 
     buff = ""
     mini_buff = ""
@@ -658,7 +658,7 @@ contains
             this%objective_list(i)%objective%value
     end do
 
-    write(mini_buff, formatting) tmp_real 
+    write(mini_buff, formatting) tmp_real
     buff = trim(buff)//trim(mini_buff)
 
     do i = 1, this%get_n_objectives()
@@ -672,6 +672,6 @@ contains
        write(mini_buff, formatting) this%constraint_list(i)%constraint%value
        buff = trim(buff)//trim(mini_buff)
     end do
-    
+
   end function problem_get_log_state
 end module problem

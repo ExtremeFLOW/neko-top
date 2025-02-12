@@ -159,7 +159,7 @@ contains
     call this%init_base(design%size(), mask_name)
 
     ! Assign the name to constraint
-    this%log_name = log_name 
+    this%log_name = log_name
 
     ! Store the attributes
     this%is_max = is_max
