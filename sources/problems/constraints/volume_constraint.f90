@@ -264,10 +264,10 @@ contains
 
     volume = 0.0_rp
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        volume = volume_topopt_design(this, design)
 
-      class default
+    class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
