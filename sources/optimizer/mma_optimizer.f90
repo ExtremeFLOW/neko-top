@@ -119,11 +119,11 @@ contains
     ! These would all be owned by the logger_t
     ! ------------------------------------------------------------------------
     !> format for writing real values in the log file
-    character(len=10) :: real_format 
+    character(len=10) :: real_format
     ! logging
     character(len=1024) :: problem_log ! I assume 1024 is enough?
     character(len=1024) :: optimization_log ! I assume 1024 is enough?
-    character(len=100) :: log_format 
+    character(len=100) :: log_format
     integer :: log_unit
     ! ------------------------------------------------------------------------
 
@@ -148,7 +148,7 @@ contains
     ! ------------------------------------------------------------------------
     !Writing the optimization data in a separate file
     log_unit = 1368
-    real_format = 'ES25.17' 
+    real_format = 'ES10.05'
     open(log_unit, file = "optimization_data.txt", status = "replace")
     log_format = '(I3, A, ", ", '//real_format//', ", ", '//real_format//&
        ', ", ", '//real_format//')'
@@ -224,9 +224,9 @@ contains
             this%mma%get_residumax(), this%mma%get_residunorm(), scalingfactor
          if (pe_rank .eq. 0) then
             write(log_unit, '(A)') trim(optimization_log)
+            ! Flush the buffer to write the data during the run
+            flush(log_unit)
          end if
-         ! Flush the buffer to write the data during the run
-         flush(log_unit)
          ! -------------------------------------------------------------------
 
          call problem%write(iter)
