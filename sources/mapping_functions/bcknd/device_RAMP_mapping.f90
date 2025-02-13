@@ -35,6 +35,12 @@ module device_RAMP_mapping
   use num_types, only : rp, c_rp
   use, intrinsic :: iso_c_binding, only : c_ptr, c_int
   implicit none
+  private
+
+  public :: device_convex_up_RAMP_mapping_apply, &
+       device_convex_up_RAMP_mapping_apply_backward, &
+       device_convex_down_RAMP_mapping_apply, &
+       device_convex_down_RAMP_mapping_apply_backward
 
 #if HAVE_HIP
 
