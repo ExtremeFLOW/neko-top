@@ -46,8 +46,10 @@ __global__ void convex_down_RAMP_mapping_apply_kernel(
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) { X_out_d[i] = f_min + (f_max - f_min)
-    * X_in_d[i] / (1.0 + q * (1.0 + X_in_d[i])); }
+    for (int i = idx; i < n; i += str) {
+        X_out_d[i] = f_min 
+            + (f_max - f_min) * X_in_d[i] / (1.0 + q * (1.0 + X_in_d[i]));
+    }
 }
 
 /**
@@ -61,9 +63,11 @@ __global__ void convex_down_RAMP_mapping_apply_backward_kernel(
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) { dF_dX_in_d[i] = (f_max - f_min) *
-    (q + 1.0) / ((1.0 - q * (X_in_d[i] - 1.0))*(1.0 - q * (X_in_d[i] - 1.0)) )
-    * dF_dX_out_d[i]; }
+    for (int i = idx; i < n; i += str) {
+        dF_dX_in_d[i] = (f_max - f_min) * (q + 1.0) / ( 
+                (1.0 - q * (X_in_d[i] - 1.0)) * (1.0 - q * (X_in_d[i] - 1.0)) 
+            ) * dF_dX_out_d[i]; 
+    }
 }
 /**
  * Device kernel for RAMP (convex up) mapping
@@ -76,8 +80,10 @@ __global__ void convex_up_RAMP_mapping_apply_kernel(
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) { X_out_d[i] = f_min + (f_max - f_min)
-    * X_in_d[i] * (1.0 + q) / (X_in_d[i] + q); }
+    for (int i = idx; i < n; i += str) {
+        X_out_d[i] = f_min 
+            + (f_max - f_min) * X_in_d[i] * (1.0 + q) / (X_in_d[i] + q);
+    }
 }
 
 /**
@@ -91,7 +97,9 @@ __global__ void convex_up_RAMP_mapping_apply_backward_kernel(
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) { dF_dX_in_d[i] = (f_max - f_min)
-    * (q + 1.0) / ( (X_in_d[i] + q)*(X_in_d[i] + q)) * dF_dX_out_d[i]; }
+    for (int i = idx; i < n; i += str) {
+        dF_dX_in_d[i] = (f_max - f_min) 
+            * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * dF_dX_out_d[i];
+    }
 }
 #endif // __NEKO_CUDA_RAMP_MAPPING_KERNELS__
