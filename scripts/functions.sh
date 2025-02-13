@@ -49,19 +49,21 @@ function run {
 
     else
         # Look for the number of cores to use
-        if [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+        if [ ! -z "$NPROCS" ]; then
+            ncores=$NPROCS
+        elif [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
             ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
         elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
             ncores=$LSB_DJOB_NUMPROC
-        fi
-
-        if [ -z "$ncores" ]; then
+        else
             nsockets="$(lscpu | grep "Socket(s)" | awk '{print $2}')"
             ncores="$(lscpu | grep "Core(s) per socket" | awk '{print $4}')"
             ncores=$((nsockets * ncores))
         fi
 
-        ncores=1
+        if [ -z "$ncores" ]; then
+            ncores=1
+        fi
 
         mpirun -n $ncores $neko $casefile 2>error.log
 
