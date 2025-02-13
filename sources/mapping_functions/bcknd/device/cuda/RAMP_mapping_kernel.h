@@ -64,9 +64,9 @@ __global__ void convex_down_RAMP_mapping_apply_backward_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < n; i += str) {
-        dF_dX_in_d[i] = (f_max - f_min) * (q + 1.0) / ( 
-                (1.0 - q * (X_in_d[i] - 1.0)) * (1.0 - q * (X_in_d[i] - 1.0)) 
-            ) * dF_dX_out_d[i]; 
+        dF_dX_in_d[i] = (f_max - f_min) * (q + 1.0) / (
+                (1.0 - q * (X_in_d[i] - 1.0)) * (1.0 - q * (X_in_d[i] - 1.0))
+            ) * dF_dX_out_d[i];
     }
 }
 /**
