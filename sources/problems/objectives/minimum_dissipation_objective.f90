@@ -151,10 +151,7 @@ contains
 
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
-    call this%init_base(design%size(), weight, mask_name)
-
-    ! Assign the name to objective
-    this%name = name
+    call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
     this%fluid => simulation%fluid_scheme

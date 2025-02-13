@@ -162,10 +162,7 @@ contains
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
-    call this%init_base(design%size(), weight, mask_name)
-
-    ! Assign the name to objective
-    this%name = name
+    call this%init_base(name, design%size(), weight, mask_name)
 
     ! Set the coefficient for the lube term
     this%K = K
