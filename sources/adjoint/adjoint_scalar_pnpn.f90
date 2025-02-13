@@ -92,7 +92,7 @@ module adjoint_scalar_pnpn
      !> Dirichlet conditions for the residual
      !! Collects all the Dirichlet condition facets into one bc and applies 0,
      !! Since the values never change there during the solve.
-     type(dirichlet_t) :: bc_res
+     type(zero_dirichlet_t) :: bc_res
 
      !> A bc list for the bc_res. Contains only that, essentially just to wrap
      !! the if statement determining whether to apply on the device or CPU.
@@ -131,7 +131,25 @@ module adjoint_scalar_pnpn
      procedure, pass(this) :: free => adjoint_scalar_pnpn_free
      !> Solve for the current timestep.
      procedure, pass(this) :: step => adjoint_scalar_pnpn_step
+     !> Setup the boundary conditions
+     procedure, pass(this) :: setup_bcs_ => adjoint_scalar_pnpn_setup_bcs_
   end type adjoint_scalar_pnpn_t
+
+  interface
+     !> Boundary condition factory. Both constructs and initializes the object.
+     !! @details Will mark a mesh zone for the bc and finalize.
+     !! @param[inout] object The object to be allocated.
+     !! @param[in] scheme The `scalar_pnpn` scheme.
+     !! @param[inout] json JSON object for initializing the bc.
+     !! @param[in] coef SEM coefficients.
+     module subroutine bc_factory(object, scheme, json, coef, user)
+        class(bc_t), pointer, intent(inout) :: object
+        type(scalar_pnpn_t), intent(in) :: scheme
+        type(json_file), intent(inout) :: json
+        type(coef_t), intent(in) :: coef
+        type(user_t), intent(in) :: user
+     end subroutine bc_factory
+  end interface
 
 contains
 
