@@ -32,6 +32,10 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
 
+    printf "\n\e[4mEnvironment:\e[0m\n"
+    printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
+    printf "  -%-1s %-60s\n" "NPROCS" "Number of processors to use."
+
     printf "\n\e[4mAvailable case files:\e[0m\n"
     for case in $(find $EPATH -name "*.case" 2>/dev/null); do
         printf '  - %-s\n' ${case#$EPATH/}
