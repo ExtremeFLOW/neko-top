@@ -48,7 +48,7 @@ __global__ void copy_mask_kernel(
 
     for (int i = idx; i < mask_size; i += str) {
         a[mask[i]-1] = b[mask[i]-1];
-        }
+    }
 }
 
 /**
@@ -64,7 +64,7 @@ __global__ void cadd_mask_kernel(
 
     for (int i = idx; i < mask_size; i += str) {
         a[mask[i]-1] = a[mask[i]-1] + c;
-        }
+    }
 }
 
 /**
