@@ -531,7 +531,7 @@ contains
     end do
 
     ! Save the new designx
-    this%xold2 = this%xold1
+    this%xold2%x = this%xold1%x
     this%xold1%x = designx
     designx = x
 

@@ -478,9 +478,9 @@ contains
     n = this%u_adj%dof%size()
     if (allocated(this%chkp%previous_mesh%elements) .or. &
          this%chkp%previous_Xh%lx .ne. this%Xh%lx) then
-       associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, p => this%p_adj, &
-            c_Xh => this%c_Xh, ulag => this%ulag, vlag => this%vlag, &
-            wlag => this%wlag)
+       associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
+            p => this%p_adj, c_Xh => this%c_Xh, ulag => this%ulag, &
+            vlag => this%vlag, wlag => this%wlag)
          do concurrent (j = 1:n)
             u%x(j,1,1,1) = u%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
             v%x(j,1,1,1) = v%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
@@ -789,16 +789,17 @@ contains
          !       this%advx, this%advy, this%advz, &
          !       Xh, this%c_Xh, dm_Xh%size(), dt)
 
-         !  ! At this point the RHS contains the sum of the advection operator and
-         !  ! additional source terms, evaluated using the velocity field from the
-         !  ! previous time-step. Now, this value is used in the explicit time
-         !  ! scheme to advance both terms in time.
+         ! At this point the RHS contains the sum of the advection operator and
+         ! additional source terms, evaluated using the velocity field from the
+         ! previous time-step. Now, this value is used in the explicit time
+         ! scheme to advance both terms in time.
          !  call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
          !       this%abx2, this%aby2, this%abz2, &
          !       f_x%x, f_y%x, f_z%x, &
          !       rho, ext_bdf%advection_coeffs, n)
 
-         !  ! Now, the source terms from the previous time step are added to the RHS.
+         ! Now, the source terms from the previous time step are added to the
+         ! RHS.
          !  call makeoifs%compute_fluid(this%advx%x, this%advy%x, this%advz%x, &
          !       f_x%x, f_y%x, f_z%x, &
          !       rho, dt, n)
@@ -864,8 +865,8 @@ contains
       call profiler_start_region('Pressure_solve', 3)
 
       ! Solve for the pressure increment.
-      ksp_results(1) = &
-           this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, this%bclst_dp, gs_Xh)
+      ksp_results(1) = this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, &
+           this%bclst_dp, gs_Xh)
 
 
       call profiler_end_region('Pressure_solve', 3)
@@ -926,12 +927,12 @@ contains
 
       if (this%forced_flow_rate) then
          call neko_error('Forced flow rate is not implemented for the adjoint')
-         !  call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
-         !       c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
-         !       this%bclst_dp, this%bclst_du, this%bclst_dv, &
-         !       this%bclst_dw, this%bclst_vel_res, Ax_vel, Ax_prs, this%ksp_prs, &
-         !       this%ksp_vel, this%pc_prs, this%pc_vel, this%ksp_prs%max_iter, &
-         !       this%ksp_vel%max_iter)
+         !call this%vol_flow%adjust( u, v, w, p, u_res, v_res, w_res, p_res, &
+         !     c_Xh, gs_Xh, ext_bdf, rho, mu, dt, &
+         !     this%bclst_dp, this%bclst_du, this%bclst_dv, &
+         !     this%bclst_dw, this%bclst_vel_res, Ax_vel, Ax_prs, this%ksp_prs,&
+         !     this%ksp_vel, this%pc_prs, this%pc_vel, this%ksp_prs%max_iter, &
+         !     this%ksp_vel%max_iter)
       end if
 
       call fluid_step_info(tstep, t, dt, ksp_results, this%strict_convergence)
@@ -951,7 +952,6 @@ contains
   end subroutine adjoint_pnpn_step
 
   ! ========================================================================== !
-  ! Todo: The following functions related to boundary conditions must be verified
 
   !> Sets up the boundary condition for the scheme.
   !! @param user The user interface.
@@ -1022,8 +1022,8 @@ contains
              if (global_zone_size .eq. 0) then
                 write(error_unit, '(A, A, I0, A, A, I0, A)') "*** ERROR ***: ",&
                      "Zone index ", zone_indices(j), &
-                     " is invalid as this zone has 0 size, meaning it ", &
-                     "does not in the mesh. Check adjoint boundary condition ", &
+                     " is invalid as this zone has 0 size, meaning it does ", &
+                     "not in the mesh. Check adjoint boundary condition ", &
                      i, "."
                 error stop
              end if
@@ -1033,8 +1033,8 @@ contains
                      "Zone with index ", zone_indices(j), &
                      " has already been assigned a boundary condition. ", &
                      "Please check your boundary_conditions entry for the ", &
-                     "adjoint and make sure that each zone index appears only ", &
-                     "in a single boundary condition."
+                     "adjoint and make sure that each zone index appears ", &
+                     "only in a single boundary condition."
                 error stop
              else
                 marked_zones(zone_indices(j)) = .true.

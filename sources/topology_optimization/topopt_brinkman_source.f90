@@ -154,15 +154,15 @@ contains
        call json_get_or_default(object_settings, 'type', object_type, 'none')
 
        select case (object_type)
-         case ('boundary_mesh')
+       case ('boundary_mesh')
           call this%init_boundary_mesh(object_settings)
-         case ('point_zone')
+       case ('point_zone')
           call this%init_point_zone(object_settings)
 
-         case ('none')
+       case ('none')
           call object_settings%print()
           call neko_error('Brinkman source term objects require a region type')
-         case default
+       case default
           call neko_error('Brinkman source term unknown region type')
        end select
 
@@ -172,9 +172,9 @@ contains
     call json_get_or_default(json, 'filter.type', filter_type, 'none')
 
     select case (filter_type)
-      case ('none')
+    case ('none')
        ! Do nothing
-      case default
+    case default
        call neko_error('Brinkman source term unknown filter type')
     end select
 
@@ -182,7 +182,7 @@ contains
     ! Compute the permeability field
 
     call permeability_field(this%brinkman, this%indicator, &
-         & brinkman_limits(1), brinkman_limits(2), brinkman_penalty)
+         brinkman_limits(1), brinkman_limits(2), brinkman_penalty)
 
     ! Copy the permeability field to the device
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -280,9 +280,9 @@ contains
          mesh_transform, 'none')
 
     select case (mesh_transform)
-      case ('none')
+    case ('none')
        ! Do nothing
-      case ('bounding_box')
+    case ('bounding_box')
        call json_get(json, 'mesh_transform.box_min', box_min)
        call json_get(json, 'mesh_transform.box_max', box_max)
        call json_get_or_default(json, 'mesh_transform.keep_aspect_ratio', &
@@ -309,7 +309,7 @@ contains
                scaling * boundary_mesh%points(idx_p)%x + translation
        end do
 
-      case default
+    case default
        call neko_error('Unknown mesh transform')
     end select
 
@@ -325,21 +325,21 @@ contains
 
     ! Select how to transform the distance field to a design field
     select case (distance_transform)
-      case ('smooth_step')
+    case ('smooth_step')
        call json_get(json, 'distance_transform.value', scalar_d)
        scalar_r = real(scalar_d, kind=rp)
 
        call signed_distance_field(temp_field, boundary_mesh, scalar_d)
        call smooth_step_field(temp_field, scalar_r, 0.0_rp)
 
-      case ('step')
+    case ('step')
 
        call json_get(json, 'distance_transform.value', scalar_d)
 
        call signed_distance_field(temp_field, boundary_mesh, scalar_d)
        call step_function_field(temp_field, scalar_r, 1.0_rp, 0.0_rp)
 
-      case default
+    case default
        call neko_error('Unknown distance transform')
     end select
 
@@ -348,9 +348,9 @@ contains
     call json_get_or_default(json, 'filter.type', filter_type, 'none')
 
     select case (filter_type)
-      case ('none')
+    case ('none')
        ! Do nothing
-      case default
+    case default
        call neko_error('Unknown filter type')
     end select
 
@@ -391,9 +391,9 @@ contains
     ! Run filter on the temporary indicator field to smooth it out.
 
     select case (filter_type)
-      case ('none')
+    case ('none')
        ! Do nothing
-      case default
+    case default
        call neko_error('Unknown filter type')
     end select
 
