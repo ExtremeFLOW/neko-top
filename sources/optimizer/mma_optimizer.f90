@@ -294,9 +294,7 @@ contains
     end do
 
     ! Final state after optimization
-    if (pe_rank .eq. 0) then
-       print*, "MMA Optimization completed after", iter - 1, "iterations."
-    end if
+    print*, "MMA Optimization completed after", iter - 1, "iterations."
 
     call constraint_value%free()
     call objective_sensitivities%free()
