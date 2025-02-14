@@ -44,7 +44,10 @@ module topopt_design
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
+  use math, only: rzero
   use simulation, only: simulation_t
   use json_module, only: json_file
   implicit none
@@ -233,6 +236,7 @@ contains
     ! for now, make it a cylinder by hand
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
+    this%design_indicator%x = 0.0_rp
 
     n = this%design_indicator%dof%size()
     do i = 1, n
@@ -242,6 +246,13 @@ contains
           this%design_indicator%x(i,1,1,1) = 1.0_rp
        end if
     end do
+
+    ! again this will be handled better in the future...
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%design_indicator%x, &
+            this%design_indicator%x_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
+    end if
 
     ! TODO, of course when we move all of Tim's stuff for initialization of
     ! the initial design field we'll be reading things properly from the JSON.
@@ -253,7 +264,8 @@ contains
     ! Initialize the mask
     if (this%if_mask) then
        this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
+            neko_point_zone_registry%get_point_zone(&
+            optimization_domain_zone_name)
     end if
 
     ! TODO

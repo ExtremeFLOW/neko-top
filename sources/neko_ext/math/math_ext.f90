@@ -6,6 +6,22 @@ module math_ext
 
 contains
 
+  !> @brief Copy within a mask. NOTE, this differs from `masked_copy` in the
+  !! indexing.
+  !! \f$ a_i = b_i, for i in mask \f$
+  subroutine copy_mask(a, b, size, mask, mask_size)
+    integer, intent(in) :: size, mask_size
+    real(kind=rp), dimension(size), intent(inout) :: a
+    real(kind=rp), dimension(size), intent(in) :: b
+    integer, dimension(mask_size), intent(in) :: mask
+    integer :: i
+
+    do i = 1, mask_size
+       a(mask(i)) = b(mask(i))
+    end do
+
+  end subroutine copy_mask
+
   !> @brief Add a constant to a masked vector.
   !! \f$ a_i = a_i + c, for i in mask \f$
   subroutine cadd_mask(a, c, size, mask, mask_size)
