@@ -73,11 +73,12 @@ target_sources(neko-top
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
 )
 
 # ============================================================================ #
