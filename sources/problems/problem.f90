@@ -59,9 +59,6 @@ module problem
   type, abstract, public :: problem_t
      private
 
-     !> The simulation.
-     type(simulation_t), public :: simulation
-
      !> The number of design variables.
      integer :: n_design
      !> Number of objectives in the problem.
@@ -85,8 +82,6 @@ module problem
 
      !> Constructor for physics of the problem.
      procedure(problem_init), pass(this), public, deferred :: init
-     !> Additional constructor specific to a design.
-     procedure(problem_init_design), pass(this), public, deferred :: init_design
      !> Destructor.
      procedure(problem_free), pass(this), deferred, public :: free
 
@@ -148,6 +143,9 @@ module problem
      !> Return the objective.
      procedure, pass(this), public :: get_objective_value => &
           problem_get_objective_value
+     !> Return all components of the objective.
+     procedure, pass(this), public :: get_all_objective_values => &
+          problem_get_all_objective_values
      !> Return the constraints.
      procedure, pass(this), public :: get_constraint_values => &
           problem_get_constraint_values
@@ -158,12 +156,13 @@ module problem
      procedure, pass(this), public :: get_constraint_sensitivities => &
           problem_get_constraint_sensitivities
 
-     !> Return the number of design variables.
-     procedure, pass(this) :: get_n_design => problem_get_num_design_variables
      !> Return the number of objectives.
      procedure, pass(this) :: get_n_objectives => problem_get_num_objectives
      !> Return the number of constraints.
      procedure, pass(this) :: get_n_constraints => problem_get_num_constraints
+
+     !> Return the logfile header
+     procedure, pass(this) :: get_log_header => problem_get_log_header
 
   end type problem_t
 
@@ -176,68 +175,26 @@ module problem
      !! the derived types to initialize the problem. This is based on the
      !! abstract design type, We suggest that a switch statement is used to
      !! initialize the problem based on the design type.
-     subroutine problem_init(this)
-       import problem_t
+     subroutine problem_init(this, parameters, design, simulation)
+       import problem_t, json_file, simulation_t, design_t
        class(problem_t), intent(inout) :: this
+       type(json_file), intent(inout) :: parameters
+       class(design_t), intent(in) :: design
+       type(simulation_t), intent(inout) :: simulation
      end subroutine problem_init
-
-     !> Additional constructor based on a design.
-     subroutine problem_init_design(this, design)
-       import problem_t, design_t
-       class(problem_t), intent(inout) :: this
-       ! class(design_variable_t), intent(in) :: design
-       ! we also only have the `topopt_design_t` but this should take the more
-       ! abstract `design_variable_t` and initialize differently according to
-       ! the type entering here.
-       class(design_t), target, intent(inout) :: design
-
-       ! This is confusing to me..
-       ! The `problem` and the `design` seem very coupled in my mind.
-       ! I want to argue it's coupled one way, since the problem depends on the
-       ! design representation.
-
-       ! In principle we could have our design represented with
-       ! - splines
-       ! - levelset
-       ! - etc
-       !
-       ! BUT, for density based topology optimization, because we get all our
-       ! mesh info etc from neko, our design representation is based on the
-       ! fluid. (of course this isn't 100% true, it's just the dofmap. We could
-       ! define our design on a different set of basis functions too... but I
-       ! guess that is rather far out of scope now...)
-       !
-       ! So it's sort of coupled both ways.. :/
-       !
-       ! Tim you may need to untangle this, for now I don't see an option other
-       ! than
-       ! - initialising the fluid first.
-       !
-       ! - The initializing the design
-       !
-       ! - Then coming here and initializing the impact of the design on the
-       !   fluid
-       !
-     end subroutine problem_init_design
 
      !> Compute the problem.
      subroutine problem_compute(this, design)
-       import problem_t
-       import design_t
-
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        class(design_t), intent(inout) :: design
-
      end subroutine problem_compute
 
      !> Compute the problem.
      subroutine problem_compute_sensitivity(this, design)
-       import problem_t
-       import design_t
-
+       import problem_t, design_t
        class(problem_t), intent(inout) :: this
        class(design_t), intent(inout) :: design
-
      end subroutine problem_compute_sensitivity
 
      !> Destructor
@@ -296,10 +253,11 @@ contains
   ! ========================================================================== !
   ! Handling constraints and objectives
 
-  !> Read the objective from a json file.
-  subroutine problem_read_objectives(this, json, design)
+  !> Read the objective from a parameters file.
+  subroutine problem_read_objectives(this, parameters, simulation, design)
     class(problem_t), intent(inout) :: this
-    type(json_file), intent(inout) :: json
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(objective_t), allocatable :: objective
 
@@ -312,16 +270,15 @@ contains
 
     ! Get the number of objectives.
     path = "optimization.objectives"
-    call json%info(path, n_children = n_objectives)
+    call parameters%info(path, n_children = n_objectives)
 
-    ! Grab a single json entry and create a constraint from it.
+    ! Grab a single parameters entry and create a constraint from it.
     do i = 1, n_objectives
-       call json_extract_item(json, path, i, objective_json)
+       call json_extract_item(parameters, path, i, objective_json)
        call json_get(objective_json, "type", type)
        call neko_log%message(type)
 
-       call objective_factory(objective, objective_json, design, &
-            this%simulation)
+       call objective_factory(objective, objective_json, design, simulation)
        call this%add_objective(objective)
 
     end do
@@ -330,10 +287,11 @@ contains
 
   end subroutine problem_read_objectives
 
-  !> Read the constraint from a json file.
-  subroutine problem_read_constraints(this, json, design)
+  !> Read the constraint from a parameters file.
+  subroutine problem_read_constraints(this, parameters, simulation, design)
     class(problem_t), intent(inout) :: this
-    type(json_file), intent(inout) :: json
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(constraint_t), allocatable :: constraint
 
@@ -346,16 +304,15 @@ contains
 
     ! Get the number of constraints.
     path = "optimization.constraints"
-    call json%info(path, n_children = n_constraints)
+    call parameters%info(path, n_children = n_constraints)
 
-    ! Grab a single json entry and create a constraint from it.
+    ! Grab a single parameters entry and create a constraint from it.
     do i = 1, n_constraints
-       call json_extract_item(json, path, i, constraint_json)
+       call json_extract_item(parameters, path, i, constraint_json)
        call json_get(constraint_json, "type", type)
        call neko_log%message(type)
 
-       call constraint_factory(constraint, constraint_json, design, &
-            this%simulation)
+       call constraint_factory(constraint, constraint_json, design, simulation)
        call this%add_constraint(constraint)
 
     end do
@@ -501,6 +458,29 @@ contains
 
   end subroutine problem_get_objective_value
 
+  !> Construct and get the objective.
+  !!
+  !! This function returns all the indivual objectives comprising the
+  !! objective function
+  !! @param[out] all_objective_values A vector containing all objectives
+  subroutine problem_get_all_objective_values(this, all_objective_values)
+    class(problem_t), intent(inout) :: this
+    type(vector_t), intent(out) :: all_objective_values
+    integer :: i
+
+    call all_objective_values%init(this%n_objectives)
+
+    do i = 1, this%n_objectives
+       all_objective_values%x(i) = this%objective_list(i)%objective%value
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(all_objective_values%x, all_objective_values%x_d, &
+            this%n_objectives, HOST_TO_DEVICE, sync = .true.)
+    end if
+
+  end subroutine problem_get_all_objective_values
+
   !> Construct and get the constraints.
   !!
   !! This function constructs the constraint values from the individual
@@ -571,14 +551,6 @@ contains
   ! ========================================================================== !
   ! Simple getters
 
-  !> Return the number of design variables.
-  pure function problem_get_num_design_variables(this) result(n)
-    class(problem_t), intent(in) :: this
-    integer :: n
-
-    n = this%n_design
-  end function problem_get_num_design_variables
-
   !> Return the number of objectives.
   pure function problem_get_num_objectives(this) result(n)
     class(problem_t), intent(in) :: this
@@ -595,4 +567,38 @@ contains
     n = this%n_constraints
   end function problem_get_num_constraints
 
+  !> Return the header for the problem.
+  function problem_get_log_header(this) result(buff)
+    class(problem_t), intent(in) :: this
+    character(len=1024) :: buff
+    character(len=50) :: mini_buff
+    integer :: i
+
+    ! When it comes to multi-objective optimization
+    ! (handled in the way that we do) we want to know the value of each
+    ! objective individually, not just the combined effect.
+    !
+    ! my vision is:
+    !
+    !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
+    !
+    ! And then if we also want things like thie iteration or KKT they can be
+    ! appended to the begining or end of this by the optimizer.
+    !
+    ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
+    buff = "Total objective function"
+    do i = 1, this%get_n_objectives()
+       mini_buff = ""
+       write(mini_buff, '(", ", A)') this%objective_list(i)%objective%name
+       buff = trim(buff)//trim(mini_buff)
+    end do
+
+    do i = 1, this%get_n_constraints()
+       mini_buff = ""
+       write(mini_buff, '(", ", A)') &
+            this%constraint_list(i)%constraint%name
+       buff = trim(buff)//trim(mini_buff)
+    end do
+
+  end function problem_get_log_header
 end module problem
