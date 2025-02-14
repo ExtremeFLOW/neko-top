@@ -47,6 +47,7 @@ module problem
   use simulation, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
+  use vector, only: vector_t
 
   implicit none
   private
@@ -89,13 +90,13 @@ module problem
      !> Evaluate the optimization problem.
      !! This is the main function that evaluates the problem. It should be
      !! implemented in the derived classes.
-     procedure(problem_compute), pass(this), public, deferred :: compute
+     procedure, pass(this), public :: compute => problem_compute
 
      !> Evaluate the sensitivity of the optimization problem.
      !! This is the main function that evaluates the problem sensitivity to the
      !! design. It should be implemented in the derived classes.
-     procedure(problem_compute_sensitivity), pass(this), public, deferred :: &
-          compute_sensitivity
+     procedure, pass(this), public :: compute_sensitivity => &
+          problem_compute_sensitivity
 
      ! ----------------------------------------------------------------------- !
      ! Base class methods
@@ -183,20 +184,6 @@ module problem
        class(design_t), intent(in) :: design
        type(simulation_t), intent(inout) :: simulation
      end subroutine problem_init
-
-     !> Compute the problem.
-     subroutine problem_compute(this, design)
-       import problem_t, design_t
-       class(problem_t), intent(inout) :: this
-       class(design_t), intent(inout) :: design
-     end subroutine problem_compute
-
-     !> Compute the problem.
-     subroutine problem_compute_sensitivity(this, design)
-       import problem_t, design_t
-       class(problem_t), intent(inout) :: this
-       class(design_t), intent(inout) :: design
-     end subroutine problem_compute_sensitivity
 
      !> Destructor
      subroutine problem_free(this)
@@ -373,6 +360,35 @@ contains
     call move_alloc(constraint, this%constraint_list(n + 1)%constraint)
     this%n_constraints = n + 1
   end subroutine problem_add_constraint
+
+  ! ========================================================================== !
+  ! Problem part computation
+
+  !> The computation of the objective function and constraints.
+  subroutine problem_compute(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    call this%update_objectives(design)
+    call this%update_constraints(design)
+
+  end subroutine problem_compute
+
+  !> The computation of the objective function and constraints.
+  subroutine problem_compute_sensitivity(this, design)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    type(vector_t) :: objective_sensitivity
+
+    call this%update_objective_sensitivities(design)
+    call this%update_constraint_sensitivities(design)
+
+    call this%get_objective_sensitivities(objective_sensitivity)
+
+    call design%map_backward(objective_sensitivity)
+
+  end subroutine problem_compute_sensitivity
 
   ! ========================================================================== !
   ! Update the objectives and constraints

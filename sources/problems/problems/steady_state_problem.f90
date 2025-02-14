@@ -77,12 +77,6 @@ module steady_state_problem
      !> Destructor.
      procedure, pass(this) :: free => steady_state_problem_free
 
-     !> Generic compute function.
-     procedure, pass(this) :: compute => steady_state_problem_compute
-     !> Generic compute function for sensitivity.
-     procedure, pass(this) :: compute_sensitivity => &
-          steady_state_problem_compute_sensitivity
-
   end type steady_state_problem_t
 
 contains
@@ -151,45 +145,5 @@ contains
     call this%free_base()
 
   end subroutine steady_state_problem_free
-
-  !> The computation of the objective function and constraints.
-  subroutine steady_state_problem_compute(this, design)
-    class(steady_state_problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
-
-    call this%update_objectives(design)
-    call this%update_constraints(design)
-
-  end subroutine steady_state_problem_compute
-
-  !> The computation of the objective function and constraints.
-  subroutine steady_state_problem_compute_sensitivity(this, design)
-    class(steady_state_problem_t), intent(inout) :: this
-    class(design_t), intent(inout) :: design
-
-    select type (design)
-    type is (topopt_design_t)
-       call steady_state_problem_compute_sensitivity_topopt(this, design)
-    class default
-       call neko_error('Only topopt_design_t is supported for now')
-    end select
-
-  end subroutine steady_state_problem_compute_sensitivity
-
-  !> The computation of the sensitivity if we have a `topopt_design_t`.
-  subroutine steady_state_problem_compute_sensitivity_topopt(this, design)
-    class(steady_state_problem_t), intent(inout) :: this
-    type(topopt_design_t), intent(inout) :: design
-
-    type(vector_t) :: objective_sensitivity
-
-    call this%update_objective_sensitivities(design)
-    call this%update_constraint_sensitivities(design)
-
-    call this%get_objective_sensitivities(objective_sensitivity)
-
-    call design%map_backward(objective_sensitivity)
-
-  end subroutine steady_state_problem_compute_sensitivity_topopt
 
 end module steady_state_problem
