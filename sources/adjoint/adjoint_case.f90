@@ -199,7 +199,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
@@ -272,7 +272,7 @@ contains
     !    call json_get_or_default(neko_case%params, 'case.checkpoint_value', &
     ! real_val,&
     !         1e10_rp)
-    !   !  call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
+    !   call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
     ! end if
 
   end subroutine adjoint_case_init_common
