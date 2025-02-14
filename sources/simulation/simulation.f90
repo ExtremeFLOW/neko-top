@@ -46,6 +46,7 @@ module simulation
   use field_math, only: field_rzero
   use json_file_module, only: json_file
   use json_utils, only: json_extract_item
+  use num_types, only: rp, sp
   implicit none
   private
 
@@ -59,6 +60,10 @@ module simulation
      class(fluid_scheme_incompressible_t), public, pointer :: &
           fluid_scheme => null()
 
+     !> An output sampler for the problem. This should probably be an output
+     !! controller at some point instead.
+     type(fld_file_output_t), public :: output
+
    contains
      !> Initialize the simulation
      procedure, pass(this) :: init => simulation_init
@@ -70,6 +75,8 @@ module simulation
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
+     !> Write current state of the simulation to disk
+     procedure, pass(this) :: write => simulation_write
   end type simulation_t
 
   public :: simulation_t
@@ -101,6 +108,26 @@ contains
     call steady_comp%init(simcomp_settings, this%neko_case)
 
     call neko_simcomps%add_user_simcomp(steady_comp)
+
+    ! init the sampler
+    !---------------------------------------------------------
+    ! TODO
+    ! obviously when we do the mappings properly, to many coefficients, we'll
+    ! also have to modify this
+    ! for now:
+    ! - forward (p,u,v,w)                      1,2,3,4           p,vx,vy,vz
+    ! - adjoint (p,u,v,w)                      5,6,7,8           t,s1,s2,s3
+
+    ! Allocate the output type
+    call this%output%init(sp, 'optimization', 8)
+    call this%output%fields%assign(1, this%fluid_scheme%p)
+    call this%output%fields%assign(2, this%fluid_scheme%u)
+    call this%output%fields%assign(3, this%fluid_scheme%v)
+    call this%output%fields%assign(4, this%fluid_scheme%w)
+    call this%output%fields%assign(5, this%adjoint_case%scheme%p_adj)
+    call this%output%fields%assign(6, this%adjoint_case%scheme%u_adj)
+    call this%output%fields%assign(7, this%adjoint_case%scheme%v_adj)
+    call this%output%fields%assign(8, this%adjoint_case%scheme%w_adj)
 
   end subroutine simulation_init
 
@@ -145,5 +172,14 @@ contains
     call field_rzero(this%adjoint_case%scheme%w_adj)
 
   end subroutine simulation_reset
+
+  !> Write current state of the simulation to disk
+  subroutine simulation_write(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write
 
 end module simulation
