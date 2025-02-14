@@ -217,8 +217,7 @@ contains
     logical :: found
 
     call C%params%get('case.restart_file', restart_file, found)
-    call C%params%get('case.restart_mesh_file', restart_mesh_file,&
-         found)
+    call C%params%get('case.restart_mesh_file', restart_mesh_file, found)
 
     if (found) then
        previous_meshf = file_t(trim(restart_mesh_file))

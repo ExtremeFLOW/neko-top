@@ -13,7 +13,8 @@ module sensitivity
   use case, only : case_t
   use num_types, only : rp
   use field, only : field_t
-
+  use field_registry, only : neko_field_registry
+  use json_utils, only : json_get_or_default
   implicit none
   private
 
@@ -36,10 +37,6 @@ contains
 
   !> Actual constructor.
   subroutine sensitivity_init(this, json, neko_case)
-    use field_registry, only : neko_field_registry
-    use json_utils, only : json_get_or_default
-    implicit none
-
     class(sensitivity_t), intent(inout) :: this
     class(json_file), intent(inout) :: json
     class(case_t), intent(inout) :: neko_case

@@ -68,10 +68,10 @@ contains
     end if
 
     call json_get(json, "type", type)
-    select case(trim(type))
-      case("volume")
+    select case (trim(type))
+    case ("volume")
        allocate(volume_constraint_t::object)
-      case default
+    case default
        call neko_type_error("Constraint", type, KNOWN_TYPES)
     end select
 
