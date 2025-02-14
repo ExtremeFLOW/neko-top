@@ -34,6 +34,7 @@
 module design
   use json_module, only: json_file
   use simulation, only: simulation_t
+  use vector, only: vector_t
   implicit none
   private
 
@@ -45,12 +46,20 @@ module design
 
    contains
 
+     ! ----------------------------------------------------------------------- !
+     ! Interfaces
+
      !> Initialize the design
      procedure(design_init_from_json), pass(this), deferred :: init_from_json
+     !> Run the forward mapping of the design
+     procedure(design_map_forward), pass(this), deferred :: map_forward
+     !> Run the backward mapping of the design
+     procedure(design_map_backward), pass(this), deferred :: map_backward
+
+     ! ----------------------------------------------------------------------- !
 
      !> Initialize the base design
      procedure, pass(this) :: init_base => design_init_base
-
      !> Return the number of design variables
      procedure, pass(this) :: size => design_size
 
@@ -63,6 +72,17 @@ module design
        type(json_file), intent(inout) :: parameters
        type(simulation_t), intent(inout) :: simulation
      end subroutine design_init_from_json
+
+     subroutine design_map_forward(this)
+       import design_t, simulation_t
+       class(design_t), intent(inout) :: this
+     end subroutine design_map_forward
+
+     subroutine design_map_backward(this, sensitivity)
+       import design_t, vector_t
+       class(design_t), intent(inout) :: this
+       type(vector_t), intent(in) :: sensitivity
+     end subroutine design_map_backward
   end interface
 
 contains

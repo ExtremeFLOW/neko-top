@@ -51,6 +51,8 @@ module topopt_design
   use simulation, only: simulation_t
   use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
+  use vector, only: vector_t
+  use math, only: copy
   implicit none
   private
 
@@ -366,8 +368,7 @@ contains
 
 
   subroutine topopt_design_map_forward(this)
-    class(topopt_design_t), target, intent(inout) :: this
-
+    class(topopt_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
@@ -386,21 +387,26 @@ contains
     call this%mapping%apply_forward(this%brinkman_amplitude, &
          this%filtered_design)
 
-
   end subroutine topopt_design_map_forward
 
-  subroutine topopt_design_map_backward(this, df_dchi)
-    class(topopt_design_t), target, intent(inout) :: this
-    type(field_t), intent(in) :: df_dchi
+  subroutine topopt_design_map_backward(this, sensitivity)
+    class(topopt_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+    type(field_t), pointer :: df_dchi
     type(field_t), pointer :: dF_dfiltered_design
-    integer :: temp_indices(1)
+    integer :: temp_indices(2)
+
+    ! it would be nice to visualize this
+
+    call neko_scratch_registry%request_field(df_dchi, temp_indices(1))
+    call copy(df_dchi%x, sensitivity%x, this%size())
 
     ! TODO
     ! again..
     ! so this would be:
     ! call mapper%backward(fld_out, fld_in)
     call neko_scratch_registry%request_field(dF_dfiltered_design, &
-         temp_indices(1))
+         temp_indices(2))
 
     call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
          this%filtered_design)

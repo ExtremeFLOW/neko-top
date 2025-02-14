@@ -183,27 +183,12 @@ contains
 
     type(vector_t) :: objective_sensitivity
 
-    type(field_t), pointer :: objective_sensitivity_field
-    integer, dimension(1) :: temp_indices
-
     call this%update_objective_sensitivities(design)
     call this%update_constraint_sensitivities(design)
 
     call this%get_objective_sensitivities(objective_sensitivity)
 
-    ! it would be nice to visualize this
-
-    call neko_scratch_registry%request_field(objective_sensitivity_field, &
-         temp_indices(1))
-    call copy(objective_sensitivity_field%x, objective_sensitivity%x, &
-         design%size())
-
-    ! do the adjoint mapping
-    call design%map_backward(objective_sensitivity_field)
-    ! ok now you've fucked up the whole "list of sensitivity fields" aspect...
-    ! we somehow need to populate the list
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
+    call design%map_backward(objective_sensitivity)
 
   end subroutine steady_state_problem_compute_sensitivity_topopt
 
