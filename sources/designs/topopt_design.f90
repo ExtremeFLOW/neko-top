@@ -192,8 +192,8 @@ module topopt_design
      ! design_indicator -> coeficient and their corresponding chain rules
      ! maybe also some information about what equation they live in...
 
-     ! a sampler being called from outside would be nice
-     procedure, pass(this) :: sample => topopt_design_sample
+     ! a writer being called from outside would be nice
+     procedure, pass(this) :: write => topopt_design_write
 
      !> Destructor
      procedure, pass(this) :: free => topopt_design_free
@@ -440,12 +440,12 @@ contains
 
   end subroutine topopt_design_free
 
-  subroutine topopt_design_sample(this,t)
-    class(topopt_design_t), target, intent(inout) :: this
-    real(kind=rp), intent(in) :: t
+  subroutine topopt_design_write(this, idx)
+    class(topopt_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
 
-    call this%output%sample(t)
+    call this%output%sample(real(idx, kind=rp))
 
-  end subroutine topopt_design_sample
+  end subroutine topopt_design_write
 
 end module topopt_design

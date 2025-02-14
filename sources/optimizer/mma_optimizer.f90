@@ -79,7 +79,6 @@ contains
     type(vector_t) :: x
     type(json_file) :: solver_parameters
 
-
     ! Initialize the logger
     call this%logger%init('optimization_data.csv')
 
@@ -181,6 +180,7 @@ contains
     call this%logger%write(log_data)
 
     call problem%write(0)
+    call design%write(0)
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -289,11 +289,14 @@ contains
        call this%logger%write(log_data)
 
        call problem%write(iter)
+       call design%write(iter)
        call simulation%reset()
     end do
 
     ! Final state after optimization
-    print*, "MMA Optimization completed after", iter-1, "iterations."
+    if (pe_rank .eq. 0) then
+       print*, "MMA Optimization completed after", iter - 1, "iterations."
+    end if
 
     call constraint_value%free()
     call objective_sensitivities%free()

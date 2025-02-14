@@ -55,6 +55,8 @@ module design
      procedure(design_map_forward), pass(this), deferred :: map_forward
      !> Run the backward mapping of the design
      procedure(design_map_backward), pass(this), deferred :: map_backward
+     !> Write the design
+     procedure(design_write), pass(this), deferred :: write
 
      ! ----------------------------------------------------------------------- !
 
@@ -62,6 +64,7 @@ module design
      procedure, pass(this) :: init_base => design_init_base
      !> Return the number of design variables
      procedure, pass(this) :: size => design_size
+
 
   end type design_t
 
@@ -83,6 +86,12 @@ module design
        class(design_t), intent(inout) :: this
        type(vector_t), intent(in) :: sensitivity
      end subroutine design_map_backward
+
+     subroutine design_write(this, idx)
+       import design_t
+       class(design_t), intent(inout) :: this
+       integer, intent(in) :: idx
+     end subroutine design_write
   end interface
 
 contains

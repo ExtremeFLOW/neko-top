@@ -66,9 +66,6 @@ module steady_state_problem
   !> To compute a steady state problem
   type, public, extends(problem_t) :: steady_state_problem_t
 
-     !> a steady simulation component to append to the forward
-     type(steady_simcomp_t) :: steady_comp
-
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => steady_state_problem_init
@@ -104,31 +101,15 @@ contains
     ! - sensitivity (dF/d\rho and dC/d\rho)    13, 14            s8,s9
 
     ! Allocate the output type
-    call this%output%init(sp, 'optimization', 10)
+    call this%output%init(sp, 'optimization', 8)
     call this%output%fields%assign(1, simulation%fluid_scheme%p)
     call this%output%fields%assign(2, simulation%fluid_scheme%u)
     call this%output%fields%assign(3, simulation%fluid_scheme%v)
     call this%output%fields%assign(4, simulation%fluid_scheme%w)
-    ! I don't know why these ones need assign_to_field?
-    call this%output%fields%assign(6, simulation%adjoint_case%scheme%u_adj)
-    call this%output%fields%assign(7, simulation%adjoint_case%scheme%v_adj)
-    call this%output%fields%assign(8, simulation%adjoint_case%scheme%w_adj)
-    call this%output%fields%assign(9, simulation%adjoint_case%scheme%p_adj)
-
-    ! TODO
-    ! here we would read through our JSON to find out all of our constraints
-    ! and objectives. NOTE, perhaps we'll just populate the list but not
-    ! initialize them yet! As they may depend on the design.
-
-    select type(d => design)
-    type is(topopt_design_t)
-
-       call this%output%fields%assign_to_field(5, d%design_indicator)
-       call this%output%fields%assign_to_field(10, d%brinkman_amplitude)
-
-    class default
-       call neko_error('Only topopt_design_t is supported for now')
-    end select
+    call this%output%fields%assign(5, simulation%adjoint_case%scheme%u_adj)
+    call this%output%fields%assign(6, simulation%adjoint_case%scheme%v_adj)
+    call this%output%fields%assign(7, simulation%adjoint_case%scheme%w_adj)
+    call this%output%fields%assign(8, simulation%adjoint_case%scheme%p_adj)
 
     ! minimum dissipation objective function
     call this%read_objectives(parameters, simulation, design)
