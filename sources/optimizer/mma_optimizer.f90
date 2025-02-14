@@ -294,7 +294,7 @@ contains
     end do
 
     ! Final state after optimization
-    print*, "MMA Optimization completed after", iter - 1, "iterations."
+    print*, "MMA Optimization completed after", iter-1, "iterations."
 
     call constraint_value%free()
     call objective_sensitivities%free()
