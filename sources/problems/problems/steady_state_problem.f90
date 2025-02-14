@@ -73,9 +73,6 @@ module steady_state_problem
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => steady_state_problem_init
 
-     !> Constructor of a generic design problem.
-     procedure, pass(this) :: init_design_topopt => &
-          steady_state_problem_init_design_topopt
      ! but we could point to more depending on what design comes in
      !> Destructor.
      procedure, pass(this) :: free => steady_state_problem_free
@@ -99,116 +96,6 @@ contains
 
     call this%init_base(design%size())
 
-    ! TODO
-    ! here we would read through our JSON to find out all of our constraints
-    ! and objectives. NOTE, perhaps we'll just populate the list but not
-    ! initialize them yet! As they may depend on the design.
-
-    select type(design)
-    type is(topopt_design_t)
-       call this%init_design_topopt(parameters, simulation, design)
-    class default
-       call neko_error('Only topopt_design_t is supported for now')
-    end select
-
-  end subroutine steady_state_problem_init
-
-  !> The constructor if a `topopt_design_t` is passed
-  ! again, this is the only type of design we have so far...
-  ! but in the future we may add other types of `design_variable_t`
-  subroutine steady_state_problem_init_design_topopt(this, parameters, simulation, design)
-    class(steady_state_problem_t), intent(inout) :: this
-    type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
-    type(topopt_design_t), intent(in) :: design
-
-    type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
-
-    !> TODO
-    ! we need a `objective_list` which is allocatable and contains a factory
-    ! to fill itself up with from the JSON
-    ! for now, I'm hardcoding these two
-    ! class(objective_t), allocatable :: objective_function
-    ! class(constraint_t), allocatable :: volume_constraint
-
-    ! init the simple brinkman term for the forward problem
-    call forward_brinkman%init_from_components( &
-         simulation%fluid_scheme%f_x, &
-         simulation%fluid_scheme%f_y, &
-         simulation%fluid_scheme%f_z, &
-         design, &
-         simulation%fluid_scheme%u, &
-         simulation%fluid_scheme%v, &
-         simulation%fluid_scheme%w, &
-         simulation%fluid_scheme%c_Xh)
-    ! append brinkman source term to the forward problem
-    call simulation%fluid_scheme%source_term%add(forward_brinkman)
-
-    ! init the simple brinkman term for the adjoint
-    call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_case%scheme%f_adj_x, &
-         simulation%adjoint_case%scheme%f_adj_y, &
-         simulation%adjoint_case%scheme%f_adj_z, &
-         design, &
-         simulation%adjoint_case%scheme%u_adj, &
-         simulation%adjoint_case%scheme%v_adj, &
-         simulation%adjoint_case%scheme%w_adj, &
-         simulation%adjoint_case%scheme%c_Xh)
-    ! append brinkman source term based on design
-    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
-
-    ! TODO
-    ! Note, Tim, while you're reading this I'm sure you can already see we need
-    ! to unmangle a lot of this.
-    ! for instance,
-    ! FIRST we have to read what our objective is and all of our constraints
-    ! now if an objective involve the fluid (which it will) THIS will tell us
-    ! we need to init a fluid and an adjoint
-    ! SECOND now we know how many coefficients we need to map in the design
-    ! THIRD we can start adding adjoint forcing etc...
-    ! so the order is a little fucked up here...
-    ! technically
-
-
-    ! init the objective function
-    !---------------------------------------------------------
-    ! - somehow append a user_check
-    ! TODO:
-    ! Tim, I loved what you did with with the source term handler. I'm hoping
-    ! when you get a chance you can do something
-    ! similar with simulation components?
-    ! as in, this kind of post processing isn't just one function,
-    ! but a list of post processing modules that can be appended
-    ! to a simulation (and then we could append others to our adjoint!)
-    !
-    ! The thing is, because right now we're doing steady calculations,
-    ! so the computations of:
-    ! - The objective function: performed at the end of the steady run
-    ! - The sensitivity:        performed at the end of the adjoint run
-    !
-    ! but when we move to unsteady calculations we'll have:
-    ! - The objective function: accumulated DURING the forward run
-    ! - The sensitivity:        accumulated DURING the adjoint run
-    !
-    ! So they'll have to be simcomps that get appended to C and adj.
-    ! I trust you can whip that up lickity split!
-    !
-    ! in the future, the "problem" init will have already read out all the
-    ! types of objective functions & constraints
-    ! so in this place, we would already know from the JSON what
-    ! objectives/constraints we need to init
-    !
-    ! So we need something akin to the `source_term_t`
-    ! where we can have a list of them.
-    !
-    ! for this test we'll have 2
-
-    ! minimum dissipation objective function
-    call this%read_objectives(parameters, simulation, design)
-
-    ! volume constraint
-    call this%read_constraints(parameters, simulation, design)
-
     ! init the sampler
     !---------------------------------------------------------
     ! TODO
@@ -229,22 +116,33 @@ contains
     call this%output%fields%assign(3, simulation%fluid_scheme%v)
     call this%output%fields%assign(4, simulation%fluid_scheme%w)
     ! I don't know why these ones need assign_to_field?
-    call this%output%fields%assign_to_field(5, design%design_indicator)
     call this%output%fields%assign(6, simulation%adjoint_case%scheme%u_adj)
     call this%output%fields%assign(7, simulation%adjoint_case%scheme%v_adj)
     call this%output%fields%assign(8, simulation%adjoint_case%scheme%w_adj)
     call this%output%fields%assign(9, simulation%adjoint_case%scheme%p_adj)
-    call this%output%fields%assign_to_field(10, design%brinkman_amplitude)
 
-!------------------------------------------------------------------------------
-! TODO
-! the proceedure `steady_state_problem_compute_sensitivity_topopt` is currently
-! the only one we have...
-! but if we have a more abstract `design_variable_t` then we will need to
-! including something here in the init that assigns the correct way of computing
-! sensitivity given the `design_variable_t`
+    ! TODO
+    ! here we would read through our JSON to find out all of our constraints
+    ! and objectives. NOTE, perhaps we'll just populate the list but not
+    ! initialize them yet! As they may depend on the design.
 
-  end subroutine steady_state_problem_init_design_topopt
+    select type(d => design)
+    type is(topopt_design_t)
+
+       call this%output%fields%assign_to_field(5, d%design_indicator)
+       call this%output%fields%assign_to_field(10, d%brinkman_amplitude)
+
+    class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+    ! minimum dissipation objective function
+    call this%read_objectives(parameters, simulation, design)
+
+    ! volume constraint
+    call this%read_constraints(parameters, simulation, design)
+
+  end subroutine steady_state_problem_init
 
   !> Destructor.
   subroutine steady_state_problem_free(this)

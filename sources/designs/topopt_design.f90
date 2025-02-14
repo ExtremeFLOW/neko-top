@@ -50,6 +50,7 @@ module topopt_design
   use math, only: rzero
   use simulation, only: simulation_t
   use json_module, only: json_file
+  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   implicit none
   private
 
@@ -221,6 +222,7 @@ contains
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
+    type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
     associate(coef => simulation%neko_case%fluid%c_Xh)
       ! init the fields
@@ -316,6 +318,33 @@ contains
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
     call this%init_base(n)
+
+    ! init the simple brinkman term for the forward problem
+    call forward_brinkman%init_from_components( &
+         simulation%fluid_scheme%f_x, &
+         simulation%fluid_scheme%f_y, &
+         simulation%fluid_scheme%f_z, &
+         this%brinkman_amplitude, &
+         simulation%fluid_scheme%u, &
+         simulation%fluid_scheme%v, &
+         simulation%fluid_scheme%w, &
+         simulation%fluid_scheme%c_Xh)
+    ! append brinkman source term to the forward problem
+    call simulation%fluid_scheme%source_term%add(forward_brinkman)
+
+    ! init the simple brinkman term for the adjoint
+    call adjoint_brinkman%init_from_components( &
+         simulation%adjoint_case%scheme%f_adj_x, &
+         simulation%adjoint_case%scheme%f_adj_y, &
+         simulation%adjoint_case%scheme%f_adj_z, &
+         this%brinkman_amplitude, &
+         simulation%adjoint_case%scheme%u_adj, &
+         simulation%adjoint_case%scheme%v_adj, &
+         simulation%adjoint_case%scheme%w_adj, &
+         simulation%adjoint_case%scheme%c_Xh)
+    ! append brinkman source term based on design
+    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
+
   end subroutine topopt_design_init_from_components
 
   !> Add mappings to the design
