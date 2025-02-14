@@ -40,7 +40,8 @@ contains
        ! A. Ghasemi & A. Elham (2019)
        ! "FLOW TOPOLOGY OPTIMIZATION IN PERIODIC DOMAINS WITH APPLICATION TO
        ! MICRO HEAT EXCHANGER OPTIMIZATION"
-       ! I think they are aluding to that: we only have one source term (brinkman)
+       ! I think they are aluding to that: we only have one source term
+       ! (brinkman)
        ! in the equation, so by integrating this source term we effectively are
        ! computing the lift and drag. (without the need to know the interface
        ! location)

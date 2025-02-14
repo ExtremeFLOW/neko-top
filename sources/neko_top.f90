@@ -59,7 +59,8 @@ contains
     call topopt_components%init(neko_case, 'topology_optimization.components')
 
     call neko_case%params%get_core(core)
-    call neko_case%params%get('topology_optimization.components', simcomp_object, found)
+    call neko_case%params%get('topology_optimization.components', &
+         simcomp_object, found)
     comp_subdict = json_file(simcomp_object)
 
     ! Allocation of the design

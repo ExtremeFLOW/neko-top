@@ -56,7 +56,8 @@ module simulation
      type(adjoint_case_t), public :: adjoint_case
 
      !> The fluid
-     class(fluid_scheme_incompressible_t), public, pointer :: fluid_scheme => null()
+     class(fluid_scheme_incompressible_t), public, pointer :: &
+          fluid_scheme => null()
 
    contains
      !> Initialize the simulation
@@ -86,7 +87,7 @@ contains
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
-    select type(fluid => this%neko_case%fluid)
+    select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
        this%fluid_scheme => fluid
 

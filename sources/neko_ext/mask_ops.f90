@@ -39,8 +39,10 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only : neko_scratch_registry
   use field_math, only: field_cfill, field_copy
-  use math, only: masked_copy, copy
-  use device_math, only: device_masked_copy, device_copy
+  use device_math_ext, only: device_copy_mask
+  use device_math, only: device_copy
+  use math_ext, only: copy_mask
+  use math, only: copy
   use vector, only: vector_t
   implicit none
 
@@ -65,14 +67,32 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1), i
 
+    ! To be discussed
+    ! From what I understand with this vector/field distinction is that
+    ! ultimately the design will only contain the GLL pts inside the
+    ! the optimization domain, correct?
+    !
+    ! If this is the case, then this function makes no sense since it forces
+    ! the vector and field to be the same size.
+    !
+    ! Alternatively, this vector/field distinction is just to make the types
+    ! compatible with MMA, in which case we can continue how things are here.
+    !
+    ! In any case, it's a bit confusing and we should throw an error if the
+    ! sizes are different
     call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    if (vec%n .ne. work%size()) then
+       call neko_error('vector and field are of incompatible dimension')
+    end if
 
     ! fill background fld
     call field_cfill(work, const)
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet')
+       call device_copy_mask(work%x_d, vec%x_d, work%size(), mask%mask_d, &
+            mask%size)
     else
        do i = 1, mask%size
           work%x(mask%mask(i), 1, 1, 1) = vec%x(mask%mask(i))
@@ -100,7 +120,6 @@ contains
     real(kind=rp), intent(in) :: const
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    integer :: i
 
     call neko_scratch_registry%request_field(work , temp_indices(1))
 
@@ -109,11 +128,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet')
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+            mask%size)
     else
-       do i = 1, mask%size
-          work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
-       end do
+       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over
@@ -133,7 +151,6 @@ contains
     type(field_t), intent(inout) :: background
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    integer :: i
 
     call neko_scratch_registry%request_field(work , temp_indices(1))
 
@@ -142,11 +159,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error('GPU not supported for masks yet')
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
+            mask%size)
     else
-       do i = 1, mask%size
-          work%x(mask%mask(i), 1, 1, 1) = fld%x(mask%mask(i), 1, 1, 1)
-       end do
+       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
     end if
 
     ! copy over

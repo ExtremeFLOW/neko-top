@@ -17,6 +17,7 @@ module topology_optimization_user_module
   use case, only: case_t
   use field, only: field_t
   use json_file_module, only: json_file
+  use json_utils, only: json_get
   use num_types, only: rp
   use design_module, only: topopt_permeability_force
   use coefs, only: coef_t
@@ -48,9 +49,6 @@ contains
 
   !> Initialize the material properties, unfortunately required from Neko.
   subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
-    use json_file_module, only: json_file
-    use json_utils, only: json_get
-    use num_types, only: rp
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(inout) :: rho, mu, cp, lambda
