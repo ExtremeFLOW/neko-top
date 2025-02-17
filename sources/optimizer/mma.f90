@@ -270,11 +270,7 @@ module mma
           print *, "MMA initialized with CUDA backend!"
        end if
     case default
-       call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
-          max_iter, epsimin, asyinit, asyincr, asydecr)
-       if (pe_rank == 0) then
-          print *, "Unknown backend, MMA initialized with CPU backend!"
-       end if
+       call neko_error('Unknown backend in mma_init_attributes')
     end select
 
   end subroutine mma_init_attributes
