@@ -200,7 +200,7 @@ contains
     ! this%scheme%chkp%tlag => C%tlag
     ! this%scheme%chkp%dtlag => C%dtlag
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        !  f%chkp%abx1 => f%abx1
        !  f%chkp%abx2 => f%abx2
        !  f%chkp%aby1 => f%aby1
@@ -309,7 +309,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-      type is (adjoint_pnpn_t)
+    type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
@@ -789,6 +789,7 @@ contains
        size = u%size()
     end if
 
+    norm = 0.0_rp
     if (NEKO_BCKND_DEVICE .eq. 1) then
        ! fill this in later
     else

@@ -122,14 +122,17 @@ contains
     type(simulation_t), target, intent(inout) :: simulation
 
     character(len=:), allocatable :: mask_name
+    character(len=:), allocatable :: name
     logical :: is_max
     real(kind=rp) :: limit
 
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "name", name, "Volume constraint")
     call json_get_or_default(json, "is_max", is_max, .false.)
     call json_get(json, "limit", limit)
 
-    call this%init_from_attributes(design, simulation, mask_name, is_max, limit)
+    call this%init_from_attributes(design, simulation, name, mask_name, &
+         is_max, limit)
   end subroutine volume_constraint_init_json
 
   !> The direct initializer from attributes.
@@ -139,11 +142,12 @@ contains
   !! @param is_max whether it is a maximum volume constraint.
   !! @param limit The volume limit value.
   subroutine volume_constraint_init_attributes(this, design, simulation, &
-       mask_name, is_max, limit)
+       name, mask_name, is_max, limit)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     character(len=*), intent(in) :: mask_name
+    character(len=*), intent(in) :: name
     logical, intent(in) :: is_max
     real(kind=rp), intent(in) :: limit
 
@@ -152,7 +156,7 @@ contains
     integer :: temp_indices(1)
 
     ! Initialize the base class
-    call this%init_base(design%size(), mask_name)
+    call this%init_base(name, design%size(), mask_name)
 
     ! Store the attributes
     this%is_max = is_max
@@ -257,10 +261,10 @@ contains
 
     volume = 0.0_rp
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        volume = volume_topopt_design(this, design)
 
-      class default
+    class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
@@ -272,6 +276,8 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     real(kind=rp) :: volume
+
+    volume = 0.0_rp
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!

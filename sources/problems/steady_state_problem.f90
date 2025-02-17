@@ -87,10 +87,17 @@ module steady_state_problem
 
    contains
      !> The common constructor using a JSON object.
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
      ! TODO
      ! we need to sort out the case file
      procedure, pass(this) :: init_base => steady_state_problem_init_base
      procedure, pass(this) :: init_design => &
+=======
+     procedure, pass(this) :: init => steady_state_problem_init
+
+     !> Constructor of a generic design problem.
+     procedure, pass(this) :: init_design_topopt => &
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
           steady_state_problem_init_design_topopt
      ! but we could point to more depending on what design comes in
      !> Destructor.
@@ -110,26 +117,45 @@ module steady_state_problem
 
 contains
   !> The constructor for the base problem.
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
   subroutine steady_state_problem_init_base(this)
+=======
+  subroutine steady_state_problem_init(this, parameters, design, simulation)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
     class(steady_state_problem_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    class(design_t), intent(in) :: design
+    type(simulation_t), intent(inout) :: simulation
 
-    call this%simulation%init()
-    call this%init_base(this%simulation%fluid_scheme%dm_Xh%size())
+    call this%init_base(design%size())
 
     ! TODO
     ! here we would read through our JSON to find out all of our constraints
     ! and objectives. NOTE, perhaps we'll just populate the list but not
     ! initialize them yet! As they may depend on the design.
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
 
   end subroutine steady_state_problem_init_base
+=======
+    select type(design)
+    type is(topopt_design_t)
+       call this%init_design_topopt(parameters, simulation, design)
+    class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_init
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
   !> The constructor if a `topopt_design_t` is passed
   ! again, this is the only type of design we have so far...
   ! but in the future we may add other types of `design_variable_t`
-  subroutine steady_state_problem_init_design_topopt(this, design)
+  subroutine steady_state_problem_init_design_topopt(this, parameters, simulation, design)
     class(steady_state_problem_t), intent(inout) :: this
-    type(topopt_design_t), target, intent(inout) :: design
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+    type(topopt_design_t), intent(in) :: design
 
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
@@ -153,20 +179,18 @@ contains
     ! class(objective_t), allocatable :: objective_function
     ! class(constraint_t), allocatable :: volume_constraint
 
-    ! init the design
-    call design%init(this%simulation%neko_case%params, this%simulation%fluid_scheme%c_Xh)
-
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
-         this%simulation%fluid_scheme%f_x, &
-         this%simulation%fluid_scheme%f_y, &
-         this%simulation%fluid_scheme%f_z, &
+         simulation%fluid_scheme%f_x, &
+         simulation%fluid_scheme%f_y, &
+         simulation%fluid_scheme%f_z, &
          design, &
-         this%simulation%fluid_scheme%u, &
-         this%simulation%fluid_scheme%v, &
-         this%simulation%fluid_scheme%w, &
-         this%simulation%fluid_scheme%c_Xh)
+         simulation%fluid_scheme%u, &
+         simulation%fluid_scheme%v, &
+         simulation%fluid_scheme%w, &
+         simulation%fluid_scheme%c_Xh)
     ! append brinkman source term to the forward problem
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call this%simulation%fluid_scheme%source_term%add(forward_brinkman)
 >>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
@@ -179,6 +203,22 @@ contains
          this%adj%scheme%c_Xh)
     ! append brinkman source term based on design
     call this%adj%scheme%source_term%add(adjoint_brinkman)
+=======
+    call simulation%fluid_scheme%source_term%add(forward_brinkman)
+
+    ! init the simple brinkman term for the adjoint
+    call adjoint_brinkman%init_from_components( &
+         simulation%adjoint_case%scheme%f_adj_x, &
+         simulation%adjoint_case%scheme%f_adj_y, &
+         simulation%adjoint_case%scheme%f_adj_z, &
+         design, &
+         simulation%adjoint_case%scheme%u_adj, &
+         simulation%adjoint_case%scheme%v_adj, &
+         simulation%adjoint_case%scheme%w_adj, &
+         simulation%adjoint_case%scheme%c_Xh)
+    ! append brinkman source term based on design
+    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
     ! TODO
     ! Note, Tim, while you're reading this I'm sure you can already see we need
@@ -226,9 +266,16 @@ contains
     !
     ! for this test we'll have 2
     ! minimum dissipation objective function
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call this%objective_function%init(design, this%C%fluid, this%adj%scheme)
     ! volume constraint
     call this%volume_constraint%init(design, this%C%fluid, this%adj%scheme)
+=======
+    call this%read_objectives(parameters, simulation, design)
+
+    ! volume constraint
+    call this%read_constraints(parameters, simulation, design)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
     ! init the sampler
     !---------------------------------------------------------
@@ -252,6 +299,7 @@ contains
 =======
     ! Allocate the output type
     call this%output%init(sp, 'optimization', 10)
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call this%output%fields%assign(1, this%simulation%fluid_scheme%p)
     call this%output%fields%assign(2, this%simulation%fluid_scheme%u)
     call this%output%fields%assign(3, this%simulation%fluid_scheme%v)
@@ -275,6 +323,19 @@ contains
     ! call this%output%fields%assign(13, design%sensitivity(1))
     ! call this%output%fields%assign(14, design%sensitivity(2))
     ! or something to this effect
+=======
+    call this%output%fields%assign(1, simulation%fluid_scheme%p)
+    call this%output%fields%assign(2, simulation%fluid_scheme%u)
+    call this%output%fields%assign(3, simulation%fluid_scheme%v)
+    call this%output%fields%assign(4, simulation%fluid_scheme%w)
+    ! I don't know why these ones need assign_to_field?
+    call this%output%fields%assign_to_field(5, design%design_indicator)
+    call this%output%fields%assign(6, simulation%adjoint_case%scheme%u_adj)
+    call this%output%fields%assign(7, simulation%adjoint_case%scheme%v_adj)
+    call this%output%fields%assign(8, simulation%adjoint_case%scheme%w_adj)
+    call this%output%fields%assign(9, simulation%adjoint_case%scheme%p_adj)
+    call this%output%fields%assign_to_field(10, design%brinkman_amplitude)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
 !------------------------------------------------------------------------------
 ! TODO
@@ -289,10 +350,15 @@ contains
   !> Destructor.
   subroutine steady_state_problem_free(this)
     class(steady_state_problem_t), intent(inout) :: this
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call adjoint_free(this%adj)
     call neko_finalize(this%C)
     ! TODO
     ! probably also objective functions etc
+=======
+
+    call this%free_base()
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
   end subroutine steady_state_problem_free
 
@@ -300,6 +366,7 @@ contains
   subroutine steady_state_problem_compute(this)
     class(steady_state_problem_t), intent(inout) :: this
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     call neko_solve(this%C)
     ! TODO
     ! In the future, the objective_function_t will potentially include
@@ -332,15 +399,48 @@ contains
 
   end subroutine steady_state_problem_compute
 
+=======
+    call this%update_objectives(design)
+    call this%update_constraints(design)
+
+  end subroutine steady_state_problem_compute
+
+  !> The computation of the objective function and constraints.
+  subroutine steady_state_problem_compute_sensitivity(this, design)
+    class(steady_state_problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+
+    select type (design)
+    type is (topopt_design_t)
+       call steady_state_problem_compute_sensitivity_topopt(this, design)
+    class default
+       call neko_error('Only topopt_design_t is supported for now')
+    end select
+
+  end subroutine steady_state_problem_compute_sensitivity
+
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
   !> The computation of the sensitivity if we have a `topopt_design_t`.
   subroutine steady_state_problem_compute_sensitivity_topopt(this)
     class(steady_state_problem_t), intent(inout) :: this
     call solve_adjoint(this%adj)
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
     ! again, in the future, the objective_function_t will potentially include
     ! simulation components so that we can
     ! accumulate the sensitivity during the run...
     ! here, we just compute it on the last step
+=======
+    type(vector_t) :: objective_sensitivity
+
+    type(field_t), pointer :: objective_sensitivity_field
+    integer, dimension(1) :: temp_indices
+
+    call this%update_objective_sensitivities(design)
+    call this%update_constraint_sensitivities(design)
+
+    call this%get_objective_sensitivities(objective_sensitivity)
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
 
     ! TODO
     ! now that I look at this, we could have easily had design, fluid and
@@ -359,6 +459,14 @@ contains
          this%design, this%C%fluid, this%adj%scheme)
     ! it would be nice to visualize this
 
+<<<<<<< HEAD:sources/problems/steady_state_problem.f90
+=======
+    call neko_scratch_registry%request_field(objective_sensitivity_field, &
+         temp_indices(1))
+    call copy(objective_sensitivity_field%x, objective_sensitivity%x, &
+         design%size())
+
+>>>>>>> origin/develop:sources/problems/problems/steady_state_problem.f90
     ! do the adjoint mapping
     call this%design%map_backward(&
          this%objective_function%sensitivity_to_coefficient)
