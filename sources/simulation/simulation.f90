@@ -49,14 +49,15 @@ module simulation
   implicit none
   private
 
-  type, public :: simulation_t
+  type :: simulation_t
      !> and primal case
      type(case_t), public :: neko_case
      !> and adjoint case
      type(adjoint_case_t), public :: adjoint_case
 
      !> The fluid
-     class(fluid_scheme_incompressible_t), public, pointer :: fluid_scheme => null()
+     class(fluid_scheme_incompressible_t), public, pointer :: &
+          fluid_scheme => null()
 
    contains
      !> Initialize the simulation
@@ -71,11 +72,13 @@ module simulation
      procedure, pass(this) :: reset => simulation_reset
   end type simulation_t
 
+  public :: simulation_t
 contains
 
   !> Initialize the simulation
-  subroutine simulation_init(this)
+  subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
 
@@ -84,15 +87,15 @@ contains
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
-    select type(fluid => this%neko_case%fluid)
-      type is (fluid_pnpn_t)
+    select type (fluid => this%neko_case%fluid)
+    type is (fluid_pnpn_t)
        this%fluid_scheme => fluid
 
     end select
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
-    call json_extract_item(this%neko_case%params, &
+    call json_extract_item(parameters, &
          "case.simulation_components", 1, simcomp_settings)
 
     call steady_comp%init(simcomp_settings, this%neko_case)

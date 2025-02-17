@@ -44,7 +44,7 @@ module volume_constraint
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3
+  use field_math, only: field_col3, field_addcol3, field_rone, field_copy
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
@@ -54,7 +54,7 @@ module volume_constraint
   use field, only : field_t
   use field_registry, only : neko_field_registry
   use math, only : rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
+  use device_math, only: device_copy, device_cmult, device_glsc2
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
   use scratch_registry, only : neko_scratch_registry
@@ -122,14 +122,17 @@ contains
     type(simulation_t), target, intent(inout) :: simulation
 
     character(len=:), allocatable :: mask_name
+    character(len=:), allocatable :: name
     logical :: is_max
     real(kind=rp) :: limit
 
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "name", name, "Volume constraint")
     call json_get_or_default(json, "is_max", is_max, .false.)
     call json_get(json, "limit", limit)
 
-    call this%init_from_attributes(design, simulation, mask_name, is_max, limit)
+    call this%init_from_attributes(design, simulation, name, mask_name, &
+         is_max, limit)
   end subroutine volume_constraint_init_json
 
   !> The direct initializer from attributes.
@@ -139,11 +142,12 @@ contains
   !! @param is_max whether it is a maximum volume constraint.
   !! @param limit The volume limit value.
   subroutine volume_constraint_init_attributes(this, design, simulation, &
-       mask_name, is_max, limit)
+       name, mask_name, is_max, limit)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     character(len=*), intent(in) :: mask_name
+    character(len=*), intent(in) :: name
     logical, intent(in) :: is_max
     real(kind=rp), intent(in) :: limit
 
@@ -152,7 +156,7 @@ contains
     integer :: temp_indices(1)
 
     ! Initialize the base class
-    call this%init_base(design%size(), mask_name)
+    call this%init_base(name, design%size(), mask_name)
 
     ! Store the attributes
     this%is_max = is_max
@@ -167,7 +171,9 @@ contains
        call field_rone(work)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          this%volume_domain = device_glsc2(work%x_d, this%c_xh%B_d, &
+               work%size())
        else
           this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
                design%size(), this%mask%mask, this%mask%size)
@@ -257,10 +263,10 @@ contains
 
     volume = 0.0_rp
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        volume = volume_topopt_design(this, design)
 
-      class default
+    class default
        call neko_error('Volume constraint only works with topopt_design')
     end select
 
@@ -272,13 +278,21 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     real(kind=rp) :: volume
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+
+    volume = 0.0_rp
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          call neko_scratch_registry%request_field(work , temp_indices(1))
+          call field_copy(work, design%design_indicator)
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
+          call neko_scratch_registry%relinquish_field(temp_indices)
        else
           volume = glsc2_mask(design%design_indicator%x, &
                this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
@@ -287,7 +301,8 @@ contains
     else
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error('GPU not supported volume constraint')
+          volume = device_glsc2(design%design_indicator%x_d, &
+               this%c_xh%B_d, design%size())
        else
           volume = glsc2(design%design_indicator%x, &
                this%c_Xh%B, design%size())

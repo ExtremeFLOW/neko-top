@@ -162,26 +162,26 @@ contains
 
     allocate(nloc_all(size))
     !!!!Use MPI_Allgather to gather the `nloc` from each process into `nloc_all`
-    call MPI_Allgather(this%mma%get_n(), 1, MPI_INTEGER, nloc_all,&
+    call MPI_Allgather(this%mma%get_n(), 1, MPI_INTEGER, nloc_all, &
          1, MPI_INTEGER, MPI_COMM_WORLD, ierr)
     recv_counts = this%mma%get_n()
     displs(1) = 0
     do i = 2, size
        displs(i) = displs(i-1) + nloc_all(i-1)
     end do
-    allocate(all_stuff(nglobal,4))
+    allocate(all_stuff(nglobal, 4))
     ! Gather data from all processes to the root process
-    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 1), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 1), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 2), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 2), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 3), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 3), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 4), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
     if (pe_rank .eq. 0) then
@@ -192,8 +192,8 @@ contains
     do iter = 1, 100 !10
        
        call this%mma%update(iter, x, df0dx, fval, dfdx)
-       ! print *,"first"
-       this%designx%x = reshape(x,shape(this%designx%x))
+       ! print *, "first"
+       this%designx%x = reshape(x, shape(this%designx%x))
 
        call func1(this, this%mma%get_n(), this%mma%get_m(), &
             f0val, df0dx%x, fval%x, dfdx%x)
@@ -204,6 +204,7 @@ contains
        
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
+    
        if (pe_rank .eq. 0) then
           print *, 'iter = ', iter,&
                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
@@ -220,22 +221,22 @@ contains
     print *, "this%designx%x is updated"
 
 
-    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
-    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
-    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
-    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
+    stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+    stuff(:, 2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+    stuff(:, 3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+    stuff(:, 4) = reshape(this%designx%x, [this%mma%get_n()])
 
-    call MPI_Gatherv(stuff(:,1), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,1), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 1), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 1), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,2), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,2), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 2), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 2), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,3), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,3), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 3), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 3), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
-    call MPI_Gatherv(stuff(:,4), this%mma%get_n(), mpi_real_precision, &
-         all_stuff(:,4), recv_counts, displs, mpi_real_precision, &
+    call MPI_Gatherv(stuff(:, 4), this%mma%get_n(), mpi_real_precision, &
+         all_stuff(:, 4), recv_counts, displs, mpi_real_precision, &
          0, neko_comm, ierr)
     ! Only root process writes the file
     if (pe_rank .eq. 0) then
@@ -247,11 +248,11 @@ contains
   subroutine write_stuff_vtk(stuff, n, filename)
     ! ----------------------------------------------------------- !
     !  This subroutine writes a nx4 array into a vtk file.        !
-    !  The array is called stuff(n,4) holding the coordinates of  !
+    !  The array is called stuff(n, 4) holding the coordinates of !
     !  all points and thier corresponding scalar value            !
     !  For a given point n, the array is defined as follows:      !
-    !  x = stuff(n,1), y = stuff(n,2), z = stuff(n,3)             !
-    !  scalar field value = stuff(n,4)                            !
+    !  x = stuff(n, 1), y = stuff(n, 2), z = stuff(n, 3)          !
+    !  scalar field value = stuff(n, 4)                           !
     ! ----------------------------------------------------------- !
     integer, intent(in) :: n ! Number of design variables
     !> Array containing x, y, z, and T values
@@ -273,7 +274,7 @@ contains
     ! Write the points (x, y, z coordinates)
     write(unit, '(A, I8)') 'POINTS ', n, ' double'
     do i = 1, n
-       write(unit, '(3(ES15.8,1X))') stuff(i, 1), stuff(i, 2), stuff(i, 3)
+       write(unit, '(3(ES15.8, 1X))') stuff(i, 1), stuff(i, 2), stuff(i, 3)
     end do
 
     ! Write the temperature data associated with the points
@@ -294,8 +295,8 @@ contains
     !  This subroutine calculates function values and gradients   !
     !  for "toy problem 3":                                       !
     !                                                             !
-    !    minimize sum_(j = 1,..,n) xj/n                           !
-    !  subject to sum_(j = 1,..,n) {(xj - Xj_GLL)^2} = 0          !
+    !    minimize sum_(j = 1, .., n) xj/n                           !
+    !  subject to sum_(j = 1, .., n) {(xj - Xj_GLL)^2} = 0          !
     ! ----------------------------------------------------------- !
     implicit none
     class(mma_comp_t), intent(inout) :: this
@@ -332,7 +333,7 @@ contains
          mpi_real_precision, mpi_sum, neko_comm, ierr)
     fval(1) = Globalf0val
 
-    dfdx(1,:) = 2.0_rp * (x - coordx)
+    dfdx(1, :) = 2.0_rp * (x - coordx)
     fval(2) = - fval(1)
     dfdx(2,:) = - dfdx(1,:)
   end subroutine func1

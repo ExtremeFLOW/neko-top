@@ -72,7 +72,7 @@ module lube_term_objective
   use adjoint_scheme, only: adjoint_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_glsc2
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
@@ -84,6 +84,7 @@ module lube_term_objective
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
   use logger, only: neko_log
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   implicit none
   private
 
@@ -100,6 +101,7 @@ module lube_term_objective
 
      type(field_t), pointer :: u, v, w
      real(kind=rp), pointer :: B(:,:,:,:)
+     type(c_ptr) :: B_d = C_NULL_PTR
      type(field_t), pointer :: brinkman_amplitude
 
    contains
@@ -132,13 +134,16 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     character(len=:), allocatable :: mask_name
+    character(len=:), allocatable :: name
     real(kind=rp) :: weight, K
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "name", name, "Out of plane stresses")
     call json_get_or_default(json, "K", K, 1.0_rp)
 
-    call this%init_from_attributes(design, simulation, weight, mask_name, K)
+    call this%init_from_attributes(design, simulation, weight, name, &
+         mask_name, K)
   end subroutine lube_term_init_json
 
   !> The actual constructor.
@@ -148,27 +153,28 @@ contains
   !! @param mask_name the name of the mask.
   !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       mask_name, K)
+       name, mask_name, K)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: mask_name
+    character(len=*), intent(in) :: name
     real(kind=rp), intent(in) :: K
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
-    call this%init_base(design%size(), weight, mask_name)
+    call this%init_base(name, design%size(), weight, mask_name)
 
     ! Set the coefficient for the lube term
     this%K = K
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        this%brinkman_amplitude => design%brinkman_amplitude
 
-      class default
+    class default
        call neko_error('Minimum dissipation only works with topopt_design')
     end select
 
@@ -176,6 +182,7 @@ contains
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
     this%B => simulation%neko_case%fluid%c_Xh%B
+    this%B_d = simulation%neko_case%fluid%c_Xh%B_d
 
     ! if we have the lube term we need to initialize and append that too
 
@@ -231,15 +238,23 @@ contains
     call field_addcol3(work, this%w, this%brinkman_amplitude)
 
     if (this%has_mask) then
-       this%value = glsc2_mask(work%x, this%B, design%size(), &
-            this%mask%mask, this%mask%size)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          ! note, this could be done more elagantly by writing
+          ! device_glsc2_mask
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+       else
+          this%value = glsc2_mask(work%x, this%B, design%size(), &
+               this%mask%mask, this%mask%size)
+       end if
     else
-       this%value = glsc2(work%x, this%B, design%size())
+       if (neko_bcknd_device .eq. 1) then
+          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+       else
+          this%value = glsc2(work%x, this%B, design%size())
+       end if
     end if
     this%value = 0.5 * this%K * this%value
-
-    !TODO
-    ! GPUS
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

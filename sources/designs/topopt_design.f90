@@ -44,8 +44,12 @@ module topopt_design
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
-
+  use math, only: rzero
+  use simulation, only: simulation_t
+  use json_module, only: json_file
   implicit none
   private
 
@@ -153,8 +157,24 @@ module topopt_design
 
 
    contains
-     !> init (will make this legit at some point)
-     procedure, pass(this) :: init => topopt_design_init
+
+     ! ----------------------------------------------------------------------- !
+     ! Initializations
+
+     !> Initialize the design
+     generic, public :: init => init_from_json, &
+          init_from_components
+     !> Initialize the design from a JSON file
+     procedure, pass(this), public :: init_from_json => &
+          topopt_design_init_from_json
+     !> Initialize the design from components
+     procedure, pass(this), public :: init_from_components => &
+          topopt_design_init_from_components
+
+     !> Add mappings to the design
+     procedure, pass(this) :: add_mapping => topopt_design_add_mapping
+
+
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
      ! and ultimately handle mapping different coeficients!
@@ -184,18 +204,31 @@ module topopt_design
 
 contains
 
-  subroutine topopt_design_init(this, json, coef)
-    class(topopt_design_t), target, intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    type(coef_t), intent(inout) :: coef
+
+  !> Initialize the design from a JSON file
+  subroutine topopt_design_init_from_json(this, parameters, simulation)
+    class(topopt_design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+
+    call this%init_from_components(simulation)
+
+  end subroutine topopt_design_init_from_json
+
+
+  subroutine topopt_design_init_from_components(this, simulation)
+    class(topopt_design_t), intent(inout) :: this
+    type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
 
-    ! init the fields
-    call this%design_indicator%init(coef%dof, "design_indicator")
-    call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
-    call this%sensitivity%init(coef%dof, "sensitivity")
-    call this%filtered_design%init(coef%dof, "filtered_design")
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      ! init the fields
+      call this%design_indicator%init(coef%dof, "design_indicator")
+      call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
+      call this%sensitivity%init(coef%dof, "sensitivity")
+      call this%filtered_design%init(coef%dof, "filtered_design")
+    end associate
 
     ! TODO
     ! this is where we steal basically everything in
@@ -203,6 +236,7 @@ contains
     ! for now, make it a cylinder by hand
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
+    this%design_indicator%x = 0.0_rp
 
     n = this%design_indicator%dof%size()
     do i = 1, n
@@ -213,9 +247,16 @@ contains
        end if
     end do
 
+    ! again this will be handled better in the future...
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%design_indicator%x, &
+            this%design_indicator%x_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
+    end if
+
     ! TODO, of course when we move all of Tim's stuff for initialization of
     ! the initial design field we'll be reading things properly from the JSON.
-    ! call json_get(json, 'name', optimization_domain_zone_name)
+    ! call json_get(parameters, 'name', optimization_domain_zone_name)
     ! Right now, I'm hardcoding the name of the point zone.
     this%if_mask = .true.
     optimization_domain_zone_name = "optimization_domain"
@@ -223,11 +264,9 @@ contains
     ! Initialize the mask
     if (this%if_mask) then
        this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(optimization_domain_zone_name)
+            neko_point_zone_registry%get_point_zone(&
+            optimization_domain_zone_name)
     end if
-
-
-
 
     ! TODO
     ! Regarding masks and filters,
@@ -262,18 +301,6 @@ contains
             this%optimization_domain, 0.0_rp)
     end if
 
-    ! TODO
-    ! we would also need to make a mapping type that reads in
-    ! parameters etc about filtering and mapping
-    ! ie,
-    ! call mapper%init(this woud be from JSON)
-    call this%filter%init(json, coef)
-    call this%mapping%init(json, coef)
-
-    ! and then we would map for the first one
-    call this%map_forward()
-
-
     ! a field writer would be nice to output
     ! - design indicator (\rho)
     ! - mapped design (\chi)
@@ -284,12 +311,29 @@ contains
     ! obviously when we do the mappings properly, to many coeficients,
     ! we'll also have to modify this
     call this%output%init(sp, 'design', 3)
-    call this%output%fields%assign(1, this%design_indicator)
-    call this%output%fields%assign(2, this%brinkman_amplitude)
-    call this%output%fields%assign(3, this%sensitivity)
+    call this%output%fields%assign_to_field(1, this%design_indicator)
+    call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
+    call this%output%fields%assign_to_field(3, this%sensitivity)
 
     call this%init_base(n)
-  end subroutine topopt_design_init
+  end subroutine topopt_design_init_from_components
+
+  !> Add mappings to the design
+  subroutine topopt_design_add_mapping(this, parameters, simulation)
+    class(topopt_design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+
+    ! Todo: This need to be read from the parameters in the JSON
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      call this%filter%init(parameters, coef)
+      call this%mapping%init(parameters, coef)
+    end associate
+
+    ! and then we would map for the first one
+    call this%map_forward()
+
+  end subroutine topopt_design_add_mapping
 
 
   subroutine topopt_design_map_forward(this)

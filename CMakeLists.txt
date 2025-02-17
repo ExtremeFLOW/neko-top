@@ -43,22 +43,14 @@ set(CMAKE_Fortran_STANDARD 2008)
 # Enable devices
 option(DEVICE_TYPE "Enable device support" OFF)
 if (DEVICE_TYPE STREQUAL "CUDA")
-    find_package(CUDAToolkit REQUIRED)
-    find_program(CMAKE_CUDA_COMPILER NAMES nvcc)
-    if (CMAKE_CUDA_COMPILER)
-        enable_language(CUDA)
-        message(STATUS "CUDA support enabled with nvcc: ${CMAKE_CUDA_COMPILER}")
-        add_compile_definitions(HAVE_CUDA=1)
-    else()
-        message(FATAL_ERROR "CUDA requested but nvcc was not found. Install CUDA or check your PATH.")
-    endif()
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
 endif()
 
 # ............................................................................ #
 # Options
 
 option(BUILD_DOCS "Build documentation" OFF)
-option(BUILD_EXAMPLES "Build the examples" ON)
 option(BUILD_TESTING "Build the tests" OFF)
 
 # Advanced options
@@ -87,16 +79,28 @@ set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
 # ............................................................................ #
 # Define compiler flags
 
+# Define the list of available build types
+set(CMAKE_BUILD_TYPE_LIST
+    Debug
+    Release
+    Testing
+)
+
 set(CMAKE_Fortran_PREPROCESS ON)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(
+        # Debugging flags
+        $<$<COMPILE_LANGUAGE:Fortran>:-g>
         $<$<COMPILE_LANGUAGE:Fortran>:-Og>
+
+        # Warnings which for debug builds are errors
         $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
-        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
+        $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
     )
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(
@@ -108,11 +112,35 @@ elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
         $<$<COMPILE_LANGUAGE:Fortran>:-fwhole-program>
         $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
     )
-endif()
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
+    add_compile_options(
+        # Debugging flags
+        $<$<COMPILE_LANGUAGE:Fortran>:-g>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Og>
 
-add_compile_options(
-    $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
-)
+        # Warnings which for debug builds are errors
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wsurprising>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Warray-temporaries>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wimplicit-interface>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
+
+        # Debugging checks
+        $<$<COMPILE_LANGUAGE:Fortran>:-fcheck=all>
+        $<$<COMPILE_LANGUAGE:Fortran>:-fbacktrace>
+        $<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-real=snan>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-integer=-99999999>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-character=ascii>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-logical=true>
+        $<$<COMPILE_LANGUAGE:Fortran>:-finit-local-zero>
+    )
+endif()
 
 # ============================================================================ #
 # Documentation
@@ -175,9 +203,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
 # Build the examples
 # ============================================================================ #
 
-if (BUILD_EXAMPLES)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
 # ============================================================================ #
 # Build the tests
@@ -207,7 +233,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "Current configuration:")
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
-    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
     message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")

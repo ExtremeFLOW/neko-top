@@ -63,7 +63,8 @@
 module minimum_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
+       field_copy
   use operators, only: grad
   use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
@@ -74,7 +75,7 @@ module minimum_dissipation_objective
   use adjoint_scheme, only: adjoint_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_glsc2
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
@@ -124,13 +125,15 @@ contains
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+    character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "name", name, "Dissipation")
 
-    call this%init_from_attributes(design, simulation, weight, mask_name)
+    call this%init_from_attributes(design, simulation, weight, name, mask_name)
   end subroutine minimum_dissipation_init_json
 
 !> The actual constructor.
@@ -139,16 +142,17 @@ contains
 !! @param weight the weight of the objective function.
 !! @param mask_name the name of the mask.
   subroutine minimum_dissipation_init_attributes(this, design, simulation, &
-       weight, mask_name)
+       weight, name, mask_name)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
+    character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
 
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
-    call this%init_base(design%size(), weight, mask_name)
+    call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
     this%fluid => simulation%fluid_scheme
@@ -184,15 +188,16 @@ contains
   subroutine minimum_dissipation_update_value(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: wo1, wo2, wo3
+    type(field_t), pointer :: wo1, wo2, wo3, work
     type(field_t), pointer :: objective_field
-    integer :: temp_indices(4)
+    integer :: temp_indices(5)
     integer n
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
     call neko_scratch_registry%request_field(wo3, temp_indices(3))
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
+    call neko_scratch_registry%request_field(work, temp_indices(5))
 
     ! update_value the objective function.
     call grad(wo1%x, wo2%x, wo3%x, this%fluid%u%x, this%fluid%c_Xh)
@@ -213,14 +218,24 @@ contains
     ! integrate the field
     n = wo1%size()
     if (this%has_mask) then
-       this%value = glsc2_mask(objective_field%x, this%fluid%c_Xh%b, &
-            n, this%mask%mask, this%mask%size)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          ! note, this could be done more elagantly by writing
+          ! device_glsc2_mask
+          call field_copy(work, objective_field)
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          this%value = device_glsc2(work%x_d, this%fluid%c_xh%B_d, n)
+       else
+          this%value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
+               n, this%mask%mask, this%mask%size)
+       end if
     else
-       this%value = glsc2(objective_field%x, this%fluid%c_Xh%b, n)
+       if (neko_bcknd_device .eq. 1) then
+          this%value = device_glsc2(objective_field%x_d, &
+               this%fluid%C_Xh%b_d, n)
+       else
+          this%value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
+       end if
     end if
-
-    !TODO
-    ! GPUS
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

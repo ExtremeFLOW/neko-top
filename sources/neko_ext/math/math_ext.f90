@@ -1,9 +1,26 @@
 module math_ext
   use num_types, only: rp, xp
-  use comm
+  use comm, only: NEKO_COMM, MPI_EXTRA_PRECISION
+  use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_IN_PLACE
   implicit none
 
 contains
+
+  !> @brief Copy within a mask. NOTE, this differs from `masked_copy` in the
+  !! indexing.
+  !! \f$ a_i = b_i, for i in mask \f$
+  subroutine copy_mask(a, b, size, mask, mask_size)
+    integer, intent(in) :: size, mask_size
+    real(kind=rp), dimension(size), intent(inout) :: a
+    real(kind=rp), dimension(size), intent(in) :: b
+    integer, dimension(mask_size), intent(in) :: mask
+    integer :: i
+
+    do i = 1, mask_size
+       a(mask(i)) = b(mask(i))
+    end do
+
+  end subroutine copy_mask
 
   !> @brief Add a constant to a masked vector.
   !! \f$ a_i = a_i + c, for i in mask \f$
@@ -94,7 +111,7 @@ contains
 
   end subroutine sub3_mask
 
-  !> @brief Weighted inner product 
+  !> @brief Weighted inner product
   !! \f$ a^T b \f$ for indices in the mask
   function glsc2_mask(a, b, size, mask, mask_size)
     integer, intent(in) :: size, mask_size

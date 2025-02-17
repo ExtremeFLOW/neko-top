@@ -31,14 +31,15 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 
 submodule (mma) mma_cpu
+  use lapack_interfaces, only: dgesv
 
   implicit none
 
 contains
 
 
-  module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr)
+  module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, &
+       xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !

@@ -10,14 +10,16 @@ module neko_top
   use user_intf, only: simulation_component_user_settings
   use num_types, only: rp
   use logger, only: neko_log
+  use neko, only: neko_solve
+  use neko_ext, only: setup_iteration
+  use json_utils, only: json_get_or_default
+  use develop, only: estimate_temperature
 
   use design_module, only: design_t
   use sensitivity, only: sensitivity_t
   use topology_optimization_user_module, only: neko_user_init
-  use, intrinsic :: iso_fortran_env
 
   implicit none
-
   private
   public :: neko_top_init, neko_top_solve, neko_top_finalize
 
@@ -57,7 +59,8 @@ contains
     call topopt_components%init(neko_case, 'topology_optimization.components')
 
     call neko_case%params%get_core(core)
-    call neko_case%params%get('topology_optimization.components', simcomp_object, found)
+    call neko_case%params%get('topology_optimization.components', &
+         simcomp_object, found)
     comp_subdict = json_file(simcomp_object)
 
     ! Allocation of the design
@@ -69,11 +72,6 @@ contains
   end subroutine neko_top_init
 
   subroutine neko_top_solve(neko_case)
-    use neko, only: neko_solve
-    use neko_ext, only: setup_iteration
-    use json_utils, only: json_get_or_default
-    implicit none
-
     type(case_t), intent(inout) :: neko_case
 
     integer :: iter, max_iter
@@ -108,11 +106,6 @@ contains
   end subroutine neko_top_solve
 
   subroutine neko_top_finalize(neko_case)
-    use neko, only: neko_finalize
-    use develop, only: estimate_temperature
-    use logger, only: neko_log
-    use json_utils, only: json_get_or_default
-
     type(case_t), intent(inout) :: neko_case
 
     logical :: temperature_enabled

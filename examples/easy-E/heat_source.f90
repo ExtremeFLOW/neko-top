@@ -84,7 +84,7 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_map(resistance, resistance_d, rhs%dm%size())
           call device_memcpy(resistance, resistance_d, rhs%dm%size(), &
-                                                                    host_to_device, .true.)
+               host_to_device, .true.)
        end if
     end if
 
@@ -93,21 +93,29 @@ contains
     current_temperature = min(1.0_rp, t / ramp_time_end) * target_temperature
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), cyl%mask_d, cyl%size)
-       call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), ball%mask_d, ball%size)
+       call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), &
+            cyl%mask_d, cyl%size)
+       call device_cfill_mask(s%x_d, current_temperature, rhs%dm%size(), &
+            ball%mask_d, ball%size)
 
 
        !  call device_cfill(rhs%s_d, 0.0_rp, rhs%dm%size())
-       !  call device_sub3_mask(rhs%s_d, resistance_d, s%x_d, rhs%dm%size(), cyl%mask_d, cyl%size)
-       !  call device_sub3_mask(rhs%s_d, resistance_d, s%x_d, rhs%dm%size(), ball%mask_d, ball%size)
+       !  call device_sub3_mask(rhs%s_d, resistance_d, s%x_d, rhs%dm%size(), &
+       !       cyl%mask_d, cyl%size)
+       !  call device_sub3_mask(rhs%s_d, resistance_d, s%x_d, rhs%dm%size(), &
+       !       ball%mask_d, ball%size)
     else
 
-       call cfill_mask(s%x, current_temperature, rhs%dm%size(), cyl%mask, cyl%size)
-       call cfill_mask(s%x, current_temperature, rhs%dm%size(), ball%mask, ball%size)
+       call cfill_mask(s%x, current_temperature, rhs%dm%size(), cyl%mask, &
+            cyl%size)
+       call cfill_mask(s%x, current_temperature, rhs%dm%size(), ball%mask, &
+            ball%size)
 
        !  call cfill(rhs%s, 0.0_rp, rhs%dm%size())
-       !  call sub3_mask(rhs%s, resistance, s%x, rhs%dm%size(), cyl%mask, cyl%size)
-       !  call sub3_mask(rhs%s, resistance, s%x, rhs%dm%size(), ball%mask, ball%size)
+       !  call sub3_mask(rhs%s, resistance, s%x, rhs%dm%size(), cyl%mask, &
+       !       cyl%size)
+       !  call sub3_mask(rhs%s, resistance, s%x, rhs%dm%size(), ball%mask, &
+       !       ball%size)
     end if
 
   end subroutine heat_source
