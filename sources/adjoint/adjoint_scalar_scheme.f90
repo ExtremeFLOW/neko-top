@@ -102,9 +102,12 @@ module adjoint_scalar_scheme
   use neko_config, only : NEKO_BCKND_DEVICE
   use field_series, only : field_series_t
   use time_step_controller, only : time_step_controller_t
+  use gradient_jump_penalty, only : gradient_jump_penalty_t
   ! steal some things from the OG passive scalar
   use scalar_scheme, only: scalar_scheme_solver_factory, &
        scalar_scheme_precon_factory
+  ! extra json support
+  use json_utils_ext, only: json_key_fallback
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
@@ -281,29 +284,43 @@ contains
     integer :: integer_val, ierr
     character(len=:), allocatable :: solver_type, solver_precon
     real(kind=rp) :: GJP_param_a, GJP_param_b
+    character(len=:), allocatable :: json_key
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
 
-    call neko_log%section('Scalar')
-    call json_get(params, 'case.fluid.velocity_solver.type', solver_type)
-    call json_get(params, 'case.fluid.velocity_solver.preconditioner', &
-         solver_precon)
-    call json_get(params, 'case.fluid.velocity_solver.absolute_tolerance', &
-         solver_abstol)
+    call neko_log%section('Adjoint Scalar')
 
-    call json_get_or_default(params, &
-         'case.fluid.velocity_solver.projection_space_size', &
-         this%projection_dim, 20)
-    call json_get_or_default(params, &
-         'case.fluid.velocity_solver.projection_hold_steps', &
-         this%projection_activ_step, 5)
+    json_key = json_key_fallback(params, &
+         'case.adjoint.velocity_solver.type', &
+         'case.fluid.velocity_solver.type')
+    call json_get(params, json_key, solver_type)
+
+    json_key = json_key_fallback(params, &
+         'case.adjoint.velocity_solver.preconditioner', &
+         'case.fluid.velocity_solver.preconditioner')
+    call json_get(params, json_key, solver_precon)
+
+    json_key = json_key_fallback(params, &
+         'case.adjoint.velocity_solver.absolute_tolerance', &
+         'case.fluid.velocity_solver.absolute_tolerance')
+    call json_get(params, json_key, solver_abstol)
+
+    json_key = json_key_fallback(params, &
+         'case.adjoint.velocity_solver.projection_space_size', &
+         'case.fluid.velocity_solver.projection_space_size')
+    call json_get_or_default(params, json_key, this%projection_dim, 20)
+
+    json_key = json_key_fallback(params, &
+         'case.adjoint.velocity_solver.projection_hold_steps', &
+         'case.fluid.velocity_solver.projection_hold_steps')
+    call json_get_or_default(params, json_key, this%projection_activ_step, 5)
 
 
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
     call neko_log%message(log_buf)
-    call neko_log%message('Ksp scalar : ('// trim(solver_type) // &
+    call neko_log%message('Ksp adjoint scalar : ('// trim(solver_type) // &
          ', ' // trim(solver_precon) // ')')
     write(log_buf, '(A,ES13.6)') ' `-abs tol :', solver_abstol
     call neko_log%message(log_buf)
@@ -340,10 +357,14 @@ contains
     !
     ! Turbulence modelling and variable material properties
     !
-    if (params%valid_path('case.scalar.nut_field')) then
-       call json_get(params, 'case.scalar.Pr_t', this%pr_turb)
-       call json_get(params, 'case.scalar.nut_field', this%nut_field_name)
-       this%variable_material_properties = .true.
+    json_key = json_key_fallback(params, &
+         'case.adjoint_scalar.nut_field', &
+         'case.scalar.nut_field')
+    if (params%valid_path(json_key)) then
+       call neko_error('Variable material properties not yet implemented')
+       ! call json_get(params, 'case.scalar.Pr_t', this%pr_turb)
+       ! call json_get(params, 'case.scalar.nut_field', this%nut_field_name)
+       ! this%variable_material_properties = .true.
     else
        this%nut_field_name = ""
     end if
@@ -353,41 +374,47 @@ contains
 
     ! Fill lambda field with the physical value
     call this%lambda_field%init(this%dm_Xh, "lambda")
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%lambda_field%x_d, this%lambda, &
-            this%lambda_field%size())
-    else
-       call cfill(this%lambda_field%x, this%lambda, this%lambda_field%size())
-    end if
+    call field_cfill(this%lambda_field, this%lambda)
 
     !
     ! Setup right-hand side field.
     !
     allocate(this%f_Xh)
-    call this%f_Xh%init(this%dm_Xh, fld_name = "scalar_rhs")
+    call this%f_Xh%init(this%dm_Xh, fld_name = "adjoint_scalar_rhs")
 
     ! Initialize the source term
+    ! Note: This time we don't use the JSON key, we shouldn't take source
+    ! terms from the primal.
     call this%source_term%init(this%f_Xh, this%c_Xh, user)
-    call this%source_term%add(params, 'case.scalar.source_terms')
+    call this%source_term%add(params, 'case.adjoint_scalar.source_terms')
 
     ! todo parameter file ksp tol should be added
-    call json_get_or_default(params, &
-         'case.fluid.velocity_solver.max_iterations', &
-         integer_val, KSP_MAX_ITER)
-    call json_get_or_default(params, &
-         'case.fluid.velocity_solver.monitor', &
-         logical_val, .false.)
+    json_key = json_key_fallback(params, &
+       'case.fluid.velocity_solver.max_iterations', &
+       'case.adjoint.velocity_solver.max_iterations')
+    call json_get_or_default(params, json_key, integer_val, KSP_MAX_ITER)
+
+    json_key = json_key_fallback(params, &
+       'case.fluid.velocity_solver.monitor', &
+       'case.adjoint.velocity_solver.monitor')
+    call json_get_or_default(params, json_key logical_val, .false.)
+
     ! HARRY
     ! I feel like these can be stolen from scalar scheme
+    ! edit
+    ! why would I think this? we need to get a adjoint_pnpn
     call scalar_scheme_solver_factory(this%ksp, this%dm_Xh%size(), &
          solver_type, integer_val, solver_abstol, logical_val)
+    ! this probably can
     call scalar_scheme_precon_factory(this%pc, this%ksp, &
          this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, solver_precon)
 
     ! Initiate gradient jump penalty
-    call json_get_or_default(params, &
-         'case.scalar.gradient_jump_penalty.enabled',&
-         this%if_gradient_jump_penalty, .false.)
+    json_key = json_key_fallback(params, &
+       'case.scalar.gradient_jump_penalty.enabled', &
+       'case.adjoint_scalar.gradient_jump_penalty.enabled')
+    call json_get_or_default(params, json_key, this%if_gradient_jump_penalty, &
+       .false.)
 
     if (this%if_gradient_jump_penalty .eqv. .true.) then
        call neko_error('Gradient jump penalty not implemented for adjoint')
@@ -476,53 +503,6 @@ contains
 
   ! I think this we can steal from the OG passive scalar
 !  subroutine scalar_scheme_solver_factory(ksp, n, solver, max_iter, &
-!       abstol, monitor)
-!    class(ksp_t), allocatable, target, intent(inout) :: ksp
-!    integer, intent(in), value :: n
-!    integer, intent(in) :: max_iter
-!    character(len=*), intent(in) :: solver
-!    real(kind=rp) :: abstol
-!    logical, intent(in) :: monitor
-!
-!    call krylov_solver_factory(ksp, n, solver, max_iter, &
-!         abstol, monitor = monitor)
-!
-!  end subroutine scalar_scheme_solver_factory
-!
-!  !> Initialize a Krylov preconditioner
-!  subroutine scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, bclst, &
-!       pctype)
-!    class(pc_t), allocatable, target, intent(inout) :: pc
-!    class(ksp_t), target, intent(inout) :: ksp
-!    type(coef_t), target, intent(inout) :: coef
-!    type(dofmap_t), target, intent(inout) :: dof
-!    type(gs_t), target, intent(inout) :: gs
-!    type(bc_list_t), target, intent(inout) :: bclst
-!    character(len=*) :: pctype
-!
-!    call precon_factory(pc, pctype)
-!
-!    select type (pcp => pc)
-!      type is (jacobi_t)
-!       call pcp%init(coef, dof, gs)
-!      type is (sx_jacobi_t)
-!       call pcp%init(coef, dof, gs)
-!      type is (device_jacobi_t)
-!       call pcp%init(coef, dof, gs)
-!      type is (hsmg_t)
-!       if (len_trim(pctype) .gt. 4) then
-!          if (index(pctype, '+') .eq. 5) then
-!             call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst, &
-!                  trim(pctype(6:)))
-!          else
-!             call neko_error('Unknown coarse grid solver')
-!          end if
-!       else
-!          call pcp%init(dof%msh, dof%Xh, coef, dof, gs, bclst)
-!       end if
-!    end select
-!
-!    call ksp%set_pc(pc)
 !
 !  end subroutine scalar_scheme_precon_factory
 
@@ -560,6 +540,11 @@ contains
     real(kind=rp) :: dummy_mu, dummy_rho
 
     dummy_mp_ptr => dummy_user_material_properties
+
+    ! HARRY
+    ! HUGE TODO HERE !!
+    ! I would have to sit down with a pen and paper to see if this makes
+    ! sense for the adjoint...
 
     if (.not. associated(user%material_properties, dummy_mp_ptr)) then
 

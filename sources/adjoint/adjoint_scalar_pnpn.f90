@@ -159,11 +159,16 @@ contains
   !! @param gs The gather-scatter.
   !! @param params The case parameter file in json.
   !! @param user Type with user-defined procedures.
+  !! @param ulag Lag arrays for the x velocity component.
+  !! @param vlag Lag arrays for the y velocity component.
+  !! @param wlag Lag arrays for the z velocity component.
+  !! @param time_scheme The time-integration controller.
+  !! @param rho The fluid density.
   subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, user, &
        ulag, vlag, wlag, time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
-    type(mesh_t), target, intent(inout) :: msh
-    type(coef_t), target, intent(inout) :: coef
+    type(mesh_t), target, intent(in) :: msh
+    type(coef_t), target, intent(in) :: coef
     type(gs_t), target, intent(inout) :: gs
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
@@ -171,7 +176,9 @@ contains
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
     real(kind=rp), intent(in) :: rho
     integer :: i
+    class(bc_t), pointer :: bc_i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
+    logical :: advection
 
     call this%free()
 
@@ -187,7 +194,7 @@ contains
     ! Setup backend dependent summation of extrapolation scheme
     call rhs_maker_ext_fctry(this%makeext)
 
-    ! Setup backend depenent contributions to F from lagged BD terms
+    ! Setup backend dependent contributions to F from lagged BD terms
     call rhs_maker_bdf_fctry(this%makebdf)
 
     ! Setup backend dependent contributions of the OIFS scheme
@@ -209,32 +216,19 @@ contains
 
     end associate
 
-    ! Initialize dirichlet bcs for scalar residual
-    ! todo: look that this works
+    ! Set up boundary conditions
+    call this%setup_bcs_(user)
 
-    ! TODO
-    ! maybe read the BCs from scalar and make adjustments?
-    ! ie, 'v' -> 'w'
-    ! but I think in general the BCs for the passive scalar will be neuman
-    ! specifically for the mixer, I think the BCs will be
-    ! diriclet on the inflow -> 'w'
-    ! symetry on the remaining walls? is the $ \nabla \cdot \mathbf{n} = 0 $
-    ! and I think these stay symetry in the adjoint.
-    ! so it's only the diriclet conditions to worry about
-    call this%bc_res%init_base(this%c_Xh)
-    do i = 1, this%n_dir_bcs
-       call this%bc_res%mark_facets(this%dir_bcs(i)%marked_facet)
+    ! Initialize dirichlet bcs for scalar residual
+    call this%bc_res%init(this%c_Xh, params)
+    do i = 1, this%bcs%size()
+       if (this%bcs%strong(i)) then
+          bc_i => this%bcs%get(i)
+          call this%bc_res%mark_facets(bc_i%marked_facet)
+       end if
     end do
 
-    ! Check for user bcs
-    if (this%user_bc%msk(0) .gt. 0) then
-       call this%bc_res%mark_facets(this%user_bc%marked_facet)
-    end if
-
-    call this%bc_res%mark_zones_from_list(msh%labeled_zones, 'd_s', &
-         this%bc_labels)
     call this%bc_res%finalize()
-    call this%bc_res%set_g(0.0_rp)
 
     call this%bclst_ds%init()
     call this%bclst_ds%append(this%bc_res)
@@ -252,14 +246,8 @@ contains
     call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
 
     ! Initialize advection factory
-    ! man I don't know why all this stuff changed...
-    ! but I guess it's the oifs stuff?
-    ! TODO
-    ! we're behind neko by a few PRs it would seem...
-    !
-    !call advection_adjoint_factory(this%adv, params, this%c_Xh, &
-    !                       ulag, vlag, wlag, this%chkp%dtlag, &
-    !                       this%chkp%tlag, time_scheme, this%slag)
+    ! NOTE
+    ! This is changed a fair amount and I suspect it's due oifs
     call advection_adjoint_factory(this%adv, params, this%c_Xh)
   end subroutine adjoint_scalar_pnpn_init
 
@@ -367,24 +355,20 @@ contains
          if_variable_dt => dt_controller%if_variable_dt, &
          dt_last_change => dt_controller%dt_last_change)
 
-      if (neko_log%level_ .ge. NEKO_LOG_DEBUG) then
-         write(log_buf, '(A,A,E15.7,A,E15.7,A,E15.7)') 'Scalar debug', &
-              ' l2norm s', glsc2(this%s_adj%x, this%s_adj%x, n), &
-              ' slag1', glsc2(this%slag%lf(1)%x, this%slag%lf(1)%x, n), &
-              ' slag2', glsc2(this%slag%lf(2)%x, this%slag%lf(2)%x, n)
-         call neko_log%message(log_buf)
-         write(log_buf, '(A,A,E15.7,A,E15.7)') 'Scalar debug2', &
-              ' l2norm abx1', glsc2(this%abx1%x, this%abx1%x, n), &
-              ' abx2', glsc2(this%abx2%x, this%abx2%x, n)
-         call neko_log%message(log_buf)
-      end if
-
+      ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
+      call print_debug(this)
       ! Compute the source terms
       call this%source_term%compute(t, tstep)
 
+      ! Compute the grandient jump penalty term
+      if (this%if_gradient_jump_penalty .eqv. .true.) then
+         call neko_error("gradient jump penalty not implemented for adjoint")
+         ! call this%gradient_jump_penalty%compute(u, v, w, s)
+         ! call this%gradient_jump_penalty%perform(f_Xh)
+      end if
 
-      ! Apply Neumann boundary conditions
-      call this%bclst_neumann%apply_scalar(this%f_Xh%x, dm_Xh%size())
+      ! Apply weak boundary conditions, that contribute to the source terms.
+      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), t, tstep, .false.)
 
       ! Add the advection operators to the right-hans-side.
       ! HARRY
@@ -409,13 +393,9 @@ contains
 
       call slag%update()
 
-      !> Apply Dirichlet boundary conditions
-      !! We assume that no change of boundary conditions
-      !! occurs between elements. i.e. we do not apply gsop here like in Nek5000
-      call this%field_dir_bc%update(this%field_dir_bc%field_list, &
-           this%field_dirichlet_bcs, this%c_Xh, t, tstep, "scalar")
-      call this%bclst_dirichlet%apply_scalar(this%s_adj%x, this%dm_Xh%size())
 
+      !> Apply strong boundary conditions.
+      call this%bcs%apply_scalar(this%s%x, this%dm_Xh%size(), t, tstep, .true.)
 
       ! Update material properties if necessary
       call this%update_material_properties()
