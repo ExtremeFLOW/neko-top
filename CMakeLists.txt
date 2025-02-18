@@ -53,16 +53,6 @@ endif()
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
 
-# Advanced options
-include(CMakeDependentOption)
-
-option(ONLY_DOCS "Only build the documentation" OFF)
-if (ONLY_DOCS)
-    set(BUILD_DOCS ON)
-    set(BUILD_EXAMPLES OFF)
-    set(BUILD_TESTING OFF)
-endif()
-
 if (CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release"
         CACHE STRING "Choose the type of build" FORCE)
@@ -146,12 +136,12 @@ endif()
 # Documentation
 # ============================================================================ #
 
+# Add the documentation target to ALL if we have "BUILD_DOCS" enabled
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
 if (BUILD_DOCS)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
-endif()
-
-if (ONLY_DOCS)
-    return()
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()
 
 # ============================================================================ #
@@ -234,7 +224,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
-    message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
     message(STATUS "")
     message(STATUS "External dependencies:")
