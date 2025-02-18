@@ -193,17 +193,17 @@ contains
     integer :: i
 
     select case (trim(type))
-      case ('linear')
+    case ('linear')
        bla => blasius_linear
-      case ('quadratic')
+    case ('quadratic')
        bla => blasius_quadratic
-      case ('cubic')
+    case ('cubic')
        bla => blasius_cubic
-      case ('quartic')
+    case ('quartic')
        bla => blasius_quartic
-      case ('sin')
+    case ('sin')
        bla => blasius_sin
-      case default
+    case default
        call neko_error('Invalid Blasius approximation')
     end select
 
