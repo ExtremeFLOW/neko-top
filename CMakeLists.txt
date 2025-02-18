@@ -96,6 +96,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         # Warnings which for debug builds are errors
         $<$<COMPILE_LANGUAGE:Fortran>:-Wall>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wextra>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-dummy-argument>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
