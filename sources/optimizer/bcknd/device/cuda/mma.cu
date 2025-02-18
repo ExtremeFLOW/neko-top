@@ -1,13 +1,14 @@
-#include "../../../../../external/neko/src/device/cuda/check.h"
+#include "device/cuda/check.h"
 #include "mma_kernel.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 
 extern "C" {
-#include "../../../../../external/neko/src/math/bcknd/device/device_mpi_reduce.h"
-#include "../../../../../external/neko/src/math/bcknd/device/device_mpi_op.h"
-#include "../../../../../external/neko/src/device/device_config.h"
+#include "math/bcknd/device/device_mpi_reduce.h"
+#include "math/bcknd/device/device_mpi_op.h"
+#include "device/device_config.h"
+
 
   int mma_red_s = 0;
   real * mma_bufred = NULL;

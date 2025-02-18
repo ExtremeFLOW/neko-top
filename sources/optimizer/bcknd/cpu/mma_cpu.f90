@@ -140,8 +140,8 @@ contains
     
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
-            ", d=", d, "epsimin =", this%epsimin 
-    end if 
+            ", d=", d, "epsimin =", this%epsimin
+    end if
 
     !the object is correctly initialized
     this%is_initialized = .true.

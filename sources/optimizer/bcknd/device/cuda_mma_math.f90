@@ -144,17 +144,16 @@ module cuda_mma_math
     subroutine cuda_deta(deta_d, eta_d, dx_d, x_d, beta_d, epsi, n) &
          bind(c, name = 'cuda_deta')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: deta_d, eta_d, dx_d, x_d, beta_d
       real(c_rp) :: epsi
       integer(c_int) :: n
     end subroutine cuda_deta
-  
-  
+
     real(c_rp) function cuda_maxval2(dxx_d, xx_d, cons, n) &
          bind(c, name = 'cuda_maxval2')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: dxx_d, xx_d
       real(c_rp) :: cons
       integer(c_int) :: n
@@ -163,7 +162,7 @@ module cuda_mma_math
     real(c_rp) function  cuda_maxval3(dx_d, x_d, alpha_d, cons, n) &
          bind(c, name = 'cuda_maxval3')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: dx_d, x_d, alpha_d
       real(c_rp) :: cons
       integer(c_int) :: n
@@ -179,7 +178,7 @@ module cuda_mma_math
   
     subroutine cuda_maxcons(a_d, b, c, d_d, n) bind(c, name = 'cuda_maxcons')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: a_d, d_d
       real(c_rp) :: b, c
       integer(c_int) :: n
@@ -201,7 +200,7 @@ module cuda_mma_math
   
     subroutine cuda_add2inv2(a_d, b_d, c, n) bind(c, name = 'cuda_add2inv2')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: a_d, b_d
       integer(c_int) :: n
       real(c_rp) :: c
@@ -209,7 +208,7 @@ module cuda_mma_math
   
     subroutine cuda_max2(a_d, b, c_d, d, n) bind(c, name = 'cuda_max2')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: a_d, c_d
       integer(c_int) :: n
       real(c_rp) :: b, d
@@ -218,7 +217,7 @@ module cuda_mma_math
     subroutine cuda_updatebb(bb_d, dellambda_d, dely_d, d_d, mu_d, y_d, delz, &
          m) bind(c, name = 'cuda_updatebb')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: bb_d, dellambda_d, dely_d, d_d, mu_d, y_d
       integer(c_int) :: m
       real(c_rp) :: delz
@@ -227,7 +226,7 @@ module cuda_mma_math
     subroutine cuda_updateAA(AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, &
          y_d, a_d, zeta, z, m) bind(c, name = 'cuda_updateAA')
       use, intrinsic :: iso_c_binding, only: c_int, c_ptr
-      import c_rp       
+      import c_rp
       type(c_ptr), value :: AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, &
            y_d, a_d
       integer(c_int) :: m

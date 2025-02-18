@@ -164,7 +164,7 @@ contains
 !     if (present(backnd)) this%backnd = backnd
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
-            ", d=", d, "epsimin =", this%epsimin 
+            ", d=", d, "epsimin =", this%epsimin
     end if
     !the object is correctly initialized
     this%is_initialized = .true.
@@ -358,7 +358,7 @@ contains
      call device_mma_gensub3(x%x_d, df0dx%x_d, dfdx%x_d, this%low%x_d, &
           this%upp%x_d, this%xmin%x_d, this%xmax%x_d, this%alpha%x_d, &
           this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
-          this%qij%x_d, this%n, this%m) 
+          this%qij%x_d, this%n, this%m)
 
      call device_memcpy(this%alpha%x, this%alpha%x_d, this%n, DEVICE_TO_HOST, &
          sync=.true.)
@@ -480,7 +480,7 @@ contains
           ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
           call device_rex(rex%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                this%pij%x_d, this%p0j%x_d, this%qij%x_d, this%q0j%x_d, &
-               lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m) 
+               lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m)
           call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
                neko_comm, ierr)
           call device_col3(rey%x_d, this%d%x_d, y%x_d, this%m)
@@ -607,7 +607,7 @@ contains
                     this%d%x_d, mu%x_d, y%x_d, delz, this%m)
 
                call device_cfill(AA%x_d, 0.0_rp, (this%m+1) * (this%m+1) )
-               call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m) 
+               call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
                call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                     DEVICE_TO_HOST, sync=.true.)
                globaltmp_mm%x = 0.0_rp
@@ -628,7 +628,7 @@ contains
                call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                     info)
                if (info .ne. 0) then
-                  write(stderr, *) "DGESV failed to solve the linear system in MMA."
+                  write(stderr, *) "DGESV failed in mma_device.f90."
                   write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
                   error stop
                end if
@@ -643,7 +643,7 @@ contains
                call device_dy(dy%x_d, dely%x_d, dlambda%x_d, this%d%x_d, &
                     mu%x_d, y%x_d, this%m)
                call device_dxsi(dxsi%x_d, xsi%x_d, dx%x_d, x%x_d, &
-                    this%alpha%x_d, epsi, this%n) 
+                    this%alpha%x_d, epsi, this%n)
                call device_deta(deta%x_d, eta%x_d, dx%x_d, x%x_d, &
                     this%beta%x_d, epsi, this%n)
 
@@ -719,7 +719,7 @@ contains
                     call device_rex(rex%x_d, x%x_d, this%low%x_d, &
                          this%upp%x_d, this%pij%x_d, this%p0j%x_d, &
                          this%qij%x_d, this%q0j%x_d, lambda%x_d, xsi%x_d, &
-                         eta%x_d, this%n, this%m) 
+                         eta%x_d, this%n, this%m)
 
                     call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, &
                          sync=.true.)
@@ -742,7 +742,7 @@ contains
 
                     call device_cfill(relambda%x_d, 0.0_rp, this%m)
                     call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
-                         this%low%x_d, this%pij%x_d, this%qij%x_d, & 
+                         this%low%x_d, this%pij%x_d, this%qij%x_d, &
                          this%n, this%m)
                     call device_memcpy(relambda%x, relambda%x_d, this%m, &
                          DEVICE_TO_HOST, sync=.true.)

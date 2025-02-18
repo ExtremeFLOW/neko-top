@@ -31,7 +31,6 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
-  ! call neko_error('before MPI_Init')
   call MPI_Init(ierr)
 
   ! -------------------------------------------------------------------------- !

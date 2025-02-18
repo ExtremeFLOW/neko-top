@@ -43,10 +43,10 @@ module mma_simcomp
   use matrix, only: matrix_t
   use mma, only: mma_t
 
-  use device, only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
      mpi_min, mpi_max, MPI_IN_PLACE
-  use comm, only : pe_rank, neko_comm, mpi_real_precision
+  use comm, only: pe_rank, neko_comm, mpi_real_precision
   implicit none
   private
 
@@ -55,10 +55,10 @@ module mma_simcomp
   type, public, extends(simulation_component_t) :: mma_comp_t
 
      !> Design variables defined as a field
-     type(field_t) :: designx 
+     type(field_t) :: designx
 
      !> number of constraints for the optimization problem
-     integer :: m 
+     integer :: m
 
      real(kind=rp) :: scale
      logical :: auto_scale
@@ -120,15 +120,15 @@ contains
     type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
 
-    real(kind=rp), dimension(this%mma%get_n(),4) :: stuff
+    real(kind=rp), dimension(this%mma%get_n(), 4) :: stuff
 
 
-    real(kind=rp), allocatable :: all_stuff(:,:)
+    real(kind=rp), allocatable :: all_stuff(:, :)
     integer, allocatable :: nloc_all(:)
 
     call df0dx%init(this%mma%get_n())
     call fval%init(this%mma%get_m())
-    call dfdx%init(this%mma%get_m(),this%mma%get_n())
+    call dfdx%init(this%mma%get_m(), this%mma%get_n())
 
 
     call cpu_time(start_time)
@@ -148,10 +148,10 @@ contains
           '-------, f0val = ', f0val, ',   fval = ', fval%x
     end if
     
-    stuff(:,1) = reshape(this%designx%dof%x, [this%mma%get_n()])
-    stuff(:,2) = reshape(this%designx%dof%y, [this%mma%get_n()])
-    stuff(:,3) = reshape(this%designx%dof%z, [this%mma%get_n()])
-    stuff(:,4) = reshape(this%designx%x, [this%mma%get_n()])
+    stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
+    stuff(:, 2) = reshape(this%designx%dof%y, [this%mma%get_n()])
+    stuff(:, 3) = reshape(this%designx%dof%z, [this%mma%get_n()])
+    stuff(:, 4) = reshape(this%designx%x, [this%mma%get_n()])
 
     call MPI_Comm_size(neko_comm, size, ierr)
     call MPI_Comm_rank(neko_comm, rank, ierr)
@@ -197,16 +197,19 @@ contains
 
        call func1(this, this%mma%get_n(), this%mma%get_m(), &
             f0val, df0dx%x, fval%x, dfdx%x)
-       ! update the device pointer 
-        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.) 
+       ! update the device pointer
+        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
+             HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
+             HOST_TO_DEVICE, sync=.false.)
+        call device_memcpy(dfdx%x, dfdx%x_d, &
+             this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
        
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
     
        if (pe_rank .eq. 0) then
-          print *, 'iter = ', iter,&
+          print *, 'iter = ', iter, &
                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
                ',  KKTmax = ', this%mma%get_residumax(), &
                ', KKTnorm2 = ', this%mma%get_residunorm()
@@ -306,12 +309,10 @@ contains
     real(kind=rp), dimension(n), intent(inout) :: df0dx
     real(kind=rp), dimension(m), intent(inout) :: fval
     real(kind=rp), dimension(m, n), intent(inout) :: dfdx
-    
 
     real(kind=rp), dimension(n) :: x, coordx
     integer :: ierr, nglobal
     real(kind=rp) :: Globalf0val
-
 
     call MPI_Allreduce(n, nglobal, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
@@ -335,7 +336,7 @@ contains
 
     dfdx(1, :) = 2.0_rp * (x - coordx)
     fval(2) = - fval(1)
-    dfdx(2,:) = - dfdx(1,:)
+    dfdx(2, :) = - dfdx(1, :)
   end subroutine func1
 
 end module mma_simcomp
