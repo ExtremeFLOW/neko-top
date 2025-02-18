@@ -153,9 +153,9 @@ contains
     this%w => w
 
     select type(design)
-      type is (topopt_design_t)
+    type is (topopt_design_t)
        this%chi => design%brinkman_amplitude
-      class default
+    class default
        call neko_error('Unknown design type')
     end select
 

@@ -93,7 +93,7 @@ contains
     this%designx%x = 1.0
 
     call this%mma%init_json( reshape(this%designx%x, [nloc]), &
-         nloc, this%m, case%params, this%scale,  this%auto_scale)
+         nloc, this%m, case%params, this%scale, this%auto_scale)
   end subroutine simcomp_test_init_from_json
 
 
@@ -158,7 +158,7 @@ contains
     allocate(recv_counts(size))
     allocate(displs(size))
     call MPI_Allreduce(this%mma%get_n(), nglobal, 1, &
-       MPI_INTEGER, mpi_sum, neko_comm, ierr)
+         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     allocate(nloc_all(size))
     !!!!Use MPI_Allgather to gather the `nloc` from each process into `nloc_all`

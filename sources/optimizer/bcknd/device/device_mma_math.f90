@@ -51,7 +51,7 @@ module device_mma_math
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
        device_kkt_rex
 
-  contains
+contains
 
   subroutine device_mma_gensub1(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)
     type(c_ptr) :: low_d, upp_d, x_d, xmin_d, xmax_d
@@ -296,8 +296,8 @@ module device_mma_math
   subroutine device_diagx(diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, &
        pij_d, qij_d, alpha_d, beta_d, eta_d, lambda_d, n, m)
     type(c_ptr):: diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, pij_d, &
-       qij_d, alpha_d, &
-    beta_d, eta_d, lambda_d
+         qij_d, alpha_d, &
+         beta_d, eta_d, lambda_d
     integer(c_int) :: n, m
 #if HAVE_HIP
     call neko_error('no device backend configured')
@@ -474,13 +474,13 @@ module device_mma_math
     type(c_ptr):: rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-        call neko_error('no device backend configured')
+    call neko_error('no device backend configured')
 #elif HAVE_CUDA
     call cuda_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, n, m)
 #elif HAVE_OPENCL
-        call neko_error('no device backend configured')
+    call neko_error('no device backend configured')
 #else
-        call neko_error('no device backend configured')
+    call neko_error('no device backend configured')
 #endif
   end subroutine device_kkt_rex
 
