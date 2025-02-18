@@ -15,7 +15,7 @@ module mma_optimizer
   use matrix, only: matrix_t
 
   !only to print nglobal when running in parallel
-  use comm, only: neko_comm
+  use comm, only: neko_comm, pe_rank
   use mpi_f08, only: MPI_INTEGER, mpi_sum, MPI_Allreduce
 
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -99,7 +99,9 @@ contains
        call neko_error('Unknown design type for MMA Optimizer')
     end select
 
-    print *, "Initializing mma_optimizer with steady_state_problem_t."
+    if (pe_rank .eq. 0) then
+       print *, "Initializing mma_optimizer with steady_state_problem_t."
+    end if
 
     call json_get_subdict(parameters, "optimization.solver", solver_parameters)
     call this%mma%init_json(x%x, &
@@ -161,7 +163,10 @@ contains
 
     !>initializing the scaling factor
     scaling_factor = 1.0_rp
-    print *, "max_iterations for the optimization loop = ", this%max_iterations
+    if (pe_rank .eq. 0) then
+       print *, "max_iterations for the optimization loop = ", &
+            this%max_iterations
+    end if
 
     call simulation%run_forward()
     call problem%compute(design)
@@ -294,7 +299,9 @@ contains
     end do
 
     ! Final state after optimization
-    print*, "MMA Optimization completed after", iter-1, "iterations."
+    if (pe_rank .eq. 0) then
+       print *, "MMA Optimization completed after", iter-1, "iterations."
+    end if
 
     call constraint_value%free()
     call objective_sensitivities%free()
