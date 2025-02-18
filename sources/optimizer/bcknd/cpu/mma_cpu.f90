@@ -32,7 +32,7 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-
+  use mpi_f08, only: MPI_IN_PLACE
   implicit none
 
 contains
@@ -290,7 +290,6 @@ contains
     type(matrix_t) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
-    real(kind=rp), dimension(this%m) :: globaltmp_m
     real(kind=rp), dimension(this%n) :: x_diff
     real(kind=rp) :: asy_factor
 

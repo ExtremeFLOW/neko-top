@@ -251,7 +251,6 @@ contains
      type(vector_t) :: rey, relambda, remu, res
      type(vector_t) :: rex, rexsi, reeta
      real(kind=rp) :: residu_val !!!(3*this%n+4*this%m+2)
-     real(kind=rp), dimension(4*this%m+2) :: residu_small !!!(4*this%m+2)
      integer :: ierr
      real(kind=rp) :: re_xstuff_squ_global
      real(kind=rp) :: globaltemp_norm
@@ -334,7 +333,7 @@ contains
      type(matrix_t), intent(in) :: dfdx
 
      integer, intent(in) :: iter
-     integer :: i, j, ierr
+     integer :: ierr
      type(vector_t) :: globaltmp_m
 
      call globaltmp_m%init(this%m)
@@ -391,7 +390,7 @@ contains
   subroutine mma_subsolve_dpip_device(this, designx)
      class(mma_t), intent(inout) :: this
      type(vector_t), intent(in) :: designx
-     integer :: i, j, k, iter, ggdumiter, itto, ierr
+     integer :: iter, itto, ierr
      real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
           delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
      !! the vectors with size m     
@@ -402,7 +401,6 @@ contains
      !! the vectors with size n
      type(vector_t) :: x, xsi, eta, rex, rexsi, reeta, &
           delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
-     real(kind=rp) :: residu, residu_small, ratio_xx_dxx
 
      type(vector_t) :: bb
      type(matrix_t) :: GG

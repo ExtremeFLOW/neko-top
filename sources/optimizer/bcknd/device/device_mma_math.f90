@@ -169,7 +169,8 @@ module device_mma_math
     type(c_ptr) :: a_d, b_d
     integer(c_int) :: n
     real(kind=rp) :: res
-
+    ! Default value in case of no valid backend (resolve compiler warning)
+    res = 0.0_rp
 #if HAVE_HIP
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
@@ -214,6 +215,8 @@ module device_mma_math
     type(c_ptr):: rex_d
     real(kind=rp) :: res
     integer(c_int) :: n
+    ! Default value in case of no valid backend (resolve compiler warning)
+    res = 0.0_rp
 #if HAVE_HIP
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
@@ -229,6 +232,8 @@ module device_mma_math
     type(c_ptr):: rex_d
     real(kind=rp) :: res
     integer(c_int) :: n
+    ! Default value in case of no valid backend (resolve compiler warning)
+    res = 0.0_rp
 #if HAVE_HIP
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
@@ -430,7 +435,8 @@ module device_mma_math
     integer :: n
     real(kind=rp), intent(in) :: cons
     real(kind=rp) :: res
-
+    ! Default value in case of no valid backend (resolve compiler warning)
+    res = 0.0_rp
 #if HAVE_HIP
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
@@ -448,6 +454,8 @@ module device_mma_math
     real(kind=rp), intent(in) :: cons
     real(kind=rp) :: res
     integer(c_int) :: n
+    ! Default value in case of no valid backend (resolve compiler warning)
+    res = 0.0_rp
 #if HAVE_HIP
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
