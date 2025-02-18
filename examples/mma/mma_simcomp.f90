@@ -141,13 +141,13 @@ contains
     call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
          HOST_TO_DEVICE, sync=.false.)
     call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), &
-         HOST_TO_DEVICE, sync=.false.)   
-    
+         HOST_TO_DEVICE, sync=.false.)
+
     if (pe_rank .eq. 0) then
        print *, 'iter = ', 0, &
             '-------,f0val = ', f0val, ',   fval = ', fval%x
     end if
-    
+
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
     stuff(:, 2) = reshape(this%designx%dof%y, [this%mma%get_n()])
     stuff(:, 3) = reshape(this%designx%dof%z, [this%mma%get_n()])
@@ -189,7 +189,7 @@ contains
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! The optimization loop
-    do iter = 1, 100 !10    
+    do iter = 1, 100 !10
        call this%mma%update(iter, x, df0dx, fval, dfdx)
        this%designx%x = reshape(x, shape(this%designx%x))
 
@@ -202,7 +202,7 @@ contains
             HOST_TO_DEVICE, sync=.false.)
        call device_memcpy(dfdx%x, dfdx%x_d, &
             this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
-       
+
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
        if (pe_rank .eq. 0) then

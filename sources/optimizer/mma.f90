@@ -152,7 +152,7 @@ module mma
 
   end interface
   
-  contains 
+  contains
 
   subroutine mma_init_json( this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
@@ -229,7 +229,7 @@ module mma
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
     if (pe_rank .eq. 0) then
-       print *,"Initializing MMA backend to >>> ", this%backnd
+       print *, "Initializing MMA backend to >>> ", this%backnd
     end if
 
     ! ------------------------------------------------------------------------ !

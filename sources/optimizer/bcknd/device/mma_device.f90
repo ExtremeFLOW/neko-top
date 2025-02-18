@@ -393,7 +393,7 @@ contains
      integer :: iter, itto, ierr
      real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
           delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
-     !! the vectors with size m     
+     !! the vectors with size m
      type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
           dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
      type(vector_t) :: globaltmp_m
