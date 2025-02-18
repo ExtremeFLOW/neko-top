@@ -91,6 +91,26 @@
         ]
     },
     "optimization": {
+        "solver": {
+            "type": "mma",
+            "max_iterations": 5,
+            "tolerance": 1.0e-3,
+            "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "m": 1,
+                "scale": 1.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 100.0,
+                "d": 0.0
+            }
+        },
         "objectives": [
             {
                 "type": "minimum_dissipation",
@@ -99,7 +119,6 @@
             {
                 "type": "lube_term",
                 "weight": 1.0,
-                // "mask_name": "optimization_domain",
                 "K": 1.0
             }
         ],
@@ -112,19 +131,5 @@
             }
         ],
     },
-    "mma": {
-        "max_iter": 100,
-        "asyinit": 0.5,
-        "asyincr": 1.2,
-        "asydecr": 0.7,
-        "m": 1,
-        "scale": 1.0,
-        "auto_scale": false,
-        "xmin": 0.0,
-        "xmax": 1.0,
-        "a0": 1.0,
-        "a": 0.0,
-        "c": 100.0,
-        "d": 0.0
-    }
+
 }
