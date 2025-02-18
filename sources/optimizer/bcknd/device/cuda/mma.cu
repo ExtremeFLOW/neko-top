@@ -492,8 +492,8 @@ extern "C" {
 
 
   void cuda_mpisum(void *a, int *n) {
-    real* temp=(real*)a;
 #ifdef HAVE_DEVICE_MPI
+    real* temp=(real*)a;
     cudaStreamSynchronize(stream);
     device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
 #endif
