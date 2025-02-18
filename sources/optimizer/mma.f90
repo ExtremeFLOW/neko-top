@@ -39,7 +39,7 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
-     mpi_min, mpi_max, MPI_IN_PLACE
+       mpi_min, mpi_max, MPI_IN_PLACE
   use comm, only : pe_rank, neko_comm, mpi_real_precision
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
   use utils, only: neko_error
@@ -51,7 +51,7 @@ module mma
     private
     integer :: n, m, max_iter
     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, residumax, &
-       residunorm
+         residunorm
     type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
     logical :: is_initialized = .false.
     logical :: is_updated = .false.
@@ -86,7 +86,7 @@ module mma
     ! ======================================================================== !
     !! interface for cpu backend module subroutines
     module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, &
-       xmin,  xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+         xmin,  xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
       class(mma_t), intent(inout) :: this
         integer, intent(in) :: n, m
         real(kind=rp), intent(in), dimension(n) :: x
@@ -120,7 +120,7 @@ module mma
 
     !! interface for device backend module subroutines
     module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, &
-       xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+         xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
     class(mma_t), intent(inout) :: this
       integer, intent(in) :: n, m
       real(kind=rp), intent(in), dimension(n) :: x
@@ -237,7 +237,7 @@ module mma
     ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
     !      max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr)
+         max_iter, epsimin, asyinit, asyincr, asydecr)
 
   end subroutine mma_init_json
 
@@ -259,13 +259,13 @@ module mma
     select case (this%backnd)
     case ("cpu")
        call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
-          max_iter, epsimin, asyinit, asyincr, asydecr)
+            max_iter, epsimin, asyinit, asyincr, asydecr)
        if (pe_rank == 0) then
           print *, "MMA initialized with CPU backend!"
        end if
     case ("cuda")
        call mma_init_attributes_device(this, x, n, m, a0, a, c, d, xmin, xmax, &
-          max_iter, epsimin, asyinit, asyincr, asydecr)
+            max_iter, epsimin, asyinit, asyincr, asydecr)
        if (pe_rank == 0) then
           print *, "MMA initialized with CUDA backend!"
        end if
@@ -295,7 +295,7 @@ module mma
 
   subroutine mma_free(this)
     class(mma_t), intent(inout) :: this
-    
+
     select case (this%backnd )
     case ("cpu")
        call mma_free_cpu(this)

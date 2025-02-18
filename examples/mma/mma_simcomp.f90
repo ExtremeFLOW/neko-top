@@ -45,7 +45,7 @@ module mma_simcomp
 
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
-     mpi_min, mpi_max, MPI_IN_PLACE
+       mpi_min, mpi_max, MPI_IN_PLACE
   use comm, only: pe_rank, neko_comm, mpi_real_precision
   implicit none
   private
@@ -93,7 +93,7 @@ contains
     this%designx%x = 1.0
 
     call this%mma%init_json( reshape(this%designx%x, [nloc]), &
-       nloc, this%m, case%params, this%scale,  this%auto_scale)
+         nloc, this%m, case%params, this%scale,  this%auto_scale)
   end subroutine simcomp_test_init_from_json
 
 
@@ -137,15 +137,15 @@ contains
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
     call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-       HOST_TO_DEVICE, sync=.false.)
+         HOST_TO_DEVICE, sync=.false.)
     call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-       HOST_TO_DEVICE, sync=.false.)
+         HOST_TO_DEVICE, sync=.false.)
     call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), &
-        HOST_TO_DEVICE, sync=.false.)   
+         HOST_TO_DEVICE, sync=.false.)   
     
     if (pe_rank .eq. 0) then
        print *, 'iter = ', 0, &
-          '-------, f0val = ', f0val, ',   fval = ', fval%x
+            '-------,f0val = ', f0val, ',   fval = ', fval%x
     end if
     
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
@@ -189,25 +189,22 @@ contains
     end if
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! The optimization loop
-    do iter = 1, 100 !10
-       
+    do iter = 1, 100 !10    
        call this%mma%update(iter, x, df0dx, fval, dfdx)
-       ! print *, "first"
        this%designx%x = reshape(x, shape(this%designx%x))
 
        call func1(this, this%mma%get_n(), this%mma%get_m(), &
             f0val, df0dx%x, fval%x, dfdx%x)
        ! update the device pointer
-        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-             HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-             HOST_TO_DEVICE, sync=.false.)
-        call device_memcpy(dfdx%x, dfdx%x_d, &
-             this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+       call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
+            HOST_TO_DEVICE, sync=.false.)
+       call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
+            HOST_TO_DEVICE, sync=.false.)
+       call device_memcpy(dfdx%x, dfdx%x_d, &
+            this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
        
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 
-    
        if (pe_rank .eq. 0) then
           print *, 'iter = ', iter, &
                '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &

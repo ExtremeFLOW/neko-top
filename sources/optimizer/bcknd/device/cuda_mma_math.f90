@@ -2,7 +2,7 @@ module cuda_mma_math
   use num_types, only: rp, c_rp
   implicit none
   public
-  
+
   interface
     subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n) &
          bind(c, name = 'mma_gensub1_cuda')

@@ -68,7 +68,7 @@ contains
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
 
-     call this%free()
+    call this%free()
 
     this%n = n
     this%m = m
@@ -178,9 +178,7 @@ contains
 
   !> Deallocate the MMA object.
   module subroutine mma_free_cpu(this)
-
     class(mma_t), intent(inout) :: this
-    
     ! Deallocate the internal vectors
     call this%xold1%free()
     call this%xold2%free()
@@ -249,22 +247,22 @@ contains
 
 
     associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
-         
+
       rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
            - this%xsi%x + this%eta%x
       rey = this%c%x + this%d%x*this%y%x - this%lambda%x - this%mu%x
       rez = this%a0 - this%zeta - dot_product(this%lambda%x, this%a%x)
-      
+
       relambda = fval - this%a%x * this%z - this%y%x + this%s%x
       rexsi = this%xsi%x * (x - this%xmin%x)
       reeta = this%eta%x * (this%xmax%x - x)
       remu = this%mu%x * this%y%x
       rezeta = this%zeta * this%z
       res = this%lambda%x * this%s%x
-      
+
       residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
       residual_small = [rey, rez, relambda, remu, rezeta, res]
-      
+
       this%residumax = maxval(abs(residual))
       re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
@@ -295,14 +293,14 @@ contains
     real(kind=rp), dimension(this%m) :: globaltmp_m
     real(kind=rp), dimension(this%n) :: x_diff
     real(kind=rp) :: asy_factor
-    
+
     x_diff = this%xmax%x - this%xmin%x
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
     associate(low => this%low%x, upp => this%upp%x, &
          x_1 => this%xold1%x, x_2 => this%xold2%x, x => xdesign)
-         
+
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
          low = x - this%asyinit * x_diff
@@ -332,8 +330,8 @@ contains
       end if
 
     end associate
-    
-    
+
+
     ! ------------------------------------------------------------------------ !
     ! Set the the bounds and coefficients for the approximation
     ! the move bounds (alpha and beta) are slightly more restrictive
