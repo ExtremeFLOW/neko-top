@@ -1,6 +1,8 @@
 module initial_conditions
   use field, only: field_t
   use json_file_module, only: json_file
+  use json_utils, only: json_get_or_default
+  use num_types, only: rp
   implicit none
 
 contains
@@ -15,10 +17,6 @@ contains
   !! @param[inout] s Scalar field
   !! @param[inout] params JSON file
   subroutine scalar_z_split_ic(s, params)
-    use json_utils, only: json_get_or_default
-    use num_types, only: rp
-    implicit none
-
     type(field_t), intent(inout) :: s
     type(json_file), intent(inout) :: params
 
