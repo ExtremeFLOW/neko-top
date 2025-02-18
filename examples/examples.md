@@ -21,7 +21,8 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 4. \subpage permeability-block
 5. \subpage power-iterations
 6. \subpage rugby-ball
-7. \subpage brinkman-parameters
+7. \subpage rugby-verification
+8. \subpage brinkman-parameters
 
 ## Execution of examples
 
