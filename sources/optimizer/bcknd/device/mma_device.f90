@@ -130,19 +130,19 @@ contains
 
     ! upload all init values to device pointers
     call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%xold1%x, this%xold2%x_d, this%n, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, &
-         sync=.false.)
+         sync = .false.)
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
@@ -192,14 +192,14 @@ contains
     
 
     call xdesign%init(this%n)
-    call device_memcpy(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync=.false.)
+    call device_memcpy(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync = .false.)
 
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
     !solve the approximation problem using interior point method
     call mma_subsolve_dpip_device(this, xdesign)
     !update the design vector x on the host
-    call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync=.false.)
+    call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
     this%is_updated = .true.
   end subroutine mma_update_device
@@ -259,7 +259,7 @@ contains
      call designx%init(this%n)
      designx%x = x
      call device_memcpy(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, &
-          sync=.false.)
+          sync = .false.)
 
 
      call rey%init(this%m)
@@ -351,38 +351,38 @@ contains
                this%asydecr, this%asyincr, this%n)
      end if
      call device_memcpy(this%upp%x, this%upp%x_d, this%n, DEVICE_TO_HOST, &
-          sync=.true.)
+          sync = .true.)
      call device_memcpy(this%low%x, this%low%x_d, this%n, DEVICE_TO_HOST, &
-          sync=.true.)
+          sync = .true.)
      call device_mma_gensub3(x%x_d, df0dx%x_d, dfdx%x_d, this%low%x_d, &
           this%upp%x_d, this%xmin%x_d, this%xmax%x_d, this%alpha%x_d, &
           this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
           this%qij%x_d, this%n, this%m)
 
      call device_memcpy(this%alpha%x, this%alpha%x_d, this%n, DEVICE_TO_HOST, &
-         sync=.true.)
+         sync = .true.)
      call device_memcpy(this%beta%x, this%beta%x_d, this%n, DEVICE_TO_HOST, &
-          sync=.true.)
+          sync = .true.)
 
      call device_mma_gensub4(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, &
           this%qij%x_d, this%n, this%m, this%bi%x_d)
      call device_memcpy(this%pij%x, this%pij%x_d, this%n*this%m, &
-          DEVICE_TO_HOST, sync=.true.)
+          DEVICE_TO_HOST, sync = .true.)
      call device_memcpy(this%qij%x, this%qij%x_d, this%n*this%m, &
-          DEVICE_TO_HOST, sync=.true.)
+          DEVICE_TO_HOST, sync = .true.)
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      !!!!!cpu gpu transfer and global sum
      globaltmp_m%x=0.0_rp
      call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-          sync=.true.)
+          sync = .true.)
      call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, mpi_real_precision, &
           mpi_sum, neko_comm, ierr)
      call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-          HOST_TO_DEVICE, sync=.true.)
+          HOST_TO_DEVICE, sync = .true.)
      call device_sub3(this%bi%x_d, globaltmp_m%x_d, fval%x_d, this%m)
      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
      call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-          sync=.true.)
+          sync = .true.)
 
      call globaltmp_m%free()
   end subroutine mma_gensub_device
@@ -468,9 +468,9 @@ contains
      call device_mma_max(xsi%x_d, x%x_d, this%alpha%x_d, this%n)
      call device_mma_max(eta%x_d, this%beta%x_d, x%x_d, this%n)
      call device_max2(mu%x_d, 1.0_rp, this%c%x_d, 0.5_rp, this%m)
-     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync=.true.)
-     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync=.true.)
+     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
+     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
+     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
 
      outer: do while (epsi .gt. 0.9*this%epsimin)
           ! calculating residuals based on
@@ -490,14 +490,14 @@ contains
           call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
                this%low%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m)
           call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-               sync=.true.)
+               sync = .true.)
 
           globaltmp_m%x = 0.0_rp
           call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-               HOST_TO_DEVICE, sync=.true.)
+               HOST_TO_DEVICE, sync = .true.)
           call device_add3s2(relambda%x_d, globaltmp_m%x_d, this%a%x_d, &
                1.0_rp, -z, this%m)
           call device_sub2(relambda%x_d, y%x_d, this%m)
@@ -567,14 +567,14 @@ contains
                call device_relambda(dellambda%x_d, x%x_d, this%upp%x_d, &
                     this%low%x_d, this%pij%x_d, this%qij%x_d, this%n, this%m)
                call device_memcpy(dellambda%x, dellambda%x_d, this%m, &
-                    DEVICE_TO_HOST, sync=.true.)
+                    DEVICE_TO_HOST, sync = .true.)
 
                globaltmp_m%x = 0.0_rp
                call MPI_Allreduce(dellambda%x, globaltmp_m%x, this%m, &
                     mpi_real_precision, mpi_sum, neko_comm, ierr)
 
                call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-                    HOST_TO_DEVICE, sync=.true.)
+                    HOST_TO_DEVICE, sync = .true.)
                call device_add3s2(dellambda%x_d, globaltmp_m%x_d, this%a%x_d, &
                     1.0_rp, -z, this%m)
 
@@ -593,13 +593,13 @@ contains
                call device_bb(bb%x_d, GG%x_d, delx%x_d, diagx%x_d, this%n, &
                     this%m)
                call device_memcpy(bb%x, bb%x_d, this%m, DEVICE_TO_HOST, &
-                    sync=.true.)
+                    sync = .true.)
 
                globaltmp_m%x = 0.0_rp
                call MPI_Allreduce(bb%x(1:this%m), globaltmp_m%x, this%m, &
                     mpi_real_precision, mpi_sum, neko_comm, ierr)
                call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-                    HOST_TO_DEVICE, sync=.true.)
+                    HOST_TO_DEVICE, sync = .true.)
 
                call device_updatebb(bb%x_d, dellambda%x_d, dely%x_d, &
                     this%d%x_d, mu%x_d, y%x_d, delz, this%m)
@@ -607,22 +607,22 @@ contains
                call device_cfill(AA%x_d, 0.0_rp, (this%m+1) * (this%m+1) )
                call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
                call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
-                    DEVICE_TO_HOST, sync=.true.)
+                    DEVICE_TO_HOST, sync = .true.)
                globaltmp_mm%x = 0.0_rp
                call MPI_Allreduce(AA%x(1:this%m, 1:this%m), globaltmp_mm%x, &
                     this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
                call device_memcpy(globaltmp_mm%x, globaltmp_mm%x_d, &
-                    (this%m) * (this%m), HOST_TO_DEVICE, sync=.true.)
+                    (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
                call device_updateAA(AA%x_d, globaltmp_mm%x_d, s%x_d, &
                     lambda%x_d, this%d%x_d, mu%x_d, y%x_d, this%a%x_d, &
                     zeta, z, this%m)
                call device_memcpy(AA%x, AA%x_d, (this%m+1)*(this%m+1), &
-                    DEVICE_TO_HOST, sync=.true.)
+                    DEVICE_TO_HOST, sync = .true.)
 
 
 
                call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
-                    sync=.true.)
+                    sync = .true.)
                call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                     info)
                if (info .ne. 0) then
@@ -631,7 +631,7 @@ contains
                   error stop
                end if
                call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
-                    sync=.true.)
+                    sync = .true.)
 
                call device_copy(dlambda%x_d, bb%x_d, this%m)
                dz = bb%x(this%m + 1)
@@ -720,13 +720,13 @@ contains
                          eta%x_d, this%n, this%m)
 
                     call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, &
-                         sync=.true.)
+                         sync = .true.)
                     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, &
-                         sync=.true.)
+                         sync = .true.)
                     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, &
-                         sync=.true.)
+                         sync = .true.)
                     call device_memcpy(lambda%x, lambda%x_d, this%m, &
-                         DEVICE_TO_HOST, sync=.true.)
+                         DEVICE_TO_HOST, sync = .true.)
 
 
 
@@ -743,14 +743,14 @@ contains
                          this%low%x_d, this%pij%x_d, this%qij%x_d, &
                          this%n, this%m)
                     call device_memcpy(relambda%x, relambda%x_d, this%m, &
-                         DEVICE_TO_HOST, sync=.true.)
+                         DEVICE_TO_HOST, sync = .true.)
 
                     globaltmp_m%x = 0.0_rp
                     call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, &
                          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
                     call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, &
-                         this%m, HOST_TO_DEVICE, sync=.true.)
+                         this%m, HOST_TO_DEVICE, sync = .true.)
 
 
 

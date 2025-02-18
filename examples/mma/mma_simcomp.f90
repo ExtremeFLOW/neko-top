@@ -137,11 +137,11 @@ contains
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
     call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-         HOST_TO_DEVICE, sync=.false.)
+         HOST_TO_DEVICE, sync = .false.)
     call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-         HOST_TO_DEVICE, sync=.false.)
+         HOST_TO_DEVICE, sync = .false.)
     call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), &
-         HOST_TO_DEVICE, sync=.false.)
+         HOST_TO_DEVICE, sync = .false.)
 
     if (pe_rank .eq. 0) then
        print *, 'iter = ', 0, &
@@ -197,11 +197,11 @@ contains
             f0val, df0dx%x, fval%x, dfdx%x)
        ! update the device pointer
        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-            HOST_TO_DEVICE, sync=.false.)
+            HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-            HOST_TO_DEVICE, sync=.false.)
+            HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(dfdx%x, dfdx%x_d, &
-            this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync=.false.)
+            this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync = .false.)
 
        call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
 

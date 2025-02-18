@@ -207,7 +207,7 @@ contains
        type is (topopt_design_t)
           call copy(d%design_indicator%x, x%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync=.false.)
+             call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
              call device_copy(d%design_indicator%x_d, x%x_d, n)
           end if
 
@@ -216,7 +216,7 @@ contains
           call copy(x%x, d%design_indicator%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
              call device_copy(x%x_d, d%design_indicator%x_d, n)
-             call device_memcpy(x%x, x%x_d, n, DEVICE_TO_HOST, sync=.false.)
+             call device_memcpy(x%x, x%x_d, n, DEVICE_TO_HOST, sync = .false.)
           end if
        class default
           call neko_error('Unknown design type for MMA Optimizer')
