@@ -33,14 +33,14 @@
 !> Implements the `simple_brinkman_source_term_t` type.
 ! a term in the form $\chi \mathbf{u}$
 module simple_brinkman_source_term
-  use num_types, only : rp
-  use field_list, only : field_list_t
-  use json_module, only : json_file
+  use num_types, only: rp
+  use field_list, only: field_list_t
+  use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
+  use source_term, only: source_term_t
+  use coefs, only: coef_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use utils, only: neko_error
   use field, only: field_t
   use topopt_design, only: topopt_design_t
   use field_math, only: field_subcol3

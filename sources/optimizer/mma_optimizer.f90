@@ -1,11 +1,11 @@
 module mma_optimizer
   use optimizer, only: optimizer_t
-  use steady_state_problem, only : steady_state_problem_t
+  use steady_state_problem, only: steady_state_problem_t
   use mma, only: mma_t
   use problem, only: problem_t
   use topopt_design, only: topopt_design_t
-  use num_types, only : rp
-  use utils, only : neko_error
+  use num_types, only: rp
+  use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use simulation, only: simulation_t

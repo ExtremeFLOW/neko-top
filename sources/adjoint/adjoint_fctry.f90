@@ -32,9 +32,9 @@
 !
 !> Factory for all adjoint schemes
 module adjoint_fctry
-  use adjoint_scheme, only : adjoint_scheme_t
+  use adjoint_scheme, only: adjoint_scheme_t
   use adjoint_pnpn, only: adjoint_pnpn_t
-  use utils, only : concat_string_array, neko_error
+  use utils, only: concat_string_array, neko_error
   implicit none
   private
 

@@ -36,13 +36,13 @@
 ! $V < V_\text{max}$
 ! $V > V_\text{min}$
 module volume_constraint
-  use num_types, only : rp
-  use field_list, only : field_list_t
+  use num_types, only: rp
+  use field_list, only: field_list_t
   use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
+  use source_term, only: source_term_t
+  use coefs, only: coef_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_rone, field_copy
   use user_intf, only: user_t, simulation_component_user_settings
@@ -50,19 +50,19 @@ module volume_constraint
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
+  use num_types, only: rp
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use math, only: rzero, copy, chsign
   use device_math, only: device_copy, device_cmult, device_glsc2
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl, grad
-  use scratch_registry, only : neko_scratch_registry
-  use constraint, only : constraint_t
-  use simulation, only : simulation_t
-  use adjoint_scheme, only : adjoint_scheme_t
+  use scratch_registry, only: neko_scratch_registry
+  use constraint, only: constraint_t
+  use simulation, only: simulation_t
+  use adjoint_scheme, only: adjoint_scheme_t
   use fluid_source_term, only: fluid_source_term_t
-  use math, only : glsc2
+  use math, only: glsc2
   use field_math, only: field_rone, field_cmult
   use design, only: design_t
   use topopt_design, only: topopt_design_t

@@ -36,8 +36,8 @@ submodule (mma) mma_device
   use device_mma_math
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_math_ext
-  use device, only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use comm, only : pe_rank
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use comm, only: pe_rank
 
   ! for printing the result of kernels and debugging
   use, intrinsic :: iso_c_binding
