@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Fluid formulations
-module adjoint_scheme
+module adjoint_fluid_scheme
   use gather_scatter, only: gs_t
   use mean_sqr_flow, only: mean_sqr_flow_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -87,7 +87,7 @@ module adjoint_scheme
   private
 
   !> Base type of all fluid formulations
-  type, abstract :: adjoint_scheme_t
+  type, abstract :: adjoint_fluid_scheme_t
      !> x-component of Velocity
      type(field_t), pointer :: u_adj => null()
      !> y-component of Velocity
@@ -178,121 +178,123 @@ module adjoint_scheme
      type(scratch_registry_t) :: scratch
    contains
      !> Constructor for the base type
-     procedure, pass(this) :: init_base => adjoint_scheme_init_base
+     procedure, pass(this) :: init_base => adjoint_fluid_scheme_init_base
      !> Destructor for the base type
-     procedure, pass(this) :: scheme_free => adjoint_scheme_free
+     procedure, pass(this) :: scheme_free => adjoint_fluid_scheme_free
      !> Validate that all components are properly allocated
-     procedure, pass(this) :: validate => adjoint_scheme_validate
+     procedure, pass(this) :: validate => adjoint_fluid_scheme_validate
      !> Apply pressure boundary conditions
-     procedure, pass(this) :: bc_apply_vel => adjoint_scheme_bc_apply_vel
+     procedure, pass(this) :: bc_apply_vel => adjoint_fluid_scheme_bc_apply_vel
      !> Apply velocity boundary conditions
-     procedure, pass(this) :: bc_apply_prs => adjoint_scheme_bc_apply_prs
+     procedure, pass(this) :: bc_apply_prs => adjoint_fluid_scheme_bc_apply_prs
      !> Compute the CFL number
      procedure, pass(this) :: compute_cfl => adjoint_compute_cfl
      !> Set rho and mu
      procedure, pass(this) :: set_material_properties => &
-          adjoint_scheme_set_material_properties
+          adjoint_fluid_scheme_set_material_properties
      !> Constructor
-     procedure(adjoint_scheme_init_intrf), pass(this), deferred :: init
+     procedure(adjoint_fluid_scheme_init_intrf), pass(this), deferred :: init
      !> Destructor
-     procedure(adjoint_scheme_free_intrf), pass(this), deferred :: free
+     procedure(adjoint_fluid_scheme_free_intrf), pass(this), deferred :: free
      !> Advance one step in time
-     procedure(adjoint_scheme_step_intrf), pass(this), deferred :: step
+     procedure(adjoint_fluid_scheme_step_intrf), pass(this), deferred :: step
      !> Restart from a checkpoint
-     procedure(adjoint_scheme_restart_intrf), pass(this), deferred :: restart
+     procedure(adjoint_fluid_scheme_restart_intrf), &
+        pass(this), deferred :: restart
      !> Setup boundary conditions
-     procedure(adjoint_scheme_setup_bcs_intrf), pass(this), deferred :: &
+     procedure(adjoint_fluid_scheme_setup_bcs_intrf), pass(this), deferred :: &
           setup_bcs
      !> Update variable material properties
      procedure, pass(this) :: update_material_properties => &
-          adjoint_scheme_update_material_properties
+          adjoint_fluid_scheme_update_material_properties
      !> Linear solver factory, wraps a KSP constructor
-     procedure, nopass :: solver_factory => adjoint_scheme_solver_factory
+     procedure, nopass :: solver_factory => adjoint_fluid_scheme_solver_factory
      !> Preconditioner factory
-     procedure, pass(this) :: precon_factory_ => adjoint_scheme_precon_factory
-  end type adjoint_scheme_t
+     procedure, pass(this) :: precon_factory_ => &
+        adjoint_fluid_scheme_precon_factory
+  end type adjoint_fluid_scheme_t
 
 
   !> Abstract interface to initialize an adjoint formulation
   abstract interface
-     subroutine adjoint_scheme_init_intrf(this, msh, lx, params, user, &
+     subroutine adjoint_fluid_scheme_init_intrf(this, msh, lx, params, user, &
           time_scheme)
-       import adjoint_scheme_t
+       import adjoint_fluid_scheme_t
        import json_file
        import mesh_t
        import user_t
        import time_scheme_controller_t
-       class(adjoint_scheme_t), target, intent(inout) :: this
+       class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        type(mesh_t), target, intent(inout) :: msh
        integer, intent(in) :: lx
        type(json_file), target, intent(inout) :: params
        type(user_t), target, intent(in) :: user
        type(time_scheme_controller_t), target, intent(in) :: time_scheme
-     end subroutine adjoint_scheme_init_intrf
+     end subroutine adjoint_fluid_scheme_init_intrf
   end interface
 
   !> Abstract interface to dealocate an adjoint formulation
   abstract interface
-     subroutine adjoint_scheme_free_intrf(this)
-       import adjoint_scheme_t
-       class(adjoint_scheme_t), intent(inout) :: this
-     end subroutine adjoint_scheme_free_intrf
+     subroutine adjoint_fluid_scheme_free_intrf(this)
+       import adjoint_fluid_scheme_t
+       class(adjoint_fluid_scheme_t), intent(inout) :: this
+     end subroutine adjoint_fluid_scheme_free_intrf
   end interface
 
   !> Abstract interface to compute a time-step
   abstract interface
-     subroutine adjoint_scheme_step_intrf(this, t, tstep, dt, ext_bdf, &
+     subroutine adjoint_fluid_scheme_step_intrf(this, t, tstep, dt, ext_bdf, &
           dt_controller)
-       import adjoint_scheme_t
+       import adjoint_fluid_scheme_t
        import time_scheme_controller_t
        import time_step_controller_t
        import rp
-       class(adjoint_scheme_t), target, intent(inout) :: this
+       class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        real(kind=rp), intent(in) :: t
        integer, intent(in) :: tstep
        real(kind=rp), intent(in) :: dt
        type(time_scheme_controller_t), intent(in) :: ext_bdf
        type(time_step_controller_t), intent(in) :: dt_controller
-     end subroutine adjoint_scheme_step_intrf
+     end subroutine adjoint_fluid_scheme_step_intrf
   end interface
 
   !> Abstract interface to restart an adjoint scheme
   abstract interface
-     subroutine adjoint_scheme_restart_intrf(this, dtlag, tlag)
-       import adjoint_scheme_t
+     subroutine adjoint_fluid_scheme_restart_intrf(this, dtlag, tlag)
+       import adjoint_fluid_scheme_t
        import rp
-       class(adjoint_scheme_t), target, intent(inout) :: this
+       class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        real(kind=rp) :: dtlag(10), tlag(10)
 
-     end subroutine adjoint_scheme_restart_intrf
+     end subroutine adjoint_fluid_scheme_restart_intrf
   end interface
 
   !> Abstract interface to setup boundary conditions
   abstract interface
-     subroutine adjoint_scheme_setup_bcs_intrf(this, user, params)
-       import adjoint_scheme_t, user_t, json_file
-       class(adjoint_scheme_t), intent(inout) :: this
+     subroutine adjoint_fluid_scheme_setup_bcs_intrf(this, user, params)
+       import adjoint_fluid_scheme_t, user_t, json_file
+       class(adjoint_fluid_scheme_t), intent(inout) :: this
        type(user_t), target, intent(in) :: user
        type(json_file), intent(inout) :: params
-     end subroutine adjoint_scheme_setup_bcs_intrf
+     end subroutine adjoint_fluid_scheme_setup_bcs_intrf
   end interface
 
   interface
      !> Initialise an adjoint scheme
-     module subroutine adjoint_scheme_factory(object, type_name)
-       class(adjoint_scheme_t), intent(inout), allocatable :: object
+     module subroutine adjoint_fluid_scheme_factory(object, type_name)
+       class(adjoint_fluid_scheme_t), intent(inout), allocatable :: object
        character(len=*) :: type_name
-     end subroutine adjoint_scheme_factory
+     end subroutine adjoint_fluid_scheme_factory
   end interface
 
-  public :: adjoint_scheme_t, adjoint_scheme_factory
+  public :: adjoint_fluid_scheme_t, adjoint_fluid_scheme_factory
 
 contains
 
   !> Initialize common data for the current scheme
-  subroutine adjoint_scheme_init_base(this, msh, lx, params, scheme, user, &
-       kspv_init)
-    class(adjoint_scheme_t), target, intent(inout) :: this
+  subroutine adjoint_fluid_scheme_init_base(this, msh, lx, params, scheme, &
+     user, kspv_init)
+    class(adjoint_fluid_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
     character(len=*), intent(in) :: scheme
@@ -332,7 +334,7 @@ contains
     ! First section of fluid log
     !
 
-    call neko_log%section('Adjoint')
+    call neko_log%section('Adjoint fluid')
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
     call neko_log%message(log_buf)
 
@@ -370,26 +372,26 @@ contains
 
     ! Projection spaces
     json_key = json_key_fallback(params, &
-         'case.adjoint.velocity_solver.projection_space_size', &
+         'case.adjoint_fluid.velocity_solver.projection_space_size', &
          'case.fluid.velocity_solver.projection_space_size')
     call json_get_or_default(params, json_key, this%vel_projection_dim, 20)
     json_key = json_key_fallback(params, &
-         'case.adjoint.pressure_solver.projection_space_size', &
+         'case.adjoint_fluid.pressure_solver.projection_space_size', &
          'case.fluid.pressure_solver.projection_space_size')
     call json_get_or_default(params, json_key, this%pr_projection_dim, 20)
 
     json_key = json_key_fallback(params, &
-         'case.adjoint.velocity_solver.projection_hold_steps', &
+         'case.adjoint_fluid.velocity_solver.projection_hold_steps', &
          'case.fluid.velocity_solver.projection_hold_steps')
     call json_get_or_default(params, json_key, &
          this%vel_projection_activ_step, 5)
     json_key = json_key_fallback(params, &
-         'case.adjoint.pressure_solver.projection_hold_steps', &
+         'case.adjoint_fluid.pressure_solver.projection_hold_steps', &
          'case.fluid.pressure_solver.projection_hold_steps')
     call json_get_or_default(params, json_key, &
          this%pr_projection_activ_step, 5)
 
-    json_key = json_key_fallback(params, 'case.adjoint.freeze', &
+    json_key = json_key_fallback(params, 'case.adjoint_fluid.freeze', &
          'case.fluid.freeze')
     call json_get_or_default(params, json_key, this%freeze, .false.)
 
@@ -471,7 +473,7 @@ contains
 
     call this%source_term%init(this%f_adj_x, this%f_adj_y, this%f_adj_z, &
          this%c_Xh, user)
-    call this%source_term%add(params, 'case.adjoint.source_term')
+    call this%source_term%add(params, 'case.adjoint_fluid.source_term')
 
     ! Todo: HARRY
     ! --------------------------------------------------------------------------
@@ -494,27 +496,27 @@ contains
        call neko_log%section("Adjoint Velocity solver")
 
        json_key = json_key_fallback(params, &
-            'case.adjoint.velocity_solver.max_iterations', &
+            'case.adjoint_fluid.velocity_solver.max_iterations', &
             'case.fluid.velocity_solver.max_iterations')
        call json_get_or_default(params, json_key, integer_val, KSP_MAX_ITER)
 
        json_key = json_key_fallback(params, &
-            'case.adjoint.velocity_solver.type', &
+            'case.adjoint_fluid.velocity_solver.type', &
             'case.fluid.velocity_solver.type')
        call json_get(params, json_key, string_val1)
 
        json_key = json_key_fallback(params, &
-            'case.adjoint.velocity_solver.preconditioner', &
+            'case.adjoint_fluid.velocity_solver.preconditioner', &
             'case.fluid.velocity_solver.preconditioner')
        call json_get(params, json_key, string_val2)
 
        json_key = json_key_fallback(params, &
-            'case.adjoint.velocity_solver.absolute_tolerance', &
+            'case.adjoint_fluid.velocity_solver.absolute_tolerance', &
             'case.fluid.velocity_solver.absolute_tolerance')
        call json_get(params, json_key, real_val)
 
        json_key = json_key_fallback(params, &
-            'case.adjoint.velocity_solver.monitor', &
+            'case.adjoint_fluid.velocity_solver.monitor', &
             'case.fluid.velocity_solver.monitor')
        call json_get_or_default(params, json_key, logical_val, .false.)
 
@@ -578,16 +580,16 @@ contains
 
     call neko_log%end_section()
 
-  end subroutine adjoint_scheme_init_base
+  end subroutine adjoint_fluid_scheme_init_base
 
   ! ========================================================================== !
   ! Todo: This section need to be moved
 
   ! !> Initialize all components of the current scheme
-  ! subroutine adjoint_scheme_init_all(this, msh, lx, params, kspv_init, &
+  ! subroutine adjoint_fluid_scheme_init_all(this, msh, lx, params, kspv_init, &
   !      kspp_init, scheme, user)
   !   implicit none
-  !   class(adjoint_scheme_t), target, intent(inout) :: this
+  !   class(adjoint_fluid_scheme_t), target, intent(inout) :: this
   !   type(mesh_t), target, intent(inout) :: msh
   !   integer, intent(inout) :: lx
   !   type(json_file), target, intent(inout) :: params
@@ -600,7 +602,7 @@ contains
   !   character(len=:), allocatable :: solver_type, precon_type, json_key
   !   character(len=LOG_SIZE) :: log_buf
 
-  !   call adjoint_scheme_init_base(this, msh, lx, params, scheme, user, &
+  !   call adjoint_fluid_scheme_init_base(this, msh, lx, params, scheme, user, &
   !        kspv_init)
 
   !   call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
@@ -686,9 +688,9 @@ contains
   !      write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
   !      call neko_log%message(log_buf)
 
-  !      call adjoint_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
+  !      call adjoint_fluid_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
   !           solver_type, integer_val, abs_tol)
-  !      call adjoint_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
+  !      call adjoint_fluid_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
   !           this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
 
   !      call neko_log%end_section()
@@ -698,14 +700,14 @@ contains
 
   !   call neko_log%end_section()
 
-  ! end subroutine adjoint_scheme_init_all
+  ! end subroutine adjoint_fluid_scheme_init_all
 
   ! End of section to be moved
   ! ========================================================================== !
 
   !> Deallocate a fluid formulation
-  subroutine adjoint_scheme_free(this)
-    class(adjoint_scheme_t), intent(inout) :: this
+  subroutine adjoint_fluid_scheme_free(this)
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
 
     !
     ! Free everything related to field_dirichlet BCs
@@ -776,12 +778,12 @@ contains
        call this%gradient_jump_penalty_w_adj%free()
     end if
 
-  end subroutine adjoint_scheme_free
+  end subroutine adjoint_fluid_scheme_free
 
   !> Validate that all fields, solvers etc necessary for
   !! performing time-stepping are defined
-  subroutine adjoint_scheme_validate(this)
-    class(adjoint_scheme_t), target, intent(inout) :: this
+  subroutine adjoint_fluid_scheme_validate(this)
+    class(adjoint_fluid_scheme_t), target, intent(inout) :: this
     ! Variables for retrieving json parameters
 
     if ((.not. associated(this%u_adj)) .or. &
@@ -811,14 +813,14 @@ contains
     !
     call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
-  end subroutine adjoint_scheme_validate
+  end subroutine adjoint_fluid_scheme_validate
 
   !> Apply all boundary conditions defined for velocity
   !! Here we perform additional gs operations to take care of
   !! shared points between elements that have different BCs, as done in Nek5000.
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_scheme_bc_apply_vel(this, t, tstep, strong)
-    class(adjoint_scheme_t), intent(inout) :: this
+  subroutine adjoint_fluid_scheme_bc_apply_vel(this, t, tstep, strong)
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     logical, intent(in) :: strong
@@ -827,22 +829,22 @@ contains
          this%u_adj%x, this%v_adj%x, this%w_adj%x, this%dm_Xh%size(), &
          t, tstep, strong)
 
-  end subroutine adjoint_scheme_bc_apply_vel
+  end subroutine adjoint_fluid_scheme_bc_apply_vel
 
   !> Apply all boundary conditions defined for pressure
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_scheme_bc_apply_prs(this, t, tstep)
-    class(adjoint_scheme_t), intent(inout) :: this
+  subroutine adjoint_fluid_scheme_bc_apply_prs(this, t, tstep)
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
     call this%bcs_prs%apply(this%p_adj, t, tstep)
 
-  end subroutine adjoint_scheme_bc_apply_prs
+  end subroutine adjoint_fluid_scheme_bc_apply_prs
 
   !> Initialize a linear solver
   !! @note Currently only supporting Krylov solvers
-  subroutine adjoint_scheme_solver_factory(ksp, n, solver, &
+  subroutine adjoint_fluid_scheme_solver_factory(ksp, n, solver, &
        max_iter, abstol, monitor)
     class(ksp_t), allocatable, target, intent(inout) :: ksp
     integer, intent(in), value :: n
@@ -854,12 +856,12 @@ contains
     call krylov_solver_factory(ksp, n, solver, max_iter, abstol, &
          monitor = monitor)
 
-  end subroutine adjoint_scheme_solver_factory
+  end subroutine adjoint_fluid_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine adjoint_scheme_precon_factory(this, pc, ksp, coef, dof, gs, &
+  subroutine adjoint_fluid_scheme_precon_factory(this, pc, ksp, coef, dof, gs, &
        bclst, pctype)
-    class(adjoint_scheme_t), intent(inout) :: this
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
     type(coef_t), target, intent(in) :: coef
@@ -894,7 +896,7 @@ contains
 
     call ksp%set_pc(pc)
 
-  end subroutine adjoint_scheme_precon_factory
+  end subroutine adjoint_fluid_scheme_precon_factory
 
   !> Compute CFL
   ! TODO
@@ -914,7 +916,7 @@ contains
   !
   ! for now.... let's ignore it
   function adjoint_compute_cfl(this, dt) result(c)
-    class(adjoint_scheme_t), intent(in) :: this
+    class(adjoint_fluid_scheme_t), intent(in) :: this
     real(kind=rp), intent(in) :: dt
     real(kind=rp) :: c
 
@@ -928,8 +930,8 @@ contains
 
   ! !> Set boundary types for the diagnostic output.
   ! !! @param params The JSON case file.
-  ! subroutine adjoint_scheme_set_bc_type_output(this, params)
-  !   class(adjoint_scheme_t), intent(inout) :: this
+  ! subroutine adjoint_fluid_scheme_set_bc_type_output(this, params)
+  !   class(adjoint_fluid_scheme_t), intent(inout) :: this
   !   type(json_file), intent(inout) :: params
   !   type(dirichlet_t) :: bdry_mask
   !   logical :: found
@@ -996,15 +998,15 @@ contains
   !      call bdry_mask%free()
   !   end if
 
-  ! end subroutine adjoint_scheme_set_bc_type_output
+  ! end subroutine adjoint_fluid_scheme_set_bc_type_output
 
   ! End of section to be moved
   ! ========================================================================== !
 
 
   !> Update the values of `mu_field` if necessary.
-  subroutine adjoint_scheme_update_material_properties(this)
-    class(adjoint_scheme_t), intent(inout) :: this
+  subroutine adjoint_fluid_scheme_update_material_properties(this)
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
     type(field_t), pointer :: nut
     integer :: n
 
@@ -1015,13 +1017,13 @@ contains
        call field_add2s2(this%mu_field, nut, this%rho, n)
     end if
 
-  end subroutine adjoint_scheme_update_material_properties
+  end subroutine adjoint_fluid_scheme_update_material_properties
 
   !> Sets rho and mu
   !! @param params The case paramter file.
   !! @param user The user interface.
-  subroutine adjoint_scheme_set_material_properties(this, params, user)
-    class(adjoint_scheme_t), intent(inout) :: this
+  subroutine adjoint_fluid_scheme_set_material_properties(this, params, user)
+    class(adjoint_fluid_scheme_t), intent(inout) :: this
     type(json_file), intent(inout) :: params
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
@@ -1075,6 +1077,6 @@ contains
        end if
 
     end if
-  end subroutine adjoint_scheme_set_material_properties
+  end subroutine adjoint_fluid_scheme_set_material_properties
 
-end module adjoint_scheme
+end module adjoint_fluid_scheme

@@ -69,7 +69,7 @@ module lube_term_objective
   use objective, only: objective_t
   use simulation, only: simulation_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
-  use adjoint_scheme, only: adjoint_scheme_t
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
