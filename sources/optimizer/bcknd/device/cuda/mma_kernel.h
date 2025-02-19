@@ -1,7 +1,5 @@
 #ifndef MMA_KERNEL_H
 #define MMA_KERNEL_H
-#endif
-
 template <typename T>
 __global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
      const T* __restrict__ x, const T* __restrict__ xmin,
@@ -48,28 +46,28 @@ template< typename T >
 __global__ void mma_sub3_kernel(const T* __restrict__ x,
      const T* __restrict__ df0dx, const T* __restrict__ dfdx,
      T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
-	 const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
-	 T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
-	 T* __restrict__ qij, const int n, const int m) {
+   const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
+   T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
+   T* __restrict__ qij, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
      T xgap = xmax[tj] - xmin[tj];
      alpha[tj] = max(max(xmin[tj], low[tj] +
-	      0.1 * (x[tj] - low[tj])), x[tj] - 0.5 * xgap);
+        0.1 * (x[tj] - low[tj])), x[tj] - 0.5 * xgap);
      beta[tj] = min(min(xmax[tj], upp[tj] - 0.1 * (upp[tj] - x[tj])), x[tj] +
-	      0.5 * xgap);
+        0.5 * xgap);
      p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
-	      0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+        0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
 
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
-	      1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+        1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
      for (int i = 0; i < m; i++) {
         pij[i + tj*m] = pow(upp[tj] - x[tj], 2) *
-		     (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *
-		     max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
+         (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *
+         max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
         qij[i + tj*m] = pow(x[tj] - low[tj], 2) *
-		     (0.001 * max(dfdx[i + tj*m], 0.0) + 1.001 *
-			 max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
+         (0.001 * max(dfdx[i + tj*m], 0.0) + 1.001 *
+       max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
      }
   }
 }
@@ -83,7 +81,7 @@ __global__ void mma_sub4_kernel(const T* __restrict__ x, T* __restrict__ low,
   if (tj < n) {
      for (int i = 0; i < m; i++) {
         temp[i + tj*m] = pij[i + tj*m] / (upp[tj] - x[tj]) +
-		     qij[i + tj*m] / (x[tj] - low[tj]);
+         qij[i + tj*m] / (x[tj] - low[tj]);
      }
   }
 }
@@ -104,12 +102,12 @@ template <typename T>
 __global__ void relambda_kernel(T* __restrict__ temp, const T* __restrict__ x,
      const T* __restrict__ xupp, const T* __restrict__ xlow,
      const T* __restrict__ pij, const T* __restrict__ qij, const int n,
-	 const int m) {
+   const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
      for (int i = 0; i < m; i++) {
         temp[i + tj*m] = pij[i + tj*m] / (xupp[tj] - x[tj]) +
-		     qij[i + tj*m] / (x[tj] - xlow[tj]);
+         qij[i + tj*m] / (x[tj] - xlow[tj]);
      }
   }
 }
@@ -198,19 +196,19 @@ template <typename T>
 __global__ void delx_kernel(T* __restrict__ delx, const T* __restrict__ x,
      const T* __restrict__ xlow, const T* __restrict__ xupp,
      const T* __restrict__ pij, const T* __restrict__ qij,
-	 const T* __restrict__ p0j, const T* __restrict__ q0j,
+   const T* __restrict__ p0j, const T* __restrict__ q0j,
      const T* __restrict__ alpha, const T* __restrict__ beta,
-	 const T* __restrict__ lambda, const T epsi, const int n, const int m) {
+   const T* __restrict__ lambda, const T epsi, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
     delx[tj]=0;
     for (int i = 0; i < m; i++) {
       delx[tj] = delx[tj] + pij[i + tj * m] *
-	       lambda[i] / pow(xupp[tj] - x[tj], 2) -
+         lambda[i] / pow(xupp[tj] - x[tj], 2) -
            qij[i + tj * m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
     }
     delx[tj] = delx[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) -
-	     q0j[tj] / pow(x[tj] - xlow[tj], 2) - epsi / (x[tj] - alpha[tj])
+       q0j[tj] / pow(x[tj] - xlow[tj], 2) - epsi / (x[tj] - alpha[tj])
          + epsi / (beta[tj] - x[tj]);
   }
 }
@@ -225,7 +223,7 @@ __global__ void GG_kernel(T* __restrict__ GG, const T* __restrict__ x,
   if (tj < n) {
     for (int ggdumiter = 0; ggdumiter < m; ggdumiter++) {
       GG[ggdumiter  + m*tj] = pij[ggdumiter + m*tj] / pow(xupp[tj] - x[tj], 2) -
-	       qij[ggdumiter + m*tj] / pow(x[tj] - xlow[tj], 2);
+         qij[ggdumiter + m*tj] / pow(x[tj] - xlow[tj], 2);
     }
   }
 }
@@ -233,9 +231,9 @@ template <typename T>
 __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
      const T* __restrict__ xsi, const T* __restrict__ xlow,
      const T* __restrict__ xupp, const T* __restrict__ p0j,
-	 const T* __restrict__ q0j, const T* __restrict__ pij,
-	 const T* __restrict__ qij, const T* alpha, const T*  beta,
-	 const T*  eta, const T* lambda, const int n, const int m) {
+   const T* __restrict__ q0j, const T* __restrict__ pij,
+   const T* __restrict__ qij, const T* alpha, const T*  beta,
+   const T*  eta, const T* lambda, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
     T sum = 0;
@@ -245,9 +243,9 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
       sum1 = sum1 + qij[tj*m + i] * lambda[i];
     }
     diagx[tj] = (p0j[tj] + sum) / pow(xupp[tj] - x[tj], 3) +
-	     (q0j[tj] + sum1) / pow(x[tj] - xlow[tj], 3);
+       (q0j[tj] + sum1) / pow(x[tj] - xlow[tj], 3);
     diagx[tj] = 2.0 * diagx[tj] + xsi[tj] / (x[tj] - alpha[tj]) +
-	     eta[tj] / (beta[tj] - x[tj]);
+       eta[tj] / (beta[tj] - x[tj]);
   }
 }
 
@@ -356,7 +354,7 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
 template< typename T >
 __global__ void mmasumAA_kernel(const T*  __restrict__ GG,
      const T*  __restrict__ diagx, T*  __restrict__ buf_h, const int n,
-	 const int m, const int k0, const int k1) {
+   const int m, const int k0, const int k1) {
 
   const int idx = blockIdx.x * blockDim.x + threadIdx.x;
   const int str = blockDim.x * gridDim.x;
@@ -404,7 +402,7 @@ __global__ void AA_kernel(T* __restrict__ temp, const T* __restrict__ GG,
     for (int i0 = 0; i0 < m; i0++) {
       for (int i1 = 0; i1 < m; i1++) {
         temp[tj + i0 * n + i1 * m * n] = GG[i0 * n + tj] *
-		     (1.0 / diagx[tj]) * GG[i1 * n + tj];
+         (1.0 / diagx[tj]) * GG[i1 * n + tj];
       }
     }
   }
@@ -452,20 +450,20 @@ __global__ void deta_kernel(T* __restrict__ deta, const T* __restrict__ eta,
 template <typename T>
 __global__ void RexCalculation_kernel(T* __restrict__ rex,
      const T* __restrict__ x, const T* __restrict__ xlow,
-	 const T* __restrict__ xupp, const T* __restrict__ pij,
-	 const T* __restrict__ p0j, const T* __restrict__ qij,
-	 const T* __restrict__ q0j, const T* __restrict__ lambda,
-	 const T* __restrict__ xsi, const T* __restrict__ eta, const int n,
-	 const int m) {
+   const T* __restrict__ xupp, const T* __restrict__ pij,
+   const T* __restrict__ p0j, const T* __restrict__ qij,
+   const T* __restrict__ q0j, const T* __restrict__ lambda,
+   const T* __restrict__ xsi, const T* __restrict__ eta, const int n,
+   const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
     rex[tj] = 0.0;
     for (int i = 0; i < m; i++) {
       rex[tj] = rex[tj] + pij[i +tj*m] * lambda[i] / pow(xupp[tj] - x[tj], 2) -
-	       qij[i +tj*m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
+         qij[i +tj*m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
     }
     rex[tj] = rex[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) -
-	     q0j[tj] / pow(x[tj] - xlow[tj], 2) - xsi[tj] + eta[tj];
+       q0j[tj] / pow(x[tj] - xlow[tj], 2) - xsi[tj] + eta[tj];
   }
 }
 
@@ -604,7 +602,7 @@ template <typename T>
 __global__ void kkt_rex_kernel(T* __restrict__ rex, const T* __restrict__ df0dx,
      const T* __restrict__ dfdx, const T* __restrict__ xsi,
      const T* __restrict__ eta, const T* __restrict__ lambda, const int n,
-	 const int m) {
+   const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
     rex[tj] = 0.0;
@@ -712,8 +710,8 @@ __global__ void max2_kernel(T* __restrict__ a, const T b,
 template <typename T>
 __global__ void updatebb_kernel(T* __restrict__ bb,
      const T* __restrict__ dellambda, const T* __restrict__ dely,
-	 const T* __restrict__ d, const T* __restrict__ mu,
-	 const T* __restrict__ y, const T delz, const int m) {
+   const T* __restrict__ d, const T* __restrict__ mu,
+   const T* __restrict__ y, const T delz, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if(tj<m)
     bb[tj]=dellambda[tj] + dely[tj]/(d[tj] + mu[tj]/y[tj]) - bb[tj];
@@ -726,14 +724,14 @@ __global__ void updatebb_kernel(T* __restrict__ bb,
 template <typename T>
 __global__ void updateAA_kernel(T* __restrict__ AA,
      const T* __restrict__ globaltmp_mm, const T* __restrict__ s,
-	 const T* __restrict__ lambda, const T* __restrict__ d,
+   const T* __restrict__ lambda, const T* __restrict__ d,
      const T* __restrict__ mu, const T* __restrict__ y, const T* __restrict__ a,
-	 const T zeta, const T z, const int m) {
+   const T zeta, const T z, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if(tj<m)
     {
       AA[tj+tj*(m+1)]=globaltmp_mm[tj+tj*m] + (s[tj] / lambda[tj] +
-	       1.0/ (d[tj] + mu[tj] / y[tj]));
+         1.0/ (d[tj] + mu[tj] / y[tj]));
       AA[tj+m*(m+1)]=a[tj];
       AA[m+tj*(m+1)]=a[tj];
     }
@@ -750,5 +748,5 @@ __global__ void dy_kernel(T* __restrict__ dy, const T* __restrict__ dely,
     dy[tj] = (-dely[tj]+dlambda[tj])/(d[tj] + mu[tj]/y[tj]);
 }
 
-
+#endif
 

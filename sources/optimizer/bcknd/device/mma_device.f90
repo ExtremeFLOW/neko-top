@@ -32,15 +32,22 @@
 
 submodule (mma) mma_device
 
-  use device_math
-  use device_mma_math
+  use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
+       device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
+       device_sub2, device_sub3
+  use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
+       device_maxval2, device_maxval3, device_mma_gensub3, &
+       device_mma_gensub4, device_mma_max, device_max2, device_rex, &
+       device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
+       device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
+       device_dy, device_dxsi, device_deta, device_kkt_rex, &
+       device_mma_gensub2
+
+
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_math_ext
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use comm, only: pe_rank
-
-  ! for printing the result of kernels and debugging
-  use, intrinsic :: iso_c_binding
 
   implicit none
 

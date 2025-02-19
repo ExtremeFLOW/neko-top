@@ -50,12 +50,12 @@ module mma
   type, public :: mma_t
      private
      integer :: n, m, max_iter
-     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, residumax, &
-          residunorm
+     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
+          residumax, residunorm
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     character(len=:), allocatable :: backnd
+     character(len=:), allocatable :: bcknd
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -146,7 +146,7 @@ module mma
 
 contains
 
-  subroutine mma_init_json( this, x, n, m, json, scale, auto_scale)
+  subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -158,13 +158,15 @@ contains
     ! unnecessary extera computation of KKT norms for the   !
     ! initial design.                                       !
     ! ----------------------------------------------------- !
-    !class(mma_t), allocatable :: mma
-    ! class(mma_t), allocatable, intent(inout) :: this
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
 
     type(json_file), intent(inout) :: json
+
+    !! Read the scaling info for fval and dfdx from json
+    real(kind=rp), intent(out) :: scale
+    logical, intent(out) :: auto_scale
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -181,10 +183,6 @@ contains
     integer :: max_iter, n_global, ierr
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
 
-    !! Read the scaling info for fval and dfdx from json
-    real(kind=rp), intent(out) :: scale
-    logical, intent(out) :: auto_scale
-
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
          MPI_SUM, MPI_COMM_WORLD, ierr)
 
@@ -200,7 +198,7 @@ contains
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
-    call json_get_or_default(json, 'mma.backend', this%backnd, 'cpu')
+    call json_get_or_default(json, 'mma.backend', this%bcknd, 'cpu')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -221,13 +219,13 @@ contains
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
     if (pe_rank .eq. 0) then
-       print *, "Initializing MMA backend to >>> ", this%backnd
+       print *, "Initializing MMA backend to >>> ", this%bcknd
     end if
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
     ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-    !      max_iter, epsimin, asyinit, asyincr, asydecr, backnd)
+    !      max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr)
 
@@ -280,7 +278,7 @@ contains
 
 
     ! Select backend type
-    select case (this%backnd)
+    select case (this%bcknd)
     case ("cpu")
        call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
             max_iter, epsimin, asyinit, asyincr, asydecr)
@@ -307,7 +305,7 @@ contains
     type(matrix_t) :: dfdx
 
     ! Select backend type
-    select case (this%backnd )
+    select case (this%bcknd )
     case ("cpu")
        call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
     case ("cuda")
@@ -324,7 +322,7 @@ contains
     type(matrix_t), intent(in) :: dfdx
 
     ! Select backend type
-    select case (this%backnd )
+    select case (this%bcknd )
     case ("cpu")
        call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     case ("cuda")
