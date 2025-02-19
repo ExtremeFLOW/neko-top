@@ -61,7 +61,7 @@ contains
 
   !> Set initial flow condition (builtin)
   subroutine set_adjoint_fluid_ic_int(uadj, v_adj, w_adj, p_adj, coef, gs, &
-     type, params)
+       type, params)
     type(field_t), intent(inout) :: uadj
     type(field_t), intent(inout) :: v_adj
     type(field_t), intent(inout) :: w_adj
@@ -88,7 +88,7 @@ contains
             blasius_approximation)
        call json_get(params, 'blasius.freestream_velocity', uinf)
        call set_adjoint_fluid_ic_blasius(uadj, v_adj, w_adj, delta, uinf, &
-          blasius_approximation)
+            blasius_approximation)
     else if (trim(type_) .eq. 'point_zone') then
        call json_get(params, 'base_value', uinf)
        call json_get(params, 'zone_name', &
@@ -96,7 +96,7 @@ contains
        call json_get(params, 'zone_value', &
             zone_value)
        call set_adjoint_fluid_ic_point_zone(uadj, v_adj, w_adj, uinf, &
-          zone_name, zone_value)
+            zone_name, zone_value)
     else
        call neko_error('Invalid initial condition')
     end if
@@ -107,7 +107,7 @@ contains
 
   !> Set intial flow condition (user defined)
   subroutine set_adjoint_fluid_ic_usr(uadj, v_adj, w_adj, p_adj, coef, gs, &
-     usr_ic, params)
+       usr_ic, params)
     type(field_t), intent(inout) :: uadj
     type(field_t), intent(inout) :: v_adj
     type(field_t), intent(inout) :: w_adj
@@ -197,17 +197,17 @@ contains
     integer :: i
 
     select case (trim(type))
-      case ('linear')
+    case ('linear')
        bla => blasius_linear
-      case ('quadratic')
+    case ('quadratic')
        bla => blasius_quadratic
-      case ('cubic')
+    case ('cubic')
        bla => blasius_cubic
-      case ('quartic')
+    case ('quartic')
        bla => blasius_quartic
-      case ('sin')
+    case ('sin')
        bla => blasius_sin
-      case default
+    case default
        call neko_error('Invalid Blasius approximation')
     end select
 
@@ -246,7 +246,7 @@ contains
   !! @param zone_name The name of the point zone.
   !! @param zone_value The value of the point zone.
   subroutine set_adjoint_fluid_ic_point_zone(uadj, v_adj, w_adj, base_value, &
-     zone_name, zone_value)
+       zone_name, zone_value)
     type(field_t), intent(inout) :: uadj
     type(field_t), intent(inout) :: v_adj
     type(field_t), intent(inout) :: w_adj

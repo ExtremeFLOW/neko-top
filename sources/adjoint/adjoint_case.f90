@@ -166,7 +166,7 @@ contains
     ! Setup initial conditions
     !
     json_key = json_key_fallback(neko_case%params, &
-       'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
+         'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
     call json_get(neko_case%params, json_key//'.type', string_val)
     call json_get_subdict(neko_case%params, json_key, ic_json)

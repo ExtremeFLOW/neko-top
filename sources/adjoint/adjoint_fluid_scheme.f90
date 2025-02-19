@@ -200,7 +200,7 @@ module adjoint_fluid_scheme
      procedure(adjoint_fluid_scheme_step_intrf), pass(this), deferred :: step
      !> Restart from a checkpoint
      procedure(adjoint_fluid_scheme_restart_intrf), &
-        pass(this), deferred :: restart
+          pass(this), deferred :: restart
      !> Setup boundary conditions
      procedure(adjoint_fluid_scheme_setup_bcs_intrf), pass(this), deferred :: &
           setup_bcs
@@ -211,7 +211,7 @@ module adjoint_fluid_scheme
      procedure, nopass :: solver_factory => adjoint_fluid_scheme_solver_factory
      !> Preconditioner factory
      procedure, pass(this) :: precon_factory_ => &
-        adjoint_fluid_scheme_precon_factory
+          adjoint_fluid_scheme_precon_factory
   end type adjoint_fluid_scheme_t
 
 
@@ -293,7 +293,7 @@ contains
 
   !> Initialize common data for the current scheme
   subroutine adjoint_fluid_scheme_init_base(this, msh, lx, params, scheme, &
-     user, kspv_init)
+       user, kspv_init)
     class(adjoint_fluid_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
