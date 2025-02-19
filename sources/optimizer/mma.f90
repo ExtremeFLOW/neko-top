@@ -410,7 +410,7 @@ contains
        error stop
     end if
 
-    if (NEKO_BCKND_DEVICE .eq. 0) then
+    if (this%backend == 'cpu') then
        call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
        write(stderr, *) "Device not supported for MMA."
