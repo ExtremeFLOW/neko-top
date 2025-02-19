@@ -1055,10 +1055,10 @@ contains
              type is (symmetry_t)
                 ! Symmetry has 3 internal bcs, but only one actually contains
                 ! markings.
-                ! Symmetry's apply_scalar doesn't do anything, so we need to mark
-                ! individual nested bcs to the du,dv,dw, whereas the vel_res can
-                ! just get symmetry as a whole, because on this list we call
-                ! apply_vector.
+                ! Symmetry's apply_scalar doesn't do anything, so we need to
+                ! mark individual nested bcs to the du,dv,dw, whereas the
+                ! vel_res can just get symmetry as a whole, because on this
+                ! list we call apply_vector.
                 ! Additionally we have to mark the special surface bc for p.
                 call this%bclst_vel_res%append(bc_i)
                 call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)

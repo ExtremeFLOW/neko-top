@@ -688,7 +688,8 @@ contains
   !      write(log_buf, '(A,ES13.6)') 'Abs tol    :', abs_tol
   !      call neko_log%message(log_buf)
 
-  !      call adjoint_fluid_scheme_solver_factory(this%ksp_prs, this%dm_Xh%size(), &
+  !      call adjoint_fluid_scheme_solver_factory(this%ksp_prs, &
+  !           this%dm_Xh%size(), &
   !           solver_type, integer_val, abs_tol)
   !      call adjoint_fluid_scheme_precon_factory(this%pc_prs, this%ksp_prs, &
   !           this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
