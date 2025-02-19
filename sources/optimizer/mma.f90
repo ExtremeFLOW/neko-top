@@ -69,6 +69,7 @@ module mma
    contains
      !> Interface for initializing the MMA object
      procedure, public, pass(this) :: init_json => mma_init_json
+     procedure, public, pass(this) :: free => mma_free
      procedure, public, pass(this) :: get_n => mma_get_n
      procedure, public, pass(this) :: get_m => mma_get_m
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
@@ -76,7 +77,6 @@ module mma
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
      procedure, public, pass(this) :: init => mma_init_attributes
-     procedure, public, pass(this) :: free => mma_free
      procedure, public, pass(this) :: KKT => mma_KKT
      procedure, public, pass(this) :: update => mma_update
 
@@ -106,10 +106,6 @@ module mma
        type(matrix_t) :: dfdx
      end subroutine mma_update_cpu
 
-     module subroutine mma_free_cpu(this)
-       class(mma_t), intent(inout) :: this
-     end subroutine mma_free_cpu
-
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
@@ -138,10 +134,6 @@ module mma
        type(vector_t) :: df0dx, fval
        type(matrix_t) :: dfdx
      end subroutine mma_update_device
-
-     module subroutine mma_free_device(this)
-       class(mma_t), intent(inout) :: this
-     end subroutine mma_free_device
 
      module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
@@ -241,6 +233,38 @@ contains
 
   end subroutine mma_init_json
 
+  !> Deallocate mma object
+  subroutine mma_free(this)
+    class(mma_t), intent(inout) :: this
+    ! Deallocate the internal vectors
+    call this%xold1%free()
+    call this%xold2%free()
+    call this%alpha%free()
+    call this%beta%free()
+    call this%a%free()
+    call this%c%free()
+    call this%d%free()
+    call this%low%free()
+    call this%upp%free()
+    call this%xmax%free()
+    call this%xmin%free()
+    call this%p0j%free()
+    call this%q0j%free()
+    call this%bi%free()
+    call this%y%free()
+    call this%lambda%free()
+    call this%s%free()
+    call this%mu%free()
+    call this%xsi%free()
+    call this%eta%free()
+
+    ! Deallocate the internal dummy matrices
+    call this%pij%free()
+    call this%qij%free()
+
+    this%is_initialized = .false.
+    this%is_updated = .false.
+  end subroutine mma_free
 
   subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
        max_iter, epsimin, asyinit, asyincr, asydecr)
@@ -292,19 +316,6 @@ contains
        call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
     end select
   end subroutine mma_update
-
-  subroutine mma_free(this)
-    class(mma_t), intent(inout) :: this
-
-    select case (this%backnd )
-    case ("cpu")
-       call mma_free_cpu(this)
-    case ("cuda")
-       call mma_free_device(this)
-    case default
-       call mma_free_cpu(this)
-    end select
-  end subroutine mma_free
 
   subroutine mma_KKT(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this

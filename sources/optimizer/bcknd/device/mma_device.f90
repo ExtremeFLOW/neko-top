@@ -161,7 +161,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-!     if (present(backnd)) this%backnd = backnd
+
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
             ", d=", d, "epsimin =", this%epsimin
@@ -203,42 +203,6 @@ contains
 
     this%is_updated = .true.
   end subroutine mma_update_device
-
-  !> Deallocate the MMA object.
-  module subroutine mma_free_device(this)
-
-    class(mma_t), intent(inout) :: this
-
-    ! Deallocate the internal vectors
-    call this%xold1%free()
-    call this%xold2%free()
-    call this%alpha%free()
-    call this%beta%free()
-    call this%a%free()
-    call this%c%free()
-    call this%d%free()
-    call this%low%free()
-    call this%upp%free()
-    call this%xmax%free()
-    call this%xmin%free()
-    call this%p0j%free()
-    call this%q0j%free()
-    call this%bi%free()
-    call this%y%free()
-    call this%lambda%free()
-    call this%s%free()
-    call this%mu%free()
-    call this%xsi%free()
-    call this%eta%free()
-
-    ! Deallocate the internal dummy matrices
-    call this%pij%free()
-    call this%qij%free()
-
-    this%is_initialized = .false.
-    this%is_updated = .false.
-
-  end subroutine mma_free_device
 
   module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this

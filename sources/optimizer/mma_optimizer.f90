@@ -192,13 +192,14 @@ contains
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
 
-       !Scaling
+       ! Scaling
        if (this%auto_scale .eqv. .true.) then
           scaling_factor = abs(this%scale/constraint_value%x(1))
        else
           scaling_factor = abs(this%scale)
        end if
 
+       ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x%x, objective_sensitivities, &
             scaling_factor * constraint_value, &
             scaling_factor * constraint_sensitivities)
