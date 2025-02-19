@@ -1187,7 +1187,7 @@ contains
 
     call neko_log%section("Adjoint boundary conditions")
     write(log_buf, '(A)') &
-       'Marking using integer keys in boundary_adjoint0.f00000'
+         'Marking using integer keys in boundary_adjoint0.f00000'
     call neko_log%message(log_buf)
     write(log_buf, '(A)') 'Condition-value pairs: '
     call neko_log%message(log_buf)
