@@ -51,7 +51,8 @@ condition.
 This alternative system is what is implemented in `neko-top`, which reads (in
 weak form),
 
-$$-\int_\Omega \mathbf{v}\cdot {\frac {\partial \mathbf {u}^\dagger }{\partial t}}
+$$-\int_\Omega \mathbf{v}\cdot {\frac {\partial \mathbf {u}^\dagger }
+{\partial t}}
 + \int_\Omega \mathbf{v}\cdot (\nabla \mathbf {u})^T \mathbf {u}^\dagger
 + \int_\Omega \nabla \mathbf{v}\cdot  (\mathbf {u} \otimes \mathbf {u}^\dagger )
 =
