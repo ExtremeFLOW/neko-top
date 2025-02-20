@@ -83,13 +83,13 @@ contains
     end if
 
     select type (adv => object)
-    type is (adv_lin_dealias_t)
+      type is (adv_lin_dealias_t)
        if (lxd .gt. 0) then
           call adv%init(lxd, coef)
        else
           call adv%init(coef%Xh%lx * 3 / 2, coef)
        end if
-    type is (adv_lin_no_dealias_t)
+      type is (adv_lin_no_dealias_t)
        call adv%init(coef)
     end select
 

@@ -1,6 +1,6 @@
 program usrneko
   use neko
-  use user, only: user_setup
+  use user
   type(case_t), target :: C
 
   call user_setup(C%usr)

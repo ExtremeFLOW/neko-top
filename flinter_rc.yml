@@ -243,7 +243,7 @@ regexp-rules:
 # - fork the code.
 structure-rules:
   max-statements-in-context: 2000
-  max-declared-locals: 1000
+  max-declared-locals: 35
   min-varlen: 1
   max-varlen: 30
   max-arguments: 20
