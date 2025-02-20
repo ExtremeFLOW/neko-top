@@ -104,8 +104,8 @@ contains
     ! and objectives. NOTE, perhaps we'll just populate the list but not
     ! initialize them yet! As they may depend on the design.
 
-    select type (design)
-    type is (topopt_design_t)
+    select type(design)
+    type is(topopt_design_t)
        call this%init_design_topopt(parameters, simulation, design)
     class default
        call neko_error('Only topopt_design_t is supported for now')
@@ -116,8 +116,7 @@ contains
   !> The constructor if a `topopt_design_t` is passed
   ! again, this is the only type of design we have so far...
   ! but in the future we may add other types of `design_variable_t`
-  subroutine steady_state_problem_init_design_topopt(this, parameters, &
-       simulation, design)
+  subroutine steady_state_problem_init_design_topopt(this, parameters, simulation, design)
     class(steady_state_problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
