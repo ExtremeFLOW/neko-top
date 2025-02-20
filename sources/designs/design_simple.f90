@@ -101,7 +101,6 @@ module simple_design
 
   end type simple_design_t
 
-
 contains
 
   !> Initialize the design from a JSON file
