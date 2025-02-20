@@ -223,14 +223,14 @@ function cleanup {
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
     for nek in $(find ./ -name "*.nek5000"); do
-        printf "\t- %s\n" $(basename $nek)
+        printf "\t- %s\n" $nek
 
-        basename=$(basename $nek)
+        base=$(basename $nek)
         directory=$(dirname $nek)
-        pattern=${basename%.*}
+        pattern=$directory/${base%.*}
 
         mkdir -p $results/$pattern
-        mv -t $results/$pattern $nek $directory/$pattern.f*
+        mv -t $results/$pattern $nek $pattern.f*
     done
     printf "\n"
 
