@@ -50,6 +50,9 @@ module topopt_design
   use math, only: rzero
   use simulation, only: simulation_t
   use json_module, only: json_file
+  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
+  use vector, only: vector_t
+  use math, only: copy
   implicit none
   private
 
@@ -189,8 +192,8 @@ module topopt_design
      ! design_indicator -> coeficient and their corresponding chain rules
      ! maybe also some information about what equation they live in...
 
-     ! a sampler being called from outside would be nice
-     procedure, pass(this) :: sample => topopt_design_sample
+     ! a writer being called from outside would be nice
+     procedure, pass(this) :: write => topopt_design_write
 
      !> Destructor
      procedure, pass(this) :: free => topopt_design_free
@@ -221,6 +224,7 @@ contains
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
+    type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
     associate(coef => simulation%neko_case%fluid%c_Xh)
       ! init the fields
@@ -316,6 +320,33 @@ contains
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
     call this%init_base(n)
+
+    ! init the simple brinkman term for the forward problem
+    call forward_brinkman%init_from_components( &
+         simulation%fluid_scheme%f_x, &
+         simulation%fluid_scheme%f_y, &
+         simulation%fluid_scheme%f_z, &
+         this%brinkman_amplitude, &
+         simulation%fluid_scheme%u, &
+         simulation%fluid_scheme%v, &
+         simulation%fluid_scheme%w, &
+         simulation%fluid_scheme%c_Xh)
+    ! append brinkman source term to the forward problem
+    call simulation%fluid_scheme%source_term%add(forward_brinkman)
+
+    ! init the simple brinkman term for the adjoint
+    call adjoint_brinkman%init_from_components( &
+         simulation%adjoint_case%scheme%f_adj_x, &
+         simulation%adjoint_case%scheme%f_adj_y, &
+         simulation%adjoint_case%scheme%f_adj_z, &
+         this%brinkman_amplitude, &
+         simulation%adjoint_case%scheme%u_adj, &
+         simulation%adjoint_case%scheme%v_adj, &
+         simulation%adjoint_case%scheme%w_adj, &
+         simulation%adjoint_case%scheme%c_Xh)
+    ! append brinkman source term based on design
+    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
+
   end subroutine topopt_design_init_from_components
 
   !> Add mappings to the design
@@ -337,8 +368,7 @@ contains
 
 
   subroutine topopt_design_map_forward(this)
-    class(topopt_design_t), target, intent(inout) :: this
-
+    class(topopt_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
@@ -357,21 +387,26 @@ contains
     call this%mapping%apply_forward(this%brinkman_amplitude, &
          this%filtered_design)
 
-
   end subroutine topopt_design_map_forward
 
-  subroutine topopt_design_map_backward(this, df_dchi)
-    class(topopt_design_t), target, intent(inout) :: this
-    type(field_t), intent(in) :: df_dchi
+  subroutine topopt_design_map_backward(this, sensitivity)
+    class(topopt_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: sensitivity
+    type(field_t), pointer :: df_dchi
     type(field_t), pointer :: dF_dfiltered_design
-    integer :: temp_indices(1)
+    integer :: temp_indices(2)
+
+    ! it would be nice to visualize this
+
+    call neko_scratch_registry%request_field(df_dchi, temp_indices(1))
+    call copy(df_dchi%x, sensitivity%x, this%size())
 
     ! TODO
     ! again..
     ! so this would be:
     ! call mapper%backward(fld_out, fld_in)
     call neko_scratch_registry%request_field(dF_dfiltered_design, &
-         temp_indices(1))
+         temp_indices(2))
 
     call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
          this%filtered_design)
@@ -405,12 +440,12 @@ contains
 
   end subroutine topopt_design_free
 
-  subroutine topopt_design_sample(this,t)
-    class(topopt_design_t), target, intent(inout) :: this
-    real(kind=rp), intent(in) :: t
+  subroutine topopt_design_write(this, idx)
+    class(topopt_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
 
-    call this%output%sample(t)
+    call this%output%sample(real(idx, kind=rp))
 
-  end subroutine topopt_design_sample
+  end subroutine topopt_design_write
 
 end module topopt_design
