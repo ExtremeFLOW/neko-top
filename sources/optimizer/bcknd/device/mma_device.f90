@@ -46,139 +46,13 @@ submodule (mma) mma_device
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_math_ext
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST
   use comm, only: pe_rank
   use mpi_f08, only: MPI_IN_PLACE
 
   implicit none
 
 contains
-
-
-  module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, &
-       xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
-    ! ----------------------------------------------------- !
-    ! Initializing the mma object and all the parameters    !
-    ! required for MMA method. (a_i, c_i, d_i, ...)         !
-    ! x: the design varaibles(DV), n: number of DV,         !
-    ! m: number of constraints                              !
-    !                                                       !
-    ! Note that residumax & residunorm of the KKT conditions!
-    ! are initialized with 10^5. This is done to avoid      !
-    ! unnecessary extera computation of KKT norms for the   !
-    ! initial design.                                       !
-    ! ----------------------------------------------------- !
-    class(mma_t), intent(inout) :: this
-    integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
-    ! -------------------------------------------------------------------!
-    !      Internal parameters for MMA                                   !
-    !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
-    !    subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m             !
-    !                xmin_j <= x_j <= xmax_j,    j = 1,...,n             !
-    !                z >= 0,   y_i >= 0,         i = 1,...,m             !
-    ! -------------------------------------------------------------------!
-    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
-    real(kind=rp), intent(in), dimension(m) :: a, c, d
-    real(kind=rp), intent(in) :: a0
-    integer, intent(in), optional :: max_iter
-    real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), intent(in), allocatable :: bcknd
-
-    call this%free()
-
-    this%n = n
-    this%m = m
-
-    call this%xold1%init(n)
-    call this%xold2%init(n)
-    this%xold1%x = x
-    this%xold2%x = x
-
-    call this%alpha%init(n)
-    call this%beta%init(n)
-
-    call this%a%init(m)
-    call this%c%init(m)
-    call this%d%init(m)
-    call this%low%init(n)
-    call this%upp%init(n)
-    call this%xmax%init(n)
-    call this%xmin%init(n)
-
-    !internal dummy variables for MMA
-    call this%p0j%init(n)
-    call this%q0j%init(n)
-    call this%pij%init(m, n)
-    call this%qij%init(m, n)
-    call this%bi%init(m)
-
-    !---nesessary for KKT check after updating df0dx, fval, dfdx --------
-    call this%y%init(m)
-    call this%lambda%init(m)
-    call this%s%init(m)
-    call this%mu%init(m)
-    call this%xsi%init(n)
-    call this%eta%init(n)
-
-    this%a0 = a0
-    this%a%x = a
-    this%c%x = c
-    this%d%x = d
-
-    !setting the bounds for the design variable based on the problem
-    this%xmax%x = xmax
-    this%xmin%x = xmin
-
-    this%low%x(:) = minval(x)
-    this%upp%x(:) = maxval(x)
-
-    !setting KKT norms to a large number for the initial design
-    this%residumax = huge(0.0_rp)
-    this%residunorm = huge(0.0_rp)
-
-    ! upload all init values to device pointers
-    call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%xold1%x, this%xold2%x_d, this%n, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, HOST_TO_DEVICE, &
-         sync = .false.)
-    call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, &
-         sync = .false.)
-    ! ------------------------------------------------------------------------ !
-    ! Assign defaults if nothing is parsed
-
-    ! based on the Cpp Code by Niels
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
-    if (.not. present(max_iter)) this%max_iter = 100
-
-    ! Following parameters are set based on eq.3.8:--------
-    if (.not. present(asyinit)) this%asyinit = 0.5_rp
-    if (.not. present(asyincr)) this%asyincr = 1.2_rp
-    if (.not. present(asydecr)) this%asydecr = 0.7_rp
-
-    ! Assign values from inputs when present
-    if (present(max_iter)) this%max_iter = max_iter
-    if (present(epsimin)) this%epsimin = epsimin
-    if (present(asyinit)) this%asyinit = asyinit
-    if (present(asyincr)) this%asyincr = asyincr
-    if (present(asydecr)) this%asydecr = asydecr
-    this%bcknd = bcknd
-
-    if (pe_rank .eq. 0) then
-       print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
-            ", d=", d, "epsimin =", this%epsimin
-    end if
-    !the object is correctly initialized
-    this%is_initialized = .true.
-  end subroutine mma_init_attributes_device
 
   module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -827,7 +701,7 @@ contains
     call device_copy(this%eta%x_d, eta%x_d, this%n)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
     call device_copy(this%s%x_d, s%x_d, this%m)
-    
+
   end subroutine mma_subsolve_dpip_device
 
 
