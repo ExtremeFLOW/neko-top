@@ -1,6 +1,6 @@
 module mma_optimizer
   use optimizer, only: optimizer_t
-  use steady_state_problem, only : steady_state_problem_t
+  use problem, only : problem_t
   use mma, only: mma_t
   use problem, only: problem_t
   use topopt_design, only: topopt_design_t
@@ -79,7 +79,6 @@ contains
 
     type(vector_t) :: x
     type(json_file) :: solver_parameters
-
 
     ! Initialize the logger
     call this%logger%init('optimization_data.csv')
@@ -186,7 +185,8 @@ contains
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
-    call problem%write(0)
+    call simulation%write(0)
+    call design%write(0)
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -294,7 +294,8 @@ contains
             problem%get_n_objectives(), problem%get_n_constraints())
        call this%logger%write(log_data)
 
-       call problem%write(iter)
+       call simulation%write(iter)
+       call design%write(iter)
        call simulation%reset()
     end do
 
