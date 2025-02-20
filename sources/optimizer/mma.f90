@@ -86,7 +86,7 @@ module mma
      ! ======================================================================== !
      !! interface for cpu backend module subroutines
      module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, &
-          xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+          xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: n, m
        real(kind=rp), intent(in), dimension(n) :: x
@@ -96,6 +96,7 @@ module mma
        integer, intent(in), optional :: max_iter
        real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, &
             asydecr
+       character(len=:), intent(in), allocatable :: bcknd
      end subroutine mma_init_attributes_cpu
 
      module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
@@ -116,7 +117,7 @@ module mma
 
      !! interface for device backend module subroutines
      module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, &
-          xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+          xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: n, m
        real(kind=rp), intent(in), dimension(n) :: x
@@ -125,6 +126,7 @@ module mma
        real(kind=rp), intent(in) :: a0
        integer, intent(in), optional :: max_iter
        real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+       character(len=:), intent(in), allocatable :: bcknd
      end subroutine mma_init_attributes_device
 
      module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
@@ -176,6 +178,7 @@ contains
     ! -------------------------------------------------------------------!
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), dimension(m) :: a, c, d
+    character(len=:), allocatable :: bcknd
 
     !! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
@@ -198,7 +201,7 @@ contains
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
-    call json_get_or_default(json, 'mma.backend', this%bcknd, 'cpu')
+    call json_get_or_default(json, 'mma.backend', bcknd, 'cpu')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -219,7 +222,7 @@ contains
     xmax = xmax_const
     ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
     if (pe_rank .eq. 0) then
-       print *, "Initializing MMA backend to >>> ", this%bcknd
+       print *, "Initializing MMA backend to >>> ", bcknd
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -227,7 +230,7 @@ contains
     ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
     !      max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr)
+         max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
 
   end subroutine mma_init_json
 
@@ -265,7 +268,7 @@ contains
   end subroutine mma_free
 
   subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr)
+       max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
     real(kind=rp), intent(in), dimension(n) :: x
@@ -275,19 +278,20 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    character(len=:), intent(in), allocatable :: bcknd
 
 
     ! Select backend type
-    select case (this%bcknd)
+    select case (bcknd)
     case ("cpu")
        call mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, xmax, &
-            max_iter, epsimin, asyinit, asyincr, asydecr)
+            max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
        if (pe_rank == 0) then
           print *, "MMA initialized with CPU backend!"
        end if
     case ("cuda")
        call mma_init_attributes_device(this, x, n, m, a0, a, c, d, xmin, xmax, &
-            max_iter, epsimin, asyinit, asyincr, asydecr)
+            max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
        if (pe_rank == 0) then
           print *, "MMA initialized with CUDA backend!"
        end if

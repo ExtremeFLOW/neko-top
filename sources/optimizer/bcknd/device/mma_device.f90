@@ -48,6 +48,7 @@ submodule (mma) mma_device
   use device_math_ext
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use comm, only: pe_rank
+  use mpi_f08, only: MPI_IN_PLACE
 
   implicit none
 
@@ -55,7 +56,7 @@ contains
 
 
   module subroutine mma_init_attributes_device(this, x, n, m, a0, a, c, d, &
-       xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+       xmin, xmax, max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -82,6 +83,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    character(len=:), intent(in), allocatable :: bcknd
 
     call this%free()
 
@@ -168,6 +170,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
+    this%bcknd = bcknd
 
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
@@ -307,6 +310,8 @@ contains
     integer :: ierr
     type(vector_t) :: globaltmp_m
 
+    ! ------------------------------------------------------------------------ !
+    ! Setup the current asymptotes
     call globaltmp_m%init(this%m)
     if (iter .lt. 3) then
        call device_add3s2(this%low%x_d, this%xmax%x_d, this%xmin%x_d, &
@@ -335,14 +340,16 @@ contains
     call device_memcpy(this%beta%x, this%beta%x_d, this%n, DEVICE_TO_HOST, &
          sync = .true.)
 
+    ! ------------------------------------------------------------------------ !
+    ! Calculate p0j, q0j, pij, qij, and bi
     call device_mma_gensub4(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
     call device_memcpy(this%pij%x, this%pij%x_d, this%n*this%m, &
          DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(this%qij%x, this%qij%x_d, this%n*this%m, &
          DEVICE_TO_HOST, sync = .true.)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!!!!cpu gpu transfer and global sum
+    ! ------------------------------------------------------------------------ !
+    ! cpu gpu transfer and global sum for bi
     globaltmp_m%x=0.0_rp
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
          sync = .true.)
@@ -351,7 +358,7 @@ contains
     call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
          HOST_TO_DEVICE, sync = .true.)
     call device_sub3(this%bi%x_d, globaltmp_m%x_d, fval%x_d, this%m)
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
          sync = .true.)
 
@@ -385,6 +392,7 @@ contains
     integer :: nglobal
 
     real(kind=rp) :: cons
+    real(kind=rp) :: minimal_epsilon
 
 
     call globaltmp_m%init(this%m)
@@ -427,6 +435,10 @@ contains
 
     call GG%init(this%m, this%n)
     call AA%init(this%m+1, this%m+1)
+
+    ! ------------------------------------------------------------------------ !
+    ! initial value for the parameters in the subsolve based on
+    ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
     dummy_one = 1.0_rp
     epsi = 1.0_rp !100
     call device_add3s2(x%x_d, this%alpha%x_d, this%beta%x_d, 0.5_rp, 0.5_rp, &
@@ -442,8 +454,17 @@ contains
     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
+    ! ------------------------------------------------------------------------ !
+    ! Computing the minimal epsilon and choose the most conservative one
 
-    outer: do while (epsi .gt. 0.9*this%epsimin)
+    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
+
+    ! ------------------------------------------------------------------------ !
+
+
+    outer: do while (epsi .gt. minimal_epsilon)
        ! calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
@@ -516,7 +537,7 @@ contains
 
 
 
-       do iter = 1, 100 !this%max_iter !ittt
+       do iter = 1, this%max_iter !ittt
           if (iter .gt. (this%max_iter -2)) then
              ! print *, "The mma inner loop seems not to converge"
              ! print *, "residumax = ", residumax, "for epsi = ", epsi, &
@@ -645,6 +666,8 @@ contains
                this%n), device_maxval3(dx%x_d, this%beta%x_d, x%x_d, &
                1.01_rp, this%n), -1.01_rp*dzeta/zeta])
           steg = 1.0_rp/steg
+
+          ! find minimum step sizes between nodes
           call MPI_Allreduce(steg, steg, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
@@ -660,6 +683,9 @@ contains
           call device_copy(sold%x_d, s%x_d, this%m)
           newresidu = 2.0*residunorm
           itto = 0
+
+          ! The innermost loop to determine the suitable step length
+          ! using the Backtracking Line Search approach
           do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
              itto = itto + 1
              call device_add3s2(x%x_d, xold%x_d, dx%x_d, 1.0_rp, &
@@ -786,20 +812,22 @@ contains
        end do
        epsi = 0.1_rp * epsi
     end do outer
+
+    ! Save the new designx
     call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
     call device_copy(this%xold1%x_d, designx%x_d, this%n)
     call device_copy(designx%x_d, x%x_d, this%n)
+
+    !update the parameters of the MMA object nesessary to compute KKT residual
     call device_copy(this%y%x_d, y%x_d, this%m)
     this%z = z
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
-
-
     this%zeta = zeta
     call device_copy(this%xsi%x_d, xsi%x_d, this%n)
     call device_copy(this%eta%x_d, eta%x_d, this%n)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
     call device_copy(this%s%x_d, s%x_d, this%m)
-    !print *, "I am in mma_subsolve_dpip_gpu"
+    
   end subroutine mma_subsolve_dpip_device
 
 

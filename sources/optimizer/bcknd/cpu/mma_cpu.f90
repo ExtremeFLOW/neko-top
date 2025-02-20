@@ -39,7 +39,7 @@ contains
 
 
   module subroutine mma_init_attributes_cpu(this, x, n, m, a0, a, c, d, xmin, &
-       xmax, max_iter, epsimin, asyinit, asyincr, asydecr)
+       xmax, max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -67,6 +67,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    character(len=:), intent(in), allocatable :: bcknd
 
     call this%free()
 
@@ -137,6 +138,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
+    this%bcknd = bcknd
 
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0=", a0, ", a=", a, ", c=", c, &
