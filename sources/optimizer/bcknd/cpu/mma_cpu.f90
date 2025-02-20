@@ -133,7 +133,7 @@ contains
 
   !============================================================================!
   ! private internal subroutines
-  
+
   !> generat a subproblem; convex approximation of the optimization problem
   subroutine mma_gensub_cpu(this, iter, xdesign, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
