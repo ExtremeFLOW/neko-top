@@ -26,6 +26,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 
 # Add the adjoint library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
