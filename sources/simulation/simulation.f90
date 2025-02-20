@@ -60,9 +60,12 @@ module simulation
      class(fluid_scheme_incompressible_t), public, pointer :: &
           fluid_scheme => null()
 
-     !> An output sampler for the problem. This should probably be an output
-     !! controller at some point instead.
-     type(fld_file_output_t), public :: output
+     !> An output sampler for the forward problem.
+     !! This should probably be an output controller at some point instead.
+     type(fld_file_output_t), public :: output_forward
+     !> An output sampler for the adjoint problem.
+     !! This should probably be an output controller at some point instead.
+     type(fld_file_output_t), public :: output_adjoint
 
    contains
      !> Initialize the simulation
@@ -119,15 +122,16 @@ contains
     ! - adjoint (p,u,v,w)                      5,6,7,8           t,s1,s2,s3
 
     ! Allocate the output type
-    call this%output%init(sp, 'optimization', 8)
-    call this%output%fields%assign(1, this%fluid_scheme%p)
-    call this%output%fields%assign(2, this%fluid_scheme%u)
-    call this%output%fields%assign(3, this%fluid_scheme%v)
-    call this%output%fields%assign(4, this%fluid_scheme%w)
-    call this%output%fields%assign(5, this%adjoint_case%scheme%p_adj)
-    call this%output%fields%assign(6, this%adjoint_case%scheme%u_adj)
-    call this%output%fields%assign(7, this%adjoint_case%scheme%v_adj)
-    call this%output%fields%assign(8, this%adjoint_case%scheme%w_adj)
+    call this%output_forward%init(sp, 'forward', 4)
+    call this%output_adjoint%init(sp, 'adjoint', 4)
+    call this%output_forward%fields%assign(1, this%fluid_scheme%p)
+    call this%output_forward%fields%assign(2, this%fluid_scheme%u)
+    call this%output_forward%fields%assign(3, this%fluid_scheme%v)
+    call this%output_forward%fields%assign(4, this%fluid_scheme%w)
+    call this%output_adjoint%fields%assign(1, this%adjoint_case%scheme%p_adj)
+    call this%output_adjoint%fields%assign(2, this%adjoint_case%scheme%u_adj)
+    call this%output_adjoint%fields%assign(3, this%adjoint_case%scheme%v_adj)
+    call this%output_adjoint%fields%assign(4, this%adjoint_case%scheme%w_adj)
 
   end subroutine simulation_init
 
@@ -178,7 +182,8 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output%sample(real(idx, kind=rp))
+    call this%output_forward%sample(real(idx, kind=rp))
+    call this%output_adjoint%sample(real(idx, kind=rp))
 
   end subroutine simulation_write
 
