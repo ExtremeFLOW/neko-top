@@ -15,5 +15,3 @@ user interface.
 2. \subpage code-structure
 3. [Examples](@ref examples)
 4. [Tools and Utilities](@ref tools)
-5. \subpage theory
-   1. \subpage adjoint

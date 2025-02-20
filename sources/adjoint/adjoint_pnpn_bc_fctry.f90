@@ -31,8 +31,8 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !
-!> Defines factory subroutines for `adjoint_fluid_pnpn_t`.
-submodule(adjoint_fluid_pnpn) adjoint_fluid_pnpn_bc_fctry
+!> Defines factory subroutines for `adjoint_pnpn_t`.
+submodule(adjoint_pnpn) adjoint_pnpn_bc_fctry
   use user_intf, only : user_t
   use utils, only : neko_type_error
   use field_dirichlet, only : field_dirichlet_t
@@ -47,8 +47,7 @@ submodule(adjoint_fluid_pnpn) adjoint_fluid_pnpn_bc_fctry
   implicit none
 
   ! List of all possible types created by the boundary condition factories
-  character(len=25) :: ADJOINT_FLUID_PNPN_KNOWN_BCS(13) = &
-       [character(len=25) :: &
+  character(len=25) :: ADJOINT_PNPN_KNOWN_BCS(13) = [character(len=25) :: &
        "symmetry", &
        "velocity_value", &
        "no_slip", &
@@ -67,13 +66,13 @@ contains
 
   !> Factory routine for pressure boundary conditions.
   !! @param object The boundary condition to be allocated.
-  !! @param scheme The `adjoint_fluid_pnpn_t`  scheme.
+  !! @param scheme The `adjoint_pnpn_t`  scheme.
   !! @param json The parameter dictionary for the boundary.
   !! @param coef The SEM coeffcients.
   !! @param user The user interface.
   module subroutine pressure_bc_factory(object, scheme, json, coef, user)
     class(bc_t), pointer, intent(inout) :: object
-    type(adjoint_fluid_pnpn_t), intent(in) :: scheme
+    type(adjoint_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
@@ -99,11 +98,11 @@ contains
        end select
 
     case default
-       do i = 1, size(ADJOINT_FLUID_PNPN_KNOWN_BCS)
-          if (trim(type) .eq. trim(ADJOINT_FLUID_PNPN_KNOWN_BCS(i))) return
+       do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
+          if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
        end do
-       call neko_type_error("adjoint_fluid_pnpn boundary conditions", type, &
-            ADJOINT_FLUID_PNPN_KNOWN_BCS)
+       call neko_type_error("adjoint_pnpn boundary conditions", type, &
+            ADJOINT_PNPN_KNOWN_BCS)
     end select
 
     call json_get(json, "zone_indices", zone_indices)
@@ -129,13 +128,13 @@ contains
 
   !> Factory routine for velocity boundary conditions.
   !! @param object The boundary condition to be allocated.
-  !! @param scheme The `adjoint_fluid_pnpn_t`  scheme.
+  !! @param scheme The `adjoint_pnpn_t`  scheme.
   !! @param json The parameter dictionary for the boundary.
   !! @param coef The SEM coeffcients.
   !! @param user The user interface.
   module subroutine velocity_bc_factory(object, scheme, json, coef, user)
     class(bc_t), pointer, intent(inout) :: object
-    type(adjoint_fluid_pnpn_t), intent(in) :: scheme
+    type(adjoint_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
@@ -181,11 +180,11 @@ contains
        !  end select
 
     case default
-       do i = 1, size(ADJOINT_FLUID_PNPN_KNOWN_BCS)
-          if (trim(type) .eq. trim(ADJOINT_FLUID_PNPN_KNOWN_BCS(i))) return
+       do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
+          if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
        end do
-       call neko_type_error("adjoint_fluid_pnpn boundary conditions", type, &
-            ADJOINT_FLUID_PNPN_KNOWN_BCS)
+       call neko_type_error("adjoint_pnpn boundary conditions", type, &
+            ADJOINT_PNPN_KNOWN_BCS)
     end select
 
     call json_get(json, "zone_indices", zone_indices)
@@ -210,4 +209,4 @@ contains
     end if
   end subroutine velocity_bc_factory
 
-end submodule adjoint_fluid_pnpn_bc_fctry
+end submodule adjoint_pnpn_bc_fctry

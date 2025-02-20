@@ -34,11 +34,11 @@
 module adjoint_case
   use num_types, only: rp, dp, sp
   use case, only: case_t
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
-  use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use adjoint_scheme, only: adjoint_scheme_t
+  use adjoint_fctry, only: adjoint_scheme_factory
+  use adjoint_pnpn, only: adjoint_pnpn_t
   use adjoint_output, only: adjoint_output_t
-  use adjoint_fluid_ic, only: set_adjoint_fluid_ic
+  use adjoint_ic, only: set_adjoint_ic
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
@@ -53,7 +53,7 @@ module adjoint_case
   !! suppoerted by Neko.
   type :: adjoint_case_t
 
-     class(adjoint_fluid_scheme_t), allocatable :: scheme
+     class(adjoint_scheme_t), allocatable :: scheme
      type(case_t), pointer :: case
 
      ! Fields
@@ -119,7 +119,7 @@ contains
     ! Setup fluid scheme
     !
     call json_get(neko_case%params, 'case.fluid.scheme', string_val)
-    call adjoint_fluid_scheme_factory(this%scheme, trim(string_val))
+    call adjoint_scheme_factory(this%scheme, trim(string_val))
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
@@ -166,18 +166,18 @@ contains
     ! Setup initial conditions
     !
     json_key = json_key_fallback(neko_case%params, &
-         'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
+         'case.adjoint.initial_condition', 'case.fluid.initial_condition')
 
     call json_get(neko_case%params, json_key//'.type', string_val)
     call json_get_subdict(neko_case%params, json_key, ic_json)
 
     if (trim(string_val) .ne. 'user') then
-       call set_adjoint_fluid_ic( &
+       call set_adjoint_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
             string_val, ic_json)
     else
-       call set_adjoint_fluid_ic( &
+       call set_adjoint_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
             neko_case%usr%fluid_user_ic, ic_json)
@@ -199,7 +199,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-    type is (adjoint_fluid_pnpn_t)
+    type is (adjoint_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)
