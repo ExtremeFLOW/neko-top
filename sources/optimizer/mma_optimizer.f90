@@ -150,23 +150,11 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
-    type(field_t), pointer :: design_indicator
-
     type(vector_t) :: log_data
 
 
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
-
-    call x%init(n)
-
-    select type (design)
-    type is (topopt_design_t)
-       design_indicator => neko_field_registry%get_field("design_indicator")
-       call copy(x%x, design_indicator%x, n)
-    class default
-       call neko_error('Unknown design type for MMA Optimizer')
-    end select
 
     !>initializing the scaling factor
     scaling_factor = 1.0_rp
@@ -205,6 +193,8 @@ contains
        else
           scaling_factor = abs(this%scale)
        end if
+
+       x = design%get_design()
 
        ! Scale the constraint value and sensitivities
        constraint_value = scaling_factor * constraint_value
@@ -261,26 +251,8 @@ contains
                constraint_value%x, constraint_sensitivities%x)
        end if
 
-       select type (d => design)
-       type is (topopt_design_t)
-
-          design_indicator => neko_field_registry%get_field("design_indicator")
-
-          call copy(design_indicator%x, x%x, n)
-          if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_copy(design_indicator%x_d, x%x_d, n)
-          end if
-
-          call d%map_forward()
-
-          call copy(x%x, design_indicator%x, n)
-          if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_copy(x%x_d, design_indicator%x_d, n)
-          end if
-
-       class default
-          call neko_error('Unknown design type for MMA Optimizer')
-       end select
+       call design%update_design(x)
+       x = design%get_design()
 
        call simulation%run_forward()
        call problem%compute(design)

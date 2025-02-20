@@ -179,8 +179,11 @@ module topopt_design
      !> Add mappings to the design
      procedure, pass(this) :: add_mapping => topopt_design_add_mapping
 
+     !> Retrieve the design variables
+     procedure, pass(this) :: get_design => topopt_design_get_design
+
      !> Update the design
-     procedure, pass(this) :: update => topopt_design_update
+     procedure, pass(this) :: update_design => topopt_design_update_design
 
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
@@ -205,12 +208,11 @@ module topopt_design
      ! I'm not sure who owns the optimizer...
      ! but it would make sense to have it in here so you provide it
      ! with dF/d_design_indicator and it updates itself.
-     ! procedure, pass(this) :: update => topopt_design_update
+     ! procedure, pass(this) :: update => topopt_design_update_design
   end type topopt_design_t
 
 
 contains
-
 
   !> Initialize the design from a JSON file
   subroutine topopt_design_init_from_json(this, parameters, simulation)
@@ -414,17 +416,34 @@ contains
 
   end subroutine topopt_design_map_forward
 
-  subroutine topopt_design_update(this, new_x)
+  function topopt_design_get_design(this) result(x)
+    class(topopt_design_t), intent(in) :: this
+    type(vector_t) :: x
+    integer :: n
+
+    n = this%size()
+    call x%init(n)
+    call copy(x%x, this%design_indicator%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(x%x_d, this%design_indicator%x_d, n)
+    end if
+
+  end function topopt_design_get_design
+
+  subroutine topopt_design_update_design(this, new_x)
     class(topopt_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: new_x
+    integer :: n
 
-    call this%filter%apply_forward(this%filtered_design, &
-         this%design_indicator)
+    n = this%size()
+    call copy(this%design_indicator%x, new_x%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%design_indicator%x_d, new_x%x_d, n)
+    end if
 
-    call this%mapping%apply_forward(this%brinkman_amplitude, &
-         this%filtered_design)
+    call this%map_forward()
 
-  end subroutine topopt_design_update
+  end subroutine topopt_design_update_design
 
   subroutine topopt_design_map_backward(this, sensitivity)
     class(topopt_design_t), intent(inout) :: this
