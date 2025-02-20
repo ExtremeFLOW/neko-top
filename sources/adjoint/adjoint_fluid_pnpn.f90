@@ -989,7 +989,7 @@ contains
     call this%bc_prs_surface%init_from_components(this%c_Xh)
     call this%bc_sym_surface%init_from_components(this%c_Xh)
 
-    json_key = 'case.adjoint.boundary_conditions'
+    json_key = 'case.adjoint_fluid.boundary_conditions'
 
     ! Populate bcs_vel and bcs_prs based on the case file
     if (params%valid_path(json_key)) then
