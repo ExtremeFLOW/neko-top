@@ -51,7 +51,7 @@ runs:
             flint score $(realpath $entry) -d ${{ inputs.depth }} -r $(realpath ${{ inputs.rc-file }}) | tee flint.txt
 
             # Extract the score from the flint.txt file.
-            s=$(grep -o "|[0-9]*\.[0-9]*|" flint.txt | sed 's/|//g')
+            s=$(awk '$1==0{print $3}' flint.txt)
 
             # Update the running score.
             score=$(echo "$score + $s" | bc)
