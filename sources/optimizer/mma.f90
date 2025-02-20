@@ -98,7 +98,7 @@ module mma
        type(matrix_t) :: dfdx
      end subroutine mma_update_cpu
 
-     !> CPU KKT check for convergence  
+     !> CPU KKT check for convergence
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
