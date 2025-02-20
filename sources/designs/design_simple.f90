@@ -30,8 +30,8 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-! Implements the `design_simple_t` type.
-module design_simple
+! Implements the `simple_design_t` type.
+module simple_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
@@ -58,7 +58,7 @@ module design_simple
   private
 
   !> A topology optimization design variable
-  type, extends(design_t), public :: design_simple_t
+  type, extends(design_t), public :: simple_design_t
      private
 
      type(vector_t) :: x
@@ -98,14 +98,14 @@ module design_simple
      !> Destructor
      procedure, pass(this) :: free => design_simple_free
 
-  end type design_simple_t
+  end type simple_design_t
 
 
 contains
 
   !> Initialize the design from a JSON file
   subroutine design_simple_init_from_json(this, parameters, simulation)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
     integer :: n
@@ -118,7 +118,7 @@ contains
 
   !> Free the design
   subroutine design_simple_free(this)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
 
     call this%free_base()
     call this%x%free()
@@ -126,7 +126,7 @@ contains
   end subroutine design_simple_free
 
   subroutine design_simple_init_from_components(this, n, simulation)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     integer, intent(in) :: n
     type(simulation_t), intent(inout) :: simulation
 
@@ -138,7 +138,7 @@ contains
 
   !> Add mappings to the design
   subroutine design_simple_add_mapping(this, parameters, simulation)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
 
@@ -146,20 +146,20 @@ contains
 
 
   subroutine design_simple_map_forward(this)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
 
 
   end subroutine design_simple_map_forward
 
   function design_simple_get_design(this) result(x)
-    class(design_simple_t), intent(in) :: this
+    class(simple_design_t), intent(in) :: this
     type(vector_t) :: x
 
     x = this%x
   end function design_simple_get_design
 
   subroutine design_simple_update_design(this, new_x)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: new_x
 
     this%x = new_x
@@ -167,15 +167,15 @@ contains
   end subroutine design_simple_update_design
 
   subroutine design_simple_map_backward(this, sensitivity)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
 
   end subroutine design_simple_map_backward
 
   subroutine design_simple_write(this, idx)
-    class(design_simple_t), intent(inout) :: this
+    class(simple_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
   end subroutine design_simple_write
 
-end module design_simple
+end module simple_design

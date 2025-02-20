@@ -78,6 +78,9 @@ module design
 
   end type design_t
 
+  ! ========================================================================== !
+  ! Public interface for the deferred methods
+
   abstract interface
      subroutine design_init_from_json(this, parameters, simulation)
        import design_t, simulation_t, json_file
@@ -119,6 +122,17 @@ module design
        class(design_t), intent(inout) :: this
        integer, intent(in) :: idx
      end subroutine design_write
+  end interface
+
+  ! ========================================================================== !
+  ! Interface for the factory function
+
+  interface
+     module subroutine design_factory(object, json, simulation)
+       class(design_t), allocatable, intent(inout) :: object
+       type(json_file), intent(inout) :: json
+       type(simulation_t), intent(inout) :: simulation
+     end subroutine design_factory
   end interface
 
 contains

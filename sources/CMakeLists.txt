@@ -53,6 +53,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_topopt.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
 
