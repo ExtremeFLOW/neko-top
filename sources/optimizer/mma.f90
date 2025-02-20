@@ -147,7 +147,7 @@ contains
 
     type(json_file), intent(inout) :: json
 
-    !! Read the scaling info for fval and dfdx from json
+    ! Read the scaling info for fval and dfdx from json
     real(kind=rp), intent(out) :: scale
     logical, intent(out) :: auto_scale
     ! -------------------------------------------------------------------!
@@ -161,7 +161,7 @@ contains
     real(kind=rp), dimension(m) :: a, c, d
     character(len=:), allocatable :: bcknd
 
-    !! For reading the values from json and then set the value for the arrays
+    ! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
 
     integer :: max_iter, n_global, ierr

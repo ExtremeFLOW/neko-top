@@ -131,8 +131,10 @@ contains
     end associate
   end subroutine mma_KKT_cpu
 
-
-  !! private internal subroutines
+  !============================================================================!
+  ! private internal subroutines
+  
+  !> generat a subproblem; convex approximation of the optimization problem
   subroutine mma_gensub_cpu(this, iter, xdesign, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
@@ -266,6 +268,7 @@ contains
 
   end subroutine mma_gensub_cpu
 
+  !> solve the subproblem defined by this%pij, this%qij, etc.
   subroutine mma_subsolve_dpip_cpu(this, designx)
     ! ------------------------------------------------------- !
     ! Dual-primal interior point method using Newton's step   !
@@ -279,8 +282,8 @@ contains
 
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(inout) :: designx
-    !! Note that there is a local dummy "x" in this subroutine, thus, we call
-    !! the current design "designx" instead of just "x"
+    ! Note that there is a local dummy "x" in this subroutine, thus, we call
+    ! the current design "designx" instead of just "x"
     integer :: i, j, k, iter, itto, ierr
     real(kind=rp) :: epsi, residual_max, residual_norm, &
          z, zeta, rez, rezeta, &
@@ -340,7 +343,7 @@ contains
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
-    !  The main loop of the dual-primal interior point method.
+    ! The main loop of the dual-primal interior point method.
 
     do while (epsi .gt. minimal_epsilon)
 
@@ -466,7 +469,10 @@ contains
           !assembling the right hand side matrix based on eq(5.20)
           ! bb = [dellambda + dely/(this%d%x + &
           !         (mu/y)) - matmul(GG,delx/diagx), delz ]
-          !!!!!!!!!!!!!!for MPI computation of bb!!!!!!!!!!!!!!!!!!!!!!!!!
+
+          !--------------------------------------------------------------------!
+          ! for MPI computation of bb
+
           bb = 0.0_rp
           do i = 1, this%m
              do j = 1, this%n
@@ -480,8 +486,8 @@ contains
           bb(1:this%m) = dellambda + dely / (this%d%x + mu / y) - bb(1:this%m)
           bb(this%m + 1) = delz
 
-          !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-          ! !assembling the coefficients matrix AA based on eq(5.20)
+          !--------------------------------------------------------------------!
+          ! assembling the coefficients matrix AA based on eq(5.20)
           ! AA(1:this%m,1:this%m) =  &
           ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
           ! !update diag(AA)
@@ -489,8 +495,8 @@ contains
           !     mma_diag(s/lambda + 1.0/(this%d%x + (mu/y)))
 
           AA = 0.0_rp
-          !Direct computation of the matrix multiplication
-          !(for better performance)
+          ! Direct computation of the matrix multiplication
+          ! (for better performance)
           do i = 1, this%m
              do j = 1, this%m
                 ! Compute the (i, j) element of AA
@@ -505,7 +511,7 @@ contains
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           do i = 1, this%m
-             !update the diag AA
+             ! update the diag AA
              AA(i, i) = AA(i, i) &
                   + s(i) / lambda(i) &
                   + 1.0_rp / (this%d%x(i) + mu(i) / y(i))

@@ -133,7 +133,7 @@ contains
 
     call cpu_time(start_time)
     x = reshape(this%designx%x, [this%mma%get_n()])
-    call func1 (this, this%mma%get_n(), this%mma%get_m(), &
+    call func1(this, this%mma%get_n(), this%mma%get_m(), &
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
     call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
@@ -290,7 +290,7 @@ contains
 
   end subroutine write_stuff_vtk
 
-  subroutine func1 (this, n, m, f0val, df0dx, fval, dfdx)
+  subroutine func1(this, n, m, f0val, df0dx, fval, dfdx)
     ! ----------------------------------------------------------- !
     !  This subroutine calculates function values and gradients   !
     !  for "toy problem 3":                                       !

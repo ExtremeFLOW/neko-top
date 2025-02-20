@@ -98,7 +98,7 @@ contains
     real(kind=rp) :: rez, rezeta
     type(vector_t) :: rey, relambda, remu, res
     type(vector_t) :: rex, rexsi, reeta
-    real(kind=rp) :: residu_val !!!(3*this%n+4*this%m+2)
+    real(kind=rp) :: residu_val
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
     real(kind=rp) :: globaltemp_norm
@@ -167,7 +167,11 @@ contains
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
          rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
   end subroutine mma_KKT_device
+  
+  !============================================================================!
+  ! private internal subroutines
 
+  !> generat a subproblem; convex approximation of the optimization problem
   subroutine mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
@@ -239,18 +243,19 @@ contains
     call globaltmp_m%free()
   end subroutine mma_gensub_device
 
+  !> solve the subproblem defined by this%pij, this%qij, etc.
   subroutine mma_subsolve_dpip_device(this, designx)
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: designx
     integer :: iter, itto, ierr
     real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
          delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
-    !! the vectors with size m
+    ! vectors with size m
     type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
          dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
     type(vector_t) :: globaltmp_m
 
-    !! the vectors with size n
+    ! vectors with size n
     type(vector_t) :: x, xsi, eta, rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
 
@@ -336,7 +341,7 @@ contains
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
-
+    ! The main loop of the dual-primal interior point method.
 
     outer: do while (epsi .gt. minimal_epsilon)
        ! calculating residuals based on
@@ -583,8 +588,8 @@ contains
              call device_add3s2(s%x_d, sold%x_d, ds%x_d, 1.0_rp, &
                   steg, this%m)
 
-             !recompute the newresidu to see if this stepsize improves
-             !the residue
+             ! recompute the newresidu to see if this stepsize improves
+             ! the residue
              call device_rex(rex%x_d, x%x_d, this%low%x_d, &
                   this%upp%x_d, this%pij%x_d, this%p0j%x_d, &
                   this%qij%x_d, this%q0j%x_d, lambda%x_d, xsi%x_d, &
@@ -673,14 +678,14 @@ contains
                   device_maxval(reeta%x_d, this%n), &
                   device_maxval(remu%x_d, this%m), rezeta, &
                   device_maxval(res%x_d, this%m)])
-             !exit outer
+             ! exit outer
           end do
           residunorm = newresidu
           residumax = 0.0_rp
           call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, &
                mpi_max, neko_comm, ierr)
           steg = 2.0_rp*steg
-          !print *, "gpu iter = ", iter, "epsi = ", epsi, &
+          ! print *, "gpu iter = ", iter, "epsi = ", epsi, &
           !   "steg = ", steg, "residunorm = ", residunorm, &
           !     "residumax = ", residumax
        end do
@@ -692,7 +697,7 @@ contains
     call device_copy(this%xold1%x_d, designx%x_d, this%n)
     call device_copy(designx%x_d, x%x_d, this%n)
 
-    !update the parameters of the MMA object nesessary to compute KKT residual
+    ! update the parameters of the MMA object nesessary to compute KKT residual
     call device_copy(this%y%x_d, y%x_d, this%m)
     this%z = z
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
