@@ -166,7 +166,7 @@ contains
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
          rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
   end subroutine mma_KKT_device
-  
+
   !============================================================================!
   ! private internal subroutines
 

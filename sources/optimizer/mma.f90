@@ -87,9 +87,9 @@ module mma
 
   interface
      ! ======================================================================= !
-     ! interface for cpu backend module subroutines 
+     ! interface for cpu backend module subroutines
 
-     !> CPU update function, runs one iteration of MMA  
+     !> CPU update function, runs one iteration of MMA
      module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -109,7 +109,7 @@ module mma
      ! ======================================================================= !
      ! interface for device backend module subroutines
 
-     !> Device update function, runs one iteration of MMA  
+     !> Device update function, runs one iteration of MMA
      module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -118,7 +118,7 @@ module mma
        type(matrix_t) :: dfdx
      end subroutine mma_update_device
 
-     !> Device KKT check for convergence  
+     !> Device KKT check for convergence
      module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
