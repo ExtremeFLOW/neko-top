@@ -42,7 +42,6 @@ module simple_brinkman_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error
   use field, only: field_t
-  use topopt_design, only: topopt_design_t
   use field_math, only: field_subcol3
   implicit none
   private
@@ -91,7 +90,7 @@ contains
   !! @param u, v, w the velocity field (either primal or adjoint)
   !! @param coef The SEM coeffs.
   subroutine simple_brinkman_source_term_init_from_components(this, &
-       f_x, f_y, f_z, design, u, v, w, coef)
+       f_x, f_y, f_z, chi, u, v, w, coef)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -99,7 +98,7 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
-    type(topopt_design_t), intent(in), target :: design
+    type(field_t), intent(in), target :: chi
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -122,7 +121,7 @@ contains
     this%v => v
     this%w => w
     ! and get chi out of the design
-    this%chi => design%brinkman_amplitude
+    this%chi => chi
 
   end subroutine simple_brinkman_source_term_init_from_components
 

@@ -1,8 +1,8 @@
 program usrneko
   use simulation, only: simulation_t
   use topopt_design, only: topopt_design_t
-  use steady_state_problem, only: steady_state_problem_t
-  use optimizer, only: optimizer_t, optimizer_factory
+  use problem, only: problem_t
+  use optimizer, only : optimizer_t, optimizer_factory
 
   use json_module, only: json_file
   use utils, only: neko_error
@@ -23,7 +23,7 @@ program usrneko
   !> The simulation we are working with
   type(simulation_t) :: simulation
   !> The problem type
-  type(steady_state_problem_t) :: problem
+  type(problem_t) :: problem
   !> The design type
   type(topopt_design_t) :: design
   !> The optimizer (in this case mma)
@@ -58,7 +58,7 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
-  
+
   call optimizer%run(problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !
