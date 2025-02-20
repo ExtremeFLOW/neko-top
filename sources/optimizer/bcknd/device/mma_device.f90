@@ -418,7 +418,7 @@ contains
        do iter = 1, this%max_iter !ittt
 
           if (residumax .lt. epsi) exit
-          
+
           call device_delx(delx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                this%pij%x_d, this%qij%x_d, this%p0j%x_d, this%q0j%x_d, &
                this%alpha%x_d, this%beta%x_d, lambda%x_d, epsi, this%n, &
