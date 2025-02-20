@@ -50,6 +50,7 @@ module simple_design
   use math, only: rzero
   use simulation, only: simulation_t
   use json_module, only: json_file
+  use json_utils, only: json_get
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy

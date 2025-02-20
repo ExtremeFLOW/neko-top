@@ -39,7 +39,7 @@ module design
   private
 
   !> A topology optimization design variable
-  type, abstract, public :: design_t
+  type, abstract :: design_t
 
      !> The number of design variables
      integer, private :: n = 0
@@ -135,6 +135,7 @@ module design
      end subroutine design_factory
   end interface
 
+  public :: design_t, design_factory
 contains
 
   !> Initialize the base design

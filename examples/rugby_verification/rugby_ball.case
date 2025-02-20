@@ -86,6 +86,9 @@
         ]
     },
     "optimization": {
+        "design": {
+            "type": "topopt"
+        },
         "solver": {
             "type": "mma",
             "max_iterations": 5,

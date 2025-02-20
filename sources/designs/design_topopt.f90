@@ -175,9 +175,6 @@ module topopt_design
      procedure, pass(this), public :: init_from_components => &
           topopt_design_init_from_components
 
-     !> Add mappings to the design
-     procedure, pass(this) :: add_mapping => topopt_design_add_mapping
-
      !> Retrieve the design variables
      procedure, pass(this) :: get_design => topopt_design_get_design
 
@@ -220,6 +217,15 @@ contains
     type(simulation_t), intent(inout) :: simulation
 
     call this%init_from_components(simulation)
+
+    ! Todo: This need to be read from the parameters in the JSON
+    associate(coef => simulation%neko_case%fluid%c_Xh)
+      call this%filter%init(parameters, coef)
+      call this%mapping%init(parameters, coef)
+    end associate
+
+    ! and then we would map for the first one
+    call this%map_forward()
 
   end subroutine topopt_design_init_from_json
 
@@ -374,23 +380,6 @@ contains
     call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
 
   end subroutine topopt_design_init_from_components
-
-  !> Add mappings to the design
-  subroutine topopt_design_add_mapping(this, parameters, simulation)
-    class(topopt_design_t), intent(inout) :: this
-    type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
-
-    ! Todo: This need to be read from the parameters in the JSON
-    associate(coef => simulation%neko_case%fluid%c_Xh)
-      call this%filter%init(parameters, coef)
-      call this%mapping%init(parameters, coef)
-    end associate
-
-    ! and then we would map for the first one
-    call this%map_forward()
-
-  end subroutine topopt_design_add_mapping
 
 
   subroutine topopt_design_map_forward(this)

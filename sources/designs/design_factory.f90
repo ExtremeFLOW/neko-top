@@ -68,7 +68,7 @@ contains
        deallocate(object)
     end if
 
-    call json_get(json, "design.type", type)
+    call json_get(json, "optimization.design.type", type)
     select case (trim(type))
     case ("topopt")
        allocate(topopt_design_t::object)
