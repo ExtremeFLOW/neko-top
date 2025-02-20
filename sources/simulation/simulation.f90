@@ -122,8 +122,8 @@ contains
     ! - adjoint (p,u,v,w)                      5,6,7,8           t,s1,s2,s3
 
     ! Allocate the output type
-    call this%output_forward%init(sp, 'forward', 4)
-    call this%output_adjoint%init(sp, 'adjoint', 4)
+    call this%output_forward%init(sp, 'forward_fields', 4)
+    call this%output_adjoint%init(sp, 'adjoint_fields', 4)
     call this%output_forward%fields%assign(1, this%fluid_scheme%p)
     call this%output_forward%fields%assign(2, this%fluid_scheme%u)
     call this%output_forward%fields%assign(3, this%fluid_scheme%v)
