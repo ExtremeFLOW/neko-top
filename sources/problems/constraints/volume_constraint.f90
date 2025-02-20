@@ -278,10 +278,11 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(topopt_design_t), intent(in) :: design
     real(kind=rp) :: volume
-    type(field_t), pointer :: work
+    type(field_t), pointer :: work, design_indicator
     integer :: temp_indices(1)
 
     volume = 0.0_rp
+    design_indicator => neko_field_registry%get_field("design_indicator")
 
     ! in the future we should be using the mapped design variable
     ! corresponding to this constraint!!!
@@ -289,22 +290,22 @@ contains
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_scratch_registry%request_field(work , temp_indices(1))
-          call field_copy(work, design%design_indicator)
+          call field_copy(work, design_indicator)
           call mask_exterior_const(work, this%mask, 0.0_rp)
           volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          volume = glsc2_mask(design%design_indicator%x, &
+          volume = glsc2_mask(design_indicator%x, &
                this%c_Xh%B, design%size(), this%mask%mask, this%mask%size)
        end if
 
     else
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          volume = device_glsc2(design%design_indicator%x_d, &
+          volume = device_glsc2(design_indicator%x_d, &
                this%c_xh%B_d, design%size())
        else
-          volume = glsc2(design%design_indicator%x, &
+          volume = glsc2(design_indicator%x, &
                this%c_Xh%B, design%size())
        end if
 

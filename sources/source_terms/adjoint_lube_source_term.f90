@@ -56,6 +56,7 @@ module adjoint_lube_source_term
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use utils, only: neko_error
+  use field_registry, only: neko_field_registry
   implicit none
   private
 
@@ -153,9 +154,9 @@ contains
     this%w => w
 
     select type(design)
-      type is (topopt_design_t)
-       this%chi => design%brinkman_amplitude
-      class default
+    type is (topopt_design_t)
+       this%chi => neko_field_registry%get_field("brinkman_amplitude")
+    class default
        call neko_error('Unknown design type')
     end select
 

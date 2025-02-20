@@ -172,7 +172,9 @@ contains
     ! Grab the brinkman amplitude for the lube term
     select type (design)
     type is (topopt_design_t)
-       this%brinkman_amplitude => design%brinkman_amplitude
+       this%brinkman_amplitude => &
+            neko_field_registry%get_field("brinkman_amplitude")
+
 
     class default
        call neko_error('Minimum dissipation only works with topopt_design')

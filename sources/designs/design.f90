@@ -43,6 +43,7 @@ module design
 
      !> The number of design variables
      integer, private :: n = 0
+     type(vector_t), private :: x
 
    contains
 
@@ -51,6 +52,12 @@ module design
 
      !> Initialize the design
      procedure(design_init_from_json), pass(this), deferred :: init_from_json
+     !> Free the design
+     procedure(design_free), pass(this), deferred :: free
+
+
+     !> Update the design variables
+     procedure(design_update), pass(this), deferred :: update
      !> Run the forward mapping of the design
      procedure(design_map_forward), pass(this), deferred :: map_forward
      !> Run the backward mapping of the design
@@ -59,9 +66,14 @@ module design
      procedure(design_write), pass(this), deferred :: write
 
      ! ----------------------------------------------------------------------- !
+     ! Methods
+
+     !> Get the design variables
+     procedure :: get => design_get
 
      !> Initialize the base design
      procedure, pass(this) :: init_base => design_init_base
+     procedure, pass(this) :: free_base => design_free_base
      !> Return the number of design variables
      procedure, pass(this) :: size => design_size
 
@@ -75,6 +87,17 @@ module design
        type(json_file), intent(inout) :: parameters
        type(simulation_t), intent(inout) :: simulation
      end subroutine design_init_from_json
+
+     subroutine design_free(this)
+       import design_t
+       class(design_t), intent(inout) :: this
+     end subroutine design_free
+
+     subroutine design_update(this, new_x)
+       import design_t, vector_t
+       class(design_t), intent(inout) :: this
+       type(vector_t), intent(in) :: new_x
+     end subroutine design_update
 
      subroutine design_map_forward(this)
        import design_t, simulation_t
@@ -96,12 +119,26 @@ module design
 
 contains
 
+  !> Get the design variables
+  function design_get(this) result(x)
+    class(design_t), intent(in) :: this
+    type(vector_t) :: x
+    x = this%x
+  end function design_get
+
   !> Initialize the base design
   subroutine design_init_base(this, n)
     class(design_t), intent(inout) :: this
     integer, intent(in) :: n
     this%n = n
+    call this%x%init(n)
   end subroutine design_init_base
+
+  !> Free the base design
+  subroutine design_free_base(this)
+    class(design_t), intent(inout) :: this
+    call this%x%free()
+  end subroutine design_free_base
 
   !> Return the number of design variables
   pure function design_size(this) result(n)

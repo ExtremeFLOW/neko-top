@@ -10,6 +10,8 @@ module mma_optimizer
   use json_utils, only: json_get_or_default
   use simulation, only: simulation_t
   use design, only: design_t
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
 
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -77,6 +79,8 @@ contains
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
 
+    type(field_t), pointer :: design_indicator
+
     type(vector_t) :: x
     type(json_file) :: solver_parameters
 
@@ -91,9 +95,10 @@ contains
 
     call x%init(design%size())
 
-    select type (d => design)
+    select type (design)
     type is (topopt_design_t)
-       call copy(x%x, d%design_indicator%x, d%size())
+       design_indicator => neko_field_registry%get_field("design_indicator")
+       call copy(x%x, design_indicator%x, design%size())
     class default
        call neko_error('Unknown design type for MMA Optimizer')
     end select
@@ -145,6 +150,8 @@ contains
     type(vector_t) :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
 
+    type(field_t), pointer :: design_indicator
+
     type(vector_t) :: log_data
 
 
@@ -153,9 +160,10 @@ contains
 
     call x%init(n)
 
-    select type (d => design)
+    select type (design)
     type is (topopt_design_t)
-       call copy(x%x, d%design_indicator%x, n)
+       design_indicator => neko_field_registry%get_field("design_indicator")
+       call copy(x%x, design_indicator%x, n)
     class default
        call neko_error('Unknown design type for MMA Optimizer')
     end select
@@ -256,16 +264,18 @@ contains
        select type (d => design)
        type is (topopt_design_t)
 
-          call copy(d%design_indicator%x, x%x, n)
+          design_indicator => neko_field_registry%get_field("design_indicator")
+
+          call copy(design_indicator%x, x%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_copy(d%design_indicator%x_d, x%x_d, n)
+             call device_copy(design_indicator%x_d, x%x_d, n)
           end if
 
           call d%map_forward()
 
-          call copy(x%x, d%design_indicator%x, n)
+          call copy(x%x, design_indicator%x, n)
           if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_copy(x%x_d, d%design_indicator%x_d, n)
+             call device_copy(x%x_d, design_indicator%x_d, n)
           end if
 
        class default

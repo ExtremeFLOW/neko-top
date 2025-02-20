@@ -53,17 +53,19 @@ module topopt_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
+  use field_registry, only: neko_field_registry
   implicit none
   private
 
   !> A topology optimization design variable
   type, extends(design_t), public :: topopt_design_t
+     private
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
      ! type, public, extends(design_variable_t) :: topopt_design_t
      !> the unfilitered design
-     type(field_t), public :: design_indicator
+     type(field_t), pointer :: design_indicator
 
      !> the mapped coefficient (Brinkman term)
      ! TODO
@@ -73,7 +75,7 @@ module topopt_design
      !
      ! or as I describe below, we also have multiple constraints,
      ! so a list-of-lists may be the correct way forward
-     type(field_t), public :: brinkman_amplitude
+     type(field_t), pointer :: brinkman_amplitude
 
      ! NOTE:
      ! again, we have to be so clear with nomenclature.
@@ -105,7 +107,7 @@ module topopt_design
      !and chain rule it's way back to
      ! dF/d\rho
      ! and store it here          v
-     type(field_t), public :: sensitivity
+     type(field_t), pointer :: sensitivity
      ! have a field list here
      ! type(filed_list_t), public :: constraint_sensitivity
      ! HOWEVER !
@@ -143,7 +145,7 @@ module topopt_design
      type(RAMP_mapping_t) :: mapping
 
      ! and we need to hold onto a field for the chain of mappings
-     type(field_t) :: filtered_design
+     type(field_t), pointer :: filtered_design
 
 
      !> A mask indicating the optimization domain
@@ -177,6 +179,8 @@ module topopt_design
      !> Add mappings to the design
      procedure, pass(this) :: add_mapping => topopt_design_add_mapping
 
+     !> Update the design
+     procedure, pass(this) :: update => topopt_design_update
 
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
@@ -218,6 +222,17 @@ contains
 
   end subroutine topopt_design_init_from_json
 
+  !> Free the design
+  subroutine topopt_design_free(this)
+    class(topopt_design_t), intent(inout) :: this
+
+    call this%free_base()
+    call this%brinkman_amplitude%free()
+    call this%design_indicator%free()
+    call this%filtered_design%free()
+    call this%sensitivity%free()
+
+  end subroutine topopt_design_free
 
   subroutine topopt_design_init_from_components(this, simulation)
     class(topopt_design_t), intent(inout) :: this
@@ -226,13 +241,23 @@ contains
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
-    associate(coef => simulation%neko_case%fluid%c_Xh)
-      ! init the fields
-      call this%design_indicator%init(coef%dof, "design_indicator")
-      call this%brinkman_amplitude%init(coef%dof, "brinkman_amplitude")
-      call this%sensitivity%init(coef%dof, "sensitivity")
-      call this%filtered_design%init(coef%dof, "filtered_design")
+    associate(dof => simulation%neko_case%fluid%dm_Xh)
+
+      call neko_field_registry%add_field(dof, "design_indicator", .true.)
+      call neko_field_registry%add_field(dof, "brinkman_amplitude", .true.)
+      call neko_field_registry%add_field(dof, "sensitivity", .true.)
+      call neko_field_registry%add_field(dof, "filtered_design", .true.)
+
     end associate
+
+    this%design_indicator => &
+         neko_field_registry%get_field("design_indicator")
+    this%brinkman_amplitude => &
+         neko_field_registry%get_field("brinkman_amplitude")
+    this%sensitivity => &
+         neko_field_registry%get_field("sensitivity")
+    this%filtered_design => &
+         neko_field_registry%get_field("filtered_design")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -389,6 +414,18 @@ contains
 
   end subroutine topopt_design_map_forward
 
+  subroutine topopt_design_update(this, new_x)
+    class(topopt_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: new_x
+
+    call this%filter%apply_forward(this%filtered_design, &
+         this%design_indicator)
+
+    call this%mapping%apply_forward(this%brinkman_amplitude, &
+         this%filtered_design)
+
+  end subroutine topopt_design_update
+
   subroutine topopt_design_map_backward(this, sensitivity)
     class(topopt_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
@@ -432,13 +469,6 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine topopt_design_map_backward
-
-  subroutine topopt_design_free(this)
-    class(topopt_design_t), target, intent(inout) :: this
-    call this%brinkman_amplitude%free()
-    call this%design_indicator%free()
-
-  end subroutine topopt_design_free
 
   subroutine topopt_design_write(this, idx)
     class(topopt_design_t), intent(inout) :: this
