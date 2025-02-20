@@ -69,9 +69,11 @@ module mma
      type(vector_t) :: xsi, eta
    contains
      !> Interface for initializing the MMA object
-     procedure, public, pass(this) :: init_json => mma_init_json
+     generic, public :: init => init_from_json, init_from_components
+     procedure, public, pass(this) :: init_from_json => mma_init_from_json
+     procedure, public, pass(this) :: init_from_components => &
+          mma_init_from_components
      procedure, public, pass(this) :: free => mma_free
-     procedure, public, pass(this) :: init => mma_init_attributes
      procedure, public, pass(this) :: get_n => mma_get_n
      procedure, public, pass(this) :: get_m => mma_get_m
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
@@ -129,7 +131,7 @@ module mma
 contains
 
   !> Read attributes from the case file, and calling the init function
-  subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
+  subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -213,7 +215,7 @@ contains
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
 
-  end subroutine mma_init_json
+  end subroutine mma_init_from_json
 
   !> Deallocate mma object
   subroutine mma_free(this)
@@ -249,7 +251,7 @@ contains
   end subroutine mma_free
 
   !> Initialize the mma object based on the attributes from the json file
-  subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
+  subroutine mma_init_from_components(this, x, n, m, a0, a, c, d, xmin, xmax, &
        max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
@@ -386,7 +388,7 @@ contains
     end if
     !the object is correctly initialized
     this%is_initialized = .true.
-  end subroutine mma_init_attributes
+  end subroutine mma_init_from_components
 
   !> Call the update function based on the backend
   subroutine mma_update(this, iter, x, df0dx, fval, dfdx)

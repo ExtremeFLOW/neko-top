@@ -45,7 +45,6 @@ submodule (mma) mma_device
 
 
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device_math_ext
   use device, only: DEVICE_TO_HOST
   use comm, only: pe_rank
   use mpi_f08, only: MPI_IN_PLACE
@@ -417,12 +416,9 @@ contains
 
 
        do iter = 1, this%max_iter !ittt
-          if (iter .gt. (this%max_iter -2)) then
-             ! print *, "The mma inner loop seems not to converge"
-             ! print *, "residumax = ", residumax, "for epsi = ", epsi, &
-             !         ", ittt  = ", iter, "out of ", this%max_iter
-          end if
+
           if (residumax .lt. epsi) exit
+          
           call device_delx(delx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                this%pij%x_d, this%qij%x_d, this%p0j%x_d, this%q0j%x_d, &
                this%alpha%x_d, this%beta%x_d, lambda%x_d, epsi, this%n, &
@@ -678,16 +674,12 @@ contains
                   device_maxval(reeta%x_d, this%n), &
                   device_maxval(remu%x_d, this%m), rezeta, &
                   device_maxval(res%x_d, this%m)])
-             ! exit outer
           end do
           residunorm = newresidu
           residumax = 0.0_rp
           call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, &
                mpi_max, neko_comm, ierr)
           steg = 2.0_rp*steg
-          ! print *, "gpu iter = ", iter, "epsi = ", epsi, &
-          !   "steg = ", steg, "residunorm = ", residunorm, &
-          !     "residumax = ", residumax
        end do
        epsi = 0.1_rp * epsi
     end do outer

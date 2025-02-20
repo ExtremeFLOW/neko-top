@@ -104,8 +104,7 @@ contains
     end if
 
     call json_get_subdict(parameters, "optimization.solver", solver_parameters)
-    call this%mma%init_json(x%x, &
-         design%size(), problem%get_n_constraints(), &
+    call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
     call this%init_from_components(problem, design, simulation, &
