@@ -84,9 +84,10 @@ module mma
   end type mma_t
 
   interface
-     ! ======================================================================== !
-     !! interface for cpu backend module subroutines
+     ! ======================================================================= !
+     ! interface for cpu backend module subroutines 
 
+     !> CPU update function, runs one iteration of MMA  
      module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -95,6 +96,7 @@ module mma
        type(matrix_t) :: dfdx
      end subroutine mma_update_cpu
 
+     !> CPU KKT check for convergence  
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
@@ -102,9 +104,10 @@ module mma
        type(matrix_t), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
+     ! ======================================================================= !
+     ! interface for device backend module subroutines
 
-     !! interface for device backend module subroutines
-
+     !> Device update function, runs one iteration of MMA  
      module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -113,6 +116,7 @@ module mma
        type(matrix_t) :: dfdx
      end subroutine mma_update_device
 
+     !> Device KKT check for convergence  
      module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
@@ -124,6 +128,7 @@ module mma
 
 contains
 
+  !> Read attributes from the case file, and calling the init function
   subroutine mma_init_json(this, x, n, m, json, scale, auto_scale)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
@@ -243,6 +248,7 @@ contains
     this%is_updated = .false.
   end subroutine mma_free
 
+  !> Initialize the mma object based on the attributes from the json file
   subroutine mma_init_attributes(this, x, n, m, a0, a, c, d, xmin, xmax, &
        max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     ! ----------------------------------------------------- !
@@ -382,6 +388,7 @@ contains
     this%is_initialized = .true.
   end subroutine mma_init_attributes
 
+  !> Call the update function based on the backend
   subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
@@ -400,6 +407,7 @@ contains
     end select
   end subroutine mma_update
 
+  !> Call the KKT ckeck function based on the backend
   subroutine mma_KKT(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
@@ -419,30 +427,36 @@ contains
 
   ! ========================================================================== !
   ! Getters and setters
+
+  !> Get the number of design variables (nloc)
   pure function mma_get_n(this) result(n)
     class(mma_t), intent(in) :: this
     integer :: n
     n = this%n
   end function mma_get_n
 
+  !> Get the number of constriants
   pure function mma_get_m(this) result(m)
     class(mma_t), intent(in) :: this
     integer :: m
     m = this%m
   end function mma_get_m
 
+  !> Get L^{inf} norm (Max Norm) of the KKT conditions
   pure function mma_get_residumax(this) result(residumax)
     class(mma_t), intent(in) :: this
     real(kind=rp) :: residumax
     residumax = this%residumax
   end function mma_get_residumax
 
+  !> Get L^{2} norm (Euclidean Norm) of the KKT conditions
   pure function mma_get_residunorm(this) result(residunorm)
     class(mma_t), intent(in) :: this
     real(kind=rp) :: residunorm
     residunorm = this%residunorm
   end function mma_get_residunorm
 
+  !> Get the maximum number of iterations for the mma_subsolve inner loop
   pure function mma_get_max_iter(this) result(max_iter_value)
     class(mma_t), intent(in) :: this
     integer :: max_iter_value
