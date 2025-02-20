@@ -104,7 +104,7 @@ module design
      end subroutine design_update_design
 
      subroutine design_map_forward(this)
-       import design_t, simulation_t
+       import design_t
        class(design_t), intent(inout) :: this
      end subroutine design_map_forward
 
