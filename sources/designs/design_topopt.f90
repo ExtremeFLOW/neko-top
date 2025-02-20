@@ -418,18 +418,23 @@ contains
 
   end function topopt_design_get_design
 
-  subroutine topopt_design_update_design(this, new_x)
+  subroutine topopt_design_update_design(this, x)
     class(topopt_design_t), intent(inout) :: this
-    type(vector_t), intent(in) :: new_x
+    type(vector_t), intent(inout) :: x
     integer :: n
 
     n = this%size()
-    call copy(this%design_indicator%x, new_x%x, n)
+    call copy(this%design_indicator%x, x%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%design_indicator%x_d, new_x%x_d, n)
+       call device_copy(this%design_indicator%x_d, x%x_d, n)
     end if
 
     call this%map_forward()
+
+    call copy(x%x, this%design_indicator%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(x%x_d, this%design_indicator%x_d, n)
+    end if
 
   end subroutine topopt_design_update_design
 

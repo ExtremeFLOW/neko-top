@@ -252,7 +252,6 @@ contains
        end if
 
        call design%update_design(x)
-       x = design%get_design()
 
        call simulation%run_forward()
        call problem%compute(design)

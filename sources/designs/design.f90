@@ -100,10 +100,17 @@ module design
        type(vector_t) :: x
      end function design_get_design
 
-     subroutine design_update_design(this, new_x)
+     !> Update the design variables
+     !!
+     !! Update the design variables based on the input vector. Any mapping or
+     !! other operations will be applied to the input upon return.
+     !!
+     !! @param this The design object.
+     !! @param x The design variables.
+     subroutine design_update_design(this, x)
        import design_t, vector_t
        class(design_t), intent(inout) :: this
-       type(vector_t), intent(in) :: new_x
+       type(vector_t), intent(inout) :: x
      end subroutine design_update_design
 
      subroutine design_map_forward(this)

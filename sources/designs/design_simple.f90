@@ -159,11 +159,11 @@ contains
     x = this%x
   end function design_simple_get_design
 
-  subroutine design_simple_update_design(this, new_x)
+  subroutine design_simple_update_design(this, x)
     class(simple_design_t), intent(inout) :: this
-    type(vector_t), intent(in) :: new_x
+    type(vector_t), intent(inout) :: x
 
-    this%x = new_x
+    this%x = x
 
   end subroutine design_simple_update_design
 

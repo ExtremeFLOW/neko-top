@@ -47,9 +47,7 @@ program usrneko
   ! Initialization of the components
 
   call simulation%init(parameters)
-
   call design_factory(design, parameters, simulation)
-
   call problem%init(parameters, design, simulation)
   call optimizer_factory(optimizer, parameters, problem, design, simulation)
 
