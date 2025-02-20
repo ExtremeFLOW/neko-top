@@ -13,8 +13,8 @@ In `neko`, and by extension `neko-top`, we solve the Navier--Stokes equations
 +  \mathbf{f}, \f]
 
 $$ \nabla \cdot \mathbf {u} = 0, $$
-where $\mathbf {u}(\mathbf{x},t)$ denotes the velocity field, $p(\mathbf{x},t)$
-the pressure field, $\mathbf{f}$ a forcing term and where $\frac{1}{Re}$ denotes
+where \f$\mathbf {u}(\mathbf{x},t)\f$ denotes the velocity field, \f$p(\mathbf{x},t)\f$
+the pressure field, \f$\mathbf{f}\f$ a forcing term and where \f$Re\f$ denotes
 the Reynolds number.
 
 
@@ -31,8 +31,8 @@ equations reads
 
 $$ \nabla \cdot \mathbf {u} ^\dagger= 0, $$
 where
-where $\mathbf {u}^\dagger(\mathbf{x},t)$ denotes the adjoint velocity field,
-$p^\dagger(\mathbf{x},t)$ the adjoint pressure field and $\mathbf{f}^\dagger$
+where \f$\mathbf {u}^\dagger(\mathbf{x},t)\f$ denotes the adjoint velocity field,
+\f$p^\dagger(\mathbf{x},t)\f$ the adjoint pressure field and \f$\mathbf{f}^\dagger\f$
 denoting a forcing term applied to the adjoint system which generally arises
 as a consequence of objective functions being evaluated.
 
