@@ -102,8 +102,7 @@ contains
 
 
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, &
-       s, s_adj, coef)
+       f_x, f_y, f_z, s, s_adj, coef)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -111,18 +110,12 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: s, s_adj
-    ! TODo
-    ! do masks later
-    !type(field_t), intent(in), target :: mask
 
-    ! I wish you didn't need a start time and end time...
-    ! but I'm just going to set a super big number...
     start_time = 0.0_rp
     end_time = 100000000.0_rp
 
     call this%free()
 
-    ! this is copying the fluid source term init
     ! We package the fields for the source term to operate on in a field list.
     call fields%init(3)
     call fields%assign(1, f_x)
@@ -135,9 +128,6 @@ contains
     this%s => s
     this%s_adj => s_adj
 
-
-    ! TODO
-    !this%mask => mask
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.
@@ -206,10 +196,6 @@ contains
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
     ! But I want to leave this todo as a reminder.
 
-
-    ! TODO
-    ! double check if add or subtract
-    ! I THINK it's negative!!
     call field_subcol3(fu,this%s_adj,dsdx)
     call field_subcol3(fv,this%s_adj,dsdy)
     call field_subcol3(fw,this%s_adj,dsdz)
