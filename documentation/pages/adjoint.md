@@ -1,4 +1,4 @@
-#  Adjoint sensitivity analysis {#adjoint}
+# Adjoint sensitivity analysis {#adjoint}
 
 \tableofcontents
 
