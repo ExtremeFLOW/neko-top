@@ -227,7 +227,7 @@ contains
          DEVICE_TO_HOST, sync = .true.)
     ! ------------------------------------------------------------------------ !
     ! cpu gpu transfer and global sum for bi
-    globaltmp_m%x=0.0_rp
+    globaltmp_m%x = 0.0_rp
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
          sync = .true.)
     call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, mpi_real_precision, &

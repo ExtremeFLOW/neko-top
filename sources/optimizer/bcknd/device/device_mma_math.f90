@@ -36,7 +36,11 @@ module device_mma_math
   use utils, only: neko_error
   use comm, only: NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use mpi_f08, only: MPI_SUM, MPI_IN_PLACE, MPI_Allreduce
-  use cuda_mma_math
+  use cuda_mma_math, only: cuda_mma_max, cuda_max2, cuda_rex, cuda_lcsc2, &
+       cuda_relambda, cuda_sub2cons2, cuda_maxval, cuda_norm, cuda_delx, &
+       cuda_add2inv2, cuda_GG, cuda_diagx, cuda_bb, cuda_updatebb, cuda_AA, &
+       cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
+       cuda_maxval3, cuda_kkt_rex
 
   implicit none
   private

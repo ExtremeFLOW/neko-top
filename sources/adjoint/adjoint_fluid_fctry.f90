@@ -49,8 +49,7 @@ contains
   !> Initialise a adjoint fluid scheme
   subroutine adjoint_fluid_scheme_factory(object, type_name)
     class(adjoint_fluid_scheme_t), intent(inout), allocatable :: object
-    character(len=*) :: type_name
-    character(len=:), allocatable :: type_string
+    character(len=*), intent(in) :: type_name
 
     select case (trim(type_name))
     case ('pnpn')

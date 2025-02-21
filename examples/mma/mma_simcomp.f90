@@ -145,7 +145,7 @@ contains
 
     if (pe_rank .eq. 0) then
        print *, 'iter = ', 0, &
-            '-------,f0val = ', f0val, ',   fval = ', fval%x
+            '-------, f0val = ', f0val, ',   fval = ', fval%x
     end if
 
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
@@ -207,7 +207,7 @@ contains
 
        if (pe_rank .eq. 0) then
           print *, 'iter = ', iter, &
-               '-------,f0val = ', f0val, ',   fval = ', fval%x(1), &
+               '-------, f0val = ', f0val, ',   fval = ', fval%x(1), &
                ',  KKTmax = ', this%mma%get_residumax(), &
                ', KKTnorm2 = ', this%mma%get_residunorm()
        end if

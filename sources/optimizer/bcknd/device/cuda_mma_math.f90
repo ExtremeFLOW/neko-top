@@ -38,7 +38,7 @@ module cuda_mma_math
   public
 
   interface
-     subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n) &
+     subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
           bind(c, name = 'mma_gensub1_cuda')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: low_d, upp_d, x_d, xmin_d, xmax_d
@@ -192,8 +192,8 @@ module cuda_mma_math
        integer(c_int) :: n
      end function cuda_maxval3
 
-     subroutine cuda_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, n, &
-          m) bind(c, name = 'cuda_kkt_rex')
+     subroutine cuda_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, &
+          n, m) bind(c, name = 'cuda_kkt_rex')
        import c_int, c_ptr
        type(c_ptr), value :: rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d
        integer(c_int) :: n, m
