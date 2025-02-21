@@ -55,7 +55,7 @@ program mmatest
   ! Compute the objective function(f0val), constraints(fval) and
   ! thier derivatives(df0dx, dfdx) for the initial value x
   call func2(n, m, x, f0val , df0dx, fval, dfdx)
-  print *, "f0val = ", f0val, "fval=", fval
+  print *, "f0val = ", f0val, "fval = ", fval
   print '(A,I3,A,3F10.4,A,F10.7,A,F10.7,A,F10.7)', 'iter = ', 0, ', x = ', &
        x, '-------, f0val = ', f0val, ', fval1 = ', fval(1), ', fval2 = ', &
        fval(1)
