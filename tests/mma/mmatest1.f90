@@ -1,14 +1,14 @@
 program mmatest
-  !===========================================================================!
-  !       Test_Case_I for the MMA solver implementation                       !
-  ! Dependencies: Neko-top and Lapack (lapack function DGESV is used to solve !
-  ! the linear system )                                                       !
-  ! ------------------------------------------------------------------------- !
-  !                                                                           !
-  !        TEST_CASE_1:                                                       !
-  !    Problem 1 in "https://people.kth.se/~krille/originalmma.pdf"           !
-  !                                                                           !
-  !===========================================================================!
+!===========================================================================!
+!       Test_Case_I for the MMA solver implementation                       !
+! Dependencies: Neko-top and Lapack (lapack function DGESV is used to solve !
+! the linear system )                                                       !
+! ------------------------------------------------------------------------- !
+!                                                                           !
+!        TEST_CASE_1:                                                       !
+!    Problem 1 in "https://people.kth.se/~krille/originalmma.pdf"           !
+!                                                                           !
+!===========================================================================!
 
 
   use num_types, only: rp
@@ -84,9 +84,9 @@ program mmatest
      call func1(n, m, x, f0val, df0dx, fval, dfdx)
      call optprob%KKT(x, df0dx, fval, dfdx)
      print '(A,I3,A,5F10.4,A,F10.7,A,F10.7,A,E10.4,A,E10.4)', &
-          'iter = ', iter, ' , x ', x, &
-          '-------, f0val = ', f0val, ', fval = ', fval, &
-          ', KKTmax = ', optprob%residumax, ', KKTnorm2 = ', optprob%residunorm
+          'iter =', iter, ' , x ', x, &
+          '-------, f0val= ', f0val, ', fval = ', fval, &
+          ', KKTmax =', optprob%residumax, ', KKTnorm2 =', optprob%residunorm
 
      if (optprob%residunorm .lt. tol) exit
   end do
