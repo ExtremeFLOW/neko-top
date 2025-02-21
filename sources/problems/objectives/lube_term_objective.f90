@@ -83,7 +83,7 @@ module lube_term_objective
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
   use logger, only: neko_log
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 

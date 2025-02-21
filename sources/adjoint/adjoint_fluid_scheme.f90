@@ -55,7 +55,7 @@ module adjoint_fluid_scheme
   use sx_jacobi, only: sx_jacobi_t
   use device_jacobi, only: device_jacobi_t
   use hsmg, only: hsmg_t
-  use phmg, only : phmg_t
+  use phmg, only: phmg_t
   use precon, only: pc_t, precon_factory, precon_destroy
   use fluid_stats, only: fluid_stats_t
   use bc, only: bc_t
@@ -77,9 +77,9 @@ module adjoint_fluid_scheme
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
   use field_math, only: field_cfill, field_add2s2
-  use wall_model_bc, only : wall_model_bc_t
-  use shear_stress, only : shear_stress_t
-  use gradient_jump_penalty, only : gradient_jump_penalty_t
+  use wall_model_bc, only: wall_model_bc_t
+  use shear_stress, only: shear_stress_t
+  use gradient_jump_penalty, only: gradient_jump_penalty_t
 
   use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
   use json_utils_ext, only: json_key_fallback
