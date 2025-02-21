@@ -482,7 +482,7 @@ contains
     !
     ! something along the lines of
     !
-    ! if (.not.params%valid_path('case.adjoint.velocity_solver')) then
+    ! if (.not.params%valid_path('case.adjoint_fluid.velocity_solver')) then
     ! 	this%ksp_vel => case%fluid%ksp_vel
     ! 	this%pc_vel => case%fluid%ksp_vel
     ! else
@@ -664,22 +664,22 @@ contains
   !      call neko_log%section("Pressure solver")
 
   !      json_key = json_key_fallback(params, &
-  !           'case.adjoint.pressure_solver.max_iterations', &
+  !           'case.adjoint_fluid.pressure_solver.max_iterations', &
   !           'case.fluid.pressure_solver.max_iterations')
   !      call json_get_or_default(params, json_key, integer_val, 800)
 
   !      json_key = json_key_fallback(params, &
-  !           'case.adjoint.pressure_solver.type', &
+  !           'case.adjoint_fluid.pressure_solver.type', &
   !           'case.fluid.pressure_solver.type')
   !      call json_get(params, json_key, solver_type)
 
   !      json_key = json_key_fallback(params, &
-  !           'case.adjoint.pressure_solver.preconditioner', &
+  !           'case.adjoint_fluid.pressure_solver.preconditioner', &
   !           'case.fluid.pressure_solver.preconditioner')
   !      call json_get(params, json_key, precon_type)
 
   !      json_key = json_key_fallback(params, &
-  !           'case.adjoint.pressure_solver.absolute_tolerance', &
+  !           'case.adjoint_fluid.pressure_solver.absolute_tolerance', &
   !           'case.fluid.pressure_solver.absolute_tolerance')
   !      call json_get(params, json_key, abs_tol)
 
