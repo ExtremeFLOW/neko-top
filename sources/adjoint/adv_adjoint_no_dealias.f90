@@ -39,7 +39,7 @@ module adv_lin_no_dealias
   use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_SX, NEKO_BCKND_XSMM, &
        NEKO_BCKND_OPENCL, NEKO_BCKND_CUDA, NEKO_BCKND_HIP
   use operators, only: opgrad, conv1, cdtp
