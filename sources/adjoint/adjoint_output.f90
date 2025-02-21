@@ -33,7 +33,7 @@
 !> Defines an output for a adjoint
 module adjoint_output
   use num_types, only: rp
-  use adjoint_scheme, only: adjoint_scheme_t
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use scalar_scheme, only: scalar_scheme_t
   use field_list, only: field_list_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -58,7 +58,9 @@ contains
   function adjoint_output_init(precision, adjoint, scalar, name, path) &
        result(this)
     integer, intent(inout) :: precision
-    class(adjoint_scheme_t), intent(in), target :: adjoint
+    class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
+    ! TODO
+    ! replace with adjoint scalar
     class(scalar_scheme_t), intent(in), optional, target :: scalar
     character(len=*), intent(in), optional :: name
     character(len=*), intent(in), optional :: path

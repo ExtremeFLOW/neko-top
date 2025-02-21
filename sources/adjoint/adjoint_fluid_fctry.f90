@@ -30,15 +30,15 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Factory for all adjoint schemes
-module adjoint_fctry
-  use adjoint_scheme, only: adjoint_scheme_t
-  use adjoint_pnpn, only: adjoint_pnpn_t
-  use utils, only: concat_string_array, neko_error
+!> Factory for all adjoint fluid schemes
+module adjoint_fluid_fctry
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use utils, only: neko_type_error
   implicit none
   private
 
-  public :: adjoint_scheme_factory
+  public :: adjoint_fluid_scheme_factory
 
   ! List of all possible types created by the factory routine
   character(len=20) :: KNOWN_TYPES(1) = [character(len=20) :: &
@@ -46,22 +46,19 @@ module adjoint_fctry
 
 contains
 
-  !> Initialise a adjoint scheme
-  subroutine adjoint_scheme_factory(object, type_name)
-    class(adjoint_scheme_t), intent(inout), allocatable :: object
+  !> Initialise a adjoint fluid scheme
+  subroutine adjoint_fluid_scheme_factory(object, type_name)
+    class(adjoint_fluid_scheme_t), intent(inout), allocatable :: object
     character(len=*) :: type_name
     character(len=:), allocatable :: type_string
 
-    if (trim(type_name) .eq. 'pnpn') then
-       allocate(adjoint_pnpn_t::object)
-    else
-       type_string = concat_string_array(KNOWN_TYPES, NEW_LINE('A') // "-  ", &
-            .true.)
-       call neko_error("Unknown adjoint scheme type: " &
-            // trim(type_name) // ". Known types are: " &
-            // type_string)
-    end if
+    select case (trim(type_name))
+    case ('pnpn')
+       allocate(adjoint_fluid_pnpn_t::object)
+    case default
+       call neko_type_error("adjoint fluid scheme", type_name, KNOWN_TYPES)
+    end select
 
-  end subroutine adjoint_scheme_factory
+  end subroutine adjoint_fluid_scheme_factory
 
-end module adjoint_fctry
+end module adjoint_fluid_fctry
