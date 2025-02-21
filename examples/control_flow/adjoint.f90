@@ -55,7 +55,8 @@ module simcomp_example
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
   use time_step_controller, only: time_step_controller_t
   use time_scheme_controller, only: time_scheme_controller_t
-  use mpi_f08, only: MPI_WTIME
+  use mpi_f08, only: MPI_WTIME, MPI_SUM
+  use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use jobctrl, only: jobctrl_time_limit
   use profiler, only: profiler_start, profiler_stop, profiler_start_region, &
        profiler_end_region
@@ -67,7 +68,6 @@ module simcomp_example
   use mean_sqr_flow_output, only : mean_sqr_flow_output_t
   use mean_flow_output, only : mean_flow_output_t
   use fluid_stats_output, only : fluid_stats_output_t
-  use mpi_f08
   use mesh_field, only : mesh_fld_t, mesh_field_init, mesh_field_free
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
@@ -80,7 +80,6 @@ module simcomp_example
   use file, only : file_t
   use utils, only : neko_error
   use mesh, only : mesh_t
-  use comm
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, NEKO_LOG_QUIET, LOG_SIZE
   use jobctrl, only : jobctrl_set_time_limit

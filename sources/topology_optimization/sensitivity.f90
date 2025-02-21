@@ -8,13 +8,13 @@
 !> Sensitivity module.
 !! This module contains the sensitivity computation of the topology optimization.
 module sensitivity
-  use simulation_component, only : simulation_component_t
-  use json_file_module, only : json_file
-  use case, only : case_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use json_utils, only : json_get_or_default
+  use simulation_component, only: simulation_component_t
+  use json_file_module, only: json_file
+  use case, only: case_t
+  use num_types, only: rp
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use json_utils, only: json_get_or_default
   implicit none
   private
 

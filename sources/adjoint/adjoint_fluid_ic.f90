@@ -38,13 +38,13 @@ module adjoint_fluid_ic
   use flow_profile, only : blasius_profile, blasius_linear, blasius_cubic, &
        blasius_quadratic, blasius_quartic, blasius_sin
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use field, only : field_t
-  use utils, only : neko_error
-  use coefs, only : coef_t
-  use math, only : col2, cfill, cfill_mask
-  use device_math, only : device_col2, device_cfill, device_cfill_mask
-  use user_intf, only : useric
-  use json_module, only : json_file
+  use field, only: field_t
+  use utils, only: neko_error
+  use coefs, only: coef_t
+  use math, only: col2, cfill, cfill_mask
+  use device_math, only: device_col2, device_cfill, device_cfill_mask
+  use user_intf, only: useric
+  use json_module, only: json_file
   use json_utils, only: json_get
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
