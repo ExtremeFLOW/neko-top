@@ -1,5 +1,13 @@
 module user
-  use neko
+  use user_intf, only: user_t
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use scratch_registry, only: neko_scratch_registry
+  use comm, only: neko_comm, pe_rank, mpi_real_precision
+  use mpi_f08, only: mpi_allreduce, mpi_sum
+  use num_types, only: rp
+  use coefs, only: coef_t
+  use json_module, only: json_file
   use field_math, only: field_col3
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
@@ -78,7 +86,7 @@ contains
 
     tmp = 0.0_rp
     do i = 1, n
-       tmp = tmp + brink(i) *sqrt( u(i)**2 + v(i)**2 + w(i)**2) * B(i)
+       tmp = tmp + brink(i) * sqrt(u(i)**2 + v(i)**2 + w(i)**2) * B(i)
     end do
 
     call mpi_allreduce(tmp, leak, 1, &

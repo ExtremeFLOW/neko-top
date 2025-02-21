@@ -40,7 +40,8 @@ module device_mma_math
        cuda_relambda, cuda_sub2cons2, cuda_maxval, cuda_norm, cuda_delx, &
        cuda_add2inv2, cuda_GG, cuda_diagx, cuda_bb, cuda_updatebb, cuda_AA, &
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
-       cuda_maxval3, cuda_kkt_rex
+       cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
+       mma_gensub3_cuda, mma_gensub4_cuda
 
   implicit none
   private
