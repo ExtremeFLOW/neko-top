@@ -44,6 +44,7 @@ module adjoint_case
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -53,7 +54,7 @@ module adjoint_case
   !! suppoerted by Neko.
   type :: adjoint_case_t
 
-     class(adjoint_fluid_scheme_t), allocatable :: scheme
+     class(adjoint_fluid_scheme_t), allocatable :: fluid_adj
      type(case_t), pointer :: case
 
      ! Fields
@@ -116,35 +117,44 @@ contains
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
     !
-    ! Setup fluid scheme
+    ! Setup fluid fluid_adj
     !
-    call json_get(neko_case%params, 'case.fluid.scheme', string_val)
-    call adjoint_fluid_scheme_factory(this%scheme, trim(string_val))
+    call json_get(neko_case%params, 'case.fluid.fluid_adj', string_val)
+    call adjoint_fluid_scheme_factory(this%fluid_adj, trim(string_val))
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
-    call this%scheme%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
+    call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
          neko_case%fluid%ext_bdf)
 
     !
-    ! Setup scalar scheme
+    ! Setup scalar fluid_adj
     !
-    ! @todo Scalar adjoint is not implemented yet
-    ! if (neko_case%params%valid_path('case.scalar')) then
-    !    call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
-    ! scalar,                             .true.)
-    ! end if
+    ! @todo no scalar factory for now, probably not needed
 
-    ! if (scalar) then
-    !    allocate(neko_case%scalar)
-    !    call neko_case%scalar%init(neko_case%msh, this%scheme%c_Xh, &
-    !         this%scheme%gs_Xh, neko_case%params, neko_case%usr,&
-    !         neko_case%material_properties)
-    !    call this%scheme%chkp%add_scalar(neko_case%scalar%output_controller)
-    !    this%scheme%chkp%abs1 => neko_case%scalar%abx1
-    !    this%scheme%chkp%abs2 => neko_case%scalar%abx2
-    !    this%scheme%chkp%slag => neko_case%scalar%slag
-    ! end if
+    ! hmmm should we check for scalar or adjoint scalar?
+    ! I'm going to check for adjoint scalar because maybe there would be
+    ! a corner case where someone would want the scalar but not the
+    ! adjoint scalar?
+    if (this%params%valid_path('case.adjoint_scalar')) then
+       call json_get_or_default(this%params, 'case.adjoint_scalar.enabled', &
+          scalar, .true.)
+    end if
+
+    if (scalar) then
+       allocate(this%scalar)
+       this%scalar%chkp%tlag => this%tlag
+       this%scalar%chkp%dtlag => this%dtlag
+       call this%scalar%init(this%msh, this%fluid%c_Xh, this%fluid%gs_Xh, &
+            this%params, this%usr, this%fluid%ulag, this%fluid%vlag, &
+            this%fluid%wlag, this%fluid%ext_bdf, this%fluid%rho)
+
+       call this%fluid%chkp%add_scalar(this%scalar%s_adj)
+
+       this%fluid%chkp%abs1 => this%scalar%abx1
+       this%fluid%chkp%abs2 => this%scalar%abx2
+       this%fluid%chkp%slag => this%scalar%slag
+    end if
 
     !
     ! Setup user defined conditions
@@ -173,32 +183,40 @@ contains
 
     if (trim(string_val) .ne. 'user') then
        call set_adjoint_fluid_ic( &
-            this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
-            this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
+            this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
+            this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
             string_val, ic_json)
     else
        call set_adjoint_fluid_ic( &
-            this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
-            this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
+            this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
+            this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
             neko_case%usr%fluid_user_ic, ic_json)
     end if
 
-    ! if (scalar) then
-    !    call json_get(neko_case%params, 'case.scalar.initial_condition.type', &
-    ! string_val)
-    !    if (trim(string_val) .ne. 'user') then
-    !       call set_scalar_ic(neko_case%scalar%output_controller, &
-    !         neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, string_val, &
-    ! neko_case%params)
-    !    else
-    !       call set_scalar_ic(neko_case%scalar%output_controller, &
-    !         neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-    ! neko_case%usr%scalar_user_ic, neko_case%params)
-    !    end if
-    ! end if
+    call neko_log%end_section()
 
-    ! Add initial conditions to BDF scheme (if present)
-    select type (f => this%scheme)
+    if (scalar) then
+
+       call json_get(this%params, &
+            'case.adjoint_scalar.initial_condition.type', string_val)
+
+       call neko_log%section("Adjoint scalar initial condition ")
+
+       if (trim(string_val) .ne. 'user') then
+          call set_scalar_ic(this%scalar%s_adj, &
+               this%scalar%c_Xh, this%scalar%gs_Xh, string_val, this%params)
+       else
+          call set_scalar_ic(this%scalar%s_adj, &
+               this%scalar%c_Xh, this%scalar%gs_Xh, this%usr%scalar_user_ic, &
+               this%params)
+       end if
+
+       call neko_log%end_section()
+
+    end if
+
+    ! Add initial conditions to BDF fluid_adj (if present)
+    select type (f => this%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
@@ -208,12 +226,12 @@ contains
     !
     ! Validate that the neko_case is properly setup for time-stepping
     !
-    call this%scheme%validate
+    call this%fluid_adj%validate
 
-    ! if (scalar) then
-    !    call neko_case%scalar%slag%set(neko_case%scalar%output_controller)
-    !    call neko_case%scalar%validate
-    ! end if
+    if (scalar) then
+       call neko_case%scalar%slag%set(neko_case%scalar%output_controller)
+       call neko_case%scalar%validate
+    end if
 
     !
     ! Setup output precision of the field files
@@ -232,10 +250,10 @@ contains
     !
     call this%output_controller%init(neko_case%end_time)
     if (scalar) then
-       this%f_out = adjoint_output_t(precision, this%scheme, neko_case%scalar, &
+       this%f_out = adjoint_output_t(precision, this%fluid_adj, neko_case%scalar, &
             path = trim(neko_case%output_directory))
     else
-       this%f_out = adjoint_output_t(precision, this%scheme, &
+       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
     end if
 
@@ -264,7 +282,7 @@ contains
     ! if (logical_val) then
     !    call json_get_or_default(neko_case%params, 'case.checkpoint_format', &
     !         string_val, "chkp")
-    !   neko_case%f_chkp = chkp_output_t(this%scheme%chkp, &
+    !   neko_case%f_chkp = chkp_output_t(this%fluid_adj%chkp, &
     ! path = output_directory, &
     !         ! fmt = trim(string_val))
     !    call json_get_or_default(neko_case%params, 'case.checkpoint_control', &
@@ -282,7 +300,7 @@ contains
     class(adjoint_case_t), intent(inout) :: this
 
     nullify(this%case)
-    call this%scheme%free()
+    call this%fluid_adj%free()
     call this%output_controller%free()
 
   end subroutine adjoint_free
