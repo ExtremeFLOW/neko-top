@@ -31,40 +31,41 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Initial flow condition
-module adjoint_ic
+module adjoint_fluid_ic
   use num_types, only : rp
   use gather_scatter, only : gs_t, GS_OP_ADD
   use neko_config, only : NEKO_BCKND_DEVICE
   use flow_profile, only : blasius_profile, blasius_linear, blasius_cubic, &
        blasius_quadratic, blasius_quartic, blasius_sin
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use field, only : field_t
-  use utils, only : neko_error
-  use coefs, only : coef_t
-  use math, only : col2, cfill, cfill_mask
-  use device_math, only : device_col2, device_cfill, device_cfill_mask
-  use user_intf, only : useric
-  use json_module, only : json_file
+  use field, only: field_t
+  use utils, only: neko_error
+  use coefs, only: coef_t
+  use math, only: col2, cfill, cfill_mask
+  use device_math, only: device_col2, device_cfill, device_cfill_mask
+  use user_intf, only: useric
+  use json_module, only: json_file
   use json_utils, only: json_get
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
   implicit none
   private
 
-  interface set_adjoint_ic
-     module procedure set_adjoint_ic_int, set_adjoint_ic_usr
-  end interface set_adjoint_ic
+  interface set_adjoint_fluid_ic
+     module procedure set_adjoint_fluid_ic_int, set_adjoint_fluid_ic_usr
+  end interface set_adjoint_fluid_ic
 
-  public :: set_adjoint_ic
+  public :: set_adjoint_fluid_ic
 
 contains
 
   !> Set initial flow condition (builtin)
-  subroutine set_adjoint_ic_int(u, v, w, p, coef, gs, type, params)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
+  subroutine set_adjoint_fluid_ic_int(u_adj, v_adj, w_adj, p_adj, coef, gs, &
+       type, params)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
+    type(field_t), intent(inout) :: p_adj
     type(coef_t), intent(in) :: coef
     type(gs_t), intent(inout) :: gs
     character(len=*) :: type
@@ -80,112 +81,116 @@ contains
 
     if (trim(type_) .eq. 'uniform') then
        call json_get(params, 'value', uinf)
-       call set_adjoint_ic_uniform(u, v, w, uinf)
+       call set_adjoint_fluid_ic_uniform(u_adj, v_adj, w_adj, uinf)
     else if (trim(type_) .eq. 'blasius') then
        call json_get(params, 'blasius.delta', delta)
        call json_get(params, 'blasius.approximation', &
             blasius_approximation)
        call json_get(params, 'blasius.freestream_velocity', uinf)
-       call set_adjoint_ic_blasius(u, v, w, delta, uinf, blasius_approximation)
+       call set_adjoint_fluid_ic_blasius(u_adj, v_adj, w_adj, delta, uinf, &
+            blasius_approximation)
     else if (trim(type_) .eq. 'point_zone') then
        call json_get(params, 'base_value', uinf)
        call json_get(params, 'zone_name', &
             zone_name)
        call json_get(params, 'zone_value', &
             zone_value)
-       call set_adjoint_ic_point_zone(u, v, w, uinf, zone_name, zone_value)
+       call set_adjoint_fluid_ic_point_zone(u_adj, v_adj, w_adj, uinf, &
+            zone_name, zone_value)
     else
        call neko_error('Invalid initial condition')
     end if
 
-    call set_adjoint_ic_common(u, v, w, p, coef, gs)
+    call set_adjoint_fluid_ic_common(u_adj, v_adj, w_adj, p_adj, coef, gs)
 
-  end subroutine set_adjoint_ic_int
+  end subroutine set_adjoint_fluid_ic_int
 
   !> Set intial flow condition (user defined)
-  subroutine set_adjoint_ic_usr(u, v, w, p, coef, gs, usr_ic, params)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
+  subroutine set_adjoint_fluid_ic_usr(u_adj, v_adj, w_adj, p_adj, coef, gs, &
+       usr_ic, params)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
+    type(field_t), intent(inout) :: p_adj
     type(coef_t), intent(in) :: coef
     type(gs_t), intent(inout) :: gs
     procedure(useric) :: usr_ic
     type(json_file), intent(inout) :: params
 
-    call usr_ic(u, v, w, p, params)
+    call usr_ic(u_adj, v_adj, w_adj, p_adj, params)
 
-    call set_adjoint_ic_common(u, v, w, p, coef, gs)
+    call set_adjoint_fluid_ic_common(u_adj, v_adj, w_adj, p_adj, coef, gs)
 
-  end subroutine set_adjoint_ic_usr
+  end subroutine set_adjoint_fluid_ic_usr
 
-  subroutine set_adjoint_ic_common(u, v, w, p, coef, gs)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
-    type(field_t), intent(inout) :: p
+  subroutine set_adjoint_fluid_ic_common(u_adj, v_adj, w_adj, p_adj, coef, gs)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
+    type(field_t), intent(inout) :: p_adj
     type(coef_t), intent(in) :: coef
     type(gs_t), intent(inout) :: gs
     integer :: n
 
-    n = u%dof%size()
+    n = u_adj%dof%size()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(u%x, u%x_d, n, &
+       call device_memcpy(u_adj%x, u_adj%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(v%x, v%x_d, n, &
+       call device_memcpy(v_adj%x, v_adj%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(w%x, w%x_d, n, &
+       call device_memcpy(w_adj%x, w_adj%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
     end if
 
     ! Ensure continuity across elements for initial conditions
-    call gs%op(u%x, u%dof%size(), GS_OP_ADD)
-    call gs%op(v%x, v%dof%size(), GS_OP_ADD)
-    call gs%op(w%x, w%dof%size(), GS_OP_ADD)
+    call gs%op(u_adj%x, u_adj%dof%size(), GS_OP_ADD)
+    call gs%op(v_adj%x, v_adj%dof%size(), GS_OP_ADD)
+    call gs%op(w_adj%x, w_adj%dof%size(), GS_OP_ADD)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(u%x_d, coef%mult_d, u%dof%size())
-       call device_col2(v%x_d, coef%mult_d, v%dof%size())
-       call device_col2(w%x_d, coef%mult_d, w%dof%size())
+       call device_col2(u_adj%x_d, coef%mult_d, u_adj%dof%size())
+       call device_col2(v_adj%x_d, coef%mult_d, v_adj%dof%size())
+       call device_col2(w_adj%x_d, coef%mult_d, w_adj%dof%size())
     else
-       call col2(u%x, coef%mult, u%dof%size())
-       call col2(v%x, coef%mult, v%dof%size())
-       call col2(w%x, coef%mult, w%dof%size())
+       call col2(u_adj%x, coef%mult, u_adj%dof%size())
+       call col2(v_adj%x, coef%mult, v_adj%dof%size())
+       call col2(w_adj%x, coef%mult, w_adj%dof%size())
     end if
 
-  end subroutine set_adjoint_ic_common
+  end subroutine set_adjoint_fluid_ic_common
 
   !> Uniform initial condition
-  subroutine set_adjoint_ic_uniform(u, v, w, uinf)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
+  subroutine set_adjoint_fluid_ic_uniform(u_adj, v_adj, w_adj, uinf)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
     real(kind=rp), intent(in) :: uinf(3)
     integer :: n
-    u = uinf(1)
-    v = uinf(2)
-    w = uinf(3)
-    n = u%dof%size()
+    u_adj = uinf(1)
+    v_adj = uinf(2)
+    w_adj = uinf(3)
+    n = u_adj%dof%size()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(u%x_d, uinf(1), n)
-       call device_cfill(v%x_d, uinf(2), n)
-       call device_cfill(w%x_d, uinf(3), n)
+       call device_cfill(u_adj%x_d, uinf(1), n)
+       call device_cfill(v_adj%x_d, uinf(2), n)
+       call device_cfill(w_adj%x_d, uinf(3), n)
     else
-       call cfill(u%x, uinf(1), n)
-       call cfill(v%x, uinf(2), n)
-       call cfill(w%x, uinf(3), n)
+       call cfill(u_adj%x, uinf(1), n)
+       call cfill(v_adj%x, uinf(2), n)
+       call cfill(w_adj%x, uinf(3), n)
     end if
 
-  end subroutine set_adjoint_ic_uniform
+  end subroutine set_adjoint_fluid_ic_uniform
 
   !> Set a Blasius profile as initial condition
   !! @note currently limited to axis aligned flow
-  subroutine set_adjoint_ic_blasius(u, v, w, delta, uinf, type)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
+  subroutine set_adjoint_fluid_ic_blasius(u_adj, v_adj, w_adj, delta, uinf, &
+       type)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
     real(kind=rp), intent(in) :: delta
     real(kind=rp), intent(in) :: uinf(3)
     character(len=*), intent(in) :: type
@@ -193,59 +198,59 @@ contains
     integer :: i
 
     select case (trim(type))
-      case ('linear')
+    case ('linear')
        bla => blasius_linear
-      case ('quadratic')
+    case ('quadratic')
        bla => blasius_quadratic
-      case ('cubic')
+    case ('cubic')
        bla => blasius_cubic
-      case ('quartic')
+    case ('quartic')
        bla => blasius_quartic
-      case ('sin')
+    case ('sin')
        bla => blasius_sin
-      case default
+    case default
        call neko_error('Invalid Blasius approximation')
     end select
 
     if ((uinf(1) .gt. 0.0_rp) .and. (uinf(2) .le. 0.0_rp) &
          .and. (uinf(3) .le. 0.0_rp)) then
-       do i = 1, u%dof%size()
-          u%x(i,1,1,1) = bla(u%dof%z(i,1,1,1), delta, uinf(1))
-          v%x(i,1,1,1) = 0.0_rp
-          w%x(i,1,1,1) = 0.0_rp
+       do i = 1, u_adj%dof%size()
+          u_adj%x(i,1,1,1) = bla(u_adj%dof%z(i,1,1,1), delta, uinf(1))
+          v_adj%x(i,1,1,1) = 0.0_rp
+          w_adj%x(i,1,1,1) = 0.0_rp
        end do
     else if ((uinf(1) .le. 0.0_rp) .and. (uinf(2) .gt. 0.0_rp) &
          .and. (uinf(3) .le. 0.0_rp)) then
-       do i = 1, u%dof%size()
-          u%x(i,1,1,1) = 0.0_rp
-          v%x(i,1,1,1) = bla(u%dof%x(i,1,1,1), delta, uinf(2))
-          w%x(i,1,1,1) = 0.0_rp
+       do i = 1, u_adj%dof%size()
+          u_adj%x(i,1,1,1) = 0.0_rp
+          v_adj%x(i,1,1,1) = bla(u_adj%dof%x(i,1,1,1), delta, uinf(2))
+          w_adj%x(i,1,1,1) = 0.0_rp
        end do
     else if ((uinf(1) .le. 0.0_rp) .and. (uinf(2) .le. 0.0_rp) &
          .and. (uinf(3) .gt. 0.0_rp)) then
-       do i = 1, u%dof%size()
-          u%x(i,1,1,1) = 0.0_rp
-          v%x(i,1,1,1) = 0.0_rp
-          w%x(i,1,1,1) = bla(u%dof%y(i,1,1,1), delta, uinf(3))
+       do i = 1, u_adj%dof%size()
+          u_adj%x(i,1,1,1) = 0.0_rp
+          v_adj%x(i,1,1,1) = 0.0_rp
+          w_adj%x(i,1,1,1) = bla(u_adj%dof%y(i,1,1,1), delta, uinf(3))
        end do
     end if
 
-  end subroutine set_adjoint_ic_blasius
+  end subroutine set_adjoint_fluid_ic_blasius
 
   !> Set the initial condition of the flow based on a point zone.
   !! @details The initial condition is set to the base value and then the
   !! zone is filled with the zone value.
-  !! @param u The x-component of the velocity field.
-  !! @param v The y-component of the velocity field.
-  !! @param w The z-component of the velocity field.
+  !! @param u_adj The x-component of the adjoint velocity field.
+  !! @param v_adj The y-component of the adjoint velocity field.
+  !! @param w_adj The z-component of the adjoint velocity field.
   !! @param base_value The base value of the initial condition.
   !! @param zone_name The name of the point zone.
   !! @param zone_value The value of the point zone.
-  subroutine set_adjoint_ic_point_zone(u, v, w, base_value, zone_name, &
-       zone_value)
-    type(field_t), intent(inout) :: u
-    type(field_t), intent(inout) :: v
-    type(field_t), intent(inout) :: w
+  subroutine set_adjoint_fluid_ic_point_zone(u_adj, v_adj, w_adj, base_value, &
+       zone_name, zone_value)
+    type(field_t), intent(inout) :: u_adj
+    type(field_t), intent(inout) :: v_adj
+    type(field_t), intent(inout) :: w_adj
     real(kind=rp), intent(in), dimension(3) :: base_value
     character(len=*), intent(in) :: zone_name
     real(kind=rp), intent(in) :: zone_value(:)
@@ -254,24 +259,24 @@ contains
     class(point_zone_t), pointer :: zone
     integer :: size
 
-    call set_adjoint_ic_uniform(u, v, w, base_value)
-    size = u%dof%size()
+    call set_adjoint_fluid_ic_uniform(u_adj, v_adj, w_adj, base_value)
+    size = u_adj%dof%size()
 
     zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill_mask(u%x_d, zone_value(1), size, &
+       call device_cfill_mask(u_adj%x_d, zone_value(1), size, &
             zone%mask_d, zone%size)
-       call device_cfill_mask(v%x_d, zone_value(2), size, &
+       call device_cfill_mask(v_adj%x_d, zone_value(2), size, &
             zone%mask_d, zone%size)
-       call device_cfill_mask(w%x_d, zone_value(3), size, &
+       call device_cfill_mask(w_adj%x_d, zone_value(3), size, &
             zone%mask_d, zone%size)
     else
-       call cfill_mask(u%x, zone_value(1), size, zone%mask, zone%size)
-       call cfill_mask(v%x, zone_value(2), size, zone%mask, zone%size)
-       call cfill_mask(w%x, zone_value(3), size, zone%mask, zone%size)
+       call cfill_mask(u_adj%x, zone_value(1), size, zone%mask, zone%size)
+       call cfill_mask(v_adj%x, zone_value(2), size, zone%mask, zone%size)
+       call cfill_mask(w_adj%x, zone_value(3), size, zone%mask, zone%size)
 
     end if
-  end subroutine set_adjoint_ic_point_zone
+  end subroutine set_adjoint_fluid_ic_point_zone
 
-end module adjoint_ic
+end module adjoint_fluid_ic

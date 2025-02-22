@@ -31,9 +31,9 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 module device_RAMP_mapping
-  use utils, only : neko_error
-  use num_types, only : rp, c_rp
-  use, intrinsic :: iso_c_binding, only : c_ptr, c_int
+  use utils, only: neko_error
+  use num_types, only: rp, c_rp
+  use, intrinsic :: iso_c_binding, only: c_ptr, c_int
   implicit none
   private
 

@@ -37,14 +37,14 @@
 ! the corresponding adjoint forcing is $ \int \nabla v \cdot \nabla u $ in weak
 ! form.
 module adjoint_minimum_dissipation_source_term
-  use num_types, only : rp
-  use field_list, only : field_list_t
-  use json_module, only : json_file
+  use num_types, only: rp
+  use field_list, only: field_list_t
+  use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
+  use source_term, only: source_term_t
+  use coefs, only: coef_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3, field_add2, field_add2s2
   use user_intf, only: user_t, simulation_component_user_settings
@@ -52,14 +52,14 @@ module adjoint_minimum_dissipation_source_term
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
+  use num_types, only: rp
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use math, only: rzero, copy, chsign
   use device_math, only: device_copy, device_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   implicit none

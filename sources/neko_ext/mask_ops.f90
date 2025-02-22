@@ -37,7 +37,7 @@ module mask_ops
   use num_types, only: rp, xp
   use utils, only: neko_error
   use point_zone, only: point_zone_t
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use field_math, only: field_cfill, field_copy
   use device_math_ext, only: device_copy_mask
   use device_math, only: device_copy
