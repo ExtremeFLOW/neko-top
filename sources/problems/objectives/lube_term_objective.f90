@@ -61,28 +61,25 @@
 ! because now I see one objective and one constraint
 !
 module lube_term_objective
-  use num_types, only: rp
-  use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
-  use operators, only: grad
-  use scratch_registry, only: neko_scratch_registry
   use objective, only: objective_t
-  use simulation, only: simulation_t
-  use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: glsc2, copy
-  use device_math, only: device_copy, device_glsc2
   use design, only: design_t
   use topopt_design, only: topopt_design_t
+  use simulation, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
-  use point_zone, only: point_zone_t
+
+  use num_types, only: rp
+  use field, only: field_t
+  use scratch_registry, only: neko_scratch_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
-  use math_ext, only: glsc2_mask
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
-  use logger, only: neko_log
+  use math, only: glsc2, copy
+  use device_math, only: device_copy, device_glsc2
+  use math_ext, only: glsc2_mask
+  use field_math, only: field_col3, field_addcol3, field_cmult
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
