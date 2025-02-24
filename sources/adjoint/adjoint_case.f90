@@ -44,7 +44,10 @@ module adjoint_case
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
+  use adjoint_scalar_convection_source_term, only: &
+       adjoint_scalar_convection_source_term_t
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -53,8 +56,13 @@ module adjoint_case
   !! Todo: This should Ideally be a subclass of case_t, however, that is not yet
   !! suppoerted by Neko.
   type :: adjoint_case_t
-
+     !> Adjoint fluid
      class(adjoint_fluid_scheme_t), allocatable :: fluid_adj
+     !> Adjoint scalar
+     type(adjoint_scalar_pnpn_t), allocatable :: scalar_adj
+     !> Source term coupling the adjoint scalar to the adjoint fluid
+     type(adjoint_scalar_convection_source_term_t), allocatable :: &
+          adjoint_convection_term
      type(case_t), pointer :: case
 
      ! Fields
@@ -94,8 +102,8 @@ contains
     this%case => neko_case
     this%tol = tol
 
-    ! Check if the scalar field is allocated
-    if (allocated(neko_case%scalar)) then
+    ! Check if the scalar_adj field is allocated
+    if (allocated(neko_case%scalar_adj)) then
        this%have_scalar = .true.
     end if
 
@@ -108,7 +116,7 @@ contains
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
-    logical :: scalar = .false.
+    logical :: scalar_adj = .false.
     real(kind=rp) :: real_val
     character(len=:), allocatable :: string_val
     integer :: precision
@@ -124,36 +132,67 @@ contains
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
-    call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, neko_case%usr, &
-         neko_case%fluid%ext_bdf)
+    call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
+       neko_case%usr, neko_case%fluid%ext_bdf)
 
     !
-    ! Setup scalar fluid_adj
+    ! Setup scalar_adj fluid_adj
     !
-    ! @todo no scalar factory for now, probably not needed
+    ! @todo no scalar_adj factory for now, probably not needed
 
-    ! hmmm should we check for scalar or adjoint scalar?
-    ! I'm going to check for adjoint scalar because maybe there would be
-    ! a corner case where someone would want the scalar but not the
-    ! adjoint scalar?
+    ! hmmm should we check for scalar_adj or adjoint scalar_adj?
+    ! I'm going to check for adjoint scalar_adj because maybe there would be
+    ! a corner case where someone would want the scalar_adj but not the
+    ! adjoint scalar_adj?
     if (this%params%valid_path('case.adjoint_scalar')) then
        call json_get_or_default(this%params, 'case.adjoint_scalar.enabled', &
-          scalar, .true.)
+          scalar_adj, .true.)
     end if
 
-    if (scalar) then
-       allocate(this%scalar)
-       this%scalar%chkp%tlag => this%tlag
-       this%scalar%chkp%dtlag => this%dtlag
-       call this%scalar%init(this%msh, this%fluid%c_Xh, this%fluid%gs_Xh, &
+    if (scalar_adj) then
+       allocate(this%scalar_adj)
+       this%scalar_adj%chkp%tlag => this%tlag
+       this%scalar_adj%chkp%dtlag => this%dtlag
+       call this%scalar_adj%init(this%msh, this%fluid%c_Xh, this%fluid%gs_Xh, &
             this%params, this%usr, this%fluid%ulag, this%fluid%vlag, &
             this%fluid%wlag, this%fluid%ext_bdf, this%fluid%rho)
 
-       call this%fluid%chkp%add_scalar(this%scalar%s_adj)
+       call this%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
 
-       this%fluid%chkp%abs1 => this%scalar%abx1
-       this%fluid%chkp%abs2 => this%scalar%abx2
-       this%fluid%chkp%slag => this%scalar%slag
+       this%fluid%chkp%abs1 => this%scalar_adj%abx1
+       this%fluid%chkp%abs2 => this%scalar_adj%abx2
+       this%fluid%chkp%slag => this%scalar_adj%slag
+
+       ! So if we have a passive scalar we also get a source term entering
+       ! the adjoint velocity equation which arises when you linearize the
+       ! the convective term in passive scalar equation.
+       !
+       ! $\phi^\dagger \nabla \phi$
+       !
+       ! I'm SOOOOO worried I have the sign the wrong way around.
+       ! We really have to write the adjoint derivation nicely.
+       !
+       ! for now I'm assuming in our adjoint derivation we ADD all the
+       ! equations together.
+       ! - So it starts as being positive on the LHS
+       ! - if we treat this term as a source term it goes on the RHS, so now
+       !   it's negative on the RHS.
+       !
+       ! I checked through Casper's adjoint equations and the first term
+       ! after the = sign of eq (14) looks like the term I'm talking about.
+       ! And his is negative too.
+       ! So I THINK this is correct, but we need to double check.
+
+       ! allocate the coupling term
+       allocate(this%adjoint_convection_term)
+       ! initialize the coupling term
+       call this%adjoint_convection_term%init_from_components( &
+            this%scheme%f_adj_x, this%scheme%f_adj_y, &
+            this%scheme%f_adj_z, &
+            neko_case%scalar%s, &
+            this%scalar%s_adj, this%scheme%c_Xh)
+       ! append the coupling term to the adjoint velocity equation
+       call this%scheme%source_term%add(this%adjoint_convection_term)
     end if
 
     !
@@ -167,9 +206,9 @@ contains
     !    end if
     ! end if
 
-    ! Setup user boundary conditions for the scalar.
-    ! if (scalar) then
-    !    call neko_case%scalar%set_user_bc(neko_case%usr%scalar_user_bc)
+    ! Setup user boundary conditions for the scalar_adj.
+    ! if (scalar_adj) then
+    !    call neko_case%scalar_adj%set_user_bc(neko_case%usr%scalar_user_bc)
     ! end if
 
     !
@@ -195,20 +234,20 @@ contains
 
     call neko_log%end_section()
 
-    if (scalar) then
+    if (scalar_adj) then
 
        call json_get(this%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
 
-       call neko_log%section("Adjoint scalar initial condition ")
+       call neko_log%section("Adjoint scalar_adj initial condition ")
 
        if (trim(string_val) .ne. 'user') then
-          call set_scalar_ic(this%scalar%s_adj, &
-               this%scalar%c_Xh, this%scalar%gs_Xh, string_val, this%params)
+          call set_scalar_ic(this%scalar_adj%s_adj, this%scalar_adj%c_Xh, &
+             this%scalar_adj%gs_Xh, string_val, this%params)
        else
-          call set_scalar_ic(this%scalar%s_adj, &
-               this%scalar%c_Xh, this%scalar%gs_Xh, this%usr%scalar_user_ic, &
-               this%params)
+          call set_scalar_ic(this%scalar_adj%s_adj, &
+               this%scalar_adj%c_Xh, this%scalar_adj%gs_Xh, &
+               this%usr%scalar_user_ic, this%params)
        end if
 
        call neko_log%end_section()
@@ -228,9 +267,9 @@ contains
     !
     call this%fluid_adj%validate
 
-    if (scalar) then
-       call neko_case%scalar%slag%set(neko_case%scalar%output_controller)
-       call neko_case%scalar%validate
+    if (scalar_adj) then
+       call this%scalar_adj%slag%set(this%scalar_adj%output_controller)
+       call this%scalar_adj%validate
     end if
 
     !
@@ -249,9 +288,9 @@ contains
     ! Setup output_controller
     !
     call this%output_controller%init(neko_case%end_time)
-    if (scalar) then
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, neko_case%scalar, &
-            path = trim(neko_case%output_directory))
+    if (scalar_adj) then
+       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+          this%scalar_adj, path = trim(this%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))

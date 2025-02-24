@@ -243,11 +243,14 @@ contains
     call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
 
     ! Initialize advection factory
-    call json_get_or_default(params, 'case.scalar.advection', advection, .true.)
-    call advection_adjoint_factory(this%adv, params, this%c_Xh, &
-                           ulag, vlag, wlag, this%chkp%dtlag, &
-                           this%chkp%tlag, time_scheme, .not. advection, &
-                           this%s_adj_lag)
+    ! call json_get_or_default(params, 'case.scalar.advection', advection, .true.)
+    ! call advection_adjoint_factory(this%adv, params, this%c_Xh, &
+    !                        ulag, vlag, wlag, this%chkp%dtlag, &
+    !                         this%chkp%tlag, time_scheme, .not. advection, &
+    !                        this%s_adj_lag)
+    ! NOTE
+    ! This is changed a fair amount and I suspect it's due oifs
+    call advection_adjoint_factory(this%adv, params, this%c_Xh)
   end subroutine adjoint_scalar_pnpn_init
 
   !> I envision the arguments to this func might need to be expanded
@@ -371,17 +374,17 @@ contains
 
       if (oifs) then
          call neko_error("oifs not implemented for adjoint scalar")
-         ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_scalar(u, v, w, s_adj, this%advs, &
-                                   Xh, this%c_Xh, dm_Xh%size())
+         ! ! Add the advection operators to the right-hans-side.
+         ! call this%adv%compute_scalar(u, v, w, s_adj, this%advs, &
+         !                           Xh, this%c_Xh, dm_Xh%size())
 
-         call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-                                     ext_bdf%advection_coeffs, n)
+         ! call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
+         !                             ext_bdf%advection_coeffs, n)
 
-         call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
+         ! call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
       else
          ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_scalar(u, v, w, s_adj, f_Xh, &
+         call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
                                       Xh, this%c_Xh, dm_Xh%size())
 
          ! At this point the RHS contains the sum of the advection operator,
