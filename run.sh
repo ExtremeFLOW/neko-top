@@ -325,6 +325,12 @@ trap 'handler' SIGINT
 printf "\n\e[4mCompiling the examples.\e[0m\n"
 cmake --build $MAIN_DIR/build --target Examples --parallel
 
+# Check if the compilation was successful
+if [ $? -ne 0 ]; then
+    printf >&2 "\e[1;31mCompilation failed.\e[m\n"
+    exit 1
+fi
+
 # ============================================================================ #
 # Run the examples
 full_start=$(date +%s.%N)
