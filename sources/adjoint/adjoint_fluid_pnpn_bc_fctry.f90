@@ -31,23 +31,24 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !
-!> Defines factory subroutines for `adjoint_pnpn_t`.
-submodule(adjoint_pnpn) adjoint_pnpn_bc_fctry
-  use user_intf, only : user_t
-  use utils, only : neko_type_error
-  use field_dirichlet, only : field_dirichlet_t
-  use inflow, only : inflow_t
-  use usr_inflow, only : usr_inflow_t, usr_inflow_eval
-  use blasius, only : blasius_t
-  use dirichlet, only : dirichlet_t
-  use dong_outflow, only : dong_outflow_t
-  use symmetry, only : symmetry_t
-  use non_normal, only : non_normal_t
-  use field_dirichlet_vector, only : field_dirichlet_vector_t
+!> Defines factory subroutines for `adjoint_fluid_pnpn_t`.
+submodule(adjoint_fluid_pnpn) adjoint_fluid_pnpn_bc_fctry
+  use user_intf, only: user_t
+  use utils, only: neko_type_error
+  use field_dirichlet, only: field_dirichlet_t
+  use inflow, only: inflow_t
+  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
+  use blasius, only: blasius_t
+  use dirichlet, only: dirichlet_t
+  use dong_outflow, only: dong_outflow_t
+  use symmetry, only: symmetry_t
+  use non_normal, only: non_normal_t
+  use field_dirichlet_vector, only: field_dirichlet_vector_t
   implicit none
 
   ! List of all possible types created by the boundary condition factories
-  character(len=25) :: ADJOINT_PNPN_KNOWN_BCS(13) = [character(len=25) :: &
+  character(len=25) :: ADJOINT_FLUID_PNPN_KNOWN_BCS(13) = &
+       [character(len=25) :: &
        "symmetry", &
        "velocity_value", &
        "no_slip", &
@@ -66,13 +67,13 @@ contains
 
   !> Factory routine for pressure boundary conditions.
   !! @param object The boundary condition to be allocated.
-  !! @param scheme The `adjoint_pnpn_t`  scheme.
+  !! @param scheme The `adjoint_fluid_pnpn_t`  scheme.
   !! @param json The parameter dictionary for the boundary.
   !! @param coef The SEM coeffcients.
   !! @param user The user interface.
   module subroutine pressure_bc_factory(object, scheme, json, coef, user)
     class(bc_t), pointer, intent(inout) :: object
-    type(adjoint_pnpn_t), intent(in) :: scheme
+    type(adjoint_fluid_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
@@ -83,26 +84,26 @@ contains
     call json_get(json, "type", type)
 
     select case (trim(type))
-      case ("outflow", "normal_outflow")
+    case ("outflow", "normal_outflow")
        allocate(zero_dirichlet_t::object)
 
-      case ("outflow+dong", "normal_outflow+dong")
+    case ("outflow+dong", "normal_outflow+dong")
        allocate(dong_outflow_t::object)
 
-      case ("user_pressure")
+    case ("user_pressure")
        allocate(field_dirichlet_t::object)
        select type (obj => object)
-         type is (field_dirichlet_t)
+       type is (field_dirichlet_t)
           obj%update => user%user_dirichlet_update
           call json%add("field_name", scheme%p_adj%name)
        end select
 
-      case default
-       do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
-          if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
+    case default
+       do i = 1, size(ADJOINT_FLUID_PNPN_KNOWN_BCS)
+          if (trim(type) .eq. trim(ADJOINT_FLUID_PNPN_KNOWN_BCS(i))) return
        end do
-       call neko_type_error("adjoint_pnpn boundary conditions", type, &
-            ADJOINT_PNPN_KNOWN_BCS)
+       call neko_type_error("adjoint_fluid_pnpn boundary conditions", type, &
+            ADJOINT_FLUID_PNPN_KNOWN_BCS)
     end select
 
     call json_get(json, "zone_indices", zone_indices)
@@ -128,13 +129,13 @@ contains
 
   !> Factory routine for velocity boundary conditions.
   !! @param object The boundary condition to be allocated.
-  !! @param scheme The `adjoint_pnpn_t`  scheme.
+  !! @param scheme The `adjoint_fluid_pnpn_t`  scheme.
   !! @param json The parameter dictionary for the boundary.
   !! @param coef The SEM coeffcients.
   !! @param user The user interface.
   module subroutine velocity_bc_factory(object, scheme, json, coef, user)
     class(bc_t), pointer, intent(inout) :: object
-    type(adjoint_pnpn_t), intent(in) :: scheme
+    type(adjoint_fluid_pnpn_t), intent(in) :: scheme
     type(json_file), intent(inout) :: json
     type(coef_t), intent(in) :: coef
     type(user_t), intent(in) :: user
@@ -145,29 +146,29 @@ contains
     call json_get(json, "type", type)
 
     select case (trim(type))
-      case ("symmetry")
+    case ("symmetry")
        allocate(symmetry_t::object)
-      case ("velocity_value")
+    case ("velocity_value")
        allocate(inflow_t::object)
-      case ("no_slip")
+    case ("no_slip")
        allocate(zero_dirichlet_t::object)
-      case ("normal_outflow", "normal_outflow+dong")
+    case ("normal_outflow", "normal_outflow+dong")
        allocate(non_normal_t::object)
-      case ("blasius_profile")
+    case ("blasius_profile")
        allocate(blasius_t::object)
-      case ("shear_stress")
+    case ("shear_stress")
        allocate(shear_stress_t::object)
-      case ("wall_model")
+    case ("wall_model")
        allocate(wall_model_bc_t::object)
        ! Kind of hack, but maybe OK? The thing is, we need the nu for
        ! initing the wall model, and forcing the user duplicate that there
        ! would be a nightmare.
        call json%add("nu", scheme%mu / scheme%rho)
 
-      case ("user_velocity")
+    case ("user_velocity")
        allocate(field_dirichlet_vector_t::object)
        select type (obj => object)
-         type is (field_dirichlet_vector_t)
+       type is (field_dirichlet_vector_t)
           obj%update => user%user_dirichlet_update
        end select
 
@@ -179,12 +180,12 @@ contains
        !     call obj%validate()
        !  end select
 
-      case default
-       do i = 1, size(ADJOINT_PNPN_KNOWN_BCS)
-          if (trim(type) .eq. trim(ADJOINT_PNPN_KNOWN_BCS(i))) return
+    case default
+       do i = 1, size(ADJOINT_FLUID_PNPN_KNOWN_BCS)
+          if (trim(type) .eq. trim(ADJOINT_FLUID_PNPN_KNOWN_BCS(i))) return
        end do
-       call neko_type_error("adjoint_pnpn boundary conditions", type, &
-            ADJOINT_PNPN_KNOWN_BCS)
+       call neko_type_error("adjoint_fluid_pnpn boundary conditions", type, &
+            ADJOINT_FLUID_PNPN_KNOWN_BCS)
     end select
 
     call json_get(json, "zone_indices", zone_indices)
@@ -209,4 +210,4 @@ contains
     end if
   end subroutine velocity_bc_factory
 
-end submodule adjoint_pnpn_bc_fctry
+end submodule adjoint_fluid_pnpn_bc_fctry

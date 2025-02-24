@@ -69,7 +69,6 @@ module lube_term_objective
   use objective, only: objective_t
   use simulation, only: simulation_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
-  use adjoint_scheme, only: adjoint_scheme_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
@@ -84,7 +83,7 @@ module lube_term_objective
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
   use logger, only: neko_log
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 
