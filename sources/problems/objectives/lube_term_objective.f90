@@ -76,6 +76,7 @@ module lube_term_objective
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
+  use coefs, only: coef_t
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
   use math_ext, only: glsc2_mask
@@ -93,12 +94,16 @@ module lube_term_objective
      !> The coefficient for the lube term.
      real(kind=rp) :: K
 
-     ! Internal references to the simulation components.
-
-     type(field_t), pointer :: u, v, w
-     real(kind=rp), pointer :: B(:,:,:,:)
-     type(c_ptr) :: B_d = C_NULL_PTR
-     type(field_t), pointer :: brinkman_amplitude
+     !> Pointer to the u field.
+     type(field_t), pointer :: u => null()
+     !> Pointer to the v field.
+     type(field_t), pointer :: v => null()
+     !> Pointer to the w field.
+     type(field_t), pointer :: w => null()
+     !> Pointer to the coefficient field.
+     type(coef_t), pointer :: c_Xh => null()
+     !> Pointer to the brinkman amplitude field.
+     type(field_t), pointer :: brinkman_amplitude => null()
 
    contains
 
@@ -179,8 +184,7 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%B => simulation%neko_case%fluid%c_Xh%B
-    this%B_d = simulation%neko_case%fluid%c_Xh%B_d
+    this%c_Xh => simulation%neko_case%fluid%c_Xh
 
     ! if we have the lube term we need to initialize and append that too
 
@@ -209,7 +213,7 @@ contains
     this%u => null()
     this%v => null()
     this%w => null()
-    this%B => null()
+    this%c_Xh => null()
     this%brinkman_amplitude => null()
 
   end subroutine lube_term_free
@@ -240,16 +244,16 @@ contains
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
-          this%value = glsc2_mask(work%x, this%B, design%size(), &
+          this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
                this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
-          this%value = glsc2(work%x, this%B, design%size())
+          this%value = glsc2(work%x, this%c_Xh%B, design%size())
        end if
     end if
     this%value = 0.5 * this%K * this%value
