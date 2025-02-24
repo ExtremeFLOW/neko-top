@@ -3,7 +3,6 @@ module mma_optimizer
   use problem, only : problem_t
   use mma, only: mma_t
   use problem, only: problem_t
-  use topopt_design, only: topopt_design_t
   use num_types, only: rp
   use utils, only: neko_error
   use json_module, only: json_file
@@ -80,8 +79,6 @@ contains
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
 
-    type(field_t), pointer :: design_indicator
-
     type(vector_t) :: x
     type(json_file) :: solver_parameters
 
@@ -94,15 +91,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
     call this%logger%set_header(trim(optimization_header))
 
-    call x%init(design%size())
-
-    select type (design)
-    type is (topopt_design_t)
-       design_indicator => neko_field_registry%get_field("design_indicator")
-       call copy(x%x, design_indicator%x, design%size())
-    class default
-       call neko_error('Unknown design type for MMA Optimizer')
-    end select
+    x = design%get_design()
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
