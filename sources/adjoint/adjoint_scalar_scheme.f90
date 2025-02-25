@@ -76,8 +76,6 @@ module adjoint_scalar_scheme
   use gradient_jump_penalty, only : gradient_jump_penalty_t
   use json_utils_ext, only: json_key_fallback
   use scalar_scheme, only: scalar_scheme_precon_factory, &
-       scalar_scheme_update_material_properties, &
-       scalar_scheme_set_material_properties, &
        scalar_scheme_solver_factory
   implicit none
 
@@ -94,7 +92,7 @@ module adjoint_scalar_scheme
      !> The adjoint scalar.
      type(field_t), pointer :: s_adj
      !> Lag arrays, i.e. solutions at previous timesteps.
-     type(field_series_t) :: slag
+     type(field_series_t) :: s_adj_lag
      !> Function space \f$ X_h \f$.
      type(space_t), pointer :: Xh
      !> Dofmap associated with \f$ X_h \f$.
@@ -151,10 +149,10 @@ module adjoint_scalar_scheme
      procedure, pass(this) :: validate => adjoint_scalar_scheme_validate
      !> Set lambda and cp
      procedure, pass(this) :: set_material_properties => &
-          scalar_scheme_set_material_properties
+          adjoint_scalar_scheme_set_material_properties
      !> Update variable material properties
      procedure, pass(this) :: update_material_properties => &
-          scalar_scheme_update_material_properties
+          adjoint_scalar_scheme_update_material_properties
      !> Constructor.
      procedure(adjoint_scalar_scheme_init_intrf), pass(this), deferred :: init
      !> Destructor.
@@ -302,7 +300,7 @@ contains
     end if
     this%s_adj => neko_field_registry%get_field('s_adj')
 
-    call this%slag%init(this%s, 2)
+    call this%s_adj_lag%init(this%s, 2)
 
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh
@@ -373,7 +371,7 @@ contains
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.gradient_jump_penalty.enabled', &
          'case.scalar.gradient_jump_penalty.enabled')
-    call json_get_or_default(params, json_key
+    call json_get_or_default(params, json_key, &
          this%if_gradient_jump_penalty, .false.)
 
     if (this%if_gradient_jump_penalty .eqv. .true.) then
@@ -425,7 +423,7 @@ contains
     call this%bcs%free()
 
     call this%lambda_field%free()
-    call this%slag%free()
+    call this%s_adj_lag%free()
 
     ! Free gradient jump penalty
     if (this%if_gradient_jump_penalty .eqv. .true.) then
@@ -478,5 +476,84 @@ contains
 !    call this%chkp%init(this%u, this%v, this%w, this%p)
 
   end subroutine adjoint_scalar_scheme_validate
+
+  !> Update the values of `lambda_field` if necessary.
+  subroutine adjoint_scalar_scheme_update_material_properties(this)
+    class(adjoint_scalar_scheme_t), intent(inout) :: this
+    type(field_t), pointer :: nut
+    integer :: n
+    ! Factor to transform nu_t to lambda_t
+    real(kind=rp) :: lambda_factor
+
+    lambda_factor = this%rho*this%cp/this%pr_turb
+    this%lambda_field = this%lambda
+
+    if (this%variable_material_properties) then
+      call neko_error("variable properties not implemented for adjoint scalar")
+       nut => neko_field_registry%get_field(this%nut_field_name)
+       n = nut%size()
+       call field_add2s2(this%lambda_field, nut, lambda_factor, n)
+    end if
+
+  end subroutine adjoint_scalar_scheme_update_material_properties
+
+  !> Set lamdba and cp.
+  !! @param params The case parameter file.
+  !! @param user The user interface.
+  subroutine adjoint_scalar_scheme_set_material_properties(this, params, user)
+    class(adjoint_scalar_scheme_t), intent(inout) :: this
+    type(json_file), intent(inout) :: params
+    type(user_t), target, intent(in) :: user
+    character(len=LOG_SIZE) :: log_buf
+    ! A local pointer that is needed to make Intel happy
+    procedure(user_material_properties), pointer :: dummy_mp_ptr
+    real(kind=rp) :: dummy_mu, dummy_rho
+
+    ! TODO
+    ! I think everything should be read from .scalar. and we shouldnt
+    ! change anything, but this should be come back to.
+    dummy_mp_ptr => dummy_user_material_properties
+
+    if (.not. associated(user%material_properties, dummy_mp_ptr)) then
+
+       write(log_buf, '(A)') "Material properties must be set in the user&
+            & file!"
+       call neko_log%message(log_buf)
+       call user%material_properties(0.0_rp, 0, dummy_rho, dummy_mu, &
+            this%cp, this%lambda, params)
+    else
+       if (params%valid_path('case.scalar.Pe') .and. &
+            (params%valid_path('case.scalar.lambda') .or. &
+            params%valid_path('case.scalar.cp'))) then
+          call neko_error("To set the material properties for the scalar,&
+               & either provide Pe OR lambda and cp in the case file.")
+          ! Non-dimensional case
+       else if (params%valid_path('case.scalar.Pe')) then
+          write(log_buf, '(A)') 'Non-dimensional scalar material properties &
+               & input.'
+          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          write(log_buf, '(A)') 'Specific heat capacity will be set to 1,'
+          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+          write(log_buf, '(A)') 'conductivity to 1/Pe. Assumes density is 1.'
+          call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
+
+          ! Read Pe into lambda for further manipulation.
+          call json_get(params, 'case.scalar.Pe', this%lambda)
+          write(log_buf, '(A,ES13.6)') 'Pe         :', this%lambda
+          call neko_log%message(log_buf)
+
+          ! Set cp and rho to 1 since the setup is non-dimensional.
+          this%cp = 1.0_rp
+          this%rho = 1.0_rp
+          ! Invert the Pe to get conductivity
+          this%lambda = 1.0_rp/this%lambda
+          ! Dimensional case
+       else
+          call json_get(params, 'case.scalar.lambda', this%lambda)
+          call json_get(params, 'case.scalar.cp', this%cp)
+       end if
+
+    end if
+  end subroutine adjoint_scalar_scheme_set_material_properties
 
 end module adjoint_scalar_scheme

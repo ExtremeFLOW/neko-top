@@ -57,7 +57,8 @@ module adjoint_scalar_pnpn
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use advection_adjoint, only : advection_adjoint_t, advection_adjoint_factory
+  use advection_adjoint, only : advection_adjoint_t
+  use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file, json_core, json_value
@@ -95,7 +96,7 @@ module adjoint_scalar_pnpn
      type(bc_list_t) :: bclst_ds
 
      !> Advection operator.
-     class(advection_t), allocatable :: adv
+     class(advection_adjoint_t), allocatable :: adv
 
      ! Time interpolation scheme
      logical :: oifs
@@ -138,13 +139,13 @@ module adjoint_scalar_pnpn
      !! @param[in] scheme The `adjoint_scalar_pnpn` scheme.
      !! @param[inout] json JSON object for initializing the bc.
      !! @param[in] coef SEM coefficients.
-     module subroutine bc_factory(object, scheme, json, coef, user)
+     module subroutine adjoint_bc_factory(object, scheme, json, coef, user)
         class(bc_t), pointer, intent(inout) :: object
         type(adjoint_scalar_pnpn_t), intent(in) :: scheme
         type(json_file), intent(inout) :: json
         type(coef_t), intent(in) :: coef
         type(user_t), intent(in) :: user
-     end subroutine bc_factory
+     end subroutine adjoint_bc_factory
   end interface
 
 contains
@@ -530,7 +531,7 @@ contains
 
           bc_i => null()
 
-          call bc_factory(bc_i, this, bc_subdict, this%c_Xh, user)
+          call adjoint_bc_factory(bc_i, this, bc_subdict, this%c_Xh, user)
           call this%bcs%append(bc_i)
        end do
 

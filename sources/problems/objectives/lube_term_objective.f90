@@ -125,7 +125,7 @@ contains
 
   !> The common constructor using a JSON object.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
+  !! @param fluid the fluid fluid_adj.
   !! @param adjoint the fluid adjoint.
   subroutine lube_term_init_json(this, json, design, simulation)
     class(lube_term_objective_t), intent(inout) :: this
@@ -185,10 +185,10 @@ contains
 
     ! if we have the lube term we need to initialize and append that too
 
-    associate(f_adj_x => simulation%adjoint_case%scheme%f_adj_x, &
-         f_adj_y => simulation%adjoint_case%scheme%f_adj_y, &
-         f_adj_z => simulation%adjoint_case%scheme%f_adj_z, &
-         c_Xh => simulation%adjoint_case%scheme%c_Xh)
+    associate(f_adj_x => simulation%adjoint_case%fluid_adj%f_adj_x, &
+         f_adj_y => simulation%adjoint_case%fluid_adj%f_adj_y, &
+         f_adj_z => simulation%adjoint_case%fluid_adj%f_adj_z, &
+         c_Xh => simulation%adjoint_case%fluid_adj%c_Xh)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%k * this%weight, &
@@ -198,7 +198,7 @@ contains
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%scheme%source_term%add_source_term(lube_term)
+    call simulation%adjoint_case%fluid_adj%source_term%add_source_term(lube_term)
 
   end subroutine lube_term_init_attributes
 
@@ -217,7 +217,7 @@ contains
 
   !> Compute the objective function.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
+  !! @param fluid the fluid fluid_adj.
   !! @param adjoint the fluid adjoint.
   subroutine lube_term_update_value(this, design)
     class(lube_term_objective_t), intent(inout) :: this

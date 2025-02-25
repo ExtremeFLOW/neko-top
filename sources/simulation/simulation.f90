@@ -58,7 +58,7 @@ module simulation
 
      !> The fluid
      class(fluid_scheme_incompressible_t), public, pointer :: &
-          fluid_scheme => null()
+          fluid => null()
 
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
@@ -99,7 +99,7 @@ contains
 
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
-       this%fluid_scheme => fluid
+       this%fluid => fluid
 
     end select
 
@@ -124,14 +124,14 @@ contains
     ! Allocate the output type
     call this%output_forward%init(sp, 'forward_fields', 4)
     call this%output_adjoint%init(sp, 'adjoint_fields', 4)
-    call this%output_forward%fields%assign(1, this%fluid_scheme%p)
-    call this%output_forward%fields%assign(2, this%fluid_scheme%u)
-    call this%output_forward%fields%assign(3, this%fluid_scheme%v)
-    call this%output_forward%fields%assign(4, this%fluid_scheme%w)
-    call this%output_adjoint%fields%assign(1, this%adjoint_case%scheme%p_adj)
-    call this%output_adjoint%fields%assign(2, this%adjoint_case%scheme%u_adj)
-    call this%output_adjoint%fields%assign(3, this%adjoint_case%scheme%v_adj)
-    call this%output_adjoint%fields%assign(4, this%adjoint_case%scheme%w_adj)
+    call this%output_forward%fields%assign(1, this%fluid%p)
+    call this%output_forward%fields%assign(2, this%fluid%u)
+    call this%output_forward%fields%assign(3, this%fluid%v)
+    call this%output_forward%fields%assign(4, this%fluid%w)
+    call this%output_adjoint%fields%assign(1, this%adjoint_case%fluid_adj%p_adj)
+    call this%output_adjoint%fields%assign(2, this%adjoint_case%fluid_adj%u_adj)
+    call this%output_adjoint%fields%assign(3, this%adjoint_case%fluid_adj%v_adj)
+    call this%output_adjoint%fields%assign(4, this%adjoint_case%fluid_adj%w_adj)
 
   end subroutine simulation_init
 
@@ -171,9 +171,9 @@ contains
     ! TODO
     ! reset for the adjoint
     ! call reset(this%adjoint_case)
-    call field_rzero(this%adjoint_case%scheme%u_adj)
-    call field_rzero(this%adjoint_case%scheme%v_adj)
-    call field_rzero(this%adjoint_case%scheme%w_adj)
+    call field_rzero(this%adjoint_case%fluid_adj%u_adj)
+    call field_rzero(this%adjoint_case%fluid_adj%v_adj)
+    call field_rzero(this%adjoint_case%fluid_adj%w_adj)
 
   end subroutine simulation_reset
 

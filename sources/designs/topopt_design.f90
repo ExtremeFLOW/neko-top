@@ -323,29 +323,29 @@ contains
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
-         simulation%fluid_scheme%f_x, &
-         simulation%fluid_scheme%f_y, &
-         simulation%fluid_scheme%f_z, &
+         simulation%fluid%f_x, &
+         simulation%fluid%f_y, &
+         simulation%fluid%f_z, &
          this%brinkman_amplitude, &
-         simulation%fluid_scheme%u, &
-         simulation%fluid_scheme%v, &
-         simulation%fluid_scheme%w, &
-         simulation%fluid_scheme%c_Xh)
+         simulation%fluid%u, &
+         simulation%fluid%v, &
+         simulation%fluid%w, &
+         simulation%fluid%c_Xh)
     ! append brinkman source term to the forward problem
-    call simulation%fluid_scheme%source_term%add(forward_brinkman)
+    call simulation%fluid%source_term%add(forward_brinkman)
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_case%scheme%f_adj_x, &
-         simulation%adjoint_case%scheme%f_adj_y, &
-         simulation%adjoint_case%scheme%f_adj_z, &
+         simulation%adjoint_case%fluid_adj%f_adj_x, &
+         simulation%adjoint_case%fluid_adj%f_adj_y, &
+         simulation%adjoint_case%fluid_adj%f_adj_z, &
          this%brinkman_amplitude, &
-         simulation%adjoint_case%scheme%u_adj, &
-         simulation%adjoint_case%scheme%v_adj, &
-         simulation%adjoint_case%scheme%w_adj, &
-         simulation%adjoint_case%scheme%c_Xh)
+         simulation%adjoint_case%fluid_adj%u_adj, &
+         simulation%adjoint_case%fluid_adj%v_adj, &
+         simulation%adjoint_case%fluid_adj%w_adj, &
+         simulation%adjoint_case%fluid_adj%c_Xh)
     ! append brinkman source term based on design
-    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
+    call simulation%adjoint_case%fluid_adj%source_term%add(adjoint_brinkman)
 
   end subroutine topopt_design_init_from_components
 

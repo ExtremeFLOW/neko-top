@@ -15,4 +15,8 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/advection_adjoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/advection_adjoint_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_adjoint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_convection_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn_bc_fctry.f90
 )

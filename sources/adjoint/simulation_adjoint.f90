@@ -97,9 +97,9 @@ contains
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, &
-         this%scheme%v_adj, this%scheme%w_adj,&
-         this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
+    call this%case%usr%user_init_modules(t_adj, this%fluid_adj%u_adj, &
+         this%fluid_adj%v_adj, this%fluid_adj%w_adj,&
+         this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
 
@@ -122,7 +122,7 @@ contains
             this%case%tlag, this%case%dtlag, tstep_adj)
 
        call neko_log%section('Adjoint fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
+       call this%fluid_adj%step(t_adj, tstep_adj, this%case%dt, &
             this%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &

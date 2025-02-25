@@ -155,8 +155,8 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%fluid => simulation%fluid_scheme
-    this%adjoint => simulation%adjoint_case%scheme
+    this%fluid => simulation%fluid
+    this%adjoint => simulation%adjoint_case%fluid_adj
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation

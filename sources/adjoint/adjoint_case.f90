@@ -39,6 +39,7 @@ module adjoint_case
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use adjoint_fluid_ic, only: set_adjoint_fluid_ic
+  use scalar_ic, only: set_scalar_ic
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
@@ -46,6 +47,8 @@ module adjoint_case
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
+  use logger, only : neko_log
+  use utils, only: neko_error
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_t
   implicit none
@@ -89,6 +92,14 @@ contains
     ! Read the tolerance
     call json_get_or_default(neko_case%params, "tol", tol, 1.0e-6_rp)
 
+    ! I think this is correct.
+    ! Maybe there would be a case where we would want a scalar but
+    ! no adjoint scalar. So this forces us to prescribe an adjoint scalar.
+    if (neko_case%params%valid_path('case.adjoint_scalar')) then
+      call json_get_or_default(neko_case%params, 'case.adjoint_scalar.enabled', &
+         this%have_scalar, .true.)
+    end if
+
     call adjoint_init_from_attributes(this, neko_case, tol)
 
   end subroutine adjoint_init_from_json
@@ -102,10 +113,6 @@ contains
     this%case => neko_case
     this%tol = tol
 
-    ! Check if the scalar_adj field is allocated
-    if (allocated(neko_case%scalar_adj)) then
-       this%have_scalar = .true.
-    end if
 
     call adjoint_case_init_common(this, neko_case)
 
@@ -134,7 +141,6 @@ contains
     lx = lx + 1 ! add 1 to get number of gll points
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
        neko_case%usr, neko_case%fluid%ext_bdf)
-
     !
     ! Setup scalar_adj fluid_adj
     !
@@ -144,24 +150,31 @@ contains
     ! I'm going to check for adjoint scalar_adj because maybe there would be
     ! a corner case where someone would want the scalar_adj but not the
     ! adjoint scalar_adj?
-    if (this%params%valid_path('case.adjoint_scalar')) then
-       call json_get_or_default(this%params, 'case.adjoint_scalar.enabled', &
-          scalar_adj, .true.)
-    end if
 
-    if (scalar_adj) then
+
+    if (this%have_scalar) then
        allocate(this%scalar_adj)
-       this%scalar_adj%chkp%tlag => this%tlag
-       this%scalar_adj%chkp%dtlag => this%dtlag
-       call this%scalar_adj%init(this%msh, this%fluid%c_Xh, this%fluid%gs_Xh, &
-            this%params, this%usr, this%fluid%ulag, this%fluid%vlag, &
-            this%fluid%wlag, this%fluid%ext_bdf, this%fluid%rho)
+       ! TODO
+       ! these tlag and dtlag are new, we likely need to update the standard
+       ! fluid in a different PR.
+       ! For now I'm commenting them out in the scalar.
+       ! this%scalar_adj%chkp%tlag => neko_case%tlag
+       ! this%scalar_adj%chkp%dtlag => neko_case%dtlag
+       call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
+       neko_case%params, neko_case%usr, neko_case%fluid%ulag, neko_case%fluid%vlag, &
+       neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
 
-       call this%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
+       ! call neko_case%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
 
-       this%fluid%chkp%abs1 => this%scalar_adj%abx1
-       this%fluid%chkp%abs2 => this%scalar_adj%abx2
-       this%fluid%chkp%slag => this%scalar_adj%slag
+       ! TODO
+       ! I don't really understand checkpoints or why the fluid would need to know
+       ! about the scalar's lag and time integration terms.
+       !
+       ! Since we won't be using checkpoints, I'm commenting this out, but leaving
+       ! a rather large TODO here for when we come back to unsteady.
+       ! neko_case%fluid%chkp%abs1 => this%scalar_adj%abx1
+       ! neko_case%fluid%chkp%abs2 => this%scalar_adj%abx2
+       ! neko_case%fluid%chkp%slag => this%scalar_adj%slag
 
        ! So if we have a passive scalar we also get a source term entering
        ! the adjoint velocity equation which arises when you linearize the
@@ -187,12 +200,12 @@ contains
        allocate(this%adjoint_convection_term)
        ! initialize the coupling term
        call this%adjoint_convection_term%init_from_components( &
-            this%scheme%f_adj_x, this%scheme%f_adj_y, &
-            this%scheme%f_adj_z, &
+            this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
+            this%fluid_adj%f_adj_z, &
             neko_case%scalar%s, &
-            this%scalar%s_adj, this%scheme%c_Xh)
+            this%scalar_adj%s_adj, this%fluid_adj%c_Xh)
        ! append the coupling term to the adjoint velocity equation
-       call this%scheme%source_term%add(this%adjoint_convection_term)
+       call this%fluid_adj%source_term%add(this%adjoint_convection_term)
     end if
 
     !
@@ -234,20 +247,21 @@ contains
 
     call neko_log%end_section()
 
-    if (scalar_adj) then
+    if (this%have_scalar) then
 
-       call json_get(this%params, &
+       call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
 
        call neko_log%section("Adjoint scalar_adj initial condition ")
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(this%scalar_adj%s_adj, this%scalar_adj%c_Xh, &
-             this%scalar_adj%gs_Xh, string_val, this%params)
+             this%scalar_adj%gs_Xh, string_val, neko_case%params)
        else
-          call set_scalar_ic(this%scalar_adj%s_adj, &
-               this%scalar_adj%c_Xh, this%scalar_adj%gs_Xh, &
-               this%usr%scalar_user_ic, this%params)
+          call neko_error("user defined ICs not implemented for adjoint scalar")
+          ! call set_scalar_ic(this%scalar_adj%s_adj, &
+          !      this%scalar_adj%c_Xh, this%scalar_adj%gs_Xh, &
+          !      this%usr%scalar_user_ic, neko_case%params)
        end if
 
        call neko_log%end_section()
@@ -267,8 +281,8 @@ contains
     !
     call this%fluid_adj%validate
 
-    if (scalar_adj) then
-       call this%scalar_adj%slag%set(this%scalar_adj%output_controller)
+    if (this%have_scalar) then
+       call this%scalar_adj%s_adj_lag%set(this%scalar_adj%s_adj)
        call this%scalar_adj%validate
     end if
 
@@ -288,9 +302,9 @@ contains
     ! Setup output_controller
     !
     call this%output_controller%init(neko_case%end_time)
-    if (scalar_adj) then
+    if (this%have_scalar) then
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
-          this%scalar_adj, path = trim(this%output_directory))
+          this%scalar_adj, path = trim(neko_case%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
@@ -339,6 +353,7 @@ contains
     class(adjoint_case_t), intent(inout) :: this
 
     nullify(this%case)
+    call this%scalar_adj%free()
     call this%fluid_adj%free()
     call this%output_controller%free()
 
