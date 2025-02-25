@@ -228,9 +228,9 @@ function cleanup {
     for nek in $(find ./ -name "*.nek5000"); do
         printf "\t- %s\n" ${nek##*/}
 
-        basename=$(basename $nek)
+        base=$(basename $nek)
         directory=$(dirname $nek)
-        pattern=$directory/${basename%.*}
+        pattern=$directory/${base%.*}
 
         mkdir -p $pattern
         mv -t $pattern $nek ${nek%.*}.f*
