@@ -54,6 +54,8 @@ module scalar_mixing_objective
   use scratch_registry, only: neko_scratch_registry
   use adjoint_mixing_scalar_source_term, only: &
     adjoint_mixing_scalar_source_term_t
+  ! delete after
+  use field_math, only: field_addcol3, field_col3
   implicit none
   private
 
@@ -74,6 +76,12 @@ module scalar_mixing_objective
      class(coef_t), pointer :: coef
      !> Volume of the domain $|\Omega_{obj}|$
      real(kind=rp) :: domain_volume
+     
+     !> -----------------------------------------------------------------
+     !! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
+     !! These sensitivity should return zero, and the simulation
+     !! should compute the u u_adj component
+     type(field_t), pointer :: u, v, w, u_adj, v_adj, w_adj
 
    contains
 
@@ -166,6 +174,14 @@ contains
     call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
     adjoint_forcing)
 
+    !--------------------------------------------------------------------------
+    ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS
+    this%u => simulation%fluid%u
+    this%v => simulation%fluid%v
+    this%w => simulation%fluid%w
+    this%u_adj => simulation%adjoint_case%fluid_adj%u_adj
+    this%v_adj => simulation%adjoint_case%fluid_adj%v_adj
+    this%w_adj => simulation%adjoint_case%fluid_adj%w_adj
   end subroutine scalar_mixing_init_attributes
 
   !> Destructor.
@@ -238,6 +254,28 @@ contains
     !--------------------------------------------------------------------------
     ! eg,
     ! call field_rzero(this%sensitivity)
+    !
+    ! THIS SHOULD BE REPLACED WITH A ZERO CONTRIBUTION AFTER THE DESIGN UPDATE
+
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    ! here it should just be an inner product between the forward and adjoint
+    call field_col3(work, this%u, this%u_adj)
+    call field_addcol3(work, this%v, this%v_adj)
+    call field_addcol3(work, this%w, this%w_adj)
+    ! but negative
+    call field_cmult(work, -1.0_rp)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
+    else
+       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine scalar_mixing_update_sensitivity
 

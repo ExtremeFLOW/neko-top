@@ -102,6 +102,8 @@ contains
        this%fluid => fluid
 
     end select
+    
+    
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
@@ -114,20 +116,27 @@ contains
 
     ! init the sampler
     !---------------------------------------------------------
-    ! TODO
-    ! obviously when we do the mappings properly, to many coefficients, we'll
-    ! also have to modify this
-    ! for now:
-    ! - forward (p,u,v,w)                      1,2,3,4           p,vx,vy,vz
-    ! - adjoint (p,u,v,w)                      5,6,7,8           t,s1,s2,s3
+
 
     ! Allocate the output type
-    call this%output_forward%init(sp, 'forward_fields', 4)
-    call this%output_adjoint%init(sp, 'adjoint_fields', 4)
+    if (allocated(this%neko_case%scalar)) then
+       call this%output_forward%init(sp, 'forward_fields', 5)
+       call this%output_forward%fields%assign(5, this%neko_case%scalar%s)
+    else
+      call this%output_forward%init(sp, 'forward_fields', 4)
+    end if
+    
     call this%output_forward%fields%assign(1, this%fluid%p)
     call this%output_forward%fields%assign(2, this%fluid%u)
     call this%output_forward%fields%assign(3, this%fluid%v)
     call this%output_forward%fields%assign(4, this%fluid%w)
+
+    if (allocated(this%adjoint_case%scalar_adj)) then
+      call this%output_adjoint%init(sp, 'adjoint_fields', 5)
+      call this%output_adjoint%fields%assign(5, this%adjoint_case%scalar_adj%s_adj)
+    else
+      call this%output_adjoint%init(sp, 'adjoint_fields', 4)
+    end if
     call this%output_adjoint%fields%assign(1, this%adjoint_case%fluid_adj%p_adj)
     call this%output_adjoint%fields%assign(2, this%adjoint_case%fluid_adj%u_adj)
     call this%output_adjoint%fields%assign(3, this%adjoint_case%fluid_adj%v_adj)

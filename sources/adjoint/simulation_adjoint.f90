@@ -121,16 +121,9 @@ contains
        call simulation_settime(t_adj, this%case%dt, this%case%fluid%ext_bdf, &
             this%case%tlag, this%case%dtlag, tstep_adj)
 
-       call neko_log%section('Adjoint fluid')
-       call this%fluid_adj%step(t_adj, tstep_adj, this%case%dt, &
-            this%case%fluid%ext_bdf, dt_controller)
-       end_time = MPI_WTIME()
-       write(log_buf, '(A,E15.7,A,E15.7)') &
-            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-            end_time-start_time
-       call neko_log%end_section(log_buf)
-
+      
        ! Scalar step
+       ! (Note that for the adjoint we should the scalar first)
        if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
@@ -142,6 +135,16 @@ contains
                end_time-start_time
           call neko_log%end_section(log_buf)
        end if
+
+       call neko_log%section('Adjoint fluid')
+       call this%fluid_adj%step(t_adj, tstep_adj, this%case%dt, &
+            this%case%fluid%ext_bdf, dt_controller)
+       end_time = MPI_WTIME()
+       write(log_buf, '(A,E15.7,A,E15.7)') &
+            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+            end_time-start_time
+       call neko_log%end_section(log_buf)
+
 
        call neko_log%section('Postprocessing')
 
