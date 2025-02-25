@@ -1,0 +1,244 @@
+! Copyright (c) 2023, The Neko Authors
+! All rights reserved.
+!
+! Redistribution and use in source and binary forms, with or without
+! modification, are permitted provided that the following conditions
+! are met:
+!
+!    *  Redistributions of source code must retain the above copyright
+!     notice, this list of conditions and the following disclaimer.
+!
+!    *  Redistributions in binary form must reproduce the above
+!     copyright notice, this list of conditions and the following
+!     disclaimer in the documentation and/or other materials provided
+!     with the distribution.
+!
+!    *  Neither the name of the authors nor the names of its
+!     contributors may be used to endorse or promote products derived
+!     from this software without specific prior written permission.
+!
+! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+! POSSIBILITY OF SUCH DAMAGE.
+!
+!> This provides a template to be modified in constructing new objectives.
+!> For a detailed description see ///
+!
+!> An objective function corresponding to the mixing of a passive scalar
+!! $ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
+!! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, $
+!
+module scalar_mixing_objective
+  use num_types, only: rp
+  use objective, only: objective_t
+  use simulation, only: simulation_t
+  use design, only: design_t
+  use json_module, only: json_file
+  use json_utils, only: json_get_or_default
+  use field, only: field_t
+  use field_math, only: field_copy, field_cadd, field_col2
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: glsc2
+  use device_math, only: device_glsc2
+  use mask_ops, only: mask_exterior_const, compute_masked_volume
+  use coefs, only: coef_t
+  use scratch_registry, only: neko_scratch_registry
+  use adjoint_mixing_scalar_source_term, only: &
+    adjoint_mixing_scalar_source_term_t
+  implicit none
+  private
+
+  !> An objective function corresponding to the mixing of a passive scalar
+  !! $ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
+  !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, $
+  type, public, extends(objective_t) :: scalar_mixing_objective_t
+     private
+
+     !> pointer to the primal passive scalar fields $\phi$
+     type(field_t), pointer :: phi
+     !> pointer to the RHS (forcing) of adjoint passive scalar equation
+     !! $ f_{\phi^\dagger} $
+     type(field_t), pointer :: f_phi_adjoint
+     !> Target concentration in the optimized region $\phi_{ref}$
+     real(kind=rp) :: phi_ref
+     !> Coefficients defined on a given mesh
+     class(coef_t), pointer :: coef
+     !> Volume of the domain $|\Omega_{obj}|$
+     real(kind=rp) :: domain_volume
+
+   contains
+
+     !> The common constructor using a JSON object.
+     procedure, public, pass(this) :: init_json => scalar_mixing_init_json
+     !> The actual constructor.
+     procedure, public, pass(this) :: init_from_attributes => &
+          scalar_mixing_init_attributes
+     !> Destructor.
+     procedure, public, pass(this) :: free => scalar_mixing_free
+     !> Computes the value of the objective function.
+     procedure, public, pass(this) :: update_value => &
+          scalar_mixing_update_value
+     !> Computes the sensitivity with respect to the coefficient $\chi$.
+     procedure, public, pass(this) :: update_sensitivity => &
+          scalar_mixing_update_sensitivity
+
+  end type scalar_mixing_objective_t
+
+contains
+
+  !> The common constructor using a JSON object.
+  !! @param json The JSON subdictionary corresponding to your objective
+  !! @param design The design
+  !! @param simulation The simulation
+  subroutine scalar_mixing_init_json(this, json, design, simulation)
+    class(scalar_mixing_objective_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+    real(kind=rp) :: weight
+    real(kind=rp) :: phi_ref
+    character(len=:), allocatable :: name
+    character(len=:), allocatable :: mask_name
+
+    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    call json_get_or_default(json, "mask_name", mask_name, "")
+    call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
+    call json_get_or_default(json, "name", name, "Scalar Mixing")
+
+    ! initialize
+    call this%init_from_attributes(design, simulation, weight, name, mask_name, phi_ref)
+  end subroutine scalar_mixing_init_json
+
+  !> The actual constructor.
+  !! @param design the design.
+  !! @param simulation the simulation.
+  !! @param weight the weight of the objective function.
+  !! @param name the name of the objective function.
+  !! @param mask_name the name of the mask.
+  !! @param phi_ref target concentration used in the objective function.
+  subroutine scalar_mixing_init_attributes(this, design, simulation, weight, &
+       name, mask_name, phi_ref)
+    class(scalar_mixing_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(simulation_t), target, intent(inout) :: simulation
+    real(kind=rp), intent(in) :: weight
+    real(kind=rp), intent(in) :: phi_ref
+    character(len=*), intent(in) :: mask_name
+    character(len=*), intent(in) :: name
+    type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
+
+    ! Call the base initializer
+    call this%init_base(name, design%size(), weight, mask_name)
+
+    ! Associate the integration weights
+    this%coef => simulation%neko_case%fluid%c_Xh
+
+    ! Compute the masked volume
+    if (this%has_mask) then
+      this%domain_volume = compute_masked_volume(this%mask, this%coef)
+    else
+      this%domain_volume = this%coef%volume
+    end if
+
+    ! Associate json parameters
+    this%phi_ref = phi_ref
+
+    ! Associate forward passive scalar
+    this%phi => simulation%neko_case%scalar%s
+
+    ! Associate the RHS of the adjoint passive scalar equation
+    this%f_phi_adjoint => simulation%adjoint_case%scalar_adj%f_Xh
+
+    ! Initialize the scalar mixing adjoint source term
+    call adjoint_forcing%init_from_components(this%f_phi_adjoint, &
+    this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
+
+    ! append adjoint source term to the adjoint passive scalar equation
+    call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
+    adjoint_forcing)
+
+  end subroutine scalar_mixing_init_attributes
+
+  !> Destructor.
+  subroutine scalar_mixing_free(this)
+    class(scalar_mixing_objective_t), intent(inout) :: this
+    call this%free_base()
+
+    !--------------------------------------------------------------------------
+    ! TO BE FILLED: Free everything
+    !--------------------------------------------------------------------------
+    ! eg,
+
+    ! this%u => null()
+    ! this%v => null()
+    ! this%w => null()
+    ! this%B => null()
+
+  end subroutine scalar_mixing_free
+
+  !> Compute the objective function.
+  !! @param design the design.
+  subroutine scalar_mixing_update_value(this, design)
+    class(scalar_mixing_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(field_t), pointer :: work
+    integer :: temp_indices(1), n
+
+
+    ! The objective being computed is
+    !
+    ! $1/2 \int_\Omega_{obj} (\phi - \phi_ref)^2 d\Omega$
+
+    ! get a working array
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+    n = work%size()
+
+    ! \phi
+    call field_copy(work, this%phi)
+    ! \phi - \phi_ref
+    call field_cadd(work, -this%phi_ref)
+    ! (\phi - \phi_ref)^2 
+    call field_col2(work, work)
+    ! mask to \Omega_{obj}
+    if (this%has_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
+    end if
+    ! integrate
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+      this%value = device_glsc2(work%x_d, this%coef%B_d, n)
+    else
+      this%value = glsc2(work%x, this%coef%B, n)
+    end if
+  
+    ! scale by 1/2 and 1/|\Omega_{obj}|
+    this%value = 0.5_rp * this%value / this%domain_volume
+
+    ! relingush the scratch field
+    call neko_scratch_registry%relinquish_field(temp_indices)
+  end subroutine scalar_mixing_update_value
+
+  !> Compute the sensitivity of the objective function with respect to the
+  !! design
+  !! @param design the design.
+  subroutine scalar_mixing_update_sensitivity(this, design)
+    class(scalar_mixing_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+
+    !--------------------------------------------------------------------------
+    ! TO BE FILLED: Compute your sensitivity with respect to the design
+    !--------------------------------------------------------------------------
+    ! eg,
+    ! call field_rzero(this%sensitivity)
+
+  end subroutine scalar_mixing_update_sensitivity
+
+end module scalar_mixing_objective

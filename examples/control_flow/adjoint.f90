@@ -368,8 +368,9 @@ contains
     !
     call this%s%init(C%end_time)
     if (scalar) then
-       this%f_out = adjoint_output_t(precision, this%scheme, C%scalar, &
-            path = trim(C%output_directory))
+       call neko_error("adjoint scalar not implemented for this example")
+       ! this%f_out = adjoint_output_t(precision, this%scheme, C%scalar, &
+       !      path = trim(C%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%scheme, &
             path = trim(C%output_directory))
