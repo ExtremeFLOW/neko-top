@@ -50,7 +50,7 @@ module adjoint_lube_source_term
   use coefs, only: coef_t
   use field, only: field_t
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use field_math, only: field_addcol3, field_copy, field_cmult
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
@@ -154,7 +154,7 @@ contains
     this%w => w
 
     select type (design)
-    type is (topopt_design_t)
+    type is (brinkman_design_t)
        this%chi => neko_field_registry%get_field("brinkman_amplitude")
     class default
        call neko_error('Unknown design type')

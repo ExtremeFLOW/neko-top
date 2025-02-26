@@ -36,14 +36,14 @@ submodule (design) design_factory_mod
   use utils, only: neko_type_error
 
   ! Import the design function types
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use simple_design, only: simple_design_t
 
   implicit none
 
   !> Known function types
   character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
-       "topopt", &
+       "brinkman", &
        "simple"]
 
 contains
@@ -70,8 +70,8 @@ contains
 
     call json_get(json, "optimization.design.type", type)
     select case (trim(type))
-    case ("topopt")
-       allocate(topopt_design_t::object)
+    case ("brinkman")
+       allocate(brinkman_design_t::object)
     case ("simple")
        allocate(simple_design_t::object)
 

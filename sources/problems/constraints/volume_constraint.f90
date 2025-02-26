@@ -39,7 +39,7 @@ module volume_constraint
   use constraint, only: constraint_t
 
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use simulation, only: simulation_t
 
   use num_types, only: rp
@@ -90,7 +90,7 @@ module volume_constraint
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
 
-     !> Computes the volume of the topopt_design.
+     !> Computes the volume of the brinkman_design.
      procedure, private, pass(this) :: compute_volume
 
   end type volume_constraint_t
@@ -249,20 +249,20 @@ contains
 
     volume = 0.0_rp
     select type (design)
-    type is (topopt_design_t)
-       volume = volume_topopt_design(this, design)
+    type is (brinkman_design_t)
+       volume = volume_brinkman_design(this, design)
 
     class default
-       call neko_error('Volume constraint only works with topopt_design')
+       call neko_error('Volume constraint only works with brinkman_design')
     end select
 
   end function compute_volume
 
-  !> Computes the volume of the topopt_design.
+  !> Computes the volume of the brinkman_design.
   !! @param design the design.
-  function volume_topopt_design(this, design) result(volume)
+  function volume_brinkman_design(this, design) result(volume)
     class(volume_constraint_t), intent(inout) :: this
-    type(topopt_design_t), intent(in) :: design
+    type(brinkman_design_t), intent(in) :: design
     real(kind=rp) :: volume
     type(field_t), pointer :: work, design_indicator
     integer :: temp_indices(1)
@@ -297,6 +297,6 @@ contains
 
     end if
 
-  end function volume_topopt_design
+  end function volume_brinkman_design
 
 end module volume_constraint

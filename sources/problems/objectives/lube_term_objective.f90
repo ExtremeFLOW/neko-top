@@ -63,7 +63,7 @@
 module lube_term_objective
   use objective, only: objective_t
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use simulation, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
 
@@ -172,13 +172,13 @@ contains
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
-    type is (topopt_design_t)
+    type is (brinkman_design_t)
        this%brinkman_amplitude => &
             neko_field_registry%get_field("brinkman_amplitude")
 
 
     class default
-       call neko_error('Minimum dissipation only works with topopt_design')
+       call neko_error('Minimum dissipation only works with brinkman_design')
     end select
 
     this%u => neko_field_registry%get_field('u')

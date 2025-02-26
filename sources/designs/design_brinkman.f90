@@ -30,8 +30,8 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-! Implements the `topopt_design_t` type.
-module topopt_design
+! Implements the `brinkman_design_t` type.
+module brinkman_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
@@ -58,12 +58,12 @@ module topopt_design
   private
 
   !> A topology optimization design variable
-  type, extends(design_t), public :: topopt_design_t
+  type, extends(design_t), public :: brinkman_design_t
      private
 
      ! TODO
      ! in the future make this a derived type of a `design_variable`
-     ! type, public, extends(design_variable_t) :: topopt_design_t
+     ! type, public, extends(design_variable_t) :: brinkman_design_t
      !> the unfilitered design
      type(field_t), pointer :: design_indicator
 
@@ -205,14 +205,14 @@ module topopt_design
      ! but it would make sense to have it in here so you provide it
      ! with dF/d_design_indicator and it updates itself.
      ! procedure, pass(this) :: update => topopt_design_update_design
-  end type topopt_design_t
+  end type brinkman_design_t
 
 
 contains
 
   !> Initialize the design from a JSON file
   subroutine topopt_design_init_from_json(this, parameters, simulation)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
 
@@ -231,7 +231,7 @@ contains
 
   !> Free the design
   subroutine topopt_design_free(this)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
     call this%brinkman_amplitude%free()
@@ -242,7 +242,7 @@ contains
   end subroutine topopt_design_free
 
   subroutine topopt_design_init_from_components(this, simulation)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
@@ -383,7 +383,7 @@ contains
 
 
   subroutine topopt_design_map_forward(this)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
     if (this%if_mask) then
@@ -405,7 +405,7 @@ contains
   end subroutine topopt_design_map_forward
 
   function topopt_design_get_design(this) result(x)
-    class(topopt_design_t), intent(in) :: this
+    class(brinkman_design_t), intent(in) :: this
     type(vector_t) :: x
     integer :: n
 
@@ -419,7 +419,7 @@ contains
   end function topopt_design_get_design
 
   subroutine topopt_design_update_design(this, x)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(inout) :: x
     integer :: n
 
@@ -439,7 +439,7 @@ contains
   end subroutine topopt_design_update_design
 
   subroutine topopt_design_map_backward(this, sensitivity)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
     type(field_t), pointer :: df_dchi
     type(field_t), pointer :: dF_dfiltered_design
@@ -483,11 +483,11 @@ contains
   end subroutine topopt_design_map_backward
 
   subroutine topopt_design_write(this, idx)
-    class(topopt_design_t), intent(inout) :: this
+    class(brinkman_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
     call this%output%sample(real(idx, kind=rp))
 
   end subroutine topopt_design_write
 
-end module topopt_design
+end module brinkman_design

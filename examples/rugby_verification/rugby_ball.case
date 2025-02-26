@@ -87,7 +87,7 @@
     },
     "optimization": {
         "design": {
-            "type": "topopt"
+            "type": "brinkman"
         },
         "solver": {
             "type": "mma",
