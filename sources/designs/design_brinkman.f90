@@ -166,11 +166,10 @@ module brinkman_design
      ! Initializations
 
      !> Initialize the design
-     generic, public :: init => init_from_json, &
-          init_from_components
+     generic, public :: init => init_from_json_sim, init_from_components
      !> Initialize the design from a JSON file
-     procedure, pass(this), public :: init_from_json => &
-          topopt_design_init_from_json
+     procedure, pass(this), public :: init_from_json_sim => &
+          topopt_design_init_from_json_sim
      !> Initialize the design from components
      procedure, pass(this), public :: init_from_components => &
           topopt_design_init_from_components
@@ -211,10 +210,10 @@ module brinkman_design
 contains
 
   !> Initialize the design from a JSON file
-  subroutine topopt_design_init_from_json(this, parameters, simulation)
+  subroutine topopt_design_init_from_json_sim(this, parameters, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout), optional :: simulation
+    type(simulation_t), intent(inout) :: simulation
 
     call this%init_from_components(simulation)
 
@@ -227,7 +226,7 @@ contains
     ! and then we would map for the first one
     call this%map_forward()
 
-  end subroutine topopt_design_init_from_json
+  end subroutine topopt_design_init_from_json_sim
 
   !> Free the design
   subroutine topopt_design_free(this)

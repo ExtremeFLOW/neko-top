@@ -57,9 +57,9 @@ contains
   !! @param type The type of the design function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine design_factory_w_simulation(object, json, simulation)
+  module subroutine design_factory_w_simulation(object, parameters, simulation)
     class(design_t), allocatable, intent(inout) :: object
-    type(json_file), intent(inout) :: json
+    type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: type
 
@@ -68,7 +68,7 @@ contains
        deallocate(object)
     end if
 
-    call json_get(json, "optimization.design.type", type)
+    call json_get(parameters, "optimization.design.type", type)
     select case (trim(type))
     case ("brinkman")
        allocate(brinkman_design_t::object)
@@ -79,7 +79,7 @@ contains
        call neko_type_error("design", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(json, simulation)
+    call object%init_from_json(parameters, simulation)
   end subroutine design_factory_w_simulation
 
   !> Factory function
@@ -88,9 +88,9 @@ contains
   !! @param type The type of the design function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine design_factory_wo_simulation(object, json)
+  module subroutine design_factory_wo_simulation(object, parameters)
     class(design_t), allocatable, intent(inout) :: object
-    type(json_file), intent(inout) :: json
+    type(json_file), intent(inout) :: parameters
     character(len=:), allocatable :: type
 
     if (allocated(object)) then
@@ -98,7 +98,7 @@ contains
        deallocate(object)
     end if
 
-    call json_get(json, "optimization.design.type", type)
+    call json_get(parameters, "optimization.design.type", type)
     select case (trim(type))
     case ("brinkman")
        allocate(brinkman_design_t::object)
@@ -109,7 +109,7 @@ contains
        call neko_type_error("design", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(json)
+    call object%init_from_json(parameters)
   end subroutine design_factory_wo_simulation
 
 end submodule design_factory_mod

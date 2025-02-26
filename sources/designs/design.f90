@@ -35,6 +35,7 @@ module design
   use json_module, only: json_file
   use simulation, only: simulation_t
   use vector, only: vector_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -63,16 +64,25 @@ module design
      !! additional setup.
      !!
      !! @param parameters The JSON parameters.
-     !! @param simulation The simulation object. [Optional]
-     procedure(design_init_from_json), public, pass(this), deferred :: &
-          init_from_json
+     !! @param simulation The simulation object.
+     procedure, pass(this) :: init_from_json_sim => design_init_from_json_sim
+
+     !> Initialize the design.
+     !! @details
+     !! This method is used to initialize the design from a JSON file. The
+     !! design object will be initialized based on the parameters provided in
+     !! the JSON file.
+     !!
+     !! @param parameters The JSON parameters.
+     procedure, pass(this) :: init_from_json => design_init_from_json
+
      !> Free the design.
-     procedure(design_free),public, pass(this), deferred :: free
+     procedure(design_free), public, pass(this), deferred :: free
 
      !> Retrieve the design variables.
      procedure(design_get_design), public, pass(this), deferred :: get_design
      !> Update the design variables.
-     procedure(design_update_design),public, pass(this), deferred :: &
+     procedure(design_update_design), public, pass(this), deferred :: &
           update_design
 
      !> Run the forward mapping of the design
@@ -92,7 +102,7 @@ module design
      !> Free the base design
      procedure, pass(this) :: free_base => design_free_base
      !> Return the number of design variables
-     procedure, public, pass(this) :: size => desigwwwwwwwwn_size
+     procedure, public, pass(this) :: size => design_size
 
   end type design_t
 
@@ -100,13 +110,6 @@ module design
   ! Public interface for the deferred methods
 
   abstract interface
-     subroutine design_init_from_json(this, parameters, simulation)
-       import design_t, simulation_t, json_file
-       class(design_t), intent(inout) :: this
-       type(json_file), intent(inout) :: parameters
-       type(simulation_t), intent(inout), optional :: simulation
-     end subroutine design_init_from_json
-
      subroutine design_free(this)
        import design_t
        class(design_t), intent(inout) :: this
@@ -152,23 +155,42 @@ module design
   !! additional setup.
   !!
   !! @param object The design object.
-  !! @param json The JSON file.
+  !! @param parameters The JSON file.
   !! @param simulation The simulation object [Optional].
   interface design_factory
-     module subroutine design_factory_w_simulation(object, json, simulation)
+     module subroutine design_factory_simulation(object, parameters, simulation)
        class(design_t), allocatable, intent(inout) :: object
-       type(json_file), intent(inout) :: json
+       type(json_file), intent(inout) :: parameters
        type(simulation_t), intent(inout) :: simulation
-     end subroutine design_factory_w_simulation
+     end subroutine design_factory_simulation
 
-     module subroutine design_factory_wo_simulation(object, json)
+     module subroutine design_factoryulation(object, parameters)
        class(design_t), allocatable, intent(inout) :: object
-       type(json_file), intent(inout) :: json
-     end subroutine design_factory_wo_simulation
+       type(json_file), intent(inout) :: parameters
+     end subroutine design_factoryulation
   end interface design_factory
 
   public :: design_t, design_factory
 contains
+
+  !> Dummy initialization from JSON
+  subroutine design_init_from_json(this, parameters)
+    class(design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+
+    call neko_error("Design type does not support initialization &
+         &without simulation")
+  end subroutine design_init_from_json
+
+  !> Dummy initialization from JSON
+  subroutine design_init_from_json_sim(this, parameters, simulation)
+    class(design_t), intent(inout) :: this
+    type(json_file), intent(inout) :: parameters
+    type(simulation_t), intent(inout) :: simulation
+
+    call neko_error("Design type does not support initialization &
+         &with simulation")
+  end subroutine design_init_from_json_sim
 
   !> Initialize the base design
   subroutine design_init_base(this, n)

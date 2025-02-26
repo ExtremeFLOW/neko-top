@@ -72,10 +72,10 @@ module simple_design
      !> Initialize the design
      generic, public :: init => init_from_json, init_from_components
      !> Initialize the design from a JSON file
-     procedure, pass(this), public :: init_from_json => &
+     procedure, pass(this) :: init_from_json => &
           design_simple_init_from_json
      !> Initialize the design from components
-     procedure, pass(this), public :: init_from_components => &
+     procedure, pass(this) :: init_from_components => &
           design_simple_init_from_components
 
      !> Add mappings to the design
@@ -104,15 +104,14 @@ module simple_design
 contains
 
   !> Initialize the design from a JSON file
-  subroutine design_simple_init_from_json(this, parameters, simulation)
+  subroutine design_simple_init_from_json(this, parameters)
     class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout), optional :: simulation
     integer :: n
 
     call json_get(parameters, 'design.n', n)
 
-    call this%init_from_components(n, simulation)
+    call this%init_from_components(n)
 
   end subroutine design_simple_init_from_json
 
@@ -125,10 +124,9 @@ contains
 
   end subroutine design_simple_free
 
-  subroutine design_simple_init_from_components(this, n, simulation)
+  subroutine design_simple_init_from_components(this, n)
     class(simple_design_t), intent(inout) :: this
     integer, intent(in) :: n
-    type(simulation_t), intent(inout) :: simulation
 
     call this%init_base(n)
     call this%x%init(n)
