@@ -1,4 +1,4 @@
-! Copyright (c) 2024, The Neko Authors
+! Copyright (c) 2024-2025, The Neko Authors
 ! All rights reserved.
 !
 ! Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-! Implements the `topopt_design_t` type.
+!> Implements the `design_t`.
 module design
   use json_module, only: json_file
   use simulation, only: simulation_t
@@ -38,33 +38,51 @@ module design
   implicit none
   private
 
-  !> A topology optimization design variable
+  !> An abstract design type.
+  !!
+  !! This type is used to define the interface for the design variables. These
+  !! design are used to define the optimization problem. A given design can be
+  !! initialized from the factory and is responsible for providing any
+  !! alterations to the simulation based on the design variables.
   type, abstract :: design_t
+     private
 
      !> The number of design variables
-     integer, private :: n = 0
+     integer :: n = 0
 
    contains
 
      ! ----------------------------------------------------------------------- !
      ! Interfaces
 
-     !> Initialize the design
-     procedure(design_init_from_json), pass(this), deferred :: init_from_json
-     !> Free the design
-     procedure(design_free), pass(this), deferred :: free
+     !> Initialize the design.
+     !! @details
+     !! This method is used to initialize the design from a JSON file. The
+     !! design object will be initialized based on the parameters provided in
+     !! the JSON file. The simulation object is also provided to allow for any
+     !! additional setup.
+     !!
+     !! @param parameters The JSON parameters.
+     !! @param simulation The simulation object. [Optional]
+     procedure(design_init_from_json), public, pass(this), deferred :: &
+          init_from_json
+     !> Free the design.
+     procedure(design_free),public, pass(this), deferred :: free
 
-     !> Retrieve the design variables
-     procedure(design_get_design), pass(this), deferred :: get_design
-     !> Update the design variables
-     procedure(design_update_design), pass(this), deferred :: update_design
+     !> Retrieve the design variables.
+     procedure(design_get_design), public, pass(this), deferred :: get_design
+     !> Update the design variables.
+     procedure(design_update_design),public, pass(this), deferred :: &
+          update_design
 
      !> Run the forward mapping of the design
-     procedure(design_map_forward), pass(this), deferred :: map_forward
+     procedure(design_map_forward), public, pass(this), deferred :: &
+          map_forward
      !> Run the backward mapping of the design
-     procedure(design_map_backward), pass(this), deferred :: map_backward
+     procedure(design_map_backward), public, pass(this), deferred :: &
+          map_backward
      !> Write the design
-     procedure(design_write), pass(this), deferred :: write
+     procedure(design_write), public, pass(this), deferred :: write
 
      ! ----------------------------------------------------------------------- !
      ! Methods
@@ -74,7 +92,7 @@ module design
      !> Free the base design
      procedure, pass(this) :: free_base => design_free_base
      !> Return the number of design variables
-     procedure, pass(this) :: size => design_size
+     procedure, public, pass(this) :: size => desigwwwwwwwwn_size
 
   end type design_t
 
@@ -86,7 +104,7 @@ module design
        import design_t, simulation_t, json_file
        class(design_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
-       type(simulation_t), intent(inout) :: simulation
+       type(simulation_t), intent(inout), optional :: simulation
      end subroutine design_init_from_json
 
      subroutine design_free(this)
@@ -100,13 +118,6 @@ module design
        type(vector_t) :: x
      end function design_get_design
 
-     !> Update the design variables
-     !!
-     !! Update the design variables based on the input vector. Any mapping or
-     !! other operations will be applied to the input upon return.
-     !!
-     !! @param this The design object.
-     !! @param x The design variables.
      subroutine design_update_design(this, x)
        import design_t, vector_t
        class(design_t), intent(inout) :: this
@@ -134,13 +145,27 @@ module design
   ! ========================================================================== !
   ! Interface for the factory function
 
-  interface
-     module subroutine design_factory(object, json, simulation)
+  !> Factory function for the design object.
+  !! @details
+  !! This function is used to create a new design object based on the provided
+  !! JSON file. The simulation object is also provided to allow for any
+  !! additional setup.
+  !!
+  !! @param object The design object.
+  !! @param json The JSON file.
+  !! @param simulation The simulation object [Optional].
+  interface design_factory
+     module subroutine design_factory_w_simulation(object, json, simulation)
        class(design_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        type(simulation_t), intent(inout) :: simulation
-     end subroutine design_factory
-  end interface
+     end subroutine design_factory_w_simulation
+
+     module subroutine design_factory_wo_simulation(object, json)
+       class(design_t), allocatable, intent(inout) :: object
+       type(json_file), intent(inout) :: json
+     end subroutine design_factory_wo_simulation
+  end interface design_factory
 
   public :: design_t, design_factory
 contains
@@ -155,6 +180,7 @@ contains
   !> Free the base design
   subroutine design_free_base(this)
     class(design_t), intent(inout) :: this
+    this%n = 0
   end subroutine design_free_base
 
   !> Return the number of design variables

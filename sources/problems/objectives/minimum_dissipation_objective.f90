@@ -78,7 +78,7 @@ module minimum_dissipation_objective
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
+  use brinkman_design, only: brinkman_design_t
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
@@ -269,7 +269,7 @@ contains
 
   end subroutine minimum_dissipation_update_value
 
-  !> update_value the sensitivity of the objective function with respect to $\chi$
+  !> update_value the sensitivity of the objective function with respect to \f$\chi\f$
   !! @param design the design.
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this

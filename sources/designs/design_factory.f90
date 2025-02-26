@@ -57,7 +57,7 @@ contains
   !! @param type The type of the design function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine design_factory(object, json, simulation)
+  module subroutine design_factory_w_simulation(object, json, simulation)
     class(design_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(simulation_t), intent(inout) :: simulation
@@ -80,6 +80,36 @@ contains
     end select
 
     call object%init_from_json(json, simulation)
-  end subroutine design_factory
+  end subroutine design_factory_w_simulation
+
+  !> Factory function
+  !! Allocates and initializes an design function object
+  !! @param object The design function object to be created
+  !! @param type The type of the design function
+  !! @param design The design object
+  !! @param simulation The simulation object
+  module subroutine design_factory_wo_simulation(object, json)
+    class(design_t), allocatable, intent(inout) :: object
+    type(json_file), intent(inout) :: json
+    character(len=:), allocatable :: type
+
+    if (allocated(object)) then
+       call object%free()
+       deallocate(object)
+    end if
+
+    call json_get(json, "optimization.design.type", type)
+    select case (trim(type))
+    case ("brinkman")
+       allocate(brinkman_design_t::object)
+    case ("simple")
+       allocate(simple_design_t::object)
+
+    case default
+       call neko_type_error("design", type, KNOWN_TYPES)
+    end select
+
+    call object%init_from_json(json)
+  end subroutine design_factory_wo_simulation
 
 end submodule design_factory_mod

@@ -214,7 +214,7 @@ contains
   subroutine topopt_design_init_from_json(this, parameters, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
+    type(simulation_t), intent(inout), optional :: simulation
 
     call this%init_from_components(simulation)
 
