@@ -34,6 +34,7 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 2.0,
+            "output_control": "never",
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -72,30 +73,55 @@
                     "zone_indices": [ 2]
                 }
             ],
-            "output_control": "simulationtime",
-            "output_value": 2.00,
         },
         "scalar": {
             "enabled": true,
             // in the real case we'll be working with a much higher Peclet number
             "Pe": 500.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
             "boundary_conditions": [
                 {
-                    "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "type": "user",
                     "zone_indices": [ 1 ]
                 },
                 {
-                    "type": "symmetry",
-                    "zone_indices": [ 3, 4, 5, 6 ]
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [2, 3, 4, 5, 6 ]
                 },
-                {
-                    "type": "outflow",
-                    "zone_indices": [ 2]
-                }
             ],
             "initial_condition": {
-                "type": "user"
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
+            }
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [2, 3, 4, 5, 6 ]
+                },
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
             }
         },
      "point_zones": [

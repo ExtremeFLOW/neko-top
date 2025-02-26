@@ -134,7 +134,7 @@ contains
     !
     ! Setup fluid fluid_adj
     !
-    call json_get(neko_case%params, 'case.fluid.fluid_adj', string_val)
+    call json_get(neko_case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%fluid_adj, trim(string_val))
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
