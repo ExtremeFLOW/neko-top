@@ -144,6 +144,11 @@ contains
     character(len=*), intent(in) :: name
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
 
+    ! Start by checking if the adjoint scalar has been initialized
+    if (.not.allocated(simulation%adjoint_case%scalar_adj)) then
+    call neko_error("adjoint passive scalar not initialized")
+    end if
+
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
 
