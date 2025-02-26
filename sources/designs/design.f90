@@ -107,6 +107,27 @@ module design
   end type design_t
 
   ! ========================================================================== !
+  ! Interface for the factory function
+
+  !> Factory function for the design object.
+  !! @details
+  !! This function is used to create a new design object based on the provided
+  !! JSON file. The simulation object is also provided to allow for any
+  !! additional setup.
+  !!
+  !! @param object The design object.
+  !! @param parameters The JSON file.
+  !! @param simulation The simulation object [Optional].
+  interface design_factory
+     module subroutine design_factory(object, parameters, simulation)
+       class(design_t), allocatable, intent(inout) :: object
+       type(json_file), intent(inout) :: parameters
+       type(simulation_t), intent(inout), optional :: simulation
+     end subroutine design_factory
+  end interface design_factory
+
+
+  ! ========================================================================== !
   ! Public interface for the deferred methods
 
   abstract interface
@@ -144,31 +165,6 @@ module design
        integer, intent(in) :: idx
      end subroutine design_write
   end interface
-
-  ! ========================================================================== !
-  ! Interface for the factory function
-
-  !> Factory function for the design object.
-  !! @details
-  !! This function is used to create a new design object based on the provided
-  !! JSON file. The simulation object is also provided to allow for any
-  !! additional setup.
-  !!
-  !! @param object The design object.
-  !! @param parameters The JSON file.
-  !! @param simulation The simulation object [Optional].
-  interface design_factory
-     module subroutine design_factory_simulation(object, parameters, simulation)
-       class(design_t), allocatable, intent(inout) :: object
-       type(json_file), intent(inout) :: parameters
-       type(simulation_t), intent(inout) :: simulation
-     end subroutine design_factory_simulation
-
-     module subroutine design_factoryulation(object, parameters)
-       class(design_t), allocatable, intent(inout) :: object
-       type(json_file), intent(inout) :: parameters
-     end subroutine design_factoryulation
-  end interface design_factory
 
   public :: design_t, design_factory
 contains

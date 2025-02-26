@@ -57,10 +57,10 @@ contains
   !! @param type The type of the design function
   !! @param design The design object
   !! @param simulation The simulation object
-  module subroutine design_factory_w_simulation(object, parameters, simulation)
+  module subroutine design_factory(object, parameters, simulation)
     class(design_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
+    type(simulation_t), intent(inout), optional :: simulation
     character(len=:), allocatable :: type
 
     if (allocated(object)) then
@@ -79,37 +79,11 @@ contains
        call neko_type_error("design", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(parameters, simulation)
-  end subroutine design_factory_w_simulation
-
-  !> Factory function
-  !! Allocates and initializes an design function object
-  !! @param object The design function object to be created
-  !! @param type The type of the design function
-  !! @param design The design object
-  !! @param simulation The simulation object
-  module subroutine design_factory_wo_simulation(object, parameters)
-    class(design_t), allocatable, intent(inout) :: object
-    type(json_file), intent(inout) :: parameters
-    character(len=:), allocatable :: type
-
-    if (allocated(object)) then
-       call object%free()
-       deallocate(object)
+    if (present(simulation)) then
+       call object%init_from_json_sim(parameters, simulation)
+    else
+       call object%init_from_json(parameters)
     end if
-
-    call json_get(parameters, "optimization.design.type", type)
-    select case (trim(type))
-    case ("brinkman")
-       allocate(brinkman_design_t::object)
-    case ("simple")
-       allocate(simple_design_t::object)
-
-    case default
-       call neko_type_error("design", type, KNOWN_TYPES)
-    end select
-
-    call object%init_from_json(parameters)
-  end subroutine design_factory_wo_simulation
+  end subroutine design_factory
 
 end submodule design_factory_mod
