@@ -153,7 +153,11 @@ function prepare {
 
     JSON_FORTRAN=$(find $JSON_FORTRAN_DIR -type d \
         -exec test -f '{}'/libjsonfortran.so \; -print)
-    export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    # export LD_LIBRARY_PATH="$JSON_FORTRAN:$LD_LIBRARY_PATH"
+    export LD_LIBRARY_PATH="$JSON_FORTRAN/"
+    export PKG_CONFIG_PATH="${LD_LIBRARY_PATH}pkgconfig"
+    echo $PKG_CONFIG_PATH
+    echo $LD_LIBRARY_PATH
     export PATH="$NEKO_DIR/bin:$PATH"
 
     # ------------------------------------------------------------------------ #

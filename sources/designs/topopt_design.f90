@@ -243,12 +243,9 @@ contains
     this%design_indicator%x = 0.0_rp
 
     n = this%design_indicator%dof%size()
+    ! This is probably getting fixed in tim's PR anyway, otherwise I'll fix it.
     do i = 1, n
-       if (sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
-            (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2) .lt. 0.25_rp) then
-          this%design_indicator%x(i,1,1,1) = 1.0_rp
-       end if
+          this%design_indicator%x(i,1,1,1) = 0.0_rp
     end do
 
     ! again this will be handled better in the future...

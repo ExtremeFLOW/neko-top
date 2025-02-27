@@ -5,8 +5,8 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": true,
-        "end_time": 0.1,
-        "timestep": 1e-4,
+        "end_time": 9.0,
+        "timestep": 5e-4,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -23,20 +23,19 @@
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-2,
                 "max_iterations": 800
             },
             "boundary_conditions": [
                 {
-                    "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "type": "user_velocity_pointwise",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -60,9 +59,13 @@
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0,
+            },
             "boundary_conditions": [
                 {
-                    "type": "user",
+                    "type": "user_pointwise",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -71,9 +74,24 @@
                     "zone_indices": [2, 3, 4, 5, 6 ]
                 },
             ],
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [1]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [2, 3, 4, 5, 6 ]
+                }
+            ],
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": 0.0,
             }
         },
         "adjoint_fluid": {
@@ -143,22 +161,12 @@
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "scalar_mixing",
+                "phi_ref": 0.5,
                 "weight": 1.0
             },
-            {
-                "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
-            }
         ],
         "constraints": [
-            {
-                "type": "volume",
-                "mask_name": "optimization_domain",
-                "limit": 0.2,
-                "is_max": false
-            }
         ],
     },
 

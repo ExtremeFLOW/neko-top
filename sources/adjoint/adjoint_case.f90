@@ -88,6 +88,9 @@ contains
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), target, intent(inout) :: neko_case
     real(kind=rp) :: tol
+    logical :: have_scalar
+
+
 
     ! Read the tolerance
     call json_get_or_default(neko_case%params, "tol", tol, 1.0e-6_rp)
@@ -95,23 +98,23 @@ contains
     ! I think this is correct.
     ! Maybe there would be a case where we would want a scalar but
     ! no adjoint scalar. So this forces us to prescribe an adjoint scalar.
-    if (neko_case%params%valid_path('case.adjoint_scalar')) then
       call json_get_or_default(neko_case%params, 'case.adjoint_scalar.enabled', &
-         this%have_scalar, .true.)
-    end if
+         have_scalar, .false.)
 
-    call adjoint_init_from_attributes(this, neko_case, tol)
+    call adjoint_init_from_attributes(this, neko_case, tol, have_scalar)
 
   end subroutine adjoint_init_from_json
 
   ! Constructor from attributes
-  subroutine adjoint_init_from_attributes(this, neko_case, tol)
+  subroutine adjoint_init_from_attributes(this, neko_case, tol, have_scalar)
     class(adjoint_case_t), intent(inout) :: this
     class(case_t), intent(inout), target :: neko_case
     real(kind=rp), intent(in) :: tol
+    logical :: have_scalar
 
     this%case => neko_case
     this%tol = tol
+    this%have_scalar = have_scalar
 
 
     call adjoint_case_init_common(this, neko_case)
@@ -252,7 +255,7 @@ contains
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
 
-       call neko_log%section("Adjoint scalar_adj initial condition ")
+       !call neko_log%section("Adjoint scalar initial condition ")
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(this%scalar_adj%s_adj, this%scalar_adj%c_Xh, &
@@ -264,7 +267,7 @@ contains
           !      this%usr%scalar_user_ic, neko_case%params)
        end if
 
-       call neko_log%end_section()
+      ! call neko_log%end_section()
 
     end if
 

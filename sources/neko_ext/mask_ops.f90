@@ -38,7 +38,7 @@ module mask_ops
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use scratch_registry, only: neko_scratch_registry
-  use field_math, only: field_cfill, field_copy
+  use field_math, only: field_cfill, field_copy, field_rone
   use device_math_ext, only: device_copy_mask
   use device_math, only: device_copy, device_glsc2
   use math_ext, only: copy_mask
@@ -201,5 +201,5 @@ contains
    call neko_scratch_registry%relinquish_field(temp_indices)
    compute_masked_volume = tmp
   end function compute_masked_volume
-    
+
 end module mask_ops

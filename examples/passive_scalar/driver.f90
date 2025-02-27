@@ -3,7 +3,6 @@ program usrneko
   use topopt_design, only: topopt_design_t
   use problem, only: problem_t
   use optimizer, only : optimizer_t, optimizer_factory
-
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
@@ -46,6 +45,8 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
+  ! initialize the user additions
+  call user_setup(simulation%neko_case%usr)
 
   call simulation%init(parameters)
 

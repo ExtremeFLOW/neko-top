@@ -20,27 +20,12 @@ contains
   ! Register user-defined functions (see user_intf.f90)
   subroutine user_setup(user)
     type(user_t), intent(inout) :: user
-    user%init_user_simcomp => user_simcomp
-    user%fluid_user_if => fluid_bc
+    user%fluid_user_if => user_inflow_eval
     user%scalar_user_bc => scalar_bc
-    user%scalar_user_ic => scalar_ic
   end subroutine user_setup
 
-  subroutine user_simcomp(params)
-    type(json_file), intent(inout) :: params
-    type(steady_simcomp_t), allocatable :: steady_comp
-    type(json_file) :: simcomp_settings
-
-    ! Allocate a simulation component
-    allocate(steady_comp)
-    simcomp_settings = simulation_component_user_settings("steady", params)
-
-    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
-
-  end subroutine user_simcomp
-
     ! user-defined boundary condition
-    subroutine fluid_bc(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
+    subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
       real(kind=rp), intent(inout) :: u
       real(kind=rp), intent(inout) :: v
       real(kind=rp), intent(inout) :: w
@@ -59,12 +44,10 @@ contains
 
       ! Casper said he used a parabloid, which is not a solution to NS but
       ! I suppose it will sort itself out with enough distance...
-   
       u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
       v = 0._rp
       w = 0._rp
-   
-    end subroutine fluid_bc
+    end subroutine user_inflow_eval
 
     subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
     real(kind=rp), intent(inout) :: s
@@ -83,11 +66,11 @@ contains
     real(kind=rp) :: L, k, z_0
     ! TODO
     ! OK here I'm doing something different to Casper.
-    ! I feel like since we get a term in the adjoint velocity equation that 
+    ! I feel like since we get a term in the adjoint velocity equation that
     ! looks like s_adj * grad(s), it's not a good idea to have discontinuity
     ! on this boundary.
     ! ie,
-    ! 
+    !
     !    DONT                    DO (but smoother)
     !        _______               ______
     !       |                     /
@@ -101,24 +84,12 @@ contains
     z_0 = 1.0_rp
 
     s = L / (1.0_rp + exp(-k*(z - z_0)))
+    ! if (z.gt.1.0_rp) then
+    !    s = 1.0_rp
+    ! else
+    !    s = 0.0_rp
+    ! end if
 
   end subroutine scalar_bc
-
-  !> User initial condition                                                     
-  subroutine scalar_ic(s, params)                                                  
-    type(field_t), intent(inout) :: s                                           
-    type(json_file), intent(inout) :: params                                    
-    integer :: i
-    real(kind=rp) :: L, k, z_0
-
-    L = 1.0_rp
-    k = 20.0_rp
-    z_0 = 1.0_rp
-                                                                                
-    do i = 1, s%dof%size()                                                      
-       s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
-    end do                                                                      
-                                                                                
-    end subroutine scalar_ic
 
 end module user

@@ -45,13 +45,14 @@ module scalar_mixing_objective
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field, only: field_t
-  use field_math, only: field_copy, field_cadd, field_col2
+  use field_math, only: field_copy, field_cadd, field_col2, field_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: glsc2
+  use math, only: glsc2, copy
   use device_math, only: device_glsc2
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
+  use utils, only: neko_error
   use adjoint_mixing_scalar_source_term, only: &
     adjoint_mixing_scalar_source_term_t
   ! delete after
@@ -67,9 +68,6 @@ module scalar_mixing_objective
 
      !> pointer to the primal passive scalar fields $\phi$
      type(field_t), pointer :: phi
-     !> pointer to the RHS (forcing) of adjoint passive scalar equation
-     !! $ f_{\phi^\dagger} $
-     type(field_t), pointer :: f_phi_adjoint
      !> Target concentration in the optimized region $\phi_{ref}$
      real(kind=rp) :: phi_ref
      !> Coefficients defined on a given mesh
@@ -162,22 +160,25 @@ contains
       this%domain_volume = this%coef%volume
     end if
 
+     !> Associate the RHS of the passive scalar equation
+     !! $ f_{\phi^\dagger} $
+     associate(f_phi_adj => simulation%adjoint_case%scalar_adj%f_Xh)
+
     ! Associate json parameters
     this%phi_ref = phi_ref
 
     ! Associate forward passive scalar
     this%phi => simulation%neko_case%scalar%s
 
-    ! Associate the RHS of the adjoint passive scalar equation
-    this%f_phi_adjoint => simulation%adjoint_case%scalar_adj%f_Xh
-
     ! Initialize the scalar mixing adjoint source term
-    call adjoint_forcing%init_from_components(this%f_phi_adjoint, &
+    call adjoint_forcing%init_from_components(f_phi_adj, &
     this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
 
     ! append adjoint source term to the adjoint passive scalar equation
     call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
     adjoint_forcing)
+
+    end associate
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS
