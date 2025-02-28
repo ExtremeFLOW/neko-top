@@ -45,7 +45,7 @@ module adjoint_mixing_scalar_source_term
   use neko_config, only : NEKO_BCKND_DEVICE
   use utils, only : neko_error
   use field_math, only: field_addcol3, field_add2, field_cadd, field_col2, &
-  field_add2s2, field_copy, field_cfill
+       field_add2s2, field_copy, field_cfill
   use operators, only: opgrad
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use point_zone, only: point_zone_t
@@ -57,13 +57,13 @@ module adjoint_mixing_scalar_source_term
   ! TODO
   ! it actually isn't this. Infact, his is a surface integral on the outlet
   ! Which means we get strange BC's in our adjoint problem.
-  ! This source term would be if we had a certain volume that we wanted more 
+  ! This source term would be if we had a certain volume that we wanted more
   ! mixed
   ! the forcing is of the form:
   ! $ \phi - \phi_ref $
   ! ie, difference between it and the average.
   type, public, extends(source_term_t) :: &
-  adjoint_mixing_scalar_source_term_t
+       adjoint_mixing_scalar_source_term_t
      !> here we have s (coming from the primal)
      type(field_t), pointer :: s
      !> A scalaing factor
@@ -79,15 +79,15 @@ module adjoint_mixing_scalar_source_term
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
-     adjoint_mixing_scalar_source_term_init_from_json
+          adjoint_mixing_scalar_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-       adjoint_mixing_scalar_source_term_init_from_components
+          adjoint_mixing_scalar_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => adjoint_mixing_scalar_source_term_free
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute_ => &
-     adjoint_mixing_scalar_source_term_compute
+          adjoint_mixing_scalar_source_term_compute
   end type adjoint_mixing_scalar_source_term_t
 
 contains
@@ -96,7 +96,7 @@ contains
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   subroutine adjoint_mixing_scalar_source_term_init_from_json(this, &
-  json, fields, coef)
+       json, fields, coef)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
@@ -139,7 +139,7 @@ contains
     this%obj_scale = obj_scale
     this%phi_ref = phi_ref
     this%if_mask = if_mask
-    
+
     if (this%if_mask) then
        this%mask => mask
        this%mask_volume = compute_masked_volume(this%mask, coef)
@@ -168,7 +168,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-    
+
     fs => this%fields%get(1)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
@@ -185,7 +185,7 @@ contains
     call field_add2s2(fs, work, this%obj_scale / this%mask_volume)
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-    
+
   end subroutine adjoint_mixing_scalar_source_term_compute
 
 end module adjoint_mixing_scalar_source_term

@@ -64,7 +64,8 @@ module adjoint_TEMPLATE_source_term
      !-------------------------------------------------------------------------
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => adjoint_TEMPLATE_source_term_init_from_json
+     procedure, pass(this) :: init => &
+          adjoint_TEMPLATE_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
           adjoint_TEMPLATE_source_term_init_from_components
@@ -80,7 +81,7 @@ contains
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   subroutine adjoint_TEMPLATE_source_term_init_from_json(this, json, fields, &
-     coef)
+       coef)
     class(adjoint_TEMPLATE_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
@@ -95,7 +96,7 @@ contains
   ! TO BE FILLED: Document your additional parameters
   !----------------------------------------------------------------------------
   subroutine adjoint_TEMPLATE_source_term_init_from_components(this, mask, &
-     if_mask, coef)
+       if_mask, coef)
     class(adjoint_TEMPLATE_source_term_t), intent(inout) :: this
     type(field_list_t) :: fields
     type(coef_t) :: coef
