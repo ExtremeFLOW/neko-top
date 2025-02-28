@@ -254,6 +254,7 @@ contains
 
     if (this%have_scalar) then
 
+       ! we shouldn't fallback to the primal here.
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
 
