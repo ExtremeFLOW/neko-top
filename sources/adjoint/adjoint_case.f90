@@ -98,8 +98,8 @@ contains
     ! I think this is correct.
     ! Maybe there would be a case where we would want a scalar but
     ! no adjoint scalar. So this forces us to prescribe an adjoint scalar.
-      call json_get_or_default(neko_case%params, 'case.adjoint_scalar.enabled', &
-         have_scalar, .false.)
+      call json_get_or_default(neko_case%params, &
+         'case.adjoint_scalar.enabled', have_scalar, .false.)
 
     call adjoint_init_from_attributes(this, neko_case, tol, have_scalar)
 
@@ -157,24 +157,27 @@ contains
 
     if (this%have_scalar) then
        allocate(this%scalar_adj)
-       ! TODO
+       ! @todo
        ! these tlag and dtlag are new, we likely need to update the standard
        ! fluid in a different PR.
        ! For now I'm commenting them out in the scalar.
        ! this%scalar_adj%chkp%tlag => neko_case%tlag
        ! this%scalar_adj%chkp%dtlag => neko_case%dtlag
-       call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-       neko_case%params, neko_case%usr, neko_case%fluid%ulag, neko_case%fluid%vlag, &
-       neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+       call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, &
+          neko_case%fluid%gs_Xh, neko_case%params, neko_case%usr, &
+          neko_case%fluid%ulag, neko_case%fluid%vlag, &
+          neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
 
        ! call neko_case%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
 
-       ! TODO
-       ! I don't really understand checkpoints or why the fluid would need to know
-       ! about the scalar's lag and time integration terms.
+       ! ----------------------------------------------------------------------
+       ! @todo
+       ! I don't really understand checkpoints or why the fluid would need to
+       ! know about the scalar's lag and time integration terms.
        !
-       ! Since we won't be using checkpoints, I'm commenting this out, but leaving
-       ! a rather large TODO here for when we come back to unsteady.
+       ! Since we won't be using checkpoints, I'm commenting this out, but
+       ! leaving a rather large TODO here for when we come back to unsteady.
+       ! ----------------------------------------------------------------------
        ! neko_case%fluid%chkp%abs1 => this%scalar_adj%abx1
        ! neko_case%fluid%chkp%abs2 => this%scalar_adj%abx2
        ! neko_case%fluid%chkp%slag => this%scalar_adj%slag
