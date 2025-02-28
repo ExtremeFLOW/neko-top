@@ -140,11 +140,11 @@ module adjoint_scalar_pnpn
      !! @param[inout] json JSON object for initializing the bc.
      !! @param[in] coef SEM coefficients.
      module subroutine adjoint_bc_factory(object, scheme, json, coef, user)
-        class(bc_t), pointer, intent(inout) :: object
-        type(adjoint_scalar_pnpn_t), intent(in) :: scheme
-        type(json_file), intent(inout) :: json
-        type(coef_t), intent(in) :: coef
-        type(user_t), intent(in) :: user
+       class(bc_t), pointer, intent(inout) :: object
+       type(adjoint_scalar_pnpn_t), intent(in) :: scheme
+       type(json_file), intent(inout) :: json
+       type(coef_t), intent(in) :: coef
+       type(user_t), intent(in) :: user
      end subroutine adjoint_bc_factory
   end interface
 
@@ -233,8 +233,8 @@ contains
 
 
     ! Initialize projection space
-    call this%proj_s%init(this%dm_Xh%size(), this%projection_dim,  &
-                            this%projection_activ_step)
+    call this%proj_s%init(this%dm_Xh%size(), this%projection_dim, &
+         this%projection_activ_step)
 
     ! Add lagged term to checkpoint
     ! @todo Init chkp object, note, adding 3 slags
@@ -244,12 +244,13 @@ contains
     call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
 
     ! Initialize advection factory
-    ! call json_get_or_default(params, 'case.scalar.advection', advection, .true.)
+    ! call json_get_or_default(params, 'case.scalar.advection', advection, &
+    ! .true.)
     ! call advection_adjoint_factory(this%adv, params, this%c_Xh, &
     !                        ulag, vlag, wlag, this%chkp%dtlag, &
     !                         this%chkp%tlag, time_scheme, .not. advection, &
     !                        this%s_adj_lag)
-    ! NOTE
+    ! @todo NOTE:
     ! This is changed a fair amount and I suspect it's due oifs
     call advection_adjoint_factory(this%adv, params, this%c_Xh)
   end subroutine adjoint_scalar_pnpn_init
@@ -268,17 +269,17 @@ contains
     call col2(this%s_adj_lag%lf(2)%x, this%c_Xh%mult, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(this%s_adj%x, this%s_adj%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%abx1%x, this%abx1%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%abx2%x, this%abx2%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%advs%x, this%advs%x_d, &
-                          n, HOST_TO_DEVICE, sync = .false.)
+            n, HOST_TO_DEVICE, sync = .false.)
     end if
 
     call this%gs_Xh%op(this%s_adj, GS_OP_ADD)
@@ -386,7 +387,7 @@ contains
       else
          ! Add the advection operators to the right-hans-side.
          call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
-                                      Xh, this%c_Xh, dm_Xh%size())
+              Xh, this%c_Xh, dm_Xh%size())
 
          ! At this point the RHS contains the sum of the advection operator,
          ! Neumann boundary sources and additional source terms, evaluated using
@@ -394,7 +395,7 @@ contains
          ! Now, this value is used in the explicit time scheme to advance these
          ! terms in time.
          call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho, &
-                                     ext_bdf%advection_coeffs, n)
+              ext_bdf%advection_coeffs, n)
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho, &
@@ -405,15 +406,15 @@ contains
 
       !> Apply strong boundary conditions.
       call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), t, tstep, &
-         .true.)
+           .true.)
 
       ! Update material properties if necessary
       call this%update_material_properties()
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
-      call res%compute(Ax, s_adj,  s_adj_res, f_Xh, c_Xh, msh, Xh, &
-         lambda_field, rho*cp, ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
+      call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
+           lambda_field, rho*cp, ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
@@ -431,8 +432,8 @@ contains
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Adjoint_scalar_solve', 21)
 
-     call this%proj_s%post_solving(ds_adj%x, Ax, c_Xh, this%bclst_ds, gs_Xh, &
-                                   n, tstep, dt_controller)
+      call this%proj_s%post_solving(ds_adj%x, Ax, c_Xh, this%bclst_ds, gs_Xh, &
+           n, tstep, dt_controller)
 
       ! Update the solution
       if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -483,10 +484,10 @@ contains
 
     if (this%params%valid_path('case.adjoint_scalar.boundary_conditions')) then
        call this%params%info('case.adjoint_scalar.boundary_conditions', &
-          n_children = n_bcs)
+            n_children = n_bcs)
        call this%params%get_core(core)
        call this%params%get('case.adjoint_scalar.boundary_conditions', &
-          bc_object, found)
+            bc_object, found)
 
        call this%bcs%init(n_bcs)
 
@@ -540,7 +541,7 @@ contains
           if ((this%msh%labeled_zones(i)%size .gt. 0) .and. &
                (marked_zones(i) .eqv. .false.)) then
              write(error_unit, '(A, A, I0)') "*** ERROR ***: ", &
-                "No adjoint scalar boundary condition assigned to zone ", i
+                  "No adjoint scalar boundary condition assigned to zone ", i
              error stop
           end if
        end do

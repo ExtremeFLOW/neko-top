@@ -160,7 +160,8 @@ module adjoint_scalar_scheme
      !> Solve for the current timestep.
      procedure(adjoint_scalar_scheme_step_intrf), pass(this), deferred :: step
      !> Restart from a checkpoint.
-     procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: restart
+     procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: &
+        restart
   end type adjoint_scalar_scheme_t
 
   !> Abstract interface to initialize a scalar formulation
@@ -489,7 +490,7 @@ contains
     this%lambda_field = this%lambda
 
     if (this%variable_material_properties) then
-      call neko_error("variable properties not implemented for adjoint scalar")
+       call neko_error("variable properties not implemented for adjoint scalar")
        nut => neko_field_registry%get_field(this%nut_field_name)
        n = nut%size()
        call field_add2s2(this%lambda_field, nut, lambda_factor, n)

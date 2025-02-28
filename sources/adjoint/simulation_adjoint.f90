@@ -121,7 +121,7 @@ contains
        call simulation_settime(t_adj, this%case%dt, this%case%fluid%ext_bdf, &
             this%case%tlag, this%case%dtlag, tstep_adj)
 
-      
+
        ! Scalar step
        ! (Note that for the adjoint we should the scalar_adj first)
        if (allocated(this%scalar_adj)) then

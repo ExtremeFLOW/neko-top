@@ -71,7 +71,7 @@ module adv_lin_no_dealias
      ! boundary terms.
      ! We keep the differential operator on the test function
      procedure, pass(this) :: compute_adjoint_scalar => &
-     compute_adjoint_scalar_advection_no_dealias
+          compute_adjoint_scalar_advection_no_dealias
      ! NOTE
      ! This linearized advection term is the same as a normal advection term
      ! so not sure what to do here...
@@ -224,19 +224,19 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-             vx%x(i,1,1,e)*duxb(i) + &
-             vy%x(i,1,1,e)*dvxb(i) + &
-             vz%x(i,1,1,e)*dwxb(i) )
+                  vx%x(i,1,1,e)*duxb(i) + &
+                  vy%x(i,1,1,e)*dvxb(i) + &
+                  vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-             vx%x(i,1,1,e)*duyb(i) + &
-             vy%x(i,1,1,e)*dvyb(i) + &
-             vz%x(i,1,1,e)*dwyb(i))
+                  vx%x(i,1,1,e)*duyb(i) + &
+                  vy%x(i,1,1,e)*dvyb(i) + &
+                  vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-             vx%x(i,1,1,e)*duzb(i) + &
-             vy%x(i,1,1,e)*dvzb(i) + &
-             vz%x(i,1,1,e)*dwzb(i))
+                  vx%x(i,1,1,e)*duzb(i) + &
+                  vy%x(i,1,1,e)*dvzb(i) + &
+                  vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
@@ -246,22 +246,22 @@ contains
           associate(w1 => duxb, w2 => dvxb, w3 => dwxb, &
                w4 => duyb, w5 => dvyb, w6 => dwyb)
             call adjoint_weak_no_dealias_cpu( &
-            fx%x(:,:,:,e), vx%x(1,1,1,e), &
-            vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            e, coef, Xh, Xh%lxyz, &
-            w1,w2,w3,w4,w5,w6)
+                 fx%x(:,:,:,e), vx%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1,w2,w3,w4,w5,w6)
 
             call adjoint_weak_no_dealias_cpu( &
-            fy%x(:,:,:,e), vy%x(1,1,1,e), &
-            vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            e, coef, Xh, Xh%lxyz, &
-            w1,w2,w3,w4,w5,w6)
+                 fy%x(:,:,:,e), vy%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1,w2,w3,w4,w5,w6)
 
             call adjoint_weak_no_dealias_cpu( &
-            fz%x(:,:,:,e), vz%x(1,1,1,e), &
-            vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-            e, coef, Xh, Xh%lxyz, &
-            w1,w2,w3,w4,w5,w6)
+                 fz%x(:,:,:,e), vz%x(1,1,1,e), &
+                 vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+                 e, coef, Xh, Xh%lxyz, &
+                 w1,w2,w3,w4,w5,w6)
           end associate
        end do
 
@@ -490,10 +490,10 @@ contains
           ! \int \grad r . U_b  s
           !-----------------------------
           call adjoint_weak_no_dealias_cpu( &
-          fs%x(:,:,:,e), s%x(1,1,1,e), &
-          vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-          e, coef, Xh, Xh%lxyz, &
-          w1, w2, w3, w4, w5, w6)
+               fs%x(:,:,:,e), s%x(1,1,1,e), &
+               vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               e, coef, Xh, Xh%lxyz, &
+               w1, w2, w3, w4, w5, w6)
        enddo
     end if
 

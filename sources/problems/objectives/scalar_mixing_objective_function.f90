@@ -54,7 +54,7 @@ module scalar_mixing_objective
   use scratch_registry, only: neko_scratch_registry
   use utils, only: neko_error
   use adjoint_mixing_scalar_source_term, only: &
-    adjoint_mixing_scalar_source_term_t
+       adjoint_mixing_scalar_source_term_t
   ! delete after
   use field_math, only: field_addcol3, field_col3
   implicit none
@@ -74,7 +74,7 @@ module scalar_mixing_objective
      class(coef_t), pointer :: coef
      !> Volume of the domain $|\Omega_{obj}|$
      real(kind=rp) :: domain_volume
-     
+
      !> -----------------------------------------------------------------
      !! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
      !! These sensitivity should return zero, and the simulation
@@ -144,7 +144,7 @@ contains
 
     ! Start by checking if the adjoint scalar has been initialized
     if (.not.allocated(simulation%adjoint_case%scalar_adj)) then
-    call neko_error("adjoint passive scalar not initialized")
+       call neko_error("adjoint passive scalar not initialized")
     end if
 
     ! Call the base initializer
@@ -155,32 +155,32 @@ contains
 
     ! Compute the masked volume
     if (this%has_mask) then
-      this%domain_volume = compute_masked_volume(this%mask, this%coef)
+       this%domain_volume = compute_masked_volume(this%mask, this%coef)
     else
-      this%domain_volume = this%coef%volume
+       this%domain_volume = this%coef%volume
     end if
 
-     !> Associate the RHS of the passive scalar equation
-     !! $ f_{\phi^\dagger} $
-     associate(f_phi_adj => simulation%adjoint_case%scalar_adj%f_Xh)
+    !> Associate the RHS of the passive scalar equation
+    !! $ f_{\phi^\dagger} $
+    associate(f_phi_adj => simulation%adjoint_case%scalar_adj%f_Xh)
 
-    ! Associate json parameters
-    this%phi_ref = phi_ref
+      ! Associate json parameters
+      this%phi_ref = phi_ref
 
-    ! Associate forward passive scalar
-    this%phi => simulation%neko_case%scalar%s
+      ! Associate forward passive scalar
+      this%phi => simulation%neko_case%scalar%s
 
-    ! Initialize the scalar mixing adjoint source term
-    call adjoint_forcing%init_from_components(f_phi_adj, &
-    this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
+      ! Initialize the scalar mixing adjoint source term
+      call adjoint_forcing%init_from_components(f_phi_adj, &
+           this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
 
     end associate
 
     ! append adjoint source term to the adjoint passive scalar equation
     call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
-    adjoint_forcing)
+         adjoint_forcing)
 
-    
+
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS
@@ -230,7 +230,7 @@ contains
     call field_copy(work, this%phi)
     ! \phi - \phi_ref
     call field_cadd(work, -this%phi_ref)
-    ! (\phi - \phi_ref)^2 
+    ! (\phi - \phi_ref)^2
     call field_col2(work, work)
     ! mask to \Omega_{obj}
     if (this%has_mask) then
@@ -238,11 +238,11 @@ contains
     end if
     ! integrate
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      this%value = device_glsc2(work%x_d, this%coef%B_d, n)
+       this%value = device_glsc2(work%x_d, this%coef%B_d, n)
     else
-      this%value = glsc2(work%x, this%coef%B, n)
+       this%value = glsc2(work%x, this%coef%B, n)
     end if
-  
+
     ! scale by 1/2 and 1/|\Omega_{obj}|
     this%value = 0.5_rp * this%value / this%domain_volume
 

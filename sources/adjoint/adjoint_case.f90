@@ -98,7 +98,7 @@ contains
     ! I think this is correct.
     ! Maybe there would be a case where we would want a scalar but
     ! no adjoint scalar. So this forces us to prescribe an adjoint scalar.
-      call json_get_or_default(neko_case%params, &
+    call json_get_or_default(neko_case%params, &
          'case.adjoint_scalar.enabled', have_scalar, .false.)
 
     call adjoint_init_from_attributes(this, neko_case, tol, have_scalar)
@@ -143,7 +143,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
-       neko_case%usr, neko_case%fluid%ext_bdf)
+         neko_case%usr, neko_case%fluid%ext_bdf)
     !
     ! Setup scalar_adj fluid_adj
     !
@@ -164,9 +164,9 @@ contains
        ! this%scalar_adj%chkp%tlag => neko_case%tlag
        ! this%scalar_adj%chkp%dtlag => neko_case%dtlag
        call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, &
-          neko_case%fluid%gs_Xh, neko_case%params, neko_case%usr, &
-          neko_case%fluid%ulag, neko_case%fluid%vlag, &
-          neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+            neko_case%fluid%gs_Xh, neko_case%params, neko_case%usr, &
+            neko_case%fluid%ulag, neko_case%fluid%vlag, &
+            neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
 
        ! call neko_case%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
 
@@ -261,7 +261,7 @@ contains
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(this%scalar_adj%s_adj, this%scalar_adj%c_Xh, &
-             this%scalar_adj%gs_Xh, string_val, neko_case%params)
+               this%scalar_adj%gs_Xh, string_val, neko_case%params)
        else
           call neko_error("user defined ICs not implemented for adjoint scalar")
           ! call set_scalar_ic(this%scalar_adj%s_adj, &
@@ -269,7 +269,7 @@ contains
           !      this%usr%scalar_user_ic, neko_case%params)
        end if
 
-      ! call neko_log%end_section()
+       ! call neko_log%end_section()
 
     end if
 
@@ -309,7 +309,7 @@ contains
     call this%output_controller%init(neko_case%end_time)
     if (this%have_scalar) then
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
-          this%scalar_adj, path = trim(neko_case%output_directory))
+            this%scalar_adj, path = trim(neko_case%output_directory))
     else
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
