@@ -300,7 +300,7 @@ contains
     end if
     this%s_adj => neko_field_registry%get_field('s_adj')
 
-    call this%s_adj_lag%init(this%s, 2)
+    call this%s_adj_lag%init(this%s_adj, 2)
 
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh

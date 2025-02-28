@@ -174,11 +174,13 @@ contains
     call adjoint_forcing%init_from_components(f_phi_adj, &
     this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
 
+    end associate
+
     ! append adjoint source term to the adjoint passive scalar equation
     call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
     adjoint_forcing)
 
-    end associate
+    
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS

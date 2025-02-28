@@ -62,8 +62,10 @@ module adjoint_scalar_convection_source_term
   ! $\nabla s s_adj$
   type, public, extends(source_term_t) :: &
        adjoint_scalar_convection_source_term_t
-     !> here we have s and s_adj
-     type(field_t), pointer :: s, s_adj
+     !> adjoint passive scalar
+     type(field_t), pointer :: s_adj
+     !> forward passive scalar
+     type(field_t), pointer :: s
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -102,8 +104,7 @@ contains
 
 
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, &
-       s, s_adj, coef)
+       f_x, f_y, f_z, s, s_adj, coef)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -132,12 +133,9 @@ contains
     call this%init_base(fields, coef, start_time, end_time)
 
     ! point everything in the correct places
-    this%s => s
     this%s_adj => s_adj
+    this%s => s
 
-
-    ! TODO
-    !this%mask => mask
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.

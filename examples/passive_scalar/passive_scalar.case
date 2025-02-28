@@ -5,12 +5,12 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": true,
-        "end_time": 9.0,
-        "timestep": 5e-4,
+        "end_time": 30.0,
+        "timestep": 5e-3,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
-            "dealias": false
+            "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
@@ -30,7 +30,7 @@
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-2,
+                "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
             "boundary_conditions": [
@@ -124,24 +124,40 @@
                 "name": "optimization_domain",
                 "geometry": "box",
                 "x_bounds": [
-                    0.2,
-                    0.8,
+                    2.0,
+                    4.0,
                 ],
                 "y_bounds": [
-                    0.2,
-                    0.8,
+                    -1.0,
+                     3.8,
                 ],
                 "z_bounds": [
-                    -1.0,
-                    1.0,
+                   -1.0,
+                    3.0,
                 ],
-            }
+            },
+            {
+                "name": "objective_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    5.0,
+                    5.5,
+                ],
+                "y_bounds": [
+                    -1.0,
+                     3.8,
+                ],
+                "z_bounds": [
+                   -1.0,
+                    3.0,
+                ],
+            },
         ]
     },
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
+            "max_iterations": 100,
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
@@ -162,6 +178,7 @@
         "objectives": [
             {
                 "type": "scalar_mixing",
+                "mask_name": "objective_domain",
                 "phi_ref": 0.5,
                 "weight": 1.0
             },

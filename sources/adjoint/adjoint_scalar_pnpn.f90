@@ -426,7 +426,7 @@ contains
       call this%proj_s%pre_solving(s_adj_res%x, tstep, c_Xh, n, dt_controller)
 
       call this%pc%update()
-      call profiler_start_region('Adjoint_ccalar_solve', 21)
+      call profiler_start_region('Adjoint_scalar_solve', 21)
       ksp_results(1) = this%ksp%solve(Ax, ds_adj, s_adj_res%x, n, &
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Adjoint_scalar_solve', 21)
@@ -453,16 +453,16 @@ contains
     integer :: n
 
     n = this%dm_Xh%size()
-
-    write(log_buf,'(A,A,E15.7,A,E15.7,A,E15.7)') 'Adjoint scalar debug', &
-       ' l2norm s_adj', glsc2(this%s_adj%x, this%s_adj%x, n), &
-       ' slag1', glsc2(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x, n), &
-       ' slag2', glsc2(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x, n)
-    call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
-    write(log_buf,'(A,A,E15.7,A,E15.7)') 'Adjoint scalar debug2', &
-       ' l2norm abx1', glsc2(this%abx1%x, this%abx1%x, n), &
-       ' abx2', glsc2(this%abx2%x, this%abx2%x, n)
-    call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
+    ! TODO come back to this
+    !write(log_buf,'(A,A,E15.7,A,E15.7,A,E15.7)') 'Adjoint scalar debug', &
+    !   ' l2norm s_adj', glsc2(this%s_adj%x, this%s_adj%x, n), &
+    !   ' slag1', glsc2(this%s_adj_lag%lf(1)%x, this%s_adj_lag%lf(1)%x, n), &
+    !   ' slag2', glsc2(this%s_adj_lag%lf(2)%x, this%s_adj_lag%lf(2)%x, n)
+    !call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
+    !write(log_buf,'(A,A,E15.7,A,E15.7)') 'Adjoint scalar debug2', &
+    !   ' l2norm abx1', glsc2(this%abx1%x, this%abx1%x, n), &
+    !   ' abx2', glsc2(this%abx2%x, this%abx2%x, n)
+    !call neko_log%message(log_buf, lvl=NEKO_LOG_DEBUG)
   end subroutine print_debug
 
   !> Initialize boundary conditions

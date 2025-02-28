@@ -124,6 +124,7 @@ contains
     start_time = 0.0_rp
     end_time = 100000000.0_rp
 
+
     call this%free()
 
     ! this is copying the fluid source term init
@@ -137,8 +138,8 @@ contains
     this%s => s
     this%obj_scale = obj_scale
     this%phi_ref = phi_ref
-
     this%if_mask = if_mask
+    
     if (this%if_mask) then
        this%mask => mask
        this%mask_volume = compute_masked_volume(this%mask, coef)

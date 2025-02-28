@@ -123,11 +123,11 @@ contains
 
       
        ! Scalar step
-       ! (Note that for the adjoint we should the scalar first)
-       if (allocated(this%case%scalar)) then
+       ! (Note that for the adjoint we should the scalar_adj first)
+       if (allocated(this%scalar_adj)) then
           start_time = MPI_WTIME()
-          call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          call neko_log%section(' Adjoint scalar_adj')
+          call this%scalar_adj%step(t_adj, tstep_adj, this%case%dt, &
                this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -154,8 +154,8 @@ contains
        ! Update material properties
        call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
             this%case%fluid%mu, &
-            this%case%scalar%cp, &
-            this%case%scalar%lambda, &
+            this%scalar_adj%cp, &
+            this%scalar_adj%lambda, &
             this%case%params)
 
        call neko_log%end_section()

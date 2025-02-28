@@ -204,8 +204,7 @@ contains
        ! initialize the coupling term
        call this%adjoint_convection_term%init_from_components( &
             this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
-            this%fluid_adj%f_adj_z, &
-            neko_case%scalar%s, &
+            this%fluid_adj%f_adj_z, this%case%scalar%s, &
             this%scalar_adj%s_adj, this%fluid_adj%c_Xh)
        ! append the coupling term to the adjoint velocity equation
        call this%fluid_adj%source_term%add(this%adjoint_convection_term)
