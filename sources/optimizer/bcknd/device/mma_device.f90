@@ -359,8 +359,8 @@ contains
             bi => this%bi)
 
          call device_rex(rex%x_d, x%x_d, low%x_d, upp%x_d, &
-            pij%x_d, p0j%x_d, qij%x_d, q0j%x_d, &
-            lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m)
+              pij%x_d, p0j%x_d, qij%x_d, q0j%x_d, &
+              lambda%x_d, xsi%x_d, eta%x_d, this%n, this%m)
 
          call device_col3(rey%x_d, d%x_d, y%x_d, this%m)
          call device_add2(rey%x_d, c%x_d, this%m)
@@ -489,18 +489,18 @@ contains
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
           call MPI_Allreduce(MPI_IN_PLACE, AA%x(1:this%m, 1:this%m), &
-               this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+               this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
           call device_memcpy(AA%x, AA%x_d, &
                (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
-               
+
           call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
           call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
           call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)   
+               sync = .true.)
           call device_memcpy(s%x, s%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)    
+               sync = .true.)
           do i = 1, this%m
              ! update the diag AA
              AA%x(i, i) = AA%x(i, i) &
