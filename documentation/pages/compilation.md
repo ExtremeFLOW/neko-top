@@ -93,6 +93,10 @@ export CUDA_DIR=$CUDA_HOME
 export NEKO_DIR=$HOME/neko
 ```
 
+Additional examples of the prepare scripts can be seen bellow:
+
+- [LUMI](#lumi)
+
 ### Notes on linking against CUDA on WSL.
 
 Look through the following documentations:
@@ -105,3 +109,14 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
+
+### Prepare script examples
+
+Here is a few examples of prepare scripts that can be used to setup the
+environment for the compilation of Neko-TOP. These are to help you correctly
+setup the environment for a particular system.
+
+#### LUMI {#lumi}
+
+```bash
+```
