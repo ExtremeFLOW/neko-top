@@ -51,7 +51,9 @@ module adjoint_fluid_pnpn
   use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
   use projection, only: projection_t
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only : device_memcpy, HOST_TO_DEVICE, device_event_sync,&
+       device_event_create, device_event_destroy, device_stream_wait_event, &
+       glb_cmd_queue
   use advection_adjoint, only: advection_adjoint_t
   use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
@@ -82,7 +84,7 @@ module adjoint_fluid_pnpn
   use device_math, only: device_vlsc3, device_cmult
   use math, only: vlsc3, cmult
   use json_utils_ext, only: json_key_fallback
-  use, intrinsic :: iso_c_binding, only: c_ptr
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
@@ -198,6 +200,8 @@ module adjoint_fluid_pnpn
 
      !> Adjust flow volume
      !  type(fluid_volflow_t) :: vol_flow
+     !> Gather-scatter event
+     type(c_ptr) :: event = C_NULL_PTR
 
      ! ======================================================================= !
      ! Addressable attributes
@@ -436,6 +440,11 @@ contains
          this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
 
     call neko_log%end_section()
+
+    ! Setup gather-scatter event (only relevant on devices)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_event_create(this%event, 2)
+    end if
 
     ! ------------------------------------------------------------------------ !
     ! Handling the rescaling and baseflow
@@ -693,6 +702,11 @@ contains
     end if
 
     ! call this%vol_flow%free()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       if (c_associated(this%event)) then
+          call device_event_destroy(this%event)
+       end if
+    end if
 
   end subroutine adjoint_fluid_pnpn_free
 
@@ -742,7 +756,8 @@ contains
          rho_field => this%rho_field, mu_field => this%mu_field, &
          f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
          if_variable_dt => dt_controller%if_variable_dt, &
-         dt_last_change => dt_controller%dt_last_change)
+         dt_last_change => dt_controller%dt_last_change, &
+         event => this%event)
 
       ! Get temporary arrays
       call this%scratch%request_field(u_e, temp_indices(1))
@@ -843,12 +858,15 @@ contains
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface,&
            Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
-           mu_field, rho_field)
+           mu_field, rho_field, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
       if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
 
-      call gs_Xh%op(p_res, GS_OP_ADD)
+      call gs_Xh%op(p_res, GS_OP_ADD, event)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_stream_wait_event(glb_cmd_queue, event, 0)
+      end if
 
       ! Set the residual to zero at strong pressure boundaries.
       call this%bclst_dp%apply_scalar(p_res%x, p%dof%size(), t, tstep)
@@ -888,9 +906,12 @@ contains
            mu_field, rho_field, ext_bdf%diffusion_coeffs(1), &
            dt, dm_Xh%size())
 
-      call gs_Xh%op(u_res, GS_OP_ADD)
-      call gs_Xh%op(v_res, GS_OP_ADD)
-      call gs_Xh%op(w_res, GS_OP_ADD)
+      call gs_Xh%op(u_res, GS_OP_ADD, event)
+      call gs_Xh%op(v_res, GS_OP_ADD, event)
+      call gs_Xh%op(w_res, GS_OP_ADD, event)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_stream_wait_event(glb_cmd_queue, event, 0)
+      end if
 
       ! Set residual to zero at strong velocity boundaries.
       call this%bclst_vel_res%apply(u_res, v_res, w_res, t, tstep)
