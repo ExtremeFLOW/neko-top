@@ -11,6 +11,10 @@ for i in "${NPROC[@]}"; do
         echo "Error log is not empty. Exiting."
         exit 1
     fi
+    mkdir rugby_ball$i
+    cp rugby_ball.log rugby_ball$i
+    mv forward_fields* rugby_ball$i
+    mv adjoint_fields* rugby_ball$i
 
     target=$RPATH/rugby_verification/target_$i.csv
     echo "Comparing output to reference solution $target"

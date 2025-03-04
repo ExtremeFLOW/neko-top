@@ -24,6 +24,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 # Add the mapping extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 
+# Add the adjoint library
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
@@ -33,20 +36,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_case.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_output.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_scheme.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_pnpn_bc_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_ic.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adjoint_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_no_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/adv_adjoint_dealias.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/advection_adjoint_fctry.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint/simulation_adjoint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
@@ -66,7 +55,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
 
         # List of specific problems, objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problems/steady_state_problem.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
@@ -78,7 +66,13 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
         # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/mma_device.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/device_mma_math.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda_mma_math.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma.cu
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma_kernel.h
 )
 
 # ============================================================================ #

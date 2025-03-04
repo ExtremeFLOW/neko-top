@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint Pn/Pn formulation.
-module adjoint_pnpn
+module adjoint_fluid_pnpn
   use, intrinsic :: iso_fortran_env, only: error_unit
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
@@ -46,12 +46,14 @@ module adjoint_pnpn
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
   ! use adjoint_volflow, only: adjoint_volflow_t
-  use adjoint_scheme, only: adjoint_scheme_t
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use device_mathops, only: device_opcolv, device_opadd2cm
   use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
   use projection, only: projection_t
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only : device_memcpy, HOST_TO_DEVICE, device_event_sync,&
+       device_event_create, device_event_destroy, device_stream_wait_event, &
+       glb_cmd_queue
   use advection_adjoint, only: advection_adjoint_t
   use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
@@ -82,7 +84,7 @@ module adjoint_pnpn
   use device_math, only: device_vlsc3, device_cmult
   use math, only: vlsc3, cmult
   use json_utils_ext, only: json_key_fallback
-  use, intrinsic :: iso_c_binding, only: c_ptr
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
@@ -91,7 +93,7 @@ module adjoint_pnpn
   private
 
 
-  type, public, extends(adjoint_scheme_t) :: adjoint_pnpn_t
+  type, public, extends(adjoint_fluid_scheme_t) :: adjoint_fluid_pnpn_t
 
      !> The right-hand sides in the linear solves.
      type(field_t) :: p_res, u_res, v_res, w_res
@@ -198,6 +200,8 @@ module adjoint_pnpn
 
      !> Adjust flow volume
      !  type(fluid_volflow_t) :: vol_flow
+     !> Gather-scatter event
+     type(c_ptr) :: event = C_NULL_PTR
 
      ! ======================================================================= !
      ! Addressable attributes
@@ -222,23 +226,23 @@ module adjoint_pnpn
 
    contains
      !> Constructor.
-     procedure, pass(this) :: init => adjoint_pnpn_init
+     procedure, pass(this) :: init => adjoint_fluid_pnpn_init
      !> Destructor.
-     procedure, pass(this) :: free => adjoint_pnpn_free
+     procedure, pass(this) :: free => adjoint_fluid_pnpn_free
      !> Perform a single time-step of the scheme.
-     procedure, pass(this) :: step => adjoint_pnpn_step
+     procedure, pass(this) :: step => adjoint_fluid_pnpn_step
      !> Restart from a previous solution.
-     procedure, pass(this) :: restart => adjoint_pnpn_restart
+     procedure, pass(this) :: restart => adjoint_fluid_pnpn_restart
      !> Set up boundary conditions.
-     procedure, pass(this) :: setup_bcs => adjoint_pnpn_setup_bcs
+     procedure, pass(this) :: setup_bcs => adjoint_fluid_pnpn_setup_bcs
      !> Write a field with boundary condition specifications.
      procedure, pass(this) :: write_boundary_conditions => &
-          adjoint_pnpn_write_boundary_conditions
+          adjoint_fluid_pnpn_write_boundary_conditions
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
 
-  end type adjoint_pnpn_t
+  end type adjoint_fluid_pnpn_t
 
   interface
      !> Boundary condition factory for pressure.
@@ -250,7 +254,7 @@ module adjoint_pnpn
      !! @param[in] user The user interface.
      module subroutine pressure_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(adjoint_pnpn_t), intent(in) :: scheme
+       type(adjoint_fluid_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -267,7 +271,7 @@ module adjoint_pnpn
      !! @param[in] user The user interface.
      module subroutine velocity_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
-       type(adjoint_pnpn_t), intent(in) :: scheme
+       type(adjoint_fluid_pnpn_t), intent(in) :: scheme
        type(json_file), intent(inout) :: json
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
@@ -276,8 +280,8 @@ module adjoint_pnpn
 
 contains
 
-  subroutine adjoint_pnpn_init(this, msh, lx, params, user, time_scheme)
-    class(adjoint_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, time_scheme)
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
     type(json_file), target, intent(inout) :: params
@@ -408,7 +412,7 @@ contains
     call advection_adjoint_factory(this%adv, params, this%c_Xh)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
-       call neko_error("Flow rate forcing not available for adjoint_pnpn")
+       call neko_error("Flow rate forcing not available for adjoint_fluid_pnpn")
        !  call this%vol_flow%init(this%dm_Xh, params)
     end if
 
@@ -436,6 +440,11 @@ contains
          this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
 
     call neko_log%end_section()
+
+    ! Setup gather-scatter event (only relevant on devices)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_event_create(this%event, 2)
+    end if
 
     ! ------------------------------------------------------------------------ !
     ! Handling the rescaling and baseflow
@@ -468,10 +477,10 @@ contains
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
 
-  end subroutine adjoint_pnpn_init
+  end subroutine adjoint_fluid_pnpn_init
 
-  subroutine adjoint_pnpn_restart(this, dtlag, tlag)
-    class(adjoint_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_fluid_pnpn_restart(this, dtlag, tlag)
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     real(kind=rp) :: dtlag(10), tlag(10)
     integer :: i, j, n
 
@@ -621,10 +630,10 @@ contains
     !this%aby1 = this%f_y
     !this%abz1 = this%f_z
 
-  end subroutine adjoint_pnpn_restart
+  end subroutine adjoint_fluid_pnpn_restart
 
-  subroutine adjoint_pnpn_free(this)
-    class(adjoint_pnpn_t), intent(inout) :: this
+  subroutine adjoint_fluid_pnpn_free(this)
+    class(adjoint_fluid_pnpn_t), intent(inout) :: this
 
     !Deallocate velocity and pressure fields
     call this%scheme_free()
@@ -693,8 +702,13 @@ contains
     end if
 
     ! call this%vol_flow%free()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       if (c_associated(this%event)) then
+          call device_event_destroy(this%event)
+       end if
+    end if
 
-  end subroutine adjoint_pnpn_free
+  end subroutine adjoint_fluid_pnpn_free
 
   !> Advance fluid simulation in time.
   !! @param t The time value.
@@ -702,8 +716,8 @@ contains
   !! @param dt The timestep
   !! @param ext_bdf Time integration logic.
   !! @param dt_controller timestep controller
-  subroutine adjoint_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
-    class(adjoint_pnpn_t), target, intent(inout) :: this
+  subroutine adjoint_fluid_pnpn_step(this, t, tstep, dt, ext_bdf, dt_controller)
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: dt
@@ -742,7 +756,8 @@ contains
          rho_field => this%rho_field, mu_field => this%mu_field, &
          f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
          if_variable_dt => dt_controller%if_variable_dt, &
-         dt_last_change => dt_controller%dt_last_change)
+         dt_last_change => dt_controller%dt_last_change, &
+         event => this%event)
 
       ! Get temporary arrays
       call this%scratch%request_field(u_e, temp_indices(1))
@@ -843,12 +858,15 @@ contains
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface,&
            Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
-           mu_field, rho_field)
+           mu_field, rho_field, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
       if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
 
-      call gs_Xh%op(p_res, GS_OP_ADD)
+      call gs_Xh%op(p_res, GS_OP_ADD, event)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_stream_wait_event(glb_cmd_queue, event, 0)
+      end if
 
       ! Set the residual to zero at strong pressure boundaries.
       call this%bclst_dp%apply_scalar(p_res%x, p%dof%size(), t, tstep)
@@ -888,9 +906,12 @@ contains
            mu_field, rho_field, ext_bdf%diffusion_coeffs(1), &
            dt, dm_Xh%size())
 
-      call gs_Xh%op(u_res, GS_OP_ADD)
-      call gs_Xh%op(v_res, GS_OP_ADD)
-      call gs_Xh%op(w_res, GS_OP_ADD)
+      call gs_Xh%op(u_res, GS_OP_ADD, event)
+      call gs_Xh%op(v_res, GS_OP_ADD, event)
+      call gs_Xh%op(w_res, GS_OP_ADD, event)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_stream_wait_event(glb_cmd_queue, event, 0)
+      end if
 
       ! Set residual to zero at strong velocity boundaries.
       call this%bclst_vel_res%apply(u_res, v_res, w_res, t, tstep)
@@ -949,16 +970,16 @@ contains
     ! for now I'm commenting this out
     !call this%PW_compute_(t, tstep)
 
-  end subroutine adjoint_pnpn_step
+  end subroutine adjoint_fluid_pnpn_step
 
   ! ========================================================================== !
 
   !> Sets up the boundary condition for the scheme.
   !! @param user The user interface.
-  subroutine adjoint_pnpn_setup_bcs(this, user, params)
+  subroutine adjoint_fluid_pnpn_setup_bcs(this, user, params)
     use mpi_f08, only: MPI_IN_PLACE
 
-    class(adjoint_pnpn_t), intent(inout) :: this
+    class(adjoint_fluid_pnpn_t), intent(inout) :: this
     type(user_t), target, intent(in) :: user
     type(json_file), intent(inout) :: params
     integer :: i, n_bcs, j, zone_size, global_zone_size, ierr
@@ -989,7 +1010,7 @@ contains
     call this%bc_prs_surface%init_from_components(this%c_Xh)
     call this%bc_sym_surface%init_from_components(this%c_Xh)
 
-    json_key = 'case.adjoint.boundary_conditions'
+    json_key = 'case.adjoint_fluid.boundary_conditions'
 
     ! Populate bcs_vel and bcs_prs based on the case file
     if (params%valid_path(json_key)) then
@@ -1055,10 +1076,10 @@ contains
              type is (symmetry_t)
                 ! Symmetry has 3 internal bcs, but only one actually contains
                 ! markings.
-                ! Symmetry's apply_scalar doesn't do anything, so we need to mark
-                ! individual nested bcs to the du,dv,dw, whereas the vel_res can
-                ! just get symmetry as a whole, because on this list we call
-                ! apply_vector.
+                ! Symmetry's apply_scalar doesn't do anything, so we need to
+                ! mark individual nested bcs to the du,dv,dw, whereas the
+                ! vel_res can just get symmetry as a whole, because on this
+                ! list we call apply_vector.
                 ! Additionally we have to mark the special surface bc for p.
                 call this%bclst_vel_res%append(bc_i)
                 call this%bc_du%mark_facets(bc_i%bc_x%marked_facet)
@@ -1167,17 +1188,17 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, this%prs_dirichlet, 1, &
          MPI_LOGICAL, MPI_LOR, NEKO_COMM)
 
-  end subroutine adjoint_pnpn_setup_bcs
+  end subroutine adjoint_fluid_pnpn_setup_bcs
 
   !> Write a field with boundary condition specifications
-  subroutine adjoint_pnpn_write_boundary_conditions(this)
+  subroutine adjoint_fluid_pnpn_write_boundary_conditions(this)
     use inflow, only: inflow_t
     use field_dirichlet, only: field_dirichlet_t
     use blasius, only: blasius_t
     use field_dirichlet_vector, only: field_dirichlet_vector_t
     use usr_inflow, only: usr_inflow_t
     use dong_outflow, only: dong_outflow_t
-    class(adjoint_pnpn_t), target, intent(inout) :: this
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(dirichlet_t) :: bdry_mask
     type(field_t), pointer :: bdry_field
     type(file_t) :: bdry_file
@@ -1186,7 +1207,8 @@ contains
     character(len=LOG_SIZE) :: log_buf
 
     call neko_log%section("Adjoint boundary conditions")
-    write(log_buf, '(A)') 'Marking using integer keys in boundary_adjoint0.f00000'
+    write(log_buf, '(A)') &
+         'Marking using integer keys in boundary_adjoint0.f00000'
     call neko_log%message(log_buf)
     write(log_buf, '(A)') 'Condition-value pairs: '
     call neko_log%message(log_buf)
@@ -1308,14 +1330,14 @@ contains
     call bdry_file%write(bdry_field)
 
     call this%scratch%relinquish_field(temp_index)
-  end subroutine adjoint_pnpn_write_boundary_conditions
+  end subroutine adjoint_fluid_pnpn_write_boundary_conditions
 
   ! End of section to verify
   ! ========================================================================== !
 
   subroutine rescale_fluid(fluid_data, scale)
     !> Fluid data
-    class(adjoint_pnpn_t), intent(inout) :: fluid_data
+    class(adjoint_fluid_pnpn_t), intent(inout) :: fluid_data
     !> Scaling factor
     real(kind=rp), intent(in) :: scale
 
@@ -1442,7 +1464,7 @@ contains
   !! @param t The time value.
   !! @param tstep The current time-step
   subroutine power_iterations_compute(this, t, tstep)
-    class(adjoint_pnpn_t), target, intent(inout) :: this
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
@@ -1515,4 +1537,4 @@ contains
   end subroutine power_iterations_compute
 
 
-end module adjoint_pnpn
+end module adjoint_fluid_pnpn

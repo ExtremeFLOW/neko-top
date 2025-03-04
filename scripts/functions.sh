@@ -220,29 +220,32 @@ function cleanup {
     [ -d $results ] && rm -fr $results/*
     mkdir -p $results
 
+    # Remove the data link if it exists
+    [ -L data ] && rm data
+
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
     for nek in $(find ./ -name "*.nek5000"); do
-        printf "\t- %s\n" $(basename $nek)
+        printf "\t- %s\n" ${nek##*/}
 
-        basename=$(basename $nek)
+        base=$(basename $nek)
         directory=$(dirname $nek)
-        pattern=${basename%.*}
+        pattern=$directory/${base%.*}
 
-        mkdir -p $results/$pattern
-        mv -t $results/$pattern $nek $directory/$pattern.f*
+        mkdir -p $pattern
+        mv -t $pattern $nek ${nek%.*}.f*
     done
     printf "\n"
 
     # Move all files which are not the error or executable files to the log
     # folder
-    find ./ -type f \
-        -not -name "output.log" \
-        -not -name "error.log" \
-        -not -name "neko" \
-        -not -name "*.chkp" \
-        -not -name "*.smod" \
-        -exec mv -t $results {} +
+    rsync -a --no-links --remove-source-files \
+        --exclude "output.log" \
+        --exclude "error.log" \
+        --exclude "neko" \
+        --exclude "*.chkp" \
+        --exclude "*.smod" \
+        ./ $results
 
     # Remove all but the log files
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete

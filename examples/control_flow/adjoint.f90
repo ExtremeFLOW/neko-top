@@ -41,7 +41,7 @@ module simcomp_example
   use coefs, only: coef_t
   use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
-  use adjoint_pnpn, only: adjoint_pnpn_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use field_math, only: field_cfill, field_sub2, field_copy, field_glsc2, &
@@ -51,11 +51,12 @@ module simcomp_example
   use device_math, only: device_glsc2
   use adv_lin_no_dealias, only: adv_lin_no_dealias_t
   use logger, only: neko_log, LOG_SIZE
-  use adjoint_scheme, only: adjoint_scheme_t
-  use adjoint_fctry, only: adjoint_scheme_factory
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
   use time_step_controller, only: time_step_controller_t
   use time_scheme_controller, only: time_scheme_controller_t
-  use mpi_f08, only: MPI_WTIME
+  use mpi_f08, only: MPI_WTIME, MPI_SUM
+  use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use jobctrl, only: jobctrl_time_limit
   use profiler, only: profiler_start, profiler_stop, profiler_start_region, &
        profiler_end_region
@@ -67,12 +68,11 @@ module simcomp_example
   use mean_sqr_flow_output, only : mean_sqr_flow_output_t
   use mean_flow_output, only : mean_flow_output_t
   use fluid_stats_output, only : fluid_stats_output_t
-  use mpi_f08
   use mesh_field, only : mesh_fld_t, mesh_field_init, mesh_field_free
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
   use output_controller, only : output_controller_t
-  use adjoint_ic, only : set_adjoint_ic
+  use adjoint_fluid_ic, only : set_adjoint_fluid_ic
   use scalar_ic, only : set_scalar_ic
   use field, only : field_t
   use field_registry, only : neko_field_registry
@@ -80,7 +80,6 @@ module simcomp_example
   use file, only : file_t
   use utils, only : neko_error
   use mesh, only : mesh_t
-  use comm
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, NEKO_LOG_QUIET, LOG_SIZE
   use jobctrl, only : jobctrl_set_time_limit
@@ -97,7 +96,7 @@ module simcomp_example
   ! This is a simple example of a user-defined simulation component.
   type, public, extends(simulation_component_t) :: adjoint_t
 
-     class(adjoint_scheme_t), allocatable :: scheme
+     class(adjoint_fluid_scheme_t), allocatable :: scheme
 
      ! Fields
      type(field_t) :: u_old, v_old, w_old, p_old, s_old
@@ -188,7 +187,7 @@ contains
     ! HARRY
     ! keep the schemes the same for SURE
     call json_get(C%params, 'case.fluid.scheme', string_val)
-    call adjoint_scheme_factory(this%scheme, trim(string_val))
+    call adjoint_fluid_scheme_factory(this%scheme, trim(string_val))
 
     ! HARRY
     ! same with polynomial order
@@ -198,7 +197,7 @@ contains
     ! this%scheme%chkp%tlag => C%tlag
     ! this%scheme%chkp%dtlag => C%dtlag
     select type (f => this%scheme)
-    type is (adjoint_pnpn_t)
+    type is (adjoint_fluid_pnpn_t)
        !  f%chkp%abx1 => f%abx1
        !  f%chkp%abx2 => f%abx2
        !  f%chkp%aby1 => f%aby1
@@ -278,16 +277,16 @@ contains
 
 
     ! if (trim(string_val) .ne. 'user') then
-    !    !call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    !    !call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !    !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
     !    !
     !    ! passing adjoint_json
-    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    !    call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !         this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     ! else
-    !    call set_adjoint_ic(this%scheme%u_adj, this%scheme%v_adj, i&
+    !    call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, i&
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !         this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, &
     ! adjoint_json)
@@ -307,7 +306,7 @@ contains
 
     ! Add initial conditions to BDF scheme (if present)
     select type (f => this%scheme)
-    type is (adjoint_pnpn_t)
+    type is (adjoint_fluid_pnpn_t)
        call f%ulag%set(f%u_adj)
        call f%vlag%set(f%v_adj)
        call f%wlag%set(f%w_adj)

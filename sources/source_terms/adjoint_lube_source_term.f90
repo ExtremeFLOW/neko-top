@@ -43,16 +43,16 @@
 !
 ! the corresponding adjoint forcing is $K \chi \mathbf{u}$
 module adjoint_lube_source_term
-  use num_types, only : rp
-  use field_list, only : field_list_t
-  use json_module, only : json_file
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
+  use num_types, only: rp
+  use field_list, only: field_list_t
+  use json_module, only: json_file
+  use source_term, only: source_term_t
+  use coefs, only: coef_t
   use field, only: field_t
   use design, only: design_t
   use topopt_design, only: topopt_design_t
   use field_math, only: field_addcol3, field_copy, field_cmult
-  use scratch_registry, only : neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use utils, only: neko_error
@@ -152,10 +152,10 @@ contains
     this%v => v
     this%w => w
 
-    select type(design)
-      type is (topopt_design_t)
+    select type (design)
+    type is (topopt_design_t)
        this%chi => design%brinkman_amplitude
-      class default
+    class default
        call neko_error('Unknown design type')
     end select
 
