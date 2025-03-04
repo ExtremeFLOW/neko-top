@@ -54,8 +54,7 @@
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 50000000
+            "output_control": "never",
         },
         "simulation_components": [
             {
