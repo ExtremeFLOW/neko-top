@@ -129,6 +129,8 @@ contains
     ! TODO
     ! I'll do the json stuff later...
     this%r = 0.01
+    ! GET THIS INTO THE JSON
+    this%r = 0.1
     this%abstol_filt = 0.0000000001_rp
     this%ksp_max_iter = 200
     this%ksp_solver = "cg"

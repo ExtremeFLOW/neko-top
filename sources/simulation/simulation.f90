@@ -93,7 +93,11 @@ contains
     type(json_file) :: simcomp_settings
 
     ! initialize the primal
+    print *, "NEKO INIT START"
+    call this%neko_case%params%print()
     call neko_init(this%neko_case)
+        print *, "NEKO INIT FIN"
+    call this%neko_case%params%print()
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 

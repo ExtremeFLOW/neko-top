@@ -43,8 +43,8 @@ module adjoint_case
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
-  use json_utils_ext, only: json_key_fallback, json_get_subdict
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils_ext, only: json_key_fallback
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
@@ -234,9 +234,10 @@ contains
     !
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
-
+  
     call json_get(neko_case%params, json_key//'.type', string_val)
-    call json_get_subdict(neko_case%params, json_key, ic_json)
+    call json_extract_object(neko_case%params, json_key, ic_json)
+
 
     if (trim(string_val) .ne. 'user') then
        call set_adjoint_fluid_ic( &
@@ -247,7 +248,7 @@ contains
        call set_adjoint_fluid_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
-            neko_case%usr%fluid_user_ic, ic_json)
+            neko_case%usr%fluid_user_ic, neko_case%params)
     end if
 
     call neko_log%end_section()
@@ -257,12 +258,14 @@ contains
        ! we shouldn't fallback to the primal here.
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
+      call json_extract_object(neko_case%params, &
+         'case.adjoint_scalar.initial_condition', ic_json)
 
        !call neko_log%section("Adjoint scalar initial condition ")
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(this%scalar_adj%s_adj, this%scalar_adj%c_Xh, &
-               this%scalar_adj%gs_Xh, string_val, neko_case%params)
+               this%scalar_adj%gs_Xh, string_val, ic_json)
        else
           call neko_error("user defined ICs not implemented for adjoint scalar")
           ! call set_scalar_ic(this%scalar_adj%s_adj, &

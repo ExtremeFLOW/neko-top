@@ -8,7 +8,7 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -16,6 +16,7 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
+  use json_module, only : json_file
   implicit none
 
   ! ========================================================================= !
@@ -45,6 +46,7 @@ contains
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
+    type(json_file) :: json_subdict
 
     t = 0.0_rp
 
@@ -96,11 +98,13 @@ contains
 
     call json_get(neko_case%params, &
          'case.fluid.initial_condition.type', string_val)
+   call json_extract_object(neko_case%params, 'case.fluid.initial_condition', &
+       json_subdict)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u, v, w, p, &
             neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-            string_val, neko_case%params)
+            string_val, json_subdict)
     else
        call set_flow_ic(u, v, w, p, &
             neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
@@ -117,12 +121,14 @@ contains
     if (has_scalar) then
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)
+      call json_extract_object(neko_case%params, &
+         'case.scalar.initial_condition', json_subdict)
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(s, &
                neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
                string_val, &
-               neko_case%params)
+               json_subdict)
        else
           call set_scalar_ic(s, &
                neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &

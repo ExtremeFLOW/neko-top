@@ -192,12 +192,14 @@ contains
 
     ! I can't explain why this is correct, but I know it is!
     ! Sit down with a pen and paper !!
-    n = dsdx%size()
-    do i = 1, n
-       dsdx%x(i,1,1,1) = dsdx%x(i,1,1,1) / this%coef%B(i,1,1,1)
-       dsdy%x(i,1,1,1) = dsdy%x(i,1,1,1) / this%coef%B(i,1,1,1)
-       dsdz%x(i,1,1,1) = dsdz%x(i,1,1,1) / this%coef%B(i,1,1,1)
-    end do
+    ! n = dsdx%size()
+    ! do i = 1, n
+    !    dsdx%x(i,1,1,1) = dsdx%x(i,1,1,1) / this%coef%B(i,1,1,1)
+    !    dsdy%x(i,1,1,1) = dsdy%x(i,1,1,1) / this%coef%B(i,1,1,1)
+    !    dsdz%x(i,1,1,1) = dsdz%x(i,1,1,1) / this%coef%B(i,1,1,1)
+    ! end do
+    !
+    ! I think this was due to the premultiply which has now been rectified
 
     ! TODO
     ! So in principal, the derivatives could have kinks now.
