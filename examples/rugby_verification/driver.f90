@@ -1,6 +1,6 @@
 program usrneko
   use simulation, only: simulation_t
-  use topopt_design, only: topopt_design_t
+  use design, only: design_t, design_factory
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
 
@@ -22,7 +22,7 @@ program usrneko
   !> The simulation we are working with
   type(simulation_t) :: simulation
   !> The design type
-  type(topopt_design_t) :: design
+  class(design_t), allocatable :: design
   !> The problem type
   type(problem_t) :: problem
   !> The optimizer (in this case mma)
@@ -47,12 +47,7 @@ program usrneko
   ! Initialization of the components
 
   call simulation%init(parameters)
-
-  ! Todo: We are currently working on the design.
-  call design%init(parameters, simulation)
-  call design%add_mapping(parameters, simulation)
-
-
+  call design_factory(design, parameters, simulation)
   call problem%init(parameters, design, simulation)
   call optimizer_factory(optimizer, parameters, problem, design, simulation)
 
@@ -65,10 +60,11 @@ program usrneko
   ! Clean up the components
 
   call optimizer%free()
-  if (allocated(optimizer)) deallocate(optimizer)
-
   call problem%free()
   call design%free()
   call simulation%free()
+
+  if (allocated(design)) deallocate(design)
+  if (allocated(optimizer)) deallocate(optimizer)
 
 end program usrneko

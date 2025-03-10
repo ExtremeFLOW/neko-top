@@ -71,14 +71,14 @@ module minimum_dissipation_objective
        adjoint_minimum_dissipation_source_term_t
   use objective, only: objective_t
   use simulation, only: simulation_t
-  use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use coefs, only: coef_t
+  use field_registry, only: neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
   use design, only: design_t
-  use topopt_design, only: topopt_design_t
-  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+  use brinkman_design, only: brinkman_design_t
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use math_ext, only: glsc2_mask
@@ -94,8 +94,21 @@ module minimum_dissipation_objective
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
-     class(fluid_scheme_incompressible_t), pointer :: fluid
-     class(adjoint_fluid_scheme_t), pointer :: adjoint
+     !> Pointer to the u field.
+     type(field_t), pointer :: u => null()
+     !> Pointer to the v field.
+     type(field_t), pointer :: v => null()
+     !> Pointer to the w field.
+     type(field_t), pointer :: w => null()
+     !> Pointer to the coefficient field.
+     type(coef_t), pointer :: c_Xh => null()
+
+     !> Pointer to adjoint u field.
+     type(field_t), pointer :: adjoint_u => null()
+     !> Pointer to adjoint v field.
+     type(field_t), pointer :: adjoint_v => null()
+     !> Pointer to adjoint w field.
+     type(field_t), pointer :: adjoint_w => null()
 
    contains
      !> The common constructor using a JSON object.
@@ -155,19 +168,28 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%fluid => simulation%fluid_scheme
-    this%adjoint => simulation%adjoint_case%scheme
+    this%u => neko_field_registry%get_field('u')
+    this%v => neko_field_registry%get_field('v')
+    this%w => neko_field_registry%get_field('w')
+    this%c_Xh => simulation%fluid_scheme%c_Xh
+    this%adjoint_u => neko_field_registry%get_field('u_adj')
+    this%adjoint_v => neko_field_registry%get_field('v_adj')
+    this%adjoint_w => neko_field_registry%get_field('w_adj')
 
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
-         this%adjoint%f_adj_x, this%adjoint%f_adj_y, this%adjoint%f_adj_z, &
-         this%fluid%u, this%fluid%v, this%fluid%w, this%weight, &
+         simulation%adjoint_case%scheme%f_adj_x, &
+         simulation%adjoint_case%scheme%f_adj_y, &
+         simulation%adjoint_case%scheme%f_adj_z, &
+         this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
-         this%adjoint%c_Xh)
+         this%c_Xh)
+
     ! append adjoint forcing term based on objective function
-    call this%adjoint%source_term%add_source_term(adjoint_forcing)
+    call simulation%adjoint_case%scheme%source_term%add_source_term( &
+         adjoint_forcing)
 
   end subroutine minimum_dissipation_init_attributes
 
@@ -176,8 +198,14 @@ contains
     class(minimum_dissipation_objective_t), intent(inout) :: this
     call this%free_base()
 
-    if (associated(this%fluid)) nullify(this%fluid)
-    if (associated(this%adjoint)) nullify(this%adjoint)
+    if (associated(this%u)) nullify(this%u)
+    if (associated(this%v)) nullify(this%v)
+    if (associated(this%w)) nullify(this%w)
+    if (associated(this%c_Xh)) nullify(this%c_Xh)
+
+    if (associated(this%adjoint_u)) nullify(this%adjoint_u)
+    if (associated(this%adjoint_v)) nullify(this%adjoint_v)
+    if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
   end subroutine minimum_dissipation_free
 
@@ -200,17 +228,17 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(5))
 
     ! update_value the objective function.
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%u%x, this%fluid%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%v%x, this%fluid%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%v%x, this%c_Xh)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%fluid%w%x, this%fluid%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%w%x, this%c_Xh)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
@@ -223,17 +251,17 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%fluid%c_xh%B_d, n)
+          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%fluid%C_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
                n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%fluid%C_Xh%b_d, n)
+               this%C_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%fluid%C_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
        end if
     end if
 
@@ -241,7 +269,7 @@ contains
 
   end subroutine minimum_dissipation_update_value
 
-  !> update_value the sensitivity of the objective function with respect to $\chi$
+  !> update_value the sensitivity of the objective function with respect to \f$\chi\f$
   !! @param design the design.
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
@@ -252,9 +280,9 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%fluid%u, this%adjoint%u_adj)
-    call field_addcol3(work, this%fluid%v, this%adjoint%v_adj)
-    call field_addcol3(work, this%fluid%w, this%adjoint%w_adj)
+    call field_col3(work, this%u, this%adjoint_u)
+    call field_addcol3(work, this%v, this%adjoint_v)
+    call field_addcol3(work, this%w, this%adjoint_w)
     ! but negative
     call field_cmult(work, -1.0_rp)
 
