@@ -61,28 +61,26 @@
 ! because now I see one objective and one constraint
 !
 module lube_term_objective
+  use objective, only: objective_t
+  use design, only: design_t
+  use brinkman_design, only: brinkman_design_t
+  use simulation, only: simulation_t
+  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2
-  use operators, only: grad
   use scratch_registry, only: neko_scratch_registry
-  use objective, only: objective_t
-  use simulation, only: simulation_t
-  use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: glsc2, copy
-  use device_math, only: device_copy, device_glsc2
-  use design, only: design_t
-  use topopt_design, only: topopt_design_t
-  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
-  use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
-  use math_ext, only: glsc2_mask
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
-  use logger, only: neko_log
+  use coefs, only: coef_t
+  use math, only: glsc2, copy
+  use device_math, only: device_copy, device_glsc2
+  use math_ext, only: glsc2_mask
+  use field_math, only: field_col3, field_addcol3, field_cmult
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
@@ -96,12 +94,16 @@ module lube_term_objective
      !> The coefficient for the lube term.
      real(kind=rp) :: K
 
-     ! Internal references to the simulation components.
-
-     type(field_t), pointer :: u, v, w
-     real(kind=rp), pointer :: B(:,:,:,:)
-     type(c_ptr) :: B_d = C_NULL_PTR
-     type(field_t), pointer :: brinkman_amplitude
+     !> Pointer to the u field.
+     type(field_t), pointer :: u => null()
+     !> Pointer to the v field.
+     type(field_t), pointer :: v => null()
+     !> Pointer to the w field.
+     type(field_t), pointer :: w => null()
+     !> Pointer to the coefficient field.
+     type(coef_t), pointer :: c_Xh => null()
+     !> Pointer to the brinkman amplitude field.
+     type(field_t), pointer :: brinkman_amplitude => null()
 
    contains
 
@@ -170,18 +172,19 @@ contains
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
-    type is (topopt_design_t)
-       this%brinkman_amplitude => design%brinkman_amplitude
+    type is (brinkman_design_t)
+       this%brinkman_amplitude => &
+            neko_field_registry%get_field("brinkman_amplitude")
+
 
     class default
-       call neko_error('Minimum dissipation only works with topopt_design')
+       call neko_error('Minimum dissipation only works with brinkman_design')
     end select
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%B => simulation%neko_case%fluid%c_Xh%B
-    this%B_d = simulation%neko_case%fluid%c_Xh%B_d
+    this%c_Xh => simulation%neko_case%fluid%c_Xh
 
     ! if we have the lube term we need to initialize and append that too
 
@@ -210,7 +213,7 @@ contains
     this%u => null()
     this%v => null()
     this%w => null()
-    this%B => null()
+    this%c_Xh => null()
     this%brinkman_amplitude => null()
 
   end subroutine lube_term_free
@@ -241,16 +244,16 @@ contains
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
-          this%value = glsc2_mask(work%x, this%B, design%size(), &
+          this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
                this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(work%x_d, this%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
-          this%value = glsc2(work%x, this%B, design%size())
+          this%value = glsc2(work%x, this%c_Xh%B, design%size())
        end if
     end if
     this%value = 0.5 * this%K * this%value
