@@ -169,25 +169,25 @@ module brinkman_design
      generic, public :: init => init_from_json_sim, init_from_components
      !> Initialize the design from a JSON file
      procedure, pass(this), public :: init_from_json_sim => &
-          topopt_design_init_from_json_sim
+          brinkman_design_init_from_json_sim
      !> Initialize the design from components
      procedure, pass(this), public :: init_from_components => &
-          topopt_design_init_from_components
+          brinkman_design_init_from_components
 
      !> Retrieve the design variables
-     procedure, pass(this) :: get_design => topopt_design_get_design
+     procedure, pass(this) :: get_design => brinkman_design_get_design
 
      !> Update the design
-     procedure, pass(this) :: update_design => topopt_design_update_design
+     procedure, pass(this) :: update_design => brinkman_design_update_design
 
      !> map (this will include everything from mapping
      ! design_indicator -> filtering -> chi
      ! and ultimately handle mapping different coeficients!
-     procedure, pass(this) :: map_forward => topopt_design_map_forward
+     procedure, pass(this) :: map_forward => brinkman_design_map_forward
      !> this will contain chain rule for going backwards
      ! d_design_indicator <- d_filtering <- d_chi
      ! and ultimately handle mapping different coeficients!
-     procedure, pass(this) :: map_backward => topopt_design_map_backward
+     procedure, pass(this) :: map_backward => brinkman_design_map_backward
      ! TODO
      ! maybe it would have been smarter to have a "coeficient" type,
      ! which is just a scalar field and set of mappings going from
@@ -195,22 +195,22 @@ module brinkman_design
      ! maybe also some information about what equation they live in...
 
      ! a writer being called from outside would be nice
-     procedure, pass(this) :: write => topopt_design_write
+     procedure, pass(this) :: write => brinkman_design_write
 
      !> Destructor
-     procedure, pass(this) :: free => topopt_design_free
+     procedure, pass(this) :: free => brinkman_design_free
      ! TODO
      ! I'm not sure who owns the optimizer...
      ! but it would make sense to have it in here so you provide it
      ! with dF/d_design_indicator and it updates itself.
-     ! procedure, pass(this) :: update => topopt_design_update_design
+     ! procedure, pass(this) :: update => brinkman_design_update_design
   end type brinkman_design_t
 
 
 contains
 
   !> Initialize the design from a JSON file
-  subroutine topopt_design_init_from_json_sim(this, parameters, simulation)
+  subroutine brinkman_design_init_from_json_sim(this, parameters, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
@@ -226,10 +226,10 @@ contains
     ! and then we would map for the first one
     call this%map_forward()
 
-  end subroutine topopt_design_init_from_json_sim
+  end subroutine brinkman_design_init_from_json_sim
 
   !> Free the design
-  subroutine topopt_design_free(this)
+  subroutine brinkman_design_free(this)
     class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
@@ -238,9 +238,9 @@ contains
     call this%filtered_design%free()
     call this%sensitivity%free()
 
-  end subroutine topopt_design_free
+  end subroutine brinkman_design_free
 
-  subroutine topopt_design_init_from_components(this, simulation)
+  subroutine brinkman_design_init_from_components(this, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
     character(len=:), allocatable :: optimization_domain_zone_name
@@ -378,10 +378,10 @@ contains
     ! append brinkman source term based on design
     call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
 
-  end subroutine topopt_design_init_from_components
+  end subroutine brinkman_design_init_from_components
 
 
-  subroutine topopt_design_map_forward(this)
+  subroutine brinkman_design_map_forward(this)
     class(brinkman_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
@@ -401,9 +401,9 @@ contains
     call this%mapping%apply_forward(this%brinkman_amplitude, &
          this%filtered_design)
 
-  end subroutine topopt_design_map_forward
+  end subroutine brinkman_design_map_forward
 
-  function topopt_design_get_design(this) result(x)
+  function brinkman_design_get_design(this) result(x)
     class(brinkman_design_t), intent(in) :: this
     type(vector_t) :: x
     integer :: n
@@ -415,9 +415,9 @@ contains
        call device_copy(x%x_d, this%design_indicator%x_d, n)
     end if
 
-  end function topopt_design_get_design
+  end function brinkman_design_get_design
 
-  subroutine topopt_design_update_design(this, x)
+  subroutine brinkman_design_update_design(this, x)
     class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(inout) :: x
     integer :: n
@@ -435,9 +435,9 @@ contains
        call device_copy(x%x_d, this%design_indicator%x_d, n)
     end if
 
-  end subroutine topopt_design_update_design
+  end subroutine brinkman_design_update_design
 
-  subroutine topopt_design_map_backward(this, sensitivity)
+  subroutine brinkman_design_map_backward(this, sensitivity)
     class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
     type(field_t), pointer :: df_dchi
@@ -479,14 +479,14 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine topopt_design_map_backward
+  end subroutine brinkman_design_map_backward
 
-  subroutine topopt_design_write(this, idx)
+  subroutine brinkman_design_write(this, idx)
     class(brinkman_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
     call this%output%sample(real(idx, kind=rp))
 
-  end subroutine topopt_design_write
+  end subroutine brinkman_design_write
 
 end module brinkman_design
