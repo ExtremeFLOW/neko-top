@@ -85,6 +85,9 @@
         ]
     },
     "optimization": {
+        "design": {
+            "type": "brinkman"
+        },
         "solver": {
             "type": "mma",
             "max_iterations": 5,
