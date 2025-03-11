@@ -34,7 +34,7 @@ Neko library and the Neko-TOP library. The system dependencies are:
 9. Autotools
 10. PKG-Config
 
-### External libraries
+### External libraries {#installation-external}
 
 The external libraries are required to be present for the compilation of
 Neko-TOP. However, these can be compiled and installed by the `setup.sh` script
@@ -47,7 +47,7 @@ if they are not already present on the system. The external libraries are:
 5. PFUnit (optional)
 6. CUDA (optional)
 
-## Quick-start compilation
+## Quick-start compilation {#installation-quick}
 
 To compile the library and all external dependencies, the user can run the
 `setup.sh` script. This script will download and compile all dependencies and

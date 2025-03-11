@@ -10,12 +10,12 @@ observe the documentation for Neko for specific details on case files and the
 user interface.
 
 - \subpage user_guide
-  - [installation](@ref installation)
+  - [Installation](@ref installation)
   - [Examples](@ref examples)
 - \subpage dev_guide
-  - [testing](@ref testing)
-  - [contributing](@ref contributing)
-  - [code-structure](@ref code-structure)
+  - [Contributing](@ref contributing)
+  - [Code structure](@ref code-structure)
+  - [Testing](@ref testing)
 - \subpage appendices
   - [Theory](@ref theory)
   - [Tools](@ref tools)
