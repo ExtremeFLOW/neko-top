@@ -3,13 +3,14 @@ module mma_optimizer
   use problem, only : problem_t
   use mma, only: mma_t
   use problem, only: problem_t
-  use topopt_design, only: topopt_design_t
   use num_types, only: rp
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use simulation, only: simulation_t
   use design, only: design_t
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
 
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -90,14 +91,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
     call this%logger%set_header(trim(optimization_header))
 
-    call x%init(design%size())
-
-    select type (d => design)
-    type is (topopt_design_t)
-       call copy(x%x, d%design_indicator%x, d%size())
-    class default
-       call neko_error('Unknown design type for MMA Optimizer')
-    end select
+    x = design%get_design()
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
@@ -151,15 +145,6 @@ contains
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
-    call x%init(n)
-
-    select type (d => design)
-    type is (topopt_design_t)
-       call copy(x%x, d%design_indicator%x, n)
-    class default
-       call neko_error('Unknown design type for MMA Optimizer')
-    end select
-
     !>initializing the scaling factor
     scaling_factor = 1.0_rp
     if (pe_rank .eq. 0) then
@@ -198,29 +183,14 @@ contains
           scaling_factor = abs(this%scale)
        end if
 
+       x = design%get_design()
+
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x%x, objective_sensitivities, &
             scaling_factor * constraint_value, &
             scaling_factor * constraint_sensitivities)
 
-       select type (d => design)
-       type is (topopt_design_t)
-          call copy(d%design_indicator%x, x%x, n)
-          if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
-             call device_copy(d%design_indicator%x_d, x%x_d, n)
-          end if
-
-          call d%map_forward()
-
-          call copy(x%x, d%design_indicator%x, n)
-          if (NEKO_BCKND_DEVICE .eq. 1) then
-             call device_copy(x%x_d, d%design_indicator%x_d, n)
-             call device_memcpy(x%x, x%x_d, n, DEVICE_TO_HOST, sync = .false.)
-          end if
-       class default
-          call neko_error('Unknown design type for MMA Optimizer')
-       end select
+       call design%update_design(x)
 
        call simulation%run_forward()
        call problem%compute(design)
