@@ -4,12 +4,12 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": true,
-        "end_time": 30.0,
+        "output_boundary": false,
+        "end_time": 8.0,
         "timestep": 5e-4,
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 5,
+            "polynomial_order": 7,
             "dealias": true
         },
         "fluid": {
@@ -51,7 +51,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 500.0,
+            "Pe": 50000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
@@ -164,7 +164,7 @@
                 "asyincr": 1.2,
                 "asydecr": 0.7,
                 "m": 1,
-                "scale": 1.0,
+                "scale": 100.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
