@@ -24,4 +24,4 @@ jobs:
 
       - name: Build documentation
         run: |
-          cmake --build build --target documentation
+          cmake --build build --target Documentation
