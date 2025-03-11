@@ -757,7 +757,7 @@ behavior will remain as with the setting FAIL_ON_WARNINGS.
 Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
 The default value is: NO.
 
-WARN_AS_ERROR          = FAIL_ON_WARNINGS_PRINT
+WARN_AS_ERROR          = NO
 
 #---------------------------------------------------------------------------
 # Configuration options related to the input files
