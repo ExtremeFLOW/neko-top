@@ -1,15 +1,21 @@
 # ============================================================================ #
+# Find Doxygen
+# ============================================================================ #
+
+find_package(Doxygen QUIET)
+if (NOT Doxygen_FOUND)
+    if (BUILD_DOCS)
+        message(FATAL_ERROR "Doxygen is needed to build the documentation.")
+    endif()
+    return()
+endif()
+
+# ============================================================================ #
 # Doxygen Documentation
 # ============================================================================ #
 
 # Check if we wish to build the docs
 message(CHECK_START "Doxygen configuration")
-
-# ============================================================================ #
-# Find Doxygen
-# ============================================================================ #
-
-find_package(Doxygen REQUIRED)
 
 # Use fetch content to download the doxygen theme: doxygen-awesome-css
 include(FetchContent)
