@@ -74,4 +74,12 @@ add_custom_target(
     VERBATIM
 )
 
+# Add the documentation target to ALL if we have "BUILD_DOCS" enabled
+if (BUILD_DOCS)
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
+
 message(CHECK_PASS "done")

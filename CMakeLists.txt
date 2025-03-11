@@ -140,14 +140,7 @@ endif()
 
 # Add the documentation target to ALL if we have "BUILD_DOCS" enabled
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
-if (BUILD_DOCS)
-    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
-else()
-    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
-endif()
-
 if (ONLY_DOCS)
-    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
     return()
 endif()
 
