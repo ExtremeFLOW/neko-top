@@ -1,4 +1,4 @@
-# Compilation of Neko-TOP {#compilation}
+# Installation {#installation}
 \tableofcontents
 
 Neko-TOP is an extension of the Neko library, and as such it requires the Neko
