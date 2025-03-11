@@ -33,7 +33,7 @@
 !> Implements the `design_t`.
 module design
   use json_module, only: json_file
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use vector, only: vector_t
   use utils, only: neko_error
   implicit none

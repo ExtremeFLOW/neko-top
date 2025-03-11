@@ -7,7 +7,7 @@ module mma_optimizer
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use design, only: design_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
