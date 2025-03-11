@@ -87,7 +87,7 @@ contains
 
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
-    class(simulation_t), intent(inout) :: this
+    class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
