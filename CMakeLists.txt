@@ -52,6 +52,7 @@ endif()
 
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
+option(ONLY_DOCS "Only build the documentation" OFF)
 
 if (CMAKE_BUILD_TYPE STREQUAL "")
     set(CMAKE_BUILD_TYPE "Release"
@@ -143,6 +144,11 @@ if (BUILD_DOCS)
     set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
 else()
     set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
+if (ONLY_DOCS)
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
+    return()
 endif()
 
 # ============================================================================ #
