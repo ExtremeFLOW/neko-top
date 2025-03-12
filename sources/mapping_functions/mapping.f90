@@ -37,6 +37,7 @@ module mapping
   use json_module, only: json_file
   use coefs, only: coef_t
   use field, only: field_t
+  use field_math, only: field_copy
   implicit none
   private
 
@@ -44,24 +45,36 @@ module mapping
   type, abstract, public :: mapping_t
      !> Coefficients for the SEM.
      type(coef_t), pointer :: coef => null()
+     !> A copy of the unmapped field (often used for chain rule)
+     type(field_t) :: X_in
 
    contains
      !> Constructor for the mapping_t class.
      procedure, pass(this) :: init_base => mapping_init_base
      !> Destructor for the mapping_t (base) class.
      procedure, pass(this) :: free_base => mapping_free_base
+     !> Performs the forward mapping.
+     procedure, pass(this) :: apply_forward => mapping_apply_forward_wrapper
+     !> Performs the backward mapping (ie, chain rule)
+     procedure, pass(this) :: apply_backward => mapping_apply_backward_wrapper
      !> The common constructor using a JSON dictionary.
      procedure(mapping_init), pass(this), deferred :: init
      !> Destructor.
      procedure(mapping_free), pass(this), deferred :: free
      !> Apply forward
-     procedure(mapping_apply), pass(this), deferred :: apply_forward
-     !> Apply backwards (with chain rule)
-     procedure(mapping_apply_backward), pass(this), deferred :: apply_backward
-  end type mapping_t
+     procedure(mapping_apply), pass(this), deferred :: apply_forward_
+     !> Apply backwards (ie, chain rule)
+     procedure(mapping_apply_backward), pass(this), deferred :: apply_backward_
+       end type mapping_t
 
-
-
+     !> A helper type that is needed to have an array of polymorphic objects
+     type, public :: mapping_wrapper_t
+     !> Wrapped polymorphic mapping.
+     class(mapping_t), allocatable :: mapping
+   contains
+     !> Destructor.
+     procedure, pass(this) :: free => mapping_wrapper_free
+       end type mapping_wrapper_t
 
   abstract interface
      !> The common constructor using a JSON dictionary.
@@ -100,18 +113,31 @@ module mapping
      !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
      !! \frac{\partial F}{\partial \rho}$
      !! @param X_in The original input field ($\rho$)
-     !! @param dF_dX_out, sensitivity wrt to the mapped field
+     !! @param sens_in, sensitivity wrt to the mapped field
      !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
-     !! @param dF_dX_in, sensitivity wrt to the unmapped field
+     !! @param sens_out, sensitivity wrt to the unmapped field
      !! ($\frac{\partial F}{\partial \rho}$)
-     subroutine mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
+     subroutine mapping_apply_backward(this, sens_out, sens_in, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
-       type(field_t), intent(in) :: dF_dX_out
+       type(field_t), intent(in) :: sens_in
        type(field_t), intent(in) :: X_in
-       type(field_t), intent(inout) :: dF_dX_in
+       type(field_t), intent(inout) :: sens_out
      end subroutine mapping_apply_backward
   end interface
+
+    interface
+     !> mapping factory. Both constructs and initializes the object.
+     !! @param json JSON object initializing the mapping.
+     !! @param coef The SEM coefficients.
+     module subroutine mapping_factory(object, json, coef)
+       class(mapping_t), allocatable, intent(inout) :: object
+       type(json_file), intent(inout) :: json
+       type(coef_t), intent(inout) :: coef
+     end subroutine mapping_factory
+  end interface
+
+  public :: mapping_factory
 contains
 
   !> Constructor for the `mapping_t` (base) class.
@@ -121,6 +147,7 @@ contains
     type(coef_t), intent(inout), target :: coef
 
     this%coef => coef
+    call this%X_in%init(coef%dof)
 
   end subroutine mapping_init_base
 
@@ -128,9 +155,53 @@ contains
   subroutine mapping_free_base(this)
     class(mapping_t), intent(inout) :: this
 
+    call this%X_in%free()
     nullify(this%coef)
+
   end subroutine mapping_free_base
 
+  !> Destructor for the `mapping_wrapper_t` type.
+  subroutine mapping_wrapper_free(this)
+    class(mapping_wrapper_t), intent(inout) :: this
 
+    if (allocated(this%mapping)) then
+       call this%mapping%free()
+       deallocate(this%mapping)
+    end if
+  end subroutine mapping_wrapper_free
+
+  !> Executes `apply_forward_`
+     !! @param X_out The mapped field ($\tilde{\rho}$)
+     !! @param X_in The unmapped field ($\rho$)
+  subroutine mapping_apply_forward_wrapper(this, X_out, X_in)
+    class(mapping_t), intent(inout) :: this
+    type(field_t), intent(in) :: X_in
+    type(field_t), intent(inout) :: X_out
+
+    call field_copy(this%X_in, X_in)
+    call this%apply_forward_(X_out, this%X_in)
+
+  end subroutine mapping_apply_forward_wrapper
+
+    !> Executes `apply_backward_`
+     !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
+     !! \frac{\partial F}{\partial \rho}$
+     !! @param X_in The original input field ($\rho$)
+     !! @param sens_in, sensitivity wrt to the mapped field
+     !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
+     !! @param sens_out, sensitivity wrt to the unmapped field
+     !! ($\frac{\partial F}{\partial \rho}$)
+  subroutine mapping_apply_backward_wrapper(this, sens_out, sens_in)
+    class(mapping_t), intent(inout) :: this
+       type(field_t), intent(in) :: sens_in
+       type(field_t), intent(inout) :: sens_out
+    ! @todo
+    ! hmmmm, it would be silly to call mapping backward without mapping forward
+    ! but at least this%X_in is certainly initialized.
+    ! but it won't contain the correct information unless a map forward has
+    ! occured.
+    call this%apply_backward_(sens_out, sens_in, this%X_in)
+
+  end subroutine mapping_apply_backward_wrapper
 
 end module mapping
