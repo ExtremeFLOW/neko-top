@@ -98,8 +98,8 @@ contains
 
     call json_get(neko_case%params, &
          'case.fluid.initial_condition.type', string_val)
-   call json_extract_object(neko_case%params, 'case.fluid.initial_condition', &
-       json_subdict)
+    call json_extract_object(neko_case%params, 'case.fluid.initial_condition', &
+         json_subdict)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic(u, v, w, p, &
@@ -121,8 +121,8 @@ contains
     if (has_scalar) then
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)
-      call json_extract_object(neko_case%params, &
-         'case.scalar.initial_condition', json_subdict)
+       call json_extract_object(neko_case%params, &
+            'case.scalar.initial_condition', json_subdict)
 
        if (trim(string_val) .ne. 'user') then
           call set_scalar_ic(s, &
