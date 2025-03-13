@@ -180,7 +180,7 @@ contains
        call set_flow_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
-            neko_case%usr%fluid_user_ic, ic_json)
+            neko_case%usr%fluid_user_ic, neko_case%params)
     end if
 
     ! if (scalar) then
