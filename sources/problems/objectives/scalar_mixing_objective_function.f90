@@ -48,7 +48,7 @@ module scalar_mixing_objective
   use field_math, only: field_copy, field_cadd, field_col2, field_cmult
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
-  use device_math, only: device_glsc2
+  use device_math, only: device_glsc2, device_copy
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
