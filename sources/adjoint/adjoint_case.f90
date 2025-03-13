@@ -38,11 +38,11 @@ module adjoint_case
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
-  use adjoint_fluid_ic, only: set_adjoint_fluid_ic
+  use flow_ic, only: set_flow_ic
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
   use json_utils_ext, only: json_key_fallback, json_get_subdict
   implicit none
   private
@@ -169,15 +169,15 @@ contains
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
     call json_get(neko_case%params, json_key//'.type', string_val)
-    call json_get_subdict(neko_case%params, json_key, ic_json)
+    call json_extract_object(neko_case%params, json_key, ic_json)
 
     if (trim(string_val) .ne. 'user') then
-       call set_adjoint_fluid_ic( &
+       call set_flow_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
             string_val, ic_json)
     else
-       call set_adjoint_fluid_ic( &
+       call set_flow_ic( &
             this%scheme%u_adj, this%scheme%v_adj, this%scheme%w_adj, &
             this%scheme%p_adj, this%scheme%c_Xh, this%scheme%gs_Xh, &
             neko_case%usr%fluid_user_ic, ic_json)
