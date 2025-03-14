@@ -232,8 +232,8 @@ contains
 
     ! Initialize the mapper
     associate(coef => simulation%neko_case%fluid%c_Xh)
-    call this%mapping%init_base(coef)
-    call this%mapping%add(parameters, 'optimization.design.mapping')
+      call this%mapping%init_base(coef)
+      call this%mapping%add(parameters, 'optimization.design.mapping')
     end associate
 
     ! and then we would map for the first one
