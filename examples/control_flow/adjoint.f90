@@ -72,7 +72,7 @@ module simcomp_example
   use parmetis, only : parmetis_partmeshkway
   use redist, only : redist_mesh
   use output_controller, only : output_controller_t
-  use adjoint_fluid_ic, only : set_adjoint_fluid_ic
+  use flow_ic, only : set_flow_ic
   use scalar_ic, only : set_scalar_ic
   use field, only : field_t
   use field_registry, only : neko_field_registry
@@ -277,16 +277,16 @@ contains
 
 
     ! if (trim(string_val) .ne. 'user') then
-    !    !call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    !    !call set_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !    !     this%scheme%c_Xh, this%scheme%gs_Xh, string_val, C%params)
     !    !
     !    ! passing adjoint_json
-    !    call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
+    !    call set_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, &
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !         this%scheme%c_Xh, this%scheme%gs_Xh, string_val, adjoint_json)
     ! else
-    !    call set_adjoint_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, i&
+    !    call set_fluid_ic(this%scheme%u_adj, this%scheme%v_adj, i&
     ! this%scheme%w_adj, this%scheme%p_adj, &
     !         this%scheme%c_Xh, this%scheme%gs_Xh, C%usr%fluid_user_ic, &
     ! adjoint_json)
