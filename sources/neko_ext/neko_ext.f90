@@ -16,6 +16,7 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
+  use json_module, only : json_file
   ! for vector/field math
   use math, only: copy
   use device_math, only: device_copy

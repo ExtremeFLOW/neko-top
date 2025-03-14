@@ -47,12 +47,14 @@ module brinkman_design
   use design, only: design_t
   use math, only: rzero
   use simulation, only: simulation_t
-  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
+  use scalar_ic, only: set_scalar_ic
+  use json_utils, only : json_get, json_extract_object
+  use utils, only : neko_error
   implicit none
   private
 
@@ -98,7 +100,7 @@ module brinkman_design
      ! dF/d\chi, dF/dC and dF/d\kappa
      !
      ! What I'm calling "sensitivity" here, is the sensitivity with respect to
-     ! the design indicator
+     ! the design design_indicator
      ! so dF/d\rho
      !
      ! so the proceedure "map_backwards" will take in the field list
@@ -227,16 +229,47 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
+    type(json_file) :: json_subdict
+    character(len = :), allocatable :: string_val
 
+    ! Initialize and inject into the simulation
     call this%init_from_components(simulation)
 
     ! Initialize the mapper
-    associate(coef => simulation%neko_case%fluid%c_Xh)
+    associate(coef => simulation%neko_case%fluid%c_Xh, &
+         gs => simulation%neko_case%fluid%gs_Xh)
       call this%mapping%init_base(coef)
       call this%mapping%add(parameters, 'optimization.design.mapping')
+
+      ! Set the initial material distribution
+      ! @note I'm hijacking scalar_ic.f90 to set the initial material
+      ! distribution.
+      ! Tim, I know you have some nice stuff in the Brinkman_source_term, ie,
+      ! loading meshes, but they're all private to that type. I think they would
+      ! be useful for other people (initial conditions based on a mesh? maybe?)
+      ! but if we have that functionality public, then the Brinkman_source_term
+      ! could just use it, instead of keeping those functions private. Then it
+      ! would also be able to start from a field too!
+      !
+      ! The alternative is that we write a whole other set_field or something
+      ! to that effect which only contains the things we want... but it seems
+      ! like a lot of double up on code.
+      call json_get(parameters, &
+           'optimization.design.initial_distribution.type', string_val)
+      call json_extract_object(parameters, &
+           'optimization.design.initial_distribution', json_subdict)
+
+      if (trim(string_val) .ne. 'user') then
+         call set_scalar_ic(this%design_indicator, coef, gs, string_val, &
+            json_subdict)
+      else
+         call neko_error("user defined initial material distrubtions not &
+         & implemented yet")
+         ! But they could be very easily!!
+      end if
     end associate
 
-    ! and then we would map for the first one
+    ! Map to the Brinkman amplitude
     call this%map_forward()
 
   end subroutine brinkman_design_init_from_json_sim
@@ -346,7 +379,7 @@ contains
     end if
 
     ! a field writer would be nice to output
-    ! - design indicator (\rho)
+    ! - design design_indicator (\rho)
     ! - mapped design (\chi)
     ! - sensitivity (dF/d\chi)
     ! TODO
