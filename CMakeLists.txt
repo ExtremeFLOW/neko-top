@@ -76,7 +76,10 @@ set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
 # Define compiler flags
 
 # Define the list of available build types
-set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
+if (CMAKE_BUILD_TYPE STREQUAL "")
+    set(CMAKE_BUILD_TYPE "Release"
+        CACHE STRING "Choose the type of build" FORCE)
+endif()
 set(CMAKE_BUILD_TYPE_LIST
     Debug
     Release
