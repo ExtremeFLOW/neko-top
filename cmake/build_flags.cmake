@@ -32,7 +32,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             $<$<COMPILE_LANGUAGE:Fortran>:-fwhole-program>
             $<$<COMPILE_LANGUAGE:Fortran>:-Werror>
         )
-        elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
+    elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
         add_compile_options(
             # Debugging flags
             $<$<COMPILE_LANGUAGE:Fortran>:-g>
@@ -56,7 +56,7 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
             $<$<COMPILE_LANGUAGE:Fortran>:-ffpe-trap=invalid,zero,overflow>
             $<$<COMPILE_LANGUAGE:Fortran>:-finit-real=snan>
             $<$<COMPILE_LANGUAGE:Fortran>:-finit-integer=-99999999>
-            $<$<COMPILE_LANGUAGE:Fortran>:-finit-character=ascii>
+            $<$<COMPILE_LANGUAGE:Fortran>:-finit-character=1>
             $<$<COMPILE_LANGUAGE:Fortran>:-finit-logical=true>
             $<$<COMPILE_LANGUAGE:Fortran>:-finit-local-zero>
         )
