@@ -106,8 +106,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-O3>
-        $<$<COMPILE_LANGUAGE:Fortran>:-march=native>
-        $<$<COMPILE_LANGUAGE:Fortran>:-mtune=native>
         $<$<COMPILE_LANGUAGE:Fortran>:-funroll-loops>
         $<$<COMPILE_LANGUAGE:Fortran>:-flto>
         $<$<COMPILE_LANGUAGE:Fortran>:-fwhole-program>
