@@ -65,7 +65,7 @@ done
 
 # Check if the device type has changed
 if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
-    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt)
+    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt) || true
     if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
