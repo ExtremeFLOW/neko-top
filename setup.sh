@@ -101,7 +101,11 @@ source $MAIN_DIR/scripts/dependencies.sh
 if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
 if [ -z "$CXX" ]; then export CXX=$(which g++); else export CXX; fi
 if [ -z "$FC" ]; then export FC=$(which gfortran); else export FC; fi
-if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+
+# Device specific compilers
+if [ "$DEVICE_TYPE" == "CUDA" ]; then
+    if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+fi
 
 # Everything past this point should be general across all setups.
 # ============================================================================ #
