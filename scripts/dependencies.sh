@@ -186,62 +186,66 @@ function find_neko() {
             https://github.com/ExtremeFLOW/neko.git $1
     fi
 
-    # Determine available features
-    FEATURES="--enable-contrib "
-    [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
-    [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
-    [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+    # Check if Neko is installed, if not install it.
+    if [[ -z "$(find $1/lib*/ -name libneko.a)" || "$CLEAN" == true ]]; then
 
-    # Handle device specific features
-    if [ "$DEVICE_TYPE" == "CUDA" ]; then
-        if [ -d "$CUDA_DIR" ]; then
-            FEATURES+=" --with-cuda=$CUDA_DIR"
-        else
-            error "CUDA_DIR is not set."
-            error "Please set CUDA_DIR to the directory containing"
-            error "the CUDA installation."
+        # Determine available features
+        FEATURES="--enable-contrib "
+        [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
+        [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
+        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+
+        # Handle device specific features
+        if [ "$DEVICE_TYPE" == "CUDA" ]; then
+            if [ -d "$CUDA_DIR" ]; then
+                FEATURES+=" --with-cuda=$CUDA_DIR"
+            else
+                error "CUDA_DIR is not set."
+                error "Please set CUDA_DIR to the directory containing"
+                error "the CUDA installation."
+                exit 1
+            fi
+        elif [ "$DEVICE_TYPE" != "OFF" ]; then
+            printf "Invalid device type: $DEVICE_TYPE\n"
             exit 1
         fi
-    elif [ "$DEVICE_TYPE" != "OFF" ]; then
-        printf "Invalid device type: $DEVICE_TYPE\n"
-        exit 1
-    fi
 
-    CURRENT_DIR=$(pwd)
-    cd $1
-    if [[ -f regen.sh && (! -f "configure" || "$CLEAN" == true) ]]; then
-        ./regen.sh
-    fi
-    if [[ -f configure && (! -f Makefile || "$CLEAN" == true) ]]; then
-        ./configure --prefix="$(realpath ./)" $FEATURES
-    fi
+        CURRENT_DIR=$(pwd)
+        cd $1
+        if [[ -f regen.sh && (! -f "configure" || "$CLEAN" == true) ]]; then
+            ./regen.sh
+        fi
+        if [[ -f configure && (! -f Makefile || "$CLEAN" == true) ]]; then
+            ./configure --prefix="$(realpath ./)" $FEATURES
+        fi
 
-    if [ -f Makefile ]; then
-        # Update compile dependencies if makedepf90 is installed
-        if [ ! -z "$(which makedepf90)" ]; then
-            size_pre=$(stat -c %s src/.depends)
-            cd src/ && make depend && cd ../
-            if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
-                automake -a
-                rm -fr autom4te.cache
+        if [ -f Makefile ]; then
+            # Update compile dependencies if makedepf90 is installed
+            if [ ! -z "$(which makedepf90)" ]; then
+                size_pre=$(stat -c %s src/.depends)
+                cd src/ && make depend && cd ../
+                if [ "$size_pre" != "$(stat -c %s src/.depends)" ]; then
+                    automake -a
+                    rm -fr autom4te.cache
+                fi
+            fi
+            [ "$CLEAN" == true ] && make clean
+            [ "$QUIET" == true ] && make -s -j install || make -j install
+            [ "$TEST" == true ] && make check
+        fi
+
+        # Verify installation device type
+        if [ "$DEVICE_TYPE" == "CUDA" ]; then
+            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
+            if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
+                error "CUDA backend not found in Neko."
+                error "Please ensure that the CUDA installation is correct."
+                exit 1
             fi
         fi
-        [ "$CLEAN" == true ] && make clean
-        [ "$QUIET" == true ] && make -s -j install || make -j install
-        [ "$TEST" == true ] && make check
-    fi
 
-    # Verify installation device type
-    if [ "$DEVICE_TYPE" == "CUDA" ]; then
-        # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
-        if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
-            error "CUDA backend not found in Neko."
-            error "Please ensure that the CUDA installation is correct."
-            exit 1
-        fi
+        cd $CURRENT_DIR
     fi
-
-    cd $CURRENT_DIR
 
     NEKO_DIR=$(find $1 -type d -exec test -f '{}'/lib/libneko.a \; -print)
     if [ -z "$NEKO_DIR" ]; then
