@@ -25,8 +25,18 @@ function help() {
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
 }
 
+# ============================================================================ #
+# Set main directories
+
+CURRENT_DIR=$(pwd)
+MAIN_DIR=$(dirname $(realpath $0))
+EXTERNAL_DIR="$MAIN_DIR/external"
+
+# ============================================================================ #
+# Parse the options
+
 # Assign default values to the options
-DEVICE_TYPE="OFF"
+DEVICE_TYPE="NONE"
 CLEAN=false
 QUIET=false
 TEST=false
@@ -52,14 +62,21 @@ while true; do
     "--") shift && break ;;
     esac
 done
+
+# Check if the device type has changed
+if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
+    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt)
+
+    echo "Current device type: $CURRENT_DEVICE_TYPE"
+    echo "New device type: $DEVICE_TYPE"
+
+    if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
+        echo "Device type has changed, cleaning the build directory"
+        CLEAN=true
+    fi
+fi
+
 export TEST CLEAN QUIET DEVICE_TYPE
-
-# ============================================================================ #
-# Set main directories
-
-CURRENT_DIR=$(pwd)
-MAIN_DIR=$(dirname $(realpath $0))
-EXTERNAL_DIR="$MAIN_DIR/external"
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
@@ -118,11 +135,11 @@ CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-# Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
-
 printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+
+# Clean the build directory if the clean flag is set
+[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --target clean
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 

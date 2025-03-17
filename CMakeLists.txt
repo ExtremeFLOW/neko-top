@@ -41,7 +41,7 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # Enable devices
-option(DEVICE_TYPE "Enable device support" OFF)
+set(DEVICE_TYPE "NONE" CACHE STRING "Device type to use")
 if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)

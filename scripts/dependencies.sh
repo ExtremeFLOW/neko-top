@@ -205,8 +205,10 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
-        elif [ "$DEVICE_TYPE" != "OFF" ]; then
-            printf "Invalid device type: $DEVICE_TYPE\n"
+        elif [ "$DEVICE_TYPE" != "NONE" ]; then
+            printf "Device type not recognized: $DEVICE_TYPE\n"
+            printf "\tValid options are: CUDA, NONE\n"
+            printf "\tPlease submit an issue if you would like to see additional options.\n"
             exit 1
         fi
 
