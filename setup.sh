@@ -66,10 +66,6 @@ done
 # Check if the device type has changed
 if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
     CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt)
-
-    echo "Current device type: $CURRENT_DEVICE_TYPE"
-    echo "New device type: $DEVICE_TYPE"
-
     if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
@@ -124,6 +120,9 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 # ============================================================================ #
 # Compile the Neko-TOP and example codes.
 
+printf "=%.0s" {1..80} && printf "\n"
+printf "Compiling the example codes and Neko-TOP\n"
+
 # Set CMAKE_VARIABLES to pass to the cmake command
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
@@ -139,7 +138,6 @@ CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
