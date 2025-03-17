@@ -174,8 +174,8 @@ contains
     class(design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
 
-    call neko_error("Design type does not support initialization &
-         &without simulation")
+    call neko_error("Design type does not support initialization " // &
+         "without simulation")
   end subroutine design_init_from_json
 
   !> Dummy initialization from JSON
@@ -184,8 +184,8 @@ contains
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
 
-    call neko_error("Design type does not support initialization &
-         &with simulation")
+    call neko_error("Design type does not support initialization " // &
+         "with simulation")
   end subroutine design_init_from_json_sim
 
   !> Initialize the base design
