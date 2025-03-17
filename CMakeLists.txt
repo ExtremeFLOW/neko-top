@@ -159,11 +159,11 @@ endif()
 # Setup External Libraries
 # ............................................................................ #
 # Check for the required libraries.
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+find_package(BLAS QUIET)
+find_package(LAPACK QUIET)
 
 # Check for the optional libraries.
-find_package(MPI REQUIRED)
+find_package(MPI QUIET)
 
 # ............................................................................ #
 # Setup of JSON-Fortran
