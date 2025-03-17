@@ -25,8 +25,18 @@ function help() {
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
 }
 
+# ============================================================================ #
+# Set main directories
+
+CURRENT_DIR=$(pwd)
+MAIN_DIR=$(dirname $(realpath $0))
+EXTERNAL_DIR="$MAIN_DIR/external"
+
+# ============================================================================ #
+# Parse the options
+
 # Assign default values to the options
-DEVICE_TYPE="OFF"
+DEVICE_TYPE="NONE"
 CLEAN=false
 QUIET=false
 TEST=false
@@ -52,14 +62,17 @@ while true; do
     "--") shift && break ;;
     esac
 done
+
+# Check if the device type has changed
+if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
+    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt) || true
+    if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
+        echo "Device type has changed, cleaning the build directory"
+        CLEAN=true
+    fi
+fi
+
 export TEST CLEAN QUIET DEVICE_TYPE
-
-# ============================================================================ #
-# Set main directories
-
-CURRENT_DIR=$(pwd)
-MAIN_DIR=$(dirname $(realpath $0))
-EXTERNAL_DIR="$MAIN_DIR/external"
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
@@ -84,7 +97,11 @@ source $MAIN_DIR/scripts/dependencies.sh
 if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
 if [ -z "$CXX" ]; then export CXX=$(which g++); else export CXX; fi
 if [ -z "$FC" ]; then export FC=$(which gfortran); else export FC; fi
-if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+
+# Device specific compilers
+if [ "$DEVICE_TYPE" == "CUDA" ]; then
+    if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+fi
 
 # Everything past this point should be general across all setups.
 # ============================================================================ #
@@ -103,6 +120,9 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 # ============================================================================ #
 # Compile the Neko-TOP and example codes.
 
+printf "=%.0s" {1..80} && printf "\n"
+printf "Compiling the example codes and Neko-TOP\n"
+
 # Set CMAKE_VARIABLES to pass to the cmake command
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
@@ -118,11 +138,10 @@ CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-# Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
-
-printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+
+# Clean the build directory if the clean flag is set
+[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --target clean
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 

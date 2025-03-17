@@ -94,7 +94,7 @@ target_link_libraries(neko-top
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     $<$<BOOL:${MPI_FOUND}>:MPI::MPI_Fortran>
-    jsonfortran-gnu::jsonfortran
+    PkgConfig::json-fortran
     PkgConfig::neko
 )
 
