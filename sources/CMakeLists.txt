@@ -89,7 +89,7 @@ target_include_directories(neko-top
 target_link_libraries(neko-top
     BLAS::BLAS
     LAPACK::LAPACK
-    jsonfortran-gnu::jsonfortran
+    PkgConfig::json-fortran
     PkgConfig::neko
 )
 

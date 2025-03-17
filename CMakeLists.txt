@@ -165,16 +165,20 @@ find_package(LAPACK REQUIRED)
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
 
+# We need PKG Config to find the JSON-Fortran and Neko libraries
+find_package(PkgConfig REQUIRED)
+
 # ............................................................................ #
 # Setup of JSON-Fortran
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
 if (IS_DIRECTORY ${JSON_FORTRAN_DIR})
-    set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
+    set(ENV{PKG_CONFIG_PATH}
+        ${JSON_FORTRAN_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
 endif()
 
-# Check that the JSON-Fortran library was found
-find_package(jsonfortran-gnu REQUIRED)
+# Find the JSON-Fortran library
+pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
 # ............................................................................ #
 # Setup of the Neko library
@@ -188,10 +192,12 @@ if (NOT IS_DIRECTORY ${NEKO_DIR})
     )
 endif()
 
-# Set the proper paths for the NEKO_DIR and JSON_FORTRAN_DIR directories
-set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
+# Set the proper paths for the NEKO_DIR
+if (IS_DIRECTORY ${NEKO_DIR})
+    set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
+endif()
 
-find_package(PkgConfig REQUIRED)
+# Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
 # ============================================================================ #

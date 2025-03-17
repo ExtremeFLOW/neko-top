@@ -114,7 +114,7 @@ function(build_example)
     target_link_libraries(${EXAMPLE_NAME}
         BLAS::BLAS
         LAPACK::LAPACK
-        jsonfortran-gnu::jsonfortran
+        PkgConfig::json-fortran
         PkgConfig::neko
     )
 
