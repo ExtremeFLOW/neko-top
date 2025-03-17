@@ -164,6 +164,8 @@ find_package(LAPACK REQUIRED)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
+
+# Check that the MPI Fortran 2008 module is available
 if (NOT MPI_Fortran_HAVE_F08_MODULE)
     message(FATAL_ERROR
         "MPI Fortran 2008 module is required for Neko-TOP."
