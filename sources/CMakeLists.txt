@@ -90,9 +90,7 @@ target_link_libraries(neko-top
     PkgConfig::neko
 )
 
-if(MPI_FOUND)
-    target_link_libraries(neko-top MPI::MPI_Fortran)
-endif()
+target_link_libraries(neko-top MPI::MPI_Fortran)
 
 # ============================================================================ #
 # Specify installation instructions
