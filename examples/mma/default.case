@@ -34,12 +34,6 @@
                     0.0
                 ]
             },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0
-                ]
-            },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
@@ -56,14 +50,20 @@
             },
             "output_control": "nsamples",
             "output_value": 250,
-            "boundary_types": [
-                "v",
-                "v",
-                "o",
-                "w",
-                "w",
-                "w",
-                "w"
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1, 2 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 4, 5, 6 ]
+                }
             ]
         },
         "scalar": {
@@ -76,16 +76,29 @@
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
-            "boundary_types": [
-                "d=0",
-                "d=1"
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0.0,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "dirichlet",
+                    "value": 1.0,
+                    "zone_indices": [ 2 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0.0,
+                    "zone_indices": [ 3, 4, 5, 6 ]
+                }
             ],
             "initial_condition": {
                 "type": "uniform",
                 "value": 0.0
             }
         }
-    }, 
+    },
     "mma": {
         "max_iter": 100,
         "backend": "cpu",
