@@ -15,12 +15,9 @@
 !! This is a hacky way to run the physics and adjoint physics, but it works.
 module topology_optimization_user_module
   use case, only: case_t
-  use field, only: field_t
   use json_file_module, only: json_file
   use json_utils, only: json_get
   use num_types, only: rp
-  use design_module, only: topopt_permeability_force
-  use coefs, only: coef_t
   use initial_conditions, only: scalar_z_split_ic
 
   implicit none

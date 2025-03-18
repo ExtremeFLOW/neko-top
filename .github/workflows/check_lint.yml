@@ -8,7 +8,7 @@ on:
 jobs:
   score-develop:
     name: "Score develop branch"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
@@ -35,7 +35,7 @@ jobs:
 
   score-current:
     name: "Score current branch"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       score: ${{ steps.save-score.outputs.score }}
 
@@ -61,7 +61,7 @@ jobs:
 
   check-scores:
     name: "Check scores"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs:
       - score-current
       - score-develop
@@ -113,7 +113,7 @@ jobs:
   # for improvements. The suggestions are saved in a linter-report.txt file.
   lint-changes:
     name: "Suggest improvements"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs:
       - score-current
       - score-develop
@@ -211,7 +211,7 @@ jobs:
   # Create a badge for the flint score
   create-badge-lint:
     name: "Create badge"
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs:
       - score-current
       - score-develop
