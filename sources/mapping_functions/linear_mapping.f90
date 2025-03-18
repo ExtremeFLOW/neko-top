@@ -88,8 +88,8 @@ contains
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: f_min, f_max
 
-    this%f_min = 0.0_rp
-    this%f_max = 1000.0_rp
+    this%f_min = f_min
+    this%f_max = f_max
 
   end subroutine linear_mapping_init_from_attributes
 
