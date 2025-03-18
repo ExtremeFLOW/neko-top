@@ -13,12 +13,10 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ./run.sh [-h] [--help]
 ```
 
-## List of examples
+A full list of examples can be found in the 
+\subpage examples-list.
 
-1. \subpage permeability_block
-2. \subpage easy-E
-
-## Execution of examples
+## Execution of examples {#examples-running}
 
 The [run.sh](../../run.sh) script is the main driver for all examples.
 The run script will construct a local system for execution of any example
@@ -61,7 +59,7 @@ Unsupported clusters will result in an error message, but, we recommend to
 execute the `run.sh` script with the `--dry-run` switch to organize the job
 files. Then one can manually submit the job to the cluster.
 
-## Adding examples
+## Adding examples. {#examples-new}
 
 To construct new examples, place a folder in the `examples` folder. Each example
 should be self-contained with case files, the nmsh required. Any additional
@@ -76,7 +74,7 @@ are required:
   script, all of them should be placed in the root of the example folder.
   Otherwise, each folder containing a case file will be considered an example.
 
-## Case files and meshes.
+## Case files and meshes. {#examples-data}
 
 When running an example a link is made to the folders `data` and `data_local`
 both sitting at the root of Neko-TOP. The `data` folder contain some official
@@ -90,7 +88,7 @@ Additionally, we avoid copying meshes contained in the examples by creating a
 link to any `.nmsh` files contained in the example folder. This is done to avoid
 copying large meshes around and to allow for easy access to the meshes.
 
-## Advanced example setups
+## Advanced example setups. {#examples-advanced}
 
 Elaborate examples can be constructed by using the CMakeLists.txt file to
 specify the source files and the driver type. The driver type is used to

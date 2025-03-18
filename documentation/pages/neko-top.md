@@ -1,4 +1,4 @@
-# Documentation for Neko-TOP {#index}
+# Manual {#index}
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
@@ -9,11 +9,13 @@ This project is a direct extension of [Neko](https://neko.cfd), so please also
 observe the documentation for Neko for specific details on case files and the
 user interface.
 
-1. \subpage compilation
-   1. \subpage testing
-   2. \subpage contributing
-2. \subpage code-structure
-3. [Examples](@ref examples)
-4. [Tools and Utilities](@ref tools)
-5. \subpage theory
-   1. \subpage adjoint
+- \subpage user_guide
+  - [Installation](@ref installation)
+  - [Examples](@ref examples)
+- \subpage dev_guide
+  - [Contributing](@ref contributing)
+  - [Code structure](@ref code-structure)
+  - [Testing](@ref testing)
+- \subpage appendices
+  - [Theory](@ref theory)
+  - [Tools](@ref tools)
