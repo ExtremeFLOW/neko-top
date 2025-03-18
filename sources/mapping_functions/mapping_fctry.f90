@@ -42,9 +42,9 @@ submodule (mapping) mapping_fctry
 
   ! List of all possible types created by the factory routine
   character(len=20) :: MAPPING_KNOWN_TYPES(3) = [character(len=20) :: &
-     "linear", &
-     "PDE_filter", &
-     "RAMP"]
+       "linear", &
+       "PDE_filter", &
+       "RAMP"]
 
 contains
 
@@ -67,11 +67,11 @@ contains
     else if (trim(type_name) .eq. "RAMP") then
        allocate(RAMP_mapping_t::object)
     else
-       type_string =  concat_string_array(MAPPING_KNOWN_TYPES, &
+       type_string = concat_string_array(MAPPING_KNOWN_TYPES, &
             NEW_LINE('A') // "-  ", .true.)
        call neko_error("Unknown mapping type: " &
-                       // trim(type_name) // ".  Known types are: " &
-                       // type_string)
+            // trim(type_name) // ".  Known types are: " &
+            // type_string)
     end if
 
     ! Initialize

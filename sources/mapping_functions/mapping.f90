@@ -65,16 +65,16 @@ module mapping
      procedure(mapping_apply), pass(this), deferred :: apply_forward_
      !> Apply backwards (ie, chain rule)
      procedure(mapping_apply_backward), pass(this), deferred :: apply_backward_
-       end type mapping_t
+  end type mapping_t
 
-     !> A helper type that is needed to have an array of polymorphic objects
-     type, public :: mapping_wrapper_t
+  !> A helper type that is needed to have an array of polymorphic objects
+  type, public :: mapping_wrapper_t
      !> Wrapped polymorphic mapping.
      class(mapping_t), allocatable :: mapping
    contains
      !> Destructor.
      procedure, pass(this) :: free => mapping_wrapper_free
-       end type mapping_wrapper_t
+  end type mapping_wrapper_t
 
   abstract interface
      !> The common constructor using a JSON dictionary.
@@ -126,7 +126,7 @@ module mapping
      end subroutine mapping_apply_backward
   end interface
 
-    interface
+  interface
      !> mapping factory. Both constructs and initializes the object.
      !! @param json JSON object initializing the mapping.
      !! @param coef The SEM coefficients.
@@ -171,8 +171,8 @@ contains
   end subroutine mapping_wrapper_free
 
   !> Executes `apply_forward_`
-     !! @param X_out The mapped field ($\tilde{\rho}$)
-     !! @param X_in The unmapped field ($\rho$)
+  !! @param X_out The mapped field ($\tilde{\rho}$)
+  !! @param X_in The unmapped field ($\rho$)
   subroutine mapping_apply_forward_wrapper(this, X_out, X_in)
     class(mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
@@ -183,18 +183,18 @@ contains
 
   end subroutine mapping_apply_forward_wrapper
 
-    !> Executes `apply_backward_`
-     !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
-     !! \frac{\partial F}{\partial \rho}$
-     !! @param X_in The original input field ($\rho$)
-     !! @param sens_in, sensitivity wrt to the mapped field
-     !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
-     !! @param sens_out, sensitivity wrt to the unmapped field
-     !! ($\frac{\partial F}{\partial \rho}$)
+  !> Executes `apply_backward_`
+  !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
+  !! \frac{\partial F}{\partial \rho}$
+  !! @param X_in The original input field ($\rho$)
+  !! @param sens_in, sensitivity wrt to the mapped field
+  !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
+  !! @param sens_out, sensitivity wrt to the unmapped field
+  !! ($\frac{\partial F}{\partial \rho}$)
   subroutine mapping_apply_backward_wrapper(this, sens_out, sens_in)
     class(mapping_t), intent(inout) :: this
-       type(field_t), intent(in) :: sens_in
-       type(field_t), intent(inout) :: sens_out
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
     ! @todo
     ! hmmmm, it would be silly to call mapping backward without mapping forward
     ! but at least this%X_in is certainly initialized.

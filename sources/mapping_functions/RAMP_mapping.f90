@@ -118,13 +118,13 @@ contains
 
     call this%init_base(json, coef)
     call RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
-       convex_up)
+         convex_up)
 
   end subroutine RAMP_mapping_init_from_json
 
   !> Actual constructor.
   subroutine RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
-     convex_up)
+       convex_up)
     class(RAMP_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: f_min, f_max, q

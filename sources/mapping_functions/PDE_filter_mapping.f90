@@ -138,13 +138,13 @@ contains
 
     call this%init_base(json, coef)
     call PDE_filter_init_from_attributes(this, coef, r, tol, max_iter, &
-       ksp_solver, precon_type)
+         ksp_solver, precon_type)
 
   end subroutine PDE_filter_init_from_json
 
   !> Actual constructor.
   subroutine PDE_filter_init_from_attributes(this, coef, r, tol, max_iter, &
-     ksp_solver, precon_type)
+       ksp_solver, precon_type)
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: r, tol

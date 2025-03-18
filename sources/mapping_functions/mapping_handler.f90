@@ -133,8 +133,8 @@ contains
   end subroutine mapping_handler_free
 
   !> apply the cascade of mapping_cascade.
-     !! @param X_out The mapped field ($\tilde{\rho}$)
-     !! @param X_in The unmapped field ($\rho$)
+  !! @param X_out The mapped field ($\tilde{\rho}$)
+  !! @param X_in The unmapped field ($\rho$)
   subroutine mapping_handler_apply_forward(this, X_out, X_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
@@ -153,11 +153,11 @@ contains
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
        do i = 1, size(this%mapping_cascade)
-         ! the output from one mapping becomes the input for the next.
+          ! the output from one mapping becomes the input for the next.
           call field_copy(tmp_fld_in, tmp_fld_out)
           ! apply the mapping on temp_fld
           call this%mapping_cascade(i)%mapping%apply_forward(tmp_fld_out, &
-             tmp_fld_in)
+               tmp_fld_in)
 
        end do
 
@@ -171,13 +171,13 @@ contains
 
   end subroutine mapping_handler_apply_forward
 
-    !> apply the cascade of mapping_cascade.
-     !! @param X_out The mapped field ($\tilde{\rho}$)
-     !! @param X_in The unmapped field ($\rho$)
+  !> apply the cascade of mapping_cascade.
+  !! @param X_out The mapped field ($\tilde{\rho}$)
+  !! @param X_in The unmapped field ($\rho$)
   subroutine mapping_handler_apply_backward(this, sens_out, sens_in)
     class(mapping_handler_t), intent(inout) :: this
-       type(field_t), intent(in) :: sens_in
-       type(field_t), intent(inout) :: sens_out
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
     integer :: i
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
@@ -192,14 +192,14 @@ contains
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
        do i = 1, size(this%mapping_cascade)
-         ! the output from one mapping becomes the input for the next.
+          ! the output from one mapping becomes the input for the next.
           call field_copy(tmp_fld_in, tmp_fld_out)
           ! apply the mapping on temp_fld
           ! NOTE
           ! all the X_in that is required to map backward should be held
           ! internally by each mapping
           call this%mapping_cascade(i)%mapping%apply_backward(tmp_fld_out, &
-             tmp_fld_in)
+               tmp_fld_in)
 
        end do
 
@@ -238,7 +238,7 @@ contains
           if (allocated(temp)) then
              do i = 1, i0
                 call move_alloc(temp(i)%mapping, &
-                   this%mapping_cascade(i)%mapping)
+                     this%mapping_cascade(i)%mapping)
              end do
           end if
        else
@@ -251,7 +251,7 @@ contains
           call json_extract_item(json, name, i, mapping_subdict)
           call json_get(mapping_subdict, "type", type)
           call mapping_factory(this%mapping_cascade(i + i0)%mapping, &
-            mapping_subdict, this%coef)
+               mapping_subdict, this%coef)
        end do
     else
        ! I was considering an error, but maybe a warning is more appropriate
