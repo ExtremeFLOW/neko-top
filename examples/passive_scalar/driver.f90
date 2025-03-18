@@ -1,12 +1,12 @@
 program usrneko
   use simulation, only: simulation_t
-  use topopt_design, only: topopt_design_t
   use problem, only: problem_t
   use optimizer, only : optimizer_t, optimizer_factory
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use user
+  use brinkman_design, only: brinkman_design_t
 
   use mpi_f08, only: MPI_Init
 
@@ -25,7 +25,7 @@ program usrneko
   !> The problem type
   type(problem_t) :: problem
   !> The design type
-  type(topopt_design_t) :: design
+  type(brinkman_design_t) :: design
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: optimizer
 

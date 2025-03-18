@@ -38,19 +38,19 @@ module adjoint_case
   use adjoint_fluid_fctry, only: adjoint_fluid_scheme_factory
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
-  use adjoint_fluid_ic, only: set_adjoint_fluid_ic
   use scalar_ic, only: set_scalar_ic
+  use flow_ic, only: set_flow_ic
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_object
-  use json_utils_ext, only: json_key_fallback
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
   use utils, only: neko_error
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_t
+  use json_utils_ext, only: json_key_fallback, json_get_subdict
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -238,14 +238,13 @@ contains
     call json_get(neko_case%params, json_key//'.type', string_val)
     call json_extract_object(neko_case%params, json_key, ic_json)
 
-
     if (trim(string_val) .ne. 'user') then
-       call set_adjoint_fluid_ic( &
+       call set_flow_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
             string_val, ic_json)
     else
-       call set_adjoint_fluid_ic( &
+       call set_flow_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
             neko_case%usr%fluid_user_ic, neko_case%params)

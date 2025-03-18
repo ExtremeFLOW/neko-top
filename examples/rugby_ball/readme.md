@@ -1,4 +1,4 @@
-# Proof of concept for a steady state optimization problem {#rugby-verification}
+# Proof of concept for a steady state optimization problem {#rugby-ball}
 
 Here we follow the classic "rugby ball" example by 
 [Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426)

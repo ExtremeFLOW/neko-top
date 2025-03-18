@@ -44,8 +44,7 @@ module adjoint_fluid_scheme
   use space, only: space_t, GLL
   use dofmap, only: dofmap_t
   use zero_dirichlet, only: zero_dirichlet_t
-  use krylov, only: ksp_t, krylov_solver_factory, krylov_solver_destroy, &
-       KSP_MAX_ITER
+  use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
   use usr_inflow, only: usr_inflow_t, usr_inflow_eval
   use dirichlet, only: dirichlet_t
@@ -717,12 +716,12 @@ contains
     call this%Xh%free()
 
     if (allocated(this%ksp_vel)) then
-       call krylov_solver_destroy(this%ksp_vel)
+       call this%ksp_vel%free()
        deallocate(this%ksp_vel)
     end if
 
     if (allocated(this%ksp_prs)) then
-       call krylov_solver_destroy(this%ksp_prs)
+       call this%ksp_prs%free()
        deallocate(this%ksp_prs)
     end if
 
@@ -1038,7 +1037,7 @@ contains
     if (.not. associated(user%material_properties, dummy_mp_ptr)) then
 
        write(log_buf, '(A)') "Material properties must be set in the user&
-            & file!"
+       & file!"
        call neko_log%message(log_buf)
        call user%material_properties(0.0_rp, 0, this%rho, this%mu, &
             dummy_cp, dummy_lambda, params)
@@ -1058,16 +1057,16 @@ contains
             (params%valid_path('case.fluid.mu') .or. &
             params%valid_path('case.fluid.rho'))) then
           call neko_error("To set the material properties for the fluid,&
-               & either provide Re OR mu and rho in the case file.")
+          & either provide Re OR mu and rho in the case file.")
 
           ! Non-dimensional case
        else if (params%valid_path('case.fluid.Re')) then
 
           write(log_buf, '(A)') 'Non-dimensional fluid material properties &
-               & input.'
+          & input.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'Density will be set to 1, dynamic viscosity to&
-               & 1/Re.'
+          & 1/Re.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Re into mu for further manipulation.
