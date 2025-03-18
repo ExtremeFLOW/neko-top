@@ -18,7 +18,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build documentation
+      - name: Configure documentation
         run: |
           cmake -DONLY_DOCS=ON -B build -S .
-          cmake --build build --target documentation
+
+      - name: Build documentation
+        run: |
+          cmake --build build --target Documentation
