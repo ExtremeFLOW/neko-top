@@ -38,7 +38,13 @@ module steady_simcomp
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use case, only: case_t
-  use field_math, only: field_sub2, field_glsc2, field_copy
+  use field_math, only: field_sub2, field_copy
+  use math, only: glsc3
+  use device_math, only: device_glsc3
+  use coefs, only: coef_t
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use csv_file, only : csv_file_t
+  use vector, only: vector_t
   implicit none
   private
 
@@ -54,6 +60,13 @@ module steady_simcomp
      real(kind=dp) :: tol
 
      logical :: have_scalar = .false.
+
+     !> A file writer to document the convergence of the steady state
+     type(csv_file_t) :: logger
+     !> Log every ___ iterations
+     integer :: log_frequency
+     ! vector to store the data being logged
+     type(vector_t) :: log_data
 
    contains
      ! Constructor from json, wrapping the actual constructor.
@@ -75,22 +88,32 @@ contains
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
     real(kind=dp) :: tol
+    integer :: log_frequency
 
     call this%init_base(json, case)
 
     ! Read the tolerance
     call json_get_or_default(json, "tol", tol, 1.0e-6_dp)
+    ! Read the log frequency
+    call json_get_or_default(json, "log_frequency", log_frequency, 50)
 
-    call this%init_from_attributes(tol)
+    call this%init_from_attributes(tol, log_frequency)
 
   end subroutine steady_simcomp_init_from_json
 
   ! Actual constructor.
-  subroutine steady_simcomp_init_from_attributes(this, tol)
+  subroutine steady_simcomp_init_from_attributes(this, tol, log_frequency)
     class(steady_simcomp_t), intent(inout) :: this
     real(kind=dp), intent(in) :: tol
+    integer, intent(in) :: log_frequency
 
     this%tol = tol
+    this%log_frequency = log_frequency
+
+    ! initialize the logger
+    call this%logger%init('steady_state_data.csv')
+    call this%logger%set_header('iter,time,u,v,w,p,t')
+    call this%log_data%init(7)
 
     ! Point local fields to the scratch fields
     call this%u_old%init(this%case%fluid%u%dof)
@@ -117,6 +140,7 @@ contains
     if (this%have_scalar) then
        call this%s_old%free()
     end if
+    call this%log_data%free()
 
     call this%free_base()
 
@@ -130,6 +154,7 @@ contains
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
+    
 
     ! A frozen field is not interesting to compute differences for.
     if (this%case%fluid%freeze) return
@@ -162,12 +187,13 @@ contains
 
     ! Here we compute the squared difference between the old and new fields
     ! and store the result in the `normed_diff` array.
-    normed_diff(1) = field_glsc2(this%u_old, this%u_old)
-    normed_diff(2) = field_glsc2(this%v_old, this%v_old)
-    normed_diff(3) = field_glsc2(this%w_old, this%w_old)
-    normed_diff(4) = field_glsc2(this%p_old, this%p_old)
+    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, this%case%dt)
+    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, this%case%dt)
+    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, this%case%dt)
+    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, this%case%dt)
     if (this%have_scalar) then
-       normed_diff(5) = field_glsc2(this%s_old, this%s_old)
+       normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, &
+          this%case%dt)
     else
        normed_diff(5) = 0.0_rp
     end if
@@ -184,12 +210,53 @@ contains
           call field_copy(this%s_old, s)
        end if
 
+       ! this could be a csv, but I think it's nicer in the logfile, it can
+       ! always be greped out later if you want to plot.
+       if (mod(tstep, this%log_frequency) .eq. 0) then
+       this%log_data%x(1) = real(tstep, kind=rp)
+       this%log_data%x(2) = t
+       this%log_data%x(3) = normed_diff(1)
+       this%log_data%x(4) = normed_diff(2)
+       this%log_data%x(5) = normed_diff(3)
+       this%log_data%x(6) = normed_diff(4)
+       this%log_data%x(7) = normed_diff(5)
+          call this%logger%write(this%log_data)
+       end if
+
     else
        this%case%fluid%freeze = .true.
+       if (this%have_scalar) then
+          ! @todo
+          ! we should implement a freeze for the scalar too
+          !this%case%scalar%freeze = .true.
+       end if
     end if
 
 
   end subroutine steady_simcomp_compute
+
+  !> A norm for a scalar field based on the energy.
+  !! Assuming the time derivative $\frac{\partial u}{\partial t} 
+  !! \approx \frac{\Delta u}{\Delta t}$, this norm computes the spatial
+  !! integral normalized by the domain volume.
+  function energy_norm(delta_fld, coef, dt)
+  type(field_t), intent(in) :: delta_fld
+  type(coef_t), intent(in) :: coef
+  real(kind=rp), intent(in) :: dt
+  real(kind=rp) :: energy_norm, tmp
+  integer :: n
+
+  tmp = 0.0_rp
+  n = delta_fld%size()
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+     tmp = device_glsc3(delta_fld%x_d, delta_fld%x_d, coef%B_d, n)
+  else
+      tmp = glsc3(delta_fld%x, delta_fld%x, coef%B, n)
+  end if
+     energy_norm = sqrt(tmp)/dt/coef%volume
+
+  end function energy_norm
+
 
 end module steady_simcomp
 
