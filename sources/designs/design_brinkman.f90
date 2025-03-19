@@ -52,7 +52,7 @@ module brinkman_design
   use math, only: copy
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
-  use scalar_ic, only: set_scalar_ic
+  use optimization_ic, only: set_optimization_ic
   use json_utils, only : json_get, json_extract_object
   use utils, only : neko_error
   implicit none
@@ -241,31 +241,17 @@ contains
       call this%mapping%init_base(coef)
       call this%mapping%add(parameters, 'optimization.design.mapping')
 
-      ! Set the initial material distribution
-      ! @note I'm hijacking scalar_ic.f90 to set the initial material
-      ! distribution.
-      ! Tim, I know you have some nice stuff in the Brinkman_source_term, ie,
-      ! loading meshes, but they're all private to that type. I think they would
-      ! be useful for other people (initial conditions based on a mesh? maybe?)
-      ! but if we have that functionality public, then the Brinkman_source_term
-      ! could just use it, instead of keeping those functions private. Then it
-      ! would also be able to start from a field too!
-      !
-      ! The alternative is that we write a whole other set_field or something
-      ! to that effect which only contains the things we want... but it seems
-      ! like a lot of double up on code.
       call json_get(parameters, &
            'optimization.design.initial_distribution.type', string_val)
       call json_extract_object(parameters, &
            'optimization.design.initial_distribution', json_subdict)
 
       if (trim(string_val) .ne. 'user') then
-         call set_scalar_ic(this%design_indicator, coef, gs, string_val, &
+         call set_optimization_ic(this%design_indicator, coef, gs, string_val, &
             json_subdict)
       else
-         call neko_error("user defined initial material distrubtions not &
-         & implemented yet")
-         ! But they could be very easily!!
+         call neko_error("user defined initial material distrubtions should &
+         & be enforced through the driver.")
       end if
     end associate
 
