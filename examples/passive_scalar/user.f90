@@ -41,33 +41,33 @@ contains
     user%scalar_user_ic => scalar_ic
   end subroutine user_setup
 
-    !> user-defined boundary condition
-    subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, &
+  !> user-defined boundary condition
+  subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, &
        ie, t, tstep)
-      real(kind=rp), intent(inout) :: u
-      real(kind=rp), intent(inout) :: v
-      real(kind=rp), intent(inout) :: w
-      real(kind=rp), intent(in) :: x
-      real(kind=rp), intent(in) :: y
-      real(kind=rp), intent(in) :: z
-      real(kind=rp), intent(in) :: nx
-      real(kind=rp), intent(in) :: ny
-      real(kind=rp), intent(in) :: nz
-      integer, intent(in) :: ix
-      integer, intent(in) :: iy
-      integer, intent(in) :: iz
-      integer, intent(in) :: ie
-      real(kind=rp), intent(in) :: t
-      integer, intent(in) :: tstep
+    real(kind=rp), intent(inout) :: u
+    real(kind=rp), intent(inout) :: v
+    real(kind=rp), intent(inout) :: w
+    real(kind=rp), intent(in) :: x
+    real(kind=rp), intent(in) :: y
+    real(kind=rp), intent(in) :: z
+    real(kind=rp), intent(in) :: nx
+    real(kind=rp), intent(in) :: ny
+    real(kind=rp), intent(in) :: nz
+    integer, intent(in) :: ix
+    integer, intent(in) :: iy
+    integer, intent(in) :: iz
+    integer, intent(in) :: ie
+    real(kind=rp), intent(in) :: t
+    integer, intent(in) :: tstep
 
-      ! Inflow velocity profile is a parabaloid
-      u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
-      v = 0._rp
-      w = 0._rp
-    end subroutine user_inflow_eval
+    ! Inflow velocity profile is a parabaloid
+    u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
+    v = 0._rp
+    w = 0._rp
+  end subroutine user_inflow_eval
 
-    !> user-defined boundary condition
-    subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
+  !> user-defined boundary condition
+  subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
     real(kind=rp), intent(inout) :: s
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in) :: y
@@ -85,10 +85,10 @@ contains
     ! Inflow scalar profile is a sigmoid separating the two species
     s = L / (1.0_rp + exp(-k*(z - z_0)))
 
-    end subroutine scalar_bc
+  end subroutine scalar_bc
 
-    !> user-defined initial condition
-    subroutine scalar_ic(s, params)
+  !> user-defined initial condition
+  subroutine scalar_ic(s, params)
     type(field_t), intent(inout) :: s
     type(json_file), intent(inout) :: params
     integer :: i
@@ -102,6 +102,6 @@ contains
     ! I haven't checked if I need a memcopy here, but the cyl_boundary_layer
     ! does do one, so I'm assuming it's not needed.
 
-    end subroutine scalar_ic
+  end subroutine scalar_ic
 
 end module user

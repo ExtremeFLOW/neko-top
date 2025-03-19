@@ -103,8 +103,8 @@ contains
        this%fluid => fluid
 
     end select
-    
-    
+
+
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
@@ -124,19 +124,19 @@ contains
        call this%output_forward%init(sp, 'forward_fields', 5)
        call this%output_forward%fields%assign(5, this%neko_case%scalar%s)
     else
-      call this%output_forward%init(sp, 'forward_fields', 4)
+       call this%output_forward%init(sp, 'forward_fields', 4)
     end if
-    
+
     call this%output_forward%fields%assign(1, this%fluid%p)
     call this%output_forward%fields%assign(2, this%fluid%u)
     call this%output_forward%fields%assign(3, this%fluid%v)
     call this%output_forward%fields%assign(4, this%fluid%w)
 
     if (allocated(this%adjoint_case%scalar_adj)) then
-      call this%output_adjoint%init(sp, 'adjoint_fields', 5)
-      call this%output_adjoint%fields%assign(5, this%adjoint_case%scalar_adj%s_adj)
+       call this%output_adjoint%init(sp, 'adjoint_fields', 5)
+       call this%output_adjoint%fields%assign(5, this%adjoint_case%scalar_adj%s_adj)
     else
-      call this%output_adjoint%init(sp, 'adjoint_fields', 4)
+       call this%output_adjoint%init(sp, 'adjoint_fields', 4)
     end if
     call this%output_adjoint%fields%assign(1, this%adjoint_case%fluid_adj%p_adj)
     call this%output_adjoint%fields%assign(2, this%adjoint_case%fluid_adj%u_adj)

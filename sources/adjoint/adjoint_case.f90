@@ -234,7 +234,7 @@ contains
     !
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
-  
+
     call json_get(neko_case%params, json_key//'.type', string_val)
     call json_extract_object(neko_case%params, json_key, ic_json)
 
@@ -257,8 +257,8 @@ contains
        ! we shouldn't fallback to the primal here.
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition.type', string_val)
-      call json_extract_object(neko_case%params, &
-         'case.adjoint_scalar.initial_condition', ic_json)
+       call json_extract_object(neko_case%params, &
+            'case.adjoint_scalar.initial_condition', ic_json)
 
        !call neko_log%section("Adjoint scalar initial condition ")
 

@@ -194,12 +194,12 @@ contains
     call field_rone(work)
     call mask_exterior_const_fld(work, mask, 0.0_rp)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      tmp = device_glsc2(work%x_d, coef%B_d, n)
-   else
-      tmp = glsc2(work%x, coef%B, n)
-   end if
-   call neko_scratch_registry%relinquish_field(temp_indices)
-   compute_masked_volume = tmp
+       tmp = device_glsc2(work%x_d, coef%B_d, n)
+    else
+       tmp = glsc2(work%x, coef%B, n)
+    end if
+    call neko_scratch_registry%relinquish_field(temp_indices)
+    compute_masked_volume = tmp
   end function compute_masked_volume
 
 end module mask_ops

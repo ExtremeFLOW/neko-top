@@ -276,7 +276,7 @@ contains
     n = this%design_indicator%dof%size()
     ! This is probably getting fixed in tim's PR anyway, otherwise I'll fix it.
     do i = 1, n
-          this%design_indicator%x(i,1,1,1) = 0.0_rp
+       this%design_indicator%x(i,1,1,1) = 0.0_rp
     end do
 
     ! again this will be handled better in the future...
