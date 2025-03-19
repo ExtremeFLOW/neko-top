@@ -163,7 +163,6 @@ contains
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: n_fields, i, n
     type(field_t), pointer :: fs
     type(field_t), pointer :: work
     integer :: temp_indices(1)
