@@ -44,7 +44,7 @@ module adv_lin_dealias
   use interpolation, only: interpolator_t
   use device_math, only: device_vdot3, device_sub2, device_col3, device_add4
   use device, only: device_map
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 
