@@ -32,10 +32,10 @@
 !
 !> Subroutines to add advection terms to the RHS of a transport equation.
 module advection_adjoint
-  use num_types, only : rp
-  use space, only : space_t
-  use field, only : field_t
-  use coefs, only : coef_t
+  use num_types, only: rp
+  use space, only: space_t
+  use field, only: field_t
+  use coefs, only: coef_t
   implicit none
   private
 

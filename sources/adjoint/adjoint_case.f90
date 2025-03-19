@@ -149,10 +149,10 @@ contains
     !
     ! @todo no scalar_adj factory for now, probably not needed
 
-    ! hmmm should we check for scalar_adj or adjoint scalar_adj?
-    ! I'm going to check for adjoint scalar_adj because maybe there would be
-    ! a corner case where someone would want the scalar_adj but not the
-    ! adjoint scalar_adj?
+    ! hmmm should we check for scalar or adjoint scalar?
+    ! I'm going to check for adjoint scalar because maybe there would be
+    ! a corner case where someone would want the scalar but not the
+    ! adjoint scalar?
 
 
     if (this%have_scalar) then
@@ -224,7 +224,7 @@ contains
     !    end if
     ! end if
 
-    ! Setup user boundary conditions for the scalar_adj.
+    ! Setup user boundary conditions for the scalar.
     ! if (scalar_adj) then
     !    call neko_case%scalar_adj%set_user_bc(neko_case%usr%scalar_user_bc)
     ! end if
