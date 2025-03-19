@@ -18,12 +18,6 @@
             "initial_condition": {
                 "type": "user",
             },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0
-                ]
-            },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
@@ -40,11 +34,21 @@
             },
             "output_control": "simulationtime",
             "output_value": 2.5,
-            "boundary_types": [
-                "v",
-                "o+dong",
-                "on",
-                "on",
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0],
+                    "zone_indices": [ 1 ],
+                },
+                {
+                    "type": "outflow+dong",
+                    "zone_indices": [ 2 ],
+                },
+                {
+                    "type": "normal_outflow",
+                    "value": [ 1.0, 0.0, 0.0],
+                    "zone_indices": [ 3, 4 ],
+                }
             ],
             "source_terms": [
                 {
