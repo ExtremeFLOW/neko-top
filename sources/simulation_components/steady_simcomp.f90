@@ -154,7 +154,6 @@ contains
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
-    
 
     ! A frozen field is not interesting to compute differences for.
     if (this%case%fluid%freeze) return
@@ -193,7 +192,7 @@ contains
     normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, this%case%dt)
     if (this%have_scalar) then
        normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, &
-          this%case%dt)
+            this%case%dt)
     else
        normed_diff(5) = 0.0_rp
     end if
@@ -213,13 +212,13 @@ contains
        ! this could be a csv, but I think it's nicer in the logfile, it can
        ! always be greped out later if you want to plot.
        if (mod(tstep, this%log_frequency) .eq. 0) then
-       this%log_data%x(1) = real(tstep, kind=rp)
-       this%log_data%x(2) = t
-       this%log_data%x(3) = normed_diff(1)
-       this%log_data%x(4) = normed_diff(2)
-       this%log_data%x(5) = normed_diff(3)
-       this%log_data%x(6) = normed_diff(4)
-       this%log_data%x(7) = normed_diff(5)
+          this%log_data%x(1) = real(tstep, kind=rp)
+          this%log_data%x(2) = t
+          this%log_data%x(3) = normed_diff(1)
+          this%log_data%x(4) = normed_diff(2)
+          this%log_data%x(5) = normed_diff(3)
+          this%log_data%x(6) = normed_diff(4)
+          this%log_data%x(7) = normed_diff(5)
           call this%logger%write(this%log_data)
        end if
 
@@ -236,24 +235,24 @@ contains
   end subroutine steady_simcomp_compute
 
   !> A norm for a scalar field based on the energy.
-  !! Assuming the time derivative $\frac{\partial u}{\partial t} 
+  !! Assuming the time derivative $\frac{\partial u}{\partial t}
   !! \approx \frac{\Delta u}{\Delta t}$, this norm computes the spatial
   !! integral normalized by the domain volume.
   function energy_norm(delta_fld, coef, dt)
-  type(field_t), intent(in) :: delta_fld
-  type(coef_t), intent(in) :: coef
-  real(kind=rp), intent(in) :: dt
-  real(kind=rp) :: energy_norm, tmp
-  integer :: n
+    type(field_t), intent(in) :: delta_fld
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(in) :: dt
+    real(kind=rp) :: energy_norm, tmp
+    integer :: n
 
-  tmp = 0.0_rp
-  n = delta_fld%size()
-  if (NEKO_BCKND_DEVICE .eq. 1) then
-     tmp = device_glsc3(delta_fld%x_d, delta_fld%x_d, coef%B_d, n)
-  else
-      tmp = glsc3(delta_fld%x, delta_fld%x, coef%B, n)
-  end if
-     energy_norm = sqrt(tmp)/dt/coef%volume
+    tmp = 0.0_rp
+    n = delta_fld%size()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       tmp = device_glsc3(delta_fld%x_d, delta_fld%x_d, coef%B_d, n)
+    else
+       tmp = glsc3(delta_fld%x, delta_fld%x, coef%B, n)
+    end if
+    energy_norm = sqrt(tmp)/dt/coef%volume
 
   end function energy_norm
 
