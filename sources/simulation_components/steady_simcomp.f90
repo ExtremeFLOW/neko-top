@@ -154,7 +154,6 @@ contains
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
-    
 
     ! A frozen field is not interesting to compute differences for.
     if (this%case%fluid%freeze) return
