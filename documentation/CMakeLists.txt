@@ -1,15 +1,21 @@
 # ============================================================================ #
+# Find Doxygen
+# ============================================================================ #
+
+find_package(Doxygen QUIET)
+if (NOT Doxygen_FOUND)
+    if (BUILD_DOCS)
+        message(FATAL_ERROR "Doxygen is needed to build the documentation.")
+    endif()
+    return()
+endif()
+
+# ============================================================================ #
 # Doxygen Documentation
 # ============================================================================ #
 
 # Check if we wish to build the docs
 message(CHECK_START "Doxygen configuration")
-
-# ============================================================================ #
-# Find Doxygen
-# ============================================================================ #
-
-find_package(Doxygen REQUIRED)
 
 # Use fetch content to download the doxygen theme: doxygen-awesome-css
 include(FetchContent)
@@ -61,11 +67,19 @@ configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
 # note the option ALL which allows to build the docs together with the
 # application
 add_custom_target(
-    documentation ALL
+    Documentation
     COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Generating API documentation with Doxygen"
     VERBATIM
 )
+
+# Add the documentation target to ALL if we have "BUILD_DOCS" enabled
+if (BUILD_DOCS)
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL FALSE)
+else()
+    set_target_properties(Documentation PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
+
 
 message(CHECK_PASS "done")
