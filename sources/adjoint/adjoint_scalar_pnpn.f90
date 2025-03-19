@@ -175,7 +175,6 @@ contains
     integer :: i
     class(bc_t), pointer :: bc_i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
-    logical :: advection
 
     call this%free()
 
@@ -340,7 +339,6 @@ contains
     integer :: n
     ! Linear solver results monitor
     type(ksp_monitor_t) :: ksp_results(1)
-    character(len=LOG_SIZE) :: log_buf
 
     n = this%dm_Xh%size()
 
@@ -450,7 +448,6 @@ contains
 
   subroutine print_debug(this)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
-    character(len=LOG_SIZE) :: log_buf
     integer :: n
 
     n = this%dm_Xh%size()
