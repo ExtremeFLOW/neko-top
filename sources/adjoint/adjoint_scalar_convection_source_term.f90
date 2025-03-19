@@ -152,7 +152,6 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    integer :: i, n
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz

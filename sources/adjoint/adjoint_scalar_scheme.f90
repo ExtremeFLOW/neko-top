@@ -248,10 +248,10 @@ contains
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
     logical :: logical_val
-    real(kind=rp) :: real_val, solver_abstol
-    integer :: integer_val, ierr
+    real(kind=rp) :: solver_abstol
+    integer :: integer_val
     character(len=:), allocatable :: solver_type, solver_precon
-    real(kind=rp) :: GJP_param_a, GJP_param_b
+    ! real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
 
     this%u => neko_field_registry%get_field('u')
