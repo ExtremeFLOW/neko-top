@@ -18,7 +18,7 @@ program usrneko
   character(len=256) :: parameter_file
 
   ! MPI parameters
-  integer :: ierr
+  ! integer :: ierr
 
   !> The simulation we are working with
   type(simulation_t) :: simulation
@@ -31,7 +31,8 @@ program usrneko
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
-  call MPI_Init(ierr)
+
+  call simulation%init(parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -46,7 +47,6 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
-  call simulation%init(parameters)
 
   call design%init(parameters, simulation)
 

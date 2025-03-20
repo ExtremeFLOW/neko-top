@@ -6,7 +6,7 @@ module mma_optimizer
   use num_types, only: rp
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get_or_default, json_extract_object
   use simulation, only: simulation_t
   use design, only: design_t
   use field, only: field_t
@@ -29,7 +29,6 @@ module mma_optimizer
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use json_utils_ext, only: json_get_subdict
 
   use device_math, only: device_copy
   implicit none
@@ -97,7 +96,8 @@ contains
        print *, "Initializing mma_optimizer with steady_state_problem_t."
     end if
 
-    call json_get_subdict(parameters, "optimization.solver", solver_parameters)
+    call json_extract_object(parameters, "optimization.solver", &
+         solver_parameters)
     call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 

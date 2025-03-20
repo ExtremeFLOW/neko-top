@@ -172,7 +172,7 @@ if (IS_DIRECTORY ${JSON_FORTRAN_DIR})
 endif()
 
 # Check that the JSON-Fortran library was found
-find_package(jsonfortran-gnu REQUIRED)
+find_package(jsonfortran-${CMAKE_Fortran_COMPILER_ID} REQUIRED)
 
 # ............................................................................ #
 # Setup of the Neko library
