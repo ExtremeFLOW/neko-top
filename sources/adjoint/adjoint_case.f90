@@ -173,6 +173,7 @@ contains
     if (pe_rank .eq. 0) then
        write (*,*) 'json_key: ', json_key
 
+       if (allocated(string_val)) deallocate(string_val)
        call neko_case%params%print_to_string(string_val)
        write (*,*) string_val
 
