@@ -106,7 +106,8 @@ contains
     call profiler_start
     start_time_org = MPI_WTIME()
 
-    do while (t_adj .lt. this%case%time%end_time .and. (.not. jobctrl_time_limit()))
+    do while (t_adj .lt. this%case%time%end_time .and. &
+         (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
@@ -116,10 +117,12 @@ contains
        call neko_log%message(log_buf)
        call neko_log%begin()
 
-       ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%time%dt
+       ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', &
+       !  this%case%time%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%time%dt, this%case%fluid%ext_bdf, &
-            this%case%time%tlag, this%case%time%dtlag, tstep_adj)
+       call simulation_settime(t_adj, this%case%time%dt, &
+            this%case%fluid%ext_bdf, this%case%time%tlag, &
+            this%case%time%dtlag, tstep_adj)
 
        call neko_log%section('Adjoint fluid')
        call this%scheme%step(t_adj, tstep_adj, this%case%time%dt, &
