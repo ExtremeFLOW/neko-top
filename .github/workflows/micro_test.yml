@@ -75,7 +75,5 @@ jobs:
               echo "End of log file: $log"
             done
 
-            ls -l logs/
-
             exit 1
           fi
