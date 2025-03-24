@@ -75,10 +75,12 @@ contains
        if (rank .ne. 0) allocate(character(len=length) :: json_buffer)
        call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, &
             ierr)
-    end if
 
-    call json%load_from_string(json_buffer)
-    deallocate(json_buffer)
+       if (rank .ne. 0) then
+          call json%load_from_string(json_buffer)
+          deallocate(json_buffer)
+       end if
+    end if
 
   end function json_read_file
 
