@@ -22,9 +22,9 @@ contains
     character(len=*), intent(in) :: fallback
     character(len=:), allocatable :: string
 
-    if ((lookup .in. json)) then
+    if (json%valid_path(lookup)) then
        string = lookup
-    else if (fallback .in. json) then
+    else if (json%valid_path(fallback)) then
        string = fallback
     else
        string = lookup
