@@ -21,13 +21,8 @@
                 {
                     "type": "no_slip",
                     "zone_indices": [ 1, 2 ]
-                },
-                // {
-                //     "type": "velocity_value",
-                //     "value": [ 0, 0, 0 ],
-                //     "zone_indices": [ 2 ]
-                // }
-            ],
+                }
+            ]
         },
         "fluid": {
             "scheme": "pnpn",
@@ -57,7 +52,7 @@
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "never"
         },
         "simulation_components": [
             {
@@ -117,7 +112,6 @@
                 "limit": 0.2,
                 "is_max": false
             }
-        ],
-    },
-
+        ]
+    }
 }
