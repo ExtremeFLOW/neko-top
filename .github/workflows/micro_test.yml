@@ -75,5 +75,7 @@ jobs:
               echo "End of log file: $log"
             done
 
+            ls -l logs/rugby_ball
+
             exit 1
           fi
