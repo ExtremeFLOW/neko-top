@@ -66,8 +66,13 @@ jobs:
           if [ -d logs ]; then
             LOGS=$(find logs/ -type f -name "*.log")
             for log in ${LOGS[@]}; do
+              echo ""
+              echo ""
               echo "Log file: $log"
+              echo ""
               cat $log
+              echo ""
+              echo "End of log file: $log"
             done
 
             exit 1
