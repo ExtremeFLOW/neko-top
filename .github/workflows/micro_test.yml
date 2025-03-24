@@ -63,5 +63,6 @@ jobs:
         run: |
           ./run.sh -rc easy-E/easy-E_1 rugby_ball
           if [ -d logs ]; then
+            find logs/ -type f -name "*.log" -exec echo {}; cat {} \;
             exit 1
           fi
