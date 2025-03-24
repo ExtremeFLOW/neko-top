@@ -6,6 +6,10 @@ name: Test Scripts
 # This workflow is only defined here. It is triggered from other workflows.
 on:
   push:
+    branches:
+      - test/*
+      - cicd/*
+  workflow_dispatch:
   merge_group:
     types: [checks_requested]
 
@@ -57,11 +61,6 @@ jobs:
       - name: Run a gauntlet of examples
         run: |
           ./run.sh -rc easy-E/easy-E_1 rugby_ball
-
-      - name: Save the artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-results
-          path: |
-            logs/
+          if [ -d logs ]; then
+            exit 1
+          fi
