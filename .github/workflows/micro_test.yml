@@ -63,6 +63,11 @@ jobs:
         run: |
           ./run.sh -rc easy-E/easy-E_1 rugby_ball
           if [ -d logs ]; then
-            find logs/ -type f -name "*.log" -exec echo {}; cat {} \;
+            LOGS=$(find logs/ -type f -name "*.log")
+            for log in ${LOGS[@]}; do
+              echo "Log file: $log"
+              cat $log
+            done
+
             exit 1
           fi
