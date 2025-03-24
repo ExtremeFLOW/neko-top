@@ -44,6 +44,7 @@ module adjoint_case
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_object
   use json_utils_ext, only: json_key_fallback
+  use comm, only: pe_rank
   implicit none
   private
   public :: adjoint_case_t, adjoint_init, adjoint_free
@@ -165,11 +166,20 @@ contains
     !
     ! Setup initial conditions
     !
-    json_key = json_key_fallback(neko_case%params, &
-         'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
+    json_key = 'case.adjoint_fluid.initial_condition'
+    ! json_key_fallback(neko_case%params, &
+    !      , 'case.fluid.initial_condition')
 
-    call json_get(neko_case%params, json_key // '.type', string_val)
+    if (pe_rank .eq. 0) then
+       write (*,*) 'json_key: ', json_key
+
+       call neko_case%params%print_to_string(string_val)
+       write (*,*) string_val
+
+    end if
+
     call json_extract_object(neko_case%params, json_key, ic_json)
+    call json_get(ic_json, 'type', string_val)
 
     if (trim(string_val) .ne. 'user') then
        call set_flow_ic( &
@@ -230,7 +240,7 @@ contains
     !
     ! Setup output_controller
     !
-    call this%output_controller%init(neko_case%end_time)
+    call this%output_controller%init(neko_case%time%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, neko_case%scalar, &
             path = trim(neko_case%output_directory))
