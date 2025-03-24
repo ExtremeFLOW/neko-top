@@ -9,6 +9,7 @@ on:
     branches:
       - test/*
       - cicd/*
+      # Todo: This must be removed before the PR is acepted
       - bug/*
   workflow_dispatch:
   merge_group:
