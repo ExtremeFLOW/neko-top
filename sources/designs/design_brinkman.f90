@@ -159,7 +159,7 @@ module brinkman_design
      !! @todo It is currently assumed to be the Brinkman amplitude in the fluid
      !! equations. Mapping to multiple coeficients is currently not supported,
      !! ie, CHT.
-     type(brinkman_mapping_t) :: mapping
+     type(mapping_handler_t) :: mapping
 
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain

@@ -57,7 +57,7 @@ module mapping_handler
   !! This class is responsible for managing the mapping_cascade in a sequential
   !! manor. It is also responsible for using the chain rule to propogate
   !! sensitivity backwards throughout the system.
-  type, abstract, public :: mapping_handler_t
+  type, public :: mapping_handler_t
      !> Array of mapping_cascade.
      !! @note the order really matter's here since they'll be executed in
      !! sequence.
