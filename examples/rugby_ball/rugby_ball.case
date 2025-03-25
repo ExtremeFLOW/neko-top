@@ -4,7 +4,7 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": false,
+        "output_boundary": true,
         "end_time": 0.1,
         "timestep": 1e-4,
         "numerics": {
@@ -15,14 +15,21 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
             },
             "boundary_conditions": [
                 {
                     "type": "no_slip",
                     "zone_indices": [ 1, 2 ]
-                }
-            ]
+                },
+                // {
+                //     "type": "velocity_value",
+                //     "value": [ 0, 0, 0 ],
+                //     "zone_indices": [ 2 ]
+                // }
+            ],
         },
         "fluid": {
             "scheme": "pnpn",
@@ -52,7 +59,7 @@
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "never"
+            "output_control": "never",
         },
         "simulation_components": [
             {
@@ -67,9 +74,18 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [ 0.2, 0.8 ],
-                "y_bounds": [ 0.2, 0.8 ],
-                "z_bounds": [ -1.0, 1.0 ]
+                "x_bounds": [
+                    0.2,
+                    0.8,
+                ],
+                "y_bounds": [
+                    0.2,
+                    0.8,
+                ],
+                "z_bounds": [
+                    -1.0,
+                    1.0,
+                ],
             }
         ]
     },
@@ -112,6 +128,7 @@
                 "limit": 0.2,
                 "is_max": false
             }
-        ]
-    }
+        ],
+    },
+
 }
