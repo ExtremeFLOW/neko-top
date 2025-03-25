@@ -117,23 +117,6 @@ contains
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
 
-    call this%case%params%print()
-
-    call flush(output_unit)
-    print *, "case.fluid.scheme"
-    call flush(output_unit)
-
-    call this%case%params%print()
-
-    call flush(output_unit)
-    print *, "case.fluid.scheme"
-    call flush(output_unit)
-
-    call this%case%params%print()
-
-    call flush(output_unit)
-    print *, "case.fluid.scheme"
-    call flush(output_unit)
 
 
     !
@@ -142,31 +125,15 @@ contains
     call json_get(this%case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%scheme, trim(string_val))
 
-    if (pe_rank .eq. 0) then
 
 
 
-       call this%case%params%print()
-       call this%case%params%print()
-
-
-
-    end if
 
     call json_get(this%case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%scheme%init(this%case%msh, lx, this%case%params, this%case%usr, &
          this%case%fluid%ext_bdf)
 
-    if (pe_rank .eq. 0) then
-
-
-
-       call this%case%params%print()
-
-
-
-    end if
 
     !
     ! Setup scalar scheme
