@@ -172,12 +172,14 @@ contains
   end subroutine mapping_handler_apply_forward
 
   !> apply the cascade of mapping_cascade.
-  !! @param X_out The mapped field ($\tilde{\rho}$)
-  !! @param X_in The unmapped field ($\rho$)
+  !! @param sens_out The sensitivity after applying the chain rule
+  !! ($\frac{\partial F}{\partial \rho}$)
+  !! @param sens_in The sensitivity before applying the chain rule
+  !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
   subroutine mapping_handler_apply_backward(this, sens_out, sens_in)
     class(mapping_handler_t), intent(inout) :: this
-    type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
+    type(field_t), intent(in) :: sens_in
     integer :: i
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
@@ -249,7 +251,6 @@ contains
        do i = 1, n_mappings
           ! Create a new json containing just the subdict for this mapping.
           call json_extract_item(json, name, i, mapping_subdict)
-          call json_get(mapping_subdict, "type", type)
           call mapping_factory(this%mapping_cascade(i + i0)%mapping, &
                mapping_subdict, this%coef)
        end do
@@ -280,8 +281,7 @@ contains
 
     if (allocated(temp)) then
        do i = 1, n_mappings
-          call move_alloc(temp(i)%mapping, &
-               this%mapping_cascade(i)%mapping)
+          call move_alloc(temp(i)%mapping, this%mapping_cascade(i)%mapping)
        end do
     end if
 
