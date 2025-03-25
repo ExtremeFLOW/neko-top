@@ -33,6 +33,7 @@
 !
 !> Defines a factory subroutine for mapping functions.
 submodule (mapping) mapping_fctry
+  use utils, only: neko_type_error
   use linear_mapping, only : linear_mapping_t
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
