@@ -117,17 +117,11 @@ contains
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
 
-
-
     !
     ! Setup fluid scheme
     !
     call json_get(this%case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%scheme, trim(string_val))
-
-
-
-
 
     call json_get(this%case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
@@ -174,19 +168,8 @@ contains
     !
     ! Setup initial conditions
     !
-    json_key = 'case.adjoint_fluid.initial_condition'
-    ! json_key_fallback(this%case%params, &
-    !      , 'case.fluid.initial_condition')
-
-    if (pe_rank .eq. 0) then
-
-
-
-       call this%case%params%print()
-
-
-
-    end if
+    json_key = json_key_fallback(this%case%params, &
+         'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
     call json_extract_object(this%case%params, json_key, ic_json)
     call json_get(ic_json, 'type', string_val)
@@ -251,7 +234,7 @@ contains
     !
     ! Setup output_controller
     !
-    call this%output_controller%init(neko_case%time%end_time)
+    call this%output_controller%init(this%case%time%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, this%case%scalar, &
             path = trim(this%case%output_directory))
