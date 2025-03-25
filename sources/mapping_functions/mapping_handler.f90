@@ -212,7 +212,6 @@ contains
 
     ! A single mapping as its own json_file.
     type(json_file) :: mapping_subdict
-    character(len=:), allocatable :: type
     integer :: n_mappings, i, i0
 
     if (json%valid_path(name)) then
