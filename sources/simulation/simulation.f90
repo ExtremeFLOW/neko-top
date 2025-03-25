@@ -103,7 +103,6 @@ contains
     class(simulation_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
 
-    ! call user_setup(this%neko_case%usr)
     this%neko_case%usr%init_user_simcomp => user_simcomp
 
     ! initialize the primal

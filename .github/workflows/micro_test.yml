@@ -9,9 +9,7 @@ on:
     branches:
       - test/*
       - cicd/*
-      # Todo: This must be removed before the PR is acepted
-      - bug/*
-  workflow_dispatch:
+  workflow_call:
   merge_group:
     types: [checks_requested]
 
@@ -66,7 +64,6 @@ jobs:
           if [ -d logs ]; then
             LOGS=$(find logs/ -type f -name "*.log")
             for log in ${LOGS[@]}; do
-              echo ""
               echo ""
               echo "Log file: $log"
               echo ""
