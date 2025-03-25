@@ -98,18 +98,20 @@ contains
 
   end subroutine user_simcomp
 
-  subroutine user_setup(usr)
-    type(user_t), intent(inout) :: usr
-    usr%init_user_simcomp => user_simcomp
+  ! subroutine user_setup(usr)
+  !   type(user_t), intent(inout) :: usr
+  !   usr%init_user_simcomp => user_simcomp
 
-  end subroutine user_setup
+  ! end subroutine user_setup
 
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
 
-    call user_setup(this%neko_case%usr)
+    ! call user_setup(this%neko_case%usr)
+    this%neko_case%usr%init_user_simcomp => user_simcomp
+
 
     ! initialize the primal
     call neko_init(this%neko_case)
