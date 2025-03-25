@@ -35,7 +35,7 @@ module brinkman_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
-  use brinkman_mapping, only: brinkman_mapping_t
+  use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
