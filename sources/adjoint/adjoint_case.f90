@@ -230,7 +230,7 @@ contains
     !
     ! Setup output_controller
     !
-    call this%output_controller%init(neko_case%end_time)
+    call this%output_controller%init(neko_case%time%end_time)
     if (scalar) then
        this%f_out = adjoint_output_t(precision, this%scheme, neko_case%scalar, &
             path = trim(neko_case%output_directory))
