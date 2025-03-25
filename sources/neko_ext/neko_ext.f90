@@ -76,24 +76,24 @@ contains
     ! ------------------------------------------------------------------------ !
 
     ! Setup lagged time step parameters
-    neko_case%tlag(:) = t
-    neko_case%dtlag(:) = neko_case%dt
-    do i = 1, size(neko_case%tlag)
-       neko_case%tlag(i) = t - i*neko_case%dtlag(i)
+    neko_case%time%tlag(:) = t
+    neko_case%time%dtlag(:) = neko_case%time%dt
+    do i = 1, size(neko_case%time%tlag)
+       neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
     end do
 
     ! Reset the time step counter
     call neko_case%output_controller%set_counter(t)
 
     ! Restart the fields
-    call neko_case%fluid%restart(neko_case%dtlag, neko_case%tlag)
+    call neko_case%fluid%restart(neko_case%chkp)
     if (allocated(neko_case%scalar)) then
-       call neko_case%scalar%restart(neko_case%dtlag, neko_case%tlag)
+       call neko_case%scalar%restart(neko_case%chkp)
     end if
 
     ! Reset the external BDF coefficients
-    do i = 1, size(neko_case%dtlag)
-       call neko_case%fluid%ext_bdf%set_coeffs(neko_case%dtlag)
+    do i = 1, size(neko_case%time%dtlag)
+       call neko_case%fluid%ext_bdf%set_coeffs(neko_case%time%dtlag)
     end do
 
     ! Restart the simulation components

@@ -78,11 +78,11 @@ contains
     tstep_adj = 0
     call neko_log%section('Starting adjoint')
     write(log_buf, '(A,E15.7,A,E15.7,A)') 'T : [', 0d0, ', ', &
-         this%case%end_time, ')'
+         this%case%time%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%dt
+       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%time%dt
        call neko_log%message(log_buf)
     else
        write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
@@ -91,7 +91,7 @@ contains
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
-    ! call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+    ! call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
     call this%output_controller%execute(t_adj, tstep_adj)
 
     ! HARRY
@@ -106,23 +106,26 @@ contains
     call profiler_start
     start_time_org = MPI_WTIME()
 
-    do while (t_adj .lt. this%case%end_time .and. (.not. jobctrl_time_limit()))
+    do while (t_adj .lt. this%case%time%end_time .and. &
+         (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        tstep_adj = tstep_adj + 1
        start_time = MPI_WTIME()
 
-       call neko_log%status(t_adj, this%case%end_time)
+       call neko_log%status(t_adj, this%case%time%end_time)
        write(log_buf, '(A,I6)') 'Time-step: ', tstep_adj
        call neko_log%message(log_buf)
        call neko_log%begin()
 
-       ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', this%case%dt
+       ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', &
+       !  this%case%time%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%dt, this%case%fluid%ext_bdf, &
-            this%case%tlag, this%case%dtlag, tstep_adj)
+       call simulation_settime(t_adj, this%case%time%dt, &
+            this%case%fluid%ext_bdf, this%case%time%tlag, &
+            this%case%time%dtlag, tstep_adj)
 
        call neko_log%section('Adjoint fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%dt, &
+       call this%scheme%step(t_adj, tstep_adj, this%case%time%dt, &
             this%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -134,7 +137,7 @@ contains
        if (allocated(this%case%scalar)) then
           start_time = MPI_WTIME()
           call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%dt, &
+          call this%case%scalar%step(t_adj, tstep_adj, this%case%time%dt, &
                this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -145,7 +148,7 @@ contains
 
        call neko_log%section('Postprocessing')
 
-       !  call this%case%q%eval(t_adj, this%case%dt, tstep_adj)
+       !  call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
        call this%output_controller%execute(t_adj, tstep_adj)
 
        ! Update material properties
@@ -166,7 +169,7 @@ contains
          output_at_end, .true.)
     call this%output_controller%execute(t_adj, tstep_adj, output_at_end)
 
-    if (.not. (output_at_end) .and. t_adj .lt. this%case%end_time) then
+    if (.not. (output_at_end) .and. t_adj .lt. this%case%time%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
     end if
 
@@ -231,17 +234,17 @@ contains
 
     chkpf = file_t(trim(restart_file))
     call chkpf%read(C%fluid%chkp)
-    C%dtlag = C%fluid%chkp%dtlag
-    C%tlag = C%fluid%chkp%tlag
+    C%time%dtlag = C%fluid%chkp%dtlag
+    C%time%tlag = C%fluid%chkp%tlag
 
     !Free the previous mesh, dont need it anymore
     call C%fluid%chkp%previous_mesh%free()
-    do i = 1, size(C%dtlag)
-       call C%fluid%ext_bdf%set_coeffs(C%dtlag)
+    do i = 1, size(C%time%dtlag)
+       call C%fluid%ext_bdf%set_coeffs(C%time%dtlag)
     end do
 
-    call C%fluid%restart(C%dtlag, C%tlag)
-    if (allocated(C%scalar)) call C%scalar%restart(C%dtlag, C%tlag)
+    call C%fluid%restart(C%chkp)
+    if (allocated(C%scalar)) call C%scalar%restart(C%chkp)
 
     t = C%fluid%chkp%restart_time()
     call neko_log%section('Restarting from checkpoint')
