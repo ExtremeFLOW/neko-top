@@ -67,11 +67,7 @@ contains
     else if (trim(type_name) .eq. "RAMP") then
        allocate(RAMP_mapping_t::object)
     else
-       type_string = concat_string_array(MAPPING_KNOWN_TYPES, &
-            NEW_LINE('A') // "-  ", .true.)
-       call neko_error("Unknown mapping type: " &
-            // trim(type_name) // ".  Known types are: " &
-            // type_string)
+       call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
     end if
 
     ! Initialize
