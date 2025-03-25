@@ -77,7 +77,8 @@ module mapping_handler
      procedure, pass(this) :: free => mapping_handler_free
      !> Cycle through all the mapping_cascade and return the final field
      procedure, pass(this) :: apply_forward => mapping_handler_apply_forward
-     !> Cycle backwards through all the mapping_cascade and return the sensitivity
+     !> Cycle backwards through all the mapping_cascade and return the
+     !! sensitivity
      procedure, pass(this) :: apply_backward => mapping_handler_apply_backward
      !> Generic interface to add a mapping to the list.
      generic :: add => add_mapping, add_json_mappings
@@ -87,22 +88,7 @@ module mapping_handler
      !> Read from the json file and initialize the mapping_cascade.
      procedure, pass(this) :: add_json_mappings => &
           mapping_handler_add_json_mappings
-     !!> Initialize the user mapping.
-     ! procedure(mapping_handler_init_user_mapping), &
-     !     nopass, deferred :: init_user_mapping
   end type mapping_handler_t
-
-!   abstract interface
-!      subroutine mapping_handler_init_user_mapping(mapping, rhs_fields, &
-!           coef, type, user)
-!        import :: mapping_t, field_list_t, coef_t, user_t
-!        class(mapping_t), allocatable, intent(inout) :: mapping
-!        type(field_list_t) :: rhs_fields
-!        type(coef_t), intent(in) :: coef
-!        character(len=*) :: type
-!        type(user_t), intent(in) :: user
-!      end subroutine mapping_handler_init_user_mapping
-!   end interface
 
 contains
 
