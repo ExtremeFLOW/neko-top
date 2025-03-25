@@ -61,15 +61,16 @@ contains
 
     call json_get(json, "type", type_name)
 
-    if (trim(type_name) .eq. "linear") then
+    select case (trim(type_name))
+    case("linear")
        allocate(linear_mapping_t::object)
-    else if (trim(type_name) .eq. "PDE_filter") then
+    case("PDE_filter")
        allocate(PDE_filter_t::object)
-    else if (trim(type_name) .eq. "RAMP") then
+    case("RAMP")
        allocate(RAMP_mapping_t::object)
-    else
+    case default
        call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
-    end if
+    end select
 
     ! Initialize
     call object%init(json, coef)
