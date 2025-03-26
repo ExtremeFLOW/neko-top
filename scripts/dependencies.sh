@@ -207,6 +207,7 @@ function find_neko() {
         exit 1
     fi
 
+    CURRENT_DIR=$(pwd)
     cd $1
     if [[ -f regen.sh && (! -f "configure" || "$CLEAN" == true) ]]; then
         ./regen.sh
@@ -290,6 +291,7 @@ function find_exo2nek() {
     elif [ -f "$NEK5000_DIR/bin/exo2nek" ]; then
         exo2nek="$NEK5000_DIR/bin/exo2nek"
     elif [ -f "$NEK5000_DIR/tools/maketools" ]; then
+        CURRENT_DIR=$(pwd)
         cd $NEK5000_DIR/tools
         ./maketools exo2nek
         cd $CURRENT_DIR
@@ -345,6 +347,7 @@ function find_gmsh2nek() {
     elif [ -f "$NEKO_DIR/bin/gmsh2nek" ]; then
         gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
     elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
+        CURRENT_DIR=$(pwd)
         cd $NEKO_DIR/contrib/gmsh2nek
         ./compile.sh
         cd $CURRENT_DIR
