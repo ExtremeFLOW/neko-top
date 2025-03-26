@@ -82,19 +82,21 @@ contains
   !! @param gs Gather-Scatter object.
   !! @param type Type of initial condition.
   !! @param params JSON parameters.
-  subroutine set_optimization_ic_int(fld, coef, gs, type, params)
+  subroutine set_optimization_ic_int(fld, coef, gs, params)
     type(field_t), intent(inout) :: fld
     type(coef_t), intent(in) :: coef
     type(gs_t), intent(inout) :: gs
-    character(len=*) :: type
     type(json_file), intent(inout) :: params
 
     ! Variables for retrieving JSON parameters
+    character(len=:), allocatable :: type
     real(kind=rp) :: ic_value
     character(len=:), allocatable :: read_str
     character(len=NEKO_FNAME_LEN) :: fname, mesh_fname
     real(kind=rp) :: zone_value, tol
     logical :: interpolate
+
+    call json_get(params, "type", type)
 
     if (trim(type) .eq. 'uniform') then
 

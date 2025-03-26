@@ -53,8 +53,9 @@ module brinkman_design
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
-  use json_utils, only : json_get, json_extract_object
-  use utils, only : neko_error
+  use json_utils, only: json_get, json_extract_object
+  use utils, only: neko_error
+  use field_math, only: field_rzero
   implicit none
   private
 
@@ -230,7 +231,6 @@ contains
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
-    character(len = :), allocatable :: string_val
 
     ! Initialize and inject into the simulation
     call this%init_from_components(simulation)
@@ -241,17 +241,14 @@ contains
       call this%mapping%init_base(coef)
       call this%mapping%add(parameters, 'optimization.design.mapping')
 
-      call json_get(parameters, &
-           'optimization.design.initial_distribution.type', string_val)
-      call json_extract_object(parameters, &
-           'optimization.design.initial_distribution', json_subdict)
-
-      if (trim(string_val) .ne. 'user') then
-         call set_optimization_ic(this%design_indicator, coef, gs, string_val, &
+      if (parameters%valid_path(&
+        'optimization.design.initial_distribution')) then
+         call json_extract_object(parameters, &
+              'optimization.design.initial_distribution', json_subdict)
+         call set_optimization_ic(this%design_indicator, coef, gs, &
               json_subdict)
       else
-         call neko_error("user defined initial material distrubtions should &
-         & be enforced through the driver.")
+         call field_rzero(this%design_indicator)
       end if
     end associate
 
