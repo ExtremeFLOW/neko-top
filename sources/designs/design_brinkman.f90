@@ -248,7 +248,7 @@ contains
 
       if (trim(string_val) .ne. 'user') then
          call set_optimization_ic(this%design_indicator, coef, gs, string_val, &
-            json_subdict)
+              json_subdict)
       else
          call neko_error("user defined initial material distrubtions should &
          & be enforced through the driver.")

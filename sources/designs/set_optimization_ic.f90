@@ -189,7 +189,7 @@ contains
   !! @param zone_name Name of the point zone.
   !! @param zone_value Desired value of the design field in the point zone.
   subroutine set_optimization_ic_point_zone(fld, base_value, zone_name, &
-     zone_value)
+       zone_value)
     type(field_t), intent(inout) :: fld
     real(kind=rp), intent(in) :: base_value
     character(len=*), intent(in) :: zone_name
@@ -343,7 +343,7 @@ contains
 
        ! Generates an interpolator object and performs the point search
        global_interp = fld_data%generate_interpolator(fld%dof, fld%msh, &
-           tolerance)
+            tolerance)
 
        ! Evaluate design
        ! NOTE. Is is currently the convention in the design0.f* files that
