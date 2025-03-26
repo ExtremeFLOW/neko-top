@@ -101,7 +101,7 @@ module brinkman_design
      ! dF/d\chi, dF/dC and dF/d\kappa
      !
      ! What I'm calling "sensitivity" here, is the sensitivity with respect to
-     ! the design design_indicator
+     ! the design indicator
      ! so dF/d\rho
      !
      ! so the proceedure "map_backwards" will take in the field list
@@ -362,7 +362,7 @@ contains
     end if
 
     ! a field writer would be nice to output
-    ! - design design_indicator (\rho)
+    ! - design indicator (\rho)
     ! - mapped design (\chi)
     ! - sensitivity (dF/d\chi)
     ! TODO
