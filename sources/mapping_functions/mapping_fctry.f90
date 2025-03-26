@@ -33,6 +33,7 @@
 !
 !> Defines a factory subroutine for mapping functions.
 submodule (mapping) mapping_fctry
+  use utils, only: neko_type_error
   use linear_mapping, only : linear_mapping_t
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
@@ -60,19 +61,16 @@ contains
 
     call json_get(json, "type", type_name)
 
-    if (trim(type_name) .eq. "linear") then
+    select case (trim(type_name))
+    case("linear")
        allocate(linear_mapping_t::object)
-    else if (trim(type_name) .eq. "PDE_filter") then
+    case("PDE_filter")
        allocate(PDE_filter_t::object)
-    else if (trim(type_name) .eq. "RAMP") then
+    case("RAMP")
        allocate(RAMP_mapping_t::object)
-    else
-       type_string = concat_string_array(MAPPING_KNOWN_TYPES, &
-            NEW_LINE('A') // "-  ", .true.)
-       call neko_error("Unknown mapping type: " &
-            // trim(type_name) // ".  Known types are: " &
-            // type_string)
-    end if
+    case default
+       call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
+    end select
 
     ! Initialize
     call object%init(json, coef)
