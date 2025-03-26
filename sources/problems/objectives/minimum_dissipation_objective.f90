@@ -130,7 +130,7 @@ contains
 
   !> The common constructor using a JSON object.
   !! @param design the design.
-  !! @param fluid the fluid fluid_adj.
+  !! @param fluid the fluid.
   !! @param adjoint the fluid adjoint.
   subroutine minimum_dissipation_init_json(this, json, design, simulation)
     class(minimum_dissipation_objective_t), intent(inout) :: this
@@ -210,8 +210,8 @@ contains
 
   !> Compute the objective function.
   !! @param design the design.
-  !! @param fluid the fluid fluid_adj.
-  !! @param adjoint the fluid adjoint.
+  !! @param fluid the fluid.
+  !! @param adjoint the adjoint fluid.
   subroutine minimum_dissipation_update_value(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
