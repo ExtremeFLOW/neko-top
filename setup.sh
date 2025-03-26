@@ -94,9 +94,9 @@ source $MAIN_DIR/scripts/dependencies.sh
 [ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
 
 # Define standard compilers if they are not defined as environment variables
-if [ -z "$CC" ]; then export CC=$(which gcc); else export CC; fi
-if [ -z "$CXX" ]; then export CXX=$(which g++); else export CXX; fi
-if [ -z "$FC" ]; then export FC=$(which gfortran); else export FC; fi
+if [ -z "$CC" ]; then export CC=$(which mpicc); else export CC; fi
+if [ -z "$CXX" ]; then export CXX=$(which mpicxx); else export CXX; fi
+if [ -z "$FC" ]; then export FC=$(which mpifort); else export FC; fi
 
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
