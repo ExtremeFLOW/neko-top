@@ -31,11 +31,8 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 # Define the library sources and targets
 target_sources(neko-top
     PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/sensitivity.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
