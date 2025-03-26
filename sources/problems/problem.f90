@@ -44,7 +44,7 @@ module problem
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
   use vector, only: vector_t

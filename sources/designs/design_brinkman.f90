@@ -48,7 +48,7 @@ module brinkman_design
   use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
   use math, only: rzero
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t

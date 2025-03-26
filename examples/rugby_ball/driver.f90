@@ -1,15 +1,14 @@
 program usrneko
-  use simulation, only: simulation_t
-  use brinkman_design, only: brinkman_design_t
+  use simulation_m, only: simulation_t
+  use design, only: design_t, design_factory
   use problem, only: problem_t
-  use optimizer, only : optimizer_t, optimizer_factory
+  use optimizer, only: optimizer_t, optimizer_factory
 
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
   use mpi_f08, only: MPI_Init
-
   implicit none
 
   ! JSON related arguments
@@ -21,16 +20,17 @@ program usrneko
   integer :: ierr
 
   !> The simulation we are working with
-  type(simulation_t) :: simulation
-  !> The problem type
-  type(problem_t) :: problem
+  type(simulation_t) :: sim
   !> The design type
-  type(brinkman_design_t) :: design
+  class(design_t), allocatable :: des
+  !> The problem type
+  type(problem_t) :: prob
   !> The optimizer (in this case mma)
-  class(optimizer_t), allocatable :: optimizer
+  class(optimizer_t), allocatable :: opt
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
+
   call MPI_Init(ierr)
 
   ! -------------------------------------------------------------------------- !
@@ -46,27 +46,25 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
-  call simulation%init(parameters)
-
-  call design%init(parameters, simulation)
-
-
-  call problem%init(parameters, design, simulation)
-  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+  call sim%init(parameters)
+  call design_factory(des, parameters, sim)
+  call prob%init(parameters, des, sim)
+  call optimizer_factory(opt, parameters, prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
 
-  call optimizer%run(problem, design, simulation)
+  call opt%run(prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call optimizer%free()
-  if (allocated(optimizer)) deallocate(optimizer)
+  call opt%free()
+  call prob%free()
+  call des%free()
+  call sim%free()
 
-  call problem%free()
-  call design%free()
-  call simulation%free()
+  if (allocated(des)) deallocate(des)
+  if (allocated(opt)) deallocate(opt)
 
 end program usrneko

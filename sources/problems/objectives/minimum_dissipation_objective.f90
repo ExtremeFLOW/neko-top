@@ -70,7 +70,7 @@ module minimum_dissipation_objective
   use adjoint_minimum_dissipation_source_term, only: &
        adjoint_minimum_dissipation_source_term_t
   use objective, only: objective_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use coefs, only: coef_t
   use field_registry, only: neko_field_registry
