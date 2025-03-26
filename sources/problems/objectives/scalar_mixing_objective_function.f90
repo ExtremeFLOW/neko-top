@@ -55,7 +55,7 @@ module scalar_mixing_objective
   use utils, only: neko_error
   use adjoint_mixing_scalar_source_term, only: &
        adjoint_mixing_scalar_source_term_t
-  ! delete after
+  ! delete after the simulation computes u u_adj
   use field_math, only: field_addcol3, field_col3
   implicit none
   private
