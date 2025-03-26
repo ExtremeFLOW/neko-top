@@ -52,16 +52,7 @@ endif()
 
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
-
-# Advanced options
-include(CMakeDependentOption)
-
 option(ONLY_DOCS "Only build the documentation" OFF)
-if (ONLY_DOCS)
-    set(BUILD_DOCS ON)
-    set(BUILD_EXAMPLES OFF)
-    set(BUILD_TESTING OFF)
-endif()
 
 
 # Set default paths for the external dependencies
@@ -98,10 +89,8 @@ set(CMAKE_Fortran_PREPROCESS ON)
 # Documentation
 # ============================================================================ #
 
-if (BUILD_DOCS)
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
-endif()
-
+# Add the documentation target to ALL if we have "BUILD_DOCS" enabled
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/documentation)
 if (ONLY_DOCS)
     return()
 endif()
@@ -115,6 +104,15 @@ find_package(LAPACK REQUIRED)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
+
+# Check that the MPI Fortran 2008 module is available
+if (NOT MPI_Fortran_HAVE_F08_MODULE)
+    message(FATAL_ERROR
+        "MPI Fortran 2008 module is required for Neko-TOP."
+    )
+endif()
+include_directories(${MPI_Fortran_INCLUDE_DIRS})
+include_directories(${MPI_Fortran_MODULE_DIR})
 
 # ............................................................................ #
 # Setup of JSON-Fortran
@@ -186,7 +184,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
-    message(STATUS "- ONLY_DOCS: ${ONLY_DOCS}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
     message(STATUS "")
     message(STATUS "External dependencies:")
