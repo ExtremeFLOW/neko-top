@@ -33,7 +33,7 @@
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
 module adjoint_scalar_pnpn
-  use comm
+  use comm, only: MPI_INTEGER, MPI_MAX, NEKO_COMM, neko_error
   use num_types, only: rp
   use, intrinsic :: iso_fortran_env, only: error_unit
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
