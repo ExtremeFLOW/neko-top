@@ -186,13 +186,17 @@ contains
 
     ! Here we compute the squared difference between the old and new fields
     ! and store the result in the `normed_diff` array.
-    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, this%case%dt)
-    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, this%case%dt)
-    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, this%case%dt)
-    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, this%case%dt)
+    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, &
+         this%case%time%dt)
+    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, &
+         this%case%time%dt)
+    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, &
+         this%case%time%dt)
+    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, &
+         this%case%time%dt)
     if (this%have_scalar) then
        normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, &
-            this%case%dt)
+            this%case%time%dt)
     else
        normed_diff(5) = 0.0_rp
     end if
