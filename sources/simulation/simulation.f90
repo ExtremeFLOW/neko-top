@@ -32,7 +32,7 @@
 !
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
-module simulation
+module simulation_m
   use case, only: case_t
   use neko, only: neko_init, neko_finalize, neko_solve
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
@@ -87,7 +87,7 @@ contains
 
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
-    class(simulation_t), intent(inout) :: this
+    class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
@@ -187,4 +187,4 @@ contains
 
   end subroutine simulation_write
 
-end module simulation
+end module simulation_m

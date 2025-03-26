@@ -34,7 +34,7 @@
 !> Implements the `constraint_t` type.
 module constraint
   use base_functional, only: base_functional_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use design, only: design_t
   use num_types, only: rp
   use point_zone_registry, only: neko_point_zone_registry
