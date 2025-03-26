@@ -98,10 +98,6 @@ contains
        s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
     end do
 
-    !@ todo
-    ! I haven't checked if I need a memcopy here, but the cyl_boundary_layer
-    ! does do one, so I'm assuming it's not needed.
-
   end subroutine scalar_ic
 
 end module user
