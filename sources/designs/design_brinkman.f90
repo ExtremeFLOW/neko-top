@@ -242,7 +242,7 @@ contains
       call this%mapping%add(parameters, 'optimization.design.mapping')
 
       if (parameters%valid_path(&
-        'optimization.design.initial_distribution')) then
+           'optimization.design.initial_distribution')) then
          call json_extract_object(parameters, &
               'optimization.design.initial_distribution', json_subdict)
          call set_optimization_ic(this%design_indicator, coef, gs, &
