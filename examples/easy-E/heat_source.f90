@@ -14,9 +14,13 @@ module user
   real(kind=rp), dimension(:), allocatable :: resistance
   type(c_ptr) :: resistance_d = c_null_ptr
   logical :: is_initialized = .false.
-  real(kind=rp) :: Pe, target_temperature
 
+  real(kind=rp) :: target_temperature = 0.0_rp
   real(kind=rp) :: ramp_time_end = 0.0_rp
+
+  !> Variables to store the Rayleigh and Peclet numbers
+  real(kind=rp) :: Re = 0.0_rp
+  real(kind=rp) :: Pe = 0.0_rp
 
 contains
 
@@ -25,7 +29,20 @@ contains
     type(user_t), intent(inout) :: usr
     usr%scalar_user_f_vector => heat_source
     usr%material_properties => set_material_properties
+    usr%user_startup => user_startup
   end subroutine user_setup
+
+  !> Initialize the user module
+  subroutine user_startup(params)
+    type(json_file), intent(inout) :: params
+
+    call json_get(params, "case.fluid.Re", Re)
+    call json_get(params, "case.scalar.Pe", Pe)
+    call json_get(params, "case.scalar.target_temperature", target_temperature)
+    call json_get(params, "case.end_time", ramp_time_end)
+    ramp_time_end = ramp_time_end * 0.01_rp
+
+  end subroutine user_startup
 
   !> Read the material properties from the JSON file
   subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
@@ -33,14 +50,6 @@ contains
     integer, intent(in) :: tstep
     real(kind=rp), intent(inout) :: rho, mu, cp, lambda
     type(json_file), intent(inout) :: params
-
-    real(kind=rp) :: Re
-
-    call json_get(params, "case.fluid.Re", Re)
-    call json_get(params, "case.scalar.Pe", Pe)
-    call json_get(params, "case.scalar.target_temperature", target_temperature)
-    call json_get(params, "case.end_time", ramp_time_end)
-    ramp_time_end = ramp_time_end * 0.01_rp
 
     mu = 1.0_rp/Re
     lambda = 1.0_rp/Pe
