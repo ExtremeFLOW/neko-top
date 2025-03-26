@@ -57,7 +57,6 @@ contains
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
     character(len=:), allocatable :: type_name
-    character(len=:), allocatable :: type_string
 
     call json_get(json, "type", type_name)
 
