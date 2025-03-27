@@ -117,7 +117,7 @@ contains
     call json_get_or_default(json, 'convex_up', convex_up, .true.)
 
     call this%init_base(json, coef)
-    call RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
+    call this%init_from_attributes(coef, f_min, f_max, q, &
          convex_up)
 
   end subroutine RAMP_mapping_init_from_json
