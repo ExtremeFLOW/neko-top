@@ -91,7 +91,17 @@
     },
     "optimization": {
         "design": {
-            "type": "brinkman"
+            "type": "brinkman",
+            "mapping": [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 100
+                }
+            ]
         },
         "solver": {
             "type": "mma",
