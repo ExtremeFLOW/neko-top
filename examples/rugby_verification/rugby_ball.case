@@ -85,6 +85,10 @@
         ]
     },
     "optimization": {
+        "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+        },
         "design": {
             "type": "brinkman",
             "mapping" : [
