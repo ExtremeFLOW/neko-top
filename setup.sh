@@ -10,6 +10,7 @@ function help() {
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
+    echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -30,9 +31,10 @@ DEVICE_TYPE="OFF"
 CLEAN=false
 QUIET=false
 TEST=false
+DOCS=false
 
 # List possible options
-OPTIONS=help,test,clean,quiet,device:
+OPTIONS=help,test,clean,quiet,device:,doc
 OPT=h,t,c,q,d:
 
 # Parse the inputs for options
@@ -47,6 +49,9 @@ while true; do
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
+
+    # Purely long settings
+    "--doc") DOCS=true && shift ;; # Build the documentation
 
     # End of options
     "--") shift && break ;;
@@ -125,6 +130,9 @@ printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
+if [ "$DOCS" == true ]; then
+    cmake --build $MAIN_DIR/build --target Documentation --parallel
+fi
 
 # ============================================================================ #
 # Print the status of the build
