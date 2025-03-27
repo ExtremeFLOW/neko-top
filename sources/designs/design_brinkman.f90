@@ -53,6 +53,8 @@ module brinkman_design
   use math, only: copy
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
+  use json_utils, only: json_get, json_get_or_default
+  use utils, only: neko_error
   implicit none
   private
 
@@ -227,6 +229,28 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
+    character(len=:), allocatable :: optimization_domain_name, domain_type
+
+    ! Initialize the optimization domain
+    if (parameters%valid_path('optimization.domain')) then
+       call json_get(parameters, 'optimization.domain.type', domain_type)
+       select case (trim(domain_type))
+       case('point_zone')
+       this%if_mask = .true.
+       call json_get(parameters, 'optimization.domain.zone_name', &
+           optimization_domain_name)
+       this%optimization_domain => &
+            neko_point_zone_registry%get_point_zone(&
+            optimization_domain_name)
+
+       case default
+       call neko_error('brinkman design only supports point_zones for&
+       & optimization domain types')
+
+       end select
+    else
+       this%if_mask = .false.
+    end if
 
     call this%init_from_components(simulation)
 
@@ -255,7 +279,6 @@ contains
   subroutine brinkman_design_init_from_components(this, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
-    character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
@@ -296,20 +319,6 @@ contains
        call device_memcpy(this%design_indicator%x, &
             this%design_indicator%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
-    end if
-
-    ! TODO, of course when we move all of Tim's stuff for initialization of
-    ! the initial design field we'll be reading things properly from the JSON.
-    ! call json_get(parameters, 'name', optimization_domain_zone_name)
-    ! Right now, I'm hardcoding the name of the point zone.
-    this%if_mask = .true.
-    optimization_domain_zone_name = "optimization_domain"
-
-    ! Initialize the mask
-    if (this%if_mask) then
-       this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(&
-            optimization_domain_zone_name)
     end if
 
     ! TODO
