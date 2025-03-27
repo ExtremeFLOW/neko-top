@@ -236,16 +236,16 @@ contains
        call json_get(parameters, 'optimization.domain.type', domain_type)
        select case (trim(domain_type))
        case('point_zone')
-       this%if_mask = .true.
-       call json_get(parameters, 'optimization.domain.zone_name', &
-           optimization_domain_name)
-       this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(&
-            optimization_domain_name)
+          this%if_mask = .true.
+          call json_get(parameters, 'optimization.domain.zone_name', &
+               optimization_domain_name)
+          this%optimization_domain => &
+               neko_point_zone_registry%get_point_zone(&
+               optimization_domain_name)
 
        case default
-       call neko_error('brinkman design only supports point_zones for&
-       & optimization domain types')
+          call neko_error('brinkman design only supports point_zones for&
+          & optimization domain types')
 
        end select
     else
