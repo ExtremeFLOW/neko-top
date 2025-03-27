@@ -371,6 +371,7 @@ contains
   !!
   !! This function should be called after the design has been updated.
   !! It will update the value of all the objectives.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[in] design The design to update the objectives with.
   subroutine problem_update_objectives(this, design)
     class(problem_t), intent(inout) :: this
@@ -386,6 +387,7 @@ contains
   !!
   !! This function should be called after the design has been updated.
   !! It will update the value of all the constraints.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[in] design The design to update the constraints with.
   subroutine problem_update_constraints(this, design)
     class(problem_t), intent(inout) :: this
@@ -401,6 +403,7 @@ contains
   !!
   !! This function should be called after the design has been updated.
   !! It will update the sensitivity of all the objectives.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[in] design The design to update the objectives with.
   subroutine problem_update_objective_sensitivities(this, design)
     class(problem_t), intent(inout) :: this
@@ -416,6 +419,7 @@ contains
   !!
   !! This function should be called after the design has been updated.
   !! It will update the sensitivity of all the constraints.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[in] design The design to update the constraints with.
   subroutine problem_update_constraint_sensitivities(this, design)
     class(problem_t), intent(inout) :: this
@@ -434,6 +438,7 @@ contains
   !!
   !! This function constructs the objective value from the individual
   !! objectives and their weights.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[out] objective_value The weighted sum of all objective values.
   subroutine problem_get_objective_value(this, objective_value)
     class(problem_t), intent(inout) :: this
@@ -453,6 +458,7 @@ contains
   !!
   !! This function returns all the indivual objectives comprising the
   !! objective function
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[out] all_objective_values A vector containing all objectives
   subroutine problem_get_all_objective_values(this, all_objective_values)
     class(problem_t), intent(inout) :: this
@@ -476,6 +482,7 @@ contains
   !!
   !! This function constructs the constraint values from the individual
   !! constraints.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[out] constraint_value The vector of all constraint values.
   subroutine problem_get_constraint_values(this, constraint_value)
     class(problem_t), intent(inout) :: this
@@ -499,6 +506,7 @@ contains
   !!
   !! This function constructs the sensitivity of the objective value from the
   !! individual objectives and their weights.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[out] sensitivity The weighted sum of all objective sensitivities.
   subroutine problem_get_objective_sensitivities(this, sensitivity)
     class(problem_t), intent(inout) :: this
@@ -517,6 +525,7 @@ contains
   !!
   !! This function constructs the sensitivity of the constraint values from the
   !! individual constraints.
+  !! @param[inout] this The problem to update the objectives with.
   !! @param[out] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
     class(problem_t), intent(inout) :: this

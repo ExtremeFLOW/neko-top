@@ -244,14 +244,14 @@ module adjoint_fluid_pnpn
 
   end type adjoint_fluid_pnpn_t
 
-  interface
-     !> Boundary condition factory for pressure.
-     !! @details Will mark a mesh zone for the bc and finalize.
-     !! @param[inout] object The object to be allocated.
-     !! @param[in] scheme The `scalar_pnpn` scheme.
-     !! @param[inout] json JSON object for initializing the bc.
-     !! @param[in] coef SEM coefficients.
-     !! @param[in] user The user interface.
+  !> Boundary condition factory for pressure.
+  !! @details Will mark a mesh zone for the bc and finalize.
+  !! @param[inout] object The object to be allocated.
+  !! @param[in] scheme The `scalar_pnpn` scheme.
+  !! @param[inout] json JSON object for initializing the bc.
+  !! @param[in] coef SEM coefficients.
+  !! @param[in] user The user interface.
+  interface pressure_bc_factory
      module subroutine pressure_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
        type(adjoint_fluid_pnpn_t), intent(in) :: scheme
@@ -259,16 +259,16 @@ module adjoint_fluid_pnpn
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
      end subroutine pressure_bc_factory
-  end interface
+  end interface pressure_bc_factory
 
-  interface
-     !> Boundary condition factory for velocity
-     !! @details Will mark a mesh zone for the bc and finalize.
-     !! @param[inout] object The object to be allocated.
-     !! @param[in] scheme The `scalar_pnpn` scheme.
-     !! @param[inout] json JSON object for initializing the bc.
-     !! @param[in] coef SEM coefficients.
-     !! @param[in] user The user interface.
+  !> Boundary condition factory for velocity
+  !! @details Will mark a mesh zone for the bc and finalize.
+  !! @param[inout] object The object to be allocated.
+  !! @param[in] scheme The `scalar_pnpn` scheme.
+  !! @param[inout] json JSON object for initializing the bc.
+  !! @param[in] coef SEM coefficients.
+  !! @param[in] user The user interface.
+  interface velocity_bc_factory
      module subroutine velocity_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
        type(adjoint_fluid_pnpn_t), intent(in) :: scheme
@@ -276,7 +276,7 @@ module adjoint_fluid_pnpn
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
      end subroutine velocity_bc_factory
-  end interface
+  end interface velocity_bc_factory
 
 contains
 
@@ -384,7 +384,7 @@ contains
     if (this%variable_material_properties .and. &
          this%vel_projection_dim .gt. 0) then
        call neko_error("Velocity projection not available for full stress &
-            &formulation")
+       &formulation")
     end if
 
 
@@ -711,6 +711,7 @@ contains
   end subroutine adjoint_fluid_pnpn_free
 
   !> Advance fluid simulation in time.
+  !! @param this The fluid simulation object.
   !! @param t The time value.
   !! @param tstep The current interation.
   !! @param dt The timestep
@@ -962,7 +963,9 @@ contains
   ! ========================================================================== !
 
   !> Sets up the boundary condition for the scheme.
+  !! @param this The fluid simulation object.
   !! @param user The user interface.
+  !! @param params The json file containing the parameters.
   subroutine adjoint_fluid_pnpn_setup_bcs(this, user, params)
     use mpi_f08, only: MPI_IN_PLACE
 
@@ -1448,6 +1451,7 @@ contains
   end function device_norm
 
   !> Compute the power_iterations field.
+  !! @param this The fluid simulation object.
   !! @param t The time value.
   !! @param tstep The current time-step
   subroutine power_iterations_compute(this, t, tstep)

@@ -84,9 +84,10 @@ contains
   ! Implementations for the base class
 
   !> Initialize the constraint base class.
+  !! @param this The constraint object.
+  !! @param name The name of the constraint.
   !! @param design_size The number of design variables.
-  !! @param weight The weight of the constraint function.
-  !! @param[optional] mask_name The name design the mask.
+  !! @param mask_name The name design the mask. [optional]
   subroutine constraint_init_base(this, name, design_size, mask_name)
     class(constraint_t), intent(inout) :: this
     character(len=*), intent(in) :: name
