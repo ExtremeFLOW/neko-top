@@ -116,8 +116,7 @@ contains
        call json_get_or_default(params, 'interpolate', interpolate, &
             .false.)
        call json_get_or_default(params, 'tolerance', tol, 0.000001_rp)
-       call json_get_or_default(params, 'mesh_file_name', read_str, &
-            "none")
+       call json_get_or_default(params, 'mesh_file_name', read_str, "none")
        mesh_fname = trim(read_str)
 
        call set_optimization_ic_fld(fld, fname, interpolate, tol, mesh_fname)
