@@ -49,7 +49,7 @@ module simple_brinkman_source_term
   !> A simple Brinkman source term.
   ! We have a source term of the form $\chi \mathbf{u}$
   type, public, extends(source_term_t) :: simple_brinkman_source_term_t
-     !> the fields corresponding to \chi, u, v and w
+     !> the fields corresponding to \f$\chi\f$, u, v and w
      type(field_t), pointer :: chi, u, v, w
 
    contains
@@ -67,6 +67,7 @@ module simple_brinkman_source_term
 
 contains
   !> The common constructor using a JSON object.
+  !! @param this The source term.
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
@@ -85,9 +86,10 @@ contains
   end subroutine simple_brinkman_source_term_init_from_json
 
   !> The constructor from type components.
-  !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint)
-  !! @param design the design
-  !! @param u, v, w the velocity field (either primal or adjoint)
+  !! @param this The source term.
+  !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint).
+  !! @param chi the brinkman amplitude field.
+  !! @param u, v, w the velocity field (either primal or adjoint).
   !! @param coef The SEM coeffs.
   subroutine simple_brinkman_source_term_init_from_components(this, &
        f_x, f_y, f_z, chi, u, v, w, coef)
@@ -133,6 +135,7 @@ contains
   end subroutine simple_brinkman_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
+  !! @param this The source term.
   !! @param t The time value.
   !! @param tstep The current time-step.
   subroutine simple_brinkman_source_term_compute(this, t, tstep)

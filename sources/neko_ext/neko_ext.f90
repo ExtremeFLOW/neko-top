@@ -45,7 +45,7 @@ contains
   !> the lagged time step parameters, the external BDF coefficients, the fluid
   !> and scalar fields, and the simulation components.
   !>
-  !> @param[inout] C Case data structure.
+  !> @param[inout] neko_case Case data structure.
   subroutine reset(neko_case)
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t

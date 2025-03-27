@@ -742,22 +742,22 @@ WARN_FORMAT            = "$file:$line: $text"
 
 WARN_LOGFILE           =
 
-If the WARN_AS_ERROR tag is set to YES then Doxygen will immediately stop when a
-warning is encountered. If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS then
-Doxygen will continue running as if WARN_AS_ERROR tag is set to NO, but at the
-end of the Doxygen process Doxygen will return with a non-zero status. If the
-WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS_PRINT then Doxygen behaves like
-FAIL_ON_WARNINGS but in case no WARN_LOGFILE is defined Doxygen will not write
-the warning messages in between other messages but write them at the end of a
-run, in case a WARN_LOGFILE is defined the warning messages will be besides
-being in the defined file also be shown at the end of a run, unless the
-WARN_LOGFILE is defined as - i.e. standard output (stdout) in that case the
-behavior will remain as with the setting FAIL_ON_WARNINGS.
+# If the WARN_AS_ERROR tag is set to YES then Doxygen will immediately stop when
+# a warning is encountered. If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS
+# then Doxygen will continue running as if WARN_AS_ERROR tag is set to NO, but
+# at the end of the Doxygen process Doxygen will return with a non-zero status.
+# If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS_PRINT then Doxygen behaves
+# like FAIL_ON_WARNINGS but in case no WARN_LOGFILE is defined Doxygen will not
+# write the warning messages in between other messages but write them at the end
+# of a run, in case a WARN_LOGFILE is defined the warning messages will be
+# besides being in the defined file also be shown at the end of a run, unless
+# the WARN_LOGFILE is defined as - i.e. standard output (stdout) in that case
+# the behavior will remain as with the setting FAIL_ON_WARNINGS.
 
-Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
-The default value is: NO.
+# Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
+# The default value is: NO.
 
-WARN_AS_ERROR          = NO
+WARN_AS_ERROR          = FAIL_ON_WARNINGS_PRINT
 
 #---------------------------------------------------------------------------
 # Configuration options related to the input files
@@ -822,7 +822,8 @@ EXCLUDE_SYMLINKS       = NO
 # Note that the wildcards are matched against the file with absolute path, so to
 # exclude all test directories for example use the pattern */test/*
 
-EXCLUDE_PATTERNS       = @top_srcdir@/sources/**/readme.md
+EXCLUDE_PATTERNS       = @top_srcdir@/sources/**/readme.md \
+                         @top_srcdir@/examples/**/*.f90
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
@@ -907,7 +908,7 @@ FILTER_SOURCE_PATTERNS =
 # (index.html). This can be useful if you have a project on for instance GitHub
 # and want to reuse the introduction page also for the doxygen output.
 
-USE_MDFILE_AS_MAINPAGE =
+USE_MDFILE_AS_MAINPAGE = @top_srcdir@/documentation/pages/neko-top.md
 
 #---------------------------------------------------------------------------
 # Configuration options related to source browsing

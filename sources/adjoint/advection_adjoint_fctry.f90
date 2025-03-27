@@ -49,11 +49,11 @@ module advection_adjoint_fctry
 
 contains
 
-  !> A factory for \ref advection_t decendants.
-  !! @param object Polymorphic object of class \ref advection_t.
+  !> A factory for advection_t decendants.
+  !! @note The factory both allocates and initializes `object`.
+  !! @param object Polymorphic object of class advection_t.
   !! @param json The parameter file.
   !! @param coef The coefficients of the (space, mesh) pair.
-  !! @note The factory both allocates and initializes `object`.
   subroutine advection_adjoint_factory(object, json, coef)
     implicit none
     class(advection_adjoint_t), allocatable, intent(inout) :: object

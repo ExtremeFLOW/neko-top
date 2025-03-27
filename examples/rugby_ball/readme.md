@@ -19,16 +19,16 @@ we only consider topology optimization and hence we just a type `topopt_design`.
 Hopefully, this can be a derived type of the more abstract `design_variable`.
 
 ### `topopt_design`
-This contains the design field $\rho$ as well as the following key proceedures
-- `map_forward` maps the design varaible to coeffients (currently only the 
-Brinkman amplitude $\rho \mapsto \chi $)
+This contains the design field \f$\rho\f$ as well as the following key procedures
+- `map_forward` maps the design variable to coefficients (currently only the 
+Brinkman amplitude \f$\rho \mapsto \chi \f$)
 
-In the future, this should also contain filters $\rho \mapsto \tilde{\rho}
-\mapsto \chi$
+In the future, this should also contain filters \f$\rho \mapsto \tilde{\rho}
+\mapsto \chi\f$
 
-- `map_backwards` uses chain rule to map the sensitivity of the coefficents
-to the sensitivity to the design variable $\frac{\partial F}{\partial \chi}
- \mapsto \frac{\partial F}{\partial \rho}$
+- `map_backwards` uses chain rule to map the sensitivity of the coefficients
+to the sensitivity to the design variable \f$\frac{\partial F}{\partial \chi}
+ \mapsto \frac{\partial F}{\partial \rho}\f$
 
 ## Optimizer
 
@@ -58,25 +58,25 @@ the JSON case file.
 This contains a way to evaluate an optimization problem, ie, all objective
 functions and constraints. Currently, we only
 use gradient descent algorithms using first order gradient information, so
-the key proceedures are
+the key procedures are
 - `init` to initialize the type of optimization problem
-- `compute` this is to evalute all objective functions $F$ and constraints $C_i$ 
-- `compute_sensitivity` this is to evalute all the sensitivities
-$\frac{\partial F}{\partial \rho}$, $\frac{\partial C_1}{\partial \rho}$,
-$\frac{\partial C_2}{\partial \rho}$ etc.
+- `compute` this is to evaluate all objective functions \f$F\f$ and constraints \f$C_i\f$ 
+- `compute_sensitivity` this is to evaluate all the sensitivities
+\f$\frac{\partial F}{\partial \rho}\f$, \f$\frac{\partial C_1}{\partial \rho}\f$,
+\f$\frac{\partial C_2}{\partial \rho}\f$ etc.
 - in princple only the `compute` is required. (eg, gradient free algorithms) or
 more may be required (eg, `compute_hessian`)
 
 Within a `problem` we also contain fluid and adjoint schemes as well as instance
  of the following classes.
 
-Currently we have only implemented a steady topologogy optimization case.
+Currently we have only implemented a steady topology optimization case.
 
 
 
 ### `objective_function`
 this could be either an objective function or a constraint.
-The key proceedures are
+The key procedures are
 - `init` allowing various source terms to be appended to the adjoint.
 - `compute` to compute the objective/constraint function value.
 - `compute_sensitivity` to compute the sensitivity of the objective/constraint
@@ -86,12 +86,12 @@ with respect to the design.
 Here we have made 2 derived types,
 
 `minimum_dissipation_objective function` for objectives
-$F = \int_\Omega |\nabla \mathbf{u}|^2 d\Omega + K \int_\Omega \chi |u|^2 d\Omega$
+\f$F = \int_\Omega |\nabla \mathbf{u}|^2 d\Omega + K \int_\Omega \chi |u|^2 d\Omega\f$
 
-`volume_constraint` for constraints either $V < V_{max}$ or $V > V_{min}$ where
-$V = \int_\Omega \tilde{\rho} d \Omega $.
+`volume_constraint` for constraints either \f$V < V_{max}\f$ or \f$V > V_{min}\f$ where
+\f$V = \int_\Omega \tilde{\rho} d \Omega \f$.
 
-Note, it should be over $\Omega_O$ after masks are included.
+Note, it should be over \f$\Omega_O\f$ after masks are included.
 
 This is example is primarily used to summarize the list of remaining tasks.
 
@@ -165,7 +165,7 @@ This is a BIG one, and we need to discuss the best way forward before
 implementing anything. 
 
 Right now, a `design_t` only has the Brinkman term to map to. But in principle, 
-we may want to map to many coefficients, eg conductivity $\kappa$ etc for CHT. 
+we may want to map to many coefficients, eg conductivity \f$\kappa\f$ etc for CHT. 
 So I'm thinking it would be better for us to have a `field_list_t` for all the 
 coefficients, and then each one has a unique subroutine for its mapping. 
 
@@ -175,22 +175,22 @@ could use a `get_by_name` so that's nice. It's like our own little self
 contained registry of sorts.
 
 Similarly, the `objective_function_t` type has a field to hold the sensitivity 
-wrt to the coefficient (for us, it's just the brinkman term $\chi$) 
-ie, $\frac{\partial F}{\partial \chi}$. This gets passed to the `design_t` 
-to chain rule backwards, ie, $\frac{\partial F}{\partial \rho}$. 
+wrt to the coefficient (for us, it's just the brinkman term \f$\chi\f$) 
+ie, \f$\frac{\partial F}{\partial \chi}\f$. This gets passed to the `design_t` 
+to chain rule backwards, ie, \f$\frac{\partial F}{\partial \rho}\f$. 
 
 But with more coefficients we'll need to pass a list back, 
-ie $\frac{\partial F}{\partial \chi}$, $\frac{\partial F}{\partial C}$, 
-$\frac{\partial F}{\partial \kappa}$ etc, 
+ie \f$\frac{\partial F}{\partial \chi}\f$, \f$\frac{\partial F}{\partial C}\f$, 
+\f$\frac{\partial F}{\partial \kappa}\f$ etc, 
 and some kind of instructions of how to assemble the sensitivity. 
 
 All in all, this is a bit tricky in my mind.
 
 ### Handle multiple constraints (such that we have multiple sensitivities)
 In a similar vibe, we would want a design to have a `field_list_t` for the 
-sensitivities coming from the objective function $F$ and all the constraints 
-$C_i$. ie, $\frac{\partial F}{\partial \rho}$, 
-$\frac{\partial C_1}{\partial \rho}$, $\frac{\partial C_2}{\partial \rho}$  etc. 
+sensitivities coming from the objective function \f$F\f$ and all the constraints 
+\f$C_i\f$. ie, \f$\frac{\partial F}{\partial \rho}\f$, 
+\f$\frac{\partial C_1}{\partial \rho}\f$, \f$\frac{\partial C_2}{\partial \rho}\f$  etc. 
 
 All the initialization and execution of all of these need to be wrapped up 
 nicely, similar to `source_terms` I guess.
