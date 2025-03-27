@@ -229,7 +229,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
-    character(len=:), allocatable :: optimization_domain_name, domain_type
+    character(len=:), allocatable :: domain_name, domain_type
 
     ! Initialize the optimization domain
     if (parameters%valid_path('optimization.domain')) then
@@ -238,10 +238,9 @@ contains
        case('point_zone')
           this%if_mask = .true.
           call json_get(parameters, 'optimization.domain.zone_name', &
-               optimization_domain_name)
+               domain_name)
           this%optimization_domain => &
-               neko_point_zone_registry%get_point_zone(&
-               optimization_domain_name)
+               neko_point_zone_registry%get_point_zone(domain_name)
 
        case default
           call neko_error('brinkman design only supports point_zones for&
