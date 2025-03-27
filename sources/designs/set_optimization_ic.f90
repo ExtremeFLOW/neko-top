@@ -98,21 +98,19 @@ contains
 
     call json_get(params, "type", type)
 
-    if (trim(type) .eq. 'uniform') then
-
+    select case (trim(type))
+    case ('uniform')
        call json_get(params, 'value', ic_value)
        call set_optimization_ic_uniform(fld, ic_value)
 
-    else if (trim(type) .eq. 'point_zone') then
-
+    case ('point_zone')
        call json_get(params, 'base_value', ic_value)
        call json_get(params, 'zone_name', read_str)
        call json_get(params, 'zone_value', zone_value)
 
        call set_optimization_ic_point_zone(fld, ic_value, read_str, zone_value)
 
-    else if (trim(type) .eq. 'field') then
-
+    case ('field')
        call json_get(params, 'file_name', read_str)
        fname = trim(read_str)
        call json_get_or_default(params, 'interpolate', interpolate, &
@@ -124,9 +122,10 @@ contains
 
        call set_optimization_ic_fld(fld, fname, interpolate, tol, mesh_fname)
 
-    else
+    case default
        call neko_error('Invalid initial condition')
-    end if
+
+    end select
 
     call set_optimization_ic_common(fld, coef, gs)
 
