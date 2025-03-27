@@ -199,7 +199,7 @@ contains
     type(vector_t), intent(in) :: vector
 
     ! first check they're the same size
-    if (field%size() .ne. vector%n) then
+    if (field%size() .ne. vector%size()) then
        call neko_error("vector and field are not the same size")
     end if
 
@@ -223,7 +223,7 @@ contains
     type(field_t), intent(in) :: field
 
     ! first check they're the same size
-    if (field%size() .ne. vector%n) then
+    if (field%size() .ne. vector%size()) then
        call neko_error("vector and field are not the same size")
     end if
 
