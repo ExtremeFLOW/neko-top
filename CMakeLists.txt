@@ -59,11 +59,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "")
         CACHE STRING "Choose the type of build" FORCE)
 endif()
 
-# Set default paths for the external dependencies
-set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
-    CACHE STRING "Path to the JSON-Fortran installation")
-set(NEKO_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
-    CACHE STRING "Path to the Neko installation")
 set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
     CACHE STRING "Path to the pFUnit installation")
 
@@ -152,7 +147,7 @@ find_package(BLAS QUIET)
 find_package(LAPACK QUIET)
 
 # Check for the optional libraries.
-find_package(MPI QUIET)
+find_package(MPI REQUIRED)
 
 # We need PKG Config to find the JSON-Fortran and Neko libraries
 find_package(PkgConfig REQUIRED)
@@ -170,10 +165,15 @@ include_directories(${MPI_Fortran_MODULE_DIR})
 # Setup of JSON-Fortran
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
-if (IS_DIRECTORY ${JSON_FORTRAN_DIR})
-    set(ENV{PKG_CONFIG_PATH}
-        ${JSON_FORTRAN_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
+if (DEFINED ENV{JSON_FORTRAN_DIR})
+    set(JSON_FORTRAN_DIR ENV{JSON_FORTRAN_DIR} CACHE STRING
+        "Path to the JSON-Fortran installation")
+else()
+    set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+        CACHE STRING "Path to the JSON-Fortran installation")
 endif()
+
+set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find the JSON-Fortran library
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
@@ -181,19 +181,15 @@ pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 # ............................................................................ #
 # Setup of the Neko library
 
-# Check that the NEKO_DIR directories exist
-if (NOT IS_DIRECTORY ${NEKO_DIR})
-    message(FATAL_ERROR
-        "Neko directory not found (${NEKO_DIR})."
-        "Please run `git submodule update --init` to download the external "
-        "libraries."
-    )
+# Set the proper paths for the NEKO_DIR
+if (DEFINED ENV{NEKO_DIR})
+    set(NEKO_DIR ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
+else()
+    set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
+        CACHE STRING "Path to the Neko installation")
 endif()
 
-# Set the proper paths for the NEKO_DIR
-if (IS_DIRECTORY ${NEKO_DIR})
-    set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
-endif()
+set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
