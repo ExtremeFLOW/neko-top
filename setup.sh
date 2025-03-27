@@ -119,6 +119,7 @@ fi
 # Set the variables for the compilation
 CMAKE_VARIABLES+=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
 CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
+[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
@@ -130,9 +131,6 @@ printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
-if [ "$DOCS" == true ]; then
-    cmake --build $MAIN_DIR/build --target Documentation --parallel
-fi
 
 # ============================================================================ #
 # Print the status of the build
