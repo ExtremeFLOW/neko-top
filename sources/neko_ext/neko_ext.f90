@@ -24,14 +24,6 @@ module neko_ext
   use field, only: field_t
   use utils, only: neko_error
   use json_module, only : json_file
-  ! for vector/field math
-  use math, only: copy
-  use device_math, only: device_copy
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use vector, only: vector_t
-  use field, only: field_t
-  use utils, only: neko_error
-  use json_module, only : json_file
   implicit none
 
   ! ========================================================================= !
