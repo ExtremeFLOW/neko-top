@@ -295,7 +295,7 @@ contains
 
        if (size(box_min) .ne. 3 .or. size(box_max) .ne. 3) then
           call neko_error('Case file: mesh_transform. &
-               &box_min and box_max must be 3 element arrays of reals')
+          &box_min and box_max must be 3 element arrays of reals')
        end if
 
        call target_box%init(box_min, box_max)
