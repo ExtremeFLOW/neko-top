@@ -35,7 +35,7 @@ module brinkman_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
-  use brinkman_mapping, only: brinkman_mapping_t
+  use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
@@ -46,7 +46,8 @@ module brinkman_design
   use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
   use math, only: rzero
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
+  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
@@ -162,7 +163,7 @@ module brinkman_design
      !! @todo It is currently assumed to be the Brinkman amplitude in the fluid
      !! equations. Mapping to multiple coeficients is currently not supported,
      !! ie, CHT.
-     type(brinkman_mapping_t) :: mapping
+     type(mapping_handler_t) :: mapping
 
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain

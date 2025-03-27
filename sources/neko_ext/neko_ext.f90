@@ -16,6 +16,13 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
+  ! for vector/field math
+  use math, only: copy
+  use device_math, only: device_copy
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use vector, only: vector_t
+  use field, only: field_t
+  use utils, only: neko_error
   use json_module, only : json_file
   ! for vector/field math
   use math, only: copy
@@ -200,7 +207,7 @@ contains
     type(vector_t), intent(in) :: vector
 
     ! first check they're the same size
-    if (field%size() .ne. vector%n) then
+    if (field%size() .ne. vector%size()) then
        call neko_error("vector and field are not the same size")
     end if
 
@@ -224,7 +231,7 @@ contains
     type(field_t), intent(in) :: field
 
     ! first check they're the same size
-    if (field%size() .ne. vector%n) then
+    if (field%size() .ne. vector%size()) then
        call neko_error("vector and field are not the same size")
     end if
 
