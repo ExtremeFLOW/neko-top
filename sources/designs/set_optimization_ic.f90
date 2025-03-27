@@ -268,7 +268,7 @@ contains
     ! Change from "field0.f000*" to "field0.fld" for the fld reader
     call filename_chsuffix(file_name, file_name, 'fld')
 
-    call fld_data%init
+    call fld_data%init()
     f = file_t(trim(file_name))
 
     if (interpolate) then
@@ -349,7 +349,7 @@ contains
        ! NOTE. Is is currently the convention in the design0.f* files that
        ! the unfiltered design should be stored in the u component.
        call global_interp%evaluate(fld%x, fld_data%u%x)
-       call global_interp%free
+       call global_interp%free()
 
     else ! No interpolation, just potentially from different spaces
 
@@ -360,11 +360,11 @@ contains
        ! Do the space-to-space interpolation
        call space_interp%map_host(fld%x, fld_data%t%x, fld_data%nelv, fld%Xh)
 
-       call space_interp%free
+       call space_interp%free()
 
     end if
 
-    call fld_data%free
+    call fld_data%free()
 
   end subroutine set_optimization_ic_fld
 
