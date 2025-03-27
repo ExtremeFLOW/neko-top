@@ -19,14 +19,14 @@ we only consider topology optimization and hence we just a type `topopt_design`.
 Hopefully, this can be a derived type of the more abstract `design_variable`.
 
 ### `topopt_design`
-This contains the design field \f$\rho\f$ as well as the following key proceedures
-- `map_forward` maps the design varaible to coeffients (currently only the 
+This contains the design field \f$\rho\f$ as well as the following key procedures
+- `map_forward` maps the design variable to coefficients (currently only the 
 Brinkman amplitude \f$\rho \mapsto \chi \f$)
 
 In the future, this should also contain filters \f$\rho \mapsto \tilde{\rho}
 \mapsto \chi\f$
 
-- `map_backwards` uses chain rule to map the sensitivity of the coefficents
+- `map_backwards` uses chain rule to map the sensitivity of the coefficients
 to the sensitivity to the design variable \f$\frac{\partial F}{\partial \chi}
  \mapsto \frac{\partial F}{\partial \rho}\f$
 
@@ -58,25 +58,25 @@ the JSON case file.
 This contains a way to evaluate an optimization problem, ie, all objective
 functions and constraints. Currently, we only
 use gradient descent algorithms using first order gradient information, so
-the key proceedures are
+the key procedures are
 - `init` to initialize the type of optimization problem
-- `compute` this is to evalute all objective functions \f$F\f$ and constraints \f$C_i\f$ 
-- `compute_sensitivity` this is to evalute all the sensitivities
+- `compute` this is to evaluate all objective functions \f$F\f$ and constraints \f$C_i\f$ 
+- `compute_sensitivity` this is to evaluate all the sensitivities
 \f$\frac{\partial F}{\partial \rho}\f$, \f$\frac{\partial C_1}{\partial \rho}\f$,
 \f$\frac{\partial C_2}{\partial \rho}\f$ etc.
-- in princple only the `compute` is required. (eg, gradient free algorithms) or
+- in principle only the `compute` is required. (eg, gradient free algorithms) or
 more may be required (eg, `compute_hessian`)
 
 Within a `problem` we also contain fluid and adjoint schemes as well as instance
  of the following classes.
 
-Currently we have only implemented a steady topologogy optimization case.
+Currently we have only implemented a steady topology optimization case.
 
 
 
 ### `objective_function`
 this could be either an objective function or a constraint.
-The key proceedures are
+The key procedures are
 - `init` allowing various source terms to be appended to the adjoint.
 - `compute` to compute the objective/constraint function value.
 - `compute_sensitivity` to compute the sensitivity of the objective/constraint
@@ -115,7 +115,7 @@ So then we can start appending simcomps that compute time averaged objective
 functions and sensitivity.
 
 ### Steady states
-I would preffer if this is done in Neko, because the simulation component 
+I would prefer if this is done in Neko, because the simulation component 
 we have right now is a bit hacky. I suppose have a `am_I_done` function that 
 returns a boolean of y/n is a good idea!
 - Then in most cases this is just checking `t < t_final`
