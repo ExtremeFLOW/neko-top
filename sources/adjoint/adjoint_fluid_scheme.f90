@@ -1044,14 +1044,6 @@ contains
     else
 
        ! Incorrect user input
-       print *, "FIRST"
-       call params%print()
-       if_Re = params%valid_path('case.fluid.Re')
-       print *, "SECOND"
-       call params%print()
-       if_mu = params%valid_path('case.fluid.mu')
-       print *, "THIRD"
-       call params%print()
        if_rho = params%valid_path('case.fluid.rho')
        if (params%valid_path('case.fluid.Re') .and. &
             (params%valid_path('case.fluid.mu') .or. &
