@@ -95,10 +95,9 @@ module RAMP_mapping
      !> Destructor.
      procedure, pass(this) :: free => RAMP_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward_ => RAMP_mapping_apply
+     procedure, pass(this) :: forward_mapping => RAMP_forward_mapping
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward_ => &
-          RAMP_mapping_apply_backward
+     procedure, pass(this) :: backward_mapping => RAMP_backward_mapping
   end type RAMP_mapping_t
 
 contains
@@ -117,7 +116,7 @@ contains
     call json_get_or_default(json, 'convex_up', convex_up, .true.)
 
     call this%init_base(json, coef)
-    call RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
+    call this%init_from_attributes(coef, f_min, f_max, q, &
          convex_up)
 
   end subroutine RAMP_mapping_init_from_json
@@ -148,7 +147,7 @@ contains
   !> Apply the mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
-  subroutine RAMP_mapping_apply(this, X_out, X_in)
+  subroutine RAMP_forward_mapping(this, X_out, X_in)
     class(RAMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -161,14 +160,14 @@ contains
             this%q, X_out, X_in)
     end if
 
-  end subroutine RAMP_mapping_apply
+  end subroutine RAMP_forward_mapping
 
 
   !> Apply the  chain rule
   !! @param X_in unmapped field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design
-  subroutine RAMP_mapping_apply_backward(this, sens_out, sens_in, X_in)
+  subroutine RAMP_backward_mapping(this, sens_out, sens_in, X_in)
     class(RAMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
@@ -182,7 +181,7 @@ contains
             this%q, sens_out, sens_in, X_in)
     end if
 
-  end subroutine RAMP_mapping_apply_backward
+  end subroutine RAMP_backward_mapping
 
   !> Apply the mapping
   !! @param X_out mapped field

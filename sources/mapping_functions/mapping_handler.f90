@@ -57,7 +57,7 @@ module mapping_handler
   !! This class is responsible for managing the mapping_cascade in a sequential
   !! manor. It is also responsible for using the chain rule to propogate
   !! sensitivity backwards throughout the system.
-  type, abstract, public :: mapping_handler_t
+  type, public :: mapping_handler_t
      !> Array of mapping_cascade.
      !! @note the order really matter's here since they'll be executed in
      !! sequence.
@@ -66,9 +66,6 @@ module mapping_handler
      type(field_list_t) :: rhs_fields
      !> The coefficients of the (space, mesh) pair.
      type(coef_t), pointer :: coef
-     ! @todo, we should handle user mapping_cascade in a different PR
-     !!> The user object.
-     !!type(user_t), pointer :: user
 
    contains
      !> Constructor.
@@ -77,7 +74,8 @@ module mapping_handler
      procedure, pass(this) :: free => mapping_handler_free
      !> Cycle through all the mapping_cascade and return the final field
      procedure, pass(this) :: apply_forward => mapping_handler_apply_forward
-     !> Cycle backwards through all the mapping_cascade and return the sensitivity
+     !> Cycle backwards through all the mapping_cascade and return the
+     !! sensitivity
      procedure, pass(this) :: apply_backward => mapping_handler_apply_backward
      !> Generic interface to add a mapping to the list.
      generic :: add => add_mapping, add_json_mappings
@@ -87,22 +85,7 @@ module mapping_handler
      !> Read from the json file and initialize the mapping_cascade.
      procedure, pass(this) :: add_json_mappings => &
           mapping_handler_add_json_mappings
-     !!> Initialize the user mapping.
-     ! procedure(mapping_handler_init_user_mapping), &
-     !     nopass, deferred :: init_user_mapping
   end type mapping_handler_t
-
-!   abstract interface
-!      subroutine mapping_handler_init_user_mapping(mapping, rhs_fields, &
-!           coef, type, user)
-!        import :: mapping_t, field_list_t, coef_t, user_t
-!        class(mapping_t), allocatable, intent(inout) :: mapping
-!        type(field_list_t) :: rhs_fields
-!        type(coef_t), intent(in) :: coef
-!        character(len=*) :: type
-!        type(user_t), intent(in) :: user
-!      end subroutine mapping_handler_init_user_mapping
-!   end interface
 
 contains
 
@@ -133,8 +116,8 @@ contains
   end subroutine mapping_handler_free
 
   !> apply the cascade of mapping_cascade.
-  !! @param X_out The mapped field ($\tilde{\rho}$)
-  !! @param X_in The unmapped field ($\rho$)
+  !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
+  !! @param X_in The unmapped field (\f$\rho\f$)
   subroutine mapping_handler_apply_forward(this, X_out, X_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
@@ -172,12 +155,14 @@ contains
   end subroutine mapping_handler_apply_forward
 
   !> apply the cascade of mapping_cascade.
-  !! @param X_out The mapped field ($\tilde{\rho}$)
-  !! @param X_in The unmapped field ($\rho$)
+  !! @param sens_out The sensitivity after applying the chain rule
+  !! (\f$\frac{\partial F}{\partial \rho}\f$)
+  !! @param sens_in The sensitivity before applying the chain rule
+  !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
   subroutine mapping_handler_apply_backward(this, sens_out, sens_in)
     class(mapping_handler_t), intent(inout) :: this
-    type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
+    type(field_t), intent(in) :: sens_in
     integer :: i
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
@@ -224,7 +209,6 @@ contains
 
     ! A single mapping as its own json_file.
     type(json_file) :: mapping_subdict
-    character(len=:), allocatable :: type
     integer :: n_mappings, i, i0
 
     if (json%valid_path(name)) then
@@ -249,7 +233,6 @@ contains
        do i = 1, n_mappings
           ! Create a new json containing just the subdict for this mapping.
           call json_extract_item(json, name, i, mapping_subdict)
-          call json_get(mapping_subdict, "type", type)
           call mapping_factory(this%mapping_cascade(i + i0)%mapping, &
                mapping_subdict, this%coef)
        end do
@@ -280,8 +263,7 @@ contains
 
     if (allocated(temp)) then
        do i = 1, n_mappings
-          call move_alloc(temp(i)%mapping, &
-               this%mapping_cascade(i)%mapping)
+          call move_alloc(temp(i)%mapping, this%mapping_cascade(i)%mapping)
        end do
     end if
 
