@@ -54,17 +54,17 @@ module mapping
      !> Destructor for the mapping_t (base) class.
      procedure, pass(this) :: free_base => mapping_free_base
      !> Performs the forward mapping.
-     procedure, pass(this) :: apply_forward => mapping_apply_forward_wrapper
+     procedure, pass(this) :: forward_mapping => mapping_apply_forward_wrapper
      !> Performs the backward mapping (ie, chain rule)
-     procedure, pass(this) :: apply_backward => mapping_apply_backward_wrapper
+     procedure, pass(this) :: backward_mapping => mapping_apply_backward_wrapper
      !> The common constructor using a JSON dictionary.
      procedure(mapping_init), pass(this), deferred :: init
      !> Destructor.
      procedure(mapping_free), pass(this), deferred :: free
      !> Apply forward
-     procedure(mapping_apply), pass(this), deferred :: apply_forward_
+     procedure(mapping_apply), pass(this), deferred :: apply_forward
      !> Apply backwards (ie, chain rule)
-     procedure(mapping_apply_backward), pass(this), deferred :: apply_backward_
+     procedure(mapping_apply_backward), pass(this), deferred :: apply_backward
   end type mapping_t
 
   !> A helper type that is needed to have an array of polymorphic objects
@@ -179,7 +179,7 @@ contains
     type(field_t), intent(inout) :: X_out
 
     call field_copy(this%X_in, X_in)
-    call this%apply_forward_(X_out, this%X_in)
+    call this%apply_forward(X_out, this%X_in)
 
   end subroutine mapping_apply_forward_wrapper
 
@@ -200,7 +200,7 @@ contains
     ! but at least this%X_in is certainly initialized.
     ! but it won't contain the correct information unless a map forward has
     ! occured.
-    call this%apply_backward_(sens_out, sens_in, this%X_in)
+    call this%apply_backward(sens_out, sens_in, this%X_in)
 
   end subroutine mapping_apply_backward_wrapper
 

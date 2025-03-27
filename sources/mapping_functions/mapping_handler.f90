@@ -142,7 +142,7 @@ contains
           ! the output from one mapping becomes the input for the next.
           call field_copy(tmp_fld_in, tmp_fld_out)
           ! apply the mapping on temp_fld
-          call this%mapping_cascade(i)%mapping%apply_forward(tmp_fld_out, &
+          call this%mapping_cascade(i)%mapping%forward_mapping(tmp_fld_out, &
                tmp_fld_in)
 
        end do
@@ -186,7 +186,7 @@ contains
           ! NOTE
           ! all the X_in that is required to map backward should be held
           ! internally by each mapping
-          call this%mapping_cascade(i)%mapping%apply_backward(tmp_fld_out, &
+          call this%mapping_cascade(i)%mapping%backward_mapping(tmp_fld_out, &
                tmp_fld_in)
 
        end do

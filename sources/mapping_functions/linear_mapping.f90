@@ -60,9 +60,9 @@ module linear_mapping
      !> Destructor.
      procedure, pass(this) :: free => linear_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward_ => linear_mapping_apply
+     procedure, pass(this) :: apply_forward => linear_mapping_apply
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward_ => linear_mapping_apply_backward
+     procedure, pass(this) :: apply_backward => linear_mapping_apply_backward
   end type linear_mapping_t
 
 contains
