@@ -754,8 +754,8 @@ WARN_LOGFILE           =
 # the WARN_LOGFILE is defined as - i.e. standard output (stdout) in that case
 # the behavior will remain as with the setting FAIL_ON_WARNINGS.
 
-Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
-The default value is: NO.
+# Possible values are: NO, YES, FAIL_ON_WARNINGS and FAIL_ON_WARNINGS_PRINT.
+# The default value is: NO.
 
 WARN_AS_ERROR          = FAIL_ON_WARNINGS_PRINT
 
