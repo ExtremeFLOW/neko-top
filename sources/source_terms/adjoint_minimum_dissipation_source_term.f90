@@ -96,6 +96,7 @@ module adjoint_minimum_dissipation_source_term
 contains
   !> The common constructor using a JSON object.
   !! @param json The JSON object for the source.
+  !! @param this The source term.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, &
@@ -112,10 +113,13 @@ contains
   end subroutine adjoint_minimum_dissipation_source_term_init_from_json
 
   !> The constructor from type components.
+  !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the adjoint equations
   !! @param u, v, w the flow fields of the primal
-  !! @obj_scale a scaling factor
-  ! u,v,w reffer to the primal, not the adjoint
+  !! @param obj_scale a scaling factor
+  !! @param mask the mask for the source term
+  !! @param if_mask whether to use the mask
+  !! @param coef The SEM coeffs.
   subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
        u, v, w, obj_scale, &
@@ -170,6 +174,7 @@ contains
   end subroutine adjoint_minimum_dissipation_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
+  !! @param this The source term.
   !! @param t The time value.
   !! @param tstep The current time-step.
   subroutine adjoint_minimum_dissipation_source_term_compute(this, t, tstep)

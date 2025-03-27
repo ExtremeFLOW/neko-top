@@ -75,6 +75,7 @@ module adv_lin_no_dealias
 contains
 
   !> Constructor
+  !! @param this The object.
   !! @param coef The coefficients of the (space, mesh) pair.
   subroutine init_no_dealias(this, coef)
     class(adv_lin_no_dealias_t), intent(inout) :: this
@@ -104,6 +105,7 @@ contains
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
   !! @param vz The z component of adjoint velocity.
@@ -214,40 +216,40 @@ contains
           do i = 1, Xh%lxyz
              idxx = idx + i
              fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duxb(i) + &
-                  & vy%x(i,1,1,e)*dvxb(i) + &
-                  & vz%x(i,1,1,e)*dwxb(i) )
+                  vx%x(i,1,1,e)*duxb(i) + &
+                  vy%x(i,1,1,e)*dvxb(i) + &
+                  vz%x(i,1,1,e)*dwxb(i) )
 
              fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duyb(i) + &
-                  & vy%x(i,1,1,e)*dvyb(i) + &
-                  & vz%x(i,1,1,e)*dwyb(i))
+                  vx%x(i,1,1,e)*duyb(i) + &
+                  vy%x(i,1,1,e)*dvyb(i) + &
+                  vz%x(i,1,1,e)*dwyb(i))
 
              fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
-                  & vx%x(i,1,1,e)*duzb(i) + &
-                  & vy%x(i,1,1,e)*dvzb(i) + &
-                  & vz%x(i,1,1,e)*dwzb(i))
+                  vx%x(i,1,1,e)*duzb(i) + &
+                  vy%x(i,1,1,e)*dvzb(i) + &
+                  vz%x(i,1,1,e)*dwzb(i))
           end do
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
           call adjoint_weak_no_dealias_cpu( &
-               & fx%x(:,:,:,e), vx%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               fx%x(:,:,:,e), vx%x(1,1,1,e), &
+               vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               e, coef, Xh, Xh%lxyz, &
+               duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-               & fy%x(:,:,:,e), vy%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               fy%x(:,:,:,e), vy%x(1,1,1,e), &
+               vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               e, coef, Xh, Xh%lxyz, &
+               duxb, dvxb, dwxb, duyb, dvyb, dwyb)
 
           call adjoint_weak_no_dealias_cpu( &
-               & fz%x(:,:,:,e), vz%x(1,1,1,e), &
-               & vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
-               & e, coef, Xh, Xh%lxyz, &
-               & duxb, dvxb, dwxb, duyb, dvyb, dwyb)
+               fz%x(:,:,:,e), vz%x(1,1,1,e), &
+               vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
+               e, coef, Xh, Xh%lxyz, &
+               duxb, dvxb, dwxb, duyb, dvyb, dwyb)
        end do
 
     end if
@@ -350,6 +352,7 @@ contains
   !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of perturbed velocity.
   !! @param vy The y component of perturbed velocity.
   !! @param vz The z component of perturbed velocity.

@@ -90,6 +90,7 @@ contains
   ! Public methods
 
   !> The common constructor using a JSON object.
+  !! @param this The source term object.
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
@@ -193,6 +194,7 @@ contains
   end subroutine brinkman_source_term_init_from_json
 
   !> Destructor.
+  !! @param this The source term object.
   subroutine brinkman_source_term_free(this)
     class(topopt_brinkman_source_term_t), intent(inout) :: this
 
@@ -201,6 +203,7 @@ contains
   end subroutine brinkman_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
+  !! @param this The source term object.
   !! @param t The time value.
   !! @param tstep The current time-step.
   subroutine brinkman_source_term_compute(this, t, tstep)
@@ -230,6 +233,8 @@ contains
   ! Private methods
 
   !> Initializes the source term from a boundary mesh.
+  !! @param this The source term object.
+  !! @param json The JSON object for the boundary mesh.
   subroutine init_boundary_mesh(this, json)
     class(topopt_brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
@@ -290,7 +295,7 @@ contains
 
        if (size(box_min) .ne. 3 .or. size(box_max) .ne. 3) then
           call neko_error('Case file: mesh_transform. &
-               &box_min and box_max must be 3 element arrays of reals')
+          &box_min and box_max must be 3 element arrays of reals')
        end if
 
        call target_box%init(box_min, box_max)
@@ -360,6 +365,8 @@ contains
   end subroutine init_boundary_mesh
 
   !> Initializes the source term from a point zone.
+  !! @param this The source term object.
+  !! @param json The JSON object for the source.
   subroutine init_point_zone(this, json)
     class(topopt_brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
