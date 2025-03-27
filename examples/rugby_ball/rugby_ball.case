@@ -96,7 +96,7 @@
         },
         "design": {
             "type": "brinkman",
-            "mapping" : [
+            "mapping": [
                 {
                     "type": "PDE_filter",
                     "r": 0.01
