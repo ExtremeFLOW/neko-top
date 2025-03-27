@@ -86,8 +86,8 @@ module lube_term_objective
   private
 
   !> An objective function corresponding to minimum dissipation
-  !! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega $
+  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
+  !! |\mathbf{u}|^2 d \Omega \f$
   type, public, extends(objective_t) :: lube_term_objective_t
      private
 
@@ -117,7 +117,7 @@ module lube_term_objective
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
           lube_term_update_value
-     !> Computes the sensitivity with respect to the coefficient $\chi$.
+     !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           lube_term_update_sensitivity
 
@@ -126,9 +126,10 @@ module lube_term_objective
 contains
 
   !> The common constructor using a JSON object.
+  !! @param this The objective.
+  !! @param json the JSON object.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
+  !! @param simulation the simulation.
   subroutine lube_term_init_json(this, json, design, simulation)
     class(lube_term_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
@@ -148,9 +149,11 @@ contains
   end subroutine lube_term_init_json
 
   !> The actual constructor.
+  !! @param this The objective.
   !! @param design the design.
   !! @param simulation the simulation.
   !! @param weight the weight of the objective function.
+  !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
   !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
@@ -219,9 +222,8 @@ contains
   end subroutine lube_term_free
 
   !> Compute the objective function.
+  !! @param this The objective.
   !! @param design the design.
-  !! @param fluid the fluid scheme.
-  !! @param adjoint the fluid adjoint.
   subroutine lube_term_update_value(this, design)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -263,6 +265,7 @@ contains
   end subroutine lube_term_update_value
 
   !> update_value the sensitivity of the objective function with respect to $\chi$
+  !! @param this The objective.
   !! @param design the design.
   subroutine lube_term_update_sensitivity(this, design)
     class(lube_term_objective_t), intent(inout) :: this
