@@ -27,7 +27,4 @@ if(DEVICE_TYPE STREQUAL "CUDA")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
     )
-    if(CMAKE_VERSION VERSION_GREATER "3.24.0")
-        set_target_properties(neko-top PROPERTIES CUDA_ARCHITECTURES native)
-    endif()
 endif()

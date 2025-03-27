@@ -16,6 +16,13 @@ module neko_ext
   use field, only: field_t
   use chkp_output, only: chkp_output_t
   use output_controller, only: output_controller_t
+  ! for vector/field math
+  use math, only: copy
+  use device_math, only: device_copy
+  use neko_config, only : NEKO_BCKND_DEVICE
+  use vector, only: vector_t
+  use field, only: field_t
+  use utils, only: neko_error
   use json_module, only : json_file
   implicit none
 
@@ -23,7 +30,7 @@ module neko_ext
   ! Module interface
   ! ========================================================================= !
   private
-  public :: setup_iteration, reset
+  public :: setup_iteration, reset, field_to_vector, vector_to_field
 
 contains
 
@@ -179,5 +186,53 @@ contains
     call neko_case%output_controller%execute(0.0_rp, 0, .true.)
 
   end subroutine setup_iteration
+
+  !> @brief Vector to field
+  !!
+  !! @details This subroutine converts a vector to a field in the special case
+  !! that they have the same dimension.
+  !!
+  !! @param[out] field the output field.
+  !! @param[in] vector the input vector.
+  subroutine vector_to_field(field, vector)
+    type(field_t), intent(inout) :: field
+    type(vector_t), intent(in) :: vector
+
+    ! first check they're the same size
+    if (field%size() .ne. vector%size()) then
+       call neko_error("vector and field are not the same size")
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(field%x_d, vector%x_d, field%size())
+    else
+       call copy(field%x, vector%x, field%size())
+    end if
+
+  end subroutine vector_to_field
+
+  !> @brief Field to vector
+  !!
+  !! @details This subroutine converts a field to a vector in the special case
+  !! that they have the same dimension.
+  !!
+  !! @param[out] vector the output vector.
+  !! @param[in] field the input field.
+  subroutine field_to_vector(vector, field)
+    type(vector_t), intent(inout) :: vector
+    type(field_t), intent(in) :: field
+
+    ! first check they're the same size
+    if (field%size() .ne. vector%size()) then
+       call neko_error("vector and field are not the same size")
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(vector%x_d, field%x_d, field%size())
+    else
+       call copy(vector%x, field%x, field%size())
+    end if
+
+  end subroutine field_to_vector
 
 end module neko_ext

@@ -14,6 +14,8 @@
 target_sources(neko-top
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/mapping_handler.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/PDE_filter_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
@@ -31,7 +33,4 @@ if(DEVICE_TYPE STREQUAL "CUDA")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
     )
-    if(CMAKE_VERSION VERSION_GREATER "3.24.0")
-        set_target_properties(neko-top PROPERTIES CUDA_ARCHITECTURES native)
-    endif()
 endif()
