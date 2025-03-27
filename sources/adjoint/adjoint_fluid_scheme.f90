@@ -1030,7 +1030,6 @@ contains
     ! A local pointer that is needed to make Intel happy
     procedure(user_material_properties), pointer :: dummy_mp_ptr
     real(kind=rp) :: dummy_lambda, dummy_cp
-    logical :: if_re, if_mu, if_rho
 
     dummy_mp_ptr => dummy_user_material_properties
 
