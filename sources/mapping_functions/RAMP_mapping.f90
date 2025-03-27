@@ -95,9 +95,9 @@ module RAMP_mapping
      !> Destructor.
      procedure, pass(this) :: free => RAMP_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward => RAMP_mapping_apply
+     procedure, pass(this) :: forward_mapping => RAMP_mapping_apply
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward => &
+     procedure, pass(this) :: backward_mapping => &
           RAMP_mapping_apply_backward
   end type RAMP_mapping_t
 

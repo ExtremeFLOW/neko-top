@@ -105,7 +105,7 @@ module PDE_filter
      !> Destructor.
      procedure, pass(this) :: free => PDE_filter_free
      !> Apply the filter
-     procedure, pass(this) :: apply_forward => PDE_filter_apply
+     procedure, pass(this) :: forward_mapping => PDE_filter_apply
      !> Apply the adjoint filter
      ! TODO
      ! TALK TO NIELS, I think this is correct...
@@ -115,7 +115,7 @@ module PDE_filter
      ! UPDATE:
      ! After an email with Niels, we should be using the chain rule,
      ! not a sensitivity filter
-     procedure, pass(this) :: apply_backward => PDE_filter_apply_backward
+     procedure, pass(this) :: backward_mapping => PDE_filter_apply_backward
   end type PDE_filter_t
 
 contains
