@@ -112,11 +112,11 @@ function(build_example)
     # Link the executable to the required libraries.
 
     target_link_libraries(${EXAMPLE_NAME}
+        PkgConfig::neko
+        PkgConfig::json-fortran
+        MPI::MPI_Fortran
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-        $<$<BOOL:${MPI_FOUND}>:MPI::MPI_Fortran>
-        PkgConfig::json-fortran
-        PkgConfig::neko
     )
 
     # Import the neko-top static library

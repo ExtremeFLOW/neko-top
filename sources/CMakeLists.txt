@@ -88,11 +88,11 @@ target_include_directories(neko-top
 # Link to the required libraries.
 
 target_link_libraries(neko-top
+    PkgConfig::neko
+    PkgConfig::json-fortran
+    MPI::MPI_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-    $<$<BOOL:${MPI_FOUND}>:MPI::MPI_Fortran>
-    PkgConfig::json-fortran
-    PkgConfig::neko
 )
 
 # ============================================================================ #
