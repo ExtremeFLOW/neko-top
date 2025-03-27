@@ -1,4 +1,4 @@
-# Description: This file defines the workflow that will be run when the a new
+# Description: This file defines the workflow that will be run when a new
 #              merge group is created. The workflow will run the automated
 #              setup and example execution scripts.
 name: Test Scripts
