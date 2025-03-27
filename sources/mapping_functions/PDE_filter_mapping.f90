@@ -105,7 +105,7 @@ module PDE_filter
      !> Destructor.
      procedure, pass(this) :: free => PDE_filter_free
      !> Apply the filter
-     procedure, pass(this) :: forward_mapping => PDE_filter_apply
+     procedure, pass(this) :: forward_mapping => PDE_filter_forward_mapping
      !> Apply the adjoint filter
      ! TODO
      ! TALK TO NIELS, I think this is correct...
@@ -115,7 +115,7 @@ module PDE_filter
      ! UPDATE:
      ! After an email with Niels, we should be using the chain rule,
      ! not a sensitivity filter
-     procedure, pass(this) :: backward_mapping => PDE_filter_apply_backward
+     procedure, pass(this) :: backward_mapping => PDE_filter_backward_mapping
   end type PDE_filter_t
 
 contains
@@ -204,7 +204,7 @@ contains
   !> Apply the filter
   !! @param X_out filtered field
   !! @param X_in unfiltered field
-  subroutine PDE_filter_apply(this, X_out, X_in)
+  subroutine PDE_filter_forward_mapping(this, X_out, X_in)
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -292,7 +292,7 @@ contains
 
 
 
-  end subroutine PDE_filter_apply
+  end subroutine PDE_filter_forward_mapping
 
   !> Apply the adjoint filter
   !! @param X_in unfiltered field
@@ -312,7 +312,7 @@ contains
   ! Niels did mention the order of the RHS assembly should be reversed however.
   ! I'm not exactly sure how this applies to us, but it should be brought up
   ! in the next group meeting.
-  subroutine PDE_filter_apply_backward(this, sens_out, sens_in, X_in)
+  subroutine PDE_filter_backward_mapping(this, sens_out, sens_in, X_in)
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
@@ -391,7 +391,7 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine PDE_filter_apply_backward
+  end subroutine PDE_filter_backward_mapping
 
   subroutine filter_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
 

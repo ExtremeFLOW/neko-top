@@ -60,9 +60,10 @@ module linear_mapping
      !> Destructor.
      procedure, pass(this) :: free => linear_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: forward_mapping => linear_mapping_apply
+     procedure, pass(this) :: forward_mapping => linear_forward_mapping
      !> Apply the adjoint mapping
-     procedure, pass(this) :: backward_mapping => linear_mapping_apply_backward
+     procedure, pass(this) :: backward_mapping => &
+          linear_backward_mapping
   end type linear_mapping_t
 
 contains
@@ -104,7 +105,7 @@ contains
   !> Apply the mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
-  subroutine linear_mapping_apply(this, X_out, X_in)
+  subroutine linear_forward_mapping(this, X_out, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -114,14 +115,14 @@ contains
     call field_cmult(X_out, this%f_max - this%f_min)
     call field_cadd(X_out, this%f_min)
 
-  end subroutine linear_mapping_apply
+  end subroutine linear_forward_mapping
 
 
   !> Apply the  chain rule
   !! @param X_in unmapped field
   !! @param sens_out is the sensitivity with respect to the unfiltered design
   !! @param sens_in is the sensitivity with respect to the filtered design
-  subroutine linear_mapping_apply_backward(this, sens_out, sens_in, X_in)
+  subroutine linear_backward_mapping(this, sens_out, sens_in, X_in)
     class(linear_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
@@ -134,6 +135,6 @@ contains
     call field_copy(sens_out, sens_in)
     call field_cmult(sens_out, this%f_max - this%f_min)
 
-  end subroutine linear_mapping_apply_backward
+  end subroutine linear_backward_mapping
 
 end module linear_mapping
