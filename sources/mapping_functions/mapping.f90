@@ -98,9 +98,9 @@ module mapping
   end interface
 
   abstract interface
-     !> The application of the mapping ($\rho \mapsto \tilde{\rho}$).
-     !! @param X_out The mapped field ($\tilde{\rho}$)
-     !! @param X_in The unmapped field ($\rho$)
+     !> The application of the mapping (\f$\rho \mapsto \tilde{\rho}\f$).
+     !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
+     !! @param X_in The unmapped field (\f$\rho\f$)
      subroutine mapping_forward_mapping(this, X_out, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
@@ -111,13 +111,13 @@ module mapping
 
   abstract interface
      !> The application of the mapping backward with chain rule).
-     !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
-     !! \frac{\partial F}{\partial \rho}$
-     !! @param X_in The original input field ($\rho$)
+     !! \f$\frac{\partial F}{\partial \tilde{\rho}} \mapsto
+     !! \frac{\partial F}{\partial \rho}\f$
+     !! @param X_in The original input field (\f$\rho\f$)
      !! @param sens_in, sensitivity wrt to the mapped field
-     !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
+     !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
      !! @param sens_out, sensitivity wrt to the unmapped field
-     !! ($\frac{\partial F}{\partial \rho}$)
+     !! (\f$\frac{\partial F}{\partial \rho}\f$)
      subroutine mapping_backward_mapping(this, sens_out, sens_in, X_in)
        import mapping_t, field_t
        class(mapping_t), intent(inout) :: this
@@ -171,31 +171,31 @@ contains
     end if
   end subroutine mapping_wrapper_free
 
-  !> Executes `apply_forward_`
-  !! @param X_out The mapped field ($\tilde{\rho}$)
-  !! @param X_in The unmapped field ($\rho$)
+  !> Executes `apply_forward`
+  !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
+  !! @param X_in The unmapped field (\f$\rho\f$)
   subroutine mapping_apply_forward_wrapper(this, X_out, X_in)
     class(mapping_t), intent(inout) :: this
-    type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
+    type(field_t), intent(in) :: X_in
 
     call field_copy(this%X_in, X_in)
     call this%forward_mapping(X_out, this%X_in)
 
   end subroutine mapping_apply_forward_wrapper
 
-  !> Executes `apply_backward_`
-  !! $\frac{\partial F}{\partial \tilde{\rho}} \mapsto
-  !! \frac{\partial F}{\partial \rho}$
-  !! @param X_in The original input field ($\rho$)
+  !> Executes `apply_backward`
+  !! \f$\frac{\partial F}{\partial \tilde{\rho}} \mapsto
+  !! \frac{\partial F}{\partial \rho}\f$
+  !! @param X_in The original input field (\f$\rho\f$)
   !! @param sens_in, sensitivity wrt to the mapped field
-  !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
+  !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
   !! @param sens_out, sensitivity wrt to the unmapped field
-  !! ($\frac{\partial F}{\partial \rho}$)
+  !! (\f$\frac{\partial F}{\partial \rho}\f$)
   subroutine mapping_apply_backward_wrapper(this, sens_out, sens_in)
     class(mapping_t), intent(inout) :: this
-    type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
+    type(field_t), intent(in) :: sens_in
     ! @todo
     ! hmmmm, it would be silly to call mapping backward without mapping forward
     ! but at least this%X_in is certainly initialized.

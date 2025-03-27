@@ -66,9 +66,6 @@ module mapping_handler
      type(field_list_t) :: rhs_fields
      !> The coefficients of the (space, mesh) pair.
      type(coef_t), pointer :: coef
-     ! @todo, we should handle user mapping_cascade in a different PR
-     !!> The user object.
-     !!type(user_t), pointer :: user
 
    contains
      !> Constructor.
@@ -119,8 +116,8 @@ contains
   end subroutine mapping_handler_free
 
   !> apply the cascade of mapping_cascade.
-  !! @param X_out The mapped field ($\tilde{\rho}$)
-  !! @param X_in The unmapped field ($\rho$)
+  !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
+  !! @param X_in The unmapped field (\f$\rho\f$)
   subroutine mapping_handler_apply_forward(this, X_out, X_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
@@ -159,9 +156,9 @@ contains
 
   !> apply the cascade of mapping_cascade.
   !! @param sens_out The sensitivity after applying the chain rule
-  !! ($\frac{\partial F}{\partial \rho}$)
+  !! (\f$\frac{\partial F}{\partial \rho}\f$)
   !! @param sens_in The sensitivity before applying the chain rule
-  !! ($\frac{\partial F}{\partial \tilde{\rho}}$)
+  !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
   subroutine mapping_handler_apply_backward(this, sens_out, sens_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(inout) :: sens_out
