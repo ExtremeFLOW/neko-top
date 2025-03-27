@@ -119,10 +119,13 @@ fi
 # Set the variables for the compilation
 CMAKE_VARIABLES+=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
 CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
-[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
+
+# Set the documentation flag
+[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
+[ "$DOCS" == false ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -rf $MAIN_DIR/build
