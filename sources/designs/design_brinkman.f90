@@ -381,16 +381,16 @@ contains
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_case%fluid_adj%f_adj_x, &
-         simulation%adjoint_case%fluid_adj%f_adj_y, &
-         simulation%adjoint_case%fluid_adj%f_adj_z, &
+         simulation%adjoint_fluid%f_adj_x, &
+         simulation%adjoint_fluid%f_adj_y, &
+         simulation%adjoint_fluid%f_adj_z, &
          this%brinkman_amplitude, &
-         simulation%adjoint_case%fluid_adj%u_adj, &
-         simulation%adjoint_case%fluid_adj%v_adj, &
-         simulation%adjoint_case%fluid_adj%w_adj, &
-         simulation%adjoint_case%fluid_adj%c_Xh)
+         simulation%adjoint_fluid%u_adj, &
+         simulation%adjoint_fluid%v_adj, &
+         simulation%adjoint_fluid%w_adj, &
+         simulation%adjoint_fluid%c_Xh)
     ! append brinkman source term based on design
-    call simulation%adjoint_case%fluid_adj%source_term%add(adjoint_brinkman)
+    call simulation%adjoint_fluid%source_term%add(adjoint_brinkman)
 
   end subroutine brinkman_design_init_from_components
 
