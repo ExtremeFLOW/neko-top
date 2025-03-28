@@ -83,15 +83,16 @@ module advection_adjoint
   abstract interface
      !> Add advection operator to the right-hand-side for a scalar.
      !! @param this The object.
-     !! @param vx The x component of velocity.
-     !! @param vy The y component of velocity.
-     !! @param vz The z component of velocity.
+     !! @param vxb The x component of velocity.
+     !! @param vyb The y component of velocity.
+     !! @param vzb The z component of velocity.
      !! @param s The scalar.
      !! @param fs The source term.
      !! @param Xh The function space.
      !! @param coef The coefficients of the (Xh, mesh) pair.
      !! @param n Typically the size of the mesh.
-     subroutine compute_scalar_adv_lin(this, vxb, vyb, vzb, s, fs, Xh, coef, n, dt)
+     subroutine compute_scalar_adv_lin(this, vxb, vyb, vzb, s, fs, Xh, coef, &
+          n, dt)
        import :: advection_adjoint_t
        import :: coef_t
        import :: space_t
@@ -103,8 +104,6 @@ module advection_adjoint
        type(field_t), intent(inout) :: fs
        type(space_t), intent(inout) :: Xh
        type(coef_t), intent(inout) :: coef
-       ! HARRY
-       ! I don't know when they switched the advetion term to include this :|
        real(kind=rp), intent(in), optional :: dt
        integer, intent(in) :: n
      end subroutine compute_scalar_adv_lin

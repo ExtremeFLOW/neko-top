@@ -448,9 +448,9 @@ contains
   !! RHS.
   !! or in weak form, \f$  \int \nabla r \cdot u s^\dagger \f$
   !! @param this The object.
-  !! @param vx The x component of velocity.
-  !! @param vy The y component of velocity.
-  !! @param vz The z component of velocity.
+  !! @param vxb The x component of velocity.
+  !! @param vyb The y component of velocity.
+  !! @param vzb The z component of velocity.
   !! @param s The adjoint scalar.
   !! @param fs The source term.
   !! @param Xh The function space.

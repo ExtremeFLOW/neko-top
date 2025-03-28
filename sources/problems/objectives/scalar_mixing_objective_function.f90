@@ -30,12 +30,9 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> This provides a template to be modified in constructing new objectives.
-!> For a detailed description see ///
-!
 !> An objective function corresponding to the mixing of a passive scalar
-!! $ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
-!! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, $
+!! \f$ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
+!! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
 !
 module scalar_mixing_objective
   use num_types, only: rp
@@ -61,24 +58,24 @@ module scalar_mixing_objective
   private
 
   !> An objective function corresponding to the mixing of a passive scalar
-  !! $ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
-  !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, $
+  !! \f$ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
+  !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
   type, public, extends(objective_t) :: scalar_mixing_objective_t
      private
 
-     !> pointer to the primal passive scalar fields $\phi$
+     !> pointer to the primal passive scalar fields \f$\phi\f$
      type(field_t), pointer :: phi
-     !> Target concentration in the optimized region $\phi_{ref}$
+     !> Target concentration in the optimized region \f$\phi_{ref}\f$
      real(kind=rp) :: phi_ref
      !> Coefficients defined on a given mesh
      class(coef_t), pointer :: coef
-     !> Volume of the domain $|\Omega_{obj}|$
+     !> Volume of the domain \f$|\Omega_{obj}|\f$
      real(kind=rp) :: domain_volume
 
-     !> -----------------------------------------------------------------
-     !! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
-     !! These sensitivity should return zero, and the simulation
-     !! should compute the u u_adj component
+     ! -----------------------------------------------------------------
+     ! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
+     ! These sensitivity should return zero, and the simulation
+     ! should compute the u u_adj component
      type(field_t), pointer :: u, v, w, u_adj, v_adj, w_adj
 
    contains
@@ -102,6 +99,7 @@ module scalar_mixing_objective
 contains
 
   !> The common constructor using a JSON object.
+  !! @param this The object
   !! @param json The JSON subdictionary corresponding to your objective
   !! @param design The design
   !! @param simulation The simulation
@@ -126,6 +124,7 @@ contains
   end subroutine scalar_mixing_init_json
 
   !> The actual constructor.
+  !! @param this The object
   !! @param design the design.
   !! @param simulation the simulation.
   !! @param weight the weight of the objective function.
@@ -152,7 +151,7 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Associate the integration weights
-    this%coef => simulation%neko_case%fluid%c_Xh
+    this%coef => simulation%fluid%c_Xh
 
     ! Compute the masked volume
     if (this%has_mask) then
@@ -162,14 +161,14 @@ contains
     end if
 
     !> Associate the RHS of the passive scalar equation
-    !! $ f_{\phi^\dagger} $
-    associate(f_phi_adj => simulation%adjoint_case%scalar_adj%f_Xh)
+    !! \f$ f_{\phi^\dagger} \f$
+    associate(f_phi_adj => simulation%adjoint_scalar%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref
 
       ! Associate forward passive scalar
-      this%phi => simulation%neko_case%scalar%s
+      this%phi => simulation%scalar%s
 
       ! Initialize the scalar mixing adjoint source term
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
@@ -178,10 +177,7 @@ contains
     end associate
 
     ! append adjoint source term to the adjoint passive scalar equation
-    call simulation%adjoint_case%scalar_adj%source_term%add_source_term( &
-         adjoint_forcing)
-
-
+    call simulation%adjoint_scalar%source_term%add_source_term(adjoint_forcing)
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS
@@ -198,15 +194,13 @@ contains
     class(scalar_mixing_objective_t), intent(inout) :: this
     call this%free_base()
 
-    !--------------------------------------------------------------------------
-    ! TO BE FILLED: Free everything
-    !--------------------------------------------------------------------------
-    ! eg,
-
-    ! this%u => null()
-    ! this%v => null()
-    ! this%w => null()
-    ! this%B => null()
+    this%u => null()
+    this%v => null()
+    this%w => null()
+    this%phi => null()
+    this%u_adj => null()
+    this%v_adj => null()
+    this%w_adj => null()
 
   end subroutine scalar_mixing_free
 
@@ -221,7 +215,7 @@ contains
 
     ! The objective being computed is
     !
-    ! $1/2 \int_\Omega_{obj} (\phi - \phi_ref)^2 d\Omega$
+    ! \f$1/2 \int_\Omega_{obj} (\phi - \phi_ref)^2 d\Omega\f$
 
     ! get a working array
     call neko_scratch_registry%request_field(work, temp_indices(1))
@@ -253,19 +247,14 @@ contains
 
   !> Compute the sensitivity of the objective function with respect to the
   !! design
+  !! @param this The object.
   !! @param design the design.
   subroutine scalar_mixing_update_sensitivity(this, design)
     class(scalar_mixing_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
     !--------------------------------------------------------------------------
-    ! TO BE FILLED: Compute your sensitivity with respect to the design
-    !--------------------------------------------------------------------------
-    ! eg,
-    ! call field_rzero(this%sensitivity)
-    !
     ! THIS SHOULD BE REPLACED WITH A ZERO CONTRIBUTION AFTER THE DESIGN UPDATE
-
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
