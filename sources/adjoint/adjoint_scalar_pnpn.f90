@@ -162,6 +162,7 @@ contains
   !! @param[in] wlag Lag arrays for the z velocity component.
   !! @param[in] time_scheme The time-integration controller.
   !! @param[in] rho The fluid density.
+  !! @param scheme The time integration scheme.
   subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, user, &
        ulag, vlag, wlag, time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
