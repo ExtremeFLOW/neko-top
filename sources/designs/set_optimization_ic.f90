@@ -80,7 +80,6 @@ contains
   !! @param fld design field.
   !! @param coef Coefficient.
   !! @param gs Gather-Scatter object.
-  !! @param type Type of initial condition.
   !! @param params JSON parameters.
   subroutine set_optimization_ic_int(fld, coef, gs, params)
     type(field_t), intent(inout) :: fld
