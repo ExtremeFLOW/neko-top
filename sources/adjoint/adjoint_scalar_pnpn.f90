@@ -150,20 +150,18 @@ module adjoint_scalar_pnpn
 
 contains
 
-  ! !> Constructor.
-  ! !! @details initialize the scheme.
-  ! !! @param scheme The time integration scheme.
-  ! !! @param[inout] this The object.
-  ! !! @param[in] msh The mesh.
-  ! !! @param[in] coef The coefficients.
-  ! !! @param[in] gs The gather-scatter.
-  ! !! @param[inout] params The case parameter file in json.
-  ! !! @param[in] user Type with user-defined procedures.
-  ! !! @param[in] ulag Lag arrays for the x velocity component.
-  ! !! @param[in] vlag Lag arrays for the y velocity component.
-  ! !! @param[in] wlag Lag arrays for the z velocity component.
-  ! !! @param[in] time_scheme The time-integration controller.
-  ! !! @param[in] rho The fluid density.
+  !> Constructor.
+  !! @details initialize the scheme.
+  !! @param[inout] this The object.
+  !! @param[in] msh The mesh.
+  !! @param[in] gs The gather-scatter.
+  !! @param[inout] params The case parameter file in json.
+  !! @param[in] user Type with user-defined procedures.
+  !! @param[in] ulag Lag arrays for the x velocity component.
+  !! @param[in] vlag Lag arrays for the y velocity component.
+  !! @param[in] wlag Lag arrays for the z velocity component.
+  !! @param[in] time_scheme The time-integration controller.
+  !! @param[in] rho The fluid density.
   subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, user, &
        ulag, vlag, wlag, time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
