@@ -154,6 +154,7 @@ contains
   !! @details initialize the scheme.
   !! @param[inout] this The object.
   !! @param[in] msh The mesh.
+  !! @param[in] coef The coefficients of the mesh.
   !! @param[in] gs The gather-scatter.
   !! @param[inout] params The case parameter file in json.
   !! @param[in] user Type with user-defined procedures.
