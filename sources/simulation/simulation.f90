@@ -51,6 +51,7 @@ module simulation_m
   use json_file_module, only: json_file
   use json_utils, only: json_extract_item
   use num_types, only: rp, sp
+  use user_intf, only: user_t, simulation_component_user_settings
   implicit none
   private
 
@@ -59,7 +60,6 @@ module simulation_m
      type(case_t), public :: neko_case
      !> and adjoint case
      type(adjoint_case_t), public :: adjoint_case
-
      !> The fluid
      class(fluid_scheme_incompressible_t), public, pointer :: fluid => null()
      !> The scalar
@@ -68,7 +68,6 @@ module simulation_m
      class(adjoint_fluid_scheme_t), public, pointer :: adjoint_fluid => null()
      !> The adjoint scalar
      type(adjoint_scalar_pnpn_t), public, pointer :: adjoint_scalar => null()
-
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_forward
@@ -94,12 +93,24 @@ module simulation_m
   public :: simulation_t
 contains
 
+  subroutine user_simcomp(params)
+    type(json_file), intent(inout) :: params
+    type(steady_simcomp_t), allocatable :: steady_comp
+    type(json_file) :: simcomp_settings
+
+    ! Allocate a simulation component
+    allocate(steady_comp)
+    simcomp_settings = simulation_component_user_settings("steady", params)
+    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
+
+  end subroutine user_simcomp
+
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-    type(steady_simcomp_t), allocatable :: steady_comp
-    type(json_file) :: simcomp_settings
+
+    this%neko_case%usr%init_user_simcomp => user_simcomp
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -126,15 +137,6 @@ contains
     if (allocated(this%adjoint_case%scalar_adj)) then
        this%adjoint_scalar => this%adjoint_case%scalar_adj
     end if
-
-    !> Initialize the steady state simulation component
-    allocate(steady_comp)
-    call json_extract_item(parameters, &
-         "case.simulation_components", 1, simcomp_settings)
-
-    call steady_comp%init(simcomp_settings, this%neko_case)
-
-    call neko_simcomps%add_user_simcomp(steady_comp)
 
     ! init the sampler
     !---------------------------------------------------------
