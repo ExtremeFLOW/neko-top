@@ -33,7 +33,6 @@
 !> An objective function corresponding to the mixing of a passive scalar
 !! \f$ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
 !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
-!
 module scalar_mixing_objective
   use num_types, only: rp
   use objective, only: objective_t

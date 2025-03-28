@@ -753,14 +753,10 @@ contains
             call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
             call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
 
-         enddo
+         end do
 
       end if
     end associate
 
   end subroutine compute_adjoint_scalar_advection_dealias
-
-
-
-
 end module adv_lin_dealias

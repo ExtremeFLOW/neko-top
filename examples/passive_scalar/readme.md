@@ -1,4 +1,4 @@
-# Passive scalar example (moving towards the mixer)
+# Passive scalar example (moving towards the mixer) {#passive-scalar}
 So in order to replicate the passive mixer problem by 
 [C. S. Andreasen et al. 2009](https://doi.org/10.1002/fld.1964)
 we need adjoint passive scalar capability.
@@ -49,16 +49,16 @@ PR.
 
 Often times one can replace an objective on a BC with a volume integral, 
 ie, instead of of evaluated the "mixedness" on the outlet surface, measure
-the mixedness in a volume downsteam close to the outlet.
+the mixedness in a volume downstream close to the outlet.
 This turns the surface integral (and subsequent adjoint BCs) into a 
-volume integral (and subseqent adjoint source terms) which may be easier to
+volume integral (and subsequent adjoint source terms) which may be easier to
 work with.
 
 Hence, for testing, until we fix the handing of the adjoint BCs, I've 
 implemented a `adjoint_enhanced_mixing_scalar_source_term` instead.
 
 > I also feel the design needs to enter the passive scalar
-> equation. Probably not in the difusive term, but I think it should show up
+> equation. Probably not in the diffusive term, but I think it should show up
 > in the convective term. ie, not
 >
 > \f$(\mathbf{u} \cdot \nabla ) \phi\f$
@@ -117,7 +117,7 @@ access to both the fluid and the scalar.
 - obviously testing... but we don't really have a good case to test yet
 When I did my derivation (I'll write it up neatly at some point...) 
 - Double check with Casper what the BC's are, it looks like he keeps drawing
-parabolic profiles, is there a periodic or symetric directions?
+parabolic profiles, is there a periodic or symmetric directions?
 - The JSON stuff isn't finished
 - The adjoint BCs aren't finished
 - We need to look into non-dimensionalization etc more carefully, 

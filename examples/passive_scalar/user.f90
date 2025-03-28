@@ -60,7 +60,7 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
 
-    ! Inflow velocity profile is a parabaloid
+    ! Inflow velocity profile is a paraboloid
     u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
     v = 0._rp
     w = 0._rp

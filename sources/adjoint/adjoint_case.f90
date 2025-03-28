@@ -57,7 +57,7 @@ module adjoint_case
 
   !> Adjoint case type.
   !! Todo: This should Ideally be a subclass of case_t, however, that is not yet
-  !! suppoerted by Neko.
+  !! supported by Neko.
   type :: adjoint_case_t
      !> Adjoint fluid
      class(adjoint_fluid_scheme_t), allocatable :: fluid_adj

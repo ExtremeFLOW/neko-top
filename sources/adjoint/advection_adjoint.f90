@@ -44,7 +44,8 @@ module advection_adjoint
    contains
      procedure(compute_adv_lin), pass(this), deferred :: compute_linear
      procedure(compute_adv_lin), pass(this), deferred :: compute_adjoint
-     procedure(compute_scalar_adv_lin), pass(this), deferred :: compute_adjoint_scalar
+     procedure(compute_scalar_adv_lin), pass(this), deferred :: &
+          compute_adjoint_scalar
      procedure(advection_adjoint_free), pass(this), deferred :: free
   end type advection_adjoint_t
 

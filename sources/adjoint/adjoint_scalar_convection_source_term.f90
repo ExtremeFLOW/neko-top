@@ -33,21 +33,15 @@
 !> Implements the `adjoint_scalar_convection_source_term` type.
 ! this is a such a dumb name
 module adjoint_scalar_convection_source_term
-  use num_types, only : rp
-  use field_list, only : field_list_t
+  use num_types, only: rp
+  use field_list, only: field_list_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
-  use json_module, only : json_file
-  use json_utils, only: json_get, json_get_or_default
-  use source_term, only : source_term_t
-  use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
+  use json_module, only: json_file
+  use source_term, only: source_term_t
+  use coefs, only: coef_t
   use field_math, only: field_subcol3
-  use operators, only: opgrad, grad
-  use math, only: invcol2
-  use gather_scatter, only : GS_OP_ADD
+  use operators, only: grad
   implicit none
   private
 

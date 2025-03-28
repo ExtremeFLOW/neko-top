@@ -132,13 +132,13 @@ module adjoint_scalar_pnpn
      procedure, pass(this) :: setup_bcs_ => adjoint_scalar_pnpn_setup_bcs_
   end type adjoint_scalar_pnpn_t
 
-  interface
-     !> Boundary condition factory. Both constructs and initializes the object.
-     !! @details Will mark a mesh zone for the bc and finalize.
-     !! @param[inout] object The object to be allocated.
-     !! @param[in] scheme The `adjoint_scalar_pnpn` scheme.
-     !! @param[inout] json JSON object for initializing the bc.
-     !! @param[in] coef SEM coefficients.
+  !> Boundary condition factory. Both constructs and initializes the object.
+  !! @details Will mark a mesh zone for the bc and finalize.
+  !! @param[inout] object The object to be allocated.
+  !! @param[in] scheme The `adjoint_scalar_pnpn` scheme.
+  !! @param[inout] json JSON object for initializing the bc.
+  !! @param[in] coef SEM coefficients.
+  interface adjoint_bc_factory
      module subroutine adjoint_bc_factory(object, scheme, json, coef, user)
        class(bc_t), pointer, intent(inout) :: object
        type(adjoint_scalar_pnpn_t), intent(in) :: scheme
