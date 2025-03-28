@@ -40,7 +40,7 @@
 module scalar_mixing_objective
   use num_types, only: rp
   use objective, only: objective_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -121,7 +121,8 @@ contains
     call json_get_or_default(json, "name", name, "Scalar Mixing")
 
     ! initialize
-    call this%init_from_attributes(design, simulation, weight, name, mask_name, phi_ref)
+    call this%init_from_attributes(design, simulation, weight, name, &
+         mask_name, phi_ref)
   end subroutine scalar_mixing_init_json
 
   !> The actual constructor.
@@ -171,8 +172,8 @@ contains
       this%phi => simulation%neko_case%scalar%s
 
       ! Initialize the scalar mixing adjoint source term
-      call adjoint_forcing%init_from_components(f_phi_adj, &
-           this%phi, this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
+      call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
+           this%weight, this%phi_ref, this%mask, this%has_mask, this%coef)
 
     end associate
 
@@ -187,9 +188,9 @@ contains
     this%u => simulation%fluid%u
     this%v => simulation%fluid%v
     this%w => simulation%fluid%w
-    this%u_adj => simulation%adjoint_case%fluid_adj%u_adj
-    this%v_adj => simulation%adjoint_case%fluid_adj%v_adj
-    this%w_adj => simulation%adjoint_case%fluid_adj%w_adj
+    this%u_adj => simulation%adjoint_fluid%u_adj
+    this%v_adj => simulation%adjoint_fluid%v_adj
+    this%w_adj => simulation%adjoint_fluid%w_adj
   end subroutine scalar_mixing_init_attributes
 
   !> Destructor.

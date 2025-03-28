@@ -85,6 +85,7 @@ module adv_lin_no_dealias
 contains
 
   !> Constructor
+  !! @param this The object.
   !! @param coef The coefficients of the (space, mesh) pair.
   subroutine init_no_dealias(this, coef)
     class(adv_lin_no_dealias_t), intent(inout) :: this
@@ -114,6 +115,7 @@ contains
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
   !! @param vz The z component of adjoint velocity.
@@ -241,7 +243,6 @@ contains
 
           ! \int \grad v . U_b ^ u
           ! with ^ an outer product
-
           ! use these as work arrays
           associate(w1 => duxb, w2 => dvxb, w3 => dwxb, &
                w4 => duyb, w5 => dvyb, w6 => dwyb)
@@ -365,6 +366,7 @@ contains
   !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of perturbed velocity.
   !! @param vy The y component of perturbed velocity.
   !! @param vz The z component of perturbed velocity.

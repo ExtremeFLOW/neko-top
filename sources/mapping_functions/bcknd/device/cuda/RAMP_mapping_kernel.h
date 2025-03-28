@@ -57,16 +57,16 @@ __global__ void convex_down_RAMP_mapping_apply_kernel(
  */
 template <typename T>
 __global__ void convex_down_RAMP_mapping_apply_backward_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ dF_dX_in_d,
-    T* __restrict__ dF_dX_out_d, T* __restrict__ X_in_d, const int n) {
+    const T f_min, const T f_max, const T q, T* __restrict__ sens_out_d,
+    T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < n; i += str) {
-        dF_dX_in_d[i] = (f_max - f_min) * (q + 1.0) / (
+        sens_out_d[i] = (f_max - f_min) * (q + 1.0) / (
                 (1.0 - q * (X_in_d[i] - 1.0)) * (1.0 - q * (X_in_d[i] - 1.0))
-            ) * dF_dX_out_d[i];
+            ) * sens_in_d[i];
     }
 }
 /**
@@ -91,15 +91,15 @@ __global__ void convex_up_RAMP_mapping_apply_kernel(
  */
 template <typename T>
 __global__ void convex_up_RAMP_mapping_apply_backward_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ dF_dX_in_d,
-    T* __restrict__ dF_dX_out_d, T* __restrict__ X_in_d, const int n) {
+    const T f_min, const T f_max, const T q, T* __restrict__ sens_out_d,
+    T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < n; i += str) {
-        dF_dX_in_d[i] = (f_max - f_min) 
-            * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * dF_dX_out_d[i];
+        sens_out_d[i] = (f_max - f_min) 
+            * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * sens_in_d[i];
     }
 }
 #endif // __NEKO_CUDA_RAMP_MAPPING_KERNELS__

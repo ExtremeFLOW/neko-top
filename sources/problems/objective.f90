@@ -34,7 +34,7 @@
 !> Implements the `objective_t` type.
 module objective
   use base_functional, only: base_functional_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use design, only: design_t
   use num_types, only: rp
   use point_zone_registry, only: neko_point_zone_registry
@@ -86,9 +86,11 @@ contains
   ! Implementations for the base class
 
   !> Initialize the objective base class.
+  !! @param this The objective.
+  !! @param name The name of the objective.
   !! @param design_size The number of design variables.
   !! @param weight The weight of the objective function.
-  !! @param[optional] mask_name The name design the mask.
+  !! @param mask_name The name design the mask. [optional]
   subroutine objective_init_base(this, name, design_size, weight, mask_name)
     class(objective_t), intent(inout) :: this
     character(len=*), intent(in) :: name

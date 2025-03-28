@@ -61,13 +61,14 @@ module PDE_filter
   use hsmg, only: hsmg_t
   use utils, only: neko_error
   use device_math, only: device_cfill, device_subcol3, device_cmult
+  use json_utils, only: json_get, json_get_or_default
   implicit none
   private
 
-  !> A PDE based filter mapping $\rho \mapsto \tilde{\rho}$,
+  !> A PDE based filter mapping \f$\rho \mapsto \tilde{\rho}\f$,
   !! see Lazarov & O. Sigmund 2010,
   !! by solving an equation
-  !! of the form $\f -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
+  !! of the form \f$ -r^2 \nabla^2 \tilde{\rho} + \tilde{\rho} = \rho \f$
   type, public, extends(mapping_t) :: PDE_filter_t
      !> Ax
      class(ax_t), allocatable :: Ax
@@ -104,7 +105,7 @@ module PDE_filter
      !> Destructor.
      procedure, pass(this) :: free => PDE_filter_free
      !> Apply the filter
-     procedure, pass(this) :: apply_forward => PDE_filter_apply
+     procedure, pass(this) :: forward_mapping => PDE_filter_forward_mapping
      !> Apply the adjoint filter
      ! TODO
      ! TALK TO NIELS, I think this is correct...
@@ -114,7 +115,7 @@ module PDE_filter
      ! UPDATE:
      ! After an email with Niels, we should be using the chain rule,
      ! not a sensitivity filter
-     procedure, pass(this) :: apply_backward => PDE_filter_apply_backward
+     procedure, pass(this) :: backward_mapping => PDE_filter_backward_mapping
   end type PDE_filter_t
 
 contains
@@ -124,27 +125,37 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
+    real(kind=rp) :: r, tol
+    integer :: max_iter
+    character(len=:), allocatable :: ksp_solver, precon_type
 
-    ! TODO
-    ! I'll do the json stuff later...
-    this%r = 0.01
-    ! GET THIS INTO THE JSON
-    this%r = 0.05
-    this%abstol_filt = 0.0000000001_rp
-    this%ksp_max_iter = 200
-    this%ksp_solver = "cg"
-    this%precon_type_filt = "jacobi"
+    call json_get(json, 'r', r)
+    call json_get_or_default(json, 'tol', tol, 0.0000000001_rp)
+    call json_get_or_default(json, 'max_iter', max_iter, 200)
+    call json_get_or_default(json, 'solver', ksp_solver, "cg")
+    call json_get_or_default(json, 'preconditioner', precon_type, "jacobi")
 
     call this%init_base(json, coef)
-    call PDE_filter_init_from_attributes(this, coef)
+    call this%init_from_attributes(coef, r, tol, max_iter, &
+         ksp_solver, precon_type)
 
   end subroutine PDE_filter_init_from_json
 
   !> Actual constructor.
-  subroutine PDE_filter_init_from_attributes(this, coef)
+  subroutine PDE_filter_init_from_attributes(this, coef, r, tol, max_iter, &
+       ksp_solver, precon_type)
     class(PDE_filter_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
+    real(kind=rp), intent(in) :: r, tol
+    integer, intent(in) :: max_iter
+    character(len=*), intent(in) :: ksp_solver, precon_type
     integer :: n
+
+    this%r = r
+    this%abstol_filt = tol
+    this%ksp_max_iter = max_iter
+    this%ksp_solver = ksp_solver
+    this%precon_type_filt = precon_type
 
     ! set the number of dofs
     n = this%coef%dof%size()
@@ -191,9 +202,10 @@ contains
   end subroutine PDE_filter_free
 
   !> Apply the filter
+  !! @param this the filter
   !! @param X_out filtered field
   !! @param X_in unfiltered field
-  subroutine PDE_filter_apply(this, X_out, X_in)
+  subroutine PDE_filter_forward_mapping(this, X_out, X_in)
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -281,12 +293,13 @@ contains
 
 
 
-  end subroutine PDE_filter_apply
+  end subroutine PDE_filter_forward_mapping
 
   !> Apply the adjoint filter
+  !! @param this the filter
   !! @param X_in unfiltered field
-  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
-  !! @param dF_dX_out is the sensitivity with respect to the filtered design
+  !! @param sens_out is the sensitivity with respect to the unfiltered design
+  !! @param sens_in is the sensitivity with respect to the filtered design
   ! TODO
   ! this really confuses me!
   ! it's not really a chain rule back, it's just a filtering of the sensitivity
@@ -301,11 +314,11 @@ contains
   ! Niels did mention the order of the RHS assembly should be reversed however.
   ! I'm not exactly sure how this applies to us, but it should be brought up
   ! in the next group meeting.
-  subroutine PDE_filter_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
+  subroutine PDE_filter_backward_mapping(this, sens_out, sens_in, X_in)
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: df_dX_out
-    type(field_t), intent(inout) :: df_dX_in
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
     integer :: n, i
     type(field_t), pointer :: RHS, delta ! I'm so sorry for this notation..
     integer :: temp_indices(2)
@@ -330,20 +343,20 @@ contains
     end if
     this%coef%ifh2 = .true.
 
-    ! compute the A(dF_dX_out) component of the RHS
-    ! (note, to be safe with the inout intent we first copy dF_dX_out to the
+    ! compute the A(sens_in) component of the RHS
+    ! (note, to be safe with the inout intent we first copy sens_in to the
     !  temporary delta)
-    call field_copy(delta, dF_dX_out)
+    call field_copy(delta, sens_in)
     call this%Ax%compute(RHS%x, delta%x, this%coef, this%coef%msh, &
          this%coef%Xh)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_subcol3(RHS%x_d, dF_dX_out%x_d, this%coef%B_d, n)
+       call device_subcol3(RHS%x_d, sens_in%x_d, this%coef%B_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
        do i = 1, n
           ! mass matrix should be included here
-          RHS%x(i,1,1,1) = dF_dX_out%x(i,1,1,1) * this%coef%B(i,1,1,1) &
+          RHS%x(i,1,1,1) = sens_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
                - RHS%x(i,1,1,1)
        end do
     end if
@@ -361,7 +374,7 @@ contains
          this%bclst_filt, this%coef%gs_h)
 
     ! add result
-    call field_add3(dF_dX_in, dF_dX_out, delta)
+    call field_add3(sens_out, sens_in, delta)
 
     call profiler_end_region
 
@@ -380,7 +393,7 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine PDE_filter_apply_backward
+  end subroutine PDE_filter_backward_mapping
 
   subroutine filter_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
 

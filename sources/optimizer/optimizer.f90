@@ -6,7 +6,7 @@ module optimizer
   !-----------------------------------------------------------!
 
   use json_module, only: json_file
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
@@ -76,13 +76,13 @@ module optimizer
   ! -------------------------------------------------------------------------- !
   ! Interfaces for the factory functions
 
-  interface
-     !> Factory function for the optimizer
-     !! @param object The optimizer object to be created.
-     !! @param parameters The JSON file containing the optimizer parameters.
-     !! @param problem The problem object.
-     !! @param design The design object.
-     !! @param simulation The simulation object.
+  !> Factory function for the optimizer
+  !! @param object The optimizer object to be created.
+  !! @param parameters The JSON file containing the optimizer parameters.
+  !! @param problem The problem object.
+  !! @param design The design object.
+  !! @param simulation The simulation object.
+  interface optimizer_factory
      module subroutine optimizer_factory(object, parameters, problem, design, &
           simulation)
        class(optimizer_t), allocatable, intent(inout) :: object
@@ -91,7 +91,7 @@ module optimizer
        class(design_t), intent(in) :: design
        class(simulation_t), intent(in) :: simulation
      end subroutine optimizer_factory
-  end interface
+  end interface optimizer_factory
 
   public :: optimizer_t, optimizer_factory
 

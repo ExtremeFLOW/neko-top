@@ -64,7 +64,7 @@ module lube_term_objective
   use objective, only: objective_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
 
   use num_types, only: rp
@@ -86,8 +86,8 @@ module lube_term_objective
   private
 
   !> An objective function corresponding to minimum dissipation
-  !! $ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega $
+  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
+  !! |\mathbf{u}|^2 d \Omega \f$
   type, public, extends(objective_t) :: lube_term_objective_t
      private
 
@@ -117,7 +117,7 @@ module lube_term_objective
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
           lube_term_update_value
-     !> Computes the sensitivity with respect to the coefficient $\chi$.
+     !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           lube_term_update_sensitivity
 
@@ -126,9 +126,10 @@ module lube_term_objective
 contains
 
   !> The common constructor using a JSON object.
+  !! @param this The objective.
+  !! @param json the JSON object.
   !! @param design the design.
-  !! @param fluid the fluid fluid_adj.
-  !! @param adjoint the fluid adjoint.
+  !! @param simulation the simulation.
   subroutine lube_term_init_json(this, json, design, simulation)
     class(lube_term_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
@@ -148,9 +149,11 @@ contains
   end subroutine lube_term_init_json
 
   !> The actual constructor.
+  !! @param this The objective.
   !! @param design the design.
   !! @param simulation the simulation.
   !! @param weight the weight of the objective function.
+  !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
   !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
@@ -188,20 +191,19 @@ contains
 
     ! if we have the lube term we need to initialize and append that too
 
-    associate(f_adj_x => simulation%adjoint_case%fluid_adj%f_adj_x, &
-         f_adj_y => simulation%adjoint_case%fluid_adj%f_adj_y, &
-         f_adj_z => simulation%adjoint_case%fluid_adj%f_adj_z, &
-         c_Xh => simulation%adjoint_case%fluid_adj%c_Xh)
+    associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
+         f_adj_y => simulation%adjoint_fluid%f_adj_y, &
+         f_adj_z => simulation%adjoint_fluid%f_adj_z, &
+         c_Xh => simulation%adjoint_fluid%c_Xh)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%k * this%weight, &
-           this%u, this%v, this%w, &
-           this%mask, this%has_mask, c_Xh)
+           this%k * this%weight, this%u, this%v, this%w, this%mask, &
+           this%has_mask, c_Xh)
 
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%fluid_adj%source_term%add_source_term(lube_term)
+    call simulation%adjoint_fluid%source_term%add_source_term(lube_term)
 
   end subroutine lube_term_init_attributes
 
@@ -219,9 +221,8 @@ contains
   end subroutine lube_term_free
 
   !> Compute the objective function.
+  !! @param this The objective.
   !! @param design the design.
-  !! @param fluid the fluid fluid_adj.
-  !! @param adjoint the fluid adjoint.
   subroutine lube_term_update_value(this, design)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -263,6 +264,7 @@ contains
   end subroutine lube_term_update_value
 
   !> update_value the sensitivity of the objective function with respect to $\chi$
+  !! @param this The objective.
   !! @param design the design.
   subroutine lube_term_update_sensitivity(this, design)
     class(lube_term_objective_t), intent(inout) :: this

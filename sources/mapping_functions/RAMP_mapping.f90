@@ -43,6 +43,7 @@ module RAMP_mapping
        device_convex_down_RAMP_mapping_apply_backward, &
        device_convex_up_RAMP_mapping_apply, &
        device_convex_up_RAMP_mapping_apply_backward
+  use json_utils, only: json_get, json_get_or_default
   implicit none
   private
 
@@ -50,7 +51,7 @@ module RAMP_mapping
   !! This is the standard RAMP described in
   !! https://doi.org/10.1007/s001580100129
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}$
+  !! \f$f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}\f$
   !!
   !!
   !!  |        .
@@ -63,7 +64,7 @@ module RAMP_mapping
   !! or a convex up equivelent used by Borrvall & Peterson
   !! https://doi.org/10.1002/fld.1964
   !!
-  !! $f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}$
+  !! \f$f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}\f$
   !!
   !! It seems very similar to RAMP but with the convexity the other way
   !!
@@ -94,10 +95,9 @@ module RAMP_mapping
      !> Destructor.
      procedure, pass(this) :: free => RAMP_mapping_free
      !> Apply the forward mapping
-     procedure, pass(this) :: apply_forward => RAMP_mapping_apply
+     procedure, pass(this) :: forward_mapping => RAMP_forward_mapping
      !> Apply the adjoint mapping
-     procedure, pass(this) :: apply_backward => &
-          RAMP_mapping_apply_backward
+     procedure, pass(this) :: backward_mapping => RAMP_backward_mapping
   end type RAMP_mapping_t
 
 contains
@@ -107,24 +107,32 @@ contains
     class(RAMP_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
+    real(kind=rp) :: f_min, f_max, q
+    logical :: convex_up
 
-    ! do the JSON stuff later
-    this%f_min = 0.0_rp
-    this%f_max = 1000.0_rp
-    this%q = 1.0_rp
-    this%convex_up = .true.
+    call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
+    call json_get(json, 'f_max', f_max)
+    call json_get_or_default(json, 'q', q, 1.0_rp)
+    call json_get_or_default(json, 'convex_up', convex_up, .true.)
 
     call this%init_base(json, coef)
-    call RAMP_mapping_init_from_attributes(this, coef)
+    call this%init_from_attributes(coef, f_min, f_max, q, &
+         convex_up)
 
   end subroutine RAMP_mapping_init_from_json
 
   !> Actual constructor.
-  subroutine RAMP_mapping_init_from_attributes(this, coef)
+  subroutine RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
+       convex_up)
     class(RAMP_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
+    real(kind=rp), intent(in) :: f_min, f_max, q
+    logical, intent(in) :: convex_up
 
-    ! there's actually nothing to do here.
+    this%f_min = f_min
+    this%f_max = f_max
+    this%q = q
+    this%convex_up = convex_up
 
   end subroutine RAMP_mapping_init_from_attributes
 
@@ -137,9 +145,10 @@ contains
   end subroutine RAMP_mapping_free
 
   !> Apply the mapping
+  !! @param this mapping
   !! @param X_out mapped field
   !! @param X_in unmapped field
-  subroutine RAMP_mapping_apply(this, X_out, X_in)
+  subroutine RAMP_forward_mapping(this, X_out, X_in)
     class(RAMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -152,30 +161,34 @@ contains
             this%q, X_out, X_in)
     end if
 
-  end subroutine RAMP_mapping_apply
+  end subroutine RAMP_forward_mapping
 
 
   !> Apply the  chain rule
+  !! @param this mapping
+  !! @param sens_out is the sensitivity with respect to the unfiltered design
+  !! @param sens_in is the sensitivity with respect to the filtered design
   !! @param X_in unmapped field
-  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
-  !! @param dF_dX_out is the sensitivity with respect to the filtered design
-  subroutine RAMP_mapping_apply_backward(this, dF_dX_in, dF_dX_out, X_in)
+  subroutine RAMP_backward_mapping(this, sens_out, sens_in, X_in)
     class(RAMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: dF_dX_out
-    type(field_t), intent(inout) :: dF_dX_in
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
 
     if (this%convex_up .eqv. .true.) then
        call convex_up_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-            this%q, dF_dX_in, dF_dX_out, X_in)
+            this%q, sens_out, sens_in, X_in)
     else
        call convex_down_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-            this%q, dF_dX_in, dF_dX_out, X_in)
+            this%q, sens_out, sens_in, X_in)
     end if
 
-  end subroutine RAMP_mapping_apply_backward
+  end subroutine RAMP_backward_mapping
 
   !> Apply the mapping
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine convex_down_RAMP_mapping_apply(f_min, f_max, q, X_out, X_in)
@@ -201,15 +214,18 @@ contains
 
 
   !> Apply the  chain rule
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_in unmapped field
-  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
-  !! @param dF_dX_out is the sensitivity with respect to the filtered design
+  !! @param sens_out is the sensitivity with respect to the unfiltered design
+  !! @param sens_in is the sensitivity with respect to the filtered design
   subroutine convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
-       dF_dX_in, dF_dX_out, X_in)
+       sens_out, sens_in, X_in)
     real(kind=rp), intent(in) :: f_min, f_max, q
     type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: dF_dX_out
-    type(field_t), intent(inout) :: dF_dX_in
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
     integer :: n, i
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
@@ -220,18 +236,21 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
-            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
        do i = 1, n
-          dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
+          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
                ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-               dF_dX_out%x(i,1,1,1)
+               sens_in%x(i,1,1,1)
        end do
     end if
 
   end subroutine convex_down_RAMP_mapping_apply_backward
 
   !> Apply the mapping
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_out mapped field
   !! @param X_in unmapped field
   subroutine convex_up_RAMP_mapping_apply(f_min, f_max, q, X_out, X_in)
@@ -259,15 +278,18 @@ contains
 
 
   !> Apply the  chain rule
+  !! @param f_min minimum value
+  !! @param f_max maximum value
+  !! @param q penalty parameter
   !! @param X_in unmapped field
-  !! @param dF_dX_in is the sensitivity with respect to the unfiltered design
-  !! @param dF_dX_out is the sensitivity with respect to the filtered design
+  !! @param sens_out is the sensitivity with respect to the unfiltered design
+  !! @param sens_in is the sensitivity with respect to the filtered design
   subroutine convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
-       dF_dX_in, dF_dX_out, X_in)
+       sens_out, sens_in, X_in)
     real(kind=rp), intent(in) :: f_min, f_max, q
     type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: dF_dX_out
-    type(field_t), intent(inout) :: dF_dX_in
+    type(field_t), intent(in) :: sens_in
+    type(field_t), intent(inout) :: sens_out
     integer :: n, i
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
@@ -278,12 +300,12 @@ contains
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
-            dF_dX_in%x_d, dF_dX_out%x_d, X_in%x_d, n)
+            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
        do i = 1, n
-          dF_dX_in%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
+          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
                ( (X_in%x(i,1,1,1) + q)**2) * &
-               dF_dX_out%x(i,1,1,1)
+               sens_in%x(i,1,1,1)
        end do
     end if
 

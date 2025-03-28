@@ -32,11 +32,15 @@
 !
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
-module simulation
+module simulation_m
   use case, only: case_t
   use neko, only: neko_init, neko_finalize, neko_solve
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
+  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use scalar_pnpn, only: scalar_pnpn_t
+  use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use fluid_pnpn, only: fluid_pnpn_t
   use simulation_adjoint, only: solve_adjoint
   use fld_file_output, only: fld_file_output_t
@@ -57,8 +61,14 @@ module simulation
      type(adjoint_case_t), public :: adjoint_case
 
      !> The fluid
-     class(fluid_scheme_incompressible_t), public, pointer :: &
-          fluid => null()
+     class(fluid_scheme_incompressible_t), public, pointer :: fluid => null()
+     !> The scalar
+     type(scalar_pnpn_t), public, pointer :: scalar => null()
+     !> The adjoint fluid
+     class(adjoint_fluid_scheme_t), public, pointer :: &
+          adjoint_fluid => null()
+     !> The adjoint scalar
+     type(adjoint_scalar_pnpn_t), public, pointer :: adjoint_scalar => null()
 
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
@@ -87,7 +97,7 @@ contains
 
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
-    class(simulation_t), intent(inout) :: this
+    class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
@@ -97,6 +107,26 @@ contains
 
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
+
+    select type (fluid => this%neko_case%fluid)
+    type is (fluid_pnpn_t)
+       this%fluid => fluid
+
+    end select
+
+    select type (adjoint_fluid => this%adjoint_case%fluid_adj)
+    type is (adjoint_fluid_pnpn_t)
+       this%adjoint_fluid => adjoint_fluid
+
+    end select
+
+    if (allocated(this%neko_case%scalar)) then
+       this%scalar => this%neko_case%scalar
+    end if
+
+    if (allocated(this%adjoint_case%scalar_adj)) then
+       this%adjoint_scalar => this%adjoint_case%scalar_adj
+    end if
 
     !> Initialize the steady state simulation component
     allocate(steady_comp)
@@ -109,33 +139,29 @@ contains
 
     ! init the sampler
     !---------------------------------------------------------
-    associate(fluid => this%neko_case%fluid, scalar => this%neko_case%scalar, &
-         adjoint_fluid => this%adjoint_case%fluid_adj, &
-         adjoint_scalar => this%adjoint_case%scalar_adj)
     ! Allocate the output type
-    if (allocated(scalar)) then
+    if (allocated(this%neko_case%scalar)) then
        call this%output_forward%init(sp, 'forward_fields', 5)
-       call this%output_forward%fields%assign(5, scalar%s)
+       call this%output_forward%fields%assign(5, this%scalar%s)
     else
        call this%output_forward%init(sp, 'forward_fields', 4)
     end if
 
-    call this%output_forward%fields%assign(1, fluid%p)
-    call this%output_forward%fields%assign(2, fluid%u)
-    call this%output_forward%fields%assign(3, fluid%v)
-    call this%output_forward%fields%assign(4, fluid%w)
+    call this%output_forward%fields%assign(1, this%fluid%p)
+    call this%output_forward%fields%assign(2, this%fluid%u)
+    call this%output_forward%fields%assign(3, this%fluid%v)
+    call this%output_forward%fields%assign(4, this%fluid%w)
 
-    if (allocated(adjoint_scalar)) then
+    if (allocated(this%adjoint_case%scalar_adj)) then
        call this%output_adjoint%init(sp, 'adjoint_fields', 5)
-       call this%output_adjoint%fields%assign(5, adjoint_scalar%s_adj)
+       call this%output_adjoint%fields%assign(5, this%adjoint_scalar%s_adj)
     else
        call this%output_adjoint%init(sp, 'adjoint_fields', 4)
     end if
-    call this%output_adjoint%fields%assign(1, adjoint_fluid%p_adj)
-    call this%output_adjoint%fields%assign(2, adjoint_fluid%u_adj)
-    call this%output_adjoint%fields%assign(3, adjoint_fluid%v_adj)
-    call this%output_adjoint%fields%assign(4, adjoint_fluid%w_adj)
-    end associate
+    call this%output_adjoint%fields%assign(1, this%adjoint_fluid%p_adj)
+    call this%output_adjoint%fields%assign(2, this%adjoint_fluid%u_adj)
+    call this%output_adjoint%fields%assign(3, this%adjoint_fluid%v_adj)
+    call this%output_adjoint%fields%assign(4, this%adjoint_fluid%w_adj)
 
   end subroutine simulation_init
 
@@ -194,4 +220,4 @@ contains
 
   end subroutine simulation_write
 
-end module simulation
+end module simulation_m

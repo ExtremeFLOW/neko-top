@@ -142,6 +142,7 @@ module adv_lin_dealias
 contains
 
   !> Constructor
+  !! @param this The object.
   !! @param lxd The polynomial order of the space used in the dealiasing.
   !! @param coef The coefficients of the (space, mesh) pair.
   subroutine init_dealias(this, lxd, coef)
@@ -230,6 +231,7 @@ contains
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
   !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of adjoint velocity.
   !! @param vy The y component of adjoint velocity.
   !! @param vz The z component of adjoint velocity.
@@ -474,6 +476,7 @@ contains
   !> Add the linearized advection term for the fluid, i.e.
   !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
   !! the RHS.
+  !! @param this The object.
   !! @param vx The x component of perturbed velocity.
   !! @param vy The y component of perturbed velocity.
   !! @param vz The z component of perturbed velocity.

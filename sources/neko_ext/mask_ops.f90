@@ -58,9 +58,9 @@ module mask_ops
 contains
 
   !> @brief Force everything outside the mask to be a constant value
-  !! @param[in,out] fld The field being masked
-  !! @param[in,out] The mask being applied.
-  !! @param[in] The value to be filled
+  !! @param[in,out] vec The field being masked
+  !! @param[in,out] mask The mask being applied.
+  !! @param[in] const The value to be filled
   subroutine mask_exterior_const_vec(vec, mask, const)
     type(vector_t), intent(inout) :: vec
     class(point_zone_t), intent(inout) :: mask
@@ -113,8 +113,8 @@ contains
 
   !> @brief Force everything outside the mask to be a constant value
   !! @param[in,out] fld The field being masked
-  !! @param[in,out] The mask being applied.
-  !! @param[in] The value to be filled
+  !! @param[in,out] mask The mask being applied.
+  !! @param[in] const The value to be filled
   subroutine mask_exterior_const_fld(fld, mask, const)
     type(field_t), intent(inout) :: fld
     class(point_zone_t), intent(inout) :: mask
@@ -144,8 +144,8 @@ contains
 
   !> @brief Force everything outside the mask to be a background field
   !! @param[in,out] fld The field being masked
-  !! @param[in,out] The mask being applied.
-  !! @param[in] The background field
+  !! @param[in,out] mask The mask being applied.
+  !! @param[in] background The background field
   subroutine mask_exterior_fld(fld, mask, background)
     type(field_t), intent(inout) :: fld
     class(point_zone_t), intent(inout) :: mask

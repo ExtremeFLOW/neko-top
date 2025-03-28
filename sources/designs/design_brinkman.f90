@@ -35,9 +35,7 @@ module brinkman_design
   use num_types, only: rp, sp
   use field, only: field_t
   use json_module, only: json_file
-  use mapping, only: mapping_t
-  use PDE_filter, only: PDE_filter_t
-  use RAMP_mapping, only: RAMP_mapping_t
+  use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
@@ -48,12 +46,15 @@ module brinkman_design
   use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
   use math, only: rzero
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
   use field_registry, only: neko_field_registry
+  use neko_ext, only: field_to_vector, vector_to_field
+  use json_utils, only: json_get, json_get_or_default
+  use utils, only: neko_error
   implicit none
   private
 
@@ -141,12 +142,26 @@ module brinkman_design
      ! perhaps even the "objective" type is defined as a list of objectives.
 
      ! Let's say way have a chain of two mappings
-     type(PDE_filter_t) :: filter
-     type(RAMP_mapping_t) :: mapping
 
-     ! and we need to hold onto a field for the chain of mappings
-     type(field_t), pointer :: filtered_design
+     ! This is still up for discussion where the mapping will eventually live.
+     ! Maybe it makes more sense to keep the design as clean as possible,
+     ! and then the resposibility of converting the design into coefficients
+     ! used in the PDE being solved would be the responsibility of the module
+     ! used for solving the PDE, ie, the simulation.
+     ! Then the simulation would responsiblity for asking "do we have a scalar?"
+     ! ok, let me figure out how to map this design into a coeffient in the
+     ! scalar equation.
+     !
+     ! I guess then the mapping backwards gets confusing to me.
+     ! anyway, for now, let's keep things how they are and I suppose the
+     ! intention is to have different types of designs for different types of
+     ! problems.
 
+     !> A mapper to map the design into coefficients in the PDE.
+     !! @todo It is currently assumed to be the Brinkman amplitude in the fluid
+     !! equations. Mapping to multiple coeficients is currently not supported,
+     !! ie, CHT.
+     type(mapping_handler_t) :: mapping
 
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain
@@ -214,13 +229,34 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
+    character(len=:), allocatable :: domain_name, domain_type
+
+    ! Initialize the optimization domain
+    if (parameters%valid_path('optimization.domain')) then
+       call json_get(parameters, 'optimization.domain.type', domain_type)
+       select case (trim(domain_type))
+       case('point_zone')
+          this%if_mask = .true.
+          call json_get(parameters, 'optimization.domain.zone_name', &
+               domain_name)
+          this%optimization_domain => &
+               neko_point_zone_registry%get_point_zone(domain_name)
+
+       case default
+          call neko_error('brinkman design only supports point_zones for&
+          & optimization domain types')
+
+       end select
+    else
+       this%if_mask = .false.
+    end if
 
     call this%init_from_components(simulation)
 
-    ! Todo: This need to be read from the parameters in the JSON
+    ! Initialize the mapper
     associate(coef => simulation%neko_case%fluid%c_Xh)
-      call this%filter%init(parameters, coef)
-      call this%mapping%init(parameters, coef)
+      call this%mapping%init_base(coef)
+      call this%mapping%add(parameters, 'optimization.design.mapping')
     end associate
 
     ! and then we would map for the first one
@@ -235,7 +271,6 @@ contains
     call this%free_base()
     call this%brinkman_amplitude%free()
     call this%design_indicator%free()
-    call this%filtered_design%free()
     call this%sensitivity%free()
 
   end subroutine brinkman_design_free
@@ -243,7 +278,6 @@ contains
   subroutine brinkman_design_init_from_components(this, simulation)
     class(brinkman_design_t), intent(inout) :: this
     type(simulation_t), intent(inout) :: simulation
-    character(len=:), allocatable :: optimization_domain_zone_name
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
@@ -252,7 +286,6 @@ contains
       call neko_field_registry%add_field(dof, "design_indicator", .true.)
       call neko_field_registry%add_field(dof, "brinkman_amplitude", .true.)
       call neko_field_registry%add_field(dof, "sensitivity", .true.)
-      call neko_field_registry%add_field(dof, "filtered_design", .true.)
 
     end associate
 
@@ -262,8 +295,6 @@ contains
          neko_field_registry%get_field("brinkman_amplitude")
     this%sensitivity => &
          neko_field_registry%get_field("sensitivity")
-    this%filtered_design => &
-         neko_field_registry%get_field("filtered_design")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -284,20 +315,6 @@ contains
        call device_memcpy(this%design_indicator%x, &
             this%design_indicator%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
-    end if
-
-    ! TODO, of course when we move all of Tim's stuff for initialization of
-    ! the initial design field we'll be reading things properly from the JSON.
-    ! call json_get(parameters, 'name', optimization_domain_zone_name)
-    ! Right now, I'm hardcoding the name of the point zone.
-    this%if_mask = .true.
-    optimization_domain_zone_name = "optimization_domain"
-
-    ! Initialize the mask
-    if (this%if_mask) then
-       this%optimization_domain => &
-            neko_point_zone_registry%get_point_zone(&
-            optimization_domain_zone_name)
     end if
 
     ! TODO
@@ -387,16 +404,8 @@ contains
             this%optimization_domain, 0.0_rp)
     end if
 
-    ! TODO
-    ! this should be somehow deffered so we can pick different mappings!!!
-    ! so this would be:
-    ! call mapper%forward(fld_out, fld_in)
-
-    call this%filter%apply_forward(this%filtered_design, &
-         this%design_indicator)
-
     call this%mapping%apply_forward(this%brinkman_amplitude, &
-         this%filtered_design)
+         this%design_indicator)
 
   end subroutine brinkman_design_map_forward
 
@@ -437,27 +446,14 @@ contains
   subroutine brinkman_design_map_backward(this, sensitivity)
     class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
-    type(field_t), pointer :: df_dchi
-    type(field_t), pointer :: dF_dfiltered_design
-    integer :: temp_indices(2)
+    type(field_t), pointer :: tmp_fld
+    integer :: temp_indices(1)
 
-    ! it would be nice to visualize this
+    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1))
 
-    call neko_scratch_registry%request_field(df_dchi, temp_indices(1))
-    call copy(df_dchi%x, sensitivity%x, this%size())
+    call vector_to_field(tmp_fld, sensitivity)
 
-    ! TODO
-    ! again..
-    ! so this would be:
-    ! call mapper%backward(fld_out, fld_in)
-    call neko_scratch_registry%request_field(dF_dfiltered_design, &
-         temp_indices(2))
-
-    call this%mapping%apply_backward(dF_dfiltered_design, df_dchi, &
-         this%filtered_design)
-
-    call this%filter%apply_backward(this%sensitivity, dF_dfiltered_design, &
-         this%filtered_design)
+    call this%mapping%apply_backward(this%sensitivity, tmp_fld)
 
     ! TODO
     ! DELETE THIS LATER

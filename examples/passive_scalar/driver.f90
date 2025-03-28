@@ -1,5 +1,5 @@
 program usrneko
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use problem, only: problem_t
   use optimizer, only : optimizer_t, optimizer_factory
   use json_module, only: json_file

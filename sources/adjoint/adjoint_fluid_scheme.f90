@@ -1020,6 +1020,7 @@ contains
   end subroutine adjoint_fluid_scheme_update_material_properties
 
   !> Sets rho and mu
+  !! @param this The fluid scheme.
   !! @param params The case paramter file.
   !! @param user The user interface.
   subroutine adjoint_fluid_scheme_set_material_properties(this, params, user)
@@ -1043,7 +1044,6 @@ contains
     else
 
        ! Incorrect user input
-       if_rho = params%valid_path('case.fluid.rho')
        if (params%valid_path('case.fluid.Re') .and. &
             (params%valid_path('case.fluid.mu') .or. &
             params%valid_path('case.fluid.rho'))) then
