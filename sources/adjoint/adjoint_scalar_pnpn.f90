@@ -151,7 +151,7 @@ module adjoint_scalar_pnpn
 contains
 
   !> Constructor.
-  !! @param[inout] this The object.
+  !! @param this The object.
   !! @param msh The mesh.
   !! @param coef The coefficients.
   !! @param gs The gather-scatter.

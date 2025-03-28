@@ -90,7 +90,7 @@ module scalar_mixing_objective
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
           scalar_mixing_update_value
-     !> Computes the sensitivity with respect to the coefficient $\chi$.
+     !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           scalar_mixing_update_sensitivity
 
@@ -205,6 +205,7 @@ contains
   end subroutine scalar_mixing_free
 
   !> Compute the objective function.
+  !! @param this the object.
   !! @param design the design.
   subroutine scalar_mixing_update_value(this, design)
     class(scalar_mixing_objective_t), intent(inout) :: this

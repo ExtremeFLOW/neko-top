@@ -26,7 +26,7 @@ So for the passive scalar we need
 
 That last one I don't know a good name for... but it's the term arising from
 linearizing the adjoint passive scalar convective term which then enters the
-adjoint velocity equation. The term looks like $\nabla \phi \phi^\dagger$.
+adjoint velocity equation. The term looks like \f$\nabla \phi \phi^\dagger\f$.
 The reason it's not fully completed with a :white_check_mark: is because I
 beleive if one is running with `dealiased=true` then this term should be 
 evaluated on the dealiased mesh, which I currently haven't implemented.

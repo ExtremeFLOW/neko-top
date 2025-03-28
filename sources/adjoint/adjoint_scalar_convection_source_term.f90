@@ -82,6 +82,7 @@ module adjoint_scalar_convection_source_term
 
 contains
   !> The common constructor using a JSON object.
+  !! @param this The object.
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
@@ -143,6 +144,7 @@ contains
   end subroutine adjoint_scalar_convection_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
+  !! @param this The object.
   !! @param t The time value.
   !! @param tstep The current time-step.
   subroutine adjoint_scalar_convection_source_term_compute(this, t, tstep)
