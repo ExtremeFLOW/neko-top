@@ -146,7 +146,7 @@ module adjoint_scalar_pnpn
        type(coef_t), intent(in) :: coef
        type(user_t), intent(in) :: user
      end subroutine adjoint_bc_factory
-  end interface
+  end interface adjoint_bc_factory
 
 contains
 
