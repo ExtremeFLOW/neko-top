@@ -151,6 +151,7 @@ module adjoint_scalar_pnpn
 contains
 
   !> Constructor.
+  !! @details initialize the scheme.
   !! @param scheme The time integration scheme.
   !! @param[inout] this The object.
   !! @param[in] msh The mesh.
@@ -466,7 +467,7 @@ contains
   end subroutine print_debug
 
   !> Initialize boundary conditions
-  !! @param[inout] this The object.
+  !! @param[inout] this The this.
   !! @param user The user object binding the user-defined routines.
   subroutine adjoint_scalar_pnpn_setup_bcs_(this, user)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
