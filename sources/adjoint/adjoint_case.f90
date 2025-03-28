@@ -90,8 +90,6 @@ contains
     real(kind=rp) :: tol
     logical :: have_scalar
 
-
-
     ! Read the tolerance
     call json_get_or_default(neko_case%params, "tol", tol, 1.0e-6_rp)
 
@@ -134,7 +132,7 @@ contains
     type(json_file) :: ic_json
     character(len=:), allocatable :: json_key
     !
-    ! Setup fluid fluid_adj
+    ! Setup adjoint fluid
     !
     call json_get(neko_case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%fluid_adj, trim(string_val))
@@ -144,7 +142,7 @@ contains
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
          neko_case%usr, neko_case%fluid%ext_bdf)
     !
-    ! Setup scalar_adj fluid_adj
+    ! Setup adjoint scalar
     !
     ! @todo no scalar_adj factory for now, probably not needed
 

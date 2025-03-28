@@ -59,7 +59,7 @@ module adjoint_scalar_convection_source_term
 
   ! In any case,
   ! it's a source term acting on the adjoint velocity equations, of the form:
-  ! $\nabla s s_adj$
+  ! \f$\nabla s s_adj\f$
   type, public, extends(source_term_t) :: &
        adjoint_scalar_convection_source_term_t
      !> adjoint passive scalar
@@ -111,10 +111,7 @@ contains
     type(coef_t) :: coef
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    type(field_t), intent(in), target :: s, s_adj
-    ! TODo
-    ! do masks later
-    !type(field_t), intent(in), target :: mask
+    type(field_t), inte§nt(in), target :: s, s_adj
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -165,50 +162,21 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
-
-
     ! we basically just need the term
-    ! $\nabla s s_adj$
+    ! \f$\nabla s s_adj\f$
     ! TODO
     ! In principle, this should have to option to be evaluated on the dealiased
     ! mesh!
 
     ! So should the Brinkman term actually....
 
-    ! TODO
-    ! be super careful with opgrad vs grad.
-    ! I'm not sure which is correct here
-    ! From memory they only differ by a jac_inv or a B or something like that
-    ! If we implemented this like the convective term, not as a source term
-    ! (this is still a possibility) we would likely be using opgrad...
-    ! Update: I'm pretty confident grad is correct here. But I'm leaving the
-    ! todo just in case
-
-    ! TODO
-    ! I think this actually works on GPU but I haven't checked..
-    ! call opgrad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
     call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
-
-    ! I can't explain why this is correct, but I know it is!
-    ! Sit down with a pen and paper !!
-    ! n = dsdx%size()
-    ! do i = 1, n
-    !    dsdx%x(i,1,1,1) = dsdx%x(i,1,1,1) / this%coef%B(i,1,1,1)
-    !    dsdy%x(i,1,1,1) = dsdy%x(i,1,1,1) / this%coef%B(i,1,1,1)
-    !    dsdz%x(i,1,1,1) = dsdz%x(i,1,1,1) / this%coef%B(i,1,1,1)
-    ! end do
-    !
-    ! I think this was due to the premultiply which has now been rectified
 
     ! TODO
     ! So in principal, the derivatives could have kinks now.
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
     ! But I want to leave this todo as a reminder.
 
-
-    ! TODO
-    ! double check if add or subtract
-    ! I THINK it's negative!!
     call field_subcol3(fu,this%s_adj,dsdx)
     call field_subcol3(fv,this%s_adj,dsdy)
     call field_subcol3(fw,this%s_adj,dsdz)
