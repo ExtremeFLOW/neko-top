@@ -92,7 +92,7 @@ contains
     character(len=:), allocatable :: type
     real(kind=rp) :: ic_value
     character(len=:), allocatable :: read_str
-    character(len=NEKO_FNAME_LEN) :: fname, mesh_fname
+    character(len=:), allocatable :: fname, mesh_fname
     real(kind=rp) :: zone_value, tol
     logical :: interpolate
 
@@ -111,13 +111,10 @@ contains
        call set_optimization_ic_point_zone(fld, ic_value, read_str, zone_value)
 
     case ('field')
-       call json_get(params, 'file_name', read_str)
-       fname = trim(read_str)
-       call json_get_or_default(params, 'interpolate', interpolate, &
-            .false.)
+       call json_get(params, 'file_name', fname)
+       call json_get_or_default(params, 'interpolate', interpolate, .false.)
        call json_get_or_default(params, 'tolerance', tol, 0.000001_rp)
-       call json_get_or_default(params, 'mesh_file_name', read_str, "none")
-       mesh_fname = trim(read_str)
+       call json_get_or_default(params, 'mesh_file_name', mesh_fname, "none")
 
        call set_optimization_ic_fld(fld, fname, interpolate, tol, mesh_fname)
 
@@ -266,7 +263,7 @@ contains
     end if
 
     ! Change from "field0.f000*" to "field0.fld" for the fld reader
-    call filename_chsuffix(file_name, file_name, 'fld')
+    call filename_chsuffix(file_name, trim(file_name), 'fld')
 
     call fld_data%init()
     f = file_t(trim(file_name))
