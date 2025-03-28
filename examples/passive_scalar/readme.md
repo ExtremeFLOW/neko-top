@@ -5,12 +5,12 @@ we need adjoint passive scalar capability.
 
 Their objective function was essentially
 
-min $\int_{\Gamma_{out}} (\phi - \bar{\phi})^2 d\Gamma$ 
+min \f$\int_{\Gamma_{out}} (\phi - \bar{\phi})^2 d\Gamma\f$ 
 (with some normalization)
 
-s.t. $\Delta P \leq \beta \Delta P_{ref}$
+s.t. \f$\Delta P \leq \beta \Delta P_{ref}\f$
 
-They set $P_{out} = 0$ implying $\Delta P = \int_{\Gamma_{in}}p d \Gamma$
+They set \f$P_{out} = 0\f$ implying \f$\Delta P = \int_{\Gamma_{in}}p d \Gamma\f$
 
 So their workflow involves:
 - Solve the steady forward problem (velocity and passive scalar)
@@ -61,12 +61,12 @@ implemented a `adjoint_enhanced_mixing_scalar_source_term` instead.
 > equation. Probably not in the difusive term, but I think it should show up
 > in the convective term. ie, not
 >
-> $(\mathbf{u} \cdot \nabla ) \phi$
+> \f$(\mathbf{u} \cdot \nabla ) \phi\f$
 >
-> but $C(\rho) (\mathbf{u} \cdot \nabla ) \phi$ such that $C(\rho) \in [0,1]$
+> but \f$C(\rho) (\mathbf{u} \cdot \nabla ) \phi\f$ such that \f$C(\rho) \in [0,1]\f$
 >
 > I could be wrong... I mean... I suppose if the Brinkman term is doing its
-> job correctly we should have $\mathbf{u}= \mathbf{0}$ in the solid anyways..
+> job correctly we should have \f$\mathbf{u}= \mathbf{0}\f$ in the solid anyways..
 > So maybe it's ok.
 
 # Progress
@@ -101,15 +101,6 @@ I've added the adjoint convective term in
 - `sources/adjoint/adv_adjoint_dealias.f90`
 - `sources/adjoint/adv_adjoint_no_dealias.f90`
 - `sources/adjoint/adjoint_scalar_convection_source_term.f90`
-
-and have done a bit of testing for all of them. You can see in the 
-`adjoint_scalar_convection_source_term` I've divided by the mass matrix. I 
-can't explain why this is required and I stumbled over it trough trial and 
-error. It's something to do with `grad` vs `opgrad` or that this term shouldnt
-be viewed so much as a source term (which ultimately gets multiplied by the
-mass matrix). I need to sit down with a pen and paper and derive the 
-discretized representation of this term to figure out why we should be dividing
-by the mass matrix.
 
 ## Optimization
 Just for this case I've implemented
