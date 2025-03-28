@@ -114,7 +114,6 @@ contains
 
     ! initialize the primal
     call neko_init(this%neko_case)
-
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
