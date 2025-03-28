@@ -124,7 +124,6 @@ contains
     class(adjoint_case_t), intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
-    logical :: scalar = .false.
     real(kind=rp) :: real_val = 0.0_rp
     character(len=:), allocatable :: string_val
     integer :: precision
