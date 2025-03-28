@@ -60,11 +60,10 @@ module adjoint_mixing_scalar_source_term
   ! This source term would be if we had a certain volume that we wanted more
   ! mixed
   ! the forcing is of the form:
-  ! $ \phi - \phi_ref $
+  ! \f$ \phi - \phi_ref \f$
   ! ie, difference between it and the average.
-  type, public, extends(source_term_t) :: &
-       adjoint_mixing_scalar_source_term_t
-     !> here we have s (coming from the primal)
+  type, public, extends(source_term_t) :: adjoint_mixing_scalar_source_term_t
+     !> The forward scalar field
      type(field_t), pointer :: s
      !> A scalaing factor
      real(kind=rp) :: obj_scale
@@ -106,7 +105,7 @@ contains
   end subroutine adjoint_mixing_scalar_source_term_init_from_json
 
 
-  subroutine adjoint_mixing_scalar_source_term_init_from_components(this,&
+  subroutine adjoint_mixing_scalar_source_term_init_from_components(this, &
        f_s, s, obj_scale, phi_ref, mask, if_mask, coef)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s

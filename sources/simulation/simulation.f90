@@ -65,8 +65,7 @@ module simulation_m
      !> The scalar
      type(scalar_pnpn_t), public, pointer :: scalar => null()
      !> The adjoint fluid
-     class(adjoint_fluid_scheme_t), public, pointer :: &
-          adjoint_fluid => null()
+     class(adjoint_fluid_scheme_t), public, pointer :: adjoint_fluid => null()
      !> The adjoint scalar
      type(adjoint_scalar_pnpn_t), public, pointer :: adjoint_scalar => null()
 

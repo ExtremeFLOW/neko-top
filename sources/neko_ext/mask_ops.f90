@@ -176,7 +176,6 @@ contains
   !> @brief Compute the volume of the domain contained within the mask
   !! @param[in] mask The mask considered.
   !! @param[in] coef Coefficients defined on a given mesh.
-  !! PUT THE CORRECT DOXYGEN HERE FOR THE OUTPUT
   function compute_masked_volume(mask, coef)
     class(point_zone_t), intent(inout) :: mask !this should be (in)
     class(coef_t), intent(in) :: coef
