@@ -151,6 +151,7 @@ module adjoint_scalar_pnpn
 contains
 
   !> Constructor.
+  !! @param[inout] this The object.
   !! @param msh The mesh.
   !! @param coef The coefficients.
   !! @param gs The gather-scatter.
@@ -464,6 +465,7 @@ contains
   end subroutine print_debug
 
   !> Initialize boundary conditions
+  !! @param[inout] this The object.
   !! @param user The user object binding the user-defined routines.
   subroutine adjoint_scalar_pnpn_setup_bcs_(this, user)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this

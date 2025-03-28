@@ -227,6 +227,7 @@ module adjoint_scalar_scheme
 contains
 
   !> Initialize all related components of the current scheme
+  !! @param[inout] this The object.
   !! @param msh The mesh.
   !! @param c_Xh The coefficients.
   !! @param gs_Xh The gather-scatter.
@@ -498,6 +499,7 @@ contains
   end subroutine adjoint_scalar_scheme_update_material_properties
 
   !> Set lamdba and cp.
+  !! @param[inout] this The object.
   !! @param params The case parameter file.
   !! @param user The user interface.
   subroutine adjoint_scalar_scheme_set_material_properties(this, params, user)

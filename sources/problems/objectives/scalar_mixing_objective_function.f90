@@ -221,13 +221,13 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
     n = work%size()
 
-    ! \phi
+    ! \f$ \phi \f$
     call field_copy(work, this%phi)
-    ! \phi - \phi_ref
+    ! \f$ \phi - \phi_ref \f$
     call field_cadd(work, -this%phi_ref)
-    ! (\phi - \phi_ref)^2
+    ! \f$ (\phi - \phi_ref)^2 \f$
     call field_col2(work, work)
-    ! mask to \Omega_{obj}
+    ! \f$ mask to \Omega_{obj} \f$
     if (this%has_mask) then
        call mask_exterior_const(work, this%mask, 0.0_rp)
     end if
@@ -238,7 +238,7 @@ contains
        this%value = glsc2(work%x, this%coef%B, n)
     end if
 
-    ! scale by 1/2 and 1/|\Omega_{obj}|
+    ! \f$ scale by 1/2 and 1/|\Omega_{obj}| \f$
     this%value = 0.5_rp * this%value / this%domain_volume
 
     ! relingush the scratch field
