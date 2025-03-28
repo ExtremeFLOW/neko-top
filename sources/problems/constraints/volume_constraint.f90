@@ -40,7 +40,7 @@ module volume_constraint
 
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
 
   use num_types, only: rp
   use coefs, only: coef_t
@@ -98,6 +98,7 @@ module volume_constraint
 contains
 
   !> The common constructor using a JSON object.
+  !! @param this the constraint.
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
@@ -122,8 +123,10 @@ contains
   end subroutine volume_constraint_init_json
 
   !> The direct initializer from attributes.
+  !! @param this the constraint.
   !! @param design the design.
   !! @param simulation the simulation.
+  !! @param name the name of the constraint.
   !! @param mask_name the name of the mask.
   !! @param is_max whether it is a maximum volume constraint.
   !! @param limit The volume limit value.
@@ -204,8 +207,8 @@ contains
   end subroutine volume_constraint_free
 
   !> The computation of the constraint.
+  !! @param this the constraint
   !! @param design the design
-  !! @param fluid the fluid scheme
   subroutine volume_constraint_update_value(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -222,9 +225,8 @@ contains
   end subroutine volume_constraint_update_value
 
   !> The computation of the sensitivity.
+  !! @param this the constraint
   !! @param design the design
-  !! @param fluid the fluid scheme
-  !! @param adjoint the adjoint scheme
   subroutine volume_constraint_update_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -241,6 +243,7 @@ contains
   !> Computes the volume of the design.
   !!
   !! Automatically select which design type, or throw an error.
+  !! @param this the constraint.
   !! @param design the design.
   function compute_volume(this, design) result(volume)
     class(volume_constraint_t), intent(inout) :: this
@@ -259,6 +262,7 @@ contains
   end function compute_volume
 
   !> Computes the volume of the brinkman_design.
+  !! @param this the constraint.
   !! @param design the design.
   function volume_brinkman_design(this, design) result(volume)
     class(volume_constraint_t), intent(inout) :: this

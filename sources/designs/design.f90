@@ -33,7 +33,7 @@
 !> Implements the `design_t`.
 module design
   use json_module, only: json_file
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use vector, only: vector_t
   use utils, only: neko_error
   implicit none
@@ -63,6 +63,7 @@ module design
      !! the JSON file. The simulation object is also provided to allow for any
      !! additional setup.
      !!
+     !! @param this The design object.
      !! @param parameters The JSON parameters.
      !! @param simulation The simulation object.
      procedure, pass(this) :: init_from_json_sim => design_init_from_json_sim
@@ -73,6 +74,7 @@ module design
      !! design object will be initialized based on the parameters provided in
      !! the JSON file.
      !!
+     !! @param this The design object.
      !! @param parameters The JSON parameters.
      procedure, pass(this) :: init_from_json => design_init_from_json
 
@@ -170,25 +172,32 @@ module design
 contains
 
   !> Dummy initialization from JSON
+  !! @param this The design object.
+  !! @param parameters The JSON parameters.
   subroutine design_init_from_json(this, parameters)
     class(design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
 
-    call neko_error("Design type does not support initialization &
-         &without simulation")
+    call neko_error("Design type does not support initialization " // &
+         "without simulation")
   end subroutine design_init_from_json
 
   !> Dummy initialization from JSON
+  !! @param this The design object.
+  !! @param parameters The JSON parameters.
+  !! @param simulation The simulation object.
   subroutine design_init_from_json_sim(this, parameters, simulation)
     class(design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
 
-    call neko_error("Design type does not support initialization &
-         &with simulation")
+    call neko_error("Design type does not support initialization " // &
+         "with simulation")
   end subroutine design_init_from_json_sim
 
   !> Initialize the base design
+  !! @param this The design object.
+  !! @param n The number of design variables.
   subroutine design_init_base(this, n)
     class(design_t), intent(inout) :: this
     integer, intent(in) :: n
@@ -196,12 +205,15 @@ contains
   end subroutine design_init_base
 
   !> Free the base design
+  !! @param this The design object.
   subroutine design_free_base(this)
     class(design_t), intent(inout) :: this
     this%n = 0
   end subroutine design_free_base
 
   !> Return the number of design variables
+  !! @param this The design object.
+  !! @return The number of design variables.
   pure function design_size(this) result(n)
     class(design_t), intent(in) :: this
     integer :: n

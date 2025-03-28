@@ -90,6 +90,23 @@
         ]
     },
     "optimization": {
+        "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+        },
+        "design": {
+            "type": "brinkman",
+            "mapping": [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 100
+                }
+            ]
+        },
         "solver": {
             "type": "mma",
             "max_iterations": 5,

@@ -32,7 +32,7 @@
 !
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
-module simulation
+module simulation_m
   use case, only: case_t
   use neko, only: neko_init, neko_finalize, neko_solve
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
@@ -47,6 +47,7 @@ module simulation
   use json_file_module, only: json_file
   use json_utils, only: json_extract_item
   use num_types, only: rp, sp
+  use user_intf, only: user_t, simulation_component_user_settings
   implicit none
   private
 
@@ -85,12 +86,24 @@ module simulation
   public :: simulation_t
 contains
 
-  !> Initialize the simulation
-  subroutine simulation_init(this, parameters)
-    class(simulation_t), intent(inout) :: this
-    type(json_file), intent(inout) :: parameters
+  subroutine user_simcomp(params)
+    type(json_file), intent(inout) :: params
     type(steady_simcomp_t), allocatable :: steady_comp
     type(json_file) :: simcomp_settings
+
+    ! Allocate a simulation component
+    allocate(steady_comp)
+    simcomp_settings = simulation_component_user_settings("steady", params)
+    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
+
+  end subroutine user_simcomp
+
+  !> Initialize the simulation
+  subroutine simulation_init(this, parameters)
+    class(simulation_t), intent(inout), target :: this
+    type(json_file), intent(inout) :: parameters
+
+    this%neko_case%usr%init_user_simcomp => user_simcomp
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -103,14 +116,6 @@ contains
 
     end select
 
-    !> Initialize the steady state simulation component
-    allocate(steady_comp)
-    call json_extract_item(parameters, &
-         "case.simulation_components", 1, simcomp_settings)
-
-    call steady_comp%init(simcomp_settings, this%neko_case)
-
-    call neko_simcomps%add_user_simcomp(steady_comp)
 
     ! init the sampler
     !---------------------------------------------------------
@@ -187,4 +192,4 @@ contains
 
   end subroutine simulation_write
 
-end module simulation
+end module simulation_m

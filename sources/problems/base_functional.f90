@@ -36,7 +36,7 @@ module base_functional
   use json_module, only: json_file
   use num_types, only: rp
   use point_zone, only: point_zone_t
-  use simulation, only: simulation_t
+  use simulation_m, only: simulation_t
   use vector, only: vector_t
   implicit none
   private
