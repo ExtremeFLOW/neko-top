@@ -66,7 +66,7 @@ module adjoint_lube_source_term
 
      !> $u,v,w$ corresponding to the baseflow
      type(field_t), pointer :: u,v,w
-     !> $\chi$ the Brinkman amplitude
+     !> \f$\chi\f$ the Brinkman amplitude
      type(field_t), pointer :: chi
      !> a scale for this term
      real(kind=rp) :: K
@@ -89,6 +89,7 @@ module adjoint_lube_source_term
 
 contains
   !> The common constructor using a JSON object.
+  !! @param this The source term.
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
@@ -108,11 +109,14 @@ contains
   end subroutine adjoint_lube_source_term_init_from_json
 
   !> The constructor from type components.
+  !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the adjoint
   !! @param design the design
   !! @param K a scale
   !! @param u, v, w the velocity fields of the primal
-  ! $u,v,w$ reffer to the primal, not the adjoint
+  !! @param mask the mask for the source term
+  !! @param if_mask whether to use the mask
+  !! @param coef The SEM coeffs.
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
        u, v, w, &
@@ -176,6 +180,7 @@ contains
   end subroutine adjoint_lube_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
+  !! @param this The source term.
   !! @param t The time value.
   !! @param tstep The current time-step.
   subroutine adjoint_lube_source_term_compute(this, t, tstep)
