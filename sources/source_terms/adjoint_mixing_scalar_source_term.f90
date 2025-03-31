@@ -42,14 +42,9 @@ module adjoint_mixing_scalar_source_term
   use json_utils, only: json_get, json_get_or_default
   use source_term, only : source_term_t
   use coefs, only : coef_t
-  use neko_config, only : NEKO_BCKND_DEVICE
-  use utils, only : neko_error
-  use field_math, only: field_addcol3, field_add2, field_cadd, field_col2, &
-       field_add2s2, field_copy, field_cfill
-  use operators, only: opgrad
+  use field_math, only: field_add2s2, field_copy, field_cadd
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use point_zone, only: point_zone_t
-  use math, only: col2, invcol2
   implicit none
   private
 
