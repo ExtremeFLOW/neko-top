@@ -30,26 +30,6 @@ FetchContent_MakeAvailable(doxygen-awesome-css)
 # Define warning to assist debugging of missing documentation.
 # ============================================================================ #
 
-if(CMAKE_BUILD_TYPE STREQUAL "Documentation")
-    set(DOXYGEN_QUIET "NO")
-    set(DOXYGEN_WARNINGS "YES")
-    set(DOXYGEN_WARN_AS_ERROR "YES")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "YES")
-
-elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DOXYGEN_QUIET "YES")
-    set(DOXYGEN_WARNINGS "YES")
-    set(DOXYGEN_WARN_AS_ERROR "YES")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "YES")
-
-else()
-    set(DOXYGEN_QUIET "YES")
-    set(DOXYGEN_WARNINGS "NO")
-    set(DOXYGEN_WARN_AS_ERROR "NO")
-    set(DOXYGEN_WARN_IF_UNDOCUMENTED "NO")
-
-endif()
-
 # set input and output files
 set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
 set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
