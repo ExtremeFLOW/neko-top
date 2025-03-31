@@ -53,7 +53,9 @@ module brinkman_design
   use math, only: copy
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
-  use json_utils, only: json_get, json_get_or_default
+  use optimization_ic, only: set_optimization_ic
+  use field_math, only: field_rzero
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
   use utils, only: neko_error
   implicit none
   private
@@ -229,6 +231,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
+    type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type
 
     ! Initialize the optimization domain
@@ -251,15 +254,27 @@ contains
        this%if_mask = .false.
     end if
 
+    ! Initialize and inject into the simulation
     call this%init_from_components(simulation)
 
     ! Initialize the mapper
-    associate(coef => simulation%neko_case%fluid%c_Xh)
+    associate(coef => simulation%neko_case%fluid%c_Xh, &
+         gs => simulation%neko_case%fluid%gs_Xh)
       call this%mapping%init_base(coef)
       call this%mapping%add(parameters, 'optimization.design.mapping')
+
+      if (parameters%valid_path(&
+           'optimization.design.initial_distribution')) then
+         call json_extract_object(parameters, &
+              'optimization.design.initial_distribution', json_subdict)
+         call set_optimization_ic(this%design_indicator, coef, gs, &
+              json_subdict)
+      else
+         call field_rzero(this%design_indicator)
+      end if
     end associate
 
-    ! and then we would map for the first one
+    ! Map to the Brinkman amplitude
     call this%map_forward()
 
   end subroutine brinkman_design_init_from_json_sim
