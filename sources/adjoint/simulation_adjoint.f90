@@ -92,7 +92,7 @@ contains
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
     ! call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-    call this%output_controller%execute(t_adj, tstep_adj, this%case%time%dt)
+    call this%output_controller%execute(this%case%time)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
@@ -149,7 +149,7 @@ contains
        call neko_log%section('Postprocessing')
 
        !  call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-       call this%output_controller%execute(t_adj, tstep_adj, this%case%time%dt)
+       call this%output_controller%execute(this%case%time)
 
        ! Update material properties
        call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
@@ -167,7 +167,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%output_controller%execute(t_adj, tstep_adj, this%case%time%dt, output_at_end)
+    call this%output_controller%execute(this%case%time, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%time%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)

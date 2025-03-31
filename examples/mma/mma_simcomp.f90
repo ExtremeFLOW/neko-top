@@ -42,6 +42,7 @@ module mma_simcomp
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mma, only: mma_t
+  use time_state, only: time_state_t
 
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
@@ -105,12 +106,14 @@ contains
   end subroutine simcomp_test_free
 
   ! Computations.
-  subroutine simcomp_test_compute(this, t, tstep, dt)
+  subroutine simcomp_test_compute(this, time)
     implicit none
     class(mma_comp_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
+
+    real(kind=rp) :: t
+    integer :: tstep
+    real(kind=rp) :: dt
 
     integer :: iter, i, ierr, rank, size, nglobal
     integer, allocatable :: recv_counts(:), displs(:)
@@ -126,6 +129,11 @@ contains
 
     real(kind=rp), allocatable :: all_stuff(:, :)
     integer, allocatable :: nloc_all(:)
+
+    ! Grab the time and time step
+    t = time%t
+    tstep = time%tstep
+    dt = time%dt
 
     call df0dx%init(this%mma%get_n())
     call fval%init(this%mma%get_m())
