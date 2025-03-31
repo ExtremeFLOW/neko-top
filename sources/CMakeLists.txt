@@ -38,6 +38,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
