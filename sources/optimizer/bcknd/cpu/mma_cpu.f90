@@ -132,6 +132,54 @@ contains
     end associate
   end subroutine mma_KKT_cpu
 
+
+  !> Implementation of the KKT residual computation for the MMA algorithm.
+  module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    ! ----------------------------------------------------- !
+    ! Compute the KKT condition right hand side for a given !
+    ! designx x and set the max and norm values of the       !
+    ! residue of KKT system to this%residumax and           !
+    ! this%residunorm.                                      !
+    !                                                       !
+    ! The left hand sides of the KKT conditions are computed!
+    ! for the following nonlinear programming problem:      !
+    ! Minimize  f_0(x) + a_0*z +                            !
+    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
+    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
+    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
+    !                                                       !
+    !                                                       !
+    ! Note that before calling this function, the function  !
+    ! values (f0val, fval, dfdx, ...) should be updated     !
+    ! using the new x values.                               !
+    ! ----------------------------------------------------- !
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: df0dx, fval
+    type(matrix_t), intent(in) :: dfdx
+
+    real(kind=rp) :: rez, rezeta
+    real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
+    real(kind=rp), dimension(this%n) :: rex, rexsi, reeta
+    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residual
+
+    real(kind=rp), dimension(4*this%m+2) :: residual_small
+    integer :: ierr
+    real(kind=rp) :: re_sq_norm
+
+
+    associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
+      relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
+      ! Compute residual for mu (eta in the paper)
+      remu = this%lambda%x * this%mu%x 
+
+      residual = abs([relambda, remu])
+      this%residumax = maxval(residual)
+      this%residunorm = norm2(residual)
+    end associate
+  end subroutine mma_dip_KKT_cpu
+
   !============================================================================!
   ! private internal subroutines
 
@@ -701,20 +749,12 @@ contains
     real(kind=rp), dimension(this%n), intent(inout) :: designx
     ! Note that there is a local dummy "x" in this subroutine, thus, we call
     ! the current design "designx" instead of just "x"
-    integer :: i, j, k, iter, itto, ierr
+    integer :: i, j, k, iter, ierr
     real(kind=rp) :: epsi, residual_max, residual_norm, &
-         z, zeta, rez, rezeta, &
-         delz, dz, dzeta, &
-         steg, zold, zetaold, new_residual
+         z, steg
     real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
-         rey, relambda, remu, res, &
-         dely, dellambda, &
-         dy, dlambda, ds, dmu, &
-         yold, lambdaold, sold, muold, mzero, gradlambda
-    real(kind=rp), dimension(this%n) :: x, xsi, eta, &
-         rex, rexsi, reeta, &
-         delx, diagx, dx, dxsi, deta, &
-         xold, xsiold, etaold, pjlambda, qjlambda
+         relambda, remu, dlambda, dmu, mzero, gradlambda
+    real(kind=rp), dimension(this%n) :: x, pjlambda, qjlambda
 
     ! To compute the Hessian based on eq(13)
     !! https://doi.org/10.1007/s00158-012-0869-2
@@ -725,13 +765,7 @@ contains
     real(kind=rp), dimension(this%m,this%m) :: Hess
     real(kind=rp) :: Hesstrace
 
-    real(kind=rp), dimension(4*this%m + 2) :: residual_small
     real(kind=rp), dimension(3*this%n + 4*this%m + 2) :: residual
-    real(kind=rp), dimension(2*this%n + 4*this%m + 2) :: xx, dxx
-
-    real(kind=rp), dimension(this%m, this%n) :: GG
-    real(kind=rp), dimension(this%m+1) :: bb
-    real(kind=rp), dimension(this%m+1, this%m+1) :: AA
 
     ! using DGESV in lapack to solve
     ! the linear system which needs the following parameters
@@ -739,7 +773,6 @@ contains
     integer, dimension(this%m+1) :: ipiv
 
     ! Parameters for global communication
-    real(kind=rp) :: re_sq_norm
     real(kind=rp) :: minimal_epsilon
 
     integer :: nglobal
@@ -752,7 +785,7 @@ contains
     !     x = 0.5_rp * (this%alpha%x + this%beta%x)
     y = 1.0_rp
     mzero = 0.0_rp
-    lambda = this%c%x / 2.0_rp !1.0_rp !max(1.0_rp, 0.5_rp * this%c%x)
+    lambda = max(1.0_rp, 0.5_rp * this%c%x) !1.0_rp
     mu = 1.0_rp !this parameter is eta in the paper
     ! note that mu in the paper translates to epsi in the code following the 
     ! same style as the Cpp code by Neils
@@ -769,7 +802,6 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
-
     do while (epsi .gt. minimal_epsilon)
 
        ! --------------------------------------------------------------------- !
@@ -784,395 +816,197 @@ contains
             c => this%c%x, d => this%d%x, &
             a0 => this%a0, a => this%a%x, &
             bi => this%bi%x)
+         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+         ! the initial values of λ
 
-         ! Compute min(L_x, L_y, L_z) for the current value of lambda
-
-         ! Comput the value of y that minizes L_y for the current lambda
+         ! Comput the value of y that minimizes L_y for the current λ
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
-         ! dL_y/dy =0   => y= (c_i - λ_i)/d_i
+         ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          y = max(mzero, (lambda - c) / d)
 
-         ! Comput the value of z that minizes L_z for the current lambda
+         ! Comput the value of z that minimizes L_z for the current λ
          ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
          ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+         ! ensure z>=0
          z = merge(0.0, 1.0, a0 - dot_product(lambda, a) >= 0.0)
 
-         ! Comput the value of x that minizes L_x for the current lambda
-         ! minimze( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
+         ! Comput the value of x that minimizes L_x for the current λ
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          pjlambda = (p0j + matmul(transpose(pij), lambda))
          qjlambda = (q0j + matmul(transpose(qij), lambda))
          x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
               (sqrt(pjlambda) + sqrt(qjlambda)) 
-         
+
          ! Ensure that x is feasible (alpha<=x<=beta)
          x = merge(alpha, x, x .lt. alpha)
          x = merge(beta, x, x .gt. beta)
 
+         ! Compute the residual for the lambda and mu using eq(9) and eq(15)
+         relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+         !> Global comminucation for relambda values
+         call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
+              mpi_real_precision, mpi_sum, neko_comm, ierr)
+         relambda = relambda - bi - y - a * z + mu
 
-         ! Compute dL(x, y, z, λ)/dλ for the updated x, y, z
+         ! Compute residual for mu (eta in the paper)
+         remu = mu * lambda - epsi
 
-         gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+         residual_max = maxval(abs([relambda, remu]))
 
-         !> Global comminucation for gradlambda values
-         call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
+         ! ------------------------------------------------------------------- !
+         ! Internal loop
+         do iter = 1, this%max_iter
 
-         gradlambda = gradlambda - bi - y - a * z ;
+            !Check the condition
+            if (residual_max .lt. epsi) exit
 
-         ! Computing the Hessian as in equation (13) in
-         !! https://doi.org/10.1007/s00158-012-0869-2
+            ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
 
-         !----------------contributions of x terms to Hess----------------------
-         Ljjxinv= - 1/( (2*pjlambda/(upp - x)**3) + (2*qjlambda/(x - low)**3))
+            gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
 
-         ! Remove the sensitivity for the active primal constraints
-         Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
-         Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)
+            !> Global comminucation for gradlambda values
+            call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
+                 mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-         do i = 1, this%m
-            hijx(i,:) = pij(i,:) / (upp - x)**2 &
-                 - qij(i,:) / (x - low)**2
-         end do
+            gradlambda = gradlambda - bi - y - a * z
 
-         Hess = 0.0_rp
-         ! Direct computation of the matrix multiplication
-         ! (for better performance)
-         do i = 1, this%m
-            do j = 1, this%m
-               ! Compute the (i, j) element of AA
-               do k = 1, this%n !this n is global
-                  Hess(i, j) = Hess(i, j) &
-                       + hijx(i, k) * (Ljjxinv(k)) * hijx(j, k)
+            ! Update gradlambda as the right hand side for Newton's method (eq10)
+            gradlambda = - gradlambda - epsi / lambda
+
+
+            ! Computing the Hessian as in equation (13) in
+            !! https://doi.org/10.1007/s00158-012-0869-2
+
+            !--------------contributions of x terms to Hess--------------------!
+            Ljjxinv= - 1/( (2*pjlambda/(upp - x)**3) + (2*qjlambda/(x - low)**3))
+
+            ! Remove the sensitivity for the active primal constraints
+            Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)
+
+            do i = 1, this%m
+               hijx(i,:) = pij(i,:) / (upp - x)**2 &
+                    - qij(i,:) / (x - low)**2
+            end do
+
+            Hess = 0.0_rp
+            ! Direct computation of the matrix multiplication
+            ! (for better performance)
+            do i = 1, this%m
+               do j = 1, this%m
+                  ! Compute the (i, j) element of AA
+                  do k = 1, this%n !this n is global
+                     Hess(i, j) = Hess(i, j) &
+                          + hijx(i, k) * (Ljjxinv(k)) * hijx(j, k)
+                  end do
                end do
             end do
-         end do
-         
-         call MPI_Allreduce(MPI_IN_PLACE, Hess, &
-              this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-         !----------------contributions of z terms to Hess----------------------
-         ! There is no contibution to the Hess from z terms as z terms are 
-         ! linear w.r.t lambda
+            call MPI_Allreduce(MPI_IN_PLACE, Hess, &
+                 this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-
-         !----------------contributions of y terms to Hess----------------------
-         ! Only for inactive constraint, we consider contributions to Hess
-         do i = 1, this%m
-            if (y(i) .gt. 0.0_rp) then
-               Hess(i, i) = Hess(i, i) - 1.0_rp
-            end if
-            ! Based on eq(10), note the term (-\Omega \Lambda)
-            Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
-         end do
-
-         !> Improve the robustness by stablizing the Hess using 
-         !!  Levenberg-Marquardt algorithm (heuristically)
-         Hesstrace = 0.0_rp
-         do i=1, this%m
-            Hesstrace = Hesstrace + Hess(i, i)
-         end do
-         do i=1, this%m
-            Hess(i,i) = Hess(i, i) + max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
-         end do
+            !---------------contributions of z terms to Hess-------------------!
+            ! There is no contibution to the Hess from z terms as z terms are 
+            ! linear w.r.t λ
 
 
-
-
-         call neko_error('debugging')
-
-
-
-
-
-
-
-
-
-
-
-
-         rex = (p0j + matmul(transpose(pij), lambda)) / (upp - x)**2 &
-              - (q0j + matmul(transpose(qij), lambda)) / (x - low)**2 &
-              - xsi + eta
-
-         rey = c + d * y - lambda - mu
-         rez = a0 - zeta - dot_product(lambda, a)
-
-         relambda = 0.0_rp
-         do i = 1, this%m
-            do j = 1, this%n
-               ! Accumulate sums for relambda (the term gi(x))
-               relambda(i) = relambda(i) &
-                    + pij(i, j) / (upp(j) - x(j)) &
-                    + qij(i, j) / (x(j) - low(j))
+            !---------------contributions of y terms to Hess-------------------!
+            ! Only for inactive constraint, we consider contributions to Hess
+            do i = 1, this%m
+               if (y(i) .gt. 0.0_rp) then
+                  Hess(i, i) = Hess(i, i) - 1.0_rp
+               end if
+               ! Based on eq(10), note the term (-\Omega \Lambda)
+               Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
             end do
+
+            !> Improve the robustness by stablizing the Hess using 
+            !!  Levenberg-Marquardt algorithm (heuristically)
+            Hesstrace = 0.0_rp
+            do i=1, this%m
+               Hesstrace = Hesstrace + Hess(i, i)
+            end do
+            do i=1, this%m
+               Hess(i,i) = Hess(i, i) + max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+            end do
+
+
+            call DGESV(this%m , 1, Hess, this%m , ipiv, &
+                 gradlambda, this%m + 1, info)
+
+            if (info .ne. 0) then
+               write(stderr, *) "DGESV failed to solve the linear system in MMA."
+               write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
+               error stop
+            end if
+             
+            dlambda = gradlambda(1:this%m)
+            ! based on eq(11) for delta eta
+            dmu = -mu + epsi / lambda - dlambda * mu / lambda
+
+            ! Compute the stepsize and update lambda and mu (eta in the paper)
+             
+            steg = 1.005_rp
+            do i = 1, this%m
+               steg = merge(-1.01_rp * dlambda(i) / lambda(i), steg, &
+                    steg < -1.01_rp * dlambda(i) / lambda(i))
+               steg = merge(-1.01_rp * dmu(i) / mu(i), &
+                    steg, steg < -1.01_rp * dmu(i) / mu(i))
+            end do
+
+            steg = 1.0_rp / steg
+             
+            lambda = lambda + steg*dlambda
+            mu = mu + steg*dmu
+
+
+            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+            ! the updated values of λ
+
+            ! Comput the value of y that minimizes L_y for the current λ
+            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
+            ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
+            y = max(mzero, (lambda - c) / d)
+
+            ! Comput the value of z that minimizes L_z for the current λ
+            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
+            ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+            ! ensure z>=0
+            z = merge(0.0, 1.0, a0 - dot_product(lambda, a) >= 0.0)
+
+            ! Comput the value of x that minimizes L_x for the current λ
+            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
+            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+            ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
+            pjlambda = (p0j + matmul(transpose(pij), lambda))
+            qjlambda = (q0j + matmul(transpose(qij), lambda))
+            x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
+                 (sqrt(pjlambda) + sqrt(qjlambda)) 
+
+            ! Ensure that x is feasible (alpha<=x<=beta)
+            x = merge(alpha, x, x .lt. alpha)
+            x = merge(beta, x, x .gt. beta)
+
+
+            ! Compute the residual for the lambda and mu using eq(9) and eq(15)
+            relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+            !> Global comminucation for relambda values
+            call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
+                 mpi_real_precision, mpi_sum, neko_comm, ierr)
+            relambda = relambda - bi - y - a * z + mu
+
+            ! Compute residual for mu (eta in the paper)
+            remu = mu * lambda - epsi
+
+            residual_max = maxval(abs([relambda, remu]))
+            print *, "iter=", iter, "epsi=", epsi, "maxval(alpha)=", &
+                 maxval(alpha), "maxval(beta)=", maxval(beta), &
+                 "lambda=", lambda, "mu=", mu
          end do
-
+         !  print *, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", maxval(x), "minval(x)=", minval(x), "lambda=", lambda
        end associate
-
-       ! --------------------------------------------------------------------- !
-       ! Computing the norm of the residuals
-
-       ! Complete the computations of lambda residuals
-       call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       relambda = relambda - this%a%x*z - y + s - this%bi%x
-
-       rexsi = xsi * (x - this%alpha%x) - epsi
-       reeta = eta * (this%beta%x - x) - epsi
-       remu = mu * y - epsi
-       rezeta = zeta * z - epsi
-       res = lambda * s - epsi
-
-       ! Setup vectors of residuals and their norms
-       residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-       residual_small = [rey, rez, relambda, remu, rezeta, res]
-
-       residual_max = maxval(abs(residual))
-       re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
-
-       call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
-            mpi_real_precision, mpi_max, neko_comm, ierr)
-
-       call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
-            1, mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-       residual_norm = sqrt(norm2(residual_small)**2 + re_sq_norm)
-
-       ! --------------------------------------------------------------------- !
-       ! Internal loop
-
-       do iter = 1, this%max_iter
-
-          !Check the condition
-          if (residual_max .lt. epsi) exit
-
-          delx = 0.0_rp
-          do j = 1, this%n
-             do i = 1, this%m
-                delx(j) = delx(j) &
-                     + this%pij%x(i,j) * lambda(i) / (this%upp%x(j) - x(j))**2 &
-                     - this%qij%x(i,j) * lambda(i) / (x(j) - this%low%x(j))**2
-             end do
-          end do
-
-          delx = delx &
-               + this%p0j%x / (this%upp%x - x)**2 &
-               - this%q0j%x / (x - this%low%x)**2 &
-               - epsi / (x - this%alpha%x) &
-               + epsi / (this%beta%x - x)
-
-          dely = this%c%x + this%d%x * y - lambda - epsi / y
-          delz = this%a0 - dot_product(lambda, this%a%x) - epsi / z
-
-          ! Accumulate sums for dellambda (the term gi(x))
-          dellambda = 0.0_rp
-          do i = 1, this%m
-             do j = 1, this%n
-                dellambda(i) = dellambda(i) &
-                     + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
-                     + this%qij%x(i, j) / (x(j) - this%low%x(j))
-             end do
-          end do
-
-          call MPI_Allreduce(MPI_IN_PLACE, dellambda, this%m, &
-               mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-          dellambda = dellambda - this%a%x*z - y - this%bi%x + epsi / lambda
-
-          do i = 1, this%m
-             GG(i,:) = this%pij%x(i,:) / (this%upp%x - x)**2 &
-                  - this%qij%x(i,:) / (x - this%low%x)**2
-          end do
-
-          diagx = &
-               (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
-               / (this%upp%x - x)**3 &
-               + (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
-               / (x - this%low%x)**3
-
-          diagx = 2.0_rp * diagx &
-               + xsi / (x - this%alpha%x) &
-               + eta / (this%beta%x - x)
-
-
-          !Here we only consider the case m<n in the matlab code
-          !assembling the right hand side matrix based on eq(5.20)
-          ! bb = [dellambda + dely/(this%d%x + &
-          !         (mu/y)) - matmul(GG,delx/diagx), delz ]
-
-          !--------------------------------------------------------------------!
-          ! for MPI computation of bb
-
-          bb = 0.0_rp
-          do i = 1, this%m
-             do j = 1, this%n
-                bb(i) = bb(i) + GG(i, j) * (delx(j) / diagx(j))
-             end do
-          end do
-
-          call MPI_Allreduce(MPI_IN_PLACE, bb(1:this%m), this%m, &
-               mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-          bb(1:this%m) = dellambda + dely / (this%d%x + mu / y) - bb(1:this%m)
-          bb(this%m + 1) = delz
-
-          !--------------------------------------------------------------------!
-          ! assembling the coefficients matrix AA based on eq(5.20)
-          ! AA(1:this%m,1:this%m) =  &
-          ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
-          ! !update diag(AA)
-          ! AA(1:this%m,1:this%m) = AA(1:this%m,1:this%m) + &
-          !     mma_diag(s/lambda + 1.0/(this%d%x + (mu/y)))
-
-          AA = 0.0_rp
-          ! Direct computation of the matrix multiplication
-          ! (for better performance)
-          do i = 1, this%m
-             do j = 1, this%m
-                ! Compute the (i, j) element of AA
-                do k = 1, this%n !this n is global
-                   AA(i, j) = AA(i, j) &
-                        + GG(i, k) * (1.0_rp / diagx(k)) * GG(j, k)
-                end do
-             end do
-          end do
-
-          call MPI_Allreduce(MPI_IN_PLACE, AA(1:this%m, 1:this%m), &
-               this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-          do i = 1, this%m
-             ! update the diag AA
-             AA(i, i) = AA(i, i) &
-                  + s(i) / lambda(i) &
-                  + 1.0_rp / (this%d%x(i) + mu(i) / y(i))
-          end do
-
-          AA(1:this%m, this%m+1) = this%a%x
-          AA(this%m+1, 1:this%m) = this%a%x
-          AA(this%m+1, this%m+1) = - zeta/z
-
-          call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
-
-          if (info .ne. 0) then
-             write(stderr, *) "DGESV failed to solve the linear system in MMA."
-             write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
-             error stop
-          end if
-
-          dlambda = bb(1:this%m)
-          dz = bb(this%m + 1)
-
-          ! based on eq(5.19)
-          dx = - delx / diagx - matmul(transpose(GG), dlambda) / diagx
-          dy = (-dely + dlambda) / (this%d%x + mu / y)
-
-          dxsi = -xsi + (epsi - dx * xsi) / (x - this%alpha%x)
-          deta = -eta + (epsi + dx * eta) / (this%beta%x - x)
-          dmu = -mu + (epsi - mu * dy) / y
-          dzeta = -zeta + (epsi - zeta * dz) / z
-          ds = -s + (epsi - dlambda * s) / lambda
-
-          dxx = [dy, dz, dlambda, dxsi, deta, dmu, dzeta, ds]
-          xx = [y, z, lambda, xsi, eta, mu, zeta, s]
-
-          steg = 1.0_rp / maxval([ &
-               1.0_rp, &
-               -1.01_rp * dxx / xx, &
-               -1.01_rp * dx / (x - this%alpha%x), &
-               1.01_rp * dx / (this%beta%x - x) &
-               ])
-
-          ! Save the old values
-          xold = x
-          yold = y
-          zold = z
-          lambdaold = lambda
-          xsiold = xsi
-          etaold = eta
-          muold = mu
-          zetaold = zeta
-          sold = s
-
-          ! The innermost loop to determine the suitable step length
-          ! using the Backtracking Line Search approach
-          new_residual = 2.0_rp * residual_norm
-
-          ! Share the new_residual and steg values
-          call MPI_Allreduce(MPI_IN_PLACE, steg, 1, &
-               mpi_real_precision, mpi_min, neko_comm, ierr)
-          call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
-               mpi_real_precision, mpi_min, neko_comm, ierr)
-
-          itto = 0
-          do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
-             itto = itto + 1
-
-             ! update the variables
-             x = xold + steg*dx
-             y = yold + steg*dy
-             z = zold + steg*dz
-             lambda = lambdaold + steg*dlambda
-             xsi = xsiold + steg*dxsi
-             eta = etaold + steg*deta
-             mu = muold + steg*dmu
-             zeta = zetaold + steg*dzeta
-             s = sold + steg*ds
-
-             ! Recompute the new_residual to see if this stepsize improves
-             ! the residue
-             rex = (this%p0j%x + matmul(transpose(this%pij%x), lambda)) &
-                  / (this%upp%x - x)**2 &
-                  - (this%q0j%x + matmul(transpose(this%qij%x), lambda)) &
-                  / (x - this%low%x)**2 &
-                  - xsi + eta
-
-             rey = this%c%x + this%d%x*y - lambda - mu
-             rez = this%a0 - zeta - dot_product(lambda, this%a%x)
-
-             ! Accumulate sums for relambda (the term gi(x))
-             relambda = 0.0_rp
-             do i = 1, this%m
-                do j = 1, this%n
-                   relambda(i) = relambda(i) &
-                        + this%pij%x(i, j) / (this%upp%x(j) - x(j)) &
-                        + this%qij%x(i, j) / (x(j) - this%low%x(j))
-                end do
-             end do
-
-             call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
-                  mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-             relambda = relambda - this%a%x*z - y + s - this%bi%x
-
-             rexsi = xsi * (x - this%alpha%x) - epsi
-             reeta = eta * (this%beta%x - x) - epsi
-             remu = mu * y - epsi
-             rezeta = zeta * z - epsi
-             res = lambda * s - epsi
-
-             residual_small = [rey, rez, relambda, remu, rezeta, res]
-
-             re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
-             call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
-                  1, mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-             new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
-
-             steg = steg / 2.0_rp
-          end do
-          steg = 2.0_rp * steg ! Correction for the final division by 2
-
-          residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-
-          ! Update the maximum and norm of the residuals
-          residual_norm = new_residual
-          residual_max = maxval(abs(residual))
-          call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
-               mpi_real_precision, mpi_max, neko_comm, ierr)
-       end do
 
        epsi = 0.1_rp * epsi
     end do
@@ -1183,14 +1017,13 @@ contains
     designx = x
 
     !update the parameters of the MMA object nesessary to compute KKT residual
+
     this%y%x = y
     this%z = z
     this%lambda%x = lambda
-    this%zeta = zeta
-    this%xsi%x = xsi
-    this%eta%x = eta
     this%mu%x = mu
-    this%s%x = s
 
+    ! call neko_error('debugging')
   end subroutine mma_subsolve_dip_cpu
+  
 end submodule mma_cpu

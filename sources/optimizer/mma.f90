@@ -106,6 +106,14 @@ module mma
        type(matrix_t), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
+          !> CPU KKT check for convergence
+     module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+       class(mma_t), intent(inout) :: this
+       real(kind=rp), dimension(this%n), intent(in) :: x
+       type(vector_t), intent(in) :: df0dx, fval
+       type(matrix_t), intent(in) :: dfdx
+     end subroutine mma_dip_KKT_cpu
+
      ! ======================================================================= !
      ! interface for device backend module subroutines
 
@@ -419,7 +427,8 @@ contains
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+      !  call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
     case ("cuda")
        call mma_KKT_device(this, x, df0dx, fval, dfdx)
     case default
