@@ -38,12 +38,14 @@ submodule (objective) objective_factory_mod
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
   use lube_term_objective, only: lube_term_objective_t
+  use scalar_mixing_objective, only: scalar_mixing_objective_t
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
+  character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
        "minimum_dissipation", &
+       "scalar_mixing", &
        "lube_term"]
 
 contains
@@ -73,6 +75,8 @@ contains
     select case (trim(type))
     case ("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)
+    case ("scalar_mixing")
+       allocate(scalar_mixing_objective_t::object)
     case ("lube_term")
        allocate(lube_term_objective_t::object)
 

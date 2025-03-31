@@ -839,12 +839,12 @@ contains
       ! Compute pressure residual.
       call profiler_start_region('Pressure_residual', 18)
 
-      call prs_res%compute(p, p_res,&
+      call prs_res%compute(p, p_res, &
            u, v, w, &
            u_e, v_e, w_e, &
            f_x, f_y, f_z, &
            c_Xh, gs_Xh, &
-           this%bc_prs_surface, this%bc_sym_surface,&
+           this%bc_prs_surface, this%bc_sym_surface, &
            Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
            mu_field, rho_field, event)
 

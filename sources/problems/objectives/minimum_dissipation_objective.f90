@@ -174,7 +174,7 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%fluid_scheme%c_Xh
+    this%c_Xh => simulation%fluid%c_Xh
     this%adjoint_u => neko_field_registry%get_field('u_adj')
     this%adjoint_v => neko_field_registry%get_field('v_adj')
     this%adjoint_w => neko_field_registry%get_field('w_adj')
@@ -183,16 +183,15 @@ contains
     ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
-         simulation%adjoint_case%scheme%f_adj_x, &
-         simulation%adjoint_case%scheme%f_adj_y, &
-         simulation%adjoint_case%scheme%f_adj_z, &
+         simulation%adjoint_fluid%f_adj_x, &
+         simulation%adjoint_fluid%f_adj_y, &
+         simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
          this%c_Xh)
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%scheme%source_term%add_source_term( &
-         adjoint_forcing)
+    call simulation%adjoint_fluid%source_term%add_source_term(adjoint_forcing)
 
   end subroutine minimum_dissipation_init_attributes
 
