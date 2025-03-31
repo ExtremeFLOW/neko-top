@@ -10,6 +10,7 @@ function help() {
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
+    echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -40,9 +41,10 @@ DEVICE_TYPE="NONE"
 CLEAN=false
 QUIET=false
 TEST=false
+DOCS=false
 
 # List possible options
-OPTIONS=help,test,clean,quiet,device:
+OPTIONS=help,test,clean,quiet,device:,doc
 OPT=h,t,c,q,d:
 
 # Parse the inputs for options
@@ -57,6 +59,9 @@ while true; do
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
+
+    # Purely long settings
+    "--doc") DOCS=true && shift ;; # Build the documentation
 
     # End of options
     "--") shift && break ;;
@@ -137,6 +142,13 @@ CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
+
+# Set the documentation flag
+if [ "$DOCS" == true ]; then
+    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
+else
+    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
+fi
 
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 

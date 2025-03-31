@@ -724,7 +724,7 @@ WARN_IF_DOC_ERROR      = YES
 # parameter documentation, but not about the absence of documentation.
 # The default value is: NO.
 
-WARN_NO_PARAMDOC       = NO
+WARN_NO_PARAMDOC       = YES
 
 # The WARN_FORMAT tag determines the format of the warning messages that doxygen
 # can produce. The string should contain the $file, $line, and $text tags, which
@@ -740,7 +740,7 @@ WARN_FORMAT            = "$file:$line: $text"
 # messages should be written. If left blank the output is written to standard
 # error (stderr).
 
-WARN_LOGFILE           =
+WARN_LOGFILE           = @top_srcdir@/doxygen.log
 
 # If the WARN_AS_ERROR tag is set to YES then Doxygen will immediately stop when
 # a warning is encountered. If the WARN_AS_ERROR tag is set to FAIL_ON_WARNINGS
@@ -823,7 +823,8 @@ EXCLUDE_SYMLINKS       = NO
 # exclude all test directories for example use the pattern */test/*
 
 EXCLUDE_PATTERNS       = @top_srcdir@/sources/**/readme.md \
-                         @top_srcdir@/examples/**/*.f90
+                         @top_srcdir@/examples/**/*.f90 \
+                         @top_srcdir@/documentation/html/*
 
 # The EXCLUDE_SYMBOLS tag can be used to specify one or more symbol names
 # (namespaces, classes, functions, etc.) that should be excluded from the
