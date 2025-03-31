@@ -123,8 +123,8 @@
                 "name": "optimization_domain",
                 "geometry": "box",
                 "x_bounds": [
-                    2.0,
-                    4.0,
+                    1.5,
+                    4.5,
                 ],
                 "y_bounds": [
                     -1.0,
@@ -140,7 +140,7 @@
                 "geometry": "box",
                 "x_bounds": [
                     5.0,
-                    5.5,
+                    6.0,
                 ],
                 "y_bounds": [
                     -1.0,
@@ -154,6 +154,23 @@
         ]
     },
     "optimization": {
+            "design": {
+                "type": "brinkman",
+                "mapping" : [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 100
+                }
+            ],
+            "initial_distribution": {
+                "type": "uniform",
+                "value": 0.0
+            }
+        },
         "solver": {
             "type": "mma",
             "max_iterations": 100,
@@ -181,6 +198,8 @@
                 "phi_ref": 0.5,
                 "weight": 1.0
             },
+        ],
+        "constraints": [
         ],
     },
 
