@@ -254,7 +254,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call C%output_controller%set_counter(t)
+    call C%output_controller%set_counter(C%time)
   end subroutine simulation_restart
 
 !> Write a checkpoint at joblimit
