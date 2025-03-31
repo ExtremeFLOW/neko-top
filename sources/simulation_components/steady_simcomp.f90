@@ -147,10 +147,11 @@ contains
   end subroutine steady_simcomp_free
 
   ! Compute the steady_simcomp field.
-  subroutine steady_simcomp_compute(this, t, tstep)
+  subroutine steady_simcomp_compute(this, t, tstep, dt)
     class(steady_simcomp_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
+    real(kind=rp), intent(in) :: dt
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s

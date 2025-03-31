@@ -105,11 +105,12 @@ contains
   end subroutine simcomp_test_free
 
   ! Computations.
-  subroutine simcomp_test_compute(this, t, tstep)
+  subroutine simcomp_test_compute(this, t, tstep, dt)
     implicit none
     class(mma_comp_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
+    real(kind=rp), intent(in) :: dt
 
     integer :: iter, i, ierr, rank, size, nglobal
     integer, allocatable :: recv_counts(:), displs(:)

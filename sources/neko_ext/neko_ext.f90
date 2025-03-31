@@ -183,7 +183,7 @@ contains
     neko_case%f_out%output_t%file_%file_type%fname = trim(file_name)
     neko_case%f_out%output_t%file_%file_type%counter = 0
     neko_case%f_out%output_t%file_%file_type%start_counter = 0
-    call neko_case%output_controller%execute(0.0_rp, 0, .true.)
+    call neko_case%output_controller%execute(0.0_rp, 0, 0.0_rp, .true.)
 
   end subroutine setup_iteration
 
