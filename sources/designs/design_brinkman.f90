@@ -51,9 +51,12 @@ module brinkman_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
+  use device_math, only: device_copy
   use field_registry, only: neko_field_registry
   use neko_ext, only: field_to_vector, vector_to_field
-  use json_utils, only: json_get, json_get_or_default
+  use optimization_ic, only: set_optimization_ic
+  use field_math, only: field_rzero
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
   use utils, only: neko_error
   implicit none
   private
@@ -229,6 +232,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
+    type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type
 
     ! Initialize the optimization domain
@@ -251,15 +255,27 @@ contains
        this%if_mask = .false.
     end if
 
+    ! Initialize and inject into the simulation
     call this%init_from_components(simulation)
 
     ! Initialize the mapper
-    associate(coef => simulation%neko_case%fluid%c_Xh)
+    associate(coef => simulation%neko_case%fluid%c_Xh, &
+         gs => simulation%neko_case%fluid%gs_Xh)
       call this%mapping%init_base(coef)
       call this%mapping%add(parameters, 'optimization.design.mapping')
+
+      if (parameters%valid_path(&
+           'optimization.design.initial_distribution')) then
+         call json_extract_object(parameters, &
+              'optimization.design.initial_distribution', json_subdict)
+         call set_optimization_ic(this%design_indicator, coef, gs, &
+              json_subdict)
+      else
+         call field_rzero(this%design_indicator)
+      end if
     end associate
 
-    ! and then we would map for the first one
+    ! Map to the Brinkman amplitude
     call this%map_forward()
 
   end subroutine brinkman_design_init_from_json_sim
@@ -305,12 +321,9 @@ contains
     this%design_indicator%x = 0.0_rp
 
     n = this%design_indicator%dof%size()
+    ! This is probably getting fixed in tim's PR anyway, otherwise I'll fix it.
     do i = 1, n
-       if (sqrt((this%design_indicator%dof%x(i,1,1,1) - 0.5_rp)**2 + &
-            (this%design_indicator%dof%y(i,1,1,1) &
-            - 0.5_rp)**2) .lt. 0.25_rp) then
-          this%design_indicator%x(i,1,1,1) = 1.0_rp
-       end if
+       this%design_indicator%x(i,1,1,1) = 0.0_rp
     end do
 
     ! again this will be handled better in the future...
@@ -371,29 +384,29 @@ contains
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
-         simulation%fluid_scheme%f_x, &
-         simulation%fluid_scheme%f_y, &
-         simulation%fluid_scheme%f_z, &
+         simulation%fluid%f_x, &
+         simulation%fluid%f_y, &
+         simulation%fluid%f_z, &
          this%brinkman_amplitude, &
-         simulation%fluid_scheme%u, &
-         simulation%fluid_scheme%v, &
-         simulation%fluid_scheme%w, &
-         simulation%fluid_scheme%c_Xh)
+         simulation%fluid%u, &
+         simulation%fluid%v, &
+         simulation%fluid%w, &
+         simulation%fluid%c_Xh)
     ! append brinkman source term to the forward problem
-    call simulation%fluid_scheme%source_term%add(forward_brinkman)
+    call simulation%fluid%source_term%add(forward_brinkman)
 
     ! init the simple brinkman term for the adjoint
     call adjoint_brinkman%init_from_components( &
-         simulation%adjoint_case%scheme%f_adj_x, &
-         simulation%adjoint_case%scheme%f_adj_y, &
-         simulation%adjoint_case%scheme%f_adj_z, &
+         simulation%adjoint_fluid%f_adj_x, &
+         simulation%adjoint_fluid%f_adj_y, &
+         simulation%adjoint_fluid%f_adj_z, &
          this%brinkman_amplitude, &
-         simulation%adjoint_case%scheme%u_adj, &
-         simulation%adjoint_case%scheme%v_adj, &
-         simulation%adjoint_case%scheme%w_adj, &
-         simulation%adjoint_case%scheme%c_Xh)
+         simulation%adjoint_fluid%u_adj, &
+         simulation%adjoint_fluid%v_adj, &
+         simulation%adjoint_fluid%w_adj, &
+         simulation%adjoint_fluid%c_Xh)
     ! append brinkman source term based on design
-    call simulation%adjoint_case%scheme%source_term%add(adjoint_brinkman)
+    call simulation%adjoint_fluid%source_term%add(adjoint_brinkman)
 
   end subroutine brinkman_design_init_from_components
 
