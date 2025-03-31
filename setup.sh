@@ -150,7 +150,6 @@ else
     CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
 fi
 
-printf "Compiling the example codes and Neko-TOP\n"
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
