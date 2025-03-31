@@ -196,7 +196,7 @@ contains
     class(point_zone_t), pointer :: zone
     integer :: size
 
-    call neko_log%message("Type       : point_zone")
+    call neko_log%message("Type      : point_zone")
     write (log_buf, '(A,ES12.6)') "Base value: ", base_value
     call neko_log%message(log_buf)
     call neko_log%message("Zone name : " // trim(zone_name))
@@ -248,9 +248,9 @@ contains
     type(interpolator_t) :: space_interp
     ! ----
 
-    call neko_log%message("Type          : field")
-    call neko_log%message("File name     : " // trim(file_name))
-    write (log_buf, '(A,L1)') "Interpolation : ", interpolate
+    call neko_log%message("Type         : field")
+    call neko_log%message("File name    : " // trim(file_name))
+    write (log_buf, '(A,L1)') "Interpolation: ", interpolate
     call neko_log%message(log_buf)
 
     ! Extract sample index from the file name
