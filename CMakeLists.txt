@@ -105,9 +105,7 @@ find_package(PkgConfig REQUIRED)
 
 # Check that the MPI Fortran 2008 module is available
 if (NOT MPI_Fortran_HAVE_F08_MODULE)
-    message(FATAL_ERROR
-        "MPI Fortran 2008 module is required for Neko-TOP."
-    )
+    message(FATAL_ERROR "MPI Fortran 2008 module is required for Neko-TOP.")
 endif()
 include_directories(${MPI_Fortran_INCLUDE_DIRS})
 include_directories(${MPI_Fortran_MODULE_DIR})
@@ -117,7 +115,7 @@ include_directories(${MPI_Fortran_MODULE_DIR})
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
 if (DEFINED ENV{JSON_FORTRAN_DIR})
-    set(JSON_FORTRAN_DIR ENV{JSON_FORTRAN_DIR} CACHE STRING
+    set(JSON_FORTRAN_DIR $ENV{JSON_FORTRAN_DIR} CACHE STRING
         "Path to the JSON-Fortran installation")
 else()
     set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
@@ -134,7 +132,7 @@ pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
 # Set the proper paths for the NEKO_DIR
 if (DEFINED ENV{NEKO_DIR})
-    set(NEKO_DIR ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
+    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
 else()
     set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
         CACHE STRING "Path to the Neko installation")

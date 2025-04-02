@@ -44,6 +44,13 @@ function help() {
 if [ $# -lt 1 ]; then help; fi
 
 # ============================================================================ #
+# Define the main directory
+
+export CURRENT_DIR=$(pwd)
+export MAIN_DIR=$(dirname $(realpath $0))
+export EXTERNAL_DIR="$MAIN_DIR/external"
+
+# ============================================================================ #
 # User defined inputs.
 
 # Assign default values to the options
@@ -82,8 +89,6 @@ done
 
 # ============================================================================ #
 # Define environment
-export MAIN_DIR=$(dirname $(realpath $0))
-CURRENT_DIR=$(pwd)
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
