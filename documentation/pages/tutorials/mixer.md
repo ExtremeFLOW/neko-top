@@ -14,7 +14,7 @@ parts.
 We begin by considering a domain \f$\Omega\f$ which is a square duct seen in
 the figure below.
 
-\note PUT A FIGURE OF THE MIXER WORKING
+![Animation of mixer](mixer_animation.gif)
 
 Fluid enters the domain upstream and is ejected downstream, with all other
 boundary being considered solid walls. 
@@ -40,9 +40,9 @@ In this tutorial you will learn how to
 
 ## Defining the optimization problem {#mixer_optimization_problem}
 
-The equations being solved in this optimization problem are
+![Figure of boundary conditions](mixer_BCs.png)
 
-\note PUT A FIGURE OF THE DOMAIN INDICATING BOUNDARIES
+The equations being solved in this optimization problem are
 
 \f[
     {\frac {\partial \mathbf {u} }{\partial t}}
@@ -99,7 +99,7 @@ we can place material and
 a domain downstream in which we want the scalar species to be mixed
 \f$\Omega_\text{mix} \subset \Omega\f$. 
 
-\note PUT A FIGURE SHOWING THE DOMAINS
+![Figure of domains](mixer_domains.png)
 
 We can now define our objective function
 to be minimized as
@@ -168,7 +168,7 @@ which become relavent when prescribing boundary conditions. The convention is
 to label from 1-6 in the order \f$[x_\text{start}, x_\text{finish},y_\text{start}, y_\text{finish}, z_\text{start}, z_\text{finish}] \f$ 
 or as indicated in the figure below.
 
-\note PUT A FIGURE WITH THE ORDERING
+![Figure of face ordering](mixer_BC_order.png)
 
 ## The neko-top .case file {#mixer_case_file}
 The `*.case` file allows the user to set up the case.
@@ -964,7 +964,9 @@ The output from a `neko-top` topology optimization problem consists of three
 key components
 
 1) an optimization log, saved in the file `optimization_data.csv`.
+
 2) a log of the steady state residual, saved in the file `steady_state_data.csv`
+
 3) a series of field files
     - the steady state forward solution `forward_fields0.nek5000`
     - the steady state adjoint solution `adjoint_fields0.nek5000`
