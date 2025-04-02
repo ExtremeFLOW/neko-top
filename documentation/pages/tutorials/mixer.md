@@ -236,7 +236,7 @@ Here we have prescribed:
 
 \attention Despite intending to solve the steady Navier--Stokes equation,
 Currently an `end_time` must be prescribed in `neko`. More details regarding
-steady state solutions can be found [here](put the link)  but there are
+steady state solutions can be found in \subpage simulation_components  but there are
 intentions to include steady state functionality directly within `neko`,
 streamlining this process.
 
@@ -253,7 +253,6 @@ state simulation component
             }
         ],
 ```
-more details can be found [here](PUT THE LINK)
 
 \attention Currently certain features of `neko` are not supported by `neko-top`
 due to a lack of adjoint support. Relavent to this section, it should be noted
@@ -596,7 +595,7 @@ The key details which are prescribed are:
                     "flux": 0,
                     "zone_indices": [2, 3, 4, 5, 6]
 ```
-- \f$ \mathbf{u}^\dagger = 0\f$ on 
+- \f$ \mathbf{u}^\dagger = \mathbf{0}\f$ on 
 \f$ \Gamma_\text{in} \cup \Gamma_\text{wall} \f$
 ```
                     "type": "no_slip",
@@ -804,3 +803,16 @@ set(EXTRA_SOURCES
 
 build_example(${DRIVER_TYPE})
 ```
+
+This script performs the following task:
+- allows `neko-top` to use a custom driver (`set(DRIVER_TYPE "custom")`)
+- indicates to `neko-top` to use the `driver.f90` driver (`set(DRIVER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)`)
+- includes the additional `user.f90` file used to prescribe user boundary conditions
+and initial conditions.
+```
+set(EXTRA_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
+)
+```
+
+The driver itself 
