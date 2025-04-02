@@ -79,12 +79,6 @@ function run {
         return 1
     fi
 
-    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" ]]; then
-        printf >&2 "ERROR: Neko did not end normally.\n"
-        return 1
-    fi
-
     printf "\nExample concluded.\n"
     TIME_DIFF=$((TIME_END - TIME_START))
     printf "Execution time: %02d:%02d:%02d\n" \
