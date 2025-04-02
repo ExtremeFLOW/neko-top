@@ -76,8 +76,10 @@ module volume_constraint
      class(coef_t), pointer :: c_Xh => null()
 
    contains
+
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => volume_constraint_init_json
+     procedure, public, pass(this) :: init_json_sim => &
+          volume_constraint_init_json_sim
      !> The direct initializer from attributes.
      procedure, public, pass(this) :: init_from_attributes => &
           volume_constraint_init_attributes
@@ -102,7 +104,7 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine volume_constraint_init_json(this, json, design, simulation)
+  subroutine volume_constraint_init_json_sim(this, json, design, simulation)
     class(volume_constraint_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
@@ -120,7 +122,7 @@ contains
 
     call this%init_from_attributes(design, simulation, name, mask_name, &
          is_max, limit)
-  end subroutine volume_constraint_init_json
+  end subroutine volume_constraint_init_json_sim
 
   !> The direct initializer from attributes.
   !! @param this the constraint.
