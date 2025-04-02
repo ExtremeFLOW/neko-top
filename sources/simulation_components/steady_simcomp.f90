@@ -45,6 +45,7 @@ module steady_simcomp
   use neko_config, only : NEKO_BCKND_DEVICE
   use csv_file, only : csv_file_t
   use vector, only: vector_t
+  use time_state, only: time_state_t
   implicit none
   private
 
@@ -147,16 +148,23 @@ contains
   end subroutine steady_simcomp_free
 
   ! Compute the steady_simcomp field.
-  subroutine steady_simcomp_compute(this, t, tstep)
+  subroutine steady_simcomp_compute(this, time)
     class(steady_simcomp_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
+    integer :: tstep
+    real(kind=rp) :: t
+    real(kind=rp) :: dt
 
     real(kind=rp), dimension(5) :: normed_diff
     type(field_t), pointer :: u, v, w, p, s
 
     ! A frozen field is not interesting to compute differences for.
     if (this%case%fluid%freeze) return
+
+    ! Get the current time and time step
+    t = time%t
+    tstep = time%tstep
+    dt = this%case%time%dt
 
     ! ------------------------------------------------------------------------ !
     ! Computation of the maximal normed difference.
