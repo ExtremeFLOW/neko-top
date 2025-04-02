@@ -11,6 +11,7 @@ In `neko`, and by extension `neko-top`, we solve the Navier--Stokes equations
     =
     -\nabla p
     +{\frac {1}{Re}}\nabla ^{2}\mathbf {u}
+<<<<<<< HEAD
     +  \mathbf{f}, \text{ in } \Omega,\\
     \nabla \cdot \mathbf {u} = 0,  \text{ in } \Omega, 
 \f]
@@ -26,6 +27,16 @@ The governing equations are subjected  boundary conditions on
 \f]
 where \f$\Gamma_N\f$ and \f$\Gamma_D\f$ denote outflow and dirichlete boundaries
 respectively.
+=======
+    +  \mathbf{f}, \\
+    \nabla \cdot \mathbf {u} = 0,
+\f]
+
+where \f$\mathbf {u}(\mathbf{x},t)\f$ denotes the velocity field, \f$p(\mathbf{x},t)\f$
+the pressure field, \f$\mathbf{f}\f$ a forcing term and where \f$Re\f$ denotes
+the Reynolds number.
+
+>>>>>>> origin/develop
 
 A common formulation of the adjoint Navier--Stokes
 equations reads
@@ -41,12 +52,17 @@ equations reads
     \nabla \cdot \mathbf {u} ^\dagger= 0,
 \f]
 
+<<<<<<< HEAD
 
+=======
+where
+>>>>>>> origin/develop
 where \f$\mathbf {u}^\dagger(\mathbf{x},t)\f$ denotes the adjoint velocity field,
 \f$p^\dagger(\mathbf{x},t)\f$ the adjoint pressure field and \f$\mathbf{f}^\dagger\f$
 denoting a forcing term applied to the adjoint system which generally arises
 as a consequence of objective functions being evaluated.
 
+<<<<<<< HEAD
 The corresponding boundary conditions generally read
 
 \f[
@@ -57,6 +73,8 @@ The corresponding boundary conditions generally read
     \mathbf{u} = \mathbf{0}, \text{ on } \Gamma_D. \\
 \f]
 
+=======
+>>>>>>> origin/develop
 The spectral element method which underpins `neko` solves
 the above system of equations using the weak formulation, which has important
 implications when solving the adjoint system. Primarily, when deriving the
@@ -81,6 +99,7 @@ weak form),
     -\int_\Omega \mathbf{v}\cdot \nabla p^\dagger
     +{\frac {1}{Re}}\int_\Omega \nabla \mathbf{v}\cdot \nabla \mathbf {u}^\dagger
     + \int_\Omega \mathbf{v}\cdot  \mathbf{f}^\dagger, \\
+<<<<<<< HEAD
     \int_\Omega q  \nabla \cdot \mathbf {u} ^\dagger= 0,
 \f]
 where \f$\mathbf {v}\f$ is a test function.
@@ -160,3 +179,7 @@ be found [here](PUT THE LINK).
 of the theory guide. This will tie together all aspects from the mapping, to
 how these terms arise etc. For now we are simply documenting the equations
 being solved.
+=======
+    \int_\Omega q  \nabla \cdot \mathbf {u} ^\dagger= 0.
+\f]
+>>>>>>> origin/develop
