@@ -35,8 +35,8 @@ In this tutorial you will learn how to
 - [Define a mapping cascade.](@ref mixer_mapping)
 - [Define optimization parameters for the MMA algorithm.](@ref mixer_MMA)
 - [Prepare a driver to solve the optimization problem.](@ref mixer_driver)
-- Solve the optimization problem.
-- Post process the results.
+- [Solve the optimization problem.](@ref mixer_solve)
+- [Post process the results.](@ref mixer_post)
 
 ## Defining the optimization problem {#mixer_optimization_problem}
 
@@ -329,8 +329,10 @@ The key details which are prescribed are:
 
 \note The velocity and pressure solvers have been set relatively conventionally,
 however the interested reader can find more information 
-[here](https://neko.cfd/docs/release/dd/d33/case-file.html#autotoc_md39). It
-should be noted that some features in `neko` are not supported in `neko-top`
+[here](https://neko.cfd/docs/release/dd/d33/case-file.html#autotoc_md39). 
+
+\attention
+It should be noted that some features in `neko` are not supported in `neko-top`
 due to a lack of adjoint support. Relavent to this section, it should be noted
 that the use of projections or gradient jump penalty are not supported.
 
@@ -815,4 +817,158 @@ set(EXTRA_SOURCES
 )
 ```
 
-The driver itself 
+`neko-top` distinguishes between four key objects:
+- \subpage design. The design space over which one optimizes.
+- \subpage problem. The definition of the optimization problem being solved.
+- \subpage optimizer. The optimization algoirthm used to solve the optimization
+problem.
+- \subpage simulation. Specifically for problems involving fluid mechanics, a
+simulation can allow for interfaces with `neko` to perform forward simulation
+and additional `neko-top` libraries to perform adjoint sensitivity analysis.
+
+Further details regarding these componenents can be found in \subpage code-structure.
+
+The basic structure of `driver.f90` is to 
+
+1) declare these objects
+```fortran
+  type(simulation_t) :: simulation
+  type(problem_t) :: problem
+  class(design_t), allocatable :: design
+  class(optimizer_t), allocatable :: optimizer
+```
+
+2) initialize these objects along with the user specified boundary and initial
+conditions
+```fortran
+  call user_setup(simulation%neko_case%usr)
+  call simulation%init(parameters)
+  call design_factory(design, parameters, simulation)
+  call problem%init(parameters, design, simulation)
+  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+```
+
+3) run the optimization algorithm
+```fortran
+  call optimizer%run(problem, design, simulation)
+```
+
+4) clean
+```fortran
+  call optimizer%free()
+  if (allocated(optimizer)) deallocate(optimizer)
+  call problem%free()
+  call design%free()
+  call simulation%free()
+```
+
+
+The complete driver takes the following form
+
+```fortran
+program usrneko
+  use simulation_m, only: simulation_t
+  use problem, only: problem_t
+  use optimizer, only : optimizer_t, optimizer_factory
+  use json_module, only: json_file
+  use utils, only: neko_error
+  use json_utils_ext, only: json_read_file
+  use user, only: user_setup
+  use design, only: design_t, design_factory
+
+  use mpi_f08, only: MPI_Init
+
+  implicit none
+
+  ! JSON related arguments
+  integer :: argc
+  type(json_file) :: parameters
+  character(len=256) :: parameter_file
+
+  ! MPI parameters
+  integer :: ierr
+
+  !> The simulation we are working with
+  type(simulation_t) :: simulation
+  !> The problem type
+  type(problem_t) :: problem
+  !> The design type
+  class(design_t), allocatable :: design
+  !> The optimizer (in this case mma)
+  class(optimizer_t), allocatable :: optimizer
+
+  ! -------------------------------------------------------------------------- !
+  ! Initialize the MPI environment
+  call MPI_Init(ierr)
+
+  ! -------------------------------------------------------------------------- !
+  ! Read the parameters file as the first terminal argument
+
+  argc = command_argument_count()
+  if (argc .lt. 1) call neko_error('Missing parameter file')
+  call get_command_argument(1, parameter_file)
+
+  ! Read the parameters file
+  parameters = json_read_file(trim(parameter_file))
+
+  ! -------------------------------------------------------------------------- !
+  ! Initialization of the components
+
+  ! initialize the user additions for the forward (through the neko interface)
+  call user_setup(simulation%neko_case%usr)
+
+  ! initialize the simulation
+  call simulation%init(parameters)
+
+  ! initialize the design
+  call design_factory(design, parameters, simulation)
+
+  ! initialize the problem
+  call problem%init(parameters, design, simulation)
+
+  ! initialize the optimizer
+  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+
+  ! -------------------------------------------------------------------------- !
+  ! Execute the optimization
+
+  call optimizer%run(problem, design, simulation)
+
+  ! -------------------------------------------------------------------------- !
+  ! Clean up the components
+
+  call optimizer%free()
+  if (allocated(optimizer)) deallocate(optimizer)
+
+  call problem%free()
+  call design%free()
+  call simulation%free()
+
+end program usrneko
+```
+
+## Solving the optimization problem {#mixer_solve}
+
+Once the example has been constructed it can be run by simply executing
+
+```
+./run.sh passive_scalar
+```
+
+from the root `neko-top` directory. Further details on the functionality of the
+run script `run.sh` can be found in \subpage examples.
+
+## Post processing the results {#mixer_post}
+
+The output from a `neko-top` topology optimization problem consists of three
+key components
+
+1) an optimization log, saved in the file `optimization_data.csv`.
+2) a log of the steady state residual, saved in the file `steady_state_data.csv`
+3) a series of field files
+    - the steady state forward solution `forward_fields0.nek5000`
+    - the steady state adjoint solution `adjoint_fields0.nek5000`
+    - the design field `design0.nek5000`
+
+The remainder of this tutorial will help you understand how to process these
+files and provide some scripts to help you visualize the results.
