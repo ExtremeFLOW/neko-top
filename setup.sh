@@ -29,9 +29,9 @@ function help() {
 # ============================================================================ #
 # Set main directories
 
-CURRENT_DIR=$(pwd)
-MAIN_DIR=$(dirname $(realpath $0))
-EXTERNAL_DIR="$MAIN_DIR/external"
+export CURRENT_DIR=$(pwd)
+export MAIN_DIR=$(dirname $(realpath $0))
+export EXTERNAL_DIR="$MAIN_DIR/external"
 
 # ============================================================================ #
 # Parse the options
