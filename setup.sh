@@ -91,13 +91,6 @@ if [ -f "$MAIN_DIR/prepare.env" ]; then
 fi
 source $MAIN_DIR/scripts/dependencies.sh
 
-# Ensure local dependencies are used if they are not defined by the environment
-[ -z "$NEKO_DIR" ] && NEKO_DIR="$EXTERNAL_DIR/neko"
-[ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$EXTERNAL_DIR/json-fortran"
-[ -z "$NEK5000_DIR" ] && NEK5000_DIR="$EXTERNAL_DIR/Nek5000"
-[ -z "$GSLIB_DIR" ] && GSLIB_DIR="$EXTERNAL_DIR/gslib"
-[ -z "$PFUNIT_DIR" ] && PFUNIT_DIR="$EXTERNAL_DIR/pFUnit"
-
 # Define standard compilers if they are not defined as environment variables
 if [ -z "$CC" ]; then export CC=$(which mpicc); else export CC; fi
 if [ -z "$CXX" ]; then export CXX=$(which mpicxx); else export CXX; fi
@@ -115,11 +108,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies                      # Check for system dependencies.
-find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
-find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
-[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies          # Check for system dependencies.
+find_json_fortran                  # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000                       # Re-defines the NEK5000_DIR variable.
+find_neko                          # Re-defines the NEKO_DIR variable.
+[ "$TEST" == true ] && find_pfunit # Re-defines the PFUNIT_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #
@@ -137,8 +130,6 @@ if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
 fi
 
 # Set the variables for the compilation
-CMAKE_VARIABLES+=("-DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR")
-CMAKE_VARIABLES+=("-DNEKO_DIR=$NEKO_DIR")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
