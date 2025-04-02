@@ -63,7 +63,7 @@ contains
     class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
-    type(simulation_t), target, intent(inout) :: simulation
+    type(simulation_t), target, optional, intent(inout) :: simulation
     character(len=:), allocatable :: type
 
     if (allocated(object)) then
@@ -84,7 +84,7 @@ contains
        call neko_type_error("Objective", type, KNOWN_TYPES)
     end select
 
-    call object%init_json(json, design, simulation)
+    call object%init(json, design, simulation)
   end subroutine objective_factory
 
 end submodule objective_factory_mod
