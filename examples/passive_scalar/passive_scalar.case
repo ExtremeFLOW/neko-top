@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": false,
         "end_time": 8.0,
-        "timestep": 5e-4,
+        "timestep": 2e-4,
         "numerics": {
             "time_order": 1,
             "polynomial_order": 6,
@@ -113,7 +113,7 @@
             {
                 "type": "steady",
                 "is_user": true,
-                "tol": 1e-4,
+                "tol": 1e-7,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
@@ -128,7 +128,7 @@
                 ],
                 "y_bounds": [
                     -1.0,
-                     3.8,
+                     3.0,
                 ],
                 "z_bounds": [
                    -1.0,
@@ -144,7 +144,7 @@
                 ],
                 "y_bounds": [
                     -1.0,
-                     3.8,
+                     3.0,
                 ],
                 "z_bounds": [
                    -1.0,
@@ -167,7 +167,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 1000
                 }
             ],
             "initial_distribution": {
@@ -180,19 +180,11 @@
             "max_iterations": 100,
             "tolerance": 1.0e-3,
             "mma": {
-                "max_iter": 100,
-                "asyinit": 0.5,
-                "asyincr": 1.2,
-                "asydecr": 0.7,
-                "m": 1,
-                "scale": 100.0,
+                "m": 0,
+                "scale": 1000.0,
                 "auto_scale": false,
                 "xmin": 0.0,
-                "xmax": 1.0,
-                "a0": 1.0,
-                "a": 0.0,
-                "c": 100.0,
-                "d": 0.0
+                "xmax": 1.0
             }
         },
         "objectives": [
