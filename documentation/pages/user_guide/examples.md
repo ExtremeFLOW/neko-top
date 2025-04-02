@@ -125,3 +125,11 @@ set(DRIVER_TYPE "default")
 build_example()
 
 ```
+
+## Current examples. {#examples-list}
+The following examples are currently implemented in `neko-top`
+- \subpage rugby-ball
+- \subpage power-iterations
+- \subpage brinkman-parameters
+- \subpage passive-scalar
+- \subpage permeability_block
