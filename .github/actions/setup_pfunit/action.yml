@@ -90,7 +90,26 @@ runs:
         REPO: https://github.com/Goddard-Fortran-Ecosystem/pFUnit.git
         VERSION: ${{ inputs.version }}
       run: |
-        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+        git clone --depth 1 --recursive --branch $VERSION $REPO $WORKING_DIR
+
+    # # ------------------------------------------------------------------------ #
+    # # Apply temporary patch to the pFUnit library
+    # # This patch is needed to fix the issue with the pFUnit library
+    # # requiring the CMake version to be 3.20 or higher.
+    # # This is a temporary fix until the pFUnit library is updated to
+    # # require a higher version of CMake.
+
+    # - name: Apply patch
+    #   if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
+    #   shell: bash
+    #   env:
+    #     WORKING_DIR: ${{ inputs.working-dir }}
+    #   run: |
+    #     LISTS=$(find $WORKING_DIR -name CMakeLists.txt)
+    #     for LIST in $LISTS; do
+    #       sed -i 's/cmake_minimum_required *([0-9]+\.[0-9]+\.[0-9]\+)/cmake_minimum_required(3.20.0)/' $LIST
+    #       sed -i 's/cmake_minimum_required *([0-9]+\.[0-9]+)/cmake_minimum_required(3.20.0)/' $LIST
+    #     done
 
     # ------------------------------------------------------------------------ #
     # Setup the system for building the pFUnit library
@@ -99,7 +118,7 @@ runs:
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt install cmake ninja-build openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        sudo apt install cmake openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, install the library
@@ -113,8 +132,9 @@ runs:
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
-        cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
+        cmake -B $WORKING_DIR/build -S $WORKING_DIR \
+          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
+          -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
     - name: Build
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
