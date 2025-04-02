@@ -99,7 +99,7 @@ runs:
       if: ${{ steps.cache-pfunit.outputs.cache-hit != 'true' }}
       shell: bash
       run: |
-        sudo apt install openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
+        sudo apt install cmake ninja-build openmpi-bin liblapack-dev libopenmpi-dev libopenblas-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, install the library
@@ -113,7 +113,7 @@ runs:
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
-        cmake -B $WORKING_DIR/build -S $WORKING_DIR \
+        cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
           -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR
 
     - name: Build
