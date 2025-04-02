@@ -80,7 +80,8 @@ module scalar_mixing_objective
    contains
 
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => scalar_mixing_init_json
+     procedure, public, pass(this) :: init_json_sim => &
+          scalar_mixing_init_json_sim
      !> The actual constructor.
      procedure, public, pass(this) :: init_from_attributes => &
           scalar_mixing_init_attributes
@@ -102,7 +103,7 @@ contains
   !! @param json The JSON subdictionary corresponding to your objective
   !! @param design The design
   !! @param simulation The simulation
-  subroutine scalar_mixing_init_json(this, json, design, simulation)
+  subroutine scalar_mixing_init_json_sim(this, json, design, simulation)
     class(scalar_mixing_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
@@ -120,7 +121,7 @@ contains
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, phi_ref)
-  end subroutine scalar_mixing_init_json
+  end subroutine scalar_mixing_init_json_sim
 
   !> The actual constructor.
   !! @param this The object
