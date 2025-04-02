@@ -36,7 +36,7 @@ inputs:
   compiler-flags:
     description: "The compiler flag to use."
     required: false
-    default: "-O3"
+    default: "-O2 -std=f2018"
 
   build-options:
     description: "The build option to use."
@@ -75,10 +75,13 @@ runs:
         VERSION: ${{ inputs.version }}
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
+        COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
-        key="neko-$VERSION-$OS-$COMPILER"
-        [ $VERSION == "develop" ] && key="$key-$(/bin/date -u "+%Y%m%d")"
-        echo "key=$key" >> $GITHUB_OUTPUT
+        # Get the GIT sha for the current commit
+        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
+        key="neko-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
       id: cache-neko
@@ -120,14 +123,10 @@ runs:
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
-        JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
       run: |
-        export PKG_CONFIG_PATH=$JSON_FORTRAN_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
-        export LD_LIBRARY_PATH=$JSON_FORTRAN_DIR/lib:$LD_LIBRARY_PATH
-
         cd $WORKING_DIR
         ./regen.sh
-        ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS=$FCFLAGS
+        ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS="$FCFLAGS"
         make install ${{ inputs.build-options }}
 
     # ------------------------------------------------------------------------ #
@@ -152,5 +151,10 @@ runs:
     - name: Set output
       id: set-output
       shell: bash
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
       run: |
-        echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
+        echo "install-dir=$(echo ${INSTALL_DIR})" >> $GITHUB_OUTPUT
+        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV
+        echo "PATH=${INSTALL_DIR}/bin:${PATH}" >> $GITHUB_ENV
