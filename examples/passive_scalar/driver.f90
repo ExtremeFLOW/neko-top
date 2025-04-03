@@ -6,7 +6,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use user, only: user_setup
-  use brinkman_design, only: brinkman_design_t
+  use design, only: design_t, design_factory
 
   use mpi_f08, only: MPI_Init
 
@@ -25,7 +25,7 @@ program usrneko
   !> The problem type
   type(problem_t) :: problem
   !> The design type
-  type(brinkman_design_t) :: design
+  class(design_t), allocatable :: design
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: optimizer
 
@@ -49,12 +49,16 @@ program usrneko
   ! initialize the user additions for the forward (through the neko interface)
   call user_setup(simulation%neko_case%usr)
 
+  ! initialize the simulation
   call simulation%init(parameters)
 
-  call design%init(parameters, simulation)
+  ! initialize the design
+  call design_factory(design, parameters, simulation)
 
-
+  ! initialize the problem
   call problem%init(parameters, design, simulation)
+
+  ! initialize the optimizer
   call optimizer_factory(optimizer, parameters, problem, design, simulation)
 
   ! -------------------------------------------------------------------------- !
