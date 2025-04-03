@@ -125,6 +125,8 @@ done
 # ============================================================================ #
 # Print errors for all unfinished tests
 
+ERROR_OCCURRED=0
+
 for test in ${tests[@]}; do
     # Check if there were errors. Print them if there were.
     if [ -s $LPATH/$test/error.log ]; then
@@ -132,6 +134,8 @@ for test in ${tests[@]}; do
         if [ "$(head -n 1 $LPATH/$test/error.log)" = "Interrupted" ]; then
             continue
         fi
+
+        ERROR_OCCURRED=1
 
         # Print the header with example name
         printf '\n\e[4;31m%-s\e[m' "${test:0:79}"
@@ -160,4 +164,7 @@ printf "\n"
 
 # Remove all empty folders in the logs folder
 find $LPATH -type d -empty -delete
+
+# If an error occurred, return 1
+exit $ERROR_OCCURRED
 # # EOF # #

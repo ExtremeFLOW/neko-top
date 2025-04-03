@@ -267,7 +267,6 @@ function find_neko() {
     find_json_fortran
     find_gslib
     find_hdf5
-    [ "$TEST" == true ] && find_pfunit
 
     # Determine the Neko installation directory
     if [ ! -z "$1" ]; then
@@ -285,14 +284,13 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    if [[ -z "$(find $1/lib*/ -name libneko.a)" || "$CLEAN" == true ]]; then
+    if [[ -z "$(find $NEKO_DIR/lib*/ -name libneko.a)" || "$CLEAN" == true ]]; then
 
         # Determine available features
         FEATURES="--enable-contrib "
         [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
         [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ ! -z "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
-        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -331,7 +329,6 @@ function find_neko() {
         fi
         [ "$CLEAN" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
-        [ "$TEST" == true ] && make check
 
         # Verify installation device type
         if [ "$DEVICE_TYPE" == "CUDA" ]; then

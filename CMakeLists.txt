@@ -160,13 +160,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 # ============================================================================ #
 
 # Setup testing
-include(CTest)
-if (BUILD_TESTING)
-    find_package(PFUNIT REQUIRED
-        HINTS ${PFUNIT_DIR}
-    )
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # ============================================================================ #
 # Write messages to the user about the options and paths if we are at the top

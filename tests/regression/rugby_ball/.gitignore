@@ -1,0 +1,5 @@
+# Ignore all target files, they are machine dependent
+rugby_ball-tests
+*.log
+box.nmsh
+optimization_data.csv

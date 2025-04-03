@@ -455,7 +455,11 @@ done
 
 if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
+
+    # If status return an error, we exit with an error code
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
 fi
 
-printf "\n"
 # # EOF # #
