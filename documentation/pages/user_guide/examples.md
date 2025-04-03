@@ -14,7 +14,7 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ```
 
 A full list of examples can be found in the 
-@ref examples-list.
+\subpage examples-list.
 
 ## Execution of examples {#examples-running}
 
@@ -125,4 +125,3 @@ set(DRIVER_TYPE "default")
 build_example()
 
 ```
-
