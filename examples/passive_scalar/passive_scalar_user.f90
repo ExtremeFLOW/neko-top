@@ -1,5 +1,5 @@
 ! User module for the user defined simulation component
-module user
+module passive_scalar_user
   use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
@@ -100,4 +100,4 @@ contains
 
   end subroutine scalar_ic
 
-end module user
+end module passive_scalar_user

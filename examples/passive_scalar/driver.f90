@@ -5,7 +5,7 @@ program usrneko
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
-  use user, only: user_setup
+  use passive_scalar_user, only: user_setup
   use brinkman_design, only: brinkman_design_t
 
   use mpi_f08, only: MPI_Init
