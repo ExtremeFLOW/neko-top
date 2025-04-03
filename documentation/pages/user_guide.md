@@ -13,3 +13,11 @@ writing JSON files, and the PFUnit library, which is used for unit testing.
   - [Creating a new case](@ref examples-new)
   - [Case files and meshes](@ref examples-data)
   - [Advanced example setups](@ref examples-advanced)
+
+\note the remaining structure here should be discussed. I suggest we follow
+in suit with `neko`, where they essentially break up the user guide based on
+the top level structure of the case file. In any case, this would be where we
+introduce these subpages
+\subpage mapping_cascade
+\subpage objectives_and_constraints
+\subpage simulation_components
