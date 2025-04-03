@@ -1,7 +1,9 @@
 # List of examples {#examples-list}
 
-2. \subpage easy-E
-5. \subpage power-iterations
-6. \subpage rugby-ball
-7. \subpage rugby-verification
-8. \subpage brinkman-parameters
+1. \subpage easy-E
+2. \subpage power-iterations
+3. \subpage rugby-ball
+4. \subpage rugby-verification
+5. \subpage brinkman-parameters
+6. \subpage passive-scalar
+7. \subpage permeability_block
