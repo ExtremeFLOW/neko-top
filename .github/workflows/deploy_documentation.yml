@@ -20,20 +20,21 @@ jobs:
     name: Build documentation
     runs-on: ubuntu-latest
     steps:
+      - name: Setup system
+        shell: bash
+        run: |
+          sudo apt install git cmake doxygen graphviz
+
       - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: develop
 
-      - name: Setup system cached
-        uses: awalsh128/cache-apt-pkgs-action@latest
-        with:
-          packages: git cmake doxygen graphviz
-          version: 1.0
 
       - name: Configure documentation
         run: |
-            cmake -DONLY_DOCS=ON -B build -S .
+          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=Release
+
 
       - name: Build documentation
         run: |
