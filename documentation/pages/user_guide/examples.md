@@ -14,7 +14,7 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ```
 
 A full list of examples can be found in the 
-\subpage examples-list.
+@ref examples-list.
 
 ## Execution of examples {#examples-running}
 
@@ -126,10 +126,3 @@ build_example()
 
 ```
 
-## Current examples. {#examples-listed}
-The following examples are currently implemented in `neko-top`
-- \subpage rugby-ball
-- \subpage power-iterations
-- \subpage brinkman-parameters
-- \subpage passive-scalar
-- \subpage permeability_block

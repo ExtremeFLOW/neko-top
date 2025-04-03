@@ -154,7 +154,7 @@ the solid on the fluid as a control problem, where the feedback force is tuned
 to drive the velocity to zero in the solid region.
 Regardless of their different motivation, both methods result in a similar 
 mathematical structure. More information regarding the mapping of \f$\chi\f$ can
-be found in \subpage mapping_cascade.
+be found in [Mapping cascade](@ref mapping_cascade).
 
 \note In the future we will provide a full adjoint derivation in this section
 of the theory guide. This will tie together all aspects from the mapping, to

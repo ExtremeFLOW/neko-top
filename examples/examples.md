@@ -5,4 +5,5 @@
 3. \subpage rugby-ball
 4. \subpage rugby-verification
 5. \subpage brinkman-parameters
-5. \subpage passive-scalar
+6. \subpage passive-scalar
+7. \subpage permeability_block
