@@ -802,9 +802,9 @@ create custom drivers to perform specific tasks. Further details regarding drive
 can be found in [Advanced example setups](@ref examples-advanced).
 
 This functionality can be achieved by providing a `driver.f90` file in the
-example folder along with a `CMakelist.txt`.
+example folder along with a `CMakeLists.txt`.
 
-For this tutorial, we provide the following `CMakelist.txt`
+For this tutorial, we provide the following `CMakeLists.txt`
 
 ```CMake
 # Simple setup to compile the current example.

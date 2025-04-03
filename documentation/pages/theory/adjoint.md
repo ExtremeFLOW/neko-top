@@ -27,7 +27,7 @@ The governing equations are subjected  boundary conditions on
 where \f$\Gamma_N\f$ and \f$\Gamma_D\f$ denote outflow and dirichlet boundaries
 respectively.
 
-A common formulation of the adjoint Navier--Stokes
+A common formulation of the adjoint Navier-Stokes
 equations reads
 
 \f[
