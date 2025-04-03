@@ -8,7 +8,7 @@ This tutorial aims to replicate the passive mixer problem by
 [C. S. Andreasen et al. 2009](https://doi.org/10.1002/fld.1964).
 
 The goal of this optimization problem is to design a structure capable of
-mixing fluids in a static mannor, that is to say, without the use of moving
+mixing fluids in a static manor, that is to say, without the use of moving
 parts.
 
 We begin by considering  a square duct seen in the figure below.
@@ -45,7 +45,7 @@ In this tutorial you will learn how to
 ![Indication of the computational domain and boundary conditions.](mixer_BCs.png)
 
 We define the duct as the domain \f$\Omega\f$.
-The equations being solved in \f$\Omega\f$ are the incompressible Navier--Stokes
+The equations being solved in \f$\Omega\f$ are the incompressible Navier-Stokes
 equations with an additional passive scalar equation
 
 \f[
@@ -175,7 +175,7 @@ will be created with \f$30 \times 10 \times 10 \f$ elements.
 problem there are no periodic boundary conditions, hence the `.false.` arguments
 
 An important consideration when using `genmeshbox` is the boundary identifiers,
-which become relavent when prescribing boundary conditions. The convention is
+which become relevant when prescribing boundary conditions. The convention is
 to label from 1-6 in the order \f$[x_\text{start}, x_\text{finish},y_\text{start}, y_\text{finish}, z_\text{start}, z_\text{finish}] \f$ 
 or as indicated in the figure below.
 
@@ -236,16 +236,16 @@ numerics and case set up.
 \note The default name when using `genmeshbox` is `"box.nmsh"`.
 
 It is common practice in `neko-top` to disable the inbuilt `neko` file outputs,
-and instead rely on the output samplers provided by `neko-top` to aleviate
-excessesive outputs when looping between the forward and adjoint runs.
+and instead rely on the output samplers provided by `neko-top` to alleviate
+excessive outputs when looping between the forward and adjoint runs.
 
 Here we have prescribed: 
-- a timestep \f$\Delta t = 2\times 10^{-4} \f$ (`"timestep": 2e-4`)
+- a time-step \f$\Delta t = 2\times 10^{-4} \f$ (`"timestep": 2e-4`)
 - a first order time integration scheme (`"time_order": 1`)
 - a polynomial order of 6 (`"polynomial_order": 6`)
 - the use of overintegration when evaluating the convective terms (`"dealias": true`)
 
-\attention Despite intending to solve the steady Navier--Stokes equation,
+\attention Despite intending to solve the steady Navier-Stokes equation,
 Currently an `end_time` must be prescribed in `neko`. More details regarding
 steady state solutions can be found in [Simulation components](@ref simulation_components)  but there are
 intentions to include steady state functionality directly within `neko`,
@@ -266,8 +266,8 @@ state simulation component
 ```
 
 \attention Currently certain features of `neko` are not supported by `neko-top`
-due to a lack of adjoint support. Relavent to this section, it should be noted
-that varaible timestepping is not supported.
+due to a lack of adjoint support. Relevant to this section, it should be noted
+that variable time-stepping is not supported.
 
 ### Fluid
 The fluid section of the case file allows the user to prescribe fluid properties,
@@ -344,7 +344,7 @@ however the interested reader can find more information
 
 \attention
 It should be noted that some features in `neko` are not supported in `neko-top`
-due to a lack of adjoint support. Relavent to this section, it should be noted
+due to a lack of adjoint support. Relevant to this section, it should be noted
 that the use of projections or gradient jump penalty are not supported.
 
 To prescribe user defined conditions, such as the condition on \f$\Gamma_\text{in}\f$
@@ -352,7 +352,7 @@ users can provide additional fortran code. In this tutorial we will provide an
 additional `user.f90`. Further details on the `neko` user interface can be
 found [here](https://neko.cfd/docs/release/d6/def/user-file.html).
 
-In this tutorial we wish to prescribe a parabaloid as an inflow condition, this
+In this tutorial we wish to prescribe a paraboloid as an inflow condition, this
 is achieved by asserting `user%fluid_user_if => user_inflow_eval` and providing
 the following code excerpt:
 
@@ -438,7 +438,7 @@ to prescribe a separation between the two scalar species where
 \f$\phi = 0\f$ represents one species and \f$\phi = 1\f$ represents the other.
 It is well understood that spectral methods struggle to represent discontinuities,
 hence, a sigmoid function is use to provide a sufficient amount of smoothing
-accross the inteface of the two species. The completed `user.f90` should now
+across the interface of the two species. The completed `user.f90` should now
 read:
 ```fortran
 ! User module for the user defined simulation component
@@ -621,8 +621,8 @@ The key details which are prescribed are:
 ```
 
 ## Domain specification {#mixer_domains}
-Domains can be specified through the `neko` functionility `point_zones`, the
-reader is reffered [here](https://neko.cfd/docs/release/da/dd0/point-zones.html)
+Domains can be specified through the `neko` functionality `point_zones`, the
+reader is referred [here](https://neko.cfd/docs/release/da/dd0/point-zones.html)
 for extensive documentation on point zones.
 
 In this tutorial we must define \f$\Omega_\text{opt}\f$ and 
@@ -682,7 +682,7 @@ and `constraints` subsection of `optimization`. A full list of the available
 objectives and constraints can be found in [Objectives and constraints](@ref objectives_and_constraints).
 
 \attention In the future we wish to also include a tutorial teaching users how
-to implement their own custome objectives and constraints, however this is yet
+to implement their own custom objectives and constraints, however this is yet
 to come.
 
 In this tutorial we wish to assign a `"scalar_mixing"` objective and no
@@ -744,7 +744,7 @@ which can be prescribed with
             ],
 ```
 
-\note It is important to note that the order in which the mappings occure in
+\note It is important to note that the order in which the mappings occur in
 the case file is the order in which they will be executed.
 
 Here we have prescribed a spatial filter with radius 1 followed by a RAMP mapping
@@ -780,9 +780,9 @@ In this tutorial we we select the MMA algorithm by prescribing
         },
 ```
 
-The key paramters selected are
+The key parameters selected are
 - a maximum of 100 optimization iterations (`"max_iter": 100`)
-- a convergence criterior of 1.0e-3 (`"tolerance": 1.0e-3`)
+- a convergence criterion of 1.0e-3 (`"tolerance": 1.0e-3`)
 - no constraints (`"m": 0`)
 - a scaling factor of 1000 for the objective function (`"scale": 1000.0`)
 - assert that \f$ \rho \in [0,1] \f$
@@ -831,13 +831,13 @@ set(EXTRA_SOURCES
 `neko-top` distinguishes between four key objects:
 - [design](@ref design). The design space over which one optimizes.
 - [problem](@ref problem). The definition of the optimization problem being solved.
-- [optimizer](@ref optimizer). The optimization algoirthm used to solve the optimization
+- [optimizer](@ref optimizer). The optimization algorithm used to solve the optimization
 problem.
 - [simulation](@ref simulation). Specifically for problems involving fluid mechanics, a
 simulation can allow for interfaces with `neko` to perform forward simulation
 and additional `neko-top` libraries to perform adjoint sensitivity analysis.
 
-Further details regarding these componenents can be found in [Code structure ](@ref code-structure).
+Further details regarding these components can be found in [Code structure ](@ref code-structure).
 
 The basic structure of `driver.f90` is to 
 

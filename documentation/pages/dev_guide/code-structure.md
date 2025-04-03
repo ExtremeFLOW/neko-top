@@ -12,7 +12,7 @@ flexible and allow for easy extension and modification.
 `neko-top` distinguishes between four key objects:
 - \subpage design. The design space over which one optimizes.
 - \subpage problem. The definition of the optimization problem being solved.
-- \subpage optimizer. The optimization algoirthm used to solve the optimization
+- \subpage optimizer. The optimization algorithm used to solve the optimization
 problem.
 - \subpage simulation. Specifically for problems involving fluid mechanics, a
 simulation can allow for interfaces with `neko` to perform forward simulation
