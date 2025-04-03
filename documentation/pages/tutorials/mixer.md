@@ -247,7 +247,7 @@ Here we have prescribed:
 
 \attention Despite intending to solve the steady Navier--Stokes equation,
 Currently an `end_time` must be prescribed in `neko`. More details regarding
-steady state solutions can be found in \subpage simulation_components  but there are
+steady state solutions can be found in [Simulation components](@ref simulation_components)  but there are
 intentions to include steady state functionality directly within `neko`,
 streamlining this process.
 
@@ -549,7 +549,7 @@ end module user
 ### Adjoint fluid and scalar
 This tutorial will focus on the practical aspects of setting up the adjoint 
 simulation however the theory regarding adjoint sensitivity analysis can be 
-found in \subpage adjoint.
+found in [Adjoint sensitivity analysis](@ref adjoint).
 
 ```
         "adjoint_scalar": {
@@ -679,7 +679,7 @@ the `optimization` section of the case file
 ## Objectives and constraint {#mixer_objectives}
 Various objectives and constraints can be provided as lists in the `objectives`
 and `constraints` subsection of `optimization`. A full list of the available
-objectives and constraints can be found in \subpage objectives_and_constraints.
+objectives and constraints can be found in [Objectives and constraints](@ref objectives_and_constraints).
 
 \attention In the future we wish to also include a tutorial teaching users how
 to implement their own custome objectives and constraints, however this is yet
@@ -709,7 +709,7 @@ prescribed objectives
 where \f$w_i\f$ is a prescribed weight.
 
 Multiple constraints on the other hand are also entered in a list but are
-handled through the MMA functionality discussed in \subpage MMA.
+handled through the MMA functionality discussed in [The Method of Moving Asymptotes (MMA)](@ref MMA).
 
 Since the scalar \f$ \phi \in [0,1]\f$, we set a target value for the scalar
 concentration to \f$ \phi = 0.5\f$ (`"phi_ref": 0.5`) and assert the area of
@@ -717,11 +717,11 @@ interest is in \f$ \Omega_{mix}\f$ (`"mask_name": "objective_domain"`).
 
 
 ## Mapping cascade {#mixer_mapping}
-We saw in \subpage mixer_optimization_problem that the design indicator field
+We saw in [Defining the optimization problem](@ref mixer_optimization_problem) that the design indicator field
 \f$\rho\f$ must be mapped to the Brinkman amplitude \f$\chi\f$. This is achieved
 through the use of the mapping cascade accessible in `optimization.design.mapping`.
 A detailed description of the mapping cascade and available mappings in `neko-top`
-can be found in \subpage mapping_cascade.
+can be found in [Mapping cascade](@ref mapping_cascade).
 
 In this tutorial we use the composite mapping 
 \f$\rho \mapsto \tilde{\rho} \mapsto \chi\f$ where
@@ -762,7 +762,7 @@ the chain rule backward, i.e.
 The optimization algorithm used to solve optimization problem is prescribed
 in the `"solver"` section of the case file.
 Currently on the MMA algorithm is implemented and more details can be found
-in \subpage MMA.
+in [The Method of Moving Asymptotes (MMA)](@ref MMA).
 
 In this tutorial we we select the MMA algorithm by prescribing
 ```
@@ -829,15 +829,15 @@ set(EXTRA_SOURCES
 ```
 
 `neko-top` distinguishes between four key objects:
-- \subpage design. The design space over which one optimizes.
-- \subpage problem. The definition of the optimization problem being solved.
-- \subpage optimizer. The optimization algoirthm used to solve the optimization
+- [design](@ref design). The design space over which one optimizes.
+- [problem](@ref problem). The definition of the optimization problem being solved.
+- [optimizer](@ref optimizer). The optimization algoirthm used to solve the optimization
 problem.
-- \subpage simulation. Specifically for problems involving fluid mechanics, a
+- [simulation](@ref simulation). Specifically for problems involving fluid mechanics, a
 simulation can allow for interfaces with `neko` to perform forward simulation
 and additional `neko-top` libraries to perform adjoint sensitivity analysis.
 
-Further details regarding these componenents can be found in \subpage code-structure.
+Further details regarding these componenents can be found in [Code structure ](@ref code-structure).
 
 The basic structure of `driver.f90` is to 
 
@@ -967,7 +967,7 @@ Once the example has been constructed it can be run by simply executing
 ```
 
 from the root `neko-top` directory. Further details on the functionality of the
-run script `run.sh` can be found in \subpage examples.
+run script `run.sh` can be found in [Examples](@ref examples).
 
 ## Post processing the results {#mixer_post}
 
