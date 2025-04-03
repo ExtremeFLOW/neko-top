@@ -24,7 +24,7 @@ The governing equations are subjected  boundary conditions on
     \text{ on } \Gamma_O, \\
     \mathbf{u} = \mathbf{u}_\text{in}, \text{ on } \Gamma_D, \\
 \f]
-where \f$\Gamma_N\f$ and \f$\Gamma_D\f$ denote outflow and dirichlete boundaries
+where \f$\Gamma_N\f$ and \f$\Gamma_D\f$ denote outflow and dirichlet boundaries
 respectively.
 
 A common formulation of the adjoint Navier--Stokes
@@ -97,8 +97,8 @@ The adjoint scalar equation takes the following form
 where \f$\phi(\mathbf{x},t)\f$ denotes the scalar field,
 and where \f$Pe\f$ denotes the Peclet number. In the context of conjugate
 heat transfer, the velocity equation is often coupled to the scalar equation
-through the Boussinesq approximiation for instance, however, in lieu of this
-coupling the scalar is often reffered to as a "passive scalar" to imply the
+through the Boussinesq approximation for instance, however, in lieu of this
+coupling the scalar is often referred to as a "passive scalar" to imply the
 one way coupling.
 
 In `neko-top` the adjoint scalar reads (in weak form),
@@ -147,7 +147,7 @@ immersed object is imposed by the Brinkman forcing term \f$\mathbf{f} = - \chi
 Considering \f$\overline{\chi}\f$ to be a large value, this discontinuous forcing 
 term models a momentum loss in solid region, and thereby simulating porous 
 media with very low permeability. It is worth noting that while the Brinkman 
-penalization method is rooted in the idea of modeling solid regions as porous
+penalization method is rooted in the idea of modelling solid regions as porous
 media with vanishing permeability, the  approach proposed by 
 [Goldstein](https://doi.org/10.1006/jcph.1993.1081) frames the interaction of
 the solid on the fluid as a control problem, where the feedback force is tuned 
