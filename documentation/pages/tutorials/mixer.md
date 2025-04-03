@@ -11,17 +11,19 @@ The goal of this optimization problem is to design a structure capable of
 mixing fluids in a static mannor, that is to say, without the use of moving
 parts.
 
-We begin by considering a domain \f$\Omega\f$ which is a square duct seen in
-the figure below.
+We begin by considering  a square duct seen in the figure below.
 
-![Animation of mixer](mixer_animation.gif)
+![Indication of the convergence history of the static mixer](mixer_animation.gif)
 
 Fluid enters the domain upstream and is ejected downstream, with all other
 boundary being considered solid walls. 
-In addition, a scalar field, representative of the two species one desires to
-have mixed, enters upstream, separated into two distinct species. The goal of
+In addition, we consider a scalar field, representative of the two species one desires to
+have mixed (denoted in red and blue in the above figure). 
+The species enters the mixer upstream, originally separated into two distinct species. 
+The goal of
 the optimization problem is to design the interior structure such that the
-two species are as homogeneous as possible in the downstream location. The
+two species are as homogeneous as possible in the downstream location 
+(denoted in green in the above figure). The
 system is assumed to be low Reynolds number, implying a steady state solution
 can be found, and high Peclet number, implying the mixing must be performed
 by advective transport, not diffusion.
@@ -40,9 +42,11 @@ In this tutorial you will learn how to
 
 ## Defining the optimization problem {#mixer_optimization_problem}
 
-![Figure of boundary conditions](mixer_BCs.png)
+![Indication of the computational domain and boundary conditions.](mixer_BCs.png)
 
-The equations being solved in this optimization problem are
+We define the duct as the domain \f$\Omega\f$.
+The equations being solved in \f$\Omega\f$ are the incompressible Navier--Stokes
+equations with an additional passive scalar equation
 
 \f[
     {\frac {\partial \mathbf {u} }{\partial t}}
@@ -57,7 +61,7 @@ The equations being solved in this optimization problem are
     + (\mathbf {u} \cdot \nabla)\phi
     =
     {\frac {1}{Pe}}\nabla ^{2}\phi
-    , \text{ in } \Omega,\\
+    ,\\
 \f]
 
 subject to boundary conditions
@@ -99,7 +103,7 @@ we can place material and
 a domain downstream in which we want the scalar species to be mixed
 \f$\Omega_\text{mix} \subset \Omega\f$. 
 
-![Figure of domains](mixer_domains.png)
+![indication of the optimization domain and objective domain](mixer_domains.png)
 
 We can now define our objective function
 to be minimized as
@@ -136,6 +140,13 @@ We now introduce the abstract material indicator
 \text{Boundary conditions.}
 \f]
 
+Given this optimization consists of a single objective function and an
+exhaustively large number of design variables, it is natural to solve this
+problem with adjoint based sensitivity analysis and gradient decent algorithms.
+
+The remained of this tutorial will guide you through the process of solving
+such an optimization problem with the topology optimization framework `neko-top`.
+
 ## prepare.sh and meshing {#mixer_meshing}
 `neko-top` provides users with the capability of executing custom scripts before
 an the simulation begins but including a `prepare.sh` script in the example 
@@ -168,7 +179,7 @@ which become relavent when prescribing boundary conditions. The convention is
 to label from 1-6 in the order \f$[x_\text{start}, x_\text{finish},y_\text{start}, y_\text{finish}, z_\text{start}, z_\text{finish}] \f$ 
 or as indicated in the figure below.
 
-![Figure of face ordering](mixer_BC_order.png)
+![Indication of the face ordering used by `genmeshbox`](mixer_BC_order.png)
 
 ## The neko-top .case file {#mixer_case_file}
 The `*.case` file allows the user to set up the case.
