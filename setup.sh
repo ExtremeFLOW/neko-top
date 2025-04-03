@@ -39,12 +39,13 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Assign default values to the options
 DEVICE_TYPE="NONE"
 CLEAN=false
+CLEAN_NEKO=false
 QUIET=false
 TEST=false
 DOCS=false
 
 # List possible options
-OPTIONS=help,test,clean,quiet,device:,doc
+OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
 OPT=h,t,c,q,d:
 
 # Parse the inputs for options
@@ -61,7 +62,8 @@ while true; do
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
 
     # Purely long settings
-    "--doc") DOCS=true && shift ;; # Build the documentation
+    "--doc") DOCS=true && shift ;;              # Build the documentation
+    "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
     "--") shift && break ;;
@@ -70,14 +72,15 @@ done
 
 # Check if the device type has changed
 if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
-    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt) || true
-    if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
+    CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
+    if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
+        CLEAN_NEKO=true
     fi
 fi
 
-export TEST CLEAN QUIET DEVICE_TYPE
+export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
