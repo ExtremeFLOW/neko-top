@@ -126,7 +126,7 @@ build_example()
 
 ```
 
-## Current examples. {#examples-list}
+## Current examples. {#examples-listed}
 The following examples are currently implemented in `neko-top`
 - \subpage rugby-ball
 - \subpage power-iterations
