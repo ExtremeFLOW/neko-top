@@ -285,14 +285,14 @@ solvers, boundary conditions and initial conditions.
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "boundary_conditions": [
                 {
@@ -394,7 +394,7 @@ scalar properties, solvers, boundary conditions and initial conditions.
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "initial_condition": {
                 "type": "user"
