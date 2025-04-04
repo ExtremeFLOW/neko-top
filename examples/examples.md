@@ -1,4 +1,4 @@
-# List of examples {#examples-list}
+## List of examples {#examples-list}
 
 1. \subpage easy-E
 2. \subpage power-iterations

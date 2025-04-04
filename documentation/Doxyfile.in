@@ -823,6 +823,7 @@ EXCLUDE_SYMLINKS       = NO
 # exclude all test directories for example use the pattern */test/*
 
 EXCLUDE_PATTERNS       = @top_srcdir@/sources/**/readme.md \
+                         @top_srcdir@/examples/examples.md \
                          @top_srcdir@/examples/**/*.f90 \
                          @top_srcdir@/documentation/html/*
 

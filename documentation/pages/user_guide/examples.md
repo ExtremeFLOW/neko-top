@@ -13,8 +13,8 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ./run.sh [-h] [--help]
 ```
 
-A full list of examples can be found in the 
-\subpage examples-list.
+<!-- Include the list of examples -->
+\include{doc} "examples/examples.md"
 
 ## Execution of examples {#examples-running}
 
