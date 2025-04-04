@@ -780,7 +780,7 @@ In this tutorial we we select the MMA algorithm by prescribing
 ```
 
 The key parameters selected are
-- a maximum of 100 optimization iterations (`"max_iter": 100`)
+- a maximum of 100 optimization iterations (`"max_iterations": 100`)
 - a convergence criterion of 1.0e-3 (`"tolerance": 1.0e-3`)
 - no constraints (`"m": 0`)
 - a scaling factor of 1000 for the objective function (`"scale": 1000.0`)
