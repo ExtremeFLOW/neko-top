@@ -773,7 +773,6 @@ In this tutorial we we select the MMA algorithm by prescribing
             "mma": {
                 "m": 0,
                 "scale": 1000.0,
-                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0
             }
