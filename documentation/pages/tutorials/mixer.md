@@ -35,7 +35,7 @@ In this tutorial you will learn how to
 - [Define different domains](@ref mixer_domains)
 - [Define the objective functions and constraints being solved.](@ref mixer_objectives)
 - [Define a mapping cascade.](@ref mixer_mapping)
-- [Define optimization parameters for the MMA algorithm.](@ref mixer_MMA)
+- [Define parameters for the optimization algorithm.](@ref mixer_MMA)
 - [Prepare a driver to solve the optimization problem.](@ref mixer_driver)
 - [Solve the optimization problem.](@ref mixer_solve)
 - [Post process the results.](@ref mixer_post)
