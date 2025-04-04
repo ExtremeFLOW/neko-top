@@ -229,7 +229,7 @@ numerics and case set up.
         "timestep": 2e-4,
         "numerics": {
             "time_order": 1,
-            "polynomial_order": 6,
+            "polynomial_order": 5,
             "dealias": true
         },
 ```
