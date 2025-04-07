@@ -61,8 +61,8 @@ The objective can be selected by prescribing `"type": "minimum_dissipation"`
 and has the following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Dissipation`|
@@ -105,8 +105,8 @@ and has the following input parameters:
 based on lubrication theory written by Gersborg-Hansen et al.
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
@@ -131,8 +131,8 @@ The objective can be selected by prescribing `"type": "scalar_mixing"`
 and has the following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
@@ -164,8 +164,8 @@ The constraint can be selected by prescribing `"type": "volume"`
 and has the following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
 | `limit` | \f$ \mathcal{C}_\text{min} \f$ or \f$ \mathcal{C}_\text{max} \f$  in the above equation | Real | - |
 | `is_max` | Indicate whether a minimum or maximum volume constraint should be applied. | `.true.` or `.false.` | `.false.` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|

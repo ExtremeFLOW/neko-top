@@ -70,13 +70,13 @@ The filter can be selected by prescribing `"type": "PDE_filter"` and has the
 following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
-| `r`           | \f$r\f$ is the above equation.                                                                              | Real     | -                               |
-| `tol`                 | The desired tolerance used when solving the system. | Real                   | `0.0000000001`                               |
-| `max_iter`                    | Maximum number of iterations when solving the system.                                                                 | Integer          | `200`                         |
-| `solver` | Numerical solver used to solve the system.                                         | `cg`,`gmres`, `gmres`                     | `cg` |
-| `preconditioner` | Pre-conditioner used to solve the system.                                         | `ident`, `hsmg`, `jacobi`                     | `jacobi`  |
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `r` | \f$r\f$ is the above equation. | Real | - |
+| `tol`| The desired tolerance used when solving the system. | Real | `0.0000000001` |
+| `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
+| `solver` | Numerical solver used to solve the system. | `cg`,`gmres`, `gmres` | `cg` |
+| `preconditioner` | Pre-conditioner used to solve the system. | `ident`, `hsmg`, `jacobi` | `jacobi`  |
 
 
 ## Linear mapping {#mapping_linear}
@@ -89,10 +89,10 @@ The mapping can be selected by prescribing `"type": "linear"` and has the
 following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
-| `f_max`           | \f$f_\text{max}\f$ in the above equation.                                                                              | Real     | -                               |
-| `f_min`           | \f$f_\text{min}\f$ in the above equation.                                                                              | Real     | `0.0`                               |
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real | - |
+| `f_min`| \f$f_\text{min}\f$ in the above equation. | Real | `0.0` |
 
 ## RAMP mapping {#mapping_RAMP}
 A mapping based on the [RAMP](10.1007/s001580100129) taking the following two
@@ -112,9 +112,9 @@ The mapping can be selected by prescribing `"type": "RAMP"` and has the
 following input parameters:
 
 
-| Name                         | Description                                                                                                     | Admissible values          | Default value                   |
-|------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------|---------------------------------|
-| `f_max`           | \f$f_\text{max}\f$ in the above equation.                                                                              | Real     | -                               |
-| `f_min`           | \f$f_\text{min}\f$ in the above equation.                                                                              | Real     | `0.0`                               |
-| `q`           | \f$q\f$ in the above equation.                                                                              | Real     | `1.0`                               |
-| `convex_up`           | The convexity used in the above equation.                                                                              | `.true.` or `.false.`     | `.true.`                               |
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
+| `q` | \f$q\f$ in the above equation. | Real | `1.0`|
+| `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
