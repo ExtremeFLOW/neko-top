@@ -37,11 +37,14 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_brinkman.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/designs/set_optimization_ic.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
@@ -57,6 +60,7 @@ target_sources(neko-top
         # List of specific problems, objectives and constraints
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
@@ -83,16 +87,17 @@ target_include_directories(neko-top
         ${CMAKE_Fortran_MODULE_DIRECTORY}
 )
 
-target_link_libraries(neko-top
-    BLAS::BLAS
-    LAPACK::LAPACK
-    jsonfortran-gnu::jsonfortran
-    PkgConfig::neko
-)
 
-if(MPI_FOUND)
-    target_link_libraries(neko-top MPI::MPI_Fortran)
-endif()
+# ............................................................................ #
+# Link to the required libraries.
+
+target_link_libraries(neko-top
+    PkgConfig::neko
+    PkgConfig::json-fortran
+    MPI::MPI_Fortran
+    $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
+    $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+)
 
 # ============================================================================ #
 # Specify installation instructions

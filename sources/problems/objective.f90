@@ -76,7 +76,7 @@ module objective
        class(objective_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        class(design_t), intent(in) :: design
-       type(simulation_t), target, intent(inout) :: simulation
+       type(simulation_t), target, optional, intent(inout) :: simulation
      end subroutine objective_factory
   end interface
 

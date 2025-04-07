@@ -37,5 +37,7 @@ manim_media/
 *.mp4
 *.gif
 
+# Documentation files
+doxygen.log
 html/
 *.html

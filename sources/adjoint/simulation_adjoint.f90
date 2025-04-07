@@ -92,14 +92,14 @@ contains
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
     ! call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-    call this%output_controller%execute(t_adj, tstep_adj)
+    call this%output_controller%execute(this%case%time)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
-    call this%case%usr%user_init_modules(t_adj, this%scheme%u_adj, &
-         this%scheme%v_adj, this%scheme%w_adj,&
-         this%scheme%p_adj, this%scheme%c_Xh, this%case%params)
+    call this%case%usr%user_init_modules(t_adj, this%fluid_adj%u_adj, &
+         this%fluid_adj%v_adj, this%fluid_adj%w_adj,&
+         this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%case%params)
     call neko_log%end_section()
     call neko_log%newline()
 
@@ -124,20 +124,13 @@ contains
             this%case%fluid%ext_bdf, this%case%time%tlag, &
             this%case%time%dtlag, tstep_adj)
 
-       call neko_log%section('Adjoint fluid')
-       call this%scheme%step(t_adj, tstep_adj, this%case%time%dt, &
-            this%case%fluid%ext_bdf, dt_controller)
-       end_time = MPI_WTIME()
-       write(log_buf, '(A,E15.7,A,E15.7)') &
-            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
-            end_time-start_time
-       call neko_log%end_section(log_buf)
 
        ! Scalar step
-       if (allocated(this%case%scalar)) then
+       ! (Note that for the adjoint we should the scalar_adj first)
+       if (allocated(this%scalar_adj)) then
           start_time = MPI_WTIME()
-          call neko_log%section('Scalar')
-          call this%case%scalar%step(t_adj, tstep_adj, this%case%time%dt, &
+          call neko_log%section(' Adjoint scalar')
+          call this%scalar_adj%step(t_adj, tstep_adj, this%case%time%dt, &
                this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -146,16 +139,26 @@ contains
           call neko_log%end_section(log_buf)
        end if
 
+       call neko_log%section('Adjoint fluid')
+       call this%fluid_adj%step(t_adj, tstep_adj, this%case%time%dt, &
+            this%case%fluid%ext_bdf, dt_controller)
+       end_time = MPI_WTIME()
+       write(log_buf, '(A,E15.7,A,E15.7)') &
+            'Elapsed time (s):', end_time-start_time_org, ' Step time:', &
+            end_time-start_time
+       call neko_log%end_section(log_buf)
+
+
        call neko_log%section('Postprocessing')
 
        !  call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-       call this%output_controller%execute(t_adj, tstep_adj)
+       call this%output_controller%execute(this%case%time)
 
        ! Update material properties
        call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
             this%case%fluid%mu, &
-            this%case%scalar%cp, &
-            this%case%scalar%lambda, &
+            this%scalar_adj%cp, &
+            this%scalar_adj%lambda, &
             this%case%params)
 
        call neko_log%end_section()
@@ -167,7 +170,7 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%output_controller%execute(t_adj, tstep_adj, output_at_end)
+    call this%output_controller%execute(this%case%time, output_at_end)
 
     if (.not. (output_at_end) .and. t_adj .lt. this%case%time%end_time) then
        call simulation_joblimit_chkp(this%case, t_adj)
@@ -254,7 +257,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call C%output_controller%set_counter(t)
+    call C%output_controller%set_counter(C%time)
   end subroutine simulation_restart
 
 !> Write a checkpoint at joblimit
