@@ -47,6 +47,10 @@ file under the list `"mapping"`, for example:
             ],
 ```
 
+\attention It is important to note that the order in which the mappings occur in
+the case file is the order in which they will be executed. In the above example
+this corresponds to applying a filter first, and then a RAMP mapping.
+
 \note Currently the mapping cascade is only applicable to the `"brinkman"` type
 design.
 
