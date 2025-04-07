@@ -79,7 +79,7 @@ an objective function of the form
 \f]
 
 where \f$\mathbf{u}\f$ is the fluid velocity and \f$\chi\f$ the Brinkman amplitude
-claiming:
+was used, claiming:
 > Term I is half of the part of the dissipation function that is
 > associated with the in-plane components of the stretching
 > tensor (cf. Currie (2003)), while term II is half the part associated 
