@@ -60,8 +60,11 @@ contains
     call mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
 
     !solve the approximation problem using interior point method
-!     call mma_subsolve_dpip_cpu(this, x)
-    call mma_subsolve_dip_cpu(this, x)
+    if (this%subsolver .eq. "dip") then
+       call mma_subsolve_dip_cpu(this, x)
+    else
+       call mma_subsolve_dpip_cpu(this, x)
+    end if
 
     this%is_updated = .true.
   end subroutine mma_update_cpu

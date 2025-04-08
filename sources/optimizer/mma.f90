@@ -56,7 +56,7 @@ module mma
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     character(len=:), allocatable :: bcknd
+     character(len=:), allocatable :: bcknd, subsolver
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -169,7 +169,7 @@ contains
     ! -------------------------------------------------------------------!
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), dimension(m) :: a, c, d
-    character(len=:), allocatable :: bcknd
+    character(len=:), allocatable :: bcknd, subsolver
 
     ! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
@@ -193,6 +193,7 @@ contains
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
     call json_get_or_default(json, 'mma.backend', bcknd, 'cpu')
+    call json_get_or_default(json, 'mma.subsolver', subsolver, 'dpip')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -221,7 +222,7 @@ contains
     ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
     !      max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
+         max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
   end subroutine mma_init_from_json
 
@@ -260,7 +261,7 @@ contains
 
   !> Initialize the mma object based on the attributes from the json file
   subroutine mma_init_from_components(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
+       max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -287,7 +288,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), intent(in), allocatable :: bcknd
+    character(len=:), intent(in), allocatable :: bcknd, subsolver
 
     call this%free()
 
@@ -389,6 +390,14 @@ contains
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
     this%bcknd = bcknd
+    this%subsolver = subsolver
+    if (pe_rank == 0) then
+       if (this%subsolver .eq. "dip") then
+          print *, "Using dual solver for MMA subsolve."
+       else
+          print *, "Using dual-primal solver for MMA subsolve."
+       end if
+    end if
 
     if (pe_rank .eq. 0) then
        print *, "MMA is initialized with a0 = ", a0, ", a = ", a, ", c = ", c, &
@@ -427,8 +436,11 @@ contains
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
-      !  call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
-       call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+       if (this%subsolver .eq. "dip") then
+          call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+       else
+          call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       end if
     case ("cuda")
        call mma_KKT_device(this, x, df0dx, fval, dfdx)
     case default
