@@ -41,7 +41,7 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # Enable devices
-option(DEVICE_TYPE "Enable device support" OFF)
+set(DEVICE_TYPE "NONE" CACHE STRING "Device type to use")
 if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
@@ -55,11 +55,6 @@ option(BUILD_TESTING "Build the tests" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
 
-# Set default paths for the external dependencies
-set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
-    CACHE STRING "Path to the JSON-Fortran installation")
-set(NEKO_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
-    CACHE STRING "Path to the Neko installation")
 set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
     CACHE STRING "Path to the pFUnit installation")
 
@@ -99,17 +94,18 @@ endif()
 # Setup External Libraries
 # ............................................................................ #
 # Check for the required libraries.
-find_package(BLAS REQUIRED)
-find_package(LAPACK REQUIRED)
+find_package(BLAS QUIET)
+find_package(LAPACK QUIET)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
 
+# We need PKG Config to find the JSON-Fortran and Neko libraries
+find_package(PkgConfig REQUIRED)
+
 # Check that the MPI Fortran 2008 module is available
 if (NOT MPI_Fortran_HAVE_F08_MODULE)
-    message(FATAL_ERROR
-        "MPI Fortran 2008 module is required for Neko-TOP."
-    )
+    message(FATAL_ERROR "MPI Fortran 2008 module is required for Neko-TOP.")
 endif()
 include_directories(${MPI_Fortran_INCLUDE_DIRS})
 include_directories(${MPI_Fortran_MODULE_DIR})
@@ -118,29 +114,33 @@ include_directories(${MPI_Fortran_MODULE_DIR})
 # Setup of JSON-Fortran
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
-if (IS_DIRECTORY ${JSON_FORTRAN_DIR})
-    set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
+if (DEFINED ENV{JSON_FORTRAN_DIR})
+    set(JSON_FORTRAN_DIR $ENV{JSON_FORTRAN_DIR} CACHE STRING
+        "Path to the JSON-Fortran installation")
+else()
+    set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+        CACHE STRING "Path to the JSON-Fortran installation")
 endif()
 
-# Check that the JSON-Fortran library was found
-find_package(jsonfortran-gnu REQUIRED)
+set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
+
+# Find the JSON-Fortran library
+pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
 # ............................................................................ #
 # Setup of the Neko library
 
-# Check that the NEKO_DIR directories exist
-if (NOT IS_DIRECTORY ${NEKO_DIR})
-    message(FATAL_ERROR
-        "Neko directory not found (${NEKO_DIR})."
-        "Please run `git submodule update --init` to download the external "
-        "libraries."
-    )
+# Set the proper paths for the NEKO_DIR
+if (DEFINED ENV{NEKO_DIR})
+    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
+else()
+    set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
+        CACHE STRING "Path to the Neko installation")
 endif()
 
-# Set the proper paths for the NEKO_DIR and JSON_FORTRAN_DIR directories
-set(ENV{PKG_CONFIG_PATH} ${NEKO_DIR}/lib/pkgconfig:$ENV{PKG_CONFIG_PATH})
+set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 
-find_package(PkgConfig REQUIRED)
+# Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
 # ============================================================================ #

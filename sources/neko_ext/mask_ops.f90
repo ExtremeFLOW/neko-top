@@ -38,16 +38,17 @@ module mask_ops
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use scratch_registry, only: neko_scratch_registry
-  use field_math, only: field_cfill, field_copy
+  use field_math, only: field_cfill, field_copy, field_rone
   use device_math_ext, only: device_copy_mask
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_glsc2
   use math_ext, only: copy_mask
-  use math, only: copy
+  use math, only: copy, glsc2
   use vector, only: vector_t
+  use coefs, only: coef_t
   implicit none
 
   private
-  public :: mask_exterior_const, mask_exterior_fld
+  public :: mask_exterior_const, mask_exterior_fld, compute_masked_volume
 
   interface mask_exterior_const
      module procedure mask_exterior_const_vec
@@ -171,4 +172,33 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine mask_exterior_fld
+
+  !> @brief Compute the volume of the domain contained within the mask
+  !! @param[in] mask The mask considered.
+  !! @param[in] coef Coefficients defined on a given mesh.
+  function compute_masked_volume(mask, coef)
+    class(point_zone_t), intent(inout) :: mask !this should be (in)
+    class(coef_t), intent(in) :: coef
+    real(kind=rp) :: compute_masked_volume
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    real(kind=rp) :: tmp
+    integer n
+
+    ! This would be much smarter with a kernel similar to masked_glsc2
+    ! When that kernel get written, we can update this function.
+
+    call neko_scratch_registry%request_field(work , temp_indices(1))
+    n = work%size()
+    call field_rone(work)
+    call mask_exterior_const_fld(work, mask, 0.0_rp)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       tmp = device_glsc2(work%x_d, coef%B_d, n)
+    else
+       tmp = glsc2(work%x, coef%B, n)
+    end if
+    call neko_scratch_registry%relinquish_field(temp_indices)
+    compute_masked_volume = tmp
+  end function compute_masked_volume
+
 end module mask_ops

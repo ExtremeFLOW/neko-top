@@ -108,7 +108,7 @@ module lube_term_objective
    contains
 
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => lube_term_init_json
+     procedure, public, pass(this) :: init_json_sim => lube_term_init_json_sim
      !> The actual constructor.
      procedure, public, pass(this) :: init_from_attributes => &
           lube_term_init_attributes
@@ -130,11 +130,12 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine lube_term_init_json(this, json, design, simulation)
+  subroutine lube_term_init_json_sim(this, json, design, simulation)
     class(lube_term_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
     real(kind=rp) :: weight, K
@@ -146,7 +147,7 @@ contains
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, K)
-  end subroutine lube_term_init_json
+  end subroutine lube_term_init_json_sim
 
   !> The actual constructor.
   !! @param this The objective.
@@ -191,20 +192,19 @@ contains
 
     ! if we have the lube term we need to initialize and append that too
 
-    associate(f_adj_x => simulation%adjoint_case%scheme%f_adj_x, &
-         f_adj_y => simulation%adjoint_case%scheme%f_adj_y, &
-         f_adj_z => simulation%adjoint_case%scheme%f_adj_z, &
-         c_Xh => simulation%adjoint_case%scheme%c_Xh)
+    associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
+         f_adj_y => simulation%adjoint_fluid%f_adj_y, &
+         f_adj_z => simulation%adjoint_fluid%f_adj_z, &
+         c_Xh => simulation%adjoint_fluid%c_Xh)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%k * this%weight, &
-           this%u, this%v, this%w, &
-           this%mask, this%has_mask, c_Xh)
+           this%k * this%weight, this%u, this%v, this%w, this%mask, &
+           this%has_mask, c_Xh)
 
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%scheme%source_term%add_source_term(lube_term)
+    call simulation%adjoint_fluid%source_term%add_source_term(lube_term)
 
   end subroutine lube_term_init_attributes
 

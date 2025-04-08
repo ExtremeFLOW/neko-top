@@ -112,7 +112,8 @@ module minimum_dissipation_objective
 
    contains
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => minimum_dissipation_init_json
+     procedure, public, pass(this) :: init_json_sim => &
+          minimum_dissipation_init_json_sim
      !> The direct initializer from attributes.
      procedure, public, pass(this) :: init_from_attributes => &
           minimum_dissipation_init_attributes
@@ -134,11 +135,12 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine minimum_dissipation_init_json(this, json, design, simulation)
+  subroutine minimum_dissipation_init_json_sim(this, json, design, simulation)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
+
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
@@ -148,7 +150,7 @@ contains
     call json_get_or_default(json, "name", name, "Dissipation")
 
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
-  end subroutine minimum_dissipation_init_json
+  end subroutine minimum_dissipation_init_json_sim
 
   !> The actual constructor.
   !! @param this the objective.
@@ -174,7 +176,7 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%fluid_scheme%c_Xh
+    this%c_Xh => simulation%fluid%c_Xh
     this%adjoint_u => neko_field_registry%get_field('u_adj')
     this%adjoint_v => neko_field_registry%get_field('v_adj')
     this%adjoint_w => neko_field_registry%get_field('w_adj')
@@ -183,16 +185,15 @@ contains
     ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
-         simulation%adjoint_case%scheme%f_adj_x, &
-         simulation%adjoint_case%scheme%f_adj_y, &
-         simulation%adjoint_case%scheme%f_adj_z, &
+         simulation%adjoint_fluid%f_adj_x, &
+         simulation%adjoint_fluid%f_adj_y, &
+         simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
          this%c_Xh)
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_case%scheme%source_term%add_source_term( &
-         adjoint_forcing)
+    call simulation%adjoint_fluid%source_term%add_source_term(adjoint_forcing)
 
   end subroutine minimum_dissipation_init_attributes
 

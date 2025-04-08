@@ -38,12 +38,14 @@ submodule (objective) objective_factory_mod
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
   use lube_term_objective, only: lube_term_objective_t
+  use scalar_mixing_objective, only: scalar_mixing_objective_t
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(2) = [ character(len=25) :: &
+  character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
        "minimum_dissipation", &
+       "scalar_mixing", &
        "lube_term"]
 
 contains
@@ -61,7 +63,7 @@ contains
     class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
-    type(simulation_t), target, intent(inout) :: simulation
+    type(simulation_t), target, optional, intent(inout) :: simulation
     character(len=:), allocatable :: type
 
     if (allocated(object)) then
@@ -73,6 +75,8 @@ contains
     select case (trim(type))
     case ("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)
+    case ("scalar_mixing")
+       allocate(scalar_mixing_objective_t::object)
     case ("lube_term")
        allocate(lube_term_objective_t::object)
 
@@ -80,7 +84,7 @@ contains
        call neko_type_error("Objective", type, KNOWN_TYPES)
     end select
 
-    call object%init_json(json, design, simulation)
+    call object%init(json, design, simulation)
   end subroutine objective_factory
 
 end submodule objective_factory_mod

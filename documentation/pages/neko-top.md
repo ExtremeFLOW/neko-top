@@ -16,6 +16,8 @@ user interface.
   - [Contributing](@ref contributing)
   - [Code structure](@ref code-structure)
   - [Testing](@ref testing)
+- \subpage tutorials
+  - [Static Mixer](@ref mixer)
 - \subpage appendices
   - [Theory](@ref theory)
   - [Tools](@ref tools)
