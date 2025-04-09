@@ -105,39 +105,16 @@ contains
     real(kind=rp) :: re_sq_norm
 
 
-    associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
-
-      rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
-           - this%xsi%x + this%eta%x
-      rey = this%c%x + this%d%x*this%y%x - this%lambda%x - this%mu%x
-      rez = this%a0 - this%zeta - dot_product(this%lambda%x, this%a%x)
-
-      relambda = fval - this%a%x * this%z - this%y%x + this%s%x
-      rexsi = this%xsi%x * (x - this%xmin%x)
-      reeta = this%eta%x * (this%xmax%x - x)
-      remu = this%mu%x * this%y%x
-      rezeta = this%zeta * this%z
-      res = this%lambda%x * this%s%x
-
-      residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-      residual_small = [rey, rez, relambda, remu, rezeta, res]
-
-      this%residumax = maxval(abs(residual))
-      re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
-
-      call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
-           mpi_real_precision, mpi_max, neko_comm, ierr)
-
-      call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
-           mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-      this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
-    end associate
+    if (this%subsolver .eq. "dip") then
+       call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    else
+       call mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    end if
   end subroutine mma_KKT_cpu
 
-
-  !> Implementation of the KKT residual computation for the MMA algorithm.
-  module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+  !> Implementation of the KKT residual computation for dual primal interior 
+  ! point method (dpip) subsolve of MMA algorithm.
+  module subroutine mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
     ! designx x and set the max and norm values of the       !
@@ -170,6 +147,67 @@ contains
     real(kind=rp), dimension(4*this%m+2) :: residual_small
     integer :: ierr
     real(kind=rp) :: re_sq_norm
+
+
+    associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
+
+      rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
+           - this%xsi%x + this%eta%x
+      rey = this%c%x + this%d%x*this%y%x - this%lambda%x - this%mu%x
+      rez = this%a0 - this%zeta - dot_product(this%lambda%x, this%a%x)
+
+      relambda = fval - this%a%x * this%z - this%y%x + this%s%x
+      rexsi = this%xsi%x * (x - this%xmin%x)
+      reeta = this%eta%x * (this%xmax%x - x)
+      remu = this%mu%x * this%y%x
+      rezeta = this%zeta * this%z
+      res = this%lambda%x * this%s%x
+
+      residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+      residual_small = [rey, rez, relambda, remu, rezeta, res]
+
+      this%residumax = maxval(abs(residual))
+      re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+
+      call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
+           mpi_real_precision, mpi_max, neko_comm, ierr)
+
+      call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
+           mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+      this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
+    end associate
+  end subroutine mma_dpip_KKT_cpu
+
+  !> Implementation of the KKT residual computation for dual interior 
+  ! point method (dip) subsolve of MMA algorithm.
+  module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
+    ! ----------------------------------------------------- !
+    ! Compute the KKT condition right hand side for a given !
+    ! designx x and set the max and norm values of the      !
+    ! residue of KKT system to this%residumax and           !
+    ! this%residunorm.                                      !
+    !                                                       !
+    ! The left hand sides of the KKT conditions are computed!
+    ! for the following nonlinear programming problem:      !
+    ! Minimize  f_0(x) + a_0*z +                            !
+    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
+    !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
+    !        z >= 0,   y_i >= 0,         i = 1,...,m        !
+    !                                                       !
+    !                                                       !
+    ! Note that before calling this function, the function  !
+    ! values (f0val, fval, dfdx, ...) should be updated     !
+    ! using the new x values.                               !
+    ! ----------------------------------------------------- !
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: df0dx, fval
+    type(matrix_t), intent(in) :: dfdx
+
+    real(kind=rp), dimension(this%m) :: relambda, remu
+    real(kind=rp), dimension(2*this%m) :: residual
 
 
     associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
@@ -254,7 +292,6 @@ contains
 
       alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
       beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
-
     end associate
 
     ! ------------------------------------------------------------------------ !
@@ -317,7 +354,6 @@ contains
       bi = bi - fval%x
 
     end associate
-
   end subroutine mma_gensub_cpu
 
   !> solve the subproblem defined by this%pij, this%qij, etc.
@@ -580,6 +616,7 @@ contains
              write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
              error stop
           end if
+          
 
           dlambda = bb(1:this%m)
           dz = bb(this%m + 1)
@@ -633,6 +670,7 @@ contains
              x = xold + steg*dx
              y = yold + steg*dy
              z = zold + steg*dz
+
              lambda = lambdaold + steg*dlambda
              xsi = xsiold + steg*dxsi
              eta = etaold + steg*deta
@@ -692,7 +730,9 @@ contains
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
        end do
-
+       ! print *, "epsi=", epsi, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", &
+          ! maxval(x), "minval(x)=", minval(x), "lambda=", lambda, "itto=", itto
+       
        epsi = 0.1_rp * epsi
     end do
 
@@ -746,8 +786,6 @@ contains
     !
     ! Maximize Ψ(λ) subject to λ_i ≥ 0 for i = 1, ..., m.
 
-
-
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(inout) :: designx
     ! Note that there is a local dummy "x" in this subroutine, thus, we call
@@ -760,7 +798,7 @@ contains
     real(kind=rp), dimension(this%n) :: x, pjlambda, qjlambda
 
     ! To compute the Hessian based on eq(13)
-    !! https://doi.org/10.1007/s00158-012-0869-2
+    ! https://doi.org/10.1007/s00158-012-0869-2
 
     ! inverse of a diag matrix:
     real(kind=rp), dimension(this%n) :: Ljjxinv ! [∇_x^2 Ljj]−1 
@@ -785,11 +823,11 @@ contains
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
 
     epsi = 1.0_rp !100
-    !     x = 0.5_rp * (this%alpha%x + this%beta%x)
+    ! x = 0.5_rp * (this%alpha%x + this%beta%x)
     y = 1.0_rp
     mzero = 0.0_rp
-    lambda = max(1.0_rp, 0.5_rp * this%c%x) !1.0_rp
-    mu = 1.0_rp !this parameter is eta in the paper
+    lambda = max(1.0_rp, 0.5_rp * this%c%x)
+    mu = 1.0_rp !this parameter is eta in Niel's paper
     ! note that mu in the paper translates to epsi in the code following the 
     ! same style as the Cpp code by Neils
 
@@ -805,6 +843,7 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
+
     do while (epsi .gt. minimal_epsilon)
 
        ! --------------------------------------------------------------------- !
@@ -820,12 +859,20 @@ contains
             a0 => this%a0, a => this%a%x, &
             bi => this%bi%x)
          ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
-         ! the initial values of λ
+         ! the initial value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-         y = max(mzero, (lambda - c) / d)
+         do i=1, this%m
+            if (d(i) .eq. 0) then
+               ! to avoid devision by zero in case d=0
+               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
+               ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
+            else
+               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
+            end if
+         end do
 
          ! Comput the value of z that minimizes L_z for the current λ
          ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
@@ -872,18 +919,17 @@ contains
             !> Global comminucation for gradlambda values
             call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
-
             gradlambda = gradlambda - bi - y - a * z
 
-            ! Update gradlambda as the right hand side for Newton's method (eq10)
+            ! Update gradlambda as the right hand side for Newton's method(eq10)
             gradlambda = - gradlambda - epsi / lambda
-
 
             ! Computing the Hessian as in equation (13) in
             !! https://doi.org/10.1007/s00158-012-0869-2
 
             !--------------contributions of x terms to Hess--------------------!
-            Ljjxinv= - 1/( (2*pjlambda/(upp - x)**3) + (2*qjlambda/(x - low)**3))
+            Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &
+                 (2*qjlambda/(x - low)**3))
 
             ! Remove the sensitivity for the active primal constraints
             Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
@@ -916,10 +962,16 @@ contains
 
 
             !---------------contributions of y terms to Hess-------------------!
-            ! Only for inactive constraint, we consider contributions to Hess
+            ! Only for inactive constraint, we consider contributions to Hess.
+            ! Note that if d(i) = 0, the y terms (just like z terms) will not 
+            ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
-                  Hess(i, i) = Hess(i, i) - 1.0_rp
+                  if (d(i) .eq. 0.0_rp) then
+                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
+                  else
+                     Hess(i, i) = Hess(i, i) - 1.0_rp/d(i)
+                  end if
                end if
                ! Based on eq(10), note the term (-\Omega \Lambda)
                Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
@@ -932,16 +984,16 @@ contains
                Hesstrace = Hesstrace + Hess(i, i)
             end do
             do i=1, this%m
-               Hess(i,i) = Hess(i, i) + max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+               Hess(i,i) = Hess(i, i) - &
+                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
             end do
-
 
             call DGESV(this%m , 1, Hess, this%m , ipiv, &
                  gradlambda, this%m + 1, info)
 
             if (info .ne. 0) then
                write(stderr, *) "DGESV failed to solve the linear system in MMA."
-               write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
+               write(stderr, *) "Please check mma_subsolve_dip in mma.f90"
                error stop
             end if
              
@@ -960,10 +1012,9 @@ contains
             end do
 
             steg = 1.0_rp / steg
-             
+
             lambda = lambda + steg*dlambda
             mu = mu + steg*dmu
-
 
             ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
             ! the updated values of λ
@@ -971,13 +1022,21 @@ contains
             ! Comput the value of y that minimizes L_y for the current λ
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-            y = max(mzero, (lambda - c) / d)
+            do i=1, this%m
+               if (d(i) .eq. 0) then
+                  ! to avoid devision by zero in case d=0
+                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
+                  ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
+               else
+                    y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
+               end if
+            end do
 
             ! Comput the value of z that minimizes L_z for the current λ
             ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
             ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
             ! ensure z>=0
-            z = merge(0.0, 1.0, a0 - dot_product(lambda, a) >= 0.0)
+            z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
 
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
@@ -992,10 +1051,9 @@ contains
             x = merge(alpha, x, x .lt. alpha)
             x = merge(beta, x, x .gt. beta)
 
-
             ! Compute the residual for the lambda and mu using eq(9) and eq(15)
             relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
-            !> Global comminucation for relambda values
+            ! Global comminucation for relambda values
             call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
             relambda = relambda - bi - y - a * z + mu
@@ -1004,13 +1062,10 @@ contains
             remu = mu * lambda - epsi
 
             residual_max = maxval(abs([relambda, remu]))
-            print *, "iter=", iter, "epsi=", epsi, "maxval(alpha)=", &
-                 maxval(alpha), "maxval(beta)=", maxval(beta), &
-                 "lambda=", lambda, "mu=", mu
          end do
-         !  print *, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", maxval(x), "minval(x)=", minval(x), "lambda=", lambda
        end associate
-
+       ! print *, "epsi=", epsi, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", &
+       !      maxval(x), "minval(x)=", minval(x), "lambda=", lambda
        epsi = 0.1_rp * epsi
     end do
 
@@ -1025,8 +1080,6 @@ contains
     this%z = z
     this%lambda%x = lambda
     this%mu%x = mu
-
-    ! call neko_error('debugging')
   end subroutine mma_subsolve_dip_cpu
   
 end submodule mma_cpu

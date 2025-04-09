@@ -106,14 +106,6 @@ module mma
        type(matrix_t), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
-          !> CPU KKT check for convergence
-     module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
-       class(mma_t), intent(inout) :: this
-       real(kind=rp), dimension(this%n), intent(in) :: x
-       type(vector_t), intent(in) :: df0dx, fval
-       type(matrix_t), intent(in) :: dfdx
-     end subroutine mma_dip_KKT_cpu
-
      ! ======================================================================= !
      ! interface for device backend module subroutines
 
@@ -193,7 +185,7 @@ contains
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
     call json_get_or_default(json, 'mma.backend', bcknd, 'cpu')
-    call json_get_or_default(json, 'mma.subsolver', subsolver, 'dpip')
+    call json_get_or_default(json, 'mma.subsolver', subsolver, 'dip')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
     call json_get_or_default(json, 'mma.xmax', xmax_const, 1.0_rp)
@@ -394,8 +386,10 @@ contains
     if (pe_rank == 0) then
        if (this%subsolver .eq. "dip") then
           print *, "Using dual solver for MMA subsolve."
-       else
+       elseif (this%subsolver .eq. "dpip") then
           print *, "Using dual-primal solver for MMA subsolve."
+       else
+          call neko_error('Unknown subsolver for MMA, mma_init_from_components')
        end if
     end if
 
@@ -436,11 +430,7 @@ contains
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
-       if (this%subsolver .eq. "dip") then
-          call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
-       else
-          call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
-       end if
+       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
     case ("cuda")
        call mma_KKT_device(this, x, df0dx, fval, dfdx)
     case default
