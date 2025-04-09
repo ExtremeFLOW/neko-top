@@ -45,6 +45,9 @@ set(DEVICE_TYPE "NONE" CACHE STRING "Device type to use")
 if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
 endif()
 
 # ............................................................................ #
