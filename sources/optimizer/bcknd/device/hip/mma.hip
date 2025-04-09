@@ -9,51 +9,55 @@ extern "C" {
 #include "device/device_config.h"
 
 int mma_red_s = 0;
-real *mma_bufred = NULL;
-real *mma_bufred_d = NULL;
-
+real * mma_bufred = NULL;
+real * mma_bufred_d = NULL;
+//////
 void mma_gensub4_hip(void* x, void* low, void* upp, void* pij, void* qij, 
-                      int* n, int* m, void* bi) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    const int nb = nblcks.x;
-    const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+     int* n, int* m, void* bi) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  const int nb = ((*n) + 1024 - 1) / 1024;
+  const hipStream_t stream = (hipStream_t)glb_cmd_queue;
 
-    if (nb > mma_red_s) {
-        mma_red_s = nb;
-        if (mma_bufred != NULL) {
-            HIP_CHECK(hipHostFree(mma_bufred));
-            HIP_CHECK(hipFree(mma_bufred_d));
-        }
-        HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
-        HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
-    }
+  if (nb > mma_red_s) {
+     mma_red_s = nb;
+     if (mma_bufred != NULL) {
+        HIP_CHECK(hipFreeHost(mma_bufred));
+        HIP_CHECK(hipFree(mma_bufred_d));
+     }
+     HIP_CHECK(hipHostMalloc(&mma_bufred, 
+          nb * sizeof(real)));
+     HIP_CHECK(hipMalloc(&mma_bufred_d, 
+          nb * sizeof(real)));
+  }
 
-    real* temp;
-    real* bi_d = (real*)bi;
-    hipMalloc(&temp, (*m) * (*n) * sizeof(real));
+  real* temp;
+  real* bi_d = (real*)bi;
+  hipMalloc(&temp, (*m) * (*n) * sizeof(real));
 
-    mma_sub4_kernel<real><<<nblcks, nthrds, 0, stream>>>(
-        (real*)x, (real*)low, (real*)upp, (real*)pij, (real*)qij, 
-        temp, *n, *m);
+  hipLaunchKernelGGL(mma_sub4_kernel<real>, nblcks, nthrds, 0, stream,
+       (real*)x, (real*)low, (real*)upp, (real*)pij, (real*)qij, 
+       temp, *n, *m);
 
-    for (int i = 0; i < (*m); i++) {
-        mmasum_kernel<real><<<nblcks, nthrds, 0, stream>>>(
-            temp, mma_bufred_d, (*n), (*m), i);
-        HIP_CHECK(hipGetLastError());
+  for (int i = 0; i < (*m); i++) {
+     hipLaunchKernelGGL(mmasum_kernel<real>, nblcks, nthrds, 0, stream,
+          temp, mma_bufred_d, (*n), (*m), i);
+     HIP_CHECK(hipGetLastError());
 
-        mmareduce_kernel<real><<<1, 1024, 0, stream>>>(
-            mma_bufred_d, nb);
-        HIP_CHECK(hipGetLastError());
+     hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+          mma_bufred_d, nb);
+     HIP_CHECK(hipGetLastError());
 
-        HIP_CHECK(hipMemcpyAsync(
-            bi_d + i, mma_bufred_d, sizeof(real), 
-            hipMemcpyDeviceToDevice, stream));
-        hipStreamSynchronize(stream);
-    }
+     HIP_CHECK(hipMemcpyAsync(
+          bi_d + i, mma_bufred_d, sizeof(real), 
+          hipMemcpyDeviceToDevice, stream));
+     
+     hipStreamSynchronize(stream);
+  }
 
-    hipFree(temp);
+  hipFree(temp);
 }
+
 
 void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low, 
                       void* upp, void* xmin, void* xmax, void* alpha, 
@@ -349,158 +353,182 @@ void hip_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int* 
 }
 
 
-  /////a_d=b_d*c_d-d
-  void cuda_sub2cons(void * a,void * b,void * c, real *d, int * n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
-    sub2cons_kernel<real><<<nblcks, nthrds, 0,(cudaStream_t) glb_cmd_queue>>>
-         ((real *) a, (real *) b, (real *) c, *d, *n);
-    CUDA_CHECK(cudaGetLastError());
-  }
+ ////// a_d = b_d * c_d - d
+void hip_sub2cons(void *a, void *b, void *c, real *d, int *n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  hipLaunchKernelGGL(sub2cons_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, 
+       (real *)a, (real *)b, (real *)c, *d, *n);
+  HIP_CHECK(hipGetLastError());
+}
 
 
-  /////sum(a^2)
-  real cuda_norm(void* a, int* n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
-    const int nb = ((*n) + 1024 - 1)/ 1024;
-    const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
-    if(nb > mma_red_s){
-       mma_red_s = nb;
-       if(mma_bufred != NULL){
-          CUDA_CHECK(cudaFreeHost(mma_bufred));
-          CUDA_CHECK(cudaFree(mma_bufred_d));
-       }
-       CUDA_CHECK(cudaMallocHost(&mma_bufred,nb*sizeof(real)));
-       CUDA_CHECK(cudaMalloc(&mma_bufred_d, nb*sizeof(real)));
+////// sum(a^2)
+real hip_norm(void* a, int* n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  const int nb = ((*n) + 1024 - 1) / 1024;
+  const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+  if (nb > mma_red_s) {
+    mma_red_s = nb;
+    if (mma_bufred != NULL) {
+      HIP_CHECK(hipFreeHost(mma_bufred));
+      HIP_CHECK(hipFree(mma_bufred_d));
     }
-    norm_kernel <real> <<<nblcks, nthrds, 0, stream >>> 
-         ((real*)a, mma_bufred_d, (*n));
-    CUDA_CHECK(cudaGetLastError());
-    mmareduce_kernel<real> <<<1, 1024, 0, stream >>> (mma_bufred_d, nb);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
-         cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
-    return mma_bufred[0];
+    HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
+    HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
   }
 
+  hipLaunchKernelGGL(norm_kernel<real>, nblcks, nthrds, 0, stream, 
+       (real*)a, mma_bufred_d, (*n));
+  HIP_CHECK(hipGetLastError());
 
-  void cuda_dely(void* dely, void* c, void* d, void* y, void* lambda,
+  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  HIP_CHECK(hipGetLastError());
+
+  HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real), 
+       hipMemcpyDeviceToHost, stream));
+
+  hipStreamSynchronize(stream);
+
+  return mma_bufred[0];
+}
+
+
+void hip_dely(void* dely, void* c, void* d, void* y, void* lambda,
        real* epsi, int* n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    dely_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >>> 
-         ((real*)dely,(real*)c, (real*)d, (real*)y, (real*)lambda,*epsi, * n);
-    CUDA_CHECK(cudaGetLastError());
-  }
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  hipLaunchKernelGGL(dely_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, 
+       (real*)dely, (real*)c, (real*)d, (real*)y, (real*)lambda, *epsi, *n);
+  HIP_CHECK(hipGetLastError());
+}
 
 
-  real cuda_maxval2(void* a, void* b, real* cons, int* n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
-    const int nb = ((*n) + 1024 - 1)/ 1024;
-    const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;
-    if(nb > mma_red_s){
-       mma_red_s = nb;
-       if(mma_bufred != NULL) {
-          CUDA_CHECK(cudaFreeHost(mma_bufred));
-          CUDA_CHECK(cudaFree(mma_bufred_d));
-       }
-       CUDA_CHECK(cudaMallocHost(&mma_bufred,nb*sizeof(real)));
-       CUDA_CHECK(cudaMalloc(&mma_bufred_d, nb*sizeof(real)));
+real hip_maxval2(void* a, void* b, real* cons, int* n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  const int nb = ((*n) + 1024 - 1) / 1024;
+  const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+  if (nb > mma_red_s) {
+    mma_red_s = nb;
+    if (mma_bufred != NULL) {
+      HIP_CHECK(hipFreeHost(mma_bufred));
+      HIP_CHECK(hipFree(mma_bufred_d));
     }
-    maxval2_kernel <real> <<<nblcks, nthrds, 0,stream >>> 
-         ((real*)a, (real*)b, mma_bufred_d, *cons, *n);
-    CUDA_CHECK(cudaGetLastError());
-    max_reduce_kernel<real> <<<1, 1024, 0,stream >>> (mma_bufred_d, nb);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
-         cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
-    return mma_bufred[0];
+    HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
+    HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
   }
 
+  hipLaunchKernelGGL(maxval2_kernel<real>, nblcks, nthrds, 0, stream, 
+       (real*)a, (real*)b, mma_bufred_d, *cons, *n);
+  HIP_CHECK(hipGetLastError());
 
-  real cuda_maxval3(void* a, void* b, void* c, real* cons, int* n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
-    const int nb = ((*n) + 1024 - 1)/ 1024;
-    const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;      
-    if(nb > mma_red_s){
-       mma_red_s = nb;
-       if(mma_bufred != NULL) {
-          CUDA_CHECK(cudaFreeHost(mma_bufred));
-          CUDA_CHECK(cudaFree(mma_bufred_d));
-       }
-       CUDA_CHECK(cudaMallocHost(&mma_bufred,nb*sizeof(real)));
-       CUDA_CHECK(cudaMalloc(&mma_bufred_d, nb*sizeof(real)));
+  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  HIP_CHECK(hipGetLastError());
+
+  HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real), 
+       hipMemcpyDeviceToHost, stream));
+
+  hipStreamSynchronize(stream);
+
+  return mma_bufred[0];
+}
+
+
+real hip_maxval3(void* a, void* b, void* c, real* cons, int* n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  const int nb = ((*n) + 1024 - 1) / 1024;
+  const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+  if (nb > mma_red_s) {
+    mma_red_s = nb;
+    if (mma_bufred != NULL) {
+      HIP_CHECK(hipFreeHost(mma_bufred));
+      HIP_CHECK(hipFree(mma_bufred_d));
     }
-    maxval3_kernel <real> <<<nblcks, nthrds, 0,stream>>> 
-         ((real*)a, (real*)b, (real*)c, mma_bufred_d, *cons, *n);
-    max_reduce_kernel<real> <<<1, 1024, 0,stream >>> (mma_bufred_d, nb);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
-         cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
-    return mma_bufred[0];
+    HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
+    HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
   }
- 
- 
-  void cuda_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
+
+  hipLaunchKernelGGL(maxval3_kernel<real>, nblcks, nthrds, 0, stream, 
+       (real*)a, (real*)b, (real*)c, mma_bufred_d, *cons, *n);
+  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  HIP_CHECK(hipGetLastError());
+
+  HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real), 
+       hipMemcpyDeviceToHost, stream));
+
+  hipStreamSynchronize(stream);
+
+  return mma_bufred[0];
+}
+
+
+void hip_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
        void* eta, void* lambda, int* n, int* m) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    kkt_rex_kernel <real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >>>
-         ((real*)rex, (real*)df0dx, (real*)dfdx, (real*)xsi,
-         (real*)eta, (real*)lambda, *n, *m);
-    CUDA_CHECK(cudaGetLastError());
-  }
-
- 
-  //////a_d=max(b,c*d_d)
-  void cuda_maxcons(void* a, real* b, real* c, void* d, int* n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    maxcons_kernel <real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue >>>
-         ((real*)a, *b, *c, (real*)d, *n);
-    CUDA_CHECK(cudaGetLastError());
-  }
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  hipLaunchKernelGGL(kkt_rex_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, 
+       (real*)rex, (real*)df0dx, (real*)dfdx, (real*)xsi,
+       (real*)eta, (real*)lambda, *n, *m);
+  HIP_CHECK(hipGetLastError());
+}
 
 
-  real cuda_lcsc2(void *a, void*b, int *n) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
-    const int nb = ((*n) + 1024 - 1)/ 1024;
-    const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;  
-    if ( nb > mma_red_s){
-       mma_red_s = nb;
-       if (mma_bufred != NULL) {
-          CUDA_CHECK(cudaFreeHost(mma_bufred));
-          CUDA_CHECK(cudaFree(mma_bufred_d));        
-       }
-       CUDA_CHECK(cudaMallocHost(&mma_bufred,nb*sizeof(real)));
-       CUDA_CHECK(cudaMalloc(&mma_bufred_d, nb*sizeof(real)));
+////// a_d = max(b, c * d_d)
+void hip_maxcons(void* a, real* b, real* c, void* d, int* n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  hipLaunchKernelGGL(maxcons_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, 
+       (real*)a, *b, *c, (real*)d, *n);
+  HIP_CHECK(hipGetLastError());
+}
+
+
+real hip_lcsc2(void *a, void*b, int *n) {
+  const dim3 nthrds(1024, 1, 1);
+  const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+  const int nb = ((*n) + 1024 - 1) / 1024;
+  const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+  if (nb > mma_red_s) {
+    mma_red_s = nb;
+    if (mma_bufred != NULL) {
+      HIP_CHECK(hipFreeHost(mma_bufred));
+      HIP_CHECK(hipFree(mma_bufred_d));
     }
-    glsc2_kernel <real> <<<nblcks, nthrds, 0, stream>>> 
-         ((real*)a, (real*)b, mma_bufred_d, (*n));
-    CUDA_CHECK(cudaGetLastError());
-    mmareduce_kernel<real> <<<1, 1024, 0, stream>>> (mma_bufred_d, nb);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
-         cudaMemcpyDeviceToHost, stream));
-    cudaStreamSynchronize(stream);
-    return mma_bufred[0];
+    HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
+    HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
   }
 
+  hipLaunchKernelGGL(glsc2_kernel<real>, nblcks, nthrds, 0, stream, 
+       (real*)a, (real*)b, mma_bufred_d, (*n));
+  HIP_CHECK(hipGetLastError());
 
-  void cuda_mpisum(void *a, int *n) {
+  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  HIP_CHECK(hipGetLastError());
+
+  HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real), 
+       hipMemcpyDeviceToHost, stream));
+
+  hipStreamSynchronize(stream);
+
+  return mma_bufred[0];
+}
+
+
+void hip_mpisum(void *a, int *n) {
 #ifdef HAVE_DEVICE_MPI
-    real* temp=(real*)a;
-    cudaStreamSynchronize(stream);
-    device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
+  real* temp = (real*)a;
+  hipStreamSynchronize(stream);
+  device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
 #endif
-  }
+}
+
 
 void hip_add2inv2(void* a, void* b, real* c, int* n) {
     const dim3 nthrds(1024, 1, 1);
