@@ -359,8 +359,13 @@ contains
     class(adjoint_case_t), intent(inout) :: this
 
     nullify(this%case)
-    call this%scalar_adj%free()
-    call this%fluid_adj%free()
+    if (allocated(this%scalar_adj)) then
+       call this%scalar_adj%free()
+    end if
+
+    if (allocated(this%fluid_adj)) then
+       call this%fluid_adj%free()
+    end if
     call this%output_controller%free()
 
   end subroutine adjoint_free
