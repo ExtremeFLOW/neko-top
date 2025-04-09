@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-module cuda_mma_math
+module hip_mma_math
   use num_types, only: rp, c_rp
   use, intrinsic :: iso_c_binding, only: c_int, c_ptr
 
@@ -38,226 +38,226 @@ module cuda_mma_math
   public
 
   interface
-     subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
-          bind(c, name = 'mma_gensub1_cuda')
+     subroutine mma_gensub1_hip(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
+          bind(c, name = 'mma_gensub1_hip')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: low_d, upp_d, x_d, xmin_d, xmax_d
        real(c_rp) :: asyinit
        integer(c_int) :: n
-     end subroutine mma_gensub1_cuda
+     end subroutine mma_gensub1_hip
 
-     subroutine mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, &
-          xmax_d, asydecr, asyincr, n) bind(c, name = 'mma_gensub2_cuda')
+     subroutine mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, &
+          xmax_d, asydecr, asyincr, n) bind(c, name = 'mma_gensub2_hip')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d
        real(c_rp) :: asydecr, asyincr
        integer(c_int) :: n
-     end subroutine mma_gensub2_cuda
+     end subroutine mma_gensub2_hip
 
-     subroutine mma_gensub3_cuda(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, &
+     subroutine mma_gensub3_hip(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, &
           max_d, alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m) &
-          bind(c, name = 'mma_gensub3_cuda')
+          bind(c, name = 'mma_gensub3_hip')
        import c_int, c_ptr
        type(c_ptr), value :: x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, max_d, &
             alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
        integer(c_int) :: n, m
-     end subroutine mma_gensub3_cuda
+     end subroutine mma_gensub3_hip
 
-     subroutine mma_gensub4_cuda(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d) &
-          bind(c, name = 'mma_gensub4_cuda')
+     subroutine mma_gensub4_hip(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d) &
+          bind(c, name = 'mma_gensub4_hip')
        import c_int, c_ptr
        type(c_ptr), value :: x_d, low_d, upp_d, pij_d, qij_d, bi_d
        integer(c_int) :: n, m
-     end subroutine mma_gensub4_cuda
+     end subroutine mma_gensub4_hip
 
-     subroutine cuda_mma_max(xsi_d, x_d, alpha_d, n) &
-          bind(c, name = 'cuda_mma_max')
+     subroutine hip_mma_max(xsi_d, x_d, alpha_d, n) &
+          bind(c, name = 'hip_mma_max')
        import c_int, c_ptr
        type(c_ptr), value :: xsi_d, x_d, alpha_d
        integer(c_int) :: n
-     end subroutine cuda_mma_max
+     end subroutine hip_mma_max
 
-     subroutine cuda_rex(rex_d, x_d, low_d, upp_d, pij_d, p0j_d, qij_d, q0j_d, &
-          lambda_d, xsi_d, eta_d, n, m) bind(c, name = 'cuda_rex')
+     subroutine hip_rex(rex_d, x_d, low_d, upp_d, pij_d, p0j_d, qij_d, q0j_d, &
+          lambda_d, xsi_d, eta_d, n, m) bind(c, name = 'hip_rex')
        import c_int, c_ptr
        type(c_ptr), value :: rex_d, x_d, low_d, upp_d, pij_d, p0j_d, qij_d, &
             q0j_d, lambda_d, xsi_d, eta_d
        integer(c_int) :: n, m
-     end subroutine cuda_rex
+     end subroutine hip_rex
 
-     subroutine cuda_relambda(relambda_d, x_d, upp_d, low_d, pij_d, qij_d, n, &
-          m) bind(c, name = 'cuda_relambda')
+     subroutine hip_relambda(relambda_d, x_d, upp_d, low_d, pij_d, qij_d, n, &
+          m) bind(c, name = 'hip_relambda')
        import c_int, c_ptr
        type(c_ptr), value :: relambda_d, x_d, upp_d, low_d, pij_d, qij_d
        integer(c_int) :: n, m
-     end subroutine cuda_relambda
+     end subroutine hip_relambda
 
-     subroutine cuda_sub2cons2(rexsi_d, xsi_d, x_d, alpha_d, epsi, n) &
-          bind(c, name = 'cuda_sub2cons2')
+     subroutine hip_sub2cons2(rexsi_d, xsi_d, x_d, alpha_d, epsi, n) &
+          bind(c, name = 'hip_sub2cons2')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: rexsi_d, xsi_d, x_d, alpha_d
        real(c_rp) :: epsi
        integer(c_int) :: n
-     end subroutine cuda_sub2cons2
+     end subroutine hip_sub2cons2
 
-     real(c_rp) function cuda_maxval(rex_d, n) bind(c, name = 'cuda_maxval')
+     real(c_rp) function hip_maxval(rex_d, n) bind(c, name = 'hip_maxval')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: rex_d
        integer(c_int) :: n
-     end function cuda_maxval
+     end function hip_maxval
 
-     real(c_rp) function cuda_norm(rex_d, n) bind(c, name = 'cuda_norm')
+     real(c_rp) function hip_norm(rex_d, n) bind(c, name = 'hip_norm')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: rex_d
        integer(c_int) :: n
-     end function cuda_norm
+     end function hip_norm
 
-     subroutine cuda_delx(delx_d, x_d, low_d, upp_d, pij_d, qij_d, p0j_d, &
+     subroutine hip_delx(delx_d, x_d, low_d, upp_d, pij_d, qij_d, p0j_d, &
           q0j_d, alpha_d, beta_d, lambda_d, epsi, n, m) &
-          bind(c, name = 'cuda_delx')
+          bind(c, name = 'hip_delx')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: delx_d, x_d, low_d, upp_d, pij_d, qij_d, p0j_d, &
             q0j_d, alpha_d, beta_d, lambda_d
        real(c_rp) :: epsi
        integer(c_int) :: n, m
-     end subroutine cuda_delx
+     end subroutine hip_delx
 
 
 
-     subroutine cuda_GG(GG_d, x_d, low_d, upp_d, pij_d, qij_d, n, m) &
-          bind(c, name = 'cuda_GG')
+     subroutine hip_GG(GG_d, x_d, low_d, upp_d, pij_d, qij_d, n, m) &
+          bind(c, name = 'hip_GG')
        import c_int, c_ptr
        type(c_ptr), value :: GG_d, x_d, low_d, upp_d, pij_d, qij_d
        integer(c_int) :: n, m
-     end subroutine cuda_GG
+     end subroutine hip_GG
 
-     subroutine cuda_diagx(diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, &
+     subroutine hip_diagx(diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, &
           pij_d, qij_d, alpha_d, beta_d, eta_d, lambda_d, n, m) &
-          bind(c, name = 'cuda_diagx')
+          bind(c, name = 'hip_diagx')
        import c_int, c_ptr
        type(c_ptr), value :: diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, &
             pij_d, qij_d, alpha_d, beta_d, eta_d, lambda_d
        integer(c_int) :: n, m
-     end subroutine cuda_diagx
+     end subroutine hip_diagx
 
-     subroutine cuda_bb(bb_d, GG_d, delx_d, diagx_d, n, m) &
-          bind(c, name = 'cuda_bb')
+     subroutine hip_bb(bb_d, GG_d, delx_d, diagx_d, n, m) &
+          bind(c, name = 'hip_bb')
        import c_int, c_ptr
        type(c_ptr), value :: bb_d, GG_d, delx_d, diagx_d
        integer(c_int) :: n, m
-     end subroutine cuda_bb
+     end subroutine hip_bb
 
-     subroutine cuda_AA(AA_d, GG_d, diagx_d, n, m) bind(c, name = 'cuda_AA')
+     subroutine hip_AA(AA_d, GG_d, diagx_d, n, m) bind(c, name = 'hip_AA')
        import c_int, c_ptr
        type(c_ptr), value :: AA_d, GG_d, diagx_d
        integer(c_int) :: n, m
-     end subroutine cuda_AA
+     end subroutine hip_AA
 
-     subroutine cuda_dx(dx_d, delx_d, diagx_d, GG_d, dlambda_d, n, m) &
-          bind(c, name = 'cuda_dx')
+     subroutine hip_dx(dx_d, delx_d, diagx_d, GG_d, dlambda_d, n, m) &
+          bind(c, name = 'hip_dx')
        import c_int, c_ptr
        type(c_ptr), value :: dx_d, delx_d, diagx_d, GG_d, dlambda_d
        integer(c_int) :: n, m
-     end subroutine cuda_dx
+     end subroutine hip_dx
 
-     subroutine cuda_dxsi(dxsi_d, xsi_d, dx_d, x_d, alpha_d, epsi, n) &
-          bind(c, name = 'cuda_dxsi')
+     subroutine hip_dxsi(dxsi_d, xsi_d, dx_d, x_d, alpha_d, epsi, n) &
+          bind(c, name = 'hip_dxsi')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: dxsi_d, xsi_d, dx_d, x_d, alpha_d
        real(c_rp) :: epsi
        integer(c_int) :: n
-     end subroutine cuda_dxsi
+     end subroutine hip_dxsi
 
-     subroutine cuda_deta(deta_d, eta_d, dx_d, x_d, beta_d, epsi, n) &
-          bind(c, name = 'cuda_deta')
+     subroutine hip_deta(deta_d, eta_d, dx_d, x_d, beta_d, epsi, n) &
+          bind(c, name = 'hip_deta')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: deta_d, eta_d, dx_d, x_d, beta_d
        real(c_rp) :: epsi
        integer(c_int) :: n
-     end subroutine cuda_deta
+     end subroutine hip_deta
 
-     real(c_rp) function cuda_maxval2(dxx_d, xx_d, cons, n) &
-          bind(c, name = 'cuda_maxval2')
+     real(c_rp) function hip_maxval2(dxx_d, xx_d, cons, n) &
+          bind(c, name = 'hip_maxval2')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: dxx_d, xx_d
        real(c_rp) :: cons
        integer(c_int) :: n
-     end function cuda_maxval2
+     end function hip_maxval2
 
-     real(c_rp) function cuda_maxval3(dx_d, x_d, alpha_d, cons, n) &
-          bind(c, name = 'cuda_maxval3')
+     real(c_rp) function hip_maxval3(dx_d, x_d, alpha_d, cons, n) &
+          bind(c, name = 'hip_maxval3')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: dx_d, x_d, alpha_d
        real(c_rp) :: cons
        integer(c_int) :: n
-     end function cuda_maxval3
+     end function hip_maxval3
 
-     subroutine cuda_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, &
-          n, m) bind(c, name = 'cuda_kkt_rex')
+     subroutine hip_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, &
+          n, m) bind(c, name = 'hip_kkt_rex')
        import c_int, c_ptr
        type(c_ptr), value :: rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d
        integer(c_int) :: n, m
-     end subroutine cuda_kkt_rex
+     end subroutine hip_kkt_rex
 
 
-     subroutine cuda_maxcons(a_d, b, c, d_d, n) bind(c, name = 'cuda_maxcons')
+     subroutine hip_maxcons(a_d, b, c, d_d, n) bind(c, name = 'hip_maxcons')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d, d_d
        real(c_rp) :: b, c
        integer(c_int) :: n
-     end subroutine cuda_maxcons
+     end subroutine hip_maxcons
 
 
-     real(c_rp) function cuda_lcsc2(a_d, b_d, n) bind(c, name = 'cuda_lcsc2')
+     real(c_rp) function hip_lcsc2(a_d, b_d, n) bind(c, name = 'hip_lcsc2')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d, b_d
        integer(c_int) :: n
-     end function cuda_lcsc2
+     end function hip_lcsc2
 
-     subroutine cuda_mpisum(a_d, n) bind(c, name = 'cuda_mpisum')
+     subroutine hip_mpisum(a_d, n) bind(c, name = 'hip_mpisum')
        import c_int, c_ptr
        type(c_ptr), value :: a_d
        integer(c_int) :: n
-     end subroutine cuda_mpisum
+     end subroutine hip_mpisum
 
-     subroutine cuda_add2inv2(a_d, b_d, c, n) bind(c, name = 'cuda_add2inv2')
+     subroutine hip_add2inv2(a_d, b_d, c, n) bind(c, name = 'hip_add2inv2')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d, b_d
        integer(c_int) :: n
        real(c_rp) :: c
-     end subroutine cuda_add2inv2
+     end subroutine hip_add2inv2
 
-     subroutine cuda_max2(a_d, b, c_d, d, n) bind(c, name = 'cuda_max2')
+     subroutine hip_max2(a_d, b, c_d, d, n) bind(c, name = 'hip_max2')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: a_d, c_d
        integer(c_int) :: n
        real(c_rp) :: b, d
-     end subroutine cuda_max2
+     end subroutine hip_max2
 
-     subroutine cuda_updatebb(bb_d, dellambda_d, dely_d, d_d, mu_d, y_d, delz, &
-          m) bind(c, name = 'cuda_updatebb')
+     subroutine hip_updatebb(bb_d, dellambda_d, dely_d, d_d, mu_d, y_d, delz, &
+          m) bind(c, name = 'hip_updatebb')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: bb_d, dellambda_d, dely_d, d_d, mu_d, y_d
        integer(c_int) :: m
        real(c_rp) :: delz
-     end subroutine cuda_updatebb
+     end subroutine hip_updatebb
 
-     subroutine cuda_updateAA(AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, &
-          y_d, a_d, zeta, z, m) bind(c, name = 'cuda_updateAA')
+     subroutine hip_updateAA(AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, &
+          y_d, a_d, zeta, z, m) bind(c, name = 'hip_updateAA')
        import c_rp, c_int, c_ptr
        type(c_ptr), value :: AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, &
             y_d, a_d
        integer(c_int) :: m
        real(c_rp) :: zeta, z
-     end subroutine cuda_updateAA
+     end subroutine hip_updateAA
 
-     subroutine cuda_dy(dy_d, dely_d, dlambda_d, d_d, mu_d, y_d, n) &
-          bind(c, name = 'cuda_dy')
+     subroutine hip_dy(dy_d, dely_d, dlambda_d, d_d, mu_d, y_d, n) &
+          bind(c, name = 'hip_dy')
        import c_int, c_ptr
        type(c_ptr), value :: dy_d, dely_d, dlambda_d, d_d, mu_d, y_d
        integer(c_int) :: n
-     end subroutine cuda_dy
+     end subroutine hip_dy
 
   end interface
 
-end module cuda_mma_math
+end module hip_mma_math
