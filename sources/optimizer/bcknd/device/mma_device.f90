@@ -234,7 +234,7 @@ contains
          sync = .true.)
     call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, mpi_real_precision, &
          mpi_sum, neko_comm, ierr)
-     call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
+    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
          sync = .true.)
     call device_sub2(this%bi%x_d, fval%x_d, this%m)
 
