@@ -195,7 +195,7 @@ contains
     call json_get_or_default(json, 'mma.d', d_const, 0.0_rp)
 
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
-    call json_get_or_default(json, 'mma.auto_scale', auto_scale, .true.)
+    call json_get_or_default(json, 'mma.auto_scale', auto_scale, .false.)
 
     call json_get_or_default(json, 'mma.epsimin', epsimin, 1.0e-9_rp)
     ! Initialize the MMA object with the parsed parameters
