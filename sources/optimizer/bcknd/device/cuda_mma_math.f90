@@ -38,6 +38,13 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n) &
+          bind(c, name = 'mattrans_v_mul_cuda')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: output_d, pij_d, lambda_d
+       integer(c_int) :: m, n
+     end subroutine mattrans_v_mul_cuda
+
      subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
           bind(c, name = 'mma_gensub1_cuda')
        import c_rp, c_int, c_ptr

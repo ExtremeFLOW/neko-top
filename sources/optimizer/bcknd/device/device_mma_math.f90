@@ -41,7 +41,7 @@ module device_mma_math
        cuda_add2inv2, cuda_GG, cuda_diagx, cuda_bb, cuda_updatebb, cuda_AA, &
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
-       mma_gensub3_cuda, mma_gensub4_cuda
+       mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda
 
   implicit none
   private
@@ -54,9 +54,30 @@ module device_mma_math
        device_norm, device_delx, device_add2inv2, device_GG, device_diagx, &
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
-       device_kkt_rex
+       device_kkt_rex, device_mattrans_v_mul
 
 contains
+  subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n) 
+    !--------------------------------------------------------------------------! 
+    ! A device support to do the following matrix multiplication               !
+    !               output = matmul(transpose(pij), lambda)                    !
+    ! where matrix pij is mxn, vector lambda is of size m and the output       !
+    ! vector is of size n                                                      !
+    !--------------------------------------------------------------------------! 
+    type(c_ptr) :: output_d, pij_d, lambda_d
+    integer :: m, n
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mattrans_v_mul
+
+
 
   subroutine device_mma_gensub1(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)
     type(c_ptr) :: low_d, upp_d, x_d, xmin_d, xmax_d

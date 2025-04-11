@@ -794,7 +794,7 @@ contains
     real(kind=rp) :: epsi, residual_max, residual_norm, &
          z, steg
     real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
-         relambda, remu, dlambda, dmu, mzero, gradlambda
+         relambda, remu, dlambda, dmu, gradlambda
     real(kind=rp), dimension(this%n) :: x, pjlambda, qjlambda
 
     ! To compute the Hessian based on eq(13)
@@ -806,7 +806,6 @@ contains
     real(kind=rp), dimension(this%m,this%m) :: Hess
     real(kind=rp) :: Hesstrace
 
-    real(kind=rp), dimension(3*this%n + 4*this%m + 2) :: residual
 
     ! using DGESV in lapack to solve
     ! the linear system which needs the following parameters
@@ -825,7 +824,6 @@ contains
     epsi = 1.0_rp !100
     ! x = 0.5_rp * (this%alpha%x + this%beta%x)
     y = 1.0_rp
-    mzero = 0.0_rp
     lambda = max(1.0_rp, 0.5_rp * this%c%x)
     mu = 1.0_rp !this parameter is eta in Niel's paper
     ! note that mu in the paper translates to epsi in the code following the 
@@ -878,7 +876,7 @@ contains
          ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
          ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
          ! ensure z>=0
-         z = merge(0.0, 1.0, a0 - dot_product(lambda, a) >= 0.0)
+         z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
 
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 

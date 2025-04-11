@@ -1,5 +1,19 @@
 #ifndef MMA_KERNEL_H
 #define MMA_KERNEL_H
+
+template <typename T>
+__global__ void mattrans_v_mul_kernel(T* __restrict__ output, 
+     const T* __restrict__ pij, const T* __restrict__ lambda,
+     const int m, const int n) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj < n) {
+    output[tj] = 0.0;
+    for (int i = 0; i < m; i++) {
+      output[tj] = output[tj] + pij[tj + i * n] * lambda[i];
+    }
+  }
+}
+
 template <typename T>
 __global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
      const T* __restrict__ x, const T* __restrict__ xmin,
@@ -48,7 +62,7 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
      T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
    const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
    T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
-   T* __restrict__ qij, const int n, const int m) {
+   T* __restrict__ qij, const int m, const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
      T xgap = xmax[tj] - xmin[tj];

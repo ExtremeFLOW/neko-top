@@ -14,6 +14,15 @@ extern "C" {
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
  //////
+  void mattrans_v_mul_cuda(void* output, void* pij, void* lambda,
+       int* m, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    mattrans_v_mul_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+         ((real*)output, (real*)pij, (real*)lambda, *m, *n);
+    CUDA_CHECK(cudaGetLastError());
+  }
+
   void mma_gensub4_cuda(void* x, void* low, void* upp, void* pij, void* qij, 
        int* n, int* m, void* bi) {
     const dim3 nthrds(1024, 1, 1);
