@@ -71,5 +71,4 @@ for file in $FILES; do
             ;;
         esac
     done
-
 done
