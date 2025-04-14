@@ -10,12 +10,9 @@ for file in $(find $DIR -name "*.f90"); do
         grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
 
     if [ -z "$score" ]; then
-        echo "Error: $file"
-        cat /tmp/flint_error
         continue
-    elif [ -f /tmp/flint_error ]; then
-        rm /tmp/flint_error
     fi
+
     if [ "$score" != "10.00" ]; then
         report=$(flint lint -r $OPT $file 2>/dev/null)
         if [ -z "$report" ]; then
