@@ -239,7 +239,7 @@ contains
     if (parameters%valid_path('optimization.domain')) then
        call json_get(parameters, 'optimization.domain.type', domain_type)
        select case (trim(domain_type))
-       case('point_zone')
+       case ('point_zone')
           this%if_mask = .true.
           call json_get(parameters, 'optimization.domain.zone_name', &
                domain_name)
