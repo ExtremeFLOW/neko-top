@@ -43,6 +43,6 @@ jobs:
           cmake --build build --target Documentation
 
       - name: Deploy to GitHub Pages
-        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
+        if: ${{ github.event_name == 'push' && github.ref_name == 'develop' }}
         id: deployment
         uses: actions/deploy-pages@v4
