@@ -8,6 +8,7 @@ on:
   push:
     branches:
       - "develop"
+      - "cicd/*"
 
 jobs:
   documentation:
@@ -42,6 +43,6 @@ jobs:
           cmake --build build --target Documentation
 
       - name: Deploy to GitHub Pages
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/develop' }}
         id: deployment
         uses: actions/deploy-pages@v4
