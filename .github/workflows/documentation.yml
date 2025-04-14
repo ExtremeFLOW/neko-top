@@ -54,7 +54,7 @@ jobs:
   # Deploy documentation job
 
   deploy-docs:
-    name: Deploy documentation to GitHub Pages
+    name: Deploy documentation
     if: github.ref == 'refs/heads/develop'
     needs: build-docs
 
