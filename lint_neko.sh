@@ -16,6 +16,14 @@ for file in $(find $DIR -name "*.f90"); do
     elif [ -f /tmp/flint_error ]; then
         rm /tmp/flint_error
     fi
+    if [ "$score" != "10.00" ]; then
+        report=$(flint lint -r $OPT $file 2>/dev/null)
+        if [ -z "$report" ]; then
+            flint stats -r $OPT $file 2>/dev/null
+        else
+            echo "$report"
+        fi
+    fi
     echo "$score: $file"
 
     while true; do
@@ -29,15 +37,13 @@ for file in $(find $DIR -name "*.f90"); do
             echo "Moving to the next file"
             break
             ;;
-        [pP])
+        [uU])
             report=$(flint lint -r $OPT $file 2>/dev/null)
             if [ -z "$report" ]; then
                 flint stats -r $OPT $file 2>/dev/null
             else
                 echo "$report"
             fi
-            ;;
-        [uU])
             score=$(flint score -r $OPT $file 2>/dev/null |
                 grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
             echo "$score: $file"
