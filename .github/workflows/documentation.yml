@@ -10,6 +10,12 @@ on:
       - "develop"
       - "cicd/*"
 
+# Set workflow concurrency to prevent multiple runs from being triggered
+# simultaneously for the same branch.
+concurrency:
+  group: "documentation-${{ github.ref }}"
+  cancel-in-progress: true
+
 jobs:
 
   # -------------------------------------------------------------------------- #
