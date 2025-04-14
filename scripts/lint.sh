@@ -18,6 +18,7 @@ fi
 
 # Get the score printed between the arrows
 for file in $FILES; do
+    file=$(realpath -m "$file")
 
     score=$(flint score -r $OPT $file 2>/dev/null |
         grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
