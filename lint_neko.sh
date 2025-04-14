@@ -8,15 +8,17 @@ for file in $(find $DIR -name "*.f90"); do
 
     score=$(flint score -r $OPT $file 2>/dev/null |
         grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
-    report=$(flint lint -r $OPT $file 2>/dev/null)
-    if [ -z "$report" ]; then
+
+    if [ -z "$score" ]; then
+        echo "Error: $file"
+        cat /tmp/flint_error
         continue
-    else
-        echo "$report"
+    elif [ -f /tmp/flint_error ]; then
+        rm /tmp/flint_error
     fi
+    echo "$score: $file"
 
     while true; do
-        echo "$score: $file"
         if [ "$score" == "10.00" ]; then
             break
         else
@@ -28,11 +30,17 @@ for file in $(find $DIR -name "*.f90"); do
             break
             ;;
         [pP])
-            flint lint -r $OPT $file 2>/dev/null
+            report=$(flint lint -r $OPT $file 2>/dev/null)
+            if [ -z "$report" ]; then
+                flint stats -r $OPT $file 2>/dev/null
+            else
+                echo "$report"
+            fi
             ;;
         [uU])
             score=$(flint score -r $OPT $file 2>/dev/null |
                 grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
+            echo "$score: $file"
             ;;
         [qQ])
             echo "Quitting the script"
