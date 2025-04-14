@@ -1,8 +1,6 @@
 #!/bin/bash
 
 MAIN_DIR=$(realpath -m "$(dirname "$0")/../")
-
-DIR=$MAIN_DIR/sources/
 OPT=$MAIN_DIR/flinter_rc.yml
 
 # Check if the flint command is available
@@ -12,7 +10,7 @@ if ! command -v flint &>/dev/null; then
 fi
 
 # List the modified files from develop branch
-FILES=$(git diff --name-only develop -- $DIR | grep -E '\.f90$')
+FILES=$(git diff --name-only develop -- $MAIN_DIR | grep -E '\.f90$')
 if [ -z "$FILES" ]; then
     echo "No modified files found."
     exit 0
