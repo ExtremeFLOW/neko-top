@@ -5,6 +5,9 @@ name: Documentation
 # documentation is only built and deployed when a pull request is merged.
 on:
   workflow_call:
+  pull_request:
+    branches:
+      - "develop"
   push:
     branches:
       - "develop"
