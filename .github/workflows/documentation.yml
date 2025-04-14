@@ -11,8 +11,12 @@ on:
       - "cicd/*"
 
 jobs:
-  build:
-    # Specify runner +  build & upload the static files as an artifact
+
+  # -------------------------------------------------------------------------- #
+  # Build Documentation job
+
+  build-docs:
+    name: Build documentation
     runs-on: ubuntu-latest
     steps:
       - name: Setup system
@@ -24,8 +28,17 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Configure documentation
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
         run: |
-          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=Release
+          BUILD_TYPE=Develop
+          if [ "$BRANCH_NAME" == "develop" ]; then
+            echo "Building documentation for the develop branch"
+            BUILD_TYPE=Release
+          else
+            echo "Skipping documentation build for the $BRANCH_NAME branch"
+          fi
+          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
       - name: Build documentation
         run: |
@@ -37,28 +50,22 @@ jobs:
         with:
           path: documentation/html/
 
-  # Deployment job
+  # -------------------------------------------------------------------------- #
+  # Deploy documentation job
 
-  # Deploy job
-  deploy:
+  deploy-docs:
+    name: Deploy documentation to GitHub Pages
     if: github.ref == 'refs/heads/develop'
+    needs: build-docs
 
-    # Add a dependency to the build job
-    needs: build
-
-    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
-    permissions:
-      pages: write      # to deploy to Pages
-      id-token: write   # to verify the deployment originates from an appropriate source
-
-    # Deploy to the github-pages environment
+    # Define the deployment environment
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    # Specify runner + deployment step
+    # Define the deployment strategy
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4 # or specific "vX.X.X" version tag for this action
+        uses: actions/deploy-pages@v4
