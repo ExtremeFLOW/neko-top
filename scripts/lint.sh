@@ -1,10 +1,25 @@
 #!/bin/bash
 
-DIR=external/neko/src
-OPT=external/neko/flinter_rc.yml
+MAIN_DIR=$(realpath -m "$(dirname "$0")/../")
+
+DIR=$MAIN_DIR/sources/
+OPT=$MAIN_DIR/flinter_rc.yml
+
+# Check if the flint command is available
+if ! command -v flint &>/dev/null; then
+    echo "Flint could not be found. Please install it first."
+    exit 1
+fi
+
+# List the modified files from develop branch
+FILES=$(git diff --name-only develop -- $DIR | grep -E '\.f90$')
+if [ -z "$FILES" ]; then
+    echo "No modified files found."
+    exit 0
+fi
 
 # Get the score printed between the arrows
-for file in $(find $DIR -name "*.f90"); do
+for file in $FILES; do
 
     score=$(flint score -r $OPT $file 2>/dev/null |
         grep -oP '(?<=\>\|)[^\|\<]+(?=\|\<)')
