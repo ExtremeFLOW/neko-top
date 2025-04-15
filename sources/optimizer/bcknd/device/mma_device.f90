@@ -891,10 +891,6 @@ contains
          z = device_glsum(dummy_m%x_d, this%m)
          z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
 
-          call device_memcpy(p0j%x, p0j%x_d, this%n, DEVICE_TO_HOST, &
-                  sync = .true.)
-          print *, "sum(p0j)=", sum(p0j%x), "max(p0j)=", &
-              maxval(p0j%x), "minval(p0j)=", minval(p0j%x)
           ! call device_memcpy(pij%x, pij%x_d, this%n*this%m, DEVICE_TO_HOST, &
           !         sync = .true.)
           ! print *, "sum(pij)=", sum(pij%x), "max(pij)=", &
@@ -904,9 +900,9 @@ contains
           !           1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp ], [2,6])
           !     call device_memcpy(testM%x, testM%x_d, this%m * 6, HOST_TO_DEVICE, &
           !         sync = .true.)
-          call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-          print *, "lambda=", lambda%x
+          ! call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+          !     sync = .true.)
+          ! print *, "lambda=", lambda%x
           !     print *, "sum(pij) =", sum(pij%x)
           !     print *, "testM%x=", testM%x
           !     call device_mattrans_v_mul(output%x_d, testM%x_d, lambda%x_d, this%m, 6)
@@ -927,14 +923,14 @@ contains
          call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
               low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
           
-         call device_memcpy(pjlambda%x, pjlambda%x_d, this%n, DEVICE_TO_HOST, &
-            sync = .true.) 
-         call device_memcpy(qjlambda%x, qjlambda%x_d, this%n, DEVICE_TO_HOST, &
-            sync = .true.) 
-         print *, "sum(pjlambda)=", sum(pjlambda%x), "max(pjlambda)=", &
-              maxval(pjlambda%x), "minval(pjlambda)=", minval(pjlambda%x)
-         print *, "sum(qjlambda)=", sum(qjlambda%x), "max(qjlambda)=", &
-              maxval(qjlambda%x), "minval(qjlambda)=", minval(qjlambda%x)
+          !     call device_memcpy(pjlambda%x, pjlambda%x_d, this%n, DEVICE_TO_HOST, &
+          !        sync = .true.) 
+          !     call device_memcpy(qjlambda%x, qjlambda%x_d, this%n, DEVICE_TO_HOST, &
+          !        sync = .true.) 
+          !     print *, "sum(pjlambda)=", sum(pjlambda%x), "max(pjlambda)=", &
+          !          maxval(pjlambda%x), "minval(pjlambda)=", minval(pjlambda%x)
+          !     print *, "sum(qjlambda)=", sum(qjlambda%x), "max(qjlambda)=", &
+          !          maxval(qjlambda%x), "minval(qjlambda)=", minval(qjlambda%x)
 
 
           !     call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
@@ -951,35 +947,46 @@ contains
          call device_cfill(relambda%x_d, 0.0_rp, this%m)
          call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
               low%x_d, pij%x_d, qij%x_d, this%n, this%m)
-         call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-              sync = .true.)
+
+         !> Global comminucation for relambda values
+
          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
               sync = .true.)
-         print *, "sum(x)=", sum(x%x), "max(x)=", maxval(x%x), "minval(x)=", minval(x%x)
-         print *, "after device_relambda=", relambda%x
-         call neko_error('stooooooooooooooop!!!!!')
+         call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+              mpi_real_precision, mpi_sum, neko_comm, ierr)
+         call device_memcpy(relambda%x, relambda%x_d, this%m, &
+              HOST_TO_DEVICE, sync = .true.)
+
+         call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
+         call device_sub2(relambda%x_d, y%x_d, this%m)
+         call device_add2(relambda%x_d, mu%x_d, this%m)
+         call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+
+          ! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+          !     sync = .true.)
+          ! call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
+          !     sync = .true.)
+          ! print *, "sum(x)=", sum(x%x), "max(x)=", maxval(x%x), "minval(x)=", minval(x%x)
+          ! print *, "after device_relambda=", relambda%x
+         call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
+         call device_cadd(remu%x_d, -epsi, this%m)
+
+
+         !> Download the re(lambda, mu) to calculate residumax
+
+         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+         call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+         residumax = maxval(abs([relambda%x, remu%x]))
+          
+          
+          ! print *, "remu=", remu%x
+          ! print *, "residumax=", residumax
+          call neko_error('stooooooooooooooop!!!!!')
 
        end associate
      end do outer
-     !        globaltmp_m%x = 0.0_rp
-     !        call MPI_Allreduce(relambda%x, globaltmp_m%x, this%m, &
-     !             mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-     !        call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-     !             HOST_TO_DEVICE, sync = .true.)
-     !        call device_add3s2(relambda%x_d, globaltmp_m%x_d, this%a%x_d, &
-     !             1.0_rp, -z, this%m)
-     !        call device_sub2(relambda%x_d, y%x_d, this%m)
-     !        call device_add2(relambda%x_d, s%x_d, this%m)
-     !        call device_sub2(relambda%x_d, this%bi%x_d, this%m)
-
-     !        call device_sub3(rexsi%x_d, x%x_d, this%alpha%x_d, this%n)
-     !        call device_col2(rexsi%x_d, xsi%x_d, this%n)
-     !        call device_cadd(rexsi%x_d, -epsi, this%n)
-
-     !        call device_sub3(reeta%x_d, this%beta%x_d, x%x_d, this%n)
-     !        call device_col2(reeta%x_d, eta%x_d, this%n)
-     !        call device_cadd(reeta%x_d, -epsi, this%n)
 
      !        call device_col3(remu%x_d, mu%x_d, y%x_d, this%m)
      !        call device_cadd(remu%x_d, -epsi, this%m)
