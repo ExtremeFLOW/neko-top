@@ -2,6 +2,29 @@
 #define MMA_KERNEL_H
 
 template <typename T>
+__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x, 
+     const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
+     const T* __restrict__ low, const T* __restrict__ upp,
+     const T* __restrict__ alpha, const T* __restrict__ beta,
+     const int n) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj < n) {
+    T pj = sqrt(pjlambda[tj]);
+    T qj = sqrt(qjlambda[tj]);
+    T denom = pj + qj;
+    T val = (pj * low[tj] + qj * upp[tj]) / denom;
+
+    // Clamp x between alpha and beta using branchless min/max
+    x[tj] = fmax(fmin(val, beta[tj]), alpha[tj]);
+    // x[tj] = (sqrt(pjlambda[tj]) * low[tj] + sqrt(qjlambda[tj]) * upp[tj])/
+    //      (sqrt(pjlambda[tj]) + sqrt(qjlambda[tj]));
+    // x[tj] = fmax(fmin(x[tj], beta[tj]), alpha[tj]);
+  }
+
+}
+
+
+template <typename T>
 __global__ void mattrans_v_mul_kernel(T* __restrict__ output, 
      const T* __restrict__ pij, const T* __restrict__ lambda,
      const int m, const int n) {

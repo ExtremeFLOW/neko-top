@@ -38,6 +38,14 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, low_d, &
+          upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_dipsolvesub1_cuda')
+       import c_int, c_ptr
+       type(c_ptr), value :: x_d, pjlambda_d, qjlambda_d, low_d, &
+          upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_dipsolvesub1_cuda
+
      subroutine mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n) &
           bind(c, name = 'mattrans_v_mul_cuda')
        import c_rp, c_int, c_ptr

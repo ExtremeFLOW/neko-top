@@ -41,7 +41,8 @@ module device_mma_math
        cuda_add2inv2, cuda_GG, cuda_diagx, cuda_bb, cuda_updatebb, cuda_AA, &
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
-       mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda
+       mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
+       mma_dipsolvesub1_cuda
 
   implicit none
   private
@@ -54,9 +55,33 @@ module device_mma_math
        device_norm, device_delx, device_add2inv2, device_GG, device_diagx, &
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
-       device_kkt_rex, device_mattrans_v_mul
+       device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1
 
 contains
+  subroutine device_mma_dipsolvesub1(x_d, pjlambda_d, qjlambda_d, &
+       low_d, upp_d, alpha_d, beta_d, n)
+    !--------------------------------------------------------------------------! 
+    ! A device support to do the following calculation needed for the          !
+    ! dualsubsolve for MMA:                                                    !
+    !   x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) /  &                 !
+    !                                  (sqrt(pjlambda) + sqrt(qjlambda))       !                                                     !
+    !--------------------------------------------------------------------------! 
+    type(c_ptr) :: x_d, pjlambda_d, qjlambda_d, &
+         low_d, upp_d, alpha_d, beta_d
+    integer(c_int) :: n
+#if HAVE_HIP
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, &
+       low_d, upp_d, alpha_d, beta_d, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_mma_dipsolvesub1
+
+
   subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n) 
     !--------------------------------------------------------------------------! 
     ! A device support to do the following matrix multiplication               !

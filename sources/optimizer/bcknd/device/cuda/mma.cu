@@ -14,6 +14,17 @@ extern "C" {
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
  //////
+ 
+  void mma_dipsolvesub1_cuda(void* x, void* pjlambda, void* qjlambda,
+     void* low, void* upp, void* alpha, void* beta, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    mma_dipsolvesub1_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+         ((real*)x, (real*)pjlambda, (real*)qjlambda, (real*)low, (real*)upp,
+         (real*)alpha, (real*)beta, *n);
+    CUDA_CHECK(cudaGetLastError());
+  }
+
   void mattrans_v_mul_cuda(void* output, void* pij, void* lambda,
        int* m, int* n) {
     const dim3 nthrds(1024, 1, 1);

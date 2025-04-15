@@ -42,7 +42,7 @@ submodule (mma) mma_device
        device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
-       device_mma_gensub2, device_mattrans_v_mul
+       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1
 
 
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -888,39 +888,38 @@ contains
          z = device_glsum(dummy_m%x_d, this%m)
          z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
 
-         testM%x = reshape([ &
-               1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp, &
-               1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp ], [2,6])
-         call device_memcpy(testM%x, testM%x_d, this%m * 6, HOST_TO_DEVICE, &
-             sync = .true.)
-         call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-             sync = .true.)
-         print *, "lambda=", lambda%x
-         print *, "sum(pij) =", sum(pij%x)
-         print *, "testM%x=", testM%x
-         call device_mattrans_v_mul(output%x_d, testM%x_d, lambda%x_d, this%m, 6)
-         call device_memcpy(output%x, output%x_d, 6, DEVICE_TO_HOST, &
-             sync = .true.)         
-         print *, "output%x=", output%x
+          !     testM%x = reshape([ &
+          !           1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp, &
+          !           1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp ], [2,6])
+          !     call device_memcpy(testM%x, testM%x_d, this%m * 6, HOST_TO_DEVICE, &
+          !         sync = .true.)
+          !     call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+          !         sync = .true.)
+          !     print *, "lambda=", lambda%x
+          !     print *, "sum(pij) =", sum(pij%x)
+          !     print *, "testM%x=", testM%x
+          !     call device_mattrans_v_mul(output%x_d, testM%x_d, lambda%x_d, this%m, 6)
+          !     call device_memcpy(output%x, output%x_d, 6, DEVICE_TO_HOST, &
+          !         sync = .true.)         
+          !     print *, "output%x=", output%x
 
 
-     !     call device_cfill(test6%x_d, 1.0_rp, 6)
-     !     call device_mat_v_mul(outputM%x_d, testM%x_d, test6%x_d, this%m, 6)
-     !     call device_memcpy(outputM%x, outputM%x_d, this%m, DEVICE_TO_HOST, &
-     !         sync = .true.) 
-     !     print *, "outputM%x=", outputM%x
+         ! Comput the value of x that minimizes L_x for the current λ
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
+         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+         ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
+         call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
+         call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
+         call device_add2(pjlambda%x_d, p0j%x_d, this%n)
+         call device_add2(qjlambda%x_d, q0j%x_d, this%n)
 
+         call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
+              low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+          
+          !     call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
+          !         sync = .true.)
+          !     print *, "sum(x)=", sum(x%x), "max(x)=", maxval(x%x), "minval(x)=", minval(x%x)
          call neko_error('stooooooooooooooop!!!!!')
-
-     !     ! Comput the value of x that minimizes L_x for the current λ
-     !     ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
-     !     ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
-     !     ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
-     !     pjlambda = (p0j + matmul(transpose(pij), lambda))
-     !     qjlambda = (q0j + matmul(transpose(qij), lambda))
-     !     x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
-     !          (sqrt(pjlambda) + sqrt(qjlambda)) 
-
 
          !!!call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
          !!!    sync = .true.)
