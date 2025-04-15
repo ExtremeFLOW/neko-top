@@ -882,10 +882,21 @@ contains
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
+
+         print *, "sum(p0j)=", sum(p0j), "max(p0j)=", &
+              maxval(p0j), "minval(p0j)=", minval(p0j)
+          !     print *, "sum(pij)=", sum(pij), "max(pij)=", &
+          !          maxval(pij), "minval(pij)=", minval(pij)
+         print *, "lambda=" , lambda
          pjlambda = (p0j + matmul(transpose(pij), lambda))
          qjlambda = (q0j + matmul(transpose(qij), lambda))
          x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
               (sqrt(pjlambda) + sqrt(qjlambda)) 
+         print *, "sum(pjlambda)=", sum(pjlambda), "max(pjlambda)=", &
+              maxval(pjlambda), "minval(pjlambda)=", minval(pjlambda)
+         print *, "sum(qjlambda)=", sum(qjlambda), "max(qjlambda)=", &
+              maxval(qjlambda), "minval(qjlambda)=", minval(qjlambda)
+
 
          ! Ensure that x is feasible (alpha<=x<=beta)
          x = merge(alpha, x, x .lt. alpha)
@@ -893,6 +904,9 @@ contains
 
          ! Compute the residual for the lambda and mu using eq(9) and eq(15)
          relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+         print *, "sum(x)=", sum(x), "max(x)=", maxval(x), "minval(x)=", minval(x)
+         print *, "after cpu_relambda=", relambda
+         call neko_error('stooooooooooooooop!!!!!')
          !> Global comminucation for relambda values
          call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
               mpi_real_precision, mpi_sum, neko_comm, ierr)

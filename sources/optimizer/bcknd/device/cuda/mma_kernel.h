@@ -16,9 +16,6 @@ __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
 
     // Clamp x between alpha and beta using branchless min/max
     x[tj] = fmax(fmin(val, beta[tj]), alpha[tj]);
-    // x[tj] = (sqrt(pjlambda[tj]) * low[tj] + sqrt(qjlambda[tj]) * upp[tj])/
-    //      (sqrt(pjlambda[tj]) + sqrt(qjlambda[tj]));
-    // x[tj] = fmax(fmin(x[tj], beta[tj]), alpha[tj]);
   }
 
 }
@@ -32,7 +29,8 @@ __global__ void mattrans_v_mul_kernel(T* __restrict__ output,
   if (tj < n) {
     output[tj] = 0.0;
     for (int i = 0; i < m; i++) {
-      output[tj] = output[tj] + pij[tj + i * n] * lambda[i];
+      // output[tj] = output[tj] + pij[tj + i * n] * lambda[i];
+      output[tj] = output[tj] + pij[i + tj * m] * lambda[i];
     }
   }
 }
@@ -85,7 +83,7 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
      T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
    const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
    T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
-   T* __restrict__ qij, const int m, const int n) {
+   T* __restrict__ qij, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
      T xgap = xmax[tj] - xmin[tj];
@@ -95,7 +93,6 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
         0.5 * xgap);
      p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
         0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
-
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
         1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
      for (int i = 0; i < m; i++) {
