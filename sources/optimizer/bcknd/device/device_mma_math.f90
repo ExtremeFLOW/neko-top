@@ -47,7 +47,7 @@ module device_mma_math
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
        hip_updateAA, hip_dx, hip_dy, hip_deta, hip_dxsi, hip_maxval2, &
        hip_maxval3, hip_kkt_rex, mma_gensub1_hip, mma_gensub2_hip, &
-       mma_gensub3_hip, mma_gensub_hip
+       mma_gensub3_hip, mma_gensub4_hip
 
   implicit none
   private

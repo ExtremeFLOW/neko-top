@@ -304,9 +304,18 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+        elif [ "$DEVICE_TYPE" == "HIP" ]; then
+            if [ -d "$HIP_DIR" ]; then
+                FEATURES+=" --with-hip=$HIP_DIR"
+            else
+                error "HIP_DIR is not set."
+                error "Please set HIP_DIR to the directory containing"
+                error "the HIP installation."
+                exit 1
+            fi
         elif [ "$DEVICE_TYPE" != "NONE" ]; then
             printf "Device type not recognized: $DEVICE_TYPE\n"
-            printf "\tValid options are: CUDA, NONE\n"
+            printf "\tValid options are: CUDA, HIP or NONE\n"
             printf "\tPlease submit an issue if you would like to see additional options.\n"
             exit 1
         fi
@@ -339,6 +348,13 @@ function find_neko() {
             if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
                 error "CUDA backend not found in Neko."
                 error "Please ensure that the CUDA installation is correct."
+                exit 1
+            fi
+        elif [ "$DEVICE_TYPE" == "HIP" ]; then
+            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
+            if [ -z "$(grep "NEKO_BCKND_HIP = 1" src/config/neko_config.f90)" ]; then
+                error "HIP backend not found in Neko."
+                error "Please ensure that the HIP installation is correct."
                 exit 1
             fi
         fi
