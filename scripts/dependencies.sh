@@ -264,7 +264,7 @@ function find_neko() {
     check_external_dir
 
     # Find the required dependencies for Neko
-    find_json_fortran
+    find_json_fortran $JSON_FORTRAN_DIR
     find_gslib
     find_hdf5
     [ "$TEST" == true ] && find_pfunit
