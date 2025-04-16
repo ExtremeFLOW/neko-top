@@ -320,6 +320,9 @@ function find_neko() {
             exit 1
         fi
 
+        # Add additional features to be applied by the user
+        FEATURES+=$EXTRA_FEATURES
+
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
         if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then

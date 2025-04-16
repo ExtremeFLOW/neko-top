@@ -25,6 +25,7 @@ function help() {
     echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
+    echo -e "\tEXTRA_FEATURES    Additional features to pass to neko configure"
 }
 
 # ============================================================================ #
