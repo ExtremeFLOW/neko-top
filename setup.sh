@@ -86,7 +86,7 @@ export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 # Execute the preparation script if it exists and prepare the environment
 
 printf "=%.0s" {1..80} && printf "\n"
-printf "Preparing environment.\n\n"
+printf "Preparing environment.\n"
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
