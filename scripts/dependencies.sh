@@ -265,10 +265,9 @@ function find_neko() {
     check_external_dir
 
     # Find the required dependencies for Neko
-    find_json_fortran
-    find_gslib
-    find_hdf5
-    [ "$TEST" == true ] && find_pfunit
+    find_json_fortran $JSON_FORTRAN_DIR
+    find_gslib $GSLIB_DIR
+    find_hdf5 $HDF5_DIR
 
     # Determine the Neko installation directory
     if [ ! -z "$1" ]; then
@@ -293,7 +292,6 @@ function find_neko() {
         [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
         [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ ! -z "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
-        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -332,7 +330,6 @@ function find_neko() {
         fi
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
-        [ "$TEST" == true ] && make check
 
         # Verify installation device type
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -389,7 +386,7 @@ function find_cubit() {
 # ============================================================================ #
 # Ensure ExodusII to Nek5000 is installed, if not install it.
 function find_exo2nek() {
-    find_nek5000
+    find_nek5000 $NEK5000_DIR
 
     # Check if exo2nek is available
     if [ ! -z "$(which exo2nek)" ]; then
