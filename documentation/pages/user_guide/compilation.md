@@ -119,4 +119,13 @@ setup the environment for a particular system.
 #### LUMI {#lumi}
 
 ```bash
+module purge
+ml LUMI/24.03 PrgEnv-gnu cray-libsci
+
+export MPICC=$(which cc)
+export MPICXX=$(which CC)
+export MPIFC=$(which ftn)
+export FC=$(which ftn)
+export CXX=$(which CC)
+export CC=$(which cc)
 ```
