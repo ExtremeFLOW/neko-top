@@ -1,12 +1,17 @@
-# Cluster configurations
+# Cluster configurations {#clusters}
 
 
-## Lumi
+## Lumi {#lumi}
 prepare.env
-```.bash
-#!/bin/bash
 
-# Load the required modules
-module load LUMI/24.03
+```bash
+module purge 2>/dev/null
+ml LUMI/24.03 PrgEnv-gnu cray-libsci buildtools
 
+export MPICC=$(which cc)
+export MPICXX=$(which CC)
+export MPIFC=$(which ftn)
+export FC=$(which ftn)
+export CXX=$(which CC)
+export CC=$(which cc)
 ```
