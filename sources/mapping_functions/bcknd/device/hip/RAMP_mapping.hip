@@ -32,6 +32,7 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <hip/hip_runtime.h>
 #include "RAMP_mapping_kernel.h"
 #include <device/hip/check.h>
 #include <device/device_config.h>
