@@ -34,7 +34,7 @@
 # Neko-TOP: Neko Topology Optimization Package
 # ============================================================================ #
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.21)
 project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
 # Set language standards

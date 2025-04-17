@@ -22,6 +22,9 @@ function check_system_dependencies() {
         done
         exit 1
     fi
+
+    # Check for correct version of cmake executable (>= 3.21)
+
 }
 
 # ============================================================================ #
