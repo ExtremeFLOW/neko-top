@@ -1,7 +1,7 @@
 program usrneko
   use simulation_m, only: simulation_t
   use problem, only: problem_t
-  use optimizer, only : optimizer_t, optimizer_factory
+  use optimizer, only: optimizer_t, optimizer_factory
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
@@ -21,13 +21,13 @@ program usrneko
   integer :: ierr
 
   !> The simulation we are working with
-  type(simulation_t) :: simulation
+  type(simulation_t) :: sim
   !> The problem type
-  type(problem_t) :: problem
+  type(problem_t) :: prob
   !> The design type
-  class(design_t), allocatable :: design
+  class(design_t), allocatable :: des
   !> The optimizer (in this case mma)
-  class(optimizer_t), allocatable :: optimizer
+  class(optimizer_t), allocatable :: opt
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -47,33 +47,33 @@ program usrneko
   ! Initialization of the components
 
   ! initialize the user additions for the forward (through the neko interface)
-  call user_setup(simulation%neko_case%usr)
+  call user_setup(sim%neko_case%usr)
 
   ! initialize the simulation
-  call simulation%init(parameters)
+  call sim%init(parameters)
 
   ! initialize the design
-  call design_factory(design, parameters, simulation)
+  call design_factory(des, parameters, sim)
 
   ! initialize the problem
-  call problem%init(parameters, design, simulation)
+  call prob%init(parameters, des, sim)
 
   ! initialize the optimizer
-  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+  call optimizer_factory(opt, parameters, prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
 
-  call optimizer%run(problem, design, simulation)
+  call opt%run(prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call optimizer%free()
-  if (allocated(optimizer)) deallocate(optimizer)
+  call opt%free()
+  if (allocated(opt)) deallocate(opt)
 
-  call problem%free()
-  call design%free()
-  call simulation%free()
+  call prob%free()
+  call des%free()
+  call sim%free()
 
 end program usrneko

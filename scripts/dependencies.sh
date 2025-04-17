@@ -321,7 +321,7 @@ function find_neko() {
         fi
 
         # Add additional features to be applied by the user
-        FEATURES+=$EXTRA_FEATURES
+        FEATURES+=" ${EXTRA_FEATURES[@]}"
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
