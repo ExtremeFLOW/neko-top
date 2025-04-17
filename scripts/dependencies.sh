@@ -47,6 +47,7 @@ function find_json_fortran() {
     # Ensure JSON-Fortran is installed, if not install it.
     if [[ -z "$(find $JSON_FORTRAN_DIR -name libjsonfortran.so)" ]]; then
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
+            -DCMAKE_INSTALL_PREFIX=$JSON_FORTRAN_DIR \
             -Wno-dev \
             -DUSE_GNU_INSTALL_CONVENTION=ON \
             -DSKIP_DOC_GEN=ON
@@ -230,9 +231,10 @@ function find_hdf5() {
     # Ensure HDF5 is installed, if not install it.
     if [[ -z "$(find $HDF5_DIR -name libhdf5.so)" ]]; then
         cmake -B $HDF5_DIR/build -S $HDF5_DIR \
-            -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx \
-            -DCMAKE_Fortran_COMPILER=mpifort -DHDF5_ENABLE_PARALLEL=ON \
+            -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
+            -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
+            -DCMAKE_INSTALL_PREFIX=$HDF5_DIR \
             -DCMAKE_BUILD_TYPE=Release
         cmake --build $HDF5_DIR/build/ --config Release --parallel
         cmake --install $HDF5_DIR/build/ --prefix $HDF5_DIR
