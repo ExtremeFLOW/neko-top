@@ -115,17 +115,3 @@ update NVidia graphics drivers on the windows side as well.
 Here is a few examples of `prepare.env` scripts that can be used to setup the
 environment for the compilation of Neko-TOP. These are to help you correctly
 setup the environment for a particular system.
-
-#### LUMI {#lumi}
-
-```bash
-module purge 2>/dev/null
-ml LUMI/24.03 PrgEnv-gnu cray-libsci
-
-export MPICC=$(which cc)
-export MPICXX=$(which CC)
-export MPIFC=$(which ftn)
-export FC=$(which ftn)
-export CXX=$(which CC)
-export CC=$(which cc)
-```
