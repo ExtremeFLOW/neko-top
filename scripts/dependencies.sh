@@ -322,9 +322,6 @@ function find_neko() {
 
         # Add additional features to be applied by the user
         FEATURES+=" ${EXTRA_FEATURES[@]}"
-	echo $FEATURES
-	echo $MPIFC
-	echo $MPICC
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
