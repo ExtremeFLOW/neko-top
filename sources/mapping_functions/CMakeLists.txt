@@ -22,6 +22,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 
+
 if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
@@ -33,15 +34,32 @@ if(DEVICE_TYPE STREQUAL "CUDA")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
     )
+
 elseif(DEVICE_TYPE STREQUAL "HIP")
-    target_sources(neko-top
-        PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
-            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping_kernel.h
+    # HIP kernel compiled in separate library to ensure hipcc is used
+    add_library(hip_kernels STATIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
     )
 
+    set_target_properties(hip_kernels PROPERTIES
+        LINKER_LANGUAGE HIP
+    )
+
+    target_include_directories(hip_kernels
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip
+    )
+    target_include_directories(hip_kernels
+        PRIVATE
+            ${NEKO_DIR}/src
+    )
+
+    target_link_libraries(neko-top hip_kernels)
+
+    # Add the kernel headers for inclusion (but NOT as sources!)
     target_include_directories(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip
     )
 endif()
+
