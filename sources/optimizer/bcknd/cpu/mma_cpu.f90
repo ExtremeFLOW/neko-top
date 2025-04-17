@@ -32,7 +32,8 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-  use mpi_f08, only: MPI_IN_PLACE
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use comm, only: neko_comm, pe_rank, mpi_real_precision
   implicit none
 
 contains
@@ -52,8 +53,7 @@ contains
     type(matrix_t) :: dfdx
 
     if (.not. this%is_initialized) then
-       write(stderr, *) "The MMA object is not initialized."
-       error stop
+       call neko_error("The MMA object is not initialized.")
     end if
 
     ! generate a convex approximation of the problem
@@ -524,9 +524,7 @@ contains
           call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
           if (info .ne. 0) then
-             write(stderr, *) "DGESV failed to solve the linear system in MMA."
-             write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
-             error stop
+             call neko_error("DGESV failed to solve the linear system in MMA.")
           end if
 
           dlambda = bb(1:this%m)
