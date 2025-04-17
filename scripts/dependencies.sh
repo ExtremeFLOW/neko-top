@@ -49,13 +49,13 @@ function find_json_fortran() {
 
         # Install JSON-Fortran
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
-            -DCMAKE_INSTALL_PREFIX=$JSON_FORTRAN_DIR \
+            --install-prefix $JSON_FORTRAN_DIR \
             -Wno-dev \
             -DUSE_GNU_INSTALL_CONVENTION=ON \
             -DSKIP_DOC_GEN=ON
 
         cmake --build $JSON_FORTRAN_DIR/build --parallel
-        cmake --install $JSON_FORTRAN_DIR/build --prefix $JSON_FORTRAN_DIR
+        cmake --install $JSON_FORTRAN_DIR/build
         rm -fr $JSON_FORTRAN_DIR/build
     fi
 
@@ -127,7 +127,7 @@ function find_gslib() {
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $GSLIB_DIR
 
-        make CC=mpicc
+        make CC=$MPICC
         make install DESTDIR=.
         rm -fr build
 
@@ -236,14 +236,13 @@ function find_hdf5() {
         fi
 
         # Build and install HDF5
-        cmake -B $HDF5_DIR/build -S $HDF5_DIR \
+        cmake -B $HDF5_DIR/build -S $HDF5_DIR --install-prefix $HDF5_DIR \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
-            -DCMAKE_INSTALL_PREFIX=$HDF5_DIR \
             -DCMAKE_BUILD_TYPE=Release
         cmake --build $HDF5_DIR/build/ --config Release --parallel
-        cmake --install $HDF5_DIR/build/ --prefix $HDF5_DIR
+        cmake --install $HDF5_DIR/build/
         rm -fr $HDF5_DIR/build
     fi
 
