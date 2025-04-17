@@ -24,6 +24,12 @@ function check_system_dependencies() {
     fi
 
     # Check for correct version of cmake executable (>= 3.21)
+    CMAKE_VERSION=$(cmake --version | grep -oP '(?<=version )\d+\.\d+')
+    if [ $(echo "$CMAKE_VERSION < 3.21" | bc) -eq 1 ]; then
+        printf "CMake version >= 3.21 is required.\n"
+        printf "Please update your CMake installation.\n"
+        exit 1
+    fi
 
 }
 
