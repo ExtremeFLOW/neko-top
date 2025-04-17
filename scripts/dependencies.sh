@@ -36,16 +36,18 @@ function find_json_fortran() {
         JSON_FORTRAN_DIR="$(realpath $EXTERNAL_DIR/json-fortran)"
     fi
 
-    # Clone JSON-Fortran from the repository if it does not exist.
-    if [[ ! -d $JSON_FORTRAN_DIR || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
-
-        git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
-            https://github.com/jacobwilliams/json-fortran $JSON_FORTRAN_DIR
-    fi
-
     # Ensure JSON-Fortran is installed, if not install it.
     if [[ -z "$(find $JSON_FORTRAN_DIR -name libjsonfortran.so)" ]]; then
+
+        # Clone JSON-Fortran from the repository if it does not exist.
+        if [[ ! -d $JSON_FORTRAN_DIR || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
+            [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
+
+            git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
+                https://github.com/jacobwilliams/json-fortran $JSON_FORTRAN_DIR
+        fi
+
+        # Install JSON-Fortran
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
             -DCMAKE_INSTALL_PREFIX=$JSON_FORTRAN_DIR \
             -Wno-dev \
@@ -110,14 +112,16 @@ function find_gslib() {
         GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
     fi
 
-    # Clone GSLIB from the repository if it does not exist.
-    if [ ! -d $GSLIB_DIR ]; then
-        git clone --depth 1 --branch master \
-            https://github.com/nek5000/gslib.git $GSLIB_DIR
-    fi
-
     # Ensure GSLIB is installed, if not install it.
     if [ -z "$(find $GSLIB_DIR -name libgs.a)" ]; then
+
+        # Clone GSLIB from the repository if it does not exist.
+        if [ ! -d $GSLIB_DIR ]; then
+            git clone --depth 1 --branch master \
+                https://github.com/nek5000/gslib.git $GSLIB_DIR
+        fi
+
+        # Install GSLIB
         echo "Building GSLIB"
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
@@ -221,15 +225,17 @@ function find_hdf5() {
         HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
     fi
 
-    # Clone HDF5 from the repository if it does not exist.
-    if [ ! -d $HDF5_DIR ]; then
-        [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
-        git clone --depth 1 --branch $HDF5_VERSION \
-            https://github.com/HDFGroup/hdf5.git $HDF5_DIR
-    fi
-
     # Ensure HDF5 is installed, if not install it.
-    if [[ -z "$(find $HDF5_DIR -name libhdf5.so)" ]]; then
+    if [[ -z "$(find $HDF5_DIR -name libhdf5_fortran.so)" ]]; then
+
+        # Clone HDF5 from the repository if it does not exist.
+        if [ ! -d $HDF5_DIR ]; then
+            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
+            git clone --depth 1 --branch $HDF5_VERSION \
+                https://github.com/HDFGroup/hdf5.git $HDF5_DIR
+        fi
+
+        # Build and install HDF5
         cmake -B $HDF5_DIR/build -S $HDF5_DIR \
             -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
             -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
@@ -276,16 +282,16 @@ function find_neko() {
         NEKO_DIR="$(realpath $EXTERNAL_DIR/neko)"
     fi
 
-    # Clone Neko from the repository if it does not exist.
-    if [[ ! -d $NEKO_DIR || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="develop"
-
-        git clone --depth 1 --branch $NEKO_VERSION \
-            https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
-    fi
-
     # Check if Neko is installed, if not install it.
     if [[ -z "$(find $NEKO_DIR/lib*/ -name libneko.a)" || "$CLEAN_NEKO" == true ]]; then
+
+        # Clone Neko from the repository if it does not exist.
+        if [[ ! -d $NEKO_DIR || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
+            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="develop"
+
+            git clone --depth 1 --branch $NEKO_VERSION \
+                https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+        fi
 
         # Determine available features
         FEATURES="--enable-contrib "
