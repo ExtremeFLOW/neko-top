@@ -85,7 +85,7 @@ contains
     select type (adv => object)
     type is (adv_lin_dealias_t)
        if (lxd .gt. 0) then
-          call adv%init(lxd, coef)
+          call adv%init(lxd, coef, if_adjoint)
        else
           call adv%init(coef%Xh%lx * 3 / 2, coef, if_adjoint)
        end if

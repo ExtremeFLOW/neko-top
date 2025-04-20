@@ -42,6 +42,7 @@ module advection_adjoint
   !> Base abstract type for computing the advection operator
   type, public, abstract :: advection_adjoint_t
    contains
+     procedure(compute_adv_lin2), pass(this), deferred :: compute
      procedure(compute_adv_lin), pass(this), deferred :: compute_linear
      procedure(compute_adv_lin), pass(this), deferred :: compute_adjoint
      procedure(compute_scalar_adv_lin), pass(this), deferred :: &
@@ -79,6 +80,35 @@ module advection_adjoint
        type(field_t), intent(inout) :: fx, fy, fz
        integer, intent(in) :: n
      end subroutine compute_adv_lin
+  end interface
+
+    abstract interface
+     !> Add advection operator to the right-hand-side for a fluld.
+     !! @param this The object.
+     !! @param vx The x component of velocity.
+     !! @param vy The y component of velocity.
+     !! @param vz The z component of velocity.
+     !! @param fx The x component of source term.
+     !! @param fy The y component of source term.
+     !! @param fz The z component of source term.
+     !! @param Xh The function space.
+     !! @param coef The coefficients of the (Xh, mesh) pair.
+     !! @param n Typically the size of the mesh.
+     subroutine compute_adv_lin2(this, vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, &
+          Xh, coef, n)
+       import :: advection_adjoint_t
+       import :: coef_t
+       import :: space_t
+       import :: field_t
+       import :: rp
+       class(advection_adjoint_t), intent(inout) :: this
+       type(space_t), intent(inout) :: Xh
+       type(coef_t), intent(inout) :: coef
+       type(field_t), intent(inout) :: vx, vy, vz
+       type(field_t), intent(inout) :: vxb, vyb, vzb
+       type(field_t), intent(inout) :: fx, fy, fz
+       integer, intent(in) :: n
+     end subroutine compute_adv_lin2
   end interface
 
   abstract interface

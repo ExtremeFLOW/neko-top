@@ -219,7 +219,7 @@ module adjoint_fluid_scheme
   !> Abstract interface to initialize an adjoint formulation
   abstract interface
      subroutine adjoint_fluid_scheme_init_intrf(this, msh, lx, params, user, &
-          time_scheme)
+          time_scheme, if_adjoint)
        import adjoint_fluid_scheme_t
        import json_file
        import mesh_t
@@ -231,6 +231,7 @@ module adjoint_fluid_scheme
        type(json_file), target, intent(inout) :: params
        type(user_t), target, intent(in) :: user
        type(time_scheme_controller_t), target, intent(in) :: time_scheme
+       logical, intent(in) :: if_adjoint
      end subroutine adjoint_fluid_scheme_init_intrf
   end interface
 

@@ -75,6 +75,8 @@ module adjoint_case
 
      logical :: have_scalar = .false.
 
+     logical :: if_adjoint = .true.
+
   end type adjoint_case_t
 
   interface adjoint_init
@@ -145,7 +147,7 @@ contains
     ! somehow. This little hack allows a case to be made, then the if_adjoint
     ! flag to be toggled, and then initialize, giving you a LNS case.
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
-         neko_case%usr, neko_case%fluid%ext_bdf, if_adjoint)
+         neko_case%usr, neko_case%fluid%ext_bdf, this%if_adjoint)
     !
     ! Setup adjoint scalar
     !
