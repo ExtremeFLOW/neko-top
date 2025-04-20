@@ -181,7 +181,7 @@ contains
     call this%free()
 
     ! Initiliaze base type.
-    call this%scheme_init(msh, coef, gs, params, scheme, user, rho)
+    call this%scheme_init(msh, coef, gs, params, scheme, user, rho, .true.)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -253,7 +253,7 @@ contains
     !                        this%s_adj_lag)
     ! @todo NOTE:
     ! This is changed a fair amount and I suspect it's due oifs
-    call advection_adjoint_factory(this%adv, params, this%c_Xh)
+    call advection_adjoint_factory(this%adv, params, this%c_Xh, .true.)
   end subroutine adjoint_scalar_pnpn_init
 
   !> I envision the arguments to this func might need to be expanded
@@ -386,7 +386,7 @@ contains
          ! call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
       else
          ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_scalar(u, v, w, s_adj, f_Xh, &
+         call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
               Xh, this%c_Xh, dm_Xh%size())
 
          ! At this point the RHS contains the sum of the advection operator,

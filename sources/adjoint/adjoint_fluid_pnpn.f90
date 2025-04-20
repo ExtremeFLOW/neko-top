@@ -280,13 +280,14 @@ module adjoint_fluid_pnpn
 
 contains
 
-  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, time_scheme)
+  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, time_scheme, if_adjoint)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
+    logical, intent(in) :: if_adjoint
     character(len=15), parameter :: scheme = 'Adjoint (Pn/Pn)'
     real(kind=rp) :: abs_tol
     character(len=LOG_SIZE) :: log_buf
@@ -300,6 +301,8 @@ contains
     character(len=256) :: header_line
 
     call this%free()
+
+    this%if_adjoint = if_adjoint
 
     ! Initialize base class
     call this%init_base(msh, lx, params, scheme, user, .true.)
@@ -409,7 +412,7 @@ contains
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
 
     ! Todo: make sure this actually follow the forward advection factory
-    call advection_adjoint_factory(this%adv, params, this%c_Xh)
+    call advection_adjoint_factory(this%adv, params, this%c_Xh, this%if_adjoint)
 
     if (params%valid_path('case.fluid.flow_rate_force')) then
        call neko_error("Flow rate forcing not available for adjoint_fluid_pnpn")

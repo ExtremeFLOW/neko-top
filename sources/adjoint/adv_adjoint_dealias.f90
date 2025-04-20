@@ -50,6 +50,7 @@ module adv_lin_dealias
 
   !> Type encapsulating advection routines with dealiasing
   type, public, extends(advection_adjoint_t) :: adv_lin_dealias_t
+     logical :: if_adjoint
      !> Coeffs of the higher-order space
      type(coef_t) :: coef_GL
      !> Coeffs of the original space in the simulation
@@ -128,6 +129,11 @@ module adv_lin_dealias
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
      ! We keep the differential operator on the test function
+
+     ! this is so stupid, we need a better way of pointing but I kept getting
+     ! silly errors
+     procedure, pass(this) :: compute => compute_wrapper
+
      procedure, pass(this) :: compute_adjoint_scalar => &
           compute_adjoint_scalar_advection_dealias
      ! NOTE
@@ -145,11 +151,14 @@ contains
   !! @param this The object.
   !! @param lxd The polynomial order of the space used in the dealiasing.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine init_dealias(this, lxd, coef)
+  subroutine init_dealias(this, lxd, coef, if_adjoint)
     class(adv_lin_dealias_t), target, intent(inout) :: this
     integer, intent(in) :: lxd
     type(coef_t), intent(inout), target :: coef
+    logical, intent(in) :: if_adjoint
     integer :: nel, n_GL, n
+
+    this%if_adjoint = if_adjoint
 
     call this%Xh_GL%init(GL, lxd, lxd, lxd)
     this%Xh_GLL => coef%Xh
@@ -225,6 +234,25 @@ contains
   subroutine free_dealias(this)
     class(adv_lin_dealias_t), intent(inout) :: this
   end subroutine free_dealias
+
+    subroutine compute_wrapper(this, vx, vy, vz, vxb, vyb, vzb, fx, &
+       fy, fz, Xh, coef, n)
+    implicit none
+    class(adv_lin_dealias_t), intent(inout) :: this
+    type(space_t), intent(inout) :: Xh
+    type(coef_t), intent(inout) :: coef
+    type(field_t), intent(inout) :: vx, vy, vz
+    type(field_t), intent(inout) :: vxb, vyb, vzb
+    integer, intent(in) :: n
+    type(field_t), intent(inout) :: fx, fy, fz
+
+    if (this%if_adjoint) then
+       call this%compute_adjoint(vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
+    else
+       call this%compute_linear(vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
+    end if
+
+  end subroutine compute_wrapper
 
 
   !> Add the adjoint advection term for the fluid in weak form, i.e.
