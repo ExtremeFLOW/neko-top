@@ -12,7 +12,8 @@ module Ginzburg_Landau
    ! specific to some neko operations
    use coef, only: coef_t
    use scratch_registry, only: neko_scratch_registry
-   use field_math, only: field_col3, field_rzero, field_cmult, field_add3s2
+   use field_math, only: field_col3, field_rzero, field_cmult, field_add3s2, &
+      field_copy
    use math, only: glsc2
    use device_math, only: device_glsc2
    implicit none
@@ -56,7 +57,7 @@ module Ginzburg_Landau
    !-----------------------------------
  
    type, extends(abstract_linop_rdp), public :: neko_propagator
-      type(simulation_t) :: state
+      type(simulation_t) :: simulation
     contains
       private
       procedure, pass(this), public :: matvec => direct_solver
@@ -289,7 +290,7 @@ module Ginzburg_Landau
  
    subroutine direct_solver(this, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_pro), intent(in)  :: this
+     class(neko_propagator), intent(in)  :: this
      ! Input vector.
      class(abstract_vector_cdp) , intent(in)  :: vec_in
      ! Output vector.
@@ -304,6 +305,16 @@ module Ginzburg_Landau
      type is(state_vector)
         select type(vec_out)
         type is(state_vector)
+           ! Reset propagator.
+           call this%simulation%reset()
+           ! Get state vector.
+           call field_copy(this%simulation%adjoint_fluid%u_adj, vec_in%u)
+           call field_copy(this%simulation%adjoint_fluid%v_adj, vec_in%v)
+           call field_copy(this%simulation%adjoint_fluid%w_adj, vec_in%w)
+           ! Integrate forward in time.
+           call thi
+
+
            ! Get state vector.
            state_ic(:nx) = vec_in%state%re
            state_ic(nx+1:) = vec_in%state%im
@@ -321,7 +332,7 @@ module Ginzburg_Landau
  
    subroutine adjoint_solver(this, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_pro), intent(in)  :: this
+     class(neko_propagator), intent(in)  :: this
      ! Input vector.
      class(abstract_vector_cdp) , intent(in)  :: vec_in
      ! Output vector.
