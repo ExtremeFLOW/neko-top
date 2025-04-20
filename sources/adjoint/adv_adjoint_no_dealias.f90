@@ -56,21 +56,19 @@ module adv_lin_no_dealias
      real(kind=rp), allocatable :: temp(:)
      type(c_ptr) :: temp_d = C_NULL_PTR
    contains
-     !> Add the linearized advection term for the fluid, i.e.
-     !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
-     !! the RHS.
-     procedure, pass(this) :: compute_linear => linear_advection_no_dealias
-     !> Add the adjoint advection term for the fluid in weak form, i.e.
+     !> Add either the linearized advection term for the fluid, i.e.
+     !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, or the
+     !! adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
      !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$
      !! , to
      !! the RHS.
-     procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
+     procedure, pass(this) :: compute => null()
      !> Compute the adjoint passive scalar.
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
      ! We keep the differential operator on the test function
-     procedure, pass(this) :: compute_adjoint_scalar => &
+     procedure, pass(this) :: compute_scalar => &
           compute_adjoint_scalar_advection_no_dealias
      ! NOTE
      ! This linearized advection term is the same as a normal advection term
@@ -87,14 +85,21 @@ contains
   !> Constructor
   !! @param this The object.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine init_no_dealias(this, coef)
+  subroutine init_no_dealias(this, coef, if_adjoint)
     class(adv_lin_no_dealias_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
+    logical, intent(in) :: if_adjoint
 
     allocate(this%temp(coef%dof%size()))
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_map(this%temp, this%temp_d, coef%dof%size())
+    end if
+
+    if (if_adjoint) then
+       compute => adjoint_advection_no_dealias
+    else
+       compute => linear_advection_no_dealias
     end if
 
   end subroutine init_no_dealias

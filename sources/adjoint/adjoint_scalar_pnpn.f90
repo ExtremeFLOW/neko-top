@@ -386,7 +386,7 @@ contains
          ! call makeoifs%compute_scalar(this%advs%x, f_Xh%x, rho, dt, n)
       else
          ! Add the advection operators to the right-hans-side.
-         call this%adv%compute_adjoint_scalar(u, v, w, s_adj, f_Xh, &
+         call this%adv%compute_scalar(u, v, w, s_adj, f_Xh, &
               Xh, this%c_Xh, dm_Xh%size())
 
          ! At this point the RHS contains the sum of the advection operator,

@@ -80,6 +80,8 @@ module adjoint_scalar_scheme
 
   !> Base type for a scalar advection-diffusion solver.
   type, abstract :: adjoint_scalar_scheme_t
+     !> A logical to determine if solving the adjoint or linearized NS equations
+     logical :: if_adjoint = .true.
      !> x-component of Velocity
      type(field_t), pointer :: u
      !> y-component of Velocity
@@ -236,7 +238,7 @@ contains
   !! @param user Type with user-defined procedures.
   !! @param rho The density of the fluid.
   subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, params, &
-       scheme, user, rho)
+       scheme, user, rho, if_adjoint)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: c_Xh
@@ -245,6 +247,7 @@ contains
     character(len=*), intent(in) :: scheme
     type(user_t), target, intent(in) :: user
     real(kind=rp), intent(in) :: rho
+    logical, intent(in) :: if_adjoint
     ! IO buffer for log output
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
@@ -254,6 +257,8 @@ contains
     character(len=:), allocatable :: solver_type, solver_precon
     ! real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
+
+    this%if_adjoint = if_adjoint
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')

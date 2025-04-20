@@ -140,8 +140,12 @@ contains
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
+
+    ! TODO. The actual handling of LNS vs ANS should be done through the json
+    ! somehow. This little hack allows a case to be made, then the if_adjoint
+    ! flag to be toggled, and then initialize, giving you a LNS case.
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
-         neko_case%usr, neko_case%fluid%ext_bdf)
+         neko_case%usr, neko_case%fluid%ext_bdf, if_adjoint)
     !
     ! Setup adjoint scalar
     !

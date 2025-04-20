@@ -87,6 +87,8 @@ module adjoint_fluid_scheme
 
   !> Base type of all fluid formulations
   type, abstract :: adjoint_fluid_scheme_t
+     !> A logical to distinguish between adjoint or linearized NS
+     logical :: if_adjoint = .true.
      !> x-component of Velocity
      type(field_t), pointer :: u_adj => null()
      !> y-component of Velocity
@@ -535,13 +537,13 @@ contains
     call json_get_or_default(params, 'case.fluid.strict_convergence', &
          this%strict_convergence, .false.)
 
-    ! Assign velocity fields
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj')
-    this%u_adj => neko_field_registry%get_field('u_adj')
-    this%v_adj => neko_field_registry%get_field('v_adj')
-    this%w_adj => neko_field_registry%get_field('w_adj')
+    ! Assign velocity fields (we don't need these to be in the registry)
+    allocate(this%u_adj)
+    allocate(this%v_adj)
+    allocate(this%w_adj)
+    call this%u_adj%init(this%dm_Xh, fld_name = "adjoint_u")
+    call this%v_adj%init(this%dm_Xh, fld_name = "adjoint_v")
+    call this%w_adj%init(this%dm_Xh, fld_name = "adjoint_w")
 
     !! Initialize time-lag fields
     call this%ulag%init(this%u_adj, 2)

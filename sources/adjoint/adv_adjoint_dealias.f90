@@ -112,18 +112,14 @@ module adv_lin_dealias
      type(c_ptr) :: dwzb_d = C_NULL_PTR
 
    contains
-     !> Add the linearized advection term for the fluid, i.e.
-     !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, to
-     !! the RHS.
-     procedure, pass(this) :: compute_linear => &
-          compute_linear_advection_dealias
-     !> Add the adjoint advection term for the fluid in weak form, i.e.
+     !> Add either the linearized advection term for the fluid, i.e.
+     !! \f$u' \cdot \nabla \bar{U} + \bar{U} \cdot \nabla u' \f$, or the
+     !! adjoint advection term for the fluid in weak form, i.e.
      !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
-     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega  \f$,
-     !! to
+     !! + \int_\Omega \nabla v \cdot (\bar{U} \otimes u^\dagger) d \Omega \f$
+     !! , to
      !! the RHS.
-     procedure, pass(this) :: compute_adjoint => &
-          compute_adjoint_advection_dealias
+     procedure, pass(this) :: compute => null()
      !> Compute the adjoint passive scalar.
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
@@ -145,11 +141,18 @@ contains
   !! @param this The object.
   !! @param lxd The polynomial order of the space used in the dealiasing.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine init_dealias(this, lxd, coef)
+  subroutine init_dealias(this, lxd, coef, if_adjoint)
     class(adv_lin_dealias_t), target, intent(inout) :: this
     integer, intent(in) :: lxd
     type(coef_t), intent(inout), target :: coef
+    logical, intent(in) :: if_adjoint
     integer :: nel, n_GL, n
+
+    if (if_adjoint) then
+       compute => adjoint_advection_dealias
+    else
+       compute => linear_advection_dealias
+    end if
 
     call this%Xh_GL%init(GL, lxd, lxd, lxd)
     this%Xh_GLL => coef%Xh
