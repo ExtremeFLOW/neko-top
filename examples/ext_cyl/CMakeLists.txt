@@ -17,7 +17,7 @@ set(LIGHTKRYLOV_INSTALL_DIR ${CMAKE_BINARY_DIR}/lightkrylov_install)  # Use inst
 
 # External project for LightKrylov
 ExternalProject_Add(
-    LightKrylov
+    LightKrylov_ext_cyl
     PREFIX ${LIGHTKRYLOV_PREFIX}
     GIT_REPOSITORY https://github.com/nekStab/LightKrylov.git
     GIT_TAG main
@@ -35,7 +35,7 @@ set(RKLIB_INSTALL_DIR ${CMAKE_BINARY_DIR}/rklib_install)  # Installation directo
 
 # External project for rklib
 ExternalProject_Add(
-    rklib
+    rklib_ext_cyl
     PREFIX ${RKLIB_PREFIX}
     GIT_REPOSITORY https://github.com/jacobwilliams/rklib.git
     GIT_TAG master  # Or a specific tag/commit if desired
@@ -51,15 +51,15 @@ ExternalProject_Add(
 build_example()
 
 # Construct example target name (matches what build_example sets)
-string(REPLACE "/" "_" EXAMPLE_NAME "lightkrylov")
+string(REPLACE "/" "_" EXAMPLE_NAME "ext_cyl")
 set(EXAMPLE_TARGET "Examples-${EXAMPLE_NAME}")
 
 # Wait until the example target is defined, then patch it
 if (TARGET ${EXAMPLE_TARGET})
 
     # Ensure LightKrylov builds before the example
-    add_dependencies(${EXAMPLE_TARGET} rklib)
-    add_dependencies(${EXAMPLE_TARGET} LightKrylov)
+    add_dependencies(${EXAMPLE_TARGET} rklib_ext_cyl)
+    add_dependencies(${EXAMPLE_TARGET} LightKrylov_ext_cyl)
 
     # Add include path for rklib modules
     target_include_directories(${EXAMPLE_TARGET} PRIVATE ${RKLIB_INSTALL_DIR}/include)

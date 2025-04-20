@@ -4,19 +4,19 @@ program usrneko
   use LightKrylov
   use LightKrylov, only: wp => dp
   use LightKrylov_Logger
-  use Ginzburg_Landau
+  use cylinder
   implicit none
 
-  character(len=128), parameter :: this_module = 'Example Ginzburg_Landau'
+  character(len=128), parameter :: this_module = 'Example cylinder'
 
   !------------------------------------------------
   !-----     LINEAR OPERATOR INVESTIGATED     -----
   !------------------------------------------------
 
   !> Exponential propagator.
-  type(exponential_prop), allocatable :: A
+  type(neko_propagator), allocatable :: A
   !> Sampling time.
-  real(kind=wp), parameter :: tau = 0.1_wp
+  real(kind=wp) :: tau
 
   !---------------------------------------------------
   !-----     KRYLOV-BASED EIGENDECOMPOSITION     -----
@@ -35,7 +35,7 @@ program usrneko
 
   !> Miscellaneous.
   integer       :: i
-  complex(wp) :: eigenvectors(nx, nev)
+  !complex(wp) :: eigenvectors(nx, nev)
 
   !=============================================================================
 
@@ -46,14 +46,20 @@ program usrneko
   !> Set up logging
   call logger_setup()
 
-  !> Initialize physical parameters.
-  call initialize_parameters()
-
   !> Initialize exponential propagator.
-  A = exponential_prop(tau)
+  allocate(A)
+  call A%init()
+
+  !> Get the integration time
+  tau = real(A%neko_case%time%end_time,kind=wp)
 
   !> Initialize Krylov subspace.
-  allocate(X(nev)) ; call zero_basis(X)
+  allocate(X(nev))
+  !> Use coef to initialize all the fields
+  do i = 1, nev
+     call X(i)%init(A%neko_case%fluid%C_Xh)
+  end do
+  call zero_basis(X)
 
   !------------------------------------------
   !-----     EIGENVALUE COMPUTATION     -----
@@ -74,9 +80,9 @@ program usrneko
   call save_eigenspectrum(lambda, residuals, "example/ginzburg_landau/eigenspectrum.npy")
 
   !> Reconstruct the leading eigenvectors from the Krylov basis.
-  do i = 1, nev
-    eigenvectors(:, i) = X(i)%state
-  enddo
+  ! do i = 1, nev
+  !   eigenvectors(:, i) = X(i)%state
+  ! enddo
 
   !> Save eigenvectors to disk.
 !  call save_npy("example/ginzburg_landau/eigenvectors.npy", eigenvectors)

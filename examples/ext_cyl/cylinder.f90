@@ -1,26 +1,31 @@
-module Ginzburg_Landau
+module cylinder
    ! LightKrylov for linear algebra.
    use LightKrylov
    use LightKrylov, only: wp => dp
    ! Standard Library.
    use stdlib_math, only : linspace
    use stdlib_optval, only : optval
-   ! Additional neko-top libraries
-   use simulation_m, only: simulation_t
+   ! Additional neko-top libraries (to solve linearized and adjoint)
+   use num_types, only : rp
+   use neko, only: neko_init, neko_finalize, neko_solve
+   use case, only : case_t
+   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
+   use simulation_adjoint, only: solve_adjoint
    use json_module, only: json_file
+   ! Specific to the state vector
    use field, only: field_t
-   ! specific to some neko operations
-   use coef, only: coef_t
+   use coefs, only: coef_t
+   ! various imports for some specific neko operations
+   use neko_config, only : NEKO_BCKND_DEVICE
    use scratch_registry, only: neko_scratch_registry
    use field_math, only: field_col3, field_rzero, field_cmult, field_add3s2, &
       field_copy
    use math, only: glsc2
    use device_math, only: device_glsc2
+   use device, only : device_memcpy, HOST_TO_DEVICE
    implicit none
  
    character*128, parameter, private :: this_module = 'cylinder'
- 
-   public :: initialize_parameters
  
    !------------------------------
    !-----     PARAMETERS     -----
@@ -34,22 +39,22 @@ module Ginzburg_Landau
  
    type, extends(abstract_vector_rdp), public :: state_vector
       ! adjoint velocity fields
-      type(field_t) :: u
-      type(field_t) :: v
-      type(field_t) :: w
+      type(field_t), allocatable :: u
+      type(field_t), allocatable :: v
+      type(field_t), allocatable :: w
       ! we need the mass matrix to integrate fields..
      type(coef_t), pointer :: coef => null()
     contains
       private
-      procedure, pass(this), public :: zero
-      procedure, pass(this), public :: dot
-      procedure, pass(this), public :: scal
-      procedure, pass(this), public :: axpby
-      procedure, pass(this), public :: rand
-      procedure, pass(this), public :: get_size
+      procedure, pass(self), public :: zero
+      procedure, pass(self), public :: dot
+      procedure, pass(self), public :: scal
+      procedure, pass(self), public :: axpby
+      procedure, pass(self), public :: rand
+      procedure, pass(self), public :: get_size
       ! we also want a clean way to initialize and free
-      procedure, pass(this), public :: init => state_vector_init
-      procedure, pass(this), public :: free => state_vector_free
+      procedure, pass(self), public :: init => state_vector_init
+      procedure, pass(self), public :: free => state_vector_free
    end type state_vector
  
    !-----------------------------------
@@ -57,15 +62,21 @@ module Ginzburg_Landau
    !-----------------------------------
  
    type, extends(abstract_linop_rdp), public :: neko_propagator
-      type(simulation_t) :: simulation
+      ! The primal case
+      type(case_t), public :: neko_case
+      ! The linear case 
+      ! (I know the name is stupid here... I've had to hack around the fact we
+      ! only have an adjoint type, not "perturb" as in Nek5000)
+      type(adjoint_case_t), public :: linear_case
+      ! The adjoint case
+      type(adjoint_case_t), public :: adjoint_case
     contains
       private
-      procedure, pass(this), public :: matvec => direct_solver
-      procedure, pass(this), public :: rmatvec => adjoint_solver
+      procedure, pass(self), public :: matvec => direct_solver
+      procedure, pass(self), public :: rmatvec => adjoint_solver
       ! we also want a clean way to initialize, free and reset
-      procedure, pass(this), public :: init => neko_propagator_init
-      procedure, pass(this), public :: free => neko_propagator_free
-      procedure, pass(this), public :: reset => neko_propagator_reset
+      procedure, pass(self), public :: init => neko_propagator_init
+      procedure, pass(self), public :: free => neko_propagator_free
    end type neko_propagator
  
  contains
@@ -78,19 +89,23 @@ module Ginzburg_Landau
    !======================================================================
    !======================================================================
  
-   subroutine initialize_parameters(parameters)
-     implicit none
-     ! json containing the .case file
-     type(json_file) :: parameters
+    subroutine state_vector_init(self, coef)
+     class(state_vector), intent(inout) :: self
+     type(coef_t), intent(in), target :: coef
 
-    ! initialize the simulation
-    call this%state%init(parameters)
+     ! pass coef so we can integrate
+     self%coef => coef
 
-    ! load the baseflow
-    ! @todo
- 
+     ! allocate fields
+     allocate(self%u)
+     allocate(self%v)
+     allocate(self%w)
+     call self%u%init(self%coef%dof, fld_name = "state_u")
+     call self%v%init(self%coef%dof, fld_name = "state_v")
+     call self%w%init(self%coef%dof, fld_name = "state_w")
+
      return
-   end subroutine initialize_parameters
+   end subroutine state_vector_init
  
    !=========================================================
    !=========================================================
@@ -104,17 +119,17 @@ module Ginzburg_Landau
    !-----     TYPE-BOUND PROCEDURE FOR VECTORS     -----
    !----------------------------------------------------
  
-   subroutine zero(this)
-     class(state_vector), intent(inout) :: this
-     call field_rzero(this%u)
-     call field_rzero(this%v)
-     call field_rzero(this%w)
+   subroutine zero(self)
+     class(state_vector), intent(inout) :: self
+     call field_rzero(self%u)
+     call field_rzero(self%v)
+     call field_rzero(self%w)
      return
    end subroutine zero
  
-   real(kind=wp) function dot(this, vec) result(alpha)
-     class(state_vector)   , intent(in) :: this
-     class(abstract_vector_cdp), intent(in) :: vec
+   real(kind=wp) function dot(self, vec) result(alpha)
+     class(state_vector)   , intent(in) :: self
+     class(abstract_vector_rdp), intent(in) :: vec
      ! a working array
      type(field_t), pointer :: work
      integer :: temp_indices(1)
@@ -125,16 +140,16 @@ module Ginzburg_Landau
         ! here we're going to take an energy norm I guess...
         call neko_scratch_registry%request_field(work, temp_indices(1))
         call field_rzero(work)
-        call field_col3(work, this%u, vec%u)
-        call field_col3(work, this%v, vec%v)
-        call field_col3(work, this%w, vec%w)
+        call field_col3(work, self%u, vec%u)
+        call field_col3(work, self%v, vec%v)
+        call field_col3(work, self%w, vec%w)
         ! integrate 
         ! (I guess the GPU backend doesn't matter so much here...)
         n = work%size()
         if (NEKO_BCKND_DEVICE .eq. 1) then
-           tmp_real = device_glsc2(work%x_d, this%coef%C_Xh%B_d, n)
+           tmp_real = device_glsc2(work%x_d, self%coef%B_d, n)
        else
-           tmp_real = glsc2(work%x, this%coef%C_Xh%B, n)
+           tmp_real = glsc2(work%x, self%coef%B, n)
        end if
        tmp_real = tmp_real * 0.5_rp
        alpha = real(tmp_real, wp)
@@ -144,50 +159,49 @@ module Ginzburg_Landau
      return
    end function dot
  
-   subroutine scal(this, alpha)
-     class(state_vector), intent(inout) :: this
-     complex(kind=wp)      , intent(in)    :: alpha
+   subroutine scal(self, alpha)
+     class(state_vector), intent(inout) :: self
+     real(kind=wp)      , intent(in)    :: alpha
      real(kind=rp) :: tmp_real
      tmp_real = real(alpha, rp)
-     call field_cmult(this%u, tmp_real)
-     call field_cmult(this%v, tmp_real)
-     call field_cmult(this%w, tmp_real)
+     call field_cmult(self%u, tmp_real)
+     call field_cmult(self%v, tmp_real)
+     call field_cmult(self%w, tmp_real)
      return
    end subroutine scal
  
-   subroutine axpby(this, alpha, vec, beta)
-     class(state_vector)   , intent(inout) :: this
-     class(abstract_vector_cdp), intent(in)    :: vec
-     complex(kind=wp)         , intent(in)    :: alpha, beta
+   subroutine axpby(self, alpha, vec, beta)
+     class(state_vector)   , intent(inout) :: self
+     class(abstract_vector_rdp), intent(in)    :: vec
+     real(kind=wp)         , intent(in)    :: alpha, beta
      select type(vec)
      type is(state_vector)
-        call field_add3s2(this%u, this%u, vec%u, alpha, beta)
-        call field_add3s2(this%v, this%v, vec%v, alpha, beta)
-        call field_add3s2(this%w, this%w, vec%w, alpha, beta)
+        call field_add3s2(self%u, self%u, vec%u, alpha, beta)
+        call field_add3s2(self%v, self%v, vec%v, alpha, beta)
+        call field_add3s2(self%w, self%w, vec%w, alpha, beta)
      end select
      return
    end subroutine axpby
  
-   integer function get_size(this) result(N)
-     class(state_vector), intent(in) :: this
-     ! hmmm this is a bit confusing. I assume you mean the TOTAL size, ie,
+   integer function get_size(self) result(N)
+     class(state_vector), intent(in) :: self
+     ! hmmm self is a bit confusing. I assume you mean the TOTAL size, ie,
      ! number of GLL pts for all 3 components...
-     N = this%u%size() + this%v%size() + this%w%size()
+     N = self%u%size() + self%v%size() + self%w%size()
      return
    end function get_size
  
-   subroutine rand(this, ifnorm)
-     class(state_vector), intent(inout) :: this
+   subroutine rand(self, ifnorm)
+     class(state_vector), intent(inout) :: self
      logical, optional,   intent(in)    :: ifnorm
-     real(kind=wp) :: tmp(nx, 2)
      ! internals
      logical :: normalize
      real(kind=wp) :: alpha
      normalize = optval(ifnorm,.true.)
-     call rand_ic(this%u, this%v, this%w)
+     call rand_ic(self%u, self%v, self%w)
      if (normalize) then
-       alpha = this%norm()
-       call this%scal(1.0_wp/alpha)
+       alpha = self%norm()
+       call self%scal(1.0_wp/alpha)
      endif
      return
    end subroutine rand
@@ -196,31 +210,13 @@ module Ginzburg_Landau
    !-----     EXTRA PROCEDURES FOR THE VECTOR     -----
    !---------------------------------------------------
 
-   subroutine state_vector_init(this, coef)
-     class(state_vector), intent(inout) :: this
-     type(coef_t), intent(in), target :: coef
+   subroutine state_vector_free(self)
+     class(state_vector), intent(inout) :: self
 
-     ! pass coef so we can integrate
-     this%coef => coef
-
-     ! allocate fields
-     allocate(this%u)
-     allocate(this%v)
-     allocate(this%w)
-     call this%u%init(this%coef%dm_Xh, fld_name = "state_u")
-     call this%v%init(this%coef%dm_Xh, fld_name = "state_v")
-     call this%w%init(this%coef%dm_Xh, fld_name = "state_w")
-
-     return
-   end subroutine state_vector_init
-
-   subroutine state_vector_free(this)
-     class(state_vector), intent(inout) :: this
-
-     call this%u%free()
-     call this%v%free()
-     call this%w%free()
-     call this%coef%free()
+     call self%u%free()
+     call self%v%free()
+     call self%w%free()
+     call self%coef%free()
 
      return
    end subroutine state_vector_free
@@ -288,82 +284,106 @@ module Ginzburg_Landau
    !-----     TYPE-BOUND PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
    !------------------------------------------------------------------------
  
-   subroutine direct_solver(this, vec_in, vec_out)
+   subroutine direct_solver(self, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_propagator), intent(in)  :: this
+     class(neko_propagator), intent(in)  :: self
      ! Input vector.
-     class(abstract_vector_cdp) , intent(in)  :: vec_in
+     class(abstract_vector_rdp) , intent(in)  :: vec_in
      ! Output vector.
-     class(abstract_vector_cdp) , intent(out) :: vec_out
- 
-     ! Time-integrator.
-     type(rks54_class) :: prop
-     real(kind=wp)     :: dt = 1.0_wp
-     real(kind=wp)     :: state_ic(2*nx), state_fc(2*nx)
+     class(abstract_vector_rdp) , intent(out) :: vec_out
  
      select type(vec_in)
      type is(state_vector)
         select type(vec_out)
         type is(state_vector)
            ! Reset propagator.
-           call this%simulation%reset()
+           ! @todo
            ! Get state vector.
-           call field_copy(this%simulation%adjoint_fluid%u_adj, vec_in%u)
-           call field_copy(this%simulation%adjoint_fluid%v_adj, vec_in%v)
-           call field_copy(this%simulation%adjoint_fluid%w_adj, vec_in%w)
+           ! (again... the naming with "adjoint" isn't smart here)
+           call field_copy(self%linear_case%fluid_adj%u_adj, vec_in%u)
+           call field_copy(self%linear_case%fluid_adj%v_adj, vec_in%v)
+           call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
-           call thi
-
-
-           ! Get state vector.
-           state_ic(:nx) = vec_in%state%re
-           state_ic(nx+1:) = vec_in%state%im
-           ! Initialize propagator.
-           call prop%initialize(n=2*nx, f=rhs)
-           ! Integrate forward in time.
-           call prop%integrate(0.0_wp, state_ic, dt, this%tau, state_fc)
+           call solve_wrapper(self%linear_case)
            ! Pass-back the state vector.
-           vec_out%state%re = state_fc(:nx)
-           vec_out%state%im = state_fc(nx+1:)
+           call field_copy(vec_out%u, self%linear_case%fluid_adj%u_adj)
+           call field_copy(vec_out%v, self%linear_case%fluid_adj%v_adj)
+           call field_copy(vec_out%w, self%linear_case%fluid_adj%w_adj)
         end select
      end select
      return
    end subroutine direct_solver
  
-   subroutine adjoint_solver(this, vec_in, vec_out)
+   subroutine adjoint_solver(self, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_propagator), intent(in)  :: this
+     class(neko_propagator), intent(in)  :: self
      ! Input vector.
-     class(abstract_vector_cdp) , intent(in)  :: vec_in
+     class(abstract_vector_rdp) , intent(in)  :: vec_in
      ! Output vector.
-     class(abstract_vector_cdp) , intent(out) :: vec_out
- 
-     ! Time-integrator.
-     type(rks54_class) :: prop
-     real(kind=wp)     :: dt = 1.0_wp
-     real(kind=wp)     :: state_ic(2*nx), state_fc(2*nx)
+     class(abstract_vector_rdp) , intent(out) :: vec_out
  
      select type(vec_in)
      type is(state_vector)
         select type(vec_out)
         type is(state_vector)
-           ! Get the state.
-           state_ic(:nx) = vec_in%state%re
-           state_fc(nx+1:) = vec_in%state%im
-           ! Initialize propagator.
-           call prop%initialize(n=2*nx, f=adjoint_rhs)
+           ! Reset propagator.
+           ! @todo
+           ! Get state vector.
+           ! (again... the naming with "adjoint" isn't smart here)
+           call field_copy(self%adjoint_case%fluid_adj%u_adj, vec_in%u)
+           call field_copy(self%adjoint_case%fluid_adj%v_adj, vec_in%v)
+           call field_copy(self%adjoint_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
-           call prop%integrate(0.0_wp, state_ic, dt, this%tau, state_fc)
-           ! Pass-back the state.
-           vec_out%state%re = state_fc(:nx)
-           vec_out%state%im = state_fc(nx+1:)
+           call solve_wrapper(self%linear_case)
+           ! Pass-back the state vector.
+           call field_copy(vec_out%u, self%adjoint_case%fluid_adj%u_adj)
+           call field_copy(vec_out%v, self%adjoint_case%fluid_adj%v_adj)
+           call field_copy(vec_out%w, self%adjoint_case%fluid_adj%w_adj)
         end select
      end select
      return
    end subroutine adjoint_solver
 
-   ! some extra stuff
+   !-------------------------------------------------------------------
+   !-----     EXTRA PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
+   !-------------------------------------------------------------------
 
+   subroutine neko_propagator_init(self)
+     ! Linear Operator.
+     class(neko_propagator), intent(inout)  :: self
+     ! type(json_file), intent(inout) :: parameters
 
+     ! initialize the "baseflow"
+     call neko_init(self%neko_case)
+     ! initialize the linear
+     call adjoint_init(self%linear_case, self%neko_case)
+     ! initialize the adjoint
+     call adjoint_init(self%adjoint_case, self%neko_case)
+
+     ! TODO
+     ! Load in the baseflow
+
+     return
+   end subroutine neko_propagator_init
+
+   subroutine neko_propagator_free(self)
+     ! Linear Operator.
+     class(neko_propagator), intent(inout)  :: self
+
+     call adjoint_free(self%adjoint_case)
+     call adjoint_free(self%linear_case)
+     call neko_finalize(self%neko_case)
+     return
+   end subroutine neko_propagator_free
+
+   ! silly little wrapper to ignore intent.
+   subroutine solve_wrapper(self)
+     ! Linear Operator.
+     class(adjoint_case_t)  :: self
+
+     call solve_adjoint(self)
+
+     return
+   end subroutine solve_wrapper
  
- end module Ginzburg_Landau
+ end module cylinder
