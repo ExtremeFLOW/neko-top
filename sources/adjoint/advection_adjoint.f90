@@ -42,10 +42,8 @@ module advection_adjoint
   !> Base abstract type for computing the advection operator
   type, public, abstract :: advection_adjoint_t
    contains
-     procedure(compute_adv_lin), pass(this), deferred :: compute_linear
-     procedure(compute_adv_lin), pass(this), deferred :: compute_adjoint
-     procedure(compute_scalar_adv_lin), pass(this), deferred :: &
-          compute_adjoint_scalar
+     procedure(compute_adv_lin), pass(this), deferred :: compute
+     procedure(compute_scalar_adv_lin), pass(this), deferred :: compute_scalar
      procedure(advection_adjoint_free), pass(this), deferred :: free
   end type advection_adjoint_t
 

@@ -304,10 +304,10 @@ contains
     ! Initialize base class
     call this%init_base(msh, lx, params, scheme, user, .true.)
 
-    ! Add pressure field to the registry. For this scheme it is in the same
+    ! Allocate pressure field. For this scheme it is in the same
     ! Xh as the velocity
-    call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
-    this%p_adj => neko_field_registry%get_field('p_adj')
+    allocate(this%p_adj)
+    call this%p_adj%init(this%dm_Xh, fld_name = "adjoint_p")
 
     !
     ! Select governing equations via associated residual and Ax types

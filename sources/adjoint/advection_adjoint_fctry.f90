@@ -54,12 +54,12 @@ contains
   !! @param object Polymorphic object of class advection_t.
   !! @param json The parameter file.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine advection_adjoint_factory(object, json, coef)
+  subroutine advection_adjoint_factory(object, json, coef, if_adjoint)
     implicit none
     class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(coef_t), target :: coef
-    logical :: dealias, found
+    logical :: dealias, found, if_adjoint
     integer :: lxd, order
 
     call json_get(json, 'case.numerics.dealias', dealias)
@@ -87,10 +87,10 @@ contains
        if (lxd .gt. 0) then
           call adv%init(lxd, coef)
        else
-          call adv%init(coef%Xh%lx * 3 / 2, coef)
+          call adv%init(coef%Xh%lx * 3 / 2, coef, if_adjoint)
        end if
     type is (adv_lin_no_dealias_t)
-       call adv%init(coef)
+       call adv%init(coef, if_adjoint)
     end select
 
   end subroutine advection_adjoint_factory
