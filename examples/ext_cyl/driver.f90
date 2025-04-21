@@ -5,6 +5,7 @@ program usrneko
   use LightKrylov, only: wp => dp
   use LightKrylov_Logger
   use cylinder
+  use global_coef, only: global_coef_t, global_coef_getter
   implicit none
 
   character(len=128), parameter :: this_module = 'Example cylinder'
@@ -17,6 +18,8 @@ program usrneko
   type(neko_propagator), allocatable :: A
   !> Sampling time.
   real(kind=wp) :: tau
+  !> A way to access coef globally
+  type(global_coef_t), target :: my_global_coef_getter
 
   !---------------------------------------------------
   !-----     KRYLOV-BASED EIGENDECOMPOSITION     -----
@@ -53,12 +56,14 @@ program usrneko
   !> Get the integration time
   tau = real(A%neko_case%time%end_time,kind=wp)
 
+  !> Extract the global coef from neko
+  my_global_coef_getter%global_coef = A%neko_case%fluid%c_Xh
+  global_coef_getter => my_global_coef_getter
+
+
   !> Initialize Krylov subspace.
   allocate(X(nev))
-  !> Use coef to initialize all the fields
-  do i = 1, nev
-     call X(i)%init(A%neko_case%fluid%C_Xh)
-  end do
+  ! (this should also initialize them)
   call zero_basis(X)
 
   !------------------------------------------

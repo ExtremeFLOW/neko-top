@@ -5,7 +5,10 @@
 # Driver and source definitions for build_example()
 set(DRIVER_TYPE "custom")
 set(DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)
-set(EXTRA_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cylinder.f90)
+set(EXTRA_SOURCES
+     ${CMAKE_CURRENT_SOURCE_DIR}/cylinder.f90
+     ${CMAKE_CURRENT_SOURCE_DIR}/global_coef.f90
+)
 
 # ExternalProject to clone and build LightKrylov using fpm
 include(ExternalProject)
