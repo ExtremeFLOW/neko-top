@@ -16,12 +16,13 @@ module cylinder
    use field, only: field_t
    use coefs, only: coef_t
    use dofmap, only : dofmap_t
+   use fld_file_output, only: fld_file_output_t
    ! various imports for some specific neko operations
    use neko_config, only : NEKO_BCKND_DEVICE
    use scratch_registry, only: neko_scratch_registry
-   use field_math, only: field_col3, field_rzero, field_cmult, field_add3s2, &
-      field_copy
-   use math, only: glsc2, rzero
+   use field_math, only: field_addcol3, field_rzero, field_cmult, &
+      field_add3s2, field_copy
+   use math, only: glsc2
    use device_math, only: device_glsc2
    use device, only : device_memcpy, HOST_TO_DEVICE
    ! This one is silly... But we need coef to initialize fields
@@ -48,6 +49,8 @@ module cylinder
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
       logical :: initialized = .false.
+      ! a way to spy on the vector (mostly for debugging)
+      type(fld_file_output_t), public :: output
     contains
       private
       procedure, pass(self), public :: zero
@@ -56,9 +59,10 @@ module cylinder
       procedure, pass(self), public :: axpby
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
-      ! we also want a clean way to initialize and free
+      ! we also want a clean way to initialize, free and visualize
       procedure, pass(self), public :: init => state_vector_init
       procedure, pass(self), public :: free => state_vector_free
+      procedure, pass(self), public :: write => state_vector_write
    end type state_vector
  
    !-----------------------------------
@@ -74,6 +78,10 @@ module cylinder
       type(adjoint_case_t), public :: linear_case
       ! The adjoint case
       type(adjoint_case_t), public :: adjoint_case
+      ! a way to spy on the vector (mostly for debugging)
+      type(fld_file_output_t), public :: output_primal
+      type(fld_file_output_t), public :: output_linear
+      type(fld_file_output_t), public :: output_adjoint
     contains
       private
       procedure, pass(self), public :: matvec => direct_solver
@@ -81,6 +89,8 @@ module cylinder
       ! we also want a clean way to initialize, free and reset
       procedure, pass(self), public :: init => neko_propagator_init
       procedure, pass(self), public :: free => neko_propagator_free
+      procedure, pass(self), public :: write_linear => write_linear_wrapper
+      procedure, pass(self), public :: write_adjoint => write_adjoint_wrapper
    end type neko_propagator
  
  contains
@@ -103,6 +113,7 @@ module cylinder
        end if
           ! Take the global coef
           self%coef => global_coef_getter%global_coef
+
           ! initialize fields
           allocate(self%u)
           allocate(self%v)
@@ -110,7 +121,15 @@ module cylinder
           call self%u%init(self%coef%dof, fld_name = "state_u")
           call self%v%init(self%coef%dof, fld_name = "state_v")
           call self%w%init(self%coef%dof, fld_name = "state_w")
-        self%initialized = .true.
+
+          ! initialize the sampler so we can spy in if needed
+          call self%output%init(sp, 'state', 3)
+          call self%output%fields%assign(1, self%u)
+          call self%output%fields%assign(2, self%v)
+          call self%output%fields%assign(3, self%w)
+
+          ! done
+          self%initialized = .true.
      end if
 
      return
@@ -130,18 +149,13 @@ module cylinder
  
    subroutine zero(self)
      class(state_vector), intent(inout) :: self
-     integer n
      
      ! always try initializing
      call self%init()
 
-     n = self%u%size()
-     call rzero(self%u%x, n)
-     call rzero(self%v%x, n)
-     call rzero(self%w%x, n)
-     ! call field_rzero(self%u)
-     ! call field_rzero(self%v)
-     ! call field_rzero(self%w)
+     call field_rzero(self%u)
+     call field_rzero(self%v)
+     call field_rzero(self%w)
      return
    end subroutine zero
  
@@ -155,12 +169,16 @@ module cylinder
      real(kind=rp) :: tmp_real
      select type(vec)
      type is(state_vector)
+        ! always try initializing
+        call state_vector_init_wrapper(self)
+        call state_vector_init_wrapper(vec)
+
         ! here we're going to take an energy norm I guess...
         call neko_scratch_registry%request_field(work, temp_indices(1))
         call field_rzero(work)
-        call field_col3(work, self%u, vec%u)
-        call field_col3(work, self%v, vec%v)
-        call field_col3(work, self%w, vec%w)
+        call field_addcol3(work, self%u, vec%u)
+        call field_addcol3(work, self%v, vec%v)
+        call field_addcol3(work, self%w, vec%w)
         ! integrate 
         ! (I guess the GPU backend doesn't matter so much here...)
         n = work%size()
@@ -181,6 +199,9 @@ module cylinder
      class(state_vector), intent(inout) :: self
      real(kind=wp)      , intent(in)    :: alpha
      real(kind=rp) :: tmp_real
+     ! always try initializing
+     call state_vector_init_wrapper(self)
+
      tmp_real = real(alpha, rp)
      call field_cmult(self%u, tmp_real)
      call field_cmult(self%v, tmp_real)
@@ -194,6 +215,10 @@ module cylinder
      real(kind=wp)         , intent(in)    :: alpha, beta
      select type(vec)
      type is(state_vector)
+        ! always try initializing
+        call state_vector_init_wrapper(self)
+        call state_vector_init_wrapper(vec)
+
         call field_add3s2(self%u, self%u, vec%u, alpha, beta)
         call field_add3s2(self%v, self%v, vec%v, alpha, beta)
         call field_add3s2(self%w, self%w, vec%w, alpha, beta)
@@ -203,6 +228,8 @@ module cylinder
  
    integer function get_size(self) result(N)
      class(state_vector), intent(in) :: self
+     ! always try initializing
+     call state_vector_init_wrapper(self)
      ! hmmm self is a bit confusing. I assume you mean the TOTAL size, ie,
      ! number of GLL pts for all 3 components...
      N = self%u%size() + self%v%size() + self%w%size()
@@ -269,6 +296,7 @@ module cylinder
                 fcoeff(3) = -2.0e5_rp
                 v%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, iz, iel, xl, &
                      fcoeff) * 1.0e-08_rp
+                ! 2D
                 w%x(ix, iy, iz, iel) = 0.0_rp
              end do
           end do
@@ -301,7 +329,24 @@ module cylinder
 
     return
   end function math_ran_dst
+
+  subroutine state_vector_write(self, idx)
+     class(state_vector), intent(inout) :: self
+     integer :: idx
+
+     call self%output%sample(real(idx, kind=rp))
+
+     return
+   end subroutine state_vector_write
  
+  ! silly wrapper to ignore intent
+  subroutine state_vector_init_wrapper(self)
+     class(state_vector) :: self
+
+     call self%init()
+
+     return
+   end subroutine state_vector_init_wrapper
    !------------------------------------------------------------------------
    !-----     TYPE-BOUND PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
    !------------------------------------------------------------------------
@@ -326,7 +371,11 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%v_adj, vec_in%v)
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
+           !call self%write_linear(0)
            call solve_wrapper(self%linear_case)
+           !call self%write_linear(1)
+           ! There is a chance that vec_out isn't initialized!
+           call init_wrapper(vec_out)
            ! Pass-back the state vector.
            call field_copy(vec_out%u, self%linear_case%fluid_adj%u_adj)
            call field_copy(vec_out%v, self%linear_case%fluid_adj%v_adj)
@@ -356,7 +405,11 @@ module cylinder
            call field_copy(self%adjoint_case%fluid_adj%v_adj, vec_in%v)
            call field_copy(self%adjoint_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
+           !call self%write_adjoint(0)
            call solve_wrapper(self%linear_case)
+           !call self%write_adjoint(0)
+           ! There is a chance that vec_out isn't initialized!
+           call init_wrapper(vec_out)
            ! Pass-back the state vector.
            call field_copy(vec_out%u, self%adjoint_case%fluid_adj%u_adj)
            call field_copy(vec_out%v, self%adjoint_case%fluid_adj%v_adj)
@@ -378,12 +431,29 @@ module cylinder
      ! initialize the "baseflow"
      call neko_init(self%neko_case)
      ! initialize the linear
+     ! This is hacky, we'll work on a cleaner way soon :-)
+     self%linear_case%if_adjoint = .false.
      call adjoint_init(self%linear_case, self%neko_case)
      ! initialize the adjoint
      call adjoint_init(self%adjoint_case, self%neko_case)
 
-     ! TODO
-     ! Load in the baseflow
+     ! NOTE baseflow should be loaded via IC in .case file, but let's double
+     ! check
+          call self%output_primal%init(sp, 'checking_base', 3)
+          call self%output_primal%fields%assign(1, self%neko_case%fluid%u)
+          call self%output_primal%fields%assign(2, self%neko_case%fluid%v)
+          call self%output_primal%fields%assign(3, self%neko_case%fluid%w)
+          call self%output_primal%sample(0.0_rp)
+     ! Assign samplers for the forward and adjoint in case we want to look at
+     ! them (debugging)
+          call self%output_linear%init(sp, 'checking_linear', 3)
+          call self%output_linear%fields%assign(1, self%linear_case%fluid_adj%u_adj)
+          call self%output_linear%fields%assign(2, self%linear_case%fluid_adj%v_adj)
+          call self%output_linear%fields%assign(3, self%linear_case%fluid_adj%w_adj)
+          call self%output_adjoint%init(sp, 'checking_adjoint', 3)
+          call self%output_adjoint%fields%assign(1, self%adjoint_case%fluid_adj%u_adj)
+          call self%output_adjoint%fields%assign(2, self%adjoint_case%fluid_adj%v_adj)
+          call self%output_adjoint%fields%assign(3, self%adjoint_case%fluid_adj%w_adj)
 
      return
    end subroutine neko_propagator_init
@@ -402,10 +472,41 @@ module cylinder
    subroutine solve_wrapper(self)
      ! Linear Operator.
      class(adjoint_case_t)  :: self
-
      call solve_adjoint(self)
 
      return
    end subroutine solve_wrapper
+
+   ! silly little wrapper to ignore intent.
+   subroutine write_linear_wrapper(self, idx)
+     ! Linear Operator.
+     class(neko_propagator) :: self
+     integer :: idx
+
+     call self%output_linear%sample(real(idx, kind=rp))
+
+     return
+   end subroutine write_linear_wrapper
+
+   ! silly little wrapper to ignore intent.
+   subroutine write_adjoint_wrapper(self, idx)
+     ! Linear Operator.
+     class(neko_propagator) :: self
+     integer :: idx
+
+     call self%output_adjoint%sample(real(idx, kind=rp))
+
+     return
+   end subroutine write_adjoint_wrapper
+
+    ! silly little wrapper to ignore intent.
+   subroutine init_wrapper(self)
+     class(state_vector) :: self
+
+     call self%init()
+
+     return
+   end subroutine init_wrapper
+ 
  
  end module cylinder
