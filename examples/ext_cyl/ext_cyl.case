@@ -5,10 +5,10 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 1.0,
-        "timestep": 1e-2,
+        "end_time": 5.0,
+        "timestep": 5e-3,
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
@@ -16,24 +16,49 @@
             "scheme": "pnpn",
             "Re": 100,
             "initial_condition": {
-                "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "type": "field",
+                "file_name": "baseflow0.f00000",
+                "interpolate": true
             },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 50
+                "max_iterations": 20
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 50
+                "max_iterations": 20
             },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [1, 2] // note these are lin/adj
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [3]
+                }
+            ],
             "output_control": "never",
+            //"output_control": "tsteps",
+            //"output_value": 100,
+        },
+        "adjoint_fluid": {
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [1, 2] // note these are lin/adj
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [3]
+                }
+            ],
         },
     }
 }

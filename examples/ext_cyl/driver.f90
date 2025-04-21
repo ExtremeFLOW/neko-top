@@ -37,8 +37,7 @@ program usrneko
   integer          :: info
 
   !> Miscellaneous.
-  integer       :: i
-  !complex(wp) :: eigenvectors(nx, nev)
+  integer :: i
 
   !=============================================================================
 
@@ -59,7 +58,6 @@ program usrneko
   !> Extract the global coef from neko
   my_global_coef_getter%global_coef = A%neko_case%fluid%c_Xh
   global_coef_getter => my_global_coef_getter
-
 
   !> Initialize Krylov subspace.
   allocate(X(nev))
@@ -84,13 +82,9 @@ program usrneko
   !> Save the eigenspectrum.
   call save_eigenspectrum(lambda, residuals, "example/ginzburg_landau/eigenspectrum.npy")
 
-  !> Reconstruct the leading eigenvectors from the Krylov basis.
-  ! do i = 1, nev
-  !   eigenvectors(:, i) = X(i)%state
-  ! enddo
-
   !> Save eigenvectors to disk.
-!  call save_npy("example/ginzburg_landau/eigenvectors.npy", eigenvectors)
-
+   do i = 1, nev
+     call X(i)%write(i)
+   enddo
 
 end program usrneko
