@@ -810,7 +810,7 @@ contains
          !       f_x%x, f_y%x, f_z%x, &
          !       rho, dt, n)
       else
-         call this%adv%compute_adjoint(u, v, w, u_b, v_b, w_b, &
+         call this%adv%compute(u, v, w, u_b, v_b, w_b, &
               f_x, f_y, f_z, &
               Xh, this%c_Xh, dm_Xh%size())
 
