@@ -89,6 +89,8 @@ module adjoint_fluid_scheme
   type, abstract :: adjoint_fluid_scheme_t
      !> A logical to distinguish between adjoint or linearized NS
      logical :: if_adjoint = .true.
+     !> An index to keep track of which one I am
+     integer :: perturb_index = 0
      !> x-component of Velocity
      type(field_t), pointer :: u_adj => null()
      !> y-component of Velocity
@@ -539,23 +541,26 @@ contains
     call json_get_or_default(params, 'case.fluid.strict_convergence', &
          this%strict_convergence, .false.)
 
-   !  ! Assign velocity fields (we don't need these to be in the registry)
-   !  allocate(this%u_adj)
-   !  allocate(this%v_adj)
-   !  allocate(this%w_adj)
-   !  call this%u_adj%init(this%dm_Xh, fld_name = "adjoint_u")
-   !  call this%v_adj%init(this%dm_Xh, fld_name = "adjoint_v")
-   !  call this%w_adj%init(this%dm_Xh, fld_name = "adjoint_w")
-
-    ! ok keep them in the registry, but disable the complaint for multiples
+    ! Really hacky way of allowing an adjoint and linear.
+    ! Hopefully when Tuan's multiple scalar comes through we can draw
+    ! inspiration from him...
     ! Assign velocity fields
-    n = neko_field_registry%n_fields()
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj', .true.)
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj', .true.)
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj', .true.)
-    this%u_adj => neko_field_registry%get_field(n+1)
-    this%v_adj => neko_field_registry%get_field(n+2)
-    this%w_adj => neko_field_registry%get_field(n+3)
+    if (neko_field_registry%field_exists('u_adj')) then
+         call neko_field_registry%add_field(this%dm_Xh, 'u_adj1')
+         call neko_field_registry%add_field(this%dm_Xh, 'v_adj1')
+         call neko_field_registry%add_field(this%dm_Xh, 'w_adj1')
+         this%u_adj => neko_field_registry%get_field('u_adj1')
+         this%v_adj => neko_field_registry%get_field('v_adj1')
+         this%w_adj => neko_field_registry%get_field('w_adj1')
+         this%perturb_index = 1
+    else
+         call neko_field_registry%add_field(this%dm_Xh, 'u_adj')
+         call neko_field_registry%add_field(this%dm_Xh, 'v_adj')
+         call neko_field_registry%add_field(this%dm_Xh, 'w_adj')
+         this%u_adj => neko_field_registry%get_field('u_adj')
+         this%v_adj => neko_field_registry%get_field('v_adj')
+         this%w_adj => neko_field_registry%get_field('w_adj')
+    end if
 
     !! Initialize time-lag fields
     call this%ulag%init(this%u_adj, 2)
