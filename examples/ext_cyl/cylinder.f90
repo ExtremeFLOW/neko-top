@@ -15,14 +15,17 @@ module cylinder
    ! Specific to the state vector
    use field, only: field_t
    use coefs, only: coef_t
+   use dofmap, only : dofmap_t
    ! various imports for some specific neko operations
    use neko_config, only : NEKO_BCKND_DEVICE
    use scratch_registry, only: neko_scratch_registry
    use field_math, only: field_col3, field_rzero, field_cmult, field_add3s2, &
       field_copy
-   use math, only: glsc2
+   use math, only: glsc2, rzero
    use device_math, only: device_glsc2
    use device, only : device_memcpy, HOST_TO_DEVICE
+   ! This one is silly... But we need coef to initialize fields
+   use global_coef, only: global_coef_t, global_coef_getter
    implicit none
  
    character*128, parameter, private :: this_module = 'cylinder'
@@ -39,11 +42,12 @@ module cylinder
  
    type, extends(abstract_vector_rdp), public :: state_vector
       ! adjoint velocity fields
-      type(field_t), allocatable :: u
-      type(field_t), allocatable :: v
-      type(field_t), allocatable :: w
+      type(field_t), pointer :: u => null()
+      type(field_t), pointer :: v => null()
+      type(field_t), pointer :: w => null()
       ! we need the mass matrix to integrate fields..
-     type(coef_t), pointer :: coef => null()
+      type(coef_t), pointer :: coef => null()
+      logical :: initialized = .false.
     contains
       private
       procedure, pass(self), public :: zero
@@ -89,20 +93,25 @@ module cylinder
    !======================================================================
    !======================================================================
  
-    subroutine state_vector_init(self, coef)
+    subroutine state_vector_init(self)
      class(state_vector), intent(inout) :: self
-     type(coef_t), intent(in), target :: coef
 
-     ! pass coef so we can integrate
-     self%coef => coef
-
-     ! allocate fields
-     allocate(self%u)
-     allocate(self%v)
-     allocate(self%w)
-     call self%u%init(self%coef%dof, fld_name = "state_u")
-     call self%v%init(self%coef%dof, fld_name = "state_v")
-     call self%w%init(self%coef%dof, fld_name = "state_w")
+     ! Check for global coef
+     if (.not. self%initialized) then
+       if (.not. associated(global_coef_getter)) then
+          error stop "No global coef set!"
+       end if
+          ! Take the global coef
+          self%coef => global_coef_getter%global_coef
+          ! initialize fields
+          allocate(self%u)
+          allocate(self%v)
+          allocate(self%w)
+          call self%u%init(self%coef%dof, fld_name = "state_u")
+          call self%v%init(self%coef%dof, fld_name = "state_v")
+          call self%w%init(self%coef%dof, fld_name = "state_w")
+        self%initialized = .true.
+     end if
 
      return
    end subroutine state_vector_init
@@ -121,9 +130,18 @@ module cylinder
  
    subroutine zero(self)
      class(state_vector), intent(inout) :: self
-     call field_rzero(self%u)
-     call field_rzero(self%v)
-     call field_rzero(self%w)
+     integer n
+     
+     ! always try initializing
+     call self%init()
+
+     n = self%u%size()
+     call rzero(self%u%x, n)
+     call rzero(self%v%x, n)
+     call rzero(self%w%x, n)
+     ! call field_rzero(self%u)
+     ! call field_rzero(self%v)
+     ! call field_rzero(self%w)
      return
    end subroutine zero
  
@@ -197,6 +215,10 @@ module cylinder
      ! internals
      logical :: normalize
      real(kind=wp) :: alpha
+     
+     ! always try initializing
+     call self%init()
+
      normalize = optval(ifnorm,.true.)
      call rand_ic(self%u, self%v, self%w)
      if (normalize) then
