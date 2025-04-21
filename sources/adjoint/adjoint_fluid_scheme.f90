@@ -310,6 +310,7 @@ contains
     character(len=:), allocatable :: string_val1, string_val2
     real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
+    integer :: n
 
     !
     ! SEM simulation fundamentals
@@ -538,13 +539,23 @@ contains
     call json_get_or_default(params, 'case.fluid.strict_convergence', &
          this%strict_convergence, .false.)
 
-    ! Assign velocity fields (we don't need these to be in the registry)
-    allocate(this%u_adj)
-    allocate(this%v_adj)
-    allocate(this%w_adj)
-    call this%u_adj%init(this%dm_Xh, fld_name = "adjoint_u")
-    call this%v_adj%init(this%dm_Xh, fld_name = "adjoint_v")
-    call this%w_adj%init(this%dm_Xh, fld_name = "adjoint_w")
+   !  ! Assign velocity fields (we don't need these to be in the registry)
+   !  allocate(this%u_adj)
+   !  allocate(this%v_adj)
+   !  allocate(this%w_adj)
+   !  call this%u_adj%init(this%dm_Xh, fld_name = "adjoint_u")
+   !  call this%v_adj%init(this%dm_Xh, fld_name = "adjoint_v")
+   !  call this%w_adj%init(this%dm_Xh, fld_name = "adjoint_w")
+
+    ! ok keep them in the registry, but disable the complaint for multiples
+    ! Assign velocity fields
+    n = neko_field_registry%n_fields()
+    call neko_field_registry%add_field(this%dm_Xh, 'u_adj', .true.)
+    call neko_field_registry%add_field(this%dm_Xh, 'v_adj', .true.)
+    call neko_field_registry%add_field(this%dm_Xh, 'w_adj', .true.)
+    this%u_adj => neko_field_registry%get_field(n+1)
+    this%v_adj => neko_field_registry%get_field(n+2)
+    this%w_adj => neko_field_registry%get_field(n+3)
 
     !! Initialize time-lag fields
     call this%ulag%init(this%u_adj, 2)
