@@ -34,7 +34,7 @@ submodule (mma) mma_device
 
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
-       device_sub2, device_sub3
+       device_sub2, device_sub3, device_add2s2
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
@@ -85,6 +85,7 @@ contains
     call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
     this%is_updated = .true.
+    call xdesign%free()
   end subroutine mma_update_device
 
   module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
@@ -165,6 +166,15 @@ contains
     this%residunorm = sqrt(device_norm(rey%x_d, this%m) + rez**2 + &
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
          rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
+
+    call designx%free()
+    call rey%free()
+    call relambda%free()
+    call remu%free()
+    call res%free()
+    call rex%free()
+    call rexsi%free()
+    call reeta%free()
   end subroutine mma_KKT_device
 
   !============================================================================!
@@ -185,61 +195,49 @@ contains
 
     integer, intent(in) :: iter
     integer :: ierr
-    type(vector_t) :: globaltmp_m
 
+    type(vector_t):: x_diff
+
+    call x_diff%init(this%n)
+    call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
-    call globaltmp_m%init(this%m)
-    if (iter .lt. 3) then
-       call device_add3s2(this%low%x_d, this%xmax%x_d, this%xmin%x_d, &
-            - this%asyinit, this%asyinit, this%n)
-       call device_add2(this%low%x_d, x%x_d, this%n)
 
-       call device_add3s2( this%upp%x_d, this%xmax%x_d, this%xmin%x_d, &
-            this%asyinit, - this%asyinit, this%n)
-       call device_add2(this%upp%x_d, x%x_d, this%n)
+    if (iter .lt. 3) then
+       call device_copy(this%low%x_d, x%x_d, this%n)
+       call device_add2s2(this%low%x_d, x_diff%x_d, - this%asyinit, this%n)
+       call device_copy(this%upp%x_d, x%x_d, this%n)
+       call device_add2s2(this%upp%x_d, x_diff%x_d, this%asyinit, this%n)
     else
        call device_mma_gensub2(this%low%x_d, this%upp%x_d, x%x_d, &
             this%xold1%x_d, this%xold2%x_d, this%xmin%x_d, this%xmax%x_d, &
             this%asydecr, this%asyincr, this%n)
     end if
-    call device_memcpy(this%upp%x, this%upp%x_d, this%n, DEVICE_TO_HOST, &
-         sync = .true.)
-    call device_memcpy(this%low%x, this%low%x_d, this%n, DEVICE_TO_HOST, &
-         sync = .true.)
+
+    ! ------------------------------------------------------------------------ !
+    ! Calculate p0j, q0j, pij, qij, alpha, and beta
+
     call device_mma_gensub3(x%x_d, df0dx%x_d, dfdx%x_d, this%low%x_d, &
          this%upp%x_d, this%xmin%x_d, this%xmax%x_d, this%alpha%x_d, &
          this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m)
 
-    call device_memcpy(this%alpha%x, this%alpha%x_d, this%n, DEVICE_TO_HOST, &
-         sync = .true.)
-    call device_memcpy(this%beta%x, this%beta%x_d, this%n, DEVICE_TO_HOST, &
-         sync = .true.)
-
     ! ------------------------------------------------------------------------ !
-    ! Calculate p0j, q0j, pij, qij, and bi
+    ! Calculate bi
+
     call device_mma_gensub4(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
-    call device_memcpy(this%pij%x, this%pij%x_d, this%n*this%m, &
-         DEVICE_TO_HOST, sync = .true.)
-    call device_memcpy(this%qij%x, this%qij%x_d, this%n*this%m, &
-         DEVICE_TO_HOST, sync = .true.)
     ! ------------------------------------------------------------------------ !
     ! cpu gpu transfer and global sum for bi
-    globaltmp_m%x = 0.0_rp
+
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
          sync = .true.)
-    call MPI_Allreduce(this%bi%x, globaltmp_m%x, this%m, mpi_real_precision, &
+    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, mpi_real_precision, &
          mpi_sum, neko_comm, ierr)
-    call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, this%m, &
-         HOST_TO_DEVICE, sync = .true.)
-    call device_sub3(this%bi%x_d, globaltmp_m%x_d, fval%x_d, this%m)
-
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
+    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
          sync = .true.)
+    call device_sub2(this%bi%x_d, fval%x_d, this%m)
 
-    call globaltmp_m%free()
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc.
@@ -355,8 +353,7 @@ contains
             low => this%low, upp => this%upp, &
             alpha => this%alpha, beta => this%beta, &
             c => this%c, d => this%d, &
-            a0 => this%a0, a => this%a, &
-            bi => this%bi)
+            a0 => this%a0, a => this%a)
 
          call device_rex(rex%x_d, x%x_d, low%x_d, upp%x_d, &
               pij%x_d, p0j%x_d, qij%x_d, q0j%x_d, &
@@ -723,6 +720,45 @@ contains
     call device_copy(this%eta%x_d, eta%x_d, this%n)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
     call device_copy(this%s%x_d, s%x_d, this%m)
+
+    !free all the initiated variables in this subroutine
+    call globaltmp_m%free()
+    call globaltmp_mm%free()
+
+    call y%free()
+    call lambda%free()
+    call s%free()
+    call mu%free()
+    call rey%free()
+    call relambda%free()
+    call remu%free()
+    call res%free()
+    call dely%free()
+    call dellambda%free()
+    call dy%free()
+    call dlambda%free()
+    call ds%free()
+    call dmu%free()
+    call yold%free()
+    call lambdaold%free()
+    call sold%free()
+    call muold%free()
+    call x%free()
+    call xsi%free()
+    call eta%free()
+    call rex%free()
+    call rexsi%free()
+    call reeta%free()
+    call delx%free()
+    call diagx%free()
+    call dx%free()
+    call dxsi%free()
+    call deta%free()
+    call xold%free()
+    call xsiold%free()
+    call etaold%free()
+    call bb%free()
+
 
   end subroutine mma_subsolve_dpip_device
 
