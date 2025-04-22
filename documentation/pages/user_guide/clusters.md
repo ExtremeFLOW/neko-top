@@ -45,3 +45,27 @@ export CC=$(which cc)
 ### Execution of examples
 Examples on LUMI can be executed in two different ways, interactively or as a
 submitted batch job.
+
+In order to run the examples interactively, you can use the following command:
+
+```bash
+salloc --ntasks 2 -t 00:10:00 --partition=small 
+./run.sh EXAMPLE_NAME
+```
+
+Where `EXAMPLE_NAME` is the name of the example you want to run. This command
+will allocate 2 tasks (CPI cores) for 10 minutes in the small partition. Then
+whenever an example is invoked from the runscript, it will be executed
+on the allocated resources.
+
+In order to run the examples as a batch job, you can use the following command:
+
+```bash
+./run.sh --submit LUMI EXAMPLE_NAME
+```
+
+Where `EXAMPLE_NAME` is the name of the example you want to run. This command
+will submit the job to the LUMI batch system based on the jobscript provided in
+`scripts/jobscript/lumi/` folder. The jobscript will used to specify options
+such as the partition, number of tasks, and time limit. The jobscript will be
+submitted to the LUMI batch system using the `sbatch` command.
