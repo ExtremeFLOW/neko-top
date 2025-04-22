@@ -303,10 +303,21 @@ function Submit() {
         fi
         sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
 
+    elif [ $CLUSTER == "LUMI" ]; then
+        if [ -n "$LUMI_ACCOUNT" ]; then
+            sbatch -A $LUMI_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
+        elif [ -n "$SBATCH_ACCOUNT" ]; then
+            sbatch -J $1 job_script.sh 1>/dev/null 2>error.log
+        else
+            printf >&2 "No account specified for LUMI.\n"
+            printf >&2 "Please set the LUMI_ACCOUNT variable in the environment.\n"
+            exit 1
+        fi
     else
-        printf >&2 "No or invalid cluster specified for submission.\n"
+        printf >&2 "No or invalid cluster specified \"$CLUSTER\"\n"
         printf >&2 "\t- DTU for the DTU cluster.\n"
         printf >&2 "\t- MN5 for the Marenostrum5 cluster.\n"
+        printf >&2 "\t- LUMI for the LUMI supercomputer.\n"
         exit 1
     fi
 
@@ -402,10 +413,10 @@ for case in ${example_list[@]}; do
     cp -f $SPATH/functions.sh $log/functions.sh
 
     # If we are submitting to a cluster, look for the associated jobscript
-    if [ ! -z $CLUSTER ]; then
+    if [ -n $CLUSTER ]; then
         # Find the setting file for the case recursively
         setting=$HPATH/${case%.*}.sh
-        while [[ ! -f $setting && ! -z "$setting" ]]; do
+        while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
         setting=$(realpath $setting)
