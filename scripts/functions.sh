@@ -47,6 +47,9 @@ function run {
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         srun --gpu-bind=single:1 $neko $casefile 2>error.log
 
+    elif [ ! -z "$(srun 2>/dev/null)" ]; then
+        srun $neko $casefile 2>error.log
+
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
         if [ ! -z "$NPROCS" ]; then
