@@ -49,7 +49,7 @@ submitted batch job.
 In order to run the examples interactively, you can use the following command:
 
 ```bash
-salloc --ntasks 2 -t 00:10:00 --partition=small 
+salloc --ntasks 2 -t 00:10:00 --partition=small
 ./run.sh EXAMPLE_NAME
 ```
 
