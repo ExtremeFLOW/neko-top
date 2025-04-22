@@ -47,7 +47,7 @@ function run {
     elif [ ! -z "$SLURM_JOB_NAME" ]; then
         srun --gpu-bind=single:1 $neko $casefile 2>error.log
 
-    else
+    elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
         if [ ! -z "$NPROCS" ]; then
             ncores=$NPROCS
@@ -66,6 +66,9 @@ function run {
         fi
 
         mpirun -n $ncores $neko $casefile 2>error.log
+
+    else
+        $neko $casefile 2>error.log
 
     fi
     TIME_END=$(date +%s)
