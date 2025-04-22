@@ -305,6 +305,7 @@ contains
     real(kind=rp), dimension(this%m, this%n) :: GG
     real(kind=rp), dimension(this%m+1) :: bb
     real(kind=rp), dimension(this%m+1, this%m+1) :: AA
+    real(kind=rp), dimension(this%m * this%m) :: AA_buffer
 
     ! using DGESV in lapack to solve
     ! the linear system which needs the following parameters
@@ -507,8 +508,12 @@ contains
              end do
           end do
 
-          call MPI_Allreduce(MPI_IN_PLACE, AA(1:this%m, 1:this%m), &
+          AA_buffer = reshape(AA(1:this%m, 1:this%m), [this%m * this%m])
+
+          call MPI_Allreduce(MPI_IN_PLACE, AA_buffer, &
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+          AA(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
 
           do i = 1, this%m
              ! update the diag AA
