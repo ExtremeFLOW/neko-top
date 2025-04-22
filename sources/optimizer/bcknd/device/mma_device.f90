@@ -972,7 +972,7 @@ contains
          call device_cadd(remu%x_d, -epsi, this%m)
 
 
-         !> Download the re(lambda, mu) to calculate residumax
+         !> Download the re(lambda, mu) to CPU to calculate residumax
 
          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
               sync = .true.)
@@ -983,7 +983,41 @@ contains
           
           ! print *, "remu=", remu%x
           ! print *, "residumax=", residumax
-          call neko_error('stooooooooooooooop!!!!!')
+
+
+         ! ------------------------------------------------------------------- !
+         ! Internal loop
+         do iter = 1, this%max_iter
+            !Check the condition
+            if (residumax .lt. epsi) exit
+            
+            ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
+            ! based on the implementation of the following paper 
+            ! https://doi.org/10.1007/s00158-012-0869-2
+            ! (https://github.com/topopt/TopOpt_in_PETSc/blob/master/MMA.cc)
+            ! The formula for gradlambda and relambda are basically the same:
+            ! thus, we utilise gradlambda = relambda - mu
+            call device_copy(gradlambda%x_d, relambda%x_d, this%m)
+            call device_sub2(gradlambda%x_d, mu%x_d, this%m)
+            
+            ! Update gradlambda as the right hand side for Newton's method(eq10)
+            call device_cfill(dummy_m%x_d, epsi, this%m)
+            call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
+            call device_add2(gradlambda%x_d, dummy_m%x_d, this%m)
+            call device_cmult(gradlambda%x_d, -1.0_rp, this%m)
+
+            ! Computing the Hessian as in equation (13) in
+            !! https://doi.org/10.1007/s00158-012-0869-2
+
+
+
+
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+            print * , "gradlambda%x=", gradlambda%x
+            call neko_error('stooooooooooooooop!!!!!')
+
+         end do
 
        end associate
      end do outer
