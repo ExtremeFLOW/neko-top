@@ -110,13 +110,8 @@ NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
 
-### Prepare script examples
+### Prepararation script examples
 
-Here is a few examples of prepare scripts that can be used to setup the
+Here is a few examples of `prepare.env` scripts that can be used to setup the
 environment for the compilation of Neko-TOP. These are to help you correctly
 setup the environment for a particular system.
-
-#### LUMI {#lumi}
-
-```bash
-```
