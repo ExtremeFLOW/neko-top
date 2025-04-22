@@ -402,10 +402,10 @@ for case in ${example_list[@]}; do
     cp -f $SPATH/functions.sh $log/functions.sh
 
     # If we are submitting to a cluster, look for the associated jobscript
-    if [ ! -z $CLUSTER ]; then
+    if [ -n $CLUSTER ]; then
         # Find the setting file for the case recursively
         setting=$HPATH/${case%.*}.sh
-        while [[ ! -f $setting && ! -z "$setting" ]]; do
+        while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
         setting=$(realpath $setting)
