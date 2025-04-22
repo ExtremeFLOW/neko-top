@@ -1,7 +1,7 @@
 # Cluster configurations {#clusters}
 
 
-## Lumi {#lumi}
+## Lumi-C GNU Compiler{#lumi}
 prepare.env
 
 ```bash
