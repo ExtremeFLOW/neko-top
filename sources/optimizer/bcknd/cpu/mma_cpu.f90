@@ -481,7 +481,7 @@ contains
              end do
           end do
 
-          call MPI_Allreduce(MPI_IN_PLACE, bb(1:this%m), this%m, &
+          call MPI_Allreduce(MPI_IN_PLACE, bb, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           bb(1:this%m) = dellambda + dely / (this%d%x + mu / y) - bb(1:this%m)
