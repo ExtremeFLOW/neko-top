@@ -33,7 +33,7 @@
 */
 
 #include <hip/hip_runtime.h>
-#include "math_ext_kernel.h"
+#include "RAMP_mapping_kernel.h"
 #include <device/hip/check.h>
 #include <device/device_config.h>
 #include <stdio.h>
@@ -44,79 +44,61 @@ extern "C" {
 #include <math/bcknd/device/device_mpi_op.h>
 #include <math/bcknd/device/device_mpi_reduce.h>
 
-/** Fortran wrapper for copy_mask
- * Copy a vector \f$ a_i = b_i, for i \in mask \f$
+/** Fortran wrapper for RAMP (convex down) mapping
  */
-void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
+void hip_convex_down_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
+    void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    copy_mask_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-        (real*)a, (real*)b, *size, mask, *mask_size);
+    hipLaunchKernelGGL(convex_down_RAMP_mapping_apply_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
 }
-/** Fortran wrapper for cadd_mask
- * Add a scalar to vector \f$ a_i = a_i + s, for i \in mask \f$
+
+/** Fortran wrapper for RAMP (convex down) chain rule
  */
-void hip_cadd_mask(void* a, real* c, int* size, int* mask, int* mask_size) {
+void hip_convex_down_RAMP_mapping_apply_backward(real* f_min, real* f_max,
+    real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    cadd_mask_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-        (real*)a, *c, *size, mask, *mask_size);
+    hipLaunchKernelGGL(convex_down_RAMP_mapping_apply_backward_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
+        (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
 }
-/** Fortran wrapper for invcol1_mask
- * Invert elements of vector \f$ a_i = 1.0 / a_i, for i \in mask \f$
+
+/** Fortran wrapper for RAMP (convex up) mapping
  */
-void hip_invcol1_mask(void* a, int* size, int* mask, int* mask_size) {
+void hip_convex_up_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
+    void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    invcol1_mask_kernel<real>
-        <<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-            (real*)a, *size, mask, *mask_size);
+    hipLaunchKernelGGL(convex_up_RAMP_mapping_apply_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
 }
-/** Fortran wrapper for col2_mask
- * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
+
+/** Fortran wrapper for RAMP (convex up) chain rule
  */
-void hip_col2_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
+void hip_convex_up_RAMP_mapping_apply_backward(real* f_min, real* f_max,
+    real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    col2_mask_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-        (real*)a, (real*)b, *size, mask, *mask_size);
-    HIP_CHECK(hipGetLastError());
-}
-/** Fortran wrapper for col3_mask
- * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
- */
-void hip_col3_mask(
-    void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
-
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
-
-    col3_mask_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-        (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
-    HIP_CHECK(hipGetLastError());
-}
-/** Fortran wrapper for sub3_mask
- * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
- */
-void hip_sub3_mask(
-    void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
-
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
-
-    sub3_mask_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
-        (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
+    hipLaunchKernelGGL(convex_up_RAMP_mapping_apply_backward_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
+        (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
 }
 }

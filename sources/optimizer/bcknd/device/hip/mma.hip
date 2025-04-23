@@ -95,14 +95,13 @@ void mma_gensub4_hip(void* x, void* low, void* upp, void* pij, void* qij,
 
 
 void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low,
-                      void* upp, void* xmin, void* xmax, void* alpha,
-                      void* beta, void* p0j, void* q0j, void* pij,
-                      void* qij, int* n, int* m) {
+                     void* upp, void* xmin, void* xmax, void* alpha,
+                     void* beta, void* p0j, void* q0j, void* pij,
+                     void* qij, int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    mma_sub3_kernel<real><<<nblcks, nthrds, 0,
-        (hipStream_t)glb_cmd_queue>>>(
+    hipLaunchKernelGGL(mma_sub3_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
         (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,
         (real*)beta, (real*)p0j, (real*)q0j, (real*)pij,
@@ -112,13 +111,12 @@ void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low,
 }
 
 void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
-                      void* xold2, void* xmin, void* xmax, real* asydecr,
-                      real* asyincr, int* n) {
+                     void* xold2, void* xmin, void* xmax, real* asydecr,
+                     real* asyincr, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    mma_sub2_kernel<real><<<nblcks, nthrds, 0,
-        (hipStream_t)glb_cmd_queue>>>(
+    hipLaunchKernelGGL(mma_sub2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xold1,
         (real*)xold2, (real*)xmin, (real*)xmax, *asydecr,
         *asyincr, *n);
@@ -127,11 +125,11 @@ void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
 }
 
 void mma_gensub1_hip(void* low, void* upp, void* x, void* xmin, void* xmax,
-                      real* asyinit, int* n) {
+                     real* asyinit, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    mma_sub1_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
+    hipLaunchKernelGGL(mma_sub1_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xmin, (real*)xmax,
         *asyinit, *n);
 
@@ -142,14 +140,14 @@ void hip_mma_max(void* xsi, void* x, void* alpha, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    mma_max2_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
+    hipLaunchKernelGGL(mma_max2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         (real*)xsi, (real*)x, (real*)alpha, *n);
 
     HIP_CHECK(hipGetLastError());
 }
 
 void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
-                   void* pij, void* qij, int* n, int* m) {
+                  void* pij, void* qij, int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     const int nb = nblcks.x;
@@ -168,20 +166,21 @@ void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
     real* temp;
     hipMalloc(&temp, (*n) * (*m) * sizeof(real));
 
-    relambda_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+    hipLaunchKernelGGL(relambda_kernel<real>, nblcks, nthrds, 0, stream,
         temp, (real*)x, (real*)xupp, (real*)xlow,
         (real*)pij, (real*)qij, *n, *m);
 
     for (int i = 0; i < (*m); i++) {
-        mmasum_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        hipLaunchKernelGGL(mmasum_kernel<real>, nblcks, nthrds, 0, stream,
             temp, mma_bufred_d, (*n), (*m), i);
         HIP_CHECK(hipGetLastError());
 
-        mmareduce_kernel<real><<<1, 1024, 0, stream>>>(
+        hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
             mma_bufred_d, nb);
         HIP_CHECK(hipGetLastError());
 
-        mma_copy_kernel<<<1, 1, 0, stream>>>((real*)relambda, mma_bufred_d, 1, i);
+        hipLaunchKernelGGL(mma_copy_kernel, dim3(1), dim3(1), 0, stream,
+            (real*)relambda, mma_bufred_d, 1, i);
         HIP_CHECK(hipGetLastError());
 
         hipStreamSynchronize(stream);
@@ -194,7 +193,7 @@ void hip_sub2cons2(void* a, void* b, void* c, void* d, real* e, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    sub2cons2_kernel<real><<<nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue>>>(
+    hipLaunchKernelGGL(sub2cons2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         (real*)a, (real*)b, (real*)c, (real*)d, *e, *n);
 
     HIP_CHECK(hipGetLastError());
@@ -216,11 +215,11 @@ real hip_maxval(void* a, int* n) {
         HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
     }
 
-    maxval_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+    hipLaunchKernelGGL(maxval_kernel<real>, nblcks, nthrds, 0, stream,
         (real*)a, mma_bufred_d, (*n));
     HIP_CHECK(hipGetLastError());
 
-    max_reduce_kernel<real><<<1, 1024, 0, stream>>>(
+    hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
         mma_bufred_d, nb);
     HIP_CHECK(hipGetLastError());
 
@@ -230,6 +229,7 @@ real hip_maxval(void* a, int* n) {
 
     return mma_bufred[0];
 }
+
 
 void hip_delx(void* delx, void* x, void* xlow, void* xupp, void* pij,
        void* qij, void* p0j, void* q0j, void* alpha, void* beta, void* lambda,
