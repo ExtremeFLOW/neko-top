@@ -55,7 +55,9 @@ void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
        return;
     }
 
-    hipLaunchKernelGGL(copy_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, (real*)b, *size, mask, *mask_size);
+    hipLaunchKernelGGL(copy_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue,
+         (real*)a, (real*)b, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 
@@ -70,7 +72,8 @@ void hip_cadd_mask(void* a, real* c, int* size, int* mask, int* mask_size) {
        return;
     }
 
-    hipLaunchKernelGGL(cadd_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, *c, *size, mask, *mask_size);
+    hipLaunchKernelGGL(cadd_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue, (real*)a, *c, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 
@@ -85,7 +88,8 @@ void hip_invcol1_mask(void* a, int* size, int* mask, int* mask_size) {
        return;
     }
 
-    hipLaunchKernelGGL(invcol1_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, *size, mask, *mask_size);
+    hipLaunchKernelGGL(invcol1_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue, (real*)a, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 
@@ -100,14 +104,18 @@ void hip_col2_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
        return;
     }
 
-    hipLaunchKernelGGL(col2_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, (real*)b, *size, mask, *mask_size);
+    hipLaunchKernelGGL(col2_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue,
+         (real*)a, (real*)b, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 
 /** Fortran wrapper for col3_mask
  * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
  */
-void hip_col3_mask(void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
+void hip_col3_mask(
+    void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
@@ -115,14 +123,18 @@ void hip_col3_mask(void* a, void* b, void* c, int* size, int* mask, int* mask_si
        return;
     }
 
-    hipLaunchKernelGGL(col3_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
+    hipLaunchKernelGGL(col3_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue,
+         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 
 /** Fortran wrapper for sub3_mask
  * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
  */
-void hip_sub3_mask(void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
+void hip_sub3_mask(
+    void* a, void* b, void* c, int* size, int* mask, int* mask_size) {
+
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
@@ -130,7 +142,9 @@ void hip_sub3_mask(void* a, void* b, void* c, int* size, int* mask, int* mask_si
        return;
     }
 
-    hipLaunchKernelGGL(sub3_mask_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue, (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
+    hipLaunchKernelGGL(sub3_mask_kernel<real>, nblcks, nthrds, 0,
+         (hipStream_t)glb_cmd_queue,
+         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
 }
 }
