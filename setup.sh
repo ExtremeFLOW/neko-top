@@ -78,7 +78,6 @@ if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
     if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
-        CLEAN_NEKO=true
     fi
 fi
 
