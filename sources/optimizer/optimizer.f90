@@ -46,15 +46,15 @@ module optimizer
   abstract interface
      !> Interface for optimizer initialization
      subroutine optimizer_init_from_json(this, parameters, problem, design, &
-          simulation, max_iterations, tolerance)
+          max_iterations, tolerance, simulation)
        import optimizer_t, json_file, simulation_t, problem_t, design_t, rp
        class(optimizer_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
        class(problem_t), intent(in) :: problem
        class(design_t), intent(in) :: design
-       type(simulation_t), intent(in) :: simulation
        integer, intent(in) :: max_iterations
        real(kind=rp), intent(in) :: tolerance
+       type(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_init_from_json
 
      !> Interface for running the optimization loop
@@ -63,7 +63,7 @@ module optimizer
        class(optimizer_t), intent(inout) :: this
        class(problem_t), intent(inout) :: problem
        class(design_t), intent(inout) :: design
-       type(simulation_t), intent(inout) :: simulation
+       type(simulation_t), optional, intent(inout) :: simulation
      end subroutine optimizer_run
 
      !> Interface for freeing resources
@@ -89,7 +89,7 @@ module optimizer
        type(json_file), intent(inout) :: parameters
        class(problem_t), intent(in) :: problem
        class(design_t), intent(in) :: design
-       class(simulation_t), intent(in) :: simulation
+       class(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_factory
   end interface optimizer_factory
 
