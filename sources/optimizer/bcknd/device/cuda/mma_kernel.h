@@ -2,6 +2,25 @@
 #define MMA_KERNEL_H
 
 template <typename T>
+__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv, 
+     const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
+     const T* __restrict__ x, const T* __restrict__ low, const T* __restrict__ upp,
+     const T* __restrict__ alpha, const T* __restrict__ beta,
+     const int n) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj < n) {
+    const T xt = x[tj];
+    T val = -1.0 / (2.0 * pjlambda[tj] / pow(upp[tj] - xt, 3) +
+                    2.0 * qjlambda[tj] / pow(xt - low[tj], 3));
+    // Remove the sensitivity for the active primal constraints
+    bool is_alpha = xt == alpha[tj];
+    bool is_beta  = xt == beta[tj];
+    Ljjxinv[tj] = (is_alpha || is_beta) ? T(0.0) : val;
+  }
+}
+
+
+template <typename T>
 __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x, 
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ low, const T* __restrict__ upp,
@@ -369,6 +388,38 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
   for (int i = idx; i < n; i += str)
   {
     sum += GG[ k + i * m] * delx[i] / diagx[i];
+  }
+
+  sum = reduce_warp<T>(sum);
+  if (lane == 0)
+    shared[wid] = sum;
+  __syncthreads();
+
+  sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+  if (wid == 0)
+    sum = reduce_warp<T>(sum);
+
+  if (threadIdx.x == 0)
+    buf_h[blockIdx.x] = sum;
+
+}
+
+template< typename T >
+__global__ void mmasumHess_kernel(const T*  __restrict__ hijx,
+     const T*  __restrict__ Ljjxinv, T*  __restrict__ buf_h, const int n,
+   const int m, const int k0, const int k1) {
+
+  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int str = blockDim.x * gridDim.x;
+
+  const unsigned int lane = threadIdx.x % warpSize;
+  const unsigned int wid = threadIdx.x / warpSize;
+  // this is similar to mmasumAA_kernel but with Ljjxinv_d = 1/diagx
+  __shared__ T shared[32];
+  T sum = 0;
+  for (int i = idx; i < n; i += str)
+  {
+    sum += hijx[ k0 + i * m] * Ljjxinv[i]  * hijx[ k1 + i * m];
   }
 
   sum = reduce_warp<T>(sum);

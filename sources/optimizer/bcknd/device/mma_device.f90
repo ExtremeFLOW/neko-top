@@ -42,7 +42,8 @@ submodule (mma) mma_device
        device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
-       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1
+       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
+       device_mma_Ljjxinv, device_Hess
 
 
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -776,7 +777,7 @@ contains
     integer :: iter, itto, ierr
     real(kind=rp) :: epsi, residumax, residunorm, z, steg
     ! vectors with size m
-    type(vector_t) :: y, lambda, s, mu, relambda, remu, dellambda, dmu, &
+    type(vector_t) :: y, lambda, s, mu, relambda, remu, dlambda, dmu, &
          gradlambda, zerom, dd, dummy_m
     ! vectors with size n
     type(vector_t) :: x, pjlambda, qjlambda
@@ -808,7 +809,7 @@ contains
     call mu%init(this%m)
     call relambda%init(this%m)
     call remu%init(this%m)
-    call dellambda%init(this%m)
+    call dlambda%init(this%m)
     call dmu%init(this%m)
     call gradlambda%init(this%m)
     call zerom%init(this%m)
@@ -1009,12 +1010,98 @@ contains
             ! Computing the Hessian as in equation (13) in
             !! https://doi.org/10.1007/s00158-012-0869-2
 
+            !--------------contributions of x terms to Hess--------------------!
+            call device_mma_Ljjxinv(Ljjxinv%x_d, pjlambda%x_d, qjlambda%x_d, &
+                 x%x_d, low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+
+            call device_GG(hijx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
+                 this%pij%x_d, this%qij%x_d, this%n, this%m)
+
+            call device_memcpy(hijx%x, hijx%x_d, this%n*this%m, DEVICE_TO_HOST, &
+              sync = .true.)     
+
+            call device_cfill(Hess%x_d, 0.0_rp, (this%m) * (this%m) )
+            call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
+
+            ! download Hess to CPU, mpi reduce, upload to the device
+            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
+                 this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+            ! No need to upload to device since we solve LSE on CPU
+            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, &
+            !     sync = .true.)
+
+            !---------------contributions of z terms to Hess-------------------!
+            ! There is no contibution to the Hess from z terms as z terms are 
+            ! linear w.r.t λ
 
 
+            !---------------contributions of y terms to Hess-------------------!
+            ! Only for inactive constraint, we consider contributions to Hess.
+            ! Note that if d(i) = 0, the y terms (just like z terms) will not 
+            ! contribute to the Hessian matrix.
+            ! Note that since we use DGESV to solve LSE on CPU, we dont need
+            ! cuda kernel for this part
+
+            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)            
+            do i = 1, this%m
+               if (y%x(i) .gt. 0.0_rp) then
+                  if (this%d%x(i) .eq. 0.0_rp) then
+                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
+                  else
+                     Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
+                  end if
+               end if
+               ! Based on eq(10), note the term (-\Omega \Lambda)
+               Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
+            end do    
+        
+            !> Improve the robustness by stablizing the Hess using 
+            !!  Levenberg-Marquardt algorithm (heuristically)
+            Hesstrace = 0.0_rp
+            do i=1, this%m
+               Hesstrace = Hesstrace + Hess%x(i, i)
+            end do
+            do i=1, this%m
+               Hess%x(i,i) = Hess%x(i, i) - &
+                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+            end do
 
             call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-            print * , "gradlambda%x=", gradlambda%x
+                 sync = .true.)
+            call DGESV(this%m , 1, Hess%x, this%m , ipiv, &
+                 gradlambda%x, this%m, info)
+
+            if (info .ne. 0) then
+               write(stderr, *) "DGESV failed to solve the linear system in MMA."
+               write(stderr, *) "Please check mma_subsolve_dip in mma.f90"
+               error stop
+            end if
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
+                 sync = .true.)
+
+            call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
+
+            ! based on eq(11) for delta eta
+            call device_copy(dummy_m%x_d, dlambda%x_d, this%m)
+            call device_col2(dummy_m%x_d, mu%x_d, this%m)
+            call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
+            
+            call device_cfill(dmu%x_d, epsi, this%m)
+            call device_invcol2(dmu%x_d, lambda%x_d, this%m)
+            call device_add2s2(dmu%x_d, dummy_m%x_d, -1.0_rp, this%m)
+            call device_sub2(dmu%x_d, mu%x_d, this%m)
+
+          call device_memcpy(dmu%x, dmu%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+
+            print * , "dmu%x=", dmu%x
             call neko_error('stooooooooooooooop!!!!!')
 
          end do

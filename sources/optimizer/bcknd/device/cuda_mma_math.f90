@@ -38,6 +38,20 @@ module cuda_mma_math
   public
 
   interface
+     subroutine cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) bind(c, name = 'cuda_Hess')
+       import c_int, c_ptr
+       type(c_ptr), value :: Hess_d, hijx_d, Ljjxinv_d
+       integer(c_int) :: n, m
+     end subroutine cuda_Hess
+
+     subroutine mma_Ljjxinv_cuda(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
+          low_d, upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_Ljjxinv_cuda')
+       import c_int, c_ptr
+       type(c_ptr), value :: Ljjxinv_d, x_d, pjlambda_d, qjlambda_d, low_d, &
+          upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_Ljjxinv_cuda
+
      subroutine mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, low_d, &
           upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_dipsolvesub1_cuda')
        import c_int, c_ptr

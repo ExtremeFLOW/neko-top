@@ -14,6 +14,45 @@ extern "C" {
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
  //////
+ void cuda_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
+     const dim3 nthrds(1024, 1, 1);
+     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
+     const int nb = ((*n) + 1024 - 1)/ 1024;
+     const cudaStream_t stream = (cudaStream_t) glb_cmd_queue;   
+     cudaStreamSynchronize(stream);
+     if(nb > mma_red_s){
+        mma_red_s = nb;
+        if(mma_bufred != NULL){
+           CUDA_CHECK(cudaFreeHost(mma_bufred));
+           CUDA_CHECK(cudaFree(mma_bufred_d));
+        }
+        CUDA_CHECK(cudaMallocHost(&mma_bufred,nb*sizeof(real)));
+        CUDA_CHECK(cudaMalloc(&mma_bufred_d, nb*sizeof(real)));
+     }
+     for (int i = 0; i < (*m); i++){
+        for (int j=0; j<(*m);j++){
+           mmasumHess_kernel <real> <<<nblcks, nthrds, 0, stream>>>
+                ((real*)hijx,(real*)Ljjxinv, mma_bufred_d, (*n),(*m), i, j);
+           CUDA_CHECK(cudaGetLastError());
+           mmareduce_kernel<real> <<<1, 1024, 0, stream>>> (mma_bufred_d, nb);
+           CUDA_CHECK(cudaGetLastError());
+           mma_copy_kernel<<<1, 1, 0, stream>>>((real*)Hess, mma_bufred_d, 1,
+                i+j*(*m));
+           CUDA_CHECK(cudaGetLastError());
+           cudaStreamSynchronize(stream);
+         }
+     }
+  }
+
+ void mma_Ljjxinv_cuda(void* Ljjxinv, void* pjlambda, void* qjlambda, void* x,
+     void* low, void* upp, void* alpha, void* beta, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    mma_Ljjxinv_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+         ((real*)Ljjxinv, (real*)pjlambda, (real*)qjlambda, (real*)x, (real*)low,
+         (real*)upp, (real*)alpha, (real*)beta, *n);
+    CUDA_CHECK(cudaGetLastError());
+  }
  
   void mma_dipsolvesub1_cuda(void* x, void* pjlambda, void* qjlambda,
      void* low, void* upp, void* alpha, void* beta, int* n) {
