@@ -34,7 +34,7 @@
 # Neko-TOP: Neko Topology Optimization Package
 # ============================================================================ #
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.21)
 project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 
 # Set language standards
@@ -76,7 +76,7 @@ set(CMAKE_BUILD_TYPE_LIST
 )
 
 # Set the compiler flags
-include(cmake/build_flags.cmake)
+include(cmake/${CMAKE_Fortran_COMPILER_ID}.cmake)
 
 # ============================================================================ #
 # Set some generic flags

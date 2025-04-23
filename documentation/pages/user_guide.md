@@ -13,6 +13,7 @@ writing JSON files, and the PFUnit library, which is used for unit testing.
   - [Creating a new case](@ref examples-new)
   - [Case files and meshes](@ref examples-data)
   - [Advanced example setups](@ref examples-advanced)
+- \subpage clusters
 
 \note the remaining structure here should be discussed. I suggest we follow
 in suit with `neko`, where they essentially break up the user guide based on
