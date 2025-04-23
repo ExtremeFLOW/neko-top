@@ -26,7 +26,7 @@ program usrneko
   !---------------------------------------------------
 
   !> Number of eigenvalues we wish to converge.
-  integer, parameter :: nev = 32
+  integer, parameter :: nev = 8
   !> Krylov subspace.
   type(state_vector), allocatable :: X(:)
   !> Eigenvalues.
@@ -37,7 +37,7 @@ program usrneko
   integer          :: info
 
   !> Miscellaneous.
-  integer :: i
+  integer :: i, j
 
   !=============================================================================
 
@@ -79,12 +79,32 @@ program usrneko
   !-----     SAVE TO DISK     -----
   !--------------------------------
 
-  !> Save the eigenspectrum.
-  call save_eigenspectrum(lambda, residuals, "example/ginzburg_landau/eigenspectrum.npy")
+  !> just write them out...
+  print *, "SPECTRA"
+  do i = 1, nev
+    print *, i, lambda(i)
+  enddo
 
   !> Save eigenvectors to disk.
-   do i = 1, nev
-     call X(i)%write(i)
-   enddo
+  do i = 1, nev
+    ! this is also so stupid, we need a better way to write these out
+    do j = 1, nev - i + 1
+      call X( nev - i + 1)%write(j)
+    end do
+  enddo
+
+
+
+  !> Clean up
+  call A%free()
+  do i = 1, nev
+    call X(i)%free()
+  enddo
+
+
+
+  !> Save the eigenspectrum.
+  ! call save_eigenspectrum(lambda, residuals, "example/ginzburg_landau/eigenspectrum.npy")
+
 
 end program usrneko
