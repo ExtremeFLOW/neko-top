@@ -101,7 +101,8 @@ void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(mma_sub3_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(mma_sub3_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)x, (real*)df0dx, (real*)dfdx, (real*)low,
         (real*)upp, (real*)xmin, (real*)xmax, (real*)alpha,
         (real*)beta, (real*)p0j, (real*)q0j, (real*)pij,
@@ -116,7 +117,8 @@ void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(mma_sub2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(mma_sub2_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xold1,
         (real*)xold2, (real*)xmin, (real*)xmax, *asydecr,
         *asyincr, *n);
@@ -129,7 +131,8 @@ void mma_gensub1_hip(void* low, void* upp, void* x, void* xmin, void* xmax,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(mma_sub1_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(mma_sub1_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xmin, (real*)xmax,
         *asyinit, *n);
 
@@ -140,7 +143,8 @@ void hip_mma_max(void* xsi, void* x, void* alpha, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(mma_max2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(mma_max2_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)xsi, (real*)x, (real*)alpha, *n);
 
     HIP_CHECK(hipGetLastError());
@@ -175,8 +179,8 @@ void hip_relambda(void* relambda, void* x, void* xupp, void* xlow,
             temp, mma_bufred_d, (*n), (*m), i);
         HIP_CHECK(hipGetLastError());
 
-        hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
-            mma_bufred_d, nb);
+        hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0,
+            stream, mma_bufred_d, nb);
         HIP_CHECK(hipGetLastError());
 
         hipLaunchKernelGGL(mma_copy_kernel, dim3(1), dim3(1), 0, stream,
@@ -193,7 +197,8 @@ void hip_sub2cons2(void* a, void* b, void* c, void* d, real* e, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(sub2cons2_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(sub2cons2_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)a, (real*)b, (real*)c, (real*)d, *e, *n);
 
     HIP_CHECK(hipGetLastError());
@@ -237,7 +242,8 @@ void hip_delx(void* delx, void* x, void* xlow, void* xupp, void* pij,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(delx_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(delx_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)delx, (real*)x, (real*)xlow, (real*)xupp, (real*)pij,
         (real*)qij, (real*)p0j, (real*)q0j, (real*)alpha, (real*)beta,
         (real*)lambda, *epsi, *n, *m);
@@ -249,8 +255,10 @@ void hip_GG(void* GG, void* x, void* xlow, void* xupp,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(GG_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
-        (real*)GG, (real*)x, (real*)xlow, (real*)xupp, (real*)pij, (real*)qij, *n, *m);
+    hipLaunchKernelGGL(GG_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
+        (real*)GG, (real*)x, (real*)xlow, (real*)xupp, (real*)pij,
+        (real*)qij, *n, *m);
     HIP_CHECK(hipGetLastError());
 }
 
@@ -260,7 +268,8 @@ void hip_diagx(void* diagx, void* x, void* xsi, void* xlow, void* xupp,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(diagx_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(diagx_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)diagx, (real*)x, (real*)xsi, (real*)xlow, (real*)xupp,
         (real*)p0j, (real*)q0j, (real*)pij, (real*)qij, (real*)alpha,
         (real*)beta, (real*)eta, (real*)lambda, *n, *m);
@@ -290,10 +299,12 @@ void hip_bb(void* bb, void* GG, void* delx, void* diagx, int *n, int *m) {
             (real*)GG, (real*)delx, (real*)diagx, mma_bufred_d, *n, *m, i);
         HIP_CHECK(hipGetLastError());
 
-        hipLaunchKernelGGL(mmareduce_kernel<real>, 1, 1024, 0, stream, mma_bufred_d, nb);
+        hipLaunchKernelGGL(mmareduce_kernel<real>, 1, 1024, 0, stream,
+            mma_bufred_d, nb);
         HIP_CHECK(hipGetLastError());
 
-        hipLaunchKernelGGL(mma_copy_kernel, 1, 1, 0, stream, (real*)bb, mma_bufred_d, 1, i);
+        hipLaunchKernelGGL(mma_copy_kernel, 1, 1, 0, stream, (real*)bb,
+            mma_bufred_d, 1, i);
         HIP_CHECK(hipGetLastError());
 
         hipStreamSynchronize(stream);
@@ -324,7 +335,8 @@ void hip_AA(void* AA, void* GG, void* diagx, int *n, int *m) {
                 (real*)GG, (real*)diagx, mma_bufred_d, *n, *m, i, j);
             HIP_CHECK(hipGetLastError());
 
-            hipLaunchKernelGGL(mmareduce_kernel<real>, 1, 1024, 0, stream, mma_bufred_d, nb);
+            hipLaunchKernelGGL(mmareduce_kernel<real>, 1, 1024, 0, stream,
+                mma_bufred_d, nb);
             HIP_CHECK(hipGetLastError());
 
             hipLaunchKernelGGL(mma_copy_kernel, 1, 1, 0, stream,
@@ -341,7 +353,8 @@ void hip_dx(void* dx, void* delx, void* diagx, void* GG, void* dlambda,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(dx_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(dx_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)dx, (real*)delx, (real*)diagx, (real*)GG, (real*)dlambda, *n, *m);
     HIP_CHECK(hipGetLastError());
 }
@@ -351,7 +364,8 @@ void hip_dxsi(void* dxsi, void* xsi, void* dx, void* x,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(dxsi_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(dxsi_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)dxsi, (real*)xsi, (real*)dx, (real*)x, (real*)alpha, *epsi, *n);
     HIP_CHECK(hipGetLastError());
 }
@@ -361,7 +375,8 @@ void hip_deta(void* deta, void* eta, void* dx, void* x,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(deta_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(deta_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)deta, (real*)eta, (real*)dx, (real*)x, (real*)beta, *epsi, *n);
     HIP_CHECK(hipGetLastError());
 }
@@ -372,7 +387,8 @@ void hip_rex(void* rex, void* x, void* xlow, void* xupp, void* pij,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(RexCalculation_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(RexCalculation_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)rex, (real*)x, (real*)xlow, (real*)xupp, (real*)pij, (real*)p0j,
         (real*)qij, (real*)q0j, (real*)lambda, (real*)xsi, (real*)eta, *n, *m);
     HIP_CHECK(hipGetLastError());
@@ -382,7 +398,8 @@ void hip_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int* 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(rey_calculation_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+    hipLaunchKernelGGL(rey_calculation_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue,
         (real*)rey, (real*)c, (real*)d, (real*)y, (real*)lambda, (real*)mu, *n);
     HIP_CHECK(hipGetLastError());
 }
@@ -392,7 +409,8 @@ void hip_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int* 
 void hip_sub2cons(void *a, void *b, void *c, real *d, int *n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-  hipLaunchKernelGGL(sub2cons_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+  hipLaunchKernelGGL(sub2cons_kernel<real>, nblcks, nthrds, 0,
+       (hipStream_t)glb_cmd_queue,
        (real *)a, (real *)b, (real *)c, *d, *n);
   HIP_CHECK(hipGetLastError());
 }
@@ -419,7 +437,8 @@ real hip_norm(void* a, int* n) {
        (real*)a, mma_bufred_d, (*n));
   HIP_CHECK(hipGetLastError());
 
-  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+       mma_bufred_d, nb);
   HIP_CHECK(hipGetLastError());
 
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
@@ -435,7 +454,8 @@ void hip_dely(void* dely, void* c, void* d, void* y, void* lambda,
        real* epsi, int* n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-  hipLaunchKernelGGL(dely_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+  hipLaunchKernelGGL(dely_kernel<real>, nblcks, nthrds, 0,
+       (hipStream_t)glb_cmd_queue,
        (real*)dely, (real*)c, (real*)d, (real*)y, (real*)lambda, *epsi, *n);
   HIP_CHECK(hipGetLastError());
 }
@@ -461,7 +481,8 @@ real hip_maxval2(void* a, void* b, real* cons, int* n) {
        (real*)a, (real*)b, mma_bufred_d, *cons, *n);
   HIP_CHECK(hipGetLastError());
 
-  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+       mma_bufred_d, nb);
   HIP_CHECK(hipGetLastError());
 
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
@@ -491,7 +512,8 @@ real hip_maxval3(void* a, void* b, void* c, real* cons, int* n) {
 
   hipLaunchKernelGGL(maxval3_kernel<real>, nblcks, nthrds, 0, stream,
        (real*)a, (real*)b, (real*)c, mma_bufred_d, *cons, *n);
-  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  hipLaunchKernelGGL(max_reduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+       mma_bufred_d, nb);
   HIP_CHECK(hipGetLastError());
 
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
@@ -507,7 +529,8 @@ void hip_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
        void* eta, void* lambda, int* n, int* m) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-  hipLaunchKernelGGL(kkt_rex_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+  hipLaunchKernelGGL(kkt_rex_kernel<real>, nblcks, nthrds, 0,
+       (hipStream_t)glb_cmd_queue,
        (real*)rex, (real*)df0dx, (real*)dfdx, (real*)xsi,
        (real*)eta, (real*)lambda, *n, *m);
   HIP_CHECK(hipGetLastError());
@@ -518,7 +541,8 @@ void hip_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
 void hip_maxcons(void* a, real* b, real* c, void* d, int* n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-  hipLaunchKernelGGL(maxcons_kernel<real>, nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+  hipLaunchKernelGGL(maxcons_kernel<real>, nblcks, nthrds, 0,
+       (hipStream_t)glb_cmd_queue,
        (real*)a, *b, *c, (real*)d, *n);
   HIP_CHECK(hipGetLastError());
 }
@@ -544,7 +568,8 @@ real hip_lcsc2(void *a, void*b, int *n) {
        (real*)a, (real*)b, mma_bufred_d, (*n));
   HIP_CHECK(hipGetLastError());
 
-  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream, mma_bufred_d, nb);
+  hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+       mma_bufred_d, nb);
   HIP_CHECK(hipGetLastError());
 
   HIP_CHECK(hipMemcpyAsync(mma_bufred, mma_bufred_d, sizeof(real),
