@@ -51,7 +51,7 @@ void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(256, 1, 1);
     const dim3 nblcks(((*mask_size) + 256 - 1) / 256, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(copy_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue,
          (real*)a, (real*)b, *size, mask, *mask_size);
@@ -65,7 +65,7 @@ void hip_cadd_mask(void* a, real* c, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(cadd_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue, (real*)a, *c, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
@@ -78,7 +78,7 @@ void hip_invcol1_mask(void* a, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(invcol1_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue, (real*)a, *size, mask, *mask_size);
     HIP_CHECK(hipGetLastError());
@@ -91,7 +91,7 @@ void hip_col2_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(col2_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue,
          (real*)a, (real*)b, *size, mask, *mask_size);
@@ -107,7 +107,7 @@ void hip_col3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(col3_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue,
          (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
@@ -123,7 +123,7 @@ void hip_sub3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
-    if(*mask_size == 0) {return;}
+    if(*mask_size == 0) return;
     hipLaunchKernelGGL(sub3_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue,
          (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
