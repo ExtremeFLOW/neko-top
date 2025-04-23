@@ -32,7 +32,7 @@ contains
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
-    class(simulation_t), intent(in) :: simulation
+    class(simulation_t), optional, intent(in) :: simulation
 
     character(len=:), allocatable :: type
     integer :: max_iterations
@@ -59,8 +59,9 @@ contains
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(parameters, problem, design, simulation, &
-         max_iterations, tolerance)
+    call object%init_from_json(parameters, problem, design, &
+         max_iterations, tolerance, simulation)
+
   end subroutine optimizer_factory
 
 
