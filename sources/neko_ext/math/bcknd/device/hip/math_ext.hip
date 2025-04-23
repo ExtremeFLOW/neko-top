@@ -44,7 +44,8 @@ extern "C" {
 #include <math/bcknd/device/device_mpi_op.h>
 #include <math/bcknd/device/device_mpi_reduce.h>
 
-/** Fortran wrapper for RAMP (convex down) mapping
+/** Fortran wrapper for copy_mask
+ * Copy a vector \f$ a_i = b_i, for i \in mask \f$
  */
 void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
