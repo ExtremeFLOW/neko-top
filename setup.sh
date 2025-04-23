@@ -70,6 +70,8 @@ while true; do
     esac
 done
 
+[ "$CLEAN_NEKO" == true ] && CLEAN=true
+
 # Check if the device type has changed
 if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
     CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
@@ -128,11 +130,12 @@ printf "Compiling the example codes and Neko-TOP\n"
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
-if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
+if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
 # Set the variables for the compilation
+[ "$CLEAN" == true ] && CMAKE_VARIABLES+=("--fresh")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
