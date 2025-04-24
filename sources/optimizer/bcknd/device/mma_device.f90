@@ -490,9 +490,6 @@ contains
                this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
           AA%x(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
 
-          call device_memcpy(AA%x, AA%x_d, &
-               (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
-
           call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
           call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
@@ -511,6 +508,8 @@ contains
           AA%x(this%m+1, 1:this%m) = this%a%x
           AA%x(this%m+1, this%m+1) = - zeta/z
 
+          call device_memcpy(AA%x, AA%x_d, &
+               (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
 
 
           call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
