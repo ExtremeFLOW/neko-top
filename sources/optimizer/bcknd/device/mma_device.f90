@@ -556,7 +556,7 @@ contains
           call device_sub2(ds%x_d, s%x_d, this%m)
 
 
-          steg = maxval([dummy_one, device_maxval2(dy%x_d, y%x_d, &
+          steg = maxval([1.0_rp, device_maxval2(dy%x_d, y%x_d, &
                -1.01_rp, this%m), -1.01_rp*dz/z, &
                device_maxval2(dlambda%x_d, lambda%x_d, &
                -1.01_rp, this%m), &
@@ -713,7 +713,7 @@ contains
                mpi_max, neko_comm, ierr)
        end do
        epsi = 0.1_rp * epsi
-    end do outer
+    end do
 
     ! Save the new designx
     call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
