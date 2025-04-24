@@ -57,9 +57,9 @@ module adjoint_scalar_convection_source_term
   type, public, extends(source_term_t) :: &
        adjoint_scalar_convection_source_term_t
      !> adjoint passive scalar
-     type(field_t), pointer :: s_adj
+     type(field_t), pointer :: s_adj => null()
      !> forward passive scalar
-     type(field_t), pointer :: s
+     type(field_t), pointer :: s => null()
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &

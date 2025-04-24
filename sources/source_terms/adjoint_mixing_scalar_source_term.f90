@@ -59,7 +59,7 @@ module adjoint_mixing_scalar_source_term
   ! ie, difference between it and the average.
   type, public, extends(source_term_t) :: adjoint_mixing_scalar_source_term_t
      !> The forward scalar field
-     type(field_t), pointer :: s
+     type(field_t), pointer :: s => null()
      !> A scalaing factor
      real(kind=rp) :: obj_scale
      !> Reference concentration

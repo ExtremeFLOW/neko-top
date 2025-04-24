@@ -49,8 +49,14 @@ module simple_brinkman_source_term
   !> A simple Brinkman source term.
   ! We have a source term of the form $\chi \mathbf{u}$
   type, public, extends(source_term_t) :: simple_brinkman_source_term_t
-     !> the fields corresponding to \f$\chi\f$, u, v and w
-     type(field_t), pointer :: chi, u, v, w
+     !> the fields corresponding to \f$\chi\f$
+     type(field_t), pointer :: chi => null()
+     !> the fields corresponding to u
+     type(field_t), pointer :: u => null()
+     !> the fields corresponding to v
+     type(field_t), pointer :: v => null()
+     !> the fields corresponding to w
+     type(field_t), pointer :: w => null()
 
    contains
      !> The common constructor using a JSON object.
