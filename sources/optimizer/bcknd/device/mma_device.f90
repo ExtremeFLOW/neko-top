@@ -259,6 +259,7 @@ contains
     type(matrix_t) :: AA
     type(matrix_t) :: globaltmp_mm
 
+    real(kind=rp), dimension(this%m*this%m) :: AA_buffer
     integer :: info
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
@@ -470,7 +471,7 @@ contains
           call device_memcpy(bb%x, bb%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
 
-          call MPI_Allreduce(MPI_IN_PLACE, bb%x(1:this%m), this%m, &
+          call MPI_Allreduce(MPI_IN_PLACE, bb%x, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           call device_memcpy(bb%x, bb%x_d, this%m, &
@@ -483,8 +484,12 @@ contains
           call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
-          call MPI_Allreduce(MPI_IN_PLACE, AA%x(1:this%m, 1:this%m), &
+
+          AA_buffer = reshape(AA%x(1:this%m, 1:this%m), [this%m * this%m])
+          call MPI_Allreduce(MPI_IN_PLACE, AA_buffer, &
                this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+          AA%x(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
+
           call device_memcpy(AA%x, AA%x_d, &
                (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
 
