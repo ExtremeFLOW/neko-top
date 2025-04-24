@@ -143,15 +143,14 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: xdesign
-    type(vector_t), intent(in) :: df0dx
-    type(vector_t), intent(in) :: fval
-    type(matrix_t), intent(in) :: dfdx
+    type(vector_t) :: df0dx, fval
+    type(matrix_t) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
-    type(vector_t) :: x_diff
+    real(kind=rp), dimension(this%n) :: x_diff
     real(kind=rp) :: asy_factor
 
-    x_diff = this%xmax - this%xmin
+    x_diff = this%xmax%x - this%xmin%x
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -160,8 +159,8 @@ contains
 
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
-         low = x - this%asyinit * x_diff%x
-         upp = x + this%asyinit * x_diff%x
+         low = x - this%asyinit * x_diff
+         upp = x + this%asyinit * x_diff
       else
          do j = 1, this%n
             if ((x(j) - x_1(j)) * (x_1(j) - x_2(j)) .lt. 0.0_rp) then
@@ -179,11 +178,11 @@ contains
 
          ! Setting a minimum and maximum for the low and upp
          ! asymptotes (eq3.9)
-         low = max(low, x - 10.0_rp * x_diff%x)
-         low = min(low, x - 0.01_rp * x_diff%x)
+         low = max(low, x - 10.0_rp * x_diff)
+         low = min(low, x - 0.01_rp * x_diff)
 
-         upp = min(upp, x + 10.0_rp * x_diff%x)
-         upp = max(upp, x + 0.01_rp * x_diff%x)
+         upp = min(upp, x + 10.0_rp * x_diff)
+         upp = max(upp, x + 0.01_rp * x_diff)
       end if
 
     end associate
@@ -201,8 +200,8 @@ contains
          xmin => this%xmin%x, xmax => this%xmax%x, &
          low => this%low%x, upp => this%upp%x, x => xdesign)
 
-      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff%x)
-      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff%x)
+      alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
+      beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
 
     end associate
 
@@ -218,13 +217,13 @@ contains
       p0j = ( &
            1.001_rp * max(df0dx, 0.0_rp) &
            + 0.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(x_diff%x, 0.00001_rp) &
+           + 0.00001_rp / max(x_diff, 0.00001_rp) &
            ) * (upp - x)**2
 
       q0j = ( &
            0.001_rp * max(df0dx, 0.0_rp) &
            + 1.001_rp * max(-df0dx, 0.0_rp) &
-           + 0.00001_rp / max(x_diff%x, 0.00001_rp)&
+           + 0.00001_rp / max(x_diff, 0.00001_rp)&
            ) * (x - low)**2
 
       do j = 1, this%n
@@ -232,13 +231,13 @@ contains
             pij(i, j) = ( &
                  1.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(x_diff%x(j), 0.00001_rp) &
+                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (upp(j) - x(j))**2
 
             qij(i, j) = ( &
                  0.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
-                 + 0.00001_rp / max(x_diff%x(j), 0.00001_rp) &
+                 + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (x(j) - low(j))**2
          end do
       end do

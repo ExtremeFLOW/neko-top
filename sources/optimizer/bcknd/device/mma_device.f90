@@ -516,7 +516,6 @@ contains
           call device_memcpy(AA%x, AA%x_d, &
                (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
 
-
           call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
                sync = .true.)
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
