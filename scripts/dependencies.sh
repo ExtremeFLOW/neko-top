@@ -345,16 +345,6 @@ function find_neko() {
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
 
-        # Verify installation device type
-        if [ "$DEVICE_TYPE" == "CUDA" ]; then
-            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
-            if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
-                error "CUDA backend not found in Neko."
-                error "Please ensure that the CUDA installation is correct."
-                exit 1
-            fi
-        fi
-
         cd $CURRENT_DIR
     fi
 
@@ -366,6 +356,26 @@ function find_neko() {
         error "the Neko source code."
         error "You can download the source code from:"
         error "\thttps://github.com/ExtremeFLOW/neko.git"
+        exit 1
+    fi
+
+    # Check the device type supported by neko
+    if [ "$DEVICE_TYPE" == "NONE" ]; then
+        PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
+    else
+        PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
+    fi
+    NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
+
+    if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
+        exit 1
+    elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
         exit 1
     fi
 
