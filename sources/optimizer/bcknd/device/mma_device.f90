@@ -785,8 +785,8 @@ contains
   subroutine mma_subsolve_dip_device(this, designx)
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: designx
-    integer :: iter, itto, ierr
-    real(kind=rp) :: epsi, residumax, residunorm, z, steg
+    integer :: iter, ierr
+    real(kind=rp) :: epsi, residumax, z, steg
     ! vectors with size m
     type(vector_t) :: y, lambda, mu, relambda, remu, dlambda, dmu, &
          gradlambda, zerom, dd, dummy_m
@@ -801,11 +801,8 @@ contains
 
     integer :: info
     integer, dimension(this%m+1) :: ipiv
-    real(kind=rp) :: re_xstuff_squ_global
-
     integer :: i
 
-    real(kind=rp) :: cons
     real(kind=rp) :: minimal_epsilon
 
     call y%init(this%m)

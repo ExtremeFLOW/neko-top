@@ -784,9 +784,8 @@ contains
     ! Note that there is a local dummy "x" in this subroutine, thus, we call
     ! the current design "designx" instead of just "x"
     integer :: i, j, k, iter, ierr
-    real(kind=rp) :: epsi, residual_max, residual_norm, &
-         z, steg
-    real(kind=rp), dimension(this%m) :: y, lambda, s, mu, &
+    real(kind=rp) :: epsi, residual_max, z, steg
+    real(kind=rp), dimension(this%m) :: y, lambda, mu, &
          relambda, remu, dlambda, dmu, gradlambda
     real(kind=rp), dimension(this%n) :: x, pjlambda, qjlambda
 
@@ -817,6 +816,7 @@ contains
     epsi = 1.0_rp !100
     ! x = 0.5_rp * (this%alpha%x + this%beta%x)
     y = 1.0_rp
+    z = 0.0_rp
     lambda = max(1.0_rp, 0.5_rp * this%c%x)
     mu = 1.0_rp !this parameter is eta in Niel's paper
     ! note that mu in the paper translates to epsi in the code following the
