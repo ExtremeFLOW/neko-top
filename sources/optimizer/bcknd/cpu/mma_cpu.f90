@@ -856,7 +856,7 @@ contains
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          do i=1, this%m
-            if (d(i) .eq. 0) then
+            if (abs(d(i)) < 1.0e-15_rp) then
                ! to avoid devision by zero in case d=0
                y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
                ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
@@ -924,8 +924,8 @@ contains
                  (2.0_rp*qjlambda/(x - low)**3))
 
             ! Remove the sensitivity for the active primal constraints
-            Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
-            Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < 1.0e-15_rp)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < 1.0e-15_rp)
 
             do i = 1, this%m
                hijx(i,:) = pij(i,:) / (upp - x)**2 &
@@ -958,7 +958,7 @@ contains
             ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
-                  if (d(i) .eq. 0.0_rp) then
+                  if (abs(d(i)) < 1.0e-15_rp) then
                      ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
                   else
                      Hess(i, i) = Hess(i, i) - 1.0_rp/d(i)
@@ -1012,7 +1012,7 @@ contains
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
             do i=1, this%m
-               if (d(i) .eq. 0) then
+               if (abs(d(i)) < 1.0e-15_rp) then
                   ! to avoid devision by zero in case d=0
                   y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
                   ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)

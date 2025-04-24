@@ -993,7 +993,7 @@ contains
                  sync = .true.)
             do i = 1, this%m
                if (y%x(i) .gt. 0.0_rp) then
-                  if (this%d%x(i) .eq. 0.0_rp) then
+                  if (abs(this%d%x(i)) < 1.0e-15_rp) then
                      ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
                   else
                      Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
