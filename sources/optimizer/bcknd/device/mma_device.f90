@@ -290,7 +290,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
 
-    integer :: nglobal, i
+    integer :: i
 
     real(kind=rp) :: cons
     real(kind=rp) :: minimal_epsilon
@@ -355,9 +355,6 @@ contains
     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
-
-    call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
-         neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
@@ -795,7 +792,7 @@ contains
     integer :: iter, itto, ierr
     real(kind=rp) :: epsi, residumax, residunorm, z, steg
     ! vectors with size m
-    type(vector_t) :: y, lambda, s, mu, relambda, remu, dlambda, dmu, &
+    type(vector_t) :: y, lambda, mu, relambda, remu, dlambda, dmu, &
          gradlambda, zerom, dd, dummy_m
     ! vectors with size n
     type(vector_t) :: x, pjlambda, qjlambda
@@ -806,24 +803,17 @@ contains
     type(matrix_t) :: Hess
     real(kind=rp) :: Hesstrace
 
-    !!! this is for testing, remove it later on
-    type(matrix_t) :: testM
-    type(vector_t) :: test6
-    type(vector_t) :: output
-    type(vector_t) :: outputM
-
     integer :: info
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
 
-    integer :: nglobal, i
+    integer :: i
 
     real(kind=rp) :: cons
     real(kind=rp) :: minimal_epsilon
 
     call y%init(this%m)
     call lambda%init(this%m)
-    call s%init(this%m)
     call mu%init(this%m)
     call relambda%init(this%m)
     call remu%init(this%m)
@@ -841,11 +831,6 @@ contains
     call Ljjxinv%init(this%n)
     call hijx%init(this%m,this%n)
     call Hess%init(this%m,this%m)
-
-    call testM%init(this%m, 6)
-    call test6%init(6)
-    call output%init(6)
-    call outputM%init(this%m)
 
     call device_cfill(zerom%x_d, 0.0_rp, this%m)
 
@@ -865,11 +850,6 @@ contains
 
     ! dd is defined as this%d + 1.0e-8_rp, to avoid devision by 0 in computing y
     call device_cadd2(dd%x_d, this%d%x_d, 1.0e-8_rp, this%m)
-
-
-    
-    call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
-         neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
@@ -910,26 +890,6 @@ contains
          z = device_glsum(dummy_m%x_d, this%m)
          z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
 
-          ! call device_memcpy(pij%x, pij%x_d, this%n*this%m, DEVICE_TO_HOST, &
-          !         sync = .true.)
-          ! print *, "sum(pij)=", sum(pij%x), "max(pij)=", &
-          !     maxval(pij%x), "minval(pij)=", minval(pij%x)
-          !     testM%x = reshape([ &
-          !           1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp, &
-          !           1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp ], [2,6])
-          !     call device_memcpy(testM%x, testM%x_d, this%m * 6, HOST_TO_DEVICE, &
-          !         sync = .true.)
-          ! call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-          !     sync = .true.)
-          ! print *, "lambda=", lambda%x
-          !     print *, "sum(pij) =", sum(pij%x)
-          !     print *, "testM%x=", testM%x
-          !     call device_mattrans_v_mul(output%x_d, testM%x_d, lambda%x_d, this%m, 6)
-          !     call device_memcpy(output%x, output%x_d, 6, DEVICE_TO_HOST, &
-          !         sync = .true.)         
-          !     print *, "output%x=", output%x
-
-
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
@@ -941,27 +901,6 @@ contains
 
          call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
               low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
-          
-          !     call device_memcpy(pjlambda%x, pjlambda%x_d, this%n, DEVICE_TO_HOST, &
-          !        sync = .true.) 
-          !     call device_memcpy(qjlambda%x, qjlambda%x_d, this%n, DEVICE_TO_HOST, &
-          !        sync = .true.) 
-          !     print *, "sum(pjlambda)=", sum(pjlambda%x), "max(pjlambda)=", &
-          !          maxval(pjlambda%x), "minval(pjlambda)=", minval(pjlambda%x)
-          !     print *, "sum(qjlambda)=", sum(qjlambda%x), "max(qjlambda)=", &
-          !          maxval(qjlambda%x), "minval(qjlambda)=", minval(qjlambda%x)
-
-
-          !     call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-          !         sync = .true.)
-          !     print *, "sum(x)=", sum(x%x), "max(x)=", maxval(x%x), "minval(x)=", minval(x%x)
-
-         !!!call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-         !!!    sync = .true.)
-         !!!call device_memcpy(dd%x, dd%x_d, this%m, DEVICE_TO_HOST, &
-         !!!    sync = .true.)
-         !!!print *, "dd=", dd%x, "d= ", this%d%x, "y = ", y%x
-         !!!call neko_error('stooooooooooooooop!!!!!')
 
          call device_cfill(relambda%x_d, 0.0_rp, this%m)
          call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
@@ -981,15 +920,8 @@ contains
          call device_add2(relambda%x_d, mu%x_d, this%m)
          call device_sub2(relambda%x_d, this%bi%x_d, this%m)
 
-          ! call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-          !     sync = .true.)
-          ! call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-          !     sync = .true.)
-          ! print *, "sum(x)=", sum(x%x), "max(x)=", maxval(x%x), "minval(x)=", minval(x%x)
-          ! print *, "after device_relambda=", relambda%x
          call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
          call device_cadd(remu%x_d, -epsi, this%m)
-
 
          !> Download the re(lambda, mu) to CPU to calculate residumax
 
@@ -998,11 +930,6 @@ contains
          call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
               sync = .true.)
          residumax = maxval(abs([relambda%x, remu%x]))
-          
-          
-          ! print *, "remu=", remu%x
-          ! print *, "residumax=", residumax
-
 
          ! ------------------------------------------------------------------- !
          ! Internal loop
@@ -1011,11 +938,11 @@ contains
             if (residumax .lt. epsi) exit
             
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
-            ! based on the implementation of the following paper 
+            ! based on the implementation in the following paper by Niels
             ! https://doi.org/10.1007/s00158-012-0869-2
             ! (https://github.com/topopt/TopOpt_in_PETSc/blob/master/MMA.cc)
             ! The formula for gradlambda and relambda are basically the same:
-            ! thus, we utilise gradlambda = relambda - mu
+            ! thus, we utilise gradlambda = relambda - mu for efficiency
             call device_copy(gradlambda%x_d, relambda%x_d, this%m)
             call device_sub2(gradlambda%x_d, mu%x_d, this%m)
             
@@ -1047,8 +974,8 @@ contains
             call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
             ! No need to upload to device since we solve LSE on CPU
-            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, &
-            !     sync = .true.)
+            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
+            ! HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are 
@@ -1207,6 +1134,26 @@ contains
     this%z = z
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
+
+    call y%free()
+    call lambda%free()
+    call mu%free()
+    call relambda%free()
+    call remu%free()
+    call dlambda%free()
+    call dmu%free()
+    call gradlambda%free()
+    call zerom%free()
+    call dd%free()
+    call dummy_m%free()
+
+    call x%free()
+    call pjlambda%free()
+    call qjlambda%free()
+    
+    call Ljjxinv%free()
+    call hijx%free()
+    call Hess%free()   
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device

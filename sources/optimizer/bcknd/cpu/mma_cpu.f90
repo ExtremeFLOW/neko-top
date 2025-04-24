@@ -95,16 +95,6 @@ contains
     type(vector_t), intent(in) :: df0dx, fval
     type(matrix_t), intent(in) :: dfdx
 
-    real(kind=rp) :: rez, rezeta
-    real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
-    real(kind=rp), dimension(this%n) :: rex, rexsi, reeta
-    real(kind=rp), dimension(3*this%n+4*this%m+2) :: residual
-
-    real(kind=rp), dimension(4*this%m+2) :: residual_small
-    integer :: ierr
-    real(kind=rp) :: re_sq_norm
-
-
     if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
@@ -899,14 +889,11 @@ contains
               mpi_real_precision, mpi_sum, neko_comm, ierr)
          relambda = relambda - bi - y - a * z + mu
 
-          !     print *, "sum(x)=", sum(x), "max(x)=", maxval(x), "minval(x)=", minval(x)
-          !     print *, "after cpu_relambda=", relambda
-          !     call neko_error('stooooooooooooooop!!!!!')
          ! Compute residual for mu (eta in the paper)
          remu = mu * lambda - epsi
 
          residual_max = maxval(abs([relambda, remu]))
-
+         
          ! ------------------------------------------------------------------- !
          ! Internal loop
          do iter = 1, this%max_iter
@@ -930,8 +917,8 @@ contains
             !! https://doi.org/10.1007/s00158-012-0869-2
 
             !--------------contributions of x terms to Hess--------------------!
-            Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &
-                 (2*qjlambda/(x - low)**3))
+            Ljjxinv= - 1.0_rp / ( (2*pjlambda/(upp - x)**3) + &
+                 (2.0_rp*qjlambda/(x - low)**3))
 
             ! Remove the sensitivity for the active primal constraints
             Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)
@@ -957,11 +944,10 @@ contains
 
             call MPI_Allreduce(MPI_IN_PLACE, Hess, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-
+            
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are 
             ! linear w.r.t λ
-
 
             !---------------contributions of y terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess.
@@ -991,15 +977,15 @@ contains
             end do
 
             call DGESV(this%m , 1, Hess, this%m , ipiv, &
-                 gradlambda, this%m + 1, info)
+                 gradlambda, this%m, info)
 
             if (info .ne. 0) then
                write(stderr, *) "DGESV failed to solve the linear system in MMA."
                write(stderr, *) "Please check mma_subsolve_dip in mma.f90"
                error stop
             end if
-             
-            dlambda = gradlambda(1:this%m)
+            dlambda = gradlambda
+
             ! based on eq(11) for delta eta
             dmu = -mu + epsi / lambda - dlambda * mu / lambda
 
@@ -1017,7 +1003,7 @@ contains
 
             lambda = lambda + steg*dlambda
             mu = mu + steg*dmu
-
+            
             ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
             ! the updated values of λ
 
