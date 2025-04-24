@@ -71,14 +71,15 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
-
     call xdesign%init(this%n)
     call device_memcpy(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync = .false.)
 
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
+
     !solve the approximation problem using interior point method
     call mma_subsolve_dpip_device(this, xdesign)
+
     !update the design vector x on the host
     call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
@@ -96,17 +97,14 @@ contains
     real(kind=rp) :: rez, rezeta
     type(vector_t) :: rey, relambda, remu, res
     type(vector_t) :: rex, rexsi, reeta
-    real(kind=rp) :: residu_val
     integer :: ierr
-    real(kind=rp) :: re_xstuff_squ_global
-    real(kind=rp) :: globaltemp_norm
+    real(kind=rp) :: re_sq_norm
 
     ! create a vector type x to have a c_ptr to point to the array designx
     call designx%init(this%n)
     designx%x = x
     call device_memcpy(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, &
          sync = .false.)
-
 
     call rey%init(this%m)
     call relambda%init(this%m)
@@ -143,27 +141,33 @@ contains
 
     call device_col3(remu%x_d, this%mu%x_d, this%y%x_d, this%m)
 
-    rezeta = this%zeta*this%z
+    rezeta = this%zeta * this%z
 
     call device_col3(res%x_d, this%lambda%x_d, this%s%x_d, this%m)
 
-    residu_val = maxval([device_maxval(rex%x_d, this%n), &
-         device_maxval(rey%x_d, this%m), rez, &
+    this%residumax = maxval(abs([ &
+         device_maxval(rex%x_d, this%n), &
+         device_maxval(rey%x_d, this%m), &
+         rez, &
          device_maxval(relambda%x_d, this%m), &
-         device_maxval(rexsi%x_d, this%n), device_maxval(reeta%x_d, this%n), &
-         device_maxval(remu%x_d, this%m), rezeta, &
-         device_maxval(res%x_d, this%m)])
+         device_maxval(rexsi%x_d, this%n), &
+         device_maxval(reeta%x_d, this%n), &
+         device_maxval(remu%x_d, this%m), &
+         rezeta, &
+         device_maxval(res%x_d, this%m)]))
 
-    call MPI_Allreduce(residu_val, this%residumax, 1, &
+    re_sq_norm = device_norm(rex%x_d, this%n) + &
+         device_norm(rexsi%x_d, this%n) + device_norm(reeta%x_d, this%n)
+
+    call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
          mpi_real_precision, mpi_max, neko_comm, ierr)
 
-    globaltemp_norm = device_norm(rex%x_d, this%n) + &
-         device_norm(rexsi%x_d, this%n) + device_norm(reeta%x_d, this%n)
-    call MPI_Allreduce(globaltemp_norm, re_xstuff_squ_global, 1, &
+    call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%residunorm = sqrt(device_norm(rey%x_d, this%m) + rez**2 + &
+
+    this%residunorm = sqrt((device_norm(rey%x_d, this%m) + rez**2 + &
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
-         rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
+         rezeta**2+device_norm(res%x_d, this%m))**2 + re_sq_norm)
 
     call designx%free()
     call rey%free()
@@ -197,7 +201,8 @@ contains
     type(vector_t):: x_diff
 
     call x_diff%init(this%n)
-    call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
+    x_diff = this%xmax - this%xmin
+
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
 
@@ -230,8 +235,8 @@ contains
 
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
          sync = .true.)
-    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, mpi_real_precision, &
-         mpi_sum, neko_comm, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
          sync = .true.)
     call device_sub2(this%bi%x_d, fval%x_d, this%m)
@@ -244,7 +249,7 @@ contains
     type(vector_t), intent(in) :: designx
     integer :: iter, itto, ierr
     real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
-         delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
+         delz, dz, dzeta, steg, zold, zetaold, newresidu
     ! vectors with size m
     type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
          dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
@@ -262,7 +267,7 @@ contains
     real(kind=rp), dimension(this%m*this%m) :: AA_buffer
     integer :: info
     integer, dimension(this%m+1) :: ipiv
-    real(kind=rp) :: re_xstuff_squ_global
+    real(kind=rp) :: re_sq_norm
 
     integer :: nglobal, i
 
@@ -272,7 +277,6 @@ contains
 
     call globaltmp_m%init(this%m)
     call globaltmp_mm%init(this%m, this%m)
-
 
     call y%init(this%m)
     call lambda%init(this%m)
@@ -314,7 +318,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
-    dummy_one = 1.0_rp
+
     epsi = 1.0_rp !100
     call device_add3s2(x%x_d, this%alpha%x_d, this%beta%x_d, 0.5_rp, 0.5_rp, &
          this%n)
@@ -330,8 +334,8 @@ contains
     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
 
-    call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
-         neko_comm, ierr)
+    call MPI_Allreduce(this%n, nglobal, 1, &
+         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
@@ -343,8 +347,9 @@ contains
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
 
-    outer: do while (epsi .gt. minimal_epsilon)
-       ! calculating residuals based on
+    do while (epsi .gt. minimal_epsilon)
+       ! --------------------------------------------------------------------- !
+       ! Calculating residuals based on
        ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
        ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
        associate(p0j => this%p0j, q0j => this%q0j, &
@@ -411,16 +416,16 @@ contains
        call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, mpi_max, &
             neko_comm, ierr)
 
-       re_xstuff_squ_global = 0.0_rp
+       re_sq_norm = 0.0_rp
        cons = device_norm(rex%x_d, this%n) + &
             device_norm(rexsi%x_d, this%n)+device_norm(reeta%x_d, this%n)
-       call MPI_Allreduce(cons, re_xstuff_squ_global, 1, &
+       call MPI_Allreduce(cons, re_sq_norm, 1, &
             mpi_real_precision, mpi_sum, neko_comm, ierr)
        cons = device_norm(rey%x_d, this%m) + rez**2 + &
             device_norm(relambda%x_d, this%m) + &
             device_norm(remu%x_d, this%m)+ &
             rezeta**2+device_norm(res%x_d, this%m)
-       residunorm = sqrt(cons + re_xstuff_squ_global)
+       residunorm = sqrt(cons + re_sq_norm)
 
 
 
@@ -673,11 +678,11 @@ contains
              call device_col3(res%x_d, lambda%x_d, s%x_d, this%m)
              call device_cadd(res%x_d, -epsi, this%m)
 
-             re_xstuff_squ_global = 0.0_rp
+             re_sq_norm = 0.0_rp
              cons = device_norm(rex%x_d, this%n) + &
                   device_norm(rexsi%x_d, this%n) + &
                   device_norm(reeta%x_d, this%n)
-             call MPI_Allreduce(cons, re_xstuff_squ_global, 1, &
+             call MPI_Allreduce(cons, re_sq_norm, 1, &
                   mpi_real_precision, mpi_sum, neko_comm, ierr)
 
              cons = device_norm(rey%x_d, this%m) + rez**2 + &
@@ -685,7 +690,7 @@ contains
                   device_norm(remu%x_d, this%m) + &
                   rezeta**2+device_norm(res%x_d, this%m)
 
-             newresidu = sqrt(cons+ re_xstuff_squ_global)
+             newresidu = sqrt(cons+ re_sq_norm)
 
              steg = steg/2.0_rp
 
