@@ -154,14 +154,14 @@ contains
          device_maxval(remu%x_d, this%m), rezeta, &
          device_maxval(res%x_d, this%m)])
 
-    call MPI_Allreduce(residu_val, this%residumax, 1, &
+    call MPI_Allreduce(residu_val, this%residual_max, 1, &
          mpi_real_precision, mpi_max, neko_comm, ierr)
 
     globaltemp_norm = device_norm(rex%x_d, this%n) + &
          device_norm(rexsi%x_d, this%n) + device_norm(reeta%x_d, this%n)
     call MPI_Allreduce(globaltemp_norm, re_xstuff_squ_global, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
-    this%residunorm = sqrt(device_norm(rey%x_d, this%m) + rez**2 + &
+    this%residual_norm = sqrt(device_norm(rey%x_d, this%m) + rez**2 + &
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
          rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
 
@@ -243,8 +243,8 @@ contains
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: designx
     integer :: iter, itto, ierr
-    real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
-         delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
+    real(kind=rp) :: epsi, residual_max, residual_norm, z, zeta, rez, rezeta, &
+         delz, dz, dzeta, steg, dummy_one, zold, zetaold, new_residual
     ! vectors with size m
     type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
          dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
@@ -407,8 +407,8 @@ contains
             device_maxval(reeta%x_d, this%n), &
             device_maxval(remu%x_d, this%m), rezeta, &
             device_maxval(res%x_d, this%m)])
-       residumax = 0.0_rp
-       call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, mpi_max, &
+       residual_max = 0.0_rp
+       call MPI_Allreduce(cons, residual_max, 1, mpi_real_precision, mpi_max, &
             neko_comm, ierr)
 
        re_xstuff_squ_global = 0.0_rp
@@ -420,13 +420,13 @@ contains
             device_norm(relambda%x_d, this%m) + &
             device_norm(remu%x_d, this%m)+ &
             rezeta**2+device_norm(res%x_d, this%m)
-       residunorm = sqrt(cons + re_xstuff_squ_global)
+       residual_norm = sqrt(cons + re_xstuff_squ_global)
 
 
 
        do iter = 1, this%max_iter !ittt
 
-          if (residumax .lt. epsi) exit
+          if (residual_max .lt. epsi) exit
 
           call device_delx(delx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                this%pij%x_d, this%qij%x_d, this%p0j%x_d, this%q0j%x_d, &
@@ -578,12 +578,13 @@ contains
           call device_copy(muold%x_d, mu%x_d, this%m)
           zetaold = zeta
           call device_copy(sold%x_d, s%x_d, this%m)
-          newresidu = 2.0*residunorm
-          itto = 0
 
           ! The innermost loop to determine the suitable step length
           ! using the Backtracking Line Search approach
-          do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
+          new_residual = 2.0_rp * residual_norm
+
+          itto = 0
+          do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
              itto = itto + 1
              call device_add3s2(x%x_d, xold%x_d, dx%x_d, 1.0_rp, &
                   steg, this%n)
@@ -606,7 +607,7 @@ contains
              call device_add3s2(s%x_d, sold%x_d, ds%x_d, 1.0_rp, &
                   steg, this%m)
 
-             ! recompute the newresidu to see if this stepsize improves
+             ! recompute the new_residual to see if this stepsize improves
              ! the residue
              call device_rex(rex%x_d, x%x_d, this%low%x_d, &
                   this%upp%x_d, this%pij%x_d, this%p0j%x_d, &
@@ -684,24 +685,27 @@ contains
                   device_norm(remu%x_d, this%m) + &
                   rezeta**2+device_norm(res%x_d, this%m)
 
-             newresidu = sqrt(cons+ re_xstuff_squ_global)
+             new_residual = sqrt(cons+ re_xstuff_squ_global)
 
              steg = steg/2.0_rp
 
              cons = 0.0_rp
-             cons = maxval([device_maxval(rex%x_d, this%n), &
-                  device_maxval(rey%x_d, this%m), rez, &
-                  device_maxval(relambda%x_d, this%m), &
-                  device_maxval(rexsi%x_d, this%n), &
-                  device_maxval(reeta%x_d, this%n), &
-                  device_maxval(remu%x_d, this%m), rezeta, &
-                  device_maxval(res%x_d, this%m)])
+             cons = maxval([abs(device_maxval(rex%x_d, this%n)), &
+                  abs(device_maxval(rey%x_d, this%m)), &
+                  abs(rez), &
+                  abs(device_maxval(relambda%x_d, this%m)), &
+                  abs(device_maxval(rexsi%x_d, this%n)), &
+                  abs(device_maxval(reeta%x_d, this%n)), &
+                  abs(device_maxval(remu%x_d, this%m)), &
+                  abs(rezeta), &
+                  abs(device_maxval(res%x_d, this%m))])
           end do
-          residunorm = newresidu
-          residumax = 0.0_rp
-          call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, &
+          steg = 2.0_rp * steg ! Correction for the final division by 2
+
+          residual_norm = new_residual
+          residual_max = 0.0_rp
+          call MPI_Allreduce(cons, residual_max, 1, mpi_real_precision, &
                mpi_max, neko_comm, ierr)
-          steg = 2.0_rp*steg
        end do
        epsi = 0.1_rp * epsi
     end do outer
