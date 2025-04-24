@@ -388,6 +388,26 @@ function find_neko() {
         exit 1
     fi
 
+    # Check the device type supported by neko
+    if [ "$DEVICE_TYPE" == "NONE" ]; then
+        PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
+    else
+        PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
+    fi
+    NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
+
+    if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
+        exit 1
+    elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
+        exit 1
+    fi
+
     export NEKO_DIR=$(realpath $NEKO_DIR)
     export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
     export LD_LIBRARY_PATH=$NEKO_DIR/lib:$LD_LIBRARY_PATH

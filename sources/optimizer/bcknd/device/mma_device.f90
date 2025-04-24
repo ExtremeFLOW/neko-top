@@ -259,6 +259,7 @@ contains
     type(matrix_t) :: AA
     type(matrix_t) :: globaltmp_mm
 
+    real(kind=rp), dimension(this%m*this%m) :: AA_buffer
     integer :: info
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
@@ -470,7 +471,7 @@ contains
           call device_memcpy(bb%x, bb%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
 
-          call MPI_Allreduce(MPI_IN_PLACE, bb%x(1:this%m), this%m, &
+          call MPI_Allreduce(MPI_IN_PLACE, bb%x, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           call device_memcpy(bb%x, bb%x_d, this%m, &
@@ -483,10 +484,11 @@ contains
           call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
-          call MPI_Allreduce(MPI_IN_PLACE, AA%x(1:this%m, 1:this%m), &
+
+          AA_buffer = reshape(AA%x(1:this%m, 1:this%m), [this%m * this%m])
+          call MPI_Allreduce(MPI_IN_PLACE, AA_buffer, &
                this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-          call device_memcpy(AA%x, AA%x_d, &
-               (this%m) * (this%m), HOST_TO_DEVICE, sync = .true.)
+          AA%x(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
 
           call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
@@ -506,6 +508,8 @@ contains
           AA%x(this%m+1, 1:this%m) = this%a%x
           AA%x(this%m+1, this%m+1) = - zeta/z
 
+          call device_memcpy(AA%x, AA%x_d, &
+               (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
 
 
           call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
@@ -574,11 +578,12 @@ contains
           call device_copy(muold%x_d, mu%x_d, this%m)
           zetaold = zeta
           call device_copy(sold%x_d, s%x_d, this%m)
-          newresidu = 2.0*residunorm
-          itto = 0
 
           ! The innermost loop to determine the suitable step length
           ! using the Backtracking Line Search approach
+          newresidu = 2.0_rp * residunorm
+
+          itto = 0
           do while ((newresidu .gt. residunorm) .and. (itto .lt. 50))
              itto = itto + 1
              call device_add3s2(x%x_d, xold%x_d, dx%x_d, 1.0_rp, &
@@ -685,19 +690,22 @@ contains
              steg = steg/2.0_rp
 
              cons = 0.0_rp
-             cons = maxval([device_maxval(rex%x_d, this%n), &
-                  device_maxval(rey%x_d, this%m), rez, &
-                  device_maxval(relambda%x_d, this%m), &
-                  device_maxval(rexsi%x_d, this%n), &
-                  device_maxval(reeta%x_d, this%n), &
-                  device_maxval(remu%x_d, this%m), rezeta, &
-                  device_maxval(res%x_d, this%m)])
+             cons = maxval([abs(device_maxval(rex%x_d, this%n)), &
+                  abs(device_maxval(rey%x_d, this%m)), &
+                  abs(rez), &
+                  abs(device_maxval(relambda%x_d, this%m)), &
+                  abs(device_maxval(rexsi%x_d, this%n)), &
+                  abs(device_maxval(reeta%x_d, this%n)), &
+                  abs(device_maxval(remu%x_d, this%m)), &
+                  abs(rezeta), &
+                  abs(device_maxval(res%x_d, this%m))])
           end do
+          steg = 2.0_rp * steg ! Correction for the final division by 2
+
           residunorm = newresidu
           residumax = 0.0_rp
           call MPI_Allreduce(cons, residumax, 1, mpi_real_precision, &
                mpi_max, neko_comm, ierr)
-          steg = 2.0_rp*steg
        end do
        epsi = 0.1_rp * epsi
     end do outer
