@@ -48,7 +48,7 @@ module cuda_mma_math
           low_d, upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_Ljjxinv_cuda')
        import c_int, c_ptr
        type(c_ptr), value :: Ljjxinv_d, x_d, pjlambda_d, qjlambda_d, low_d, &
-          upp_d, alpha_d, beta_d
+            upp_d, alpha_d, beta_d
        integer(c_int) :: n
      end subroutine mma_Ljjxinv_cuda
 
@@ -56,7 +56,7 @@ module cuda_mma_math
           upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_dipsolvesub1_cuda')
        import c_int, c_ptr
        type(c_ptr), value :: x_d, pjlambda_d, qjlambda_d, low_d, &
-          upp_d, alpha_d, beta_d
+            upp_d, alpha_d, beta_d
        integer(c_int) :: n
      end subroutine mma_dipsolvesub1_cuda
 

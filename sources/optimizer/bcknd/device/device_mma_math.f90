@@ -76,7 +76,7 @@ contains
 
   subroutine device_mma_Ljjxinv(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
        low_d, upp_d, alpha_d, beta_d, n)
-    !--------------------------------------------------------------------------! 
+    !--------------------------------------------------------------------------!
     ! A device support to do the following calculation needed for the          !
     ! dualsubsolve for MMA:                                                    !
     !   Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &                         !
@@ -85,7 +85,7 @@ contains
     ! And then remove the sensitivity for the active primal constraints        !
     ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)                           !
     ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)                            !
-    !--------------------------------------------------------------------------! 
+    !--------------------------------------------------------------------------!
     type(c_ptr) :: Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
          low_d, upp_d, alpha_d, beta_d
     integer(c_int) :: n
@@ -93,7 +93,7 @@ contains
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
     call mma_Ljjxinv_cuda(Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
-       low_d, upp_d, alpha_d, beta_d, n)
+         low_d, upp_d, alpha_d, beta_d, n)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
 #else
@@ -104,12 +104,12 @@ contains
 
   subroutine device_mma_dipsolvesub1(x_d, pjlambda_d, qjlambda_d, &
        low_d, upp_d, alpha_d, beta_d, n)
-    !--------------------------------------------------------------------------! 
+    !--------------------------------------------------------------------------!
     ! A device support to do the following calculation needed for the          !
     ! dualsubsolve for MMA:                                                    !
     !   x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) /  &                 !
     !                                  (sqrt(pjlambda) + sqrt(qjlambda))       !                                                     !
-    !--------------------------------------------------------------------------! 
+    !--------------------------------------------------------------------------!
     type(c_ptr) :: x_d, pjlambda_d, qjlambda_d, &
          low_d, upp_d, alpha_d, beta_d
     integer(c_int) :: n
@@ -117,7 +117,7 @@ contains
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
     call mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, &
-       low_d, upp_d, alpha_d, beta_d, n)
+         low_d, upp_d, alpha_d, beta_d, n)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
 #else
@@ -126,13 +126,13 @@ contains
   end subroutine device_mma_dipsolvesub1
 
 
-  subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n) 
-    !--------------------------------------------------------------------------! 
+  subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n)
+    !--------------------------------------------------------------------------!
     ! A device support to do the following matrix multiplication               !
     !               output = matmul(transpose(pij), lambda)                    !
     ! where matrix pij is mxn, vector lambda is of size m and the output       !
     ! vector is of size n                                                      !
-    !--------------------------------------------------------------------------! 
+    !--------------------------------------------------------------------------!
     type(c_ptr) :: output_d, pij_d, lambda_d
     integer :: m, n
 #if HAVE_HIP

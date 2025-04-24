@@ -102,7 +102,7 @@ contains
     end if
   end subroutine mma_KKT_cpu
 
-  !> Implementation of the KKT residual computation for dual primal interior 
+  !> Implementation of the KKT residual computation for dual primal interior
   ! point method (dpip) subsolve of MMA algorithm.
   module subroutine mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -169,7 +169,7 @@ contains
     end associate
   end subroutine mma_dpip_KKT_cpu
 
-  !> Implementation of the KKT residual computation for dual interior 
+  !> Implementation of the KKT residual computation for dual interior
   ! point method (dip) subsolve of MMA algorithm.
   module subroutine mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
@@ -203,7 +203,7 @@ contains
     associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
       relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
       ! Compute residual for mu (eta in the paper)
-      remu = this%lambda%x * this%mu%x 
+      remu = this%lambda%x * this%mu%x
 
       residual = abs([relambda, remu])
       this%residumax = maxval(residual)
@@ -609,7 +609,7 @@ contains
           if (info .ne. 0) then
              call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip.")
           end if
-          
+
 
           dlambda = bb(1:this%m)
           dz = bb(this%m + 1)
@@ -724,8 +724,8 @@ contains
                mpi_real_precision, mpi_max, neko_comm, ierr)
        end do
        ! print *, "epsi=", epsi, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", &
-          ! maxval(x), "minval(x)=", minval(x), "lambda=", lambda, "itto=", itto
-       
+       ! maxval(x), "minval(x)=", minval(x), "lambda=", lambda, "itto=", itto
+
        epsi = 0.1_rp * epsi
     end do
 
@@ -794,8 +794,8 @@ contains
     ! https://doi.org/10.1007/s00158-012-0869-2
 
     ! inverse of a diag matrix:
-    real(kind=rp), dimension(this%n) :: Ljjxinv ! [∇_x^2 Ljj]−1 
-    real(kind=rp), dimension(this%m,this%n) :: hijx    ! ∇_x hij
+    real(kind=rp), dimension(this%n) :: Ljjxinv ! [∇_x^2 Ljj]−1
+    real(kind=rp), dimension(this%m,this%n) :: hijx ! ∇_x hij
     real(kind=rp), dimension(this%m,this%m) :: Hess
     real(kind=rp) :: Hesstrace
 
@@ -819,7 +819,7 @@ contains
     y = 1.0_rp
     lambda = max(1.0_rp, 0.5_rp * this%c%x)
     mu = 1.0_rp !this parameter is eta in Niel's paper
-    ! note that mu in the paper translates to epsi in the code following the 
+    ! note that mu in the paper translates to epsi in the code following the
     ! same style as the Cpp code by Neils
 
     call MPI_Allreduce(this%n, nglobal, 1, &
@@ -849,7 +849,7 @@ contains
             c => this%c%x, d => this%d%x, &
             a0 => this%a0, a => this%a%x, &
             bi => this%bi%x)
-         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
          ! the initial value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
@@ -872,20 +872,20 @@ contains
          z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
 
          ! Comput the value of x that minimizes L_x for the current λ
-         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
-         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          pjlambda = (p0j + matmul(transpose(pij), lambda))
          qjlambda = (q0j + matmul(transpose(qij), lambda))
          x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
-              (sqrt(pjlambda) + sqrt(qjlambda)) 
+              (sqrt(pjlambda) + sqrt(qjlambda))
 
          ! Ensure that x is feasible (alpha<=x<=beta)
          x = merge(alpha, x, x .lt. alpha)
          x = merge(beta, x, x .gt. beta)
 
          ! Compute the residual for the lambda and mu using eq(9) and eq(15)
-         relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+         relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
 
          !> Global comminucation for relambda values
          call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
@@ -896,7 +896,7 @@ contains
          remu = mu * lambda - epsi
 
          residual_max = maxval(abs([relambda, remu]))
-         
+
          ! ------------------------------------------------------------------- !
          ! Internal loop
          do iter = 1, this%max_iter
@@ -906,7 +906,7 @@ contains
 
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
 
-            gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+            gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
 
             !> Global comminucation for gradlambda values
             call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
@@ -947,14 +947,14 @@ contains
 
             call MPI_Allreduce(MPI_IN_PLACE, Hess, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-            
+
             !---------------contributions of z terms to Hess-------------------!
-            ! There is no contibution to the Hess from z terms as z terms are 
+            ! There is no contibution to the Hess from z terms as z terms are
             ! linear w.r.t λ
 
             !---------------contributions of y terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess.
-            ! Note that if d(i) = 0, the y terms (just like z terms) will not 
+            ! Note that if d(i) = 0, the y terms (just like z terms) will not
             ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
@@ -968,7 +968,7 @@ contains
                Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
             end do
 
-            !> Improve the robustness by stablizing the Hess using 
+            !> Improve the robustness by stablizing the Hess using
             !!  Levenberg-Marquardt algorithm (heuristically)
             Hesstrace = 0.0_rp
             do i=1, this%m
@@ -991,7 +991,7 @@ contains
             dmu = -mu + epsi / lambda - dlambda * mu / lambda
 
             ! Compute the stepsize and update lambda and mu (eta in the paper)
-             
+
             steg = 1.005_rp
             do i = 1, this%m
                steg = merge(-1.01_rp * dlambda(i) / lambda(i), steg, &
@@ -1004,8 +1004,8 @@ contains
 
             lambda = lambda + steg*dlambda
             mu = mu + steg*dmu
-            
-            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+
+            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
             ! the updated values of λ
 
             ! Comput the value of y that minimizes L_y for the current λ
@@ -1017,7 +1017,7 @@ contains
                   y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
                   ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
                else
-                    y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
+                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
                end if
             end do
 
@@ -1028,20 +1028,20 @@ contains
             z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
 
             ! Comput the value of x that minimizes L_x for the current λ
-            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
-            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
             ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
             pjlambda = (p0j + matmul(transpose(pij), lambda))
             qjlambda = (q0j + matmul(transpose(qij), lambda))
             x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) / &
-                 (sqrt(pjlambda) + sqrt(qjlambda)) 
+                 (sqrt(pjlambda) + sqrt(qjlambda))
 
             ! Ensure that x is feasible (alpha<=x<=beta)
             x = merge(alpha, x, x .lt. alpha)
             x = merge(beta, x, x .gt. beta)
 
             ! Compute the residual for the lambda and mu using eq(9) and eq(15)
-            relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low)) 
+            relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
             ! Global comminucation for relambda values
             call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -1070,5 +1070,5 @@ contains
     this%lambda%x = lambda
     this%mu%x = mu
   end subroutine mma_subsolve_dip_cpu
-  
+
 end submodule mma_cpu

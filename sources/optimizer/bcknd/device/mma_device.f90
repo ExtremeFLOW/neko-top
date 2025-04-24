@@ -108,7 +108,7 @@ contains
     end if
   end subroutine mma_KKT_device
 
-  !> Implementation of the KKT residual computation for dual primal interior 
+  !> Implementation of the KKT residual computation for dual primal interior
   ! point method (dpip) subsolve of MMA algorithm.
   module subroutine mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
@@ -535,7 +535,7 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip (device).")
+             call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip (device).")
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
                sync = .true.)
@@ -794,8 +794,8 @@ contains
     type(vector_t) :: x, pjlambda, qjlambda
 
     ! inverse of a diag matrix:
-    type(vector_t) :: Ljjxinv ! [∇_x^2 Ljj]−1 
-    type(matrix_t) :: hijx    ! ∇_x hij
+    type(vector_t) :: Ljjxinv ! [∇_x^2 Ljj]−1
+    type(matrix_t) :: hijx ! ∇_x hij
     type(matrix_t) :: Hess
     real(kind=rp) :: Hesstrace
 
@@ -823,7 +823,7 @@ contains
     call x%init(this%n)
     call pjlambda%init(this%n)
     call qjlambda%init(this%n)
-    
+
     call Ljjxinv%init(this%n)
     call hijx%init(this%m,this%n)
     call Hess%init(this%m,this%m)
@@ -867,7 +867,7 @@ contains
             alpha => this%alpha, beta => this%beta, &
             c => this%c, a0 => this%a0, a => this%a)
 
-         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
          ! the initial value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
@@ -887,8 +887,8 @@ contains
          z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
 
          ! Comput the value of x that minimizes L_x for the current λ
-         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
-         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
          call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
@@ -932,7 +932,7 @@ contains
          do iter = 1, this%max_iter
             !Check the condition
             if (residumax .lt. epsi) exit
-            
+
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
             ! based on the implementation in the following paper by Niels
             ! https://doi.org/10.1007/s00158-012-0869-2
@@ -941,7 +941,7 @@ contains
             ! thus, we utilise gradlambda = relambda - mu for efficiency
             call device_copy(gradlambda%x_d, relambda%x_d, this%m)
             call device_sub2(gradlambda%x_d, mu%x_d, this%m)
-            
+
             ! Update gradlambda as the right hand side for Newton's method(eq10)
             call device_cfill(dummy_m%x_d, epsi, this%m)
             call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
@@ -959,7 +959,7 @@ contains
                  this%pij%x_d, this%qij%x_d, this%n, this%m)
 
             call device_memcpy(hijx%x, hijx%x_d, this%n*this%m, DEVICE_TO_HOST, &
-              sync = .true.)     
+                 sync = .true.)
 
             call device_cfill(Hess%x_d, 0.0_rp, (this%m) * (this%m) )
             call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
@@ -974,13 +974,13 @@ contains
             ! HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
-            ! There is no contibution to the Hess from z terms as z terms are 
+            ! There is no contibution to the Hess from z terms as z terms are
             ! linear w.r.t λ
 
 
             !---------------contributions of y terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess.
-            ! Note that if d(i) = 0, the y terms (just like z terms) will not 
+            ! Note that if d(i) = 0, the y terms (just like z terms) will not
             ! contribute to the Hessian matrix.
             ! Note that since we use DGESV to solve LSE on CPU, we dont need
             ! cuda kernel for this part
@@ -990,7 +990,7 @@ contains
             call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
                  sync = .true.)
             call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)            
+                 sync = .true.)
             do i = 1, this%m
                if (y%x(i) .gt. 0.0_rp) then
                   if (this%d%x(i) .eq. 0.0_rp) then
@@ -1001,9 +1001,9 @@ contains
                end if
                ! Based on eq(10), note the term (-\Omega \Lambda)
                Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
-            end do    
-        
-            !> Improve the robustness by stablizing the Hess using 
+            end do
+
+            !> Improve the robustness by stablizing the Hess using
             !!  Levenberg-Marquardt algorithm (heuristically)
             Hesstrace = 0.0_rp
             do i=1, this%m
@@ -1031,15 +1031,15 @@ contains
             call device_copy(dummy_m%x_d, dlambda%x_d, this%m)
             call device_col2(dummy_m%x_d, mu%x_d, this%m)
             call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
-            
+
             call device_cfill(dmu%x_d, epsi, this%m)
             call device_invcol2(dmu%x_d, lambda%x_d, this%m)
             call device_add2s2(dmu%x_d, dummy_m%x_d, -1.0_rp, this%m)
             call device_sub2(dmu%x_d, mu%x_d, this%m)
 
             steg = maxval([1.005_rp, device_maxval2(dlambda%x_d, lambda%x_d, &
-               -1.01_rp, this%m), device_maxval2(dmu%x_d, mu%x_d, -1.01_rp, &
-               this%m)])
+                 -1.01_rp, this%m), device_maxval2(dmu%x_d, mu%x_d, -1.01_rp, &
+                 this%m)])
             steg = 1.0_rp / steg
 
             call device_add2s2(lambda%x_d, dlambda%x_d, steg, this%m)
@@ -1050,7 +1050,7 @@ contains
             call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
                  sync = .true.)
 
-            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for 
+            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
             ! the updated values of λ
 
             ! Comput the value of y that minimizes L_y for the current λ
@@ -1071,8 +1071,8 @@ contains
             z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
 
             ! Comput the value of x that minimizes L_x for the current λ
-            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * 
-            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / 
+            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
             ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
             call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
             call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
@@ -1144,10 +1144,10 @@ contains
     call x%free()
     call pjlambda%free()
     call qjlambda%free()
-    
+
     call Ljjxinv%free()
     call hijx%free()
-    call Hess%free()   
+    call Hess%free()
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device
