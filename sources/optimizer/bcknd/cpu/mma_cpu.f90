@@ -607,7 +607,7 @@ contains
           call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in MMA.")
+             call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip.")
           end if
           
 
@@ -983,9 +983,7 @@ contains
                  gradlambda, this%m, info)
 
             if (info .ne. 0) then
-               write(stderr, *) "DGESV failed to solve the linear system in MMA."
-               write(stderr, *) "Please check mma_subsolve_dip in mma.f90"
-               error stop
+               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dip.")
             end if
             dlambda = gradlambda
 

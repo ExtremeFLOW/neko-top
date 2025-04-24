@@ -42,8 +42,8 @@ submodule (mma) mma_device
        device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
-       device_mma_gensub2
-
+       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
+       device_mma_Ljjxinv, device_Hess
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST
@@ -535,7 +535,7 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-             call neko_error("DGESV failed in mma_device.f90.")
+               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip (device).")
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
                sync = .true.)
@@ -1020,9 +1020,7 @@ contains
                  gradlambda%x, this%m, info)
 
             if (info .ne. 0) then
-               write(stderr, *) "DGESV failed to solve the linear system in MMA."
-               write(stderr, *) "Please check mma_subsolve_dip in mma.f90"
-               error stop
+               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dip (device).")
             end if
             call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
                  sync = .true.)
