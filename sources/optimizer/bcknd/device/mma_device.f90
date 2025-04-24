@@ -42,14 +42,13 @@ submodule (mma) mma_device
        device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
-       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess
+       device_mma_gensub2
 
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST
-  use comm, only: pe_rank
-  use mpi_f08, only: MPI_IN_PLACE
+  use comm, only: neko_comm, pe_rank, mpi_real_precision
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
 
   implicit none
 
@@ -71,8 +70,7 @@ contains
     type(matrix_t) :: dfdx
 
     if (.not. this%is_initialized) then
-       write(stderr, *) "The MMA object is not initialized."
-       error stop
+       call neko_error("The MMA object is not initialized.")
     end if
 
 
@@ -537,9 +535,7 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-             write(stderr, *) "DGESV failed in mma_device.f90."
-             write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
-             error stop
+             call neko_error("DGESV failed in mma_device.f90.")
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
                sync = .true.)

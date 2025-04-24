@@ -38,10 +38,8 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
-       mpi_min, mpi_max
-  use comm, only: pe_rank, neko_comm, mpi_real_precision
-  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
+  use comm, only: pe_rank
   use utils, only: neko_error
   use device, only: device_memcpy, HOST_TO_DEVICE
 

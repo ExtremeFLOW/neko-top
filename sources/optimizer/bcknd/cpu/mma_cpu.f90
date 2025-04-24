@@ -32,7 +32,8 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-  use mpi_f08, only: MPI_IN_PLACE
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use comm, only: neko_comm, pe_rank, mpi_real_precision
   implicit none
 
 contains
@@ -52,8 +53,7 @@ contains
     type(matrix_t) :: dfdx
 
     if (.not. this%is_initialized) then
-       write(stderr, *) "The MMA object is not initialized."
-       error stop
+       call neko_error("The MMA object is not initialized.")
     end if
 
     ! generate a convex approximation of the problem
@@ -383,6 +383,7 @@ contains
     real(kind=rp), dimension(this%m, this%n) :: GG
     real(kind=rp), dimension(this%m+1) :: bb
     real(kind=rp), dimension(this%m+1, this%m+1) :: AA
+    real(kind=rp), dimension(this%m * this%m) :: AA_buffer
 
     ! using DGESV in lapack to solve
     ! the linear system which needs the following parameters
@@ -558,7 +559,7 @@ contains
              end do
           end do
 
-          call MPI_Allreduce(MPI_IN_PLACE, bb(1:this%m), this%m, &
+          call MPI_Allreduce(MPI_IN_PLACE, bb, this%m, &
                mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           bb(1:this%m) = dellambda + dely / (this%d%x + mu / y) - bb(1:this%m)
@@ -585,8 +586,12 @@ contains
              end do
           end do
 
-          call MPI_Allreduce(MPI_IN_PLACE, AA(1:this%m, 1:this%m), &
+          AA_buffer = reshape(AA(1:this%m, 1:this%m), [this%m * this%m])
+
+          call MPI_Allreduce(MPI_IN_PLACE, AA_buffer, &
                this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+
+          AA(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
 
           do i = 1, this%m
              ! update the diag AA
@@ -602,9 +607,7 @@ contains
           call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
           if (info .ne. 0) then
-             write(stderr, *) "DGESV failed to solve the linear system in MMA."
-             write(stderr, *) "Please check mma_subsolve_dpip in mma.f90"
-             error stop
+             call neko_error("DGESV failed to solve the linear system in MMA.")
           end if
           
 
