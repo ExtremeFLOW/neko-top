@@ -61,11 +61,11 @@ contains
     call json_get(json, "type", type_name)
 
     select case (trim(type_name))
-    case("linear")
+    case ("linear")
        allocate(linear_mapping_t::object)
-    case("PDE_filter")
+    case ("PDE_filter")
        allocate(PDE_filter_t::object)
-    case("RAMP")
+    case ("RAMP")
        allocate(RAMP_mapping_t::object)
     case default
        call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
