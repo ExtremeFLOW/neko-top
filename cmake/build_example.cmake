@@ -5,9 +5,11 @@
 # The function takes one argument, which is the type of driver to use. The
 # following driver types are supported:
 #
-#   - user:    The user provides a driver file in the examples directory.
-#   - custom:  The user provides a driver file in the current directory.
-#   - default: The driver file in the examples directory is used.
+#   - neko:        The default neko driver is used.
+#   - neko-user:   The user module is loaded and the neko driver is used.
+#   - topopt:      The default topopt driver is used.
+#   - topopt-user: The user module is loaded and the topopt driver is used.
+#   - custom:      The user provides a driver file in the current directory.
 #
 # The function also looks at the following variables:
 #
@@ -24,20 +26,25 @@ function(build_example)
     # ........................................................................ #
     # Define the executable.
     if (NOT DEFINED EXAMPLE_NAME)
-        file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR})
+        file(RELATIVE_PATH EXAMPLE_NAME
+            ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
 
     if (DEFINED DRIVER)
         set(DRIVER ${DRIVER})
         set(DRIVER_TYPE "custom")
 
-    elseif(NOT DEFINED DRIVER_TYPE)
-        set(DRIVER_TYPE "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
+    elseif(${DRIVER_TYPE} STREQUAL "neko")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/neko.f90)
 
-    elseif (${DRIVER_TYPE} STREQUAL "user")
-        set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
+    elseif (${DRIVER_TYPE} STREQUAL "neko-user")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/neko-user.f90)
+
+    elseif(${DRIVER_TYPE} STREQUAL "topopt")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/topopt.f90)
+
+    elseif(${DRIVER_TYPE} STREQUAL "topopt-user")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/topopt-user.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "custom")
         if (NOT DEFINED DRIVER)
@@ -48,12 +55,6 @@ function(build_example)
             message(FATAL_ERROR
                 "No custom driver file found. Please specify through DRIVER.")
         endif()
-
-    elseif(${DRIVER_TYPE} STREQUAL "topopt")
-        set(DRIVER ${CMAKE_SOURCE_DIR}/sources/topopt_driver.f90)
-
-    elseif(${DRIVER_TYPE} STREQUAL "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
 
     else()
         message(FATAL_ERROR "Unknown driver type: ${DRIVER_TYPE}")
