@@ -535,7 +535,7 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in " // & 
+             call neko_error("DGESV failed to solve the linear system in " // &
                   "mma_subsolve_dpip (device).")
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
@@ -1018,7 +1018,7 @@ contains
                  gradlambda%x, this%m, info)
 
             if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in " // & 
+               call neko_error("DGESV failed to solve the linear system in " // &
                     "mma_subsolve_dip (device).")
             end if
             call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
