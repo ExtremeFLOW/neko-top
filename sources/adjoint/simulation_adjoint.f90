@@ -45,10 +45,11 @@ module simulation_adjoint
   use json_utils, only: json_get_or_default
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
+  use field_math, only: field_rzero
   implicit none
   private
 
-  public :: solve_adjoint, simulation_restart
+  public :: solve_adjoint, simulation_restart, adjoint_reset
 
 contains
 
@@ -259,6 +260,31 @@ contains
 
     call C%output_controller%set_counter(C%time)
   end subroutine simulation_restart
+
+  !> Cleans all lag and RHS of a simulation
+  subroutine adjoint_reset(C)
+    type(adjoint_case_t), intent(inout) :: C
+
+    ! zero out flds
+    call field_rzero(C%fluid_adj%u_adj)
+    call field_rzero(C%fluid_adj%v_adj)
+    call field_rzero(C%fluid_adj%w_adj)
+    call field_rzero(C%fluid_adj%p_adj)
+
+    ! zero out lag fields (weird notation... but C%fluid_adj%u_adj will be zero)
+    call C%fluid_adj%ulag%set(C%fluid_adj%u_adj)
+    call C%fluid_adj%vlag%set(C%fluid_adj%u_adj)
+    call C%fluid_adj%wlag%set(C%fluid_adj%u_adj)
+
+    ! zero out RHS
+    call field_rzero(C%fluid_adj%f_adj_x)
+    call field_rzero(C%fluid_adj%f_adj_y)
+    call field_rzero(C%fluid_adj%f_adj_z)
+
+    ! There may be more related to the time scheme controller, but I think
+    ! this is sufficient and will be handled in the beginning of the simulation
+
+  end subroutine adjoint_reset
 
 !> Write a checkpoint at joblimit
   subroutine simulation_joblimit_chkp(C, t)
