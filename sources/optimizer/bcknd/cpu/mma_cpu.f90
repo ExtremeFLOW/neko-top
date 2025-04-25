@@ -346,7 +346,8 @@ contains
     end associate
   end subroutine mma_gensub_cpu
 
-  !> solve the subproblem defined by this%pij, this%qij, etc.
+  !> solve the subproblem defined by this%pij, this%qij, etc using Dual-primal 
+  !! interior point method.
   subroutine mma_subsolve_dpip_cpu(this, designx)
     ! ------------------------------------------------------- !
     ! Dual-primal interior point method using Newton's step   !
@@ -607,7 +608,8 @@ contains
           call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip.")
+             call neko_error("DGESV failed to solve the linear system in " // & 
+                  "mma_subsolve_dpip.")  
           end if
 
 
@@ -723,8 +725,6 @@ contains
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
        end do
-       ! print *, "epsi=", epsi, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", &
-       ! maxval(x), "minval(x)=", minval(x), "lambda=", lambda, "itto=", itto
 
        epsi = 0.1_rp * epsi
     end do
@@ -746,38 +746,42 @@ contains
 
   end subroutine mma_subsolve_dpip_cpu
 
+  !> solve the subproblem defined by this%pij, this%qij, etc using a pure Dual 
+  !! interior point method.
   subroutine mma_subsolve_dip_cpu(this, designx)
     ! ------------------------------------------------------------------------ !
     ! -------------------------------Dual Solver------------------------------ !
     ! ------------------------------------------------------------------------ !
-    ! This implementation is based on:
-    ! https://doi.org/10.1007/s00158-012-0869-2
-    ! Definition of the Lagrangian function:
-    !
-    !     L(x, y, z, λ) =
-    !       sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * p_{ij}) / (u_j - x_j)
-    !                   + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / (x_j - l_j) ]
-    !       - sum_{i=1}^{m} λ_i * b_i
-    !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ]
-    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z
-    !
-    ! Breakdown of terms:
-    !   - Terms related to x:  L_x (the first three lines of L(x, y, z, λ))
-    !   - Terms related to y:  L_y (the fourth line of L(x, y, z, λ))
-    !   - Terms related to z:  L_z (the last line of L(x, y, z, λ))
-    !
-    ! Optimization problem if λ is given:
-    !
-    !     Minimize L(x, y, z, λ)
-    !     subject to: α_j ≤ x_j ≤ β_j, z ≥ 0, and y_i ≥ 0 for all i, j.
-    !
-    ! Since the problem is separable:
-    !     Ψ(λ) =
-    !       sum_{j=1}^{n} min_xj {L_x(x_j, λ) | α_j ≤ x_j ≤ β_j}
-    !       + min_z {L_z(z, λ) | z ≥ 0}
-    !       + sum_{i=1}^{m} min_yi {L_y(y_i, λ) | y_i ≥ 0}
-    !
-    ! Maximize Ψ(λ) subject to λ_i ≥ 0 for i = 1, ..., m.
+    ! This implementation is based on:                                         !
+    ! https://doi.org/10.1007/s00158-012-0869-2                                !
+    ! Definition of the Lagrangian function:                                   !
+    !                                                                          !
+    !     L(x, y, z, λ) =                                                      !
+    !       sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * p_{ij}) / (u_j - x_j)!
+    !                   + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / (x_j - l_j) ]!
+    !       - sum_{i=1}^{m} λ_i * b_i                                          !
+    !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ]          !
+    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z                              !
+    !                                                                          !
+    ! Breakdown of terms:                                                      !
+    !   - Terms related to x:  L_x (the first three lines of L(x, y, z, λ))    !
+    !   - Terms related to y:  L_y (the fourth line of L(x, y, z, λ))          !
+    !   - Terms related to z:  L_z (the last line of L(x, y, z, λ))            !
+    !                                                                          !
+    ! Optimization problem if λ is given:                                      !
+    !                                                                          !
+    !     Minimize L(x, y, z, λ)                                               !
+    !     subject to: α_j ≤ x_j ≤ β_j, z ≥ 0, and y_i ≥ 0 for all i, j.        !
+    !                                                                          !
+    ! Since the problem is separable:                                          !
+    !     Ψ(λ) =                                                               !
+    !       sum_{j=1}^{n} min_xj {L_x(x_j, λ) | α_j ≤ x_j ≤ β_j}               !
+    !       + min_z {L_z(z, λ) | z ≥ 0}                                        !
+    !       + sum_{i=1}^{m} min_yi {L_y(y_i, λ) | y_i ≥ 0}                     !
+    !                                                                          !
+    ! Maximize Ψ(λ) subject to λ_i ≥ 0 for i = 1, ..., m.                      !
+    !                                                                          !
+    ! ------------------------------------------------------------------------ !
 
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(inout) :: designx
@@ -887,7 +891,7 @@ contains
          ! Compute the residual for the lambda and mu using eq(9) and eq(15)
          relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
 
-         !> Global comminucation for relambda values
+         ! Global comminucation for relambda values
          call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
               mpi_real_precision, mpi_sum, neko_comm, ierr)
          relambda = relambda - bi - y - a * z + mu
@@ -908,7 +912,7 @@ contains
 
             gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
 
-            !> Global comminucation for gradlambda values
+            ! Global comminucation for gradlambda values
             call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
             gradlambda = gradlambda - bi - y - a * z
@@ -968,8 +972,8 @@ contains
                Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
             end do
 
-            !> Improve the robustness by stablizing the Hess using
-            !!  Levenberg-Marquardt algorithm (heuristically)
+            ! Improve the robustness by stablizing the Hess using
+            ! Levenberg-Marquardt algorithm (heuristically)
             Hesstrace = 0.0_rp
             do i=1, this%m
                Hesstrace = Hesstrace + Hess(i, i)
@@ -983,7 +987,8 @@ contains
                  gradlambda, this%m, info)
 
             if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dip.")
+               call neko_error("DGESV failed to solve the linear system in " // & 
+                    "mma_subsolve_dip.")  
             end if
             dlambda = gradlambda
 
@@ -1053,8 +1058,7 @@ contains
             residual_max = maxval(abs([relambda, remu]))
          end do
        end associate
-       ! print *, "epsi=", epsi, "iter=", iter, "sum(x)=", sum(x), "maxval(x)=", &
-       !      maxval(x), "minval(x)=", minval(x), "lambda=", lambda
+
        epsi = 0.1_rp * epsi
     end do
 

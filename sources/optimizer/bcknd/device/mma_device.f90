@@ -535,7 +535,8 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in mma_subsolve_dpip (device).")
+             call neko_error("DGESV failed to solve the linear system in " // & 
+                  "mma_subsolve_dpip (device).")  
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
                sync = .true.)
@@ -899,7 +900,7 @@ contains
          call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
               low%x_d, pij%x_d, qij%x_d, this%n, this%m)
 
-         !> Global comminucation for relambda values
+         ! Global comminucation for relambda values
 
          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
               sync = .true.)
@@ -916,7 +917,7 @@ contains
          call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
          call device_cadd(remu%x_d, -epsi, this%m)
 
-         !> Download the re(lambda, mu) to CPU to calculate residumax
+         ! Download the re(lambda, mu) to CPU to calculate residumax
 
          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
               sync = .true.)
@@ -1000,8 +1001,8 @@ contains
                Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
             end do
 
-            !> Improve the robustness by stablizing the Hess using
-            !!  Levenberg-Marquardt algorithm (heuristically)
+            ! Improve the robustness by stablizing the Hess using
+            ! Levenberg-Marquardt algorithm (heuristically)
             Hesstrace = 0.0_rp
             do i=1, this%m
                Hesstrace = Hesstrace + Hess%x(i, i)
@@ -1017,7 +1018,8 @@ contains
                  gradlambda%x, this%m, info)
 
             if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in mma_subsolve_dip (device).")
+               call neko_error("DGESV failed to solve the linear system in " // & 
+                    "mma_subsolve_dip (device).")  
             end if
             call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
                  sync = .true.)
@@ -1085,7 +1087,7 @@ contains
             call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
                  low%x_d, pij%x_d, qij%x_d, this%n, this%m)
 
-            !> Global comminucation for relambda values
+            ! Global comminucation for relambda values
 
             call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
                  sync = .true.)
