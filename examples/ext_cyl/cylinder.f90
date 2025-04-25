@@ -10,7 +10,7 @@ module cylinder
    use neko, only: neko_init, neko_finalize, neko_solve
    use case, only : case_t
    use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
-   use simulation_adjoint, only: solve_adjoint
+   use simulation_adjoint, only: solve_adjoint, adjoint_reset
    use json_module, only: json_file
    ! Specific to the state vector
    use field, only: field_t
@@ -27,6 +27,8 @@ module cylinder
    use device, only : device_memcpy, HOST_TO_DEVICE
    ! This one is silly... But we need coef to initialize fields
    use global_coef, only: global_coef_t, global_coef_getter
+   ! sponges
+   use sponge_source_term, only: sponge_source_term_t
    implicit none
  
    character*128, parameter, private :: this_module = 'cylinder'
@@ -364,16 +366,16 @@ module cylinder
         select type(vec_out)
         type is(state_vector)
            ! Reset propagator.
-           ! @todo
+           call reset_wrapper(self%linear_case)
            ! Get state vector.
            ! (again... the naming with "adjoint" isn't smart here)
            call field_copy(self%linear_case%fluid_adj%u_adj, vec_in%u)
            call field_copy(self%linear_case%fluid_adj%v_adj, vec_in%v)
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
-           !call self%write_linear(0)
+           call self%write_linear(0)
            call solve_wrapper(self%linear_case)
-           !call self%write_linear(1)
+           call self%write_linear(1)
            ! There is a chance that vec_out isn't initialized!
            call init_wrapper(vec_out)
            ! Pass-back the state vector.
@@ -398,7 +400,7 @@ module cylinder
         select type(vec_out)
         type is(state_vector)
            ! Reset propagator.
-           ! @todo
+           call reset_wrapper(self%adjoint_case)
            ! Get state vector.
            ! (again... the naming with "adjoint" isn't smart here)
            call field_copy(self%adjoint_case%fluid_adj%u_adj, vec_in%u)
@@ -426,7 +428,7 @@ module cylinder
    subroutine neko_propagator_init(self)
      ! Linear Operator.
      class(neko_propagator), intent(inout)  :: self
-     ! type(json_file), intent(inout) :: parameters
+     type(sponge_source_term_t) :: linear_sponge, adjoint_sponge
 
      ! initialize the "baseflow"
      call neko_init(self%neko_case)
@@ -436,6 +438,13 @@ module cylinder
      call adjoint_init(self%linear_case, self%neko_case)
      ! initialize the adjoint
      call adjoint_init(self%adjoint_case, self%neko_case)
+
+     ! Also hacky... but throw on a sponge
+     call linear_sponge%init_from_components(self%linear_case%fluid_adj%f_adj_x, &
+        self%linear_case%fluid_adj%f_adj_y, self%linear_case%fluid_adj%f_adj_z, &
+        self%linear_case%fluid_adj%u_adj, self%linear_case%fluid_adj%v_adj, &
+        self%linear_case%fluid_adj%w_adj, self%linear_case%fluid_adj%c_Xh)
+     call self%linear_case%fluid_adj%source_term%add(linear_sponge)
 
      ! NOTE baseflow should be loaded via IC in .case file, but let's double
      ! check
@@ -470,12 +479,23 @@ module cylinder
 
    ! silly little wrapper to ignore intent.
    subroutine solve_wrapper(self)
-     ! Linear Operator.
+     ! Case
      class(adjoint_case_t)  :: self
+
      call solve_adjoint(self)
 
      return
    end subroutine solve_wrapper
+
+   ! silly little wrapper to ignore intent.
+   subroutine reset_wrapper(self)
+     ! Linear Operator.
+     class(adjoint_case_t)  :: self
+
+     call adjoint_reset(self)
+
+     return
+   end subroutine reset_wrapper
 
    ! silly little wrapper to ignore intent.
    subroutine write_linear_wrapper(self, idx)

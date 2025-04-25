@@ -9,7 +9,7 @@ SetFactory("OpenCASCADE");
 
 // mesh parameters
 cyl_rad = DefineNumber[ 0.5 , Min 0.25, Max 1.0, Step 0.05, Name "Cylinder radius" ];
-box_square = DefineNumber[ 0.9 , Min 2.0, Max 10.0, Step 1.0, Name "Size of a square region around cylinder" ];
+box_square = DefineNumber[ 3.0 , Min 2.0, Max 10.0, Step 1.0, Name "Size of a square region around cylinder" ];
 box_min_x = DefineNumber[ -14.9 , Min -30.0, Max -10.0, Step 1.0, Name "Domain minimum x" ];
 box_max_x = DefineNumber[  34.9 , Min  10.0, Max  50.0, Step 1.0, Name "Domain maximum x" ];
 box_width = DefineNumber[ 29.8 , Min 20.0, Max 50.0, Step 1.0, Name "Domain with" ];

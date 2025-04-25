@@ -26,7 +26,7 @@ program usrneko
   !---------------------------------------------------
 
   !> Number of eigenvalues we wish to converge.
-  integer, parameter :: nev = 8
+  integer, parameter :: nev = 10
   !> Krylov subspace.
   type(state_vector), allocatable :: X(:)
   !> Eigenvalues.
@@ -82,7 +82,7 @@ program usrneko
   !> just write them out...
   print *, "SPECTRA"
   do i = 1, nev
-    print *, i, lambda(i)
+    print *, i, lambda(i), "residual", residuals(i)
   enddo
 
   !> Save eigenvectors to disk.
