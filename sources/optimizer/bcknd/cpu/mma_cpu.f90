@@ -346,7 +346,7 @@ contains
     end associate
   end subroutine mma_gensub_cpu
 
-  !> solve the subproblem defined by this%pij, this%qij, etc using Dual-primal 
+  !> solve the subproblem defined by this%pij, this%qij, etc using Dual-primal
   !! interior point method.
   subroutine mma_subsolve_dpip_cpu(this, designx)
     ! ------------------------------------------------------- !
@@ -608,8 +608,8 @@ contains
           call DGESV(this%m + 1, 1, AA, this%m + 1, ipiv, bb, this%m + 1, info)
 
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in " // & 
-                  "mma_subsolve_dpip.")  
+             call neko_error("DGESV failed to solve the linear system in " // &
+                  "mma_subsolve_dpip.")
           end if
 
 
@@ -746,7 +746,7 @@ contains
 
   end subroutine mma_subsolve_dpip_cpu
 
-  !> solve the subproblem defined by this%pij, this%qij, etc using a pure Dual 
+  !> solve the subproblem defined by this%pij, this%qij, etc using a pure Dual
   !! interior point method.
   subroutine mma_subsolve_dip_cpu(this, designx)
     ! ------------------------------------------------------------------------ !
@@ -987,8 +987,8 @@ contains
                  gradlambda, this%m, info)
 
             if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in " // & 
-                    "mma_subsolve_dip.")  
+               call neko_error("DGESV failed to solve the linear system in " // &
+                    "mma_subsolve_dip.")
             end if
             dlambda = gradlambda
 
