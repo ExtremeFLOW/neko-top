@@ -128,6 +128,18 @@ contains
            mpi_real_precision, mpi_sum, neko_comm, ierr)
 
       this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
+
+
+      print *, "rex", norm2(rex)**2
+      print *, "rexsi", norm2(rexsi)**2
+      print *, "reeta", norm2(reeta)**2
+      print *, "rey", norm2(rey)**2
+      print *, "rez", rez**2
+      print *, "relambda", norm2(relambda)**2
+      print *, "remu", norm2(remu)**2
+      print *, "rezeta", rezeta**2
+      print *, "res", norm2(res)**2
+
     end associate
   end subroutine mma_KKT_cpu
 

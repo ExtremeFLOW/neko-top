@@ -145,19 +145,20 @@ contains
 
     call device_col3(res%x_d, this%lambda%x_d, this%s%x_d, this%m)
 
-    this%residumax = maxval(abs([ &
+    this%residumax = maxval([ &
          device_maxval(rex%x_d, this%n), &
          device_maxval(rey%x_d, this%m), &
-         rez, &
+         abs(rez), &
          device_maxval(relambda%x_d, this%m), &
          device_maxval(rexsi%x_d, this%n), &
          device_maxval(reeta%x_d, this%n), &
          device_maxval(remu%x_d, this%m), &
-         rezeta, &
-         device_maxval(res%x_d, this%m)]))
+         abs(rezeta), &
+         device_maxval(res%x_d, this%m)])
 
     re_sq_norm = device_norm(rex%x_d, this%n) + &
-         device_norm(rexsi%x_d, this%n) + device_norm(reeta%x_d, this%n)
+         device_norm(rexsi%x_d, this%n) + &
+         device_norm(reeta%x_d, this%n)
 
     call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
          mpi_real_precision, mpi_max, neko_comm, ierr)
@@ -165,9 +166,24 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-    this%residunorm = sqrt((device_norm(rey%x_d, this%m) + rez**2 + &
-         device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
-         rezeta**2+device_norm(res%x_d, this%m))**2 + re_sq_norm)
+    this%residunorm = sqrt( ( &
+         device_norm(rey%x_d, this%m) + &
+         rez**2 + &
+         device_norm(relambda%x_d, this%m) + &
+         device_norm(remu%x_d, this%m) + &
+         rezeta**2 + &
+         device_norm(res%x_d, this%m) &
+         ) + re_sq_norm)
+
+    print *, "rex", device_norm(rex%x_d, this%n)
+    print *, "rexsi", device_norm(rexsi%x_d, this%n)
+    print *, "reeta", device_norm(reeta%x_d, this%n)
+    print *, "rey", device_norm(rey%x_d, this%m)
+    print *, "rez", rez**2
+    print *, "relambda", device_norm(relambda%x_d, this%m)
+    print *, "remu", device_norm(remu%x_d, this%m)
+    print *, "rezeta", rezeta**2
+    print *, "res", device_norm(res%x_d, this%m)
 
     call designx%free()
     call rey%free()
@@ -496,11 +512,11 @@ contains
           AA%x(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
 
           call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
+               sync = .false.)
           call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
+               sync = .false.)
           call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
+               sync = .false.)
           call device_memcpy(s%x, s%x_d, this%m, DEVICE_TO_HOST, &
                sync = .true.)
           do i = 1, this%m
@@ -619,15 +635,13 @@ contains
                   eta%x_d, this%n, this%m)
 
              call device_memcpy(rex%x, rex%x_d, this%n, DEVICE_TO_HOST, &
-                  sync = .true.)
+                  sync = .false.)
              call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, &
-                  sync = .true.)
+                  sync = .false.)
              call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, &
-                  sync = .true.)
+                  sync = .false.)
              call device_memcpy(lambda%x, lambda%x_d, this%m, &
                   DEVICE_TO_HOST, sync = .true.)
-
-
 
              call device_col3(rey%x_d, this%d%x_d, y%x_d, this%m)
              call device_add2(rey%x_d, this%c%x_d, this%m)
@@ -651,14 +665,11 @@ contains
              call device_memcpy(globaltmp_m%x, globaltmp_m%x_d, &
                   this%m, HOST_TO_DEVICE, sync = .true.)
 
-
-
              call device_add3s2(relambda%x_d, globaltmp_m%x_d, &
                   this%a%x_d, 1.0_rp, -z, this%m)
              call device_sub2(relambda%x_d, y%x_d, this%m)
              call device_add2(relambda%x_d, s%x_d, this%m)
              call device_sub2(relambda%x_d, this%bi%x_d, this%m)
-
 
              call device_sub3(rexsi%x_d, x%x_d, this%alpha%x_d, this%n)
              call device_col2(rexsi%x_d, xsi%x_d, this%n)
