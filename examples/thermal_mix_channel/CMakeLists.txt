@@ -1,7 +1,5 @@
 # Simple setup to compile the current example.
-set(DRIVER_TYPE "default")
-set(EXTRA_SOURCES
-    # ${NEKO_DIR}/examples/turb_channel/turb_channel.f90
-)
+set(DRIVER_TYPE "neko")
+set(EXTRA_SOURCES)
 
 build_example(${DRIVER_TYPE})
