@@ -25,6 +25,7 @@ module cylinder
    use math, only: glsc2
    use device_math, only: device_glsc2
    use device, only : device_memcpy, HOST_TO_DEVICE
+   use gather_scatter, only: gs_t, GS_OP_ADD
    ! This one is silly... But we need coef to initialize fields
    use global_coef, only: global_coef_t, global_coef_getter
    ! sponges
@@ -48,6 +49,7 @@ module cylinder
       type(field_t), pointer :: u => null()
       type(field_t), pointer :: v => null()
       type(field_t), pointer :: w => null()
+      type(field_t), pointer :: p => null()
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
       logical :: initialized = .false.
@@ -61,7 +63,7 @@ module cylinder
       procedure, pass(self), public :: axpby
       procedure, pass(self), public :: rand
       procedure, pass(self), public :: get_size
-      ! we also want a clean way to initialize, free and visualize
+      ! we also want some other things
       procedure, pass(self), public :: init => state_vector_init
       procedure, pass(self), public :: free => state_vector_free
       procedure, pass(self), public :: write => state_vector_write
@@ -120,15 +122,18 @@ module cylinder
           allocate(self%u)
           allocate(self%v)
           allocate(self%w)
+          allocate(self%p)
           call self%u%init(self%coef%dof, fld_name = "state_u")
           call self%v%init(self%coef%dof, fld_name = "state_v")
           call self%w%init(self%coef%dof, fld_name = "state_w")
+          call self%p%init(self%coef%dof, fld_name = "state_p")
 
           ! initialize the sampler so we can spy in if needed
-          call self%output%init(sp, 'state', 3)
-          call self%output%fields%assign(1, self%u)
-          call self%output%fields%assign(2, self%v)
-          call self%output%fields%assign(3, self%w)
+          call self%output%init(sp, 'state', 4)
+          call self%output%fields%assign(2, self%u)
+          call self%output%fields%assign(3, self%v)
+          call self%output%fields%assign(4, self%w)
+          call self%output%fields%assign(1, self%p)
 
           ! done
           self%initialized = .true.
@@ -158,6 +163,7 @@ module cylinder
      call field_rzero(self%u)
      call field_rzero(self%v)
      call field_rzero(self%w)
+     call field_rzero(self%p)
      return
    end subroutine zero
  
@@ -208,6 +214,7 @@ module cylinder
      call field_cmult(self%u, tmp_real)
      call field_cmult(self%v, tmp_real)
      call field_cmult(self%w, tmp_real)
+     call field_cmult(self%p, tmp_real)
      return
    end subroutine scal
  
@@ -215,15 +222,20 @@ module cylinder
      class(state_vector)   , intent(inout) :: self
      class(abstract_vector_rdp), intent(in)    :: vec
      real(kind=wp)         , intent(in)    :: alpha, beta
+     real(kind=rp) :: alpha_rp, beta_rp
      select type(vec)
      type is(state_vector)
         ! always try initializing
         call state_vector_init_wrapper(self)
         call state_vector_init_wrapper(vec)
 
-        call field_add3s2(self%u, self%u, vec%u, alpha, beta)
-        call field_add3s2(self%v, self%v, vec%v, alpha, beta)
-        call field_add3s2(self%w, self%w, vec%w, alpha, beta)
+        alpha_rp = real(alpha, kind=rp)
+        beta_rp = real(beta, kind=rp)
+
+        call field_add3s2(self%u, self%u, vec%u, alpha_rp, beta_rp)
+        call field_add3s2(self%v, self%v, vec%v, alpha_rp, beta_rp)
+        call field_add3s2(self%w, self%w, vec%w, alpha_rp, beta_rp)
+        call field_add3s2(self%p, self%p, vec%p, alpha_rp, beta_rp)
      end select
      return
    end subroutine axpby
@@ -250,6 +262,12 @@ module cylinder
 
      normalize = optval(ifnorm,.true.)
      call rand_ic(self%u, self%v, self%w)
+
+    ! enforce continuity across the field
+    call self%coef%gs_h%op(self%u, GS_OP_ADD)
+    call self%coef%gs_h%op(self%v, GS_OP_ADD)
+    call self%coef%gs_h%op(self%w, GS_OP_ADD)
+
      if (normalize) then
        alpha = self%norm()
        call self%scal(1.0_wp/alpha)
@@ -267,6 +285,7 @@ module cylinder
      call self%u%free()
      call self%v%free()
      call self%w%free()
+     call self%p%free()
      call self%coef%free()
 
      return
@@ -300,6 +319,12 @@ module cylinder
                      fcoeff) * 1.0e-08_rp
                 ! 2D
                 w%x(ix, iy, iz, iel) = 0.0_rp
+
+                if (xl(1) .lt. -12.0_rp) then
+                   ! this is not needed I was just double checking my BCs
+                   u%x(ix, iy, iz, iel) = 0.0_rp
+                   v%x(ix, iy, iz, iel) = 0.0_rp
+                end if
              end do
           end do
        end do
@@ -372,16 +397,18 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%u_adj, vec_in%u)
            call field_copy(self%linear_case%fluid_adj%v_adj, vec_in%v)
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
+           call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
            call self%write_linear(0)
            call solve_wrapper(self%linear_case)
-           call self%write_linear(1)
+           ! call self%write_linear(1)
            ! There is a chance that vec_out isn't initialized!
            call init_wrapper(vec_out)
            ! Pass-back the state vector.
            call field_copy(vec_out%u, self%linear_case%fluid_adj%u_adj)
            call field_copy(vec_out%v, self%linear_case%fluid_adj%v_adj)
            call field_copy(vec_out%w, self%linear_case%fluid_adj%w_adj)
+           call field_copy(vec_out%p, self%linear_case%fluid_adj%p_adj)
         end select
      end select
      return
@@ -448,21 +475,24 @@ module cylinder
 
      ! NOTE baseflow should be loaded via IC in .case file, but let's double
      ! check
-          call self%output_primal%init(sp, 'checking_base', 3)
-          call self%output_primal%fields%assign(1, self%neko_case%fluid%u)
-          call self%output_primal%fields%assign(2, self%neko_case%fluid%v)
-          call self%output_primal%fields%assign(3, self%neko_case%fluid%w)
+          call self%output_primal%init(sp, 'checking_base', 4)
+          call self%output_primal%fields%assign(2, self%neko_case%fluid%u)
+          call self%output_primal%fields%assign(3, self%neko_case%fluid%v)
+          call self%output_primal%fields%assign(4, self%neko_case%fluid%w)
+          call self%output_primal%fields%assign(1, self%neko_case%fluid%p)
           call self%output_primal%sample(0.0_rp)
      ! Assign samplers for the forward and adjoint in case we want to look at
      ! them (debugging)
-          call self%output_linear%init(sp, 'checking_linear', 3)
-          call self%output_linear%fields%assign(1, self%linear_case%fluid_adj%u_adj)
-          call self%output_linear%fields%assign(2, self%linear_case%fluid_adj%v_adj)
-          call self%output_linear%fields%assign(3, self%linear_case%fluid_adj%w_adj)
-          call self%output_adjoint%init(sp, 'checking_adjoint', 3)
-          call self%output_adjoint%fields%assign(1, self%adjoint_case%fluid_adj%u_adj)
-          call self%output_adjoint%fields%assign(2, self%adjoint_case%fluid_adj%v_adj)
-          call self%output_adjoint%fields%assign(3, self%adjoint_case%fluid_adj%w_adj)
+          call self%output_linear%init(sp, 'checking_linear', 4)
+          call self%output_linear%fields%assign(2, self%linear_case%fluid_adj%u_adj)
+          call self%output_linear%fields%assign(3, self%linear_case%fluid_adj%v_adj)
+          call self%output_linear%fields%assign(4, self%linear_case%fluid_adj%w_adj)
+          call self%output_linear%fields%assign(1, self%linear_case%fluid_adj%p_adj)
+          call self%output_adjoint%init(sp, 'checking_adjoint', 4)
+          call self%output_adjoint%fields%assign(2, self%adjoint_case%fluid_adj%u_adj)
+          call self%output_adjoint%fields%assign(3, self%adjoint_case%fluid_adj%v_adj)
+          call self%output_adjoint%fields%assign(4, self%adjoint_case%fluid_adj%w_adj)
+          call self%output_adjoint%fields%assign(1, self%adjoint_case%fluid_adj%p_adj)
 
      return
    end subroutine neko_propagator_init

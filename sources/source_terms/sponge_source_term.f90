@@ -113,7 +113,8 @@ contains
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
     integer :: i, n
-    real :: x_end, x_start, x_current, tmp_real, squashed
+    real :: x_end, x_start, x_drop, x_current, tmp_real, squashed, &
+       x_width, x_fin_drop
     
 
 
@@ -143,8 +144,13 @@ contains
     ! Hard code this
     !---------------------------------------------------------------------------
     x_end = 35.0_rp
-    x_start = 30.0_rp
-    this%A = 10.0_rp
+
+    x_width = 12.0_rp
+    x_drop = 8.0_rp
+    this%A = 2.0_rp
+
+    x_start = x_end - x_width
+    x_fin_drop = x_start + x_drop
     !---------------------------------------------------------------------------
 
     ! init
@@ -168,11 +174,11 @@ contains
         x_current = this%coef%dof%x(i,1,1,1)
         if (x_current .le. x_start) then
            tmp_real = 0.0_rp
-        elseif (x_current .ge. x_end) then
-           tmp_real = 1.0_rp
-        else
-           squashed = (x_current - x_start)/(x_end - x_start)
+        elseif (x_current .le. x_fin_drop .and. x_current .gt. x_start) then
+           squashed = (x_current - x_start)/(x_drop)
            tmp_real = math_stepf(squashed)
+        else
+           tmp_real = 1.0_rp
         end if
         this%sponge%x(i,1,1,1) = tmp_real
     end do

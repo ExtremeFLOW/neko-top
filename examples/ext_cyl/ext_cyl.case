@@ -5,8 +5,8 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 10.0,
-        "timestep": 1e-2,
+        "end_time": 1.0,
+        "timestep": 3e-3,
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -24,14 +24,14 @@
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 20
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-7,
                 "max_iterations": 20
             },
             "output_control": "never",
@@ -39,6 +39,10 @@
                 {
                     "type": "no_slip",
                     "zone_indices": [1, 2]
+                },
+                {
+                    "type": "symmetry",
+                    "zone_indices": [4, 5] 
                 },
                 {
                     "type": "outflow",
@@ -51,6 +55,10 @@
                 {
                     "type": "no_slip",
                     "zone_indices": [1, 2] // note these are lin and adj
+                },
+                {
+                    "type": "symmetry",
+                    "zone_indices": [4, 5] 
                 },
                 {
                     "type": "outflow",

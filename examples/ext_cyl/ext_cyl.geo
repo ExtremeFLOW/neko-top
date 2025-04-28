@@ -15,13 +15,13 @@ box_max_x = DefineNumber[  34.9 , Min  10.0, Max  50.0, Step 1.0, Name "Domain m
 box_width = DefineNumber[ 29.8 , Min 20.0, Max 50.0, Step 1.0, Name "Domain with" ];
 // mesh parameters
 // number of splits at the cylinder surface
-srf_nsplit = DefineNumber[ 4 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface" ];
+srf_nsplit = DefineNumber[ 8 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface" ];
 // number of splits at the cylinder surface from the wake side
-wsrf_nsplit = DefineNumber[ 6 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface from the wake side" ];
+wsrf_nsplit = DefineNumber[ 8 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface from the wake side" ];
 // number of splits normal to the cylinder surface
-nsrf_nsplit = DefineNumber[ 4 , Min 4, Max 20, Step 1, Name "Numer of splits; normal to the cylinder surface" ];
+nsrf_nsplit = DefineNumber[ 6 , Min 4, Max 20, Step 1, Name "Numer of splits; normal to the cylinder surface" ];
 // number of splits in front of cylinder
-front_nsplit = DefineNumber[ 20 , Min 2, Max 20, Step 1,   Name "Numer of splits; front of cylinder" ];
+front_nsplit = DefineNumber[ 15 , Min 2, Max 20, Step 1,   Name "Numer of splits; front of cylinder" ];
 // number of splits in wake
 wake_nsplit = DefineNumber[ 30 , Min 2, Max 50, Step 1,   Name "Numer of splits; wake" ];
 // spanwise number of splits
@@ -30,9 +30,9 @@ spnw_nsplit = DefineNumber[ 10 , Min 2, Max 50, Step 1,   Name "Spanwise numer o
 // progression normal to the cylinder surface
 wnprog = DefineNumber[ 1.2 , Min 1, Max 2, Step 0.1,   Name "Progression normal to the cylinder surface" ];
 // progression in the wake region
-wwprog = DefineNumber[ 1.05 , Min 1, Max 2, Step 0.01,   Name "Progression in the wake region" ];
+wwprog = DefineNumber[ 1.02 , Min 1, Max 2, Step 0.01,   Name "Progression in the wake region" ];
 // progression in the front region
-wfprog = DefineNumber[ 1.08 , Min 1, Max 2, Step 0.01,   Name "Progression in the front region" ];
+wfprog = DefineNumber[ 1.05 , Min 1, Max 2, Step 0.01,   Name "Progression in the front region" ];
 
 // Element scale at cylinder surface
 cs_el_sc = 0.1;
