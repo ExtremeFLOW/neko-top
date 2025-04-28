@@ -827,7 +827,6 @@ key components
     - the steady state adjoint solution `adjoint_fields0.nek5000`
     - the design field `design0.nek5000`
 
-The remainder of this tutorial will help you understand how to process these
 
 \attention
 The remainder of this tutorial is under construction, however it intends to help
