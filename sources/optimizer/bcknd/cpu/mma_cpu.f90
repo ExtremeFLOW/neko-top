@@ -76,7 +76,7 @@ contains
     ! The left hand sides of the KKT conditions are computed!
     ! for the following nonlinear programming problem:      !
     ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !                       sum(c_i*y_i + 0.5*d_i*(y_i)^2)!
     !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
     !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
     !        z >= 0,   y_i >= 0,         i = 1,...,m        !
@@ -129,16 +129,18 @@ contains
 
       this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
-
-      print *, "rex", norm2(rex)**2
-      print *, "rexsi", norm2(rexsi)**2
-      print *, "reeta", norm2(reeta)**2
-      print *, "rey", norm2(rey)**2
-      print *, "rez", rez**2
-      print *, "relambda", norm2(relambda)**2
-      print *, "remu", norm2(remu)**2
-      print *, "rezeta", rezeta**2
-      print *, "res", norm2(res)**2
+      write (*, '(A)') " =============================================================== "
+      write (*, '(A)') "MMA KKT MAX residuals"
+      write (*, '(A7,F25.7)') "rex", maxval(abs(rex))
+      write (*, '(A7,F25.7)') "rey", maxval(abs(rey))
+      write (*, '(A7,F25.7)') "rez", abs(rez)
+      write (*, '(A7,F25.7)') "relambda", maxval(abs(relambda))
+      write (*, '(A7,F25.7)') "rexsi", maxval(abs(rexsi))
+      write (*, '(A7,F25.7)') "reeta", maxval(abs(reeta))
+      write (*, '(A7,F25.7)') "remu", maxval(abs(remu))
+      write (*, '(A7,F25.7)') "rezeta", abs(rezeta)
+      write (*, '(A7,F25.7)') "res", maxval(abs(res))
+      write (*, '(A)') " =============================================================== "
 
     end associate
   end subroutine mma_KKT_cpu
@@ -226,13 +228,13 @@ contains
          low => this%low%x, upp => this%upp%x, x => xdesign, &
          dfdx => dfdx%x, df0dx => df0dx%x)
 
-      p0j = ( &
+      p0j = (&
            1.001_rp * max(df0dx, 0.0_rp) &
            + 0.001_rp * max(-df0dx, 0.0_rp) &
            + 0.00001_rp / max(x_diff, 0.00001_rp) &
            ) * (upp - x)**2
 
-      q0j = ( &
+      q0j = (&
            0.001_rp * max(df0dx, 0.0_rp) &
            + 1.001_rp * max(-df0dx, 0.0_rp) &
            + 0.00001_rp / max(x_diff, 0.00001_rp)&
@@ -240,13 +242,13 @@ contains
 
       do j = 1, this%n
          do i = 1, this%m
-            pij(i, j) = ( &
+            pij(i, j) = (&
                  1.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
                  + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (upp(j) - x(j))**2
 
-            qij(i, j) = ( &
+            qij(i, j) = (&
                  0.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
                  + 0.00001_rp / max(x_diff(j), 0.00001_rp) &

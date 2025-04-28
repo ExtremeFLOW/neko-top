@@ -118,7 +118,6 @@ contains
     call device_kkt_rex(rex%x_d, df0dx%x_d, dfdx%x_d, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
 
-
     call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
     call device_add2(rey%x_d, this%c%x_d, this%m)
     call device_sub2(rey%x_d, this%lambda%x_d, this%m)
@@ -131,7 +130,6 @@ contains
          this%m)
     call device_sub2(relambda%x_d, this%y%x_d, this%m)
     call device_add2(relambda%x_d, this%s%x_d, this%m)
-
 
     call device_sub3(rexsi%x_d, designx%x_d, this%xmin%x_d, this%n)
     call device_col2(rexsi%x_d, this%xsi%x_d, this%n)
@@ -175,15 +173,18 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    print *, "rex", device_norm(rex%x_d, this%n)
-    print *, "rexsi", device_norm(rexsi%x_d, this%n)
-    print *, "reeta", device_norm(reeta%x_d, this%n)
-    print *, "rey", device_norm(rey%x_d, this%m)
-    print *, "rez", rez**2
-    print *, "relambda", device_norm(relambda%x_d, this%m)
-    print *, "remu", device_norm(remu%x_d, this%m)
-    print *, "rezeta", rezeta**2
-    print *, "res", device_norm(res%x_d, this%m)
+    write (*, '(A)') " =============================================================== "
+    write (*, '(A)') "MMA KKT MAX residuals"
+    write (*, '(A7,F25.7)') "rex", device_maxval(rex%x_d, this%n)
+    write (*, '(A7,F25.7)') "rey", device_maxval(rey%x_d, this%m)
+    write (*, '(A7,F25.7)') "rez", abs(rez)
+    write (*, '(A7,F25.7)') "relambda", device_maxval(relambda%x_d, this%m)
+    write (*, '(A7,F25.7)') "rexsi", device_maxval(rexsi%x_d, this%n)
+    write (*, '(A7,F25.7)') "reeta", device_maxval(reeta%x_d, this%n)
+    write (*, '(A7,F25.7)') "remu", device_maxval(remu%x_d, this%m)
+    write (*, '(A7,F25.7)') "rezeta", abs(rezeta)
+    write (*, '(A7,F25.7)') "res", device_maxval(res%x_d, this%m)
+    write (*, '(A)') " =============================================================== "
 
     call designx%free()
     call rey%free()

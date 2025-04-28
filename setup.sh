@@ -149,8 +149,8 @@ fi
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --target clean
-cmake --build $MAIN_DIR/build --parallel
+[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --clean-first --parallel
+[ "$CLEAN" != true ] && cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
