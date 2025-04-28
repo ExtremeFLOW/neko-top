@@ -1,9 +1,11 @@
 # Static Mixer {#mixer}
 
 \tableofcontents
+
 \attention
 This tutorial is currently under construction. The figures do not reflect the
 parameters documented, as these parameters will be finalized soon.
+
 This tutorial aims to replicate the passive mixer problem by 
 [C. S. Andreasen et al. 2009](https://doi.org/10.1002/fld.1964).
 
@@ -826,6 +828,7 @@ key components
     - the design field `design0.nek5000`
 
 The remainder of this tutorial will help you understand how to process these
+
 \attention
 The remainder of this tutorial is under construction, however it intends to help
 you understand how to process these files and provide some scripts to help you 
