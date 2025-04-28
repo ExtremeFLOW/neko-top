@@ -56,11 +56,13 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
         0.1 * (x[tj] - low[tj])), x[tj] - 0.5 * xgap);
      beta[tj] = min(min(xmax[tj], upp[tj] - 0.1 * (upp[tj] - x[tj])), x[tj] +
         0.5 * xgap);
+
      p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
         0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
 
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
         1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+        
      for (int i = 0; i < m; i++) {
         pij[i + tj*m] = pow(upp[tj] - x[tj], 2) *
          (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *

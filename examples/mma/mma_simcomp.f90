@@ -93,7 +93,7 @@ contains
     ! initial design
     this%designx%x = 1.0
 
-    call this%mma%init( reshape(this%designx%x, [nloc]), &
+    call this%mma%init(reshape(this%designx%x, [nloc]), &
          nloc, this%m, case%params, this%scale, this%auto_scale)
   end subroutine simcomp_test_init_from_json
 

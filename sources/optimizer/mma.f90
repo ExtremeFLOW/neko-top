@@ -397,7 +397,7 @@ contains
     type(matrix_t) :: dfdx
 
     ! Select backend type
-    select case (this%bcknd )
+    select case (this%bcknd)
     case ("cpu")
        call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
     case ("cuda")

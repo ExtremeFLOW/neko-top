@@ -129,18 +129,18 @@ contains
 
       this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
-      write (*, '(A)') " =============================================================== "
+      write (*, '(A)') "==============================================================="
       write (*, '(A)') "MMA KKT MAX residuals"
-      write (*, '(A7,F25.7)') "rex", maxval(abs(rex))
-      write (*, '(A7,F25.7)') "rey", maxval(abs(rey))
-      write (*, '(A7,F25.7)') "rez", abs(rez)
-      write (*, '(A7,F25.7)') "relambda", maxval(abs(relambda))
-      write (*, '(A7,F25.7)') "rexsi", maxval(abs(rexsi))
-      write (*, '(A7,F25.7)') "reeta", maxval(abs(reeta))
-      write (*, '(A7,F25.7)') "remu", maxval(abs(remu))
-      write (*, '(A7,F25.7)') "rezeta", abs(rezeta)
-      write (*, '(A7,F25.7)') "res", maxval(abs(res))
-      write (*, '(A)') " =============================================================== "
+      write (*, '(A10,ES16.7E2)') "rex", maxval(abs(rex))
+      write (*, '(A10,ES16.7E2)') "rey", maxval(abs(rey))
+      write (*, '(A10,ES16.7E2)') "rez", abs(rez)
+      write (*, '(A10,ES16.7E2)') "relambda", maxval(abs(relambda))
+      write (*, '(A10,ES16.7E2)') "rexsi", maxval(abs(rexsi))
+      write (*, '(A10,ES16.7E2)') "reeta", maxval(abs(reeta))
+      write (*, '(A10,ES16.7E2)') "remu", maxval(abs(remu))
+      write (*, '(A10,ES16.7E2)') "rezeta", abs(rezeta)
+      write (*, '(A10,ES16.7E2)') "res", maxval(abs(res))
+      write (*, '(A)') "==============================================================="
 
     end associate
   end subroutine mma_KKT_cpu
@@ -656,6 +656,7 @@ contains
           residual_max = maxval(abs(residual))
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
+
        end do
 
        epsi = 0.1_rp * epsi
