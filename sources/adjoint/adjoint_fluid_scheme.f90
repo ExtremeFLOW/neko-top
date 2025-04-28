@@ -215,7 +215,10 @@ module adjoint_fluid_scheme
      !> Preconditioner factory
      procedure, pass(this) :: precon_factory_ => &
           adjoint_fluid_scheme_precon_factory
+     !> Reset a simulation
+     procedure(adjoint_fluid_scheme_reset_intrf), pass(this), deferred :: reset
   end type adjoint_fluid_scheme_t
+
 
 
   !> Abstract interface to initialize an adjoint formulation
@@ -289,6 +292,14 @@ module adjoint_fluid_scheme
        class(adjoint_fluid_scheme_t), intent(inout), allocatable :: object
        character(len=*) :: type_name
      end subroutine adjoint_fluid_scheme_factory
+  end interface
+
+  !> Abstract interface to reset simulation
+  abstract interface
+     subroutine adjoint_fluid_scheme_reset_intrf(this)
+       import adjoint_fluid_scheme_t
+       class(adjoint_fluid_scheme_t), intent(inout) :: this
+     end subroutine adjoint_fluid_scheme_reset_intrf
   end interface
 
   public :: adjoint_fluid_scheme_t, adjoint_fluid_scheme_factory
