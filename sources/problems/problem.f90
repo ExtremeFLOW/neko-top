@@ -169,17 +169,17 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    type(simulation_t), intent(inout) :: simulation
+    type(simulation_t), optional, intent(inout) :: simulation
 
     this%n_design = design%size()
     this%n_objectives = 0
     this%n_constraints = 0
 
     ! minimum dissipation objective function
-    call this%read_objectives(parameters, simulation, design)
+    call this%read_objectives(parameters, design, simulation)
 
     ! volume constraint
-    call this%read_constraints(parameters, simulation, design)
+    call this%read_constraints(parameters, design, simulation)
 
   end subroutine problem_init
 
@@ -216,12 +216,12 @@ contains
   ! Handling constraints and objectives
 
   !> Read the objective from a parameters file.
-  subroutine problem_read_objectives(this, parameters, simulation, design)
+  subroutine problem_read_objectives(this, parameters, design, simulation)
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(objective_t), allocatable :: objective
+    type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single objective term as its own json_file.
     character(len=:), allocatable :: path, type
@@ -232,30 +232,31 @@ contains
 
     ! Get the number of objectives.
     path = "optimization.objectives"
-    call parameters%info(path, n_children = n_objectives)
+    if (parameters%valid_path(path)) then
+       call parameters%info(path, n_children = n_objectives)
 
-    ! Grab a single parameters entry and create a constraint from it.
-    do i = 1, n_objectives
-       call json_extract_item(parameters, path, i, objective_json)
-       call json_get(objective_json, "type", type)
-       call neko_log%message(type)
+       ! Grab a single parameters entry and create a constraint from it.
+       do i = 1, n_objectives
+          call json_extract_item(parameters, path, i, objective_json)
+          call json_get(objective_json, "type", type)
+          call neko_log%message(type)
 
-       call objective_factory(objective, objective_json, design, simulation)
-       call this%add_objective(objective)
-
-    end do
+          call objective_factory(objective, objective_json, design, simulation)
+          call this%add_objective(objective)
+       end do
+    end if
 
     call neko_log%end_section()
 
   end subroutine problem_read_objectives
 
   !> Read the constraint from a parameters file.
-  subroutine problem_read_constraints(this, parameters, simulation, design)
+  subroutine problem_read_constraints(this, parameters, design, simulation)
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(constraint_t), allocatable :: constraint
+    type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single constraint term as its own json_file.
     character(len=:), allocatable :: path, type
@@ -266,18 +267,20 @@ contains
 
     ! Get the number of constraints.
     path = "optimization.constraints"
-    call parameters%info(path, n_children = n_constraints)
 
-    ! Grab a single parameters entry and create a constraint from it.
-    do i = 1, n_constraints
-       call json_extract_item(parameters, path, i, constraint_json)
-       call json_get(constraint_json, "type", type)
-       call neko_log%message(type)
+    if (parameters%valid_path(path)) then
+       call parameters%info(path, n_children = n_constraints)
 
-       call constraint_factory(constraint, constraint_json, design, simulation)
-       call this%add_constraint(constraint)
+       ! Grab a single parameters entry and create a constraint from it.
+       do i = 1, n_constraints
+          call json_extract_item(parameters, path, i, constraint_json)
+          call json_get(constraint_json, "type", type)
+          call neko_log%message(type)
 
-    end do
+          call constraint_factory(constraint, constraint_json, design, simulation)
+          call this%add_constraint(constraint)
+       end do
+    end if
 
     call neko_log%end_section()
 

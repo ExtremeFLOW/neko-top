@@ -22,14 +22,12 @@
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 50
             },
@@ -55,7 +53,6 @@
             "solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },
