@@ -265,24 +265,7 @@ contains
   subroutine adjoint_reset(C)
     type(adjoint_case_t), intent(inout) :: C
 
-    ! zero out flds
-    call field_rzero(C%fluid_adj%u_adj)
-    call field_rzero(C%fluid_adj%v_adj)
-    call field_rzero(C%fluid_adj%w_adj)
-    call field_rzero(C%fluid_adj%p_adj)
-
-    ! zero out lag fields (weird notation... but C%fluid_adj%u_adj will be zero)
-    call C%fluid_adj%ulag%set(C%fluid_adj%u_adj)
-    call C%fluid_adj%vlag%set(C%fluid_adj%u_adj)
-    call C%fluid_adj%wlag%set(C%fluid_adj%u_adj)
-
-    ! zero out RHS
-    call field_rzero(C%fluid_adj%f_adj_x)
-    call field_rzero(C%fluid_adj%f_adj_y)
-    call field_rzero(C%fluid_adj%f_adj_z)
-
-    ! There may be more related to the time scheme controller, but I think
-    ! this is sufficient and will be handled in the beginning of the simulation
+    call C%fluid_adj%reset()
 
   end subroutine adjoint_reset
 
