@@ -401,7 +401,7 @@ __global__ void AA_kernel(T* __restrict__ temp, const T* __restrict__ GG,
   if (tj < n) {
     for (int i0 = 0; i0 < m; i0++) {
       for (int i1 = 0; i1 < m; i1++) {
-        temp[tj + i0 * n + i1 * m * n] = GG[i0 * n + tj] *
+        temp[tj + i0 * (n + 1) + i1 * (m + 1) * (n + 1)] = GG[i0 * n + tj] *
          (1.0 / diagx[tj]) * GG[i1 * n + tj];
       }
     }

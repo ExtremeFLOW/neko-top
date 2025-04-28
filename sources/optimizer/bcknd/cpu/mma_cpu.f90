@@ -637,12 +637,12 @@ contains
              rezeta = zeta * z - epsi
              res = lambda * s - epsi
 
-             residual_small = [rey, rez, relambda, remu, rezeta, res]
-
+             ! Compute squared norms for the residuals
              re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
              call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
+             residual_small = [rey, rez, relambda, remu, rezeta, res]
              new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp
