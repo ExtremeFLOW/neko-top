@@ -2,7 +2,7 @@ program usrneko
 
 !  use stdlib_io_npy, only : save_npy
   use LightKrylov
-  use LightKrylov, only: wp => dp
+  use LightKrylov, only: wp => dp, rtol => rtol_dp
   use LightKrylov_Logger
   use cylinder
   use global_coef, only: global_coef_t, global_coef_getter
@@ -26,7 +26,9 @@ program usrneko
   !---------------------------------------------------
 
   !> Number of eigenvalues we wish to converge.
-  integer, parameter :: nev = 10
+  integer, parameter :: nev = 2
+  !> Size of Krylov subspace.
+  integer, parameter :: kdim = 128
   !> Krylov subspace.
   type(state_vector), allocatable :: X(:)
   !> Eigenvalues.
@@ -60,17 +62,16 @@ program usrneko
   global_coef_getter => my_global_coef_getter
 
   !> Initialize Krylov subspace.
-  allocate(X(nev))
-  ! (this should also initialize them)
-  call zero_basis(X)
+  allocate(X(nev)); call initialize_krylov_subspace(X)
 
   !------------------------------------------
   !-----     EIGENVALUE COMPUTATION     -----
   !------------------------------------------
 
   !> Call to LightKrylov.
-  call eigs(A, X, lambda, residuals, info)
-  call check_info(info, 'eigs', module=this_module, procedure='main')
+  ! call eigs(A, X, lambda, residuals, info)
+  call eigs(A, X, lambda, residuals, info, kdim = kdim, tolerance = rtol)
+  !call check_info(info, 'eigs', module=this_module, procedure='main')
 
   !> Transform eigenspectrum from unit-disk to standard complex plane.
   lambda = log(lambda) / tau
@@ -93,15 +94,11 @@ program usrneko
     end do
   enddo
 
-
-
   !> Clean up
   call A%free()
   do i = 1, nev
     call X(i)%free()
   enddo
-
-
 
   !> Save the eigenspectrum.
   ! call save_eigenspectrum(lambda, residuals, "example/ginzburg_landau/eigenspectrum.npy")
