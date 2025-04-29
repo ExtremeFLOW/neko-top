@@ -45,7 +45,7 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "never"
         },
         "scalar": {
             "enabled": true,
@@ -68,8 +68,8 @@
                     "type": "neumann",
                     "flux": 0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
-                },
-            ],
+                }
+            ]
         },
         "adjoint_scalar": {
             "enabled": true,
@@ -87,7 +87,7 @@
             ],
             "initial_condition": {
                 "type": "uniform",
-                "value": 0.0,
+                "value": 0.0
             }
         },
         "adjoint_fluid": {
@@ -104,7 +104,7 @@
                     "type": "outflow",
                     "zone_indices": [ 2 ]
                 }
-            ],
+            ]
         },
         "simulation_components": [
             {
@@ -121,33 +121,33 @@
                 "geometry": "box",
                 "x_bounds": [
                     1.5,
-                    4.5,
+                    4.5
                 ],
                 "y_bounds": [
                     -1.0,
-                    3.0,
+                    3.0
                 ],
                 "z_bounds": [
                     -1.0,
-                    3.0,
-                ],
+                    3.0
+                ]
             },
             {
                 "name": "objective_domain",
                 "geometry": "box",
                 "x_bounds": [
                     5.0,
-                    6.0,
+                    6.0
                 ],
                 "y_bounds": [
                     -1.0,
-                    3.0,
+                    3.0
                 ],
                 "z_bounds": [
                     -1.0,
-                    3.0,
-                ],
-            },
+                    3.0
+                ]
+            }
         ]
     },
     "optimization": {
@@ -189,10 +189,8 @@
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
                 "weight": 1.0
-            },
+            }
         ],
-        "constraints": [
-        ],
-    },
-
+        "constraints": [ ]
+    }
 }

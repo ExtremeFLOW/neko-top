@@ -90,7 +90,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
     call this%logger%set_header(trim(optimization_header))
 
-    x = design%get_design()
+    x = design%get_values()
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
@@ -184,7 +184,7 @@ contains
           scaling_factor = abs(this%scale)
        end if
 
-       x = design%get_design()
+       x = design%get_values()
 
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x%x, objective_sensitivities, &
