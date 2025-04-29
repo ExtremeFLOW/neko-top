@@ -21,9 +21,9 @@ module cylinder
    use neko_config, only : NEKO_BCKND_DEVICE
    use scratch_registry, only: neko_scratch_registry
    use field_math, only: field_addcol3, field_rzero, field_cmult, &
-      field_add3s2, field_copy
-   use math, only: glsc2
-   use device_math, only: device_glsc2
+      field_add2s2, field_copy
+   use math, only: glsc3
+   use device_math, only: device_glsc3
    use device, only : device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: gs_t, GS_OP_ADD
    ! This one is silly... But we need coef to initialize fields
@@ -67,6 +67,7 @@ module cylinder
       procedure, pass(self), public :: init => state_vector_init
       procedure, pass(self), public :: free => state_vector_free
       procedure, pass(self), public :: write => state_vector_write
+      procedure, pass(self), public :: copy => state_vector_copy
    end type state_vector
  
    !-----------------------------------
@@ -170,11 +171,8 @@ module cylinder
    real(kind=wp) function dot(self, vec) result(alpha)
      class(state_vector)   , intent(in) :: self
      class(abstract_vector_rdp), intent(in) :: vec
-     ! a working array
-     type(field_t), pointer :: work
-     integer :: temp_indices(1)
      integer :: n
-     real(kind=rp) :: tmp_real
+     real(kind=rp) :: alpha_rp
      select type(vec)
      type is(state_vector)
         ! always try initializing
@@ -182,23 +180,19 @@ module cylinder
         call state_vector_init_wrapper(vec)
 
         ! here we're going to take an energy norm I guess...
-        call neko_scratch_registry%request_field(work, temp_indices(1))
-        call field_rzero(work)
-        call field_addcol3(work, self%u, vec%u)
-        call field_addcol3(work, self%v, vec%v)
-        call field_addcol3(work, self%w, vec%w)
-        ! integrate 
-        ! (I guess the GPU backend doesn't matter so much here...)
-        n = work%size()
+        n = self%u%size()
         if (NEKO_BCKND_DEVICE .eq. 1) then
-           tmp_real = device_glsc2(work%x_d, self%coef%B_d, n)
+           alpha_rp = device_glsc3(self%u%x_d, vec%u%x_d, self%coef%B_d, n)
+           alpha_rp = alpha_rp + device_glsc3(self%v%x_d, vec%v%x_d, self%coef%B_d, n)
+           alpha_rp = alpha_rp + device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
        else
-           tmp_real = glsc2(work%x, self%coef%B, n)
+           alpha_rp = glsc3(self%u%x, vec%u%x, self%coef%B, n)
+           alpha_rp = alpha_rp + glsc3(self%v%x, vec%v%x, self%coef%B, n)
+           alpha_rp = alpha_rp + glsc3(self%w%x, vec%w%x, self%coef%B, n)
        end if
-       tmp_real = tmp_real * 0.5_rp
-       alpha = real(tmp_real, wp)
+       alpha_rp = alpha_rp * 0.5_rp
+       alpha = real(alpha_rp, wp)
 
-       call neko_scratch_registry%relinquish_field(temp_indices)
      end select
      return
    end function dot
@@ -206,19 +200,19 @@ module cylinder
    subroutine scal(self, alpha)
      class(state_vector), intent(inout) :: self
      real(kind=wp)      , intent(in)    :: alpha
-     real(kind=rp) :: tmp_real
+     real(kind=rp) :: alpha_rp
      ! always try initializing
      call state_vector_init_wrapper(self)
 
-     tmp_real = real(alpha, rp)
-     call field_cmult(self%u, tmp_real)
-     call field_cmult(self%v, tmp_real)
-     call field_cmult(self%w, tmp_real)
-     call field_cmult(self%p, tmp_real)
+     alpha_rp = real(alpha, rp)
+     call field_cmult(self%u, alpha_rp)
+     call field_cmult(self%v, alpha_rp)
+     call field_cmult(self%w, alpha_rp)
+     call field_cmult(self%p, alpha_rp)
      return
    end subroutine scal
  
-   subroutine axpby(self, alpha, vec, beta)
+   subroutine axpby(alpha, vec, beta, self)
      class(state_vector)   , intent(inout) :: self
      class(abstract_vector_rdp), intent(in)    :: vec
      real(kind=wp)         , intent(in)    :: alpha, beta
@@ -232,10 +226,15 @@ module cylinder
         alpha_rp = real(alpha, kind=rp)
         beta_rp = real(beta, kind=rp)
 
-        call field_add3s2(self%u, self%u, vec%u, alpha_rp, beta_rp)
-        call field_add3s2(self%v, self%v, vec%v, alpha_rp, beta_rp)
-        call field_add3s2(self%w, self%w, vec%w, alpha_rp, beta_rp)
-        call field_add3s2(self%p, self%p, vec%p, alpha_rp, beta_rp)
+        ! be careful with the order here !
+        ! notice the axpby(alpha, vec, beta, self)
+        ! in Ginzberg_landau we have:
+        ! self%state = beta*self%state + alpha*vec%state
+        call self%scal(beta_rp)
+        call field_add2s2(self%u, vec%u, alpha_rp)
+        call field_add2s2(self%v, vec%v, alpha_rp)
+        call field_add2s2(self%w, vec%w, alpha_rp)
+        call field_add2s2(self%p, vec%p, alpha_rp)
      end select
      return
    end subroutine axpby
@@ -290,6 +289,18 @@ module cylinder
 
      return
    end subroutine state_vector_free
+
+   subroutine state_vector_copy(self, vec)
+     class(state_vector), intent(inout) :: self
+     class(state_vector), intent(in) :: vec
+
+     call field_copy(self%u, vec%u)
+     call field_copy(self%v, vec%v)
+     call field_copy(self%w, vec%w)
+     call field_copy(self%p, vec%p)
+
+     return
+   end subroutine state_vector_copy
 
   ! User defined initial condition
   subroutine rand_ic(u, v, w)
@@ -380,7 +391,7 @@ module cylinder
  
    subroutine direct_solver(self, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_propagator), intent(in)  :: self
+     class(neko_propagator), intent(inout)  :: self
      ! Input vector.
      class(abstract_vector_rdp) , intent(in)  :: vec_in
      ! Output vector.
@@ -399,7 +410,7 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
-           call self%write_linear(0)
+           call self%write_linear(self%get_counter())
            call solve_wrapper(self%linear_case)
            ! call self%write_linear(1)
            ! There is a chance that vec_out isn't initialized!
@@ -416,7 +427,7 @@ module cylinder
  
    subroutine adjoint_solver(self, vec_in, vec_out)
      ! Linear Operator.
-     class(neko_propagator), intent(in)  :: self
+     class(neko_propagator), intent(inout)  :: self
      ! Input vector.
      class(abstract_vector_rdp) , intent(in)  :: vec_in
      ! Output vector.
