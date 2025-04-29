@@ -410,7 +410,7 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
-           call self%write_linear(self%get_counter())
+           call self%write_linear(0)
            call solve_wrapper(self%linear_case)
            ! call self%write_linear(1)
            ! There is a chance that vec_out isn't initialized!
