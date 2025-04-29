@@ -64,12 +64,27 @@ runs:
     # Setup the cache for the JSON-Fortran library.
     # All following steps should look if the cache was hit and skip if it was.
 
+    - name: Create cache key based on version, OS, and compiler
+      id: create-key
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        OS: ${{ inputs.os }}
+        COMPILER: ${{ inputs.compiler }}
+        COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        REPO: https://github.com/jacobwilliams/json-fortran.git
+      run: |
+        # Get the GIT sha for the current commit
+        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
+        key="json-fortran-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
+
     - name: Cache
       id: cache-json-fortran
       uses: actions/cache@v4
       with:
         path: ${{ inputs.install-dir }}
-        key: json-fortran-${{ inputs.version }}-${{ inputs.os }}-${{ inputs.compiler }}
+        key: ${{ steps.create-key.outputs.key }}
 
     - name: Clone
       if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
@@ -140,4 +155,16 @@ runs:
     - name: Set output
       id: set-output
       shell: bash
-      run: echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT
+      env:
+        INSTALL_DIR: ${{ inputs.install-dir }}
+      run: |
+
+        if [ ! -d ${INSTALL_DIR}/lib ]; then
+          echo "Failed to install JSON-Fortran library."
+          exit 1
+        fi
+
+        echo "install-dir=${INSTALL_DIR}"
+        echo "install-dir=${INSTALL_DIR}" >> $GITHUB_OUTPUT
+        echo "PKG_CONFIG_PATH=${PKG_CONFIG_PATH}:${INSTALL_DIR}/lib/pkgconfig" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${INSTALL_DIR}/lib" >> $GITHUB_ENV
