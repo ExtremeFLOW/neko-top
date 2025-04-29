@@ -133,11 +133,6 @@ module adjoint_fluid_scheme
      integer :: pr_projection_activ_step
      !> Strict convergence for the velocity solver
      logical :: strict_convergence
-     !> Gradient jump panelty
-     logical :: if_gradient_jump_penalty
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_u_adj
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_v_adj
-     type(gradient_jump_penalty_t) :: gradient_jump_penalty_w_adj
 
      ! List of boundary conditions for pressure
      type(bc_list_t) :: bcs_prs
@@ -305,7 +300,6 @@ contains
     logical :: logical_val
     integer :: integer_val
     character(len=:), allocatable :: string_val1, string_val2
-    real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
 
     !
@@ -548,35 +542,6 @@ contains
     call this%vlag%init(this%v_adj, 2)
     call this%wlag%init(this%w_adj, 2)
 
-    ! Initiate gradient jump penalty
-    call json_get_or_default(params, &
-         'case.fluid.gradient_jump_penalty.enabled',&
-         this%if_gradient_jump_penalty, .false.)
-
-    if (this%if_gradient_jump_penalty .eqv. .true.) then
-       call neko_error('Gradient jump penalty not implemented for adjoint')
-
-       if ((this%dm_Xh%xh%lx - 1) .eq. 1) then
-          call json_get_or_default(params, &
-               'case.fluid.gradient_jump_penalty.tau',&
-               GJP_param_a, 0.02_rp)
-          GJP_param_b = 0.0_rp
-       else
-          call json_get_or_default(params, &
-               'case.fluid.gradient_jump_penalty.scaling_factor',&
-               GJP_param_a, 0.8_rp)
-          call json_get_or_default(params, &
-               'case.fluid.gradient_jump_penalty.scaling_exponent',&
-               GJP_param_b, 4.0_rp)
-       end if
-       call this%gradient_jump_penalty_u_adj%init(params, this%dm_Xh, &
-            this%c_Xh, GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_v_adj%init(params, this%dm_Xh, &
-            this%c_Xh, GJP_param_a, GJP_param_b)
-       call this%gradient_jump_penalty_w_adj%init(params, this%dm_Xh, &
-            this%c_Xh, GJP_param_a, GJP_param_b)
-    end if
-
     call neko_log%end_section()
 
   end subroutine adjoint_fluid_scheme_init_base
@@ -770,13 +735,6 @@ contains
     nullify(this%f_adj_z)
 
     call this%mu_field%free()
-
-    ! Free gradient jump penalty
-    if (this%if_gradient_jump_penalty .eqv. .true.) then
-       call this%gradient_jump_penalty_u_adj%free()
-       call this%gradient_jump_penalty_v_adj%free()
-       call this%gradient_jump_penalty_w_adj%free()
-    end if
 
   end subroutine adjoint_fluid_scheme_free
 
