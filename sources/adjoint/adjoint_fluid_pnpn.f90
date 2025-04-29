@@ -774,17 +774,6 @@ contains
       call this%bcs_vel%apply_vector(f_x%x, f_y%x, f_z%x, &
            this%dm_Xh%size(), t, tstep, strong = .false.)
 
-      ! Compute the grandient jump penalty term
-      if (this%if_gradient_jump_penalty .eqv. .true.) then
-         call neko_error("Gradient jump penalty not implemented for adjoint")
-         !  call this%gradient_jump_penalty_u_adj%compute(u, v, w, u)
-         !  call this%gradient_jump_penalty_v_adj%compute(u, v, w, v)
-         !  call this%gradient_jump_penalty_w_adj%compute(u, v, w, w)
-         !  call this%gradient_jump_penalty_u_adj%perform(f_x)
-         !  call this%gradient_jump_penalty_v_adj%perform(f_y)
-         !  call this%gradient_jump_penalty_w_adj%perform(f_z)
-      end if
-
       if (oifs) then
          call neko_error("OIFS not implemented for adjoint")
          !  ! Add the advection operators to the right-hand-side.
