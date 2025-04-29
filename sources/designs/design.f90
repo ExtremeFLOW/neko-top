@@ -86,13 +86,13 @@ module design
      procedure(design_free), public, pass(this), deferred :: free
 
      !> Retrieve the design variables.
-     procedure(design_get_vector), public, pass(this), deferred :: get_values
+     procedure(design_get_values), public, pass(this), deferred :: get_values
      !> Retrieve the x location of the design variables.
-     procedure(design_get_vector), public, pass(this), deferred :: get_x
+     procedure, public, pass(this) :: get_x => design_get_x
      !> Retrieve the y location of the design variables.
-     procedure(design_get_vector), public, pass(this), deferred :: get_y
+     procedure, public, pass(this) :: get_y => design_get_y
      !> Retrieve the z location of the design variables.
-     procedure(design_get_vector), public, pass(this), deferred :: get_z
+     procedure, public, pass(this) :: get_z => design_get_z
 
      !> Update the design variables.
      procedure(design_update_design), public, pass(this), deferred :: &
@@ -151,11 +151,11 @@ module design
        class(design_t), intent(inout) :: this
      end subroutine design_free
 
-     function design_get_vector(this) result(values)
+     function design_get_values(this) result(values)
        import design_t, vector_t
        class(design_t), intent(in) :: this
        type(vector_t) :: values
-     end function design_get_vector
+     end function design_get_values
 
      subroutine design_update_design(this, values)
        import design_t, vector_t
@@ -243,5 +243,23 @@ contains
     integer :: n
     n = this%n_global
   end function design_size_global
+
+  function design_get_x(this) result(values)
+    class(design_t), intent(in) :: this
+    type(vector_t) :: values
+    call neko_error("Design type does not support x retrieval")
+  end function design_get_x
+
+  function design_get_y(this) result(values)
+    class(design_t), intent(in) :: this
+    type(vector_t) :: values
+    call neko_error("Design type does not support y retrieval")
+  end function design_get_y
+
+  function design_get_z(this) result(values)
+    class(design_t), intent(in) :: this
+    type(vector_t) :: values
+    call neko_error("Design type does not support z retrieval")
+  end function design_get_z
 
 end module design
