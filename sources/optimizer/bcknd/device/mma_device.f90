@@ -99,14 +99,43 @@ contains
     type(matrix_t), intent(in) :: dfdx
 
     if (this%subsolver .eq. "dip") then
-       ! Note: Since kkt for dipsubsolve has very small computations, we keep
-       ! the calculations to CPU and we avoid implementing a device subroutine
-       ! for it. Thus, we just use the KKT_cpu version.
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       call mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
     else
        call mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
     end if
   end subroutine mma_KKT_device
+
+  !> Implementation of the KKT residual computation for dual interior
+  ! point method (dip) subsolve of MMA algorithm.
+  module subroutine mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: fval, df0dx
+    type(matrix_t), intent(in) :: dfdx
+
+    type(vector_t) :: relambda, remu
+
+    call relambda%init(this%m)
+    call remu%init(this%m)
+
+    ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
+    call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp, -this%z, &
+         this%m)
+    call device_sub2(relambda%x_d, this%y%x_d, this%m)
+    call device_add2(relambda%x_d, this%mu%x_d, this%m)
+
+    ! Compute residual for mu (eta in the paper)
+    call device_col3 (remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
+
+
+    this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
+         device_maxval(remu%x_d, this%m)])
+    this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
+         device_norm(remu%x_d, this%m))
+
+    call relambda%free()
+    call remu%free()
+  end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
   ! point method (dpip) subsolve of MMA algorithm.

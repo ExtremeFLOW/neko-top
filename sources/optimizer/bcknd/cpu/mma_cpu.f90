@@ -107,7 +107,7 @@ contains
   module subroutine mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Compute the KKT condition right hand side for a given !
-    ! designx x and set the max and norm values of the       !
+    ! designx x and set the max and norm values of the      !
     ! residue of KKT system to this%residumax and           !
     ! this%residunorm.                                      !
     !                                                       !
