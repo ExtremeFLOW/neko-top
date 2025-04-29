@@ -1,4 +1,4 @@
-# List of examples {#examples-list}
+## List of examples {#examples-list}
 
 1. \subpage easy-E
 2. \subpage power-iterations
@@ -6,4 +6,3 @@
 4. \subpage rugby-verification
 5. \subpage brinkman-parameters
 6. \subpage passive-scalar
-7. \subpage permeability_block
