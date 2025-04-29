@@ -62,7 +62,10 @@ module simple_design
   type, extends(design_t), public :: simple_design_t
      private
 
+     type(vector_t) :: values
      type(vector_t) :: x
+     type(vector_t) :: y
+     type(vector_t) :: z
 
    contains
 
@@ -82,7 +85,13 @@ module simple_design
      procedure, pass(this) :: add_mapping => design_simple_add_mapping
 
      !> Retrieve the design variables
-     procedure, pass(this) :: get_design => design_simple_get_design
+     procedure, pass(this) :: get_values => design_simple_get_values
+     !> Retrieve the x location of the design variables
+     procedure, pass(this) :: get_x => design_simple_get_x
+     !> Retrieve the y location of the design variables
+     procedure, pass(this) :: get_y => design_simple_get_y
+     !> Retrieve the z location of the design variables
+     procedure, pass(this) :: get_z => design_simple_get_z
 
      !> Update the design
      procedure, pass(this) :: update_design => design_simple_update_design
@@ -107,32 +116,69 @@ contains
   subroutine design_simple_init_from_json(this, parameters)
     class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    integer :: n
+    character(len=:), allocatable :: type
+    integer :: n, nx, ny, nz, i, j, k
+    real(kind=rp), dimension(:), allocatable :: limits
+    type(vector_t) :: x, y, z
 
-    call json_get(parameters, 'design.n', n)
+    call json_get(parameters, 'optimization.design.domain.type', type)
 
-    call this%init_from_components(n)
+    select case (trim(type))
+    case ("box")
+       call json_get(parameters, 'optimization.design.domain.nx', nx)
+       call json_get(parameters, 'optimization.design.domain.ny', ny)
+       call json_get(parameters, 'optimization.design.domain.nz', nz)
+       call json_get(parameters, 'optimization.design.domain.limits', limits)
+       n = nx * ny * nz
+
+       call x%init(n)
+       call y%init(n)
+       call z%init(n)
+
+       do i = 1, nx
+          do j = 1, ny
+             do k = 1, nz
+                x%x(i) = limits(1) + (limits(2) - limits(1)) * &
+                     real(i - 1, kind=rp) / real(nx, kind=rp)
+                y%x(i) = limits(3) + (limits(4) - limits(3)) * &
+                     real(j - 1, kind=rp) / real(ny, kind=rp)
+                z%x(i) = limits(5) + (limits(6) - limits(5)) * &
+                     real(k - 1, kind=rp) / real(nz, kind=rp)
+             end do
+          end do
+       end do
+
+    end select
+
+    call this%init_from_components(n, x, y, z)
 
   end subroutine design_simple_init_from_json
+
+  subroutine design_simple_init_from_components(this, n, x, y, z)
+    class(simple_design_t), intent(inout) :: this
+    integer, intent(in) :: n
+    type(vector_t), intent(in) :: x, y, z
+
+    call this%init_base(n)
+
+    call this%values%init(n)
+    this%x = x
+    this%y = y
+    this%z = z
+
+  end subroutine design_simple_init_from_components
 
   !> Free the design
   subroutine design_simple_free(this)
     class(simple_design_t), intent(inout) :: this
 
     call this%free_base()
+    call this%values%free()
     call this%x%free()
+    call this%y%free()
+    call this%z%free()
 
   end subroutine design_simple_free
-
-  subroutine design_simple_init_from_components(this, n)
-    class(simple_design_t), intent(inout) :: this
-    integer, intent(in) :: n
-
-    call this%init_base(n)
-    call this%x%init(n)
-    this%x = 0.0_rp
-
-  end subroutine design_simple_init_from_components
 
   !> Add mappings to the design
   subroutine design_simple_add_mapping(this, parameters, simulation)
@@ -149,18 +195,43 @@ contains
 
   end subroutine design_simple_map_forward
 
-  function design_simple_get_design(this) result(x)
+  function design_simple_get_values(this) result(values)
+    class(simple_design_t), intent(in) :: this
+    type(vector_t) :: values
+
+    values = this%values
+
+  end function design_simple_get_values
+
+  function design_simple_get_x(this) result(x)
     class(simple_design_t), intent(in) :: this
     type(vector_t) :: x
 
     x = this%x
-  end function design_simple_get_design
 
-  subroutine design_simple_update_design(this, x)
+  end function design_simple_get_x
+
+  function design_simple_get_y(this) result(y)
+    class(simple_design_t), intent(in) :: this
+    type(vector_t) :: y
+
+    y = this%y
+
+  end function design_simple_get_y
+
+  function design_simple_get_z(this) result(z)
+    class(simple_design_t), intent(in) :: this
+    type(vector_t) :: z
+
+    z = this%z
+
+  end function design_simple_get_z
+
+  subroutine design_simple_update_design(this, values)
     class(simple_design_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(inout) :: values
 
-    this%x = x
+    this%values = values
 
   end subroutine design_simple_update_design
 
