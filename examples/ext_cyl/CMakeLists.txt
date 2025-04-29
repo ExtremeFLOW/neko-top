@@ -23,7 +23,7 @@ ExternalProject_Add(
     LightKrylov_ext_cyl
     PREFIX ${LIGHTKRYLOV_PREFIX}
     GIT_REPOSITORY https://github.com/nekStab/LightKrylov.git
-    GIT_TAG main
+    GIT_TAG dev
     CONFIGURE_COMMAND ""
     BUILD_COMMAND fpm build --profile release
     INSTALL_COMMAND fpm install --prefix ${LIGHTKRYLOV_INSTALL_DIR}  # Install to custom path

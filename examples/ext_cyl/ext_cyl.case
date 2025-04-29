@@ -25,14 +25,14 @@
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-8,
-                "max_iterations": 20
+                "max_iterations": 100
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-7,
-                "max_iterations": 20
+                "max_iterations": 100
             },
             "output_control": "never",
             "boundary_conditions": [ // these don't actually do anything

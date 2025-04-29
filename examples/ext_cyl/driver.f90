@@ -64,6 +64,17 @@ program usrneko
   !> Initialize Krylov subspace.
   allocate(X(nev)); call initialize_krylov_subspace(X)
 
+
+  !---------------------------------------
+  !-----     CHECK LINEAR SOLVER     -----
+  !---------------------------------------
+  ! check just a massive forward run:
+  ! call X(1)%rand()
+  ! do i = 1, 100
+  !    call A%matvec(X(1), X(2))
+  !    call X(1)%copy(X(2))
+  ! end do
+
   !------------------------------------------
   !-----     EIGENVALUE COMPUTATION     -----
   !------------------------------------------
@@ -87,11 +98,10 @@ program usrneko
   enddo
 
   !> Save eigenvectors to disk.
+  ! (use the nth in the subspace for writing)
   do i = 1, nev
-    ! this is also so stupid, we need a better way to write these out
-    do j = 1, nev - i + 1
-      call X( nev - i + 1)%write(j)
-    end do
+      call X(nev)%copy(X(i))
+      call X(nev)%write(i)
   enddo
 
   !> Clean up
