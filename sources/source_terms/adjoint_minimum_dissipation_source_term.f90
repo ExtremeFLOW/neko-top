@@ -69,12 +69,16 @@ module adjoint_minimum_dissipation_source_term
   ! $\int \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
        adjoint_minimum_dissipation_source_term_t
-     !> u,v,w of the primal
-     type(field_t), pointer :: u,v,w
+     !> u of the primal
+     type(field_t), pointer :: u => null()
+     !> v of the primal
+     type(field_t), pointer :: v => null()
+     !> w of the primal
+     type(field_t), pointer :: w => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
      !> A mask for where the source term is evaluated
-     class(point_zone_t), pointer :: mask
+     class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
 

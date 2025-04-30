@@ -64,14 +64,18 @@ module adjoint_lube_source_term
   ! $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$.
   type, public, extends(source_term_t) :: adjoint_lube_source_term_t
 
-     !> $u,v,w$ corresponding to the baseflow
-     type(field_t), pointer :: u,v,w
+     !> u of the primal
+     type(field_t), pointer :: u => null()
+     !> v of the primal
+     type(field_t), pointer :: v => null()
+     !> w of the primal
+     type(field_t), pointer :: w => null()
      !> \f$\chi\f$ the Brinkman amplitude
-     type(field_t), pointer :: chi
+     type(field_t), pointer :: chi => null()
      !> a scale for this term
      real(kind=rp) :: K
      !> A mask for where the source term is evaluated
-     class(point_zone_t), pointer :: mask
+     class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
 
