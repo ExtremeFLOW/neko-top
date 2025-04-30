@@ -39,12 +39,13 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Assign default values to the options
 DEVICE_TYPE="NONE"
 CLEAN=false
+CLEAN_NEKO=false
 QUIET=false
 TEST=false
 DOCS=false
 
 # List possible options
-OPTIONS=help,test,clean,quiet,device:,doc
+OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
 OPT=h,t,c,q,d:
 
 # Parse the inputs for options
@@ -61,29 +62,32 @@ while true; do
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
 
     # Purely long settings
-    "--doc") DOCS=true && shift ;; # Build the documentation
+    "--doc") DOCS=true && shift ;;              # Build the documentation
+    "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
     "--") shift && break ;;
     esac
 done
 
+[ "$CLEAN_NEKO" == true ] && CLEAN=true
+
 # Check if the device type has changed
 if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
-    CURRENT_DEVICE_TYPE=$(grep -oP "(?<=DEVICE_TYPE:STRING=).*" $MAIN_DIR/build/CMakeCache.txt) || true
-    if [ "$CURRENT_DEVICE_TYPE" != "$DEVICE_TYPE" ]; then
+    CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
+    if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
     fi
 fi
 
-export TEST CLEAN QUIET DEVICE_TYPE
+export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 
 # ============================================================================ #
 # Execute the preparation script if it exists and prepare the environment
 
 printf "=%.0s" {1..80} && printf "\n"
-printf "Preparing environment.\n\n"
+printf "Preparing environment.\n"
 
 # Execute the preparation script if it exists
 if [ -f "$MAIN_DIR/prepare.env" ]; then
@@ -108,11 +112,11 @@ fi
 printf "=%.0s" {1..80} && printf "\n"
 printf "Setting up external dependencies\n"
 
-check_system_dependencies          # Check for system dependencies.
-find_json_fortran                  # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000                       # Re-defines the NEK5000_DIR variable.
-find_neko                          # Re-defines the NEKO_DIR variable.
-[ "$TEST" == true ] && find_pfunit # Re-defines the PFUNIT_DIR variable.
+check_system_dependencies                      # Check for system dependencies.
+find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
+find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
+find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
+[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
 # Done settng up external dependencies
 # ============================================================================ #
@@ -125,11 +129,12 @@ printf "Compiling the example codes and Neko-TOP\n"
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
-if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
+if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
 # Set the variables for the compilation
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
@@ -144,7 +149,6 @@ fi
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --target clean
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 

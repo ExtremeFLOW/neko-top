@@ -22,6 +22,15 @@ function check_system_dependencies() {
         done
         exit 1
     fi
+
+    # Check for correct version of cmake executable (>= 3.21)
+    CMAKE_VERSION=$(cmake --version | grep -oP '(?<=version )\d+\.\d+')
+    if [ $(echo "$CMAKE_VERSION < 3.21" | bc) -eq 1 ]; then
+        printf "CMake version >= 3.21 is required.\n"
+        printf "Please update your CMake installation.\n"
+        exit 1
+    fi
+
 }
 
 # ============================================================================ #
@@ -36,16 +45,18 @@ function find_json_fortran() {
         JSON_FORTRAN_DIR="$(realpath $EXTERNAL_DIR/json-fortran)"
     fi
 
-    # Clone JSON-Fortran from the repository if it does not exist.
-    if [[ ! -d $JSON_FORTRAN_DIR || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
-
-        git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
-            https://github.com/jacobwilliams/json-fortran $JSON_FORTRAN_DIR
-    fi
-
     # Ensure JSON-Fortran is installed, if not install it.
     if [[ -z "$(find $JSON_FORTRAN_DIR -name libjsonfortran.so)" ]]; then
+
+        # Clone JSON-Fortran from the repository if it does not exist.
+        if [[ ! -d $JSON_FORTRAN_DIR || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
+            [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
+
+            git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
+                https://github.com/jacobwilliams/json-fortran $JSON_FORTRAN_DIR
+        fi
+
+        # Install JSON-Fortran
         cmake -S $JSON_FORTRAN_DIR -B $JSON_FORTRAN_DIR/build \
             --install-prefix $JSON_FORTRAN_DIR \
             -Wno-dev \
@@ -110,20 +121,22 @@ function find_gslib() {
         GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
     fi
 
-    # Clone GSLIB from the repository if it does not exist.
-    if [ ! -d $GSLIB_DIR ]; then
-        git clone --depth 1 --branch master \
-            https://github.com/nek5000/gslib.git $GSLIB_DIR
-    fi
-
     # Ensure GSLIB is installed, if not install it.
     if [ -z "$(find $GSLIB_DIR -name libgs.a)" ]; then
+
+        # Clone GSLIB from the repository if it does not exist.
+        if [ ! -d $GSLIB_DIR ]; then
+            git clone --depth 1 --branch master \
+                https://github.com/nek5000/gslib.git $GSLIB_DIR
+        fi
+
+        # Install GSLIB
         echo "Building GSLIB"
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $GSLIB_DIR
 
-        make CC=mpicc
+        make CC=$MPICC
         make install DESTDIR=.
         rm -fr build
 
@@ -221,18 +234,20 @@ function find_hdf5() {
         HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
     fi
 
-    # Clone HDF5 from the repository if it does not exist.
-    if [ ! -d $HDF5_DIR ]; then
-        [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
-        git clone --depth 1 --branch $HDF5_VERSION \
-            https://github.com/HDFGroup/hdf5.git $HDF5_DIR
-    fi
-
     # Ensure HDF5 is installed, if not install it.
-    if [[ -z "$(find $HDF5_DIR -name libhdf5.so)" ]]; then
+    if [[ -z "$(find $HDF5_DIR -name libhdf5_fortran.so)" ]]; then
+
+        # Clone HDF5 from the repository if it does not exist.
+        if [ ! -d $HDF5_DIR ]; then
+            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
+            git clone --depth 1 --branch $HDF5_VERSION \
+                https://github.com/HDFGroup/hdf5.git $HDF5_DIR
+        fi
+
+        # Build and install HDF5
         cmake -B $HDF5_DIR/build -S $HDF5_DIR --install-prefix $HDF5_DIR \
-            -DCMAKE_C_COMPILER=mpicc -DCMAKE_CXX_COMPILER=mpicxx \
-            -DCMAKE_Fortran_COMPILER=mpifort -DHDF5_ENABLE_PARALLEL=ON \
+            -DCMAKE_C_COMPILER=$MPICC -DCMAKE_CXX_COMPILER=$MPICXX \
+            -DCMAKE_Fortran_COMPILER=$MPIFC -DHDF5_ENABLE_PARALLEL=ON \
             -DHDF5_BUILD_FORTRAN=ON -DHDF5_ENABLE_SZIP_SUPPORT:BOOL=OFF \
             -DCMAKE_BUILD_TYPE=Release
         cmake --build $HDF5_DIR/build/ --config Release --parallel
@@ -264,10 +279,9 @@ function find_neko() {
     check_external_dir
 
     # Find the required dependencies for Neko
-    find_json_fortran
-    find_gslib
-    find_hdf5
-    [ "$TEST" == true ] && find_pfunit
+    find_json_fortran $JSON_FORTRAN_DIR
+    find_gslib $GSLIB_DIR
+    find_hdf5 $HDF5_DIR
 
     # Determine the Neko installation directory
     if [ ! -z "$1" ]; then
@@ -276,23 +290,22 @@ function find_neko() {
         NEKO_DIR="$(realpath $EXTERNAL_DIR/neko)"
     fi
 
-    # Clone Neko from the repository if it does not exist.
-    if [[ ! -d $NEKO_DIR || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
-        [ -z "$NEKO_VERSION" ] && NEKO_VERSION="develop"
-
-        git clone --depth 1 --branch $NEKO_VERSION \
-            https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
-    fi
-
     # Check if Neko is installed, if not install it.
-    if [[ -z "$(find $1/lib*/ -name libneko.a)" || "$CLEAN" == true ]]; then
+    if [[ -z "$(find $NEKO_DIR/lib*/ -name libneko.a)" || "$CLEAN_NEKO" == true ]]; then
+
+        # Clone Neko from the repository if it does not exist.
+        if [[ ! -d $NEKO_DIR || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
+            [ -z "$NEKO_VERSION" ] && NEKO_VERSION="develop"
+
+            git clone --depth 1 --branch $NEKO_VERSION \
+                https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+        fi
 
         # Determine available features
         FEATURES="--enable-contrib "
         [ ! -z "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
         [ ! -z "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ ! -z "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
-        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -313,10 +326,10 @@ function find_neko() {
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
-        if [[ ! -f "configure" || "$CLEAN" == true ]]; then
+        if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
             ./regen.sh
         fi
-        if [[ ! -f Makefile || "$CLEAN" == true ]]; then
+        if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
@@ -329,19 +342,8 @@ function find_neko() {
                 rm -fr autom4te.cache
             fi
         fi
-        [ "$CLEAN" == true ] && make clean
+        [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
-        [ "$TEST" == true ] && make check
-
-        # Verify installation device type
-        if [ "$DEVICE_TYPE" == "CUDA" ]; then
-            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
-            if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
-                error "CUDA backend not found in Neko."
-                error "Please ensure that the CUDA installation is correct."
-                exit 1
-            fi
-        fi
 
         cd $CURRENT_DIR
     fi
@@ -354,6 +356,26 @@ function find_neko() {
         error "the Neko source code."
         error "You can download the source code from:"
         error "\thttps://github.com/ExtremeFLOW/neko.git"
+        exit 1
+    fi
+
+    # Check the device type supported by neko
+    if [ "$DEVICE_TYPE" == "NONE" ]; then
+        PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
+    else
+        PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
+    fi
+    NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
+
+    if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
+        exit 1
+    elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
+        error "Neko device type does not match the requested device type."
+        error "Please ensure that the Neko installation is correct."
+        error "Requested device type: $DEVICE_TYPE"
         exit 1
     fi
 
@@ -388,7 +410,7 @@ function find_cubit() {
 # ============================================================================ #
 # Ensure ExodusII to Nek5000 is installed, if not install it.
 function find_exo2nek() {
-    find_nek5000
+    find_nek5000 $NEK5000_DIR
 
     # Check if exo2nek is available
     if [ ! -z "$(which exo2nek)" ]; then

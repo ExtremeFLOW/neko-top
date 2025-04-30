@@ -1,4 +1,4 @@
-program usrneko
+program topopt
   use simulation_m, only: simulation_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
@@ -67,4 +67,4 @@ program usrneko
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)
 
-end program usrneko
+end program topopt
