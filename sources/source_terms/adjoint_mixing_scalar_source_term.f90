@@ -65,7 +65,7 @@ module adjoint_mixing_scalar_source_term
      !> Reference concentration
      real(kind=rp) :: phi_ref
      !> A mask for where the source term is evaluated
-     class(point_zone_t), pointer :: mask
+     class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
      !> The volume of the masked region (or whole domain)
