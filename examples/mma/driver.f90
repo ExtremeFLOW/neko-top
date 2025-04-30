@@ -20,8 +20,8 @@ program usrneko
   class(design_t), allocatable :: design
   !> The problem type
   type(problem_t) :: problem
-  type(mma_obj) :: obj
-  type(mma_con) :: con_1, con_2
+  type(mma_obj), allocatable :: obj
+  type(mma_con), allocatable :: con_1, con_2
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: optimizer
 
@@ -54,6 +54,10 @@ program usrneko
   !
   !   minimize \f$\sum_(j = 1,..,n) x_j/n \f$
   ! subject to \f$\sum_(j = 1,..,n) (x_j - X_{j,GLL})^2 = 0 \f$
+
+  allocate(obj)
+  allocate(con_1)
+  allocate(con_2)
 
   call obj%init_from_components("Objective", design)
   call con_1%init_from_components("Positive", design, 1)
