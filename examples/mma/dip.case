@@ -99,7 +99,8 @@
     },
     "mma": {
         "max_iter": 100,
-        "backend": "cpu",
+        "backend": "cuda",
+        "subsolver": "dip",
         "asyinit": 0.5,
         "asyincr": 1.2,
         "asydecr": 0.7,
