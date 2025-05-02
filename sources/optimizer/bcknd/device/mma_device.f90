@@ -34,14 +34,16 @@ submodule (mma) mma_device
 
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
-       device_sub2, device_sub3, device_add2s2
+       device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax, &
+       device_glsum, device_cmult2, device_pwmax
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
        device_relambda, device_delx, device_add2inv2, device_gg, device_diagx, &
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
-       device_mma_gensub2
+       device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
+       device_mma_Ljjxinv, device_Hess
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST
@@ -78,7 +80,11 @@ contains
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
     !solve the approximation problem using interior point method
-    call mma_subsolve_dpip_device(this, xdesign)
+    if (this%subsolver .eq. "dip") then
+       call mma_subsolve_dip_device(this, xdesign)
+    else
+       call mma_subsolve_dpip_device(this, xdesign)
+    end if
     !update the design vector x on the host
     call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
@@ -87,6 +93,53 @@ contains
   end subroutine mma_update_device
 
   module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: fval, df0dx
+    type(matrix_t), intent(in) :: dfdx
+
+    if (this%subsolver .eq. "dip") then
+       call mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
+    else
+       call mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
+    end if
+  end subroutine mma_KKT_device
+
+  !> Implementation of the KKT residual computation for dual interior
+  ! point method (dip) subsolve of MMA algorithm.
+  module subroutine mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
+    class(mma_t), intent(inout) :: this
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    type(vector_t), intent(in) :: fval, df0dx
+    type(matrix_t), intent(in) :: dfdx
+
+    type(vector_t) :: relambda, remu
+
+    call relambda%init(this%m)
+    call remu%init(this%m)
+
+    ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
+    call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp, -this%z, &
+         this%m)
+    call device_sub2(relambda%x_d, this%y%x_d, this%m)
+    call device_add2(relambda%x_d, this%mu%x_d, this%m)
+
+    ! Compute residual for mu (eta in the paper)
+    call device_col3 (remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
+
+
+    this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
+         device_maxval(remu%x_d, this%m)])
+    this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
+         device_norm(remu%x_d, this%m))
+
+    call relambda%free()
+    call remu%free()
+  end subroutine mma_dip_KKT_device
+
+  !> Implementation of the KKT residual computation for dual primal interior
+  ! point method (dpip) subsolve of MMA algorithm.
+  module subroutine mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
     type(vector_t), intent(in) :: fval, df0dx
@@ -173,7 +226,7 @@ contains
     call rex%free()
     call rexsi%free()
     call reeta%free()
-  end subroutine mma_KKT_device
+  end subroutine mma_dpip_KKT_device
 
   !============================================================================!
   ! private internal subroutines
@@ -238,7 +291,8 @@ contains
 
   end subroutine mma_gensub_device
 
-  !> solve the subproblem defined by this%pij, this%qij, etc.
+  !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
+  !! interior point method
   subroutine mma_subsolve_dpip_device(this, designx)
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: designx
@@ -263,7 +317,7 @@ contains
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_xstuff_squ_global
 
-    integer :: nglobal, i
+    integer :: i
 
     real(kind=rp) :: cons
     real(kind=rp) :: minimal_epsilon
@@ -328,9 +382,6 @@ contains
     call device_memcpy(xsi%x, xsi%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(eta%x, eta%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
-
-    call MPI_Allreduce(this%n, nglobal, 1, MPI_INTEGER, mpi_sum, &
-         neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
@@ -513,7 +564,8 @@ contains
           call DGESV(this%m+1, 1, AA%x, this%m+1, ipiv, bb%x, this%m+1, &
                info)
           if (info .ne. 0) then
-             call neko_error("DGESV failed in mma_device.f90.")
+             call neko_error("DGESV failed to solve the linear system in " // &
+                  "mma_subsolve_dpip (device).")
           end if
           call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
                sync = .true.)
@@ -758,6 +810,372 @@ contains
 
   end subroutine mma_subsolve_dpip_device
 
+  !> solve the subproblem defined by this%pij, this%qij, etc. using dual
+  !! interior point method
+  subroutine mma_subsolve_dip_device(this, designx)
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(in) :: designx
+    integer :: iter, ierr
+    real(kind=rp) :: epsi, residumax, z, steg
+    ! vectors with size m
+    type(vector_t) :: y, lambda, mu, relambda, remu, dlambda, dmu, &
+         gradlambda, zerom, dd, dummy_m
+    ! vectors with size n
+    type(vector_t) :: x, pjlambda, qjlambda
 
+    ! inverse of a diag matrix:
+    type(vector_t) :: Ljjxinv ! [∇_x^2 Ljj]−1
+    type(matrix_t) :: hijx ! ∇_x hij
+    type(matrix_t) :: Hess
+    real(kind=rp) :: Hesstrace
+
+    integer :: info
+    integer, dimension(this%m+1) :: ipiv
+    integer :: i
+
+    real(kind=rp) :: minimal_epsilon
+
+    call y%init(this%m)
+    call lambda%init(this%m)
+    call mu%init(this%m)
+    call relambda%init(this%m)
+    call remu%init(this%m)
+    call dlambda%init(this%m)
+    call dmu%init(this%m)
+    call gradlambda%init(this%m)
+    call zerom%init(this%m)
+    call dd%init(this%m)
+    call dummy_m%init(this%m)
+
+    call x%init(this%n)
+    call pjlambda%init(this%n)
+    call qjlambda%init(this%n)
+
+    call Ljjxinv%init(this%n)
+    call hijx%init(this%m,this%n)
+    call Hess%init(this%m,this%m)
+
+    call device_cfill(zerom%x_d, 0.0_rp, this%m)
+
+    ! ------------------------------------------------------------------------ !
+    ! initial value for the parameters in the subsolve based on
+    ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
+
+    epsi = 1.0_rp !100
+    call device_cfill(y%x_d, 1.0_rp, this%m)
+    ! initialize lambda with an array of ones (change to this%c%x/2 if needed!)
+    call device_cfill(lambda%x_d, 1.0_rp, this%m)
+    call device_cmult2(dummy_m%x_d, this%c%x_d, 0.5_rp, this%m)
+    call device_pwmax(lambda%x_d, dummy_m%x_d, this%m)
+
+    call device_cfill(mu%x_d, 1.0_rp, this%m)
+    z = 0.0_rp
+
+    ! dd is defined as this%d + 1.0e-8_rp, to avoid devision by 0 in computing y
+    call device_cadd2(dd%x_d, this%d%x_d, 1.0e-8_rp, this%m)
+
+    ! ------------------------------------------------------------------------ !
+    ! Computing the minimal epsilon and choose the most conservative one
+
+    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! The main loop of the dual-primal interior point method.
+
+    outer: do while (epsi .gt. minimal_epsilon)
+       ! calculating residuals based on
+       ! "https://people.kth.se/~krille/mmagcmma.pdf" for the variables
+       ! x, y, z, lambda residuals based on eq(5.9a)-(5.9d), respectively.
+       associate(p0j => this%p0j, q0j => this%q0j, &
+            pij => this%pij, qij => this%qij, &
+            low => this%low, upp => this%upp, &
+            alpha => this%alpha, beta => this%beta, &
+            c => this%c, a0 => this%a0, a => this%a)
+
+         ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
+         ! the initial value of λ
+
+         ! Comput the value of y that minimizes L_y for the current λ
+         ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
+         ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
+         call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
+         ! division by dd to avoid devision by 0 (in case this%d%x_d)
+         call device_invcol2(y%x_d, dd%x_d, this%m)
+         call device_pwmax(y%x_d, zerom%x_d, this%m)
+
+         ! Comput the value of z that minimizes L_z for the current λ
+         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
+         ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+         ! ensure z>=0
+         call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
+         z = device_glsum(dummy_m%x_d, this%m)
+         z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
+
+         ! Comput the value of x that minimizes L_x for the current λ
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+         ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
+         ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
+         call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
+         call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
+         call device_add2(pjlambda%x_d, p0j%x_d, this%n)
+         call device_add2(qjlambda%x_d, q0j%x_d, this%n)
+
+         call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
+              low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+
+         call device_cfill(relambda%x_d, 0.0_rp, this%m)
+         call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
+              low%x_d, pij%x_d, qij%x_d, this%n, this%m)
+
+         ! Global comminucation for relambda values
+
+         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+         call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+              mpi_real_precision, mpi_sum, neko_comm, ierr)
+         call device_memcpy(relambda%x, relambda%x_d, this%m, &
+              HOST_TO_DEVICE, sync = .true.)
+
+         call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
+         call device_sub2(relambda%x_d, y%x_d, this%m)
+         call device_add2(relambda%x_d, mu%x_d, this%m)
+         call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+
+         call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
+         call device_cadd(remu%x_d, -epsi, this%m)
+
+         ! Download the re(lambda, mu) to CPU to calculate residumax
+
+         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+         call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
+              sync = .true.)
+         residumax = maxval(abs([relambda%x, remu%x]))
+
+         ! ------------------------------------------------------------------- !
+         ! Internal loop
+         do iter = 1, this%max_iter
+            !Check the condition
+            if (residumax .lt. epsi) exit
+
+            ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
+            ! based on the implementation in the following paper by Niels
+            ! https://doi.org/10.1007/s00158-012-0869-2
+            ! (https://github.com/topopt/TopOpt_in_PETSc/blob/master/MMA.cc)
+            ! The formula for gradlambda and relambda are basically the same:
+            ! thus, we utilise gradlambda = relambda - mu for efficiency
+            call device_copy(gradlambda%x_d, relambda%x_d, this%m)
+            call device_sub2(gradlambda%x_d, mu%x_d, this%m)
+
+            ! Update gradlambda as the right hand side for Newton's method(eq10)
+            call device_cfill(dummy_m%x_d, epsi, this%m)
+            call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
+            call device_add2(gradlambda%x_d, dummy_m%x_d, this%m)
+            call device_cmult(gradlambda%x_d, -1.0_rp, this%m)
+
+            ! Computing the Hessian as in equation (13) in
+            !! https://doi.org/10.1007/s00158-012-0869-2
+
+            !--------------contributions of x terms to Hess--------------------!
+            call device_mma_Ljjxinv(Ljjxinv%x_d, pjlambda%x_d, qjlambda%x_d, &
+                 x%x_d, low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+
+            call device_GG(hijx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
+                 this%pij%x_d, this%qij%x_d, this%n, this%m)
+
+            call device_memcpy(hijx%x, hijx%x_d, this%n*this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+
+            call device_cfill(Hess%x_d, 0.0_rp, (this%m) * (this%m) )
+            call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
+
+            ! download Hess to CPU, mpi reduce, upload to the device
+            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
+                 this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+            ! No need to upload to device since we solve LSE on CPU
+            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
+            ! HOST_TO_DEVICE, sync = .true.)
+
+            !---------------contributions of z terms to Hess-------------------!
+            ! There is no contibution to the Hess from z terms as z terms are
+            ! linear w.r.t λ
+
+
+            !---------------contributions of y terms to Hess-------------------!
+            ! Only for inactive constraint, we consider contributions to Hess.
+            ! Note that if d(i) = 0, the y terms (just like z terms) will not
+            ! contribute to the Hessian matrix.
+            ! Note that since we use DGESV to solve LSE on CPU, we dont need
+            ! cuda kernel for this part
+
+            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            do i = 1, this%m
+               if (y%x(i) .gt. 0.0_rp) then
+                  if (abs(this%d%x(i)) < 1.0e-15_rp) then
+                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
+                  else
+                     Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
+                  end if
+               end if
+               ! Based on eq(10), note the term (-\Omega \Lambda)
+               Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
+            end do
+
+            ! Improve the robustness by stablizing the Hess using
+            ! Levenberg-Marquardt algorithm (heuristically)
+            Hesstrace = 0.0_rp
+            do i=1, this%m
+               Hesstrace = Hesstrace + Hess%x(i, i)
+            end do
+            do i=1, this%m
+               Hess%x(i,i) = Hess%x(i, i) - &
+                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+            end do
+
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call DGESV(this%m , 1, Hess%x, this%m , ipiv, &
+                 gradlambda%x, this%m, info)
+
+            if (info .ne. 0) then
+               call neko_error("DGESV failed to solve the linear system in " // &
+                    "mma_subsolve_dip (device).")
+            end if
+            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
+                 sync = .true.)
+
+            call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
+
+            ! based on eq(11) for delta eta
+            call device_copy(dummy_m%x_d, dlambda%x_d, this%m)
+            call device_col2(dummy_m%x_d, mu%x_d, this%m)
+            call device_invcol2(dummy_m%x_d, lambda%x_d, this%m)
+
+            call device_cfill(dmu%x_d, epsi, this%m)
+            call device_invcol2(dmu%x_d, lambda%x_d, this%m)
+            call device_add2s2(dmu%x_d, dummy_m%x_d, -1.0_rp, this%m)
+            call device_sub2(dmu%x_d, mu%x_d, this%m)
+
+            steg = maxval([1.005_rp, device_maxval2(dlambda%x_d, lambda%x_d, &
+                 -1.01_rp, this%m), device_maxval2(dmu%x_d, mu%x_d, -1.01_rp, &
+                 this%m)])
+            steg = 1.0_rp / steg
+
+            call device_add2s2(lambda%x_d, dlambda%x_d, steg, this%m)
+            call device_add2s2(mu%x_d, dmu%x_d, steg, this%m)
+
+            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+
+            ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
+            ! the updated values of λ
+
+            ! Comput the value of y that minimizes L_y for the current λ
+            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
+            ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
+
+            call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
+            ! division by dd to avoid devision by 0 (in case this%d%x_d)
+            call device_invcol2(y%x_d, dd%x_d, this%m)
+            call device_pwmax(y%x_d, zerom%x_d, this%m)
+
+            ! Comput the value of z that minimizes L_z for the current λ
+            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
+            ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+            ! ensure z>=0
+            call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
+            z = device_glsum(dummy_m%x_d, this%m)
+            z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
+
+            ! Comput the value of x that minimizes L_x for the current λ
+            ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+            ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
+            ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
+            call device_mattrans_v_mul(pjlambda%x_d, pij%x_d, lambda%x_d, this%m, this%n)
+            call device_mattrans_v_mul(qjlambda%x_d, qij%x_d, lambda%x_d, this%m, this%n)
+            call device_add2(pjlambda%x_d, p0j%x_d, this%n)
+            call device_add2(qjlambda%x_d, q0j%x_d, this%n)
+
+            call device_mma_dipsolvesub1(x%x_d, pjlambda%x_d, qjlambda%x_d, &
+                 low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
+
+            ! Compute the residual for the lambda and mu using eq(9) and eq(15)
+
+            call device_cfill(relambda%x_d, 0.0_rp, this%m)
+            call device_relambda(relambda%x_d, x%x_d, this%upp%x_d, &
+                 low%x_d, pij%x_d, qij%x_d, this%n, this%m)
+
+            ! Global comminucation for relambda values
+
+            call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+                 mpi_real_precision, mpi_sum, neko_comm, ierr)
+            call device_memcpy(relambda%x, relambda%x_d, this%m, &
+                 HOST_TO_DEVICE, sync = .true.)
+
+            call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
+            call device_sub2(relambda%x_d, y%x_d, this%m)
+            call device_add2(relambda%x_d, mu%x_d, this%m)
+            call device_sub2(relambda%x_d, this%bi%x_d, this%m)
+
+            call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
+            call device_cadd(remu%x_d, -epsi, this%m)
+
+
+            !> Download the re(lambda, mu) to CPU to calculate residumax
+
+            call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
+                 sync = .true.)
+            residumax = maxval(abs([relambda%x, remu%x]))
+         end do
+       end associate
+       epsi = 0.1_rp * epsi
+    end do outer
+
+    ! Save the new designx
+    call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
+    call device_copy(this%xold1%x_d, designx%x_d, this%n)
+    call device_copy(designx%x_d, x%x_d, this%n)
+
+    ! update the parameters of the MMA object nesessary to compute KKT residual
+    call device_copy(this%y%x_d, y%x_d, this%m)
+    this%z = z
+    call device_copy(this%lambda%x_d, lambda%x_d, this%m)
+    call device_copy(this%mu%x_d, mu%x_d, this%m)
+
+    call y%free()
+    call lambda%free()
+    call mu%free()
+    call relambda%free()
+    call remu%free()
+    call dlambda%free()
+    call dmu%free()
+    call gradlambda%free()
+    call zerom%free()
+    call dd%free()
+    call dummy_m%free()
+
+    call x%free()
+    call pjlambda%free()
+    call qjlambda%free()
+
+    call Ljjxinv%free()
+    call hijx%free()
+    call Hess%free()
+  end subroutine mma_subsolve_dip_device
 
 end submodule mma_device
