@@ -68,6 +68,7 @@ module adjoint_scalar_pnpn
   use time_step_controller, only : time_step_controller_t
   use scratch_registry, only : neko_scratch_registry
   use bc, only : bc_t
+  use field_math, only: field_rzero
   implicit none
   private
 
@@ -358,6 +359,8 @@ contains
          makeext => this%makeext, makebdf => this%makebdf, &
          if_variable_dt => dt_controller%if_variable_dt, &
          dt_last_change => dt_controller%dt_last_change)
+
+
 
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)

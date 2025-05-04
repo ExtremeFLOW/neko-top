@@ -772,6 +772,18 @@ contains
       call sumab%compute_fluid(u_e, v_e, w_e, u, v, w, &
            ulag, vlag, wlag, ext_bdf%advection_coeffs, ext_bdf%nadv)
 
+      ! DELETE THIS, it's super hard coded! But I'm forcing w to zero at each
+      ! timestep!
+      call field_rzero(w)
+      call field_rzero(w_e)
+      ! and this!
+      call z_plane_fix(u)
+      call z_plane_fix(v)
+      call z_plane_fix(w)
+      call z_plane_fix(u_e)
+      call z_plane_fix(v_e)
+      ! should probably do the lags too
+
       ! Compute the source terms
       call this%source_term%compute(t, tstep)
 
@@ -830,6 +842,10 @@ contains
               u, v, w, c_Xh%B, rho, dt, &
               ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       end if
+
+      ! DELETE THIS,
+      ! again, hard code the shit out of this so that everything is 2D.
+      call field_rzero(f_z)
 
       call ulag%update()
       call vlag%update()
@@ -932,12 +948,22 @@ contains
       call this%proj_w%post_solving(dw%x, Ax_vel, c_Xh, &
            this%bclst_dw, gs_Xh, n, tstep, dt_controller)
 
+      ! DELETE
+      ! zero out dw
+      call field_rzero(dw)
+
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_opadd2cm(u%x_d, v%x_d, w%x_d, &
               du%x_d, dv%x_d, dw%x_d, 1.0_rp, n, msh%gdim)
       else
          call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
       end if
+
+      ! DELETE
+      ! one more for safety
+      call z_plane_fix(u)
+      call z_plane_fix(v)
+      call z_plane_fix(w)
 
       if (this%forced_flow_rate) then
          call neko_error('Forced flow rate is not implemented for the adjoint')
@@ -1534,6 +1560,7 @@ contains
 
   subroutine adjoint_fluid_pnpn_reset(this)
   class(adjoint_fluid_pnpn_t), intent(inout) :: this
+  integer :: i
 
     ! zero out flds
     call field_rzero(this%u_adj)
@@ -1541,10 +1568,17 @@ contains
     call field_rzero(this%w_adj)
     call field_rzero(this%p_adj)
 
-    ! zero out lag fields (weird notation... but C%fluid_adj%u_adj will be zero)
-    call this%ulag%set(this%u_adj)
-    call this%vlag%set(this%u_adj)
-    call this%wlag%set(this%u_adj)
+    ! zero out lag fields (weird notation... but this%u_adj will now be zero)
+    ! call this%ulag%set(this%u_adj)
+    ! call this%vlag%set(this%u_adj)
+    ! call this%wlag%set(this%u_adj)
+
+    ! just in case "set" doesn't work properly
+       do i = 1, this%ulag%size()
+          call field_rzero(this%ulag%lf(i))
+          call field_rzero(this%vlag%lf(i))
+          call field_rzero(this%wlag%lf(i))
+       end do
 
     ! zero out RHS
     call field_rzero(this%f_adj_x)
@@ -1563,6 +1597,25 @@ contains
     ! this is sufficient and will be handled in the beginning of the simulation
 
   end subroutine adjoint_fluid_pnpn_reset
+
+  subroutine z_plane_fix(fld)
+  type(field_t), intent(inout) :: fld
+  integer :: iel, iz, iy, ix, nel
+  ! note this wont work on GPUs
+
+  do iel = 1, fld%msh%nelv
+     do iz = 2, fld%xh%lz
+     do iy = 1, fld%xh%ly
+     do ix = 1, fld%xh%lx
+
+     fld%x(ix, iy, iz, iel) = fld%x(ix, iy, 1, iel)
+     
+     end do
+     end do
+     end do
+  end do
+
+  end subroutine z_plane_fix
 
 
 end module adjoint_fluid_pnpn
