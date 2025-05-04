@@ -4,8 +4,10 @@ program usrneko
   use LightKrylov
   use LightKrylov, only: wp => dp, rtol => rtol_dp
   use LightKrylov_Logger
-  use cylinder
+  use LightKrylov_Constants
+  use cylinder, only: neko_propagator, state_vector, my_eigs
   use global_coef, only: global_coef_t, global_coef_getter
+  use LightKrylov_IterativeSolvers, only: write_results_cdp
   implicit none
 
   character(len=128), parameter :: this_module = 'Example cylinder'
@@ -28,7 +30,7 @@ program usrneko
   !> Number of eigenvalues we wish to converge.
   integer, parameter :: nev = 2
   !> Size of Krylov subspace.
-  integer, parameter :: kdim = 128
+  integer, parameter :: kdim = 256
   !> Krylov subspace.
   type(state_vector), allocatable :: X(:)
   !> Eigenvalues.
@@ -37,6 +39,9 @@ program usrneko
   real(kind=wp), allocatable    :: residuals(:)
   !> Information flag.
   integer          :: info
+
+  !> writer
+  type(state_vector), allocatable :: X_writer
 
   !> Miscellaneous.
   integer :: i, j
@@ -64,6 +69,9 @@ program usrneko
   !> Initialize Krylov subspace.
   allocate(X(nev)); call initialize_krylov_subspace(X)
 
+  !> initialize writer
+  allocate(X_writer); call X_writer%zero()
+
 
   !---------------------------------------
   !-----     CHECK LINEAR SOLVER     -----
@@ -72,7 +80,8 @@ program usrneko
   ! call X(1)%rand()
   ! do i = 1, 100
   !    call A%matvec(X(1), X(2))
-  !    call X(1)%copy(X(2))
+  !    call X(1)%axpby(1.0_wp, X(2), 0.0_wp)
+  !    call X(1)%scal(1.0_wp/x(1)%norm())
   ! end do
 
   !------------------------------------------
@@ -82,7 +91,8 @@ program usrneko
   !> Call to LightKrylov.
   ! call eigs(A, X, lambda, residuals, info)
   call eigs(A, X, lambda, residuals, info, kdim = kdim, tolerance = rtol)
-  !call check_info(info, 'eigs', module=this_module, procedure='main')
+  call check_info(info, 'eigs', module=this_module, procedure='main')
+  ! call my_eigs(A, X, lambda, residuals, info, kdim = kdim, tolerance = rtol)
 
   !> Transform eigenspectrum from unit-disk to standard complex plane.
   lambda = log(lambda) / tau
@@ -100,8 +110,8 @@ program usrneko
   !> Save eigenvectors to disk.
   ! (use the nth in the subspace for writing)
   do i = 1, nev
-      call X(nev)%copy(X(i))
-      call X(nev)%write(i)
+      call X_writer%axpby(1.0_wp, X(i), 0.0_wp)
+      call X_writer%write(i)
   enddo
 
   !> Clean up

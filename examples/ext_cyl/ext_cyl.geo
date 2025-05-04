@@ -10,16 +10,16 @@ SetFactory("OpenCASCADE");
 // mesh parameters
 cyl_rad = DefineNumber[ 0.5 , Min 0.25, Max 1.0, Step 0.05, Name "Cylinder radius" ];
 box_square = DefineNumber[ 3.0 , Min 2.0, Max 10.0, Step 1.0, Name "Size of a square region around cylinder" ];
-box_min_x = DefineNumber[ -14.9 , Min -30.0, Max -10.0, Step 1.0, Name "Domain minimum x" ];
-box_max_x = DefineNumber[  34.9 , Min  10.0, Max  50.0, Step 1.0, Name "Domain maximum x" ];
-box_width = DefineNumber[ 29.8 , Min 20.0, Max 50.0, Step 1.0, Name "Domain with" ];
+box_min_x = DefineNumber[ -15 , Min -30.0, Max -10.0, Step 1.0, Name "Domain minimum x" ];
+box_max_x = DefineNumber[  35 , Min  10.0, Max  50.0, Step 1.0, Name "Domain maximum x" ];
+box_width = DefineNumber[ 30 , Min 20.0, Max 50.0, Step 1.0, Name "Domain with" ];
 // mesh parameters
 // number of splits at the cylinder surface
 srf_nsplit = DefineNumber[ 8 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface" ];
 // number of splits at the cylinder surface from the wake side
 wsrf_nsplit = DefineNumber[ 8 , Min 2, Max 20, Step 1, Name "Numer of splits; cylinder surface from the wake side" ];
 // number of splits normal to the cylinder surface
-nsrf_nsplit = DefineNumber[ 6 , Min 4, Max 20, Step 1, Name "Numer of splits; normal to the cylinder surface" ];
+nsrf_nsplit = DefineNumber[ 4 , Min 4, Max 20, Step 1, Name "Numer of splits; normal to the cylinder surface" ];
 // number of splits in front of cylinder
 front_nsplit = DefineNumber[ 15 , Min 2, Max 20, Step 1,   Name "Numer of splits; front of cylinder" ];
 // number of splits in wake

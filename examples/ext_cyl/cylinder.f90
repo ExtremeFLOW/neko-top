@@ -6,7 +6,7 @@ module cylinder
    use stdlib_math, only : linspace
    use stdlib_optval, only : optval
    ! Additional neko-top libraries (to solve linearized and adjoint)
-   use num_types, only : rp
+   use num_types, only : rp, dp
    use neko, only: neko_init, neko_finalize, neko_solve
    use case, only : case_t
    use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
@@ -26,10 +26,16 @@ module cylinder
    use device_math, only: device_glsc3
    use device, only : device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: gs_t, GS_OP_ADD
+   use comm, only: pe_rank
    ! This one is silly... But we need coef to initialize fields
    use global_coef, only: global_coef_t, global_coef_getter
    ! sponges
    use sponge_source_term, only: sponge_source_term_t
+   ! debugging, my own eigs
+   use LightKrylov_Constants
+   use LightKrylov_Utils
+       use LightKrylov_Logger, only: log_warning, log_error, log_message, log_information, &
+    &                             log_debug, stop_error, check_info, type_error
    implicit none
  
    character*128, parameter, private :: this_module = 'cylinder'
@@ -138,6 +144,11 @@ module cylinder
 
           ! done
           self%initialized = .true.
+          call self%zero()
+
+          if (pe_rank.eq.0) then
+             print *, "im initializing myself!"
+          end if
      end if
 
      return
@@ -176,21 +187,24 @@ module cylinder
      select type(vec)
      type is(state_vector)
         ! always try initializing
-        call state_vector_init_wrapper(self)
-        call state_vector_init_wrapper(vec)
+        ! call state_vector_init_wrapper(self)
+        ! call state_vector_init_wrapper(vec)
 
         ! here we're going to take an energy norm I guess...
         n = self%u%size()
+        alpha_rp = 0.0_rp
         if (NEKO_BCKND_DEVICE .eq. 1) then
            alpha_rp = device_glsc3(self%u%x_d, vec%u%x_d, self%coef%B_d, n)
            alpha_rp = alpha_rp + device_glsc3(self%v%x_d, vec%v%x_d, self%coef%B_d, n)
-           alpha_rp = alpha_rp + device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
+           ! force 2D
+           ! alpha_rp = alpha_rp + device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
        else
            alpha_rp = glsc3(self%u%x, vec%u%x, self%coef%B, n)
            alpha_rp = alpha_rp + glsc3(self%v%x, vec%v%x, self%coef%B, n)
-           alpha_rp = alpha_rp + glsc3(self%w%x, vec%w%x, self%coef%B, n)
+           ! force 2D
+           ! alpha_rp = alpha_rp + glsc3(self%w%x, vec%w%x, self%coef%B, n)
        end if
-       alpha_rp = alpha_rp * 0.5_rp
+       ! alpha_rp = alpha_rp * 0.5_rp
        alpha = real(alpha_rp, wp)
 
      end select
@@ -202,12 +216,14 @@ module cylinder
      real(kind=wp)      , intent(in)    :: alpha
      real(kind=rp) :: alpha_rp
      ! always try initializing
-     call state_vector_init_wrapper(self)
+     ! call state_vector_init_wrapper(self)
 
      alpha_rp = real(alpha, rp)
      call field_cmult(self%u, alpha_rp)
      call field_cmult(self%v, alpha_rp)
      call field_cmult(self%w, alpha_rp)
+     ! force 2D
+     ! call field_rzero(self%w)
      call field_cmult(self%p, alpha_rp)
      return
    end subroutine scal
@@ -220,20 +236,27 @@ module cylinder
      select type(vec)
      type is(state_vector)
         ! always try initializing
+        ! (I HOPE this is only to satisfy the intent of copy...)
         call state_vector_init_wrapper(self)
-        call state_vector_init_wrapper(vec)
+        ! call state_vector_init_wrapper(vec)
 
         alpha_rp = real(alpha, kind=rp)
         beta_rp = real(beta, kind=rp)
+
+        ! if (pe_rank.eq.0) then
+        ! print *, "axbpy, alpha = ", alpha_rp, " beta = ", beta_rp
+        ! end if
 
         ! be careful with the order here !
         ! notice the axpby(alpha, vec, beta, self)
         ! in Ginzberg_landau we have:
         ! self%state = beta*self%state + alpha*vec%state
-        call self%scal(beta_rp)
+        call self%scal(beta)
         call field_add2s2(self%u, vec%u, alpha_rp)
         call field_add2s2(self%v, vec%v, alpha_rp)
         call field_add2s2(self%w, vec%w, alpha_rp)
+        ! force 2D
+        ! call field_rzero(self%w)
         call field_add2s2(self%p, vec%p, alpha_rp)
      end select
      return
@@ -242,7 +265,7 @@ module cylinder
    integer function get_size(self) result(N)
      class(state_vector), intent(in) :: self
      ! always try initializing
-     call state_vector_init_wrapper(self)
+     ! call state_vector_init_wrapper(self)
      ! hmmm self is a bit confusing. I assume you mean the TOTAL size, ie,
      ! number of GLL pts for all 3 components...
      N = self%u%size() + self%v%size() + self%w%size()
@@ -257,7 +280,7 @@ module cylinder
      real(kind=wp) :: alpha
      
      ! always try initializing
-     call self%init()
+     ! call self%init()
 
      normalize = optval(ifnorm,.true.)
      call rand_ic(self%u, self%v, self%w)
@@ -321,25 +344,23 @@ module cylinder
                 fcoeff(1) = 3.0e4_rp
                 fcoeff(2) = -1.5e3_rp
                 fcoeff(3) = 0.5e5_rp
-                u%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, iz, iel, xl, &
+                u%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, 1, iel, xl, &
                      fcoeff) * 1.0e-08_rp
                 fcoeff(1) = 2.3e4_rp
                 fcoeff(2) = 2.3e3_rp
                 fcoeff(3) = -2.0e5_rp
-                v%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, iz, iel, xl, &
+                v%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, 1, iel, xl, &
                      fcoeff) * 1.0e-08_rp
                 ! 2D
                 w%x(ix, iy, iz, iel) = 0.0_rp
-
-                if (xl(1) .lt. -12.0_rp) then
-                   ! this is not needed I was just double checking my BCs
-                   u%x(ix, iy, iz, iel) = 0.0_rp
-                   v%x(ix, iy, iz, iel) = 0.0_rp
-                end if
              end do
           end do
        end do
     end do
+
+    ! fucking quasi 2D
+    call z_plane_fix(u)
+    call z_plane_fix(v)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
       call device_memcpy(u%x, u%x_d, u%size(), host_to_device, .true.)
@@ -410,16 +431,23 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
-           call self%write_linear(0)
+           call self%write_linear(self%get_counter(.false.))
            call solve_wrapper(self%linear_case)
            ! call self%write_linear(1)
-           ! There is a chance that vec_out isn't initialized!
+           ! Since vec_out has intent out, I HOPE we can safely assume it wont
+           ! care about the value it held before computing.
+           ! however, we need to init again.
            call init_wrapper(vec_out)
            ! Pass-back the state vector.
            call field_copy(vec_out%u, self%linear_case%fluid_adj%u_adj)
            call field_copy(vec_out%v, self%linear_case%fluid_adj%v_adj)
            call field_copy(vec_out%w, self%linear_case%fluid_adj%w_adj)
            call field_copy(vec_out%p, self%linear_case%fluid_adj%p_adj)
+           ! fucking quasi 2D...
+           call z_plane_fix(vec_out%u)
+           call z_plane_fix(vec_out%v)
+           call z_plane_fix(vec_out%w)
+           call z_plane_fix(vec_out%p)
         end select
      end select
      return
@@ -454,6 +482,7 @@ module cylinder
            call field_copy(vec_out%u, self%adjoint_case%fluid_adj%u_adj)
            call field_copy(vec_out%v, self%adjoint_case%fluid_adj%v_adj)
            call field_copy(vec_out%w, self%adjoint_case%fluid_adj%w_adj)
+           
         end select
      end select
      return
@@ -482,7 +511,7 @@ module cylinder
         self%linear_case%fluid_adj%f_adj_y, self%linear_case%fluid_adj%f_adj_z, &
         self%linear_case%fluid_adj%u_adj, self%linear_case%fluid_adj%v_adj, &
         self%linear_case%fluid_adj%w_adj, self%linear_case%fluid_adj%c_Xh)
-     call self%linear_case%fluid_adj%source_term%add(linear_sponge)
+     ! call self%linear_case%fluid_adj%source_term%add(linear_sponge)
 
      ! NOTE baseflow should be loaded via IC in .case file, but let's double
      ! check
@@ -568,6 +597,150 @@ module cylinder
 
      return
    end subroutine init_wrapper
+
+
+    subroutine my_eigs(A, X, eigvals, residuals, info, x0, kdim, tolerance, transpose, write_intermediate)
+        class(abstract_linop_rdp), intent(inout) :: A
+        !! Linear operator whose leading eigenpairs need to be computed.
+        type(state_vector), intent(out) :: X(:)
+        !! Leading eigenvectors of \(\mathbf{A}\).
+        complex(dp), allocatable, intent(out) :: eigvals(:)
+        !! Leading eigenvalues of \(\mathbf{A}\).
+        real(dp), allocatable, intent(out) :: residuals(:)
+        !! Residuals associated to each Ritz eigenpair.
+        integer, intent(out) :: info
+        !! Information flag.
+        type(state_vector), optional, intent(in) :: x0
+        !! Optional starting vector for generating the Krylov subspace.
+        integer, optional, intent(in) :: kdim
+        !! Maximum dimension of the Krylov subspace (optional).
+        real(dp), optional, intent(in) :: tolerance
+        !! Tolerance.
+        logical, optional, intent(in) :: transpose
+        !! Determine whether \(\mathbf{A}\) or \(\mathbf{A}^H\) is being used.
+        logical, optional, intent(in) :: write_intermediate
+        !! Write intermediate eigenvalues to file during iteration?
+
+        !! to spy!
+        type(state_vector) :: X_writer
+
+        !--------------------------------------
+        !-----     Internal variables     -----
+        !--------------------------------------
+
+        ! Krylov subspace and Krylov subspace dimension.
+        type(state_vector), allocatable :: Xwrk(:)
+        integer :: kdim_, kstart
+        ! Hessenberg matrix.
+        real(dp), allocatable :: H(:, :)
+        ! Working arrays for the eigenvectors and eigenvalues.
+        real(dp), allocatable :: eigvecs_wrk(:, :)
+        complex(dp), allocatable :: eigvals_wrk(:)
+        real(dp), allocatable :: residuals_wrk(:)
+        ! Miscellaneous.
+        character(len=*), parameter :: this_procedure = 'my_eigs'
+        integer :: nev, conv
+        integer :: i, j, k, niter, krst
+        real(dp) :: tol, x0_norm
+        real(dp) :: beta
+        real(dp) :: alpha
+        logical :: outpost
+        character(len=256) :: msg
+
+        ! Deals with optional parameters.
+        nev = size(X)
+        kdim_   = optval(kdim, 4*nev)
+        tol     = optval(tolerance, rtol_dp)
+        outpost = optval(write_intermediate, .true.)
+
+        ! Allocate eigenvalues.
+        allocate(eigvals(nev)) ; eigvals = 0.0_dp
+
+        ! Allocate working variables.
+        allocate(Xwrk(kdim_+1), source=X(1)) ; call zero_basis(Xwrk)
+        if (present(x0)) then
+            call copy(Xwrk(1), x0)
+            x0_norm = x0%norm(); call Xwrk(1)%scal(one_rdp/x0_norm)
+        else
+            call Xwrk(1)%rand(.true.)
+        endif
+        allocate(H(kdim_+1, kdim_)) ; H = 0.0_dp
+        allocate(eigvecs_wrk(kdim_, kdim_)) ; eigvecs_wrk = 0.0_dp
+        allocate(eigvals_wrk(kdim_)) ; eigvals_wrk = 0.0_dp
+        allocate(residuals_wrk(kdim_)) ; residuals_wrk = 0.0_dp
+
+        ! Ritz eigenpairs computation.
+        H = 0.0_dp
+
+        ! to spy
+        call X_writer%zero()
+
+        kstart = 1 ; conv = 0 ; niter = 0 ; krst = 1
+
+
+           arnoldi_factorization: do k = kstart, kdim_
+                ! Arnoldi step.
+                call arnoldi(A, Xwrk, H, info, kstart=k, kend=k, transpose=transpose)
+                call check_info(info, 'arnoldi', this_module, this_procedure)
+
+                ! Spectral decomposition of the k x k Hessenberg matrix.
+                eigvals_wrk = 0.0_dp ; eigvecs_wrk = 0.0_dp
+                call eig(H(:k, :k), eigvecs_wrk(:k, :k), eigvals_wrk(:k))
+
+                ! Compute residuals.
+                beta = H(k+1, k)
+                do i = 1, k
+                    if (eigvals_wrk(i)%im > 0) then
+                        alpha = abs(cmplx(eigvecs_wrk(k, i), eigvecs_wrk(k, i+1), kind=dp))
+                    else if (eigvals_wrk(i)%im < 0) then
+                        alpha = abs(cmplx(eigvecs_wrk(k, i-1), eigvecs_wrk(k, i), kind=dp))
+                    else
+                        alpha = abs(eigvecs_wrk(k, i))
+                    endif
+                    residuals_wrk(i) = abs(alpha*beta)
+                enddo
+
+                ! write residual
+                if (pe_rank.eq.0) then
+                do i =1,k
+                 print *, "RESIDUAL ", i, " = ",  residuals_wrk(i)
+                end do
+                end if
+
+                ! save current space
+                  do i = 1, k
+                    call X_writer%copy(Xwrk(i))
+                    call X_writer%write(i)
+                  enddo
+
+                ! Check convergence.
+                niter = niter + 1
+                conv = count(residuals_wrk(:k) < tol)
+                write(msg,'(I0,A,I0,A,I0,A)') conv, '/', nev, ' eigenvalues converged after ', niter, &
+                            & ' steps of the Arnoldi process.'
+                call log_information(msg, this_module, this_procedure)
+                if (conv >= nev) exit arnoldi_factorization
+            enddo arnoldi_factorization
+            
+    end subroutine my_eigs
  
+   subroutine z_plane_fix(fld)
+  type(field_t), intent(inout) :: fld
+  integer :: iel, iz, iy, ix, nel
+  ! note this wont work on GPUs
+
+  do iel = 1, fld%msh%nelv
+     do iz = 2, fld%xh%lz
+     do iy = 1, fld%xh%ly
+     do ix = 1, fld%xh%lx
+
+     fld%x(ix, iy, iz, iel) = fld%x(ix, iy, 1, iel)
+     
+     end do
+     end do
+     end do
+  end do
+
+  end subroutine z_plane_fix
  
  end module cylinder

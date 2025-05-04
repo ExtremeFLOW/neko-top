@@ -6,9 +6,9 @@
         "output_at_end": false,
         "output_boundary": false,
         "end_time": 1.0,
-        "timestep": 3e-3,
+        "timestep": 5e-3,
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
@@ -24,7 +24,7 @@
                 "type": "cg",
                 "preconditioner": "jacobi",
                 "projection_space_size": 0,
-                "absolute_tolerance": 1e-8,
+                "absolute_tolerance": 1e-9,
                 "max_iterations": 100
             },
             "pressure_solver": {
@@ -38,11 +38,7 @@
             "boundary_conditions": [ // these don't actually do anything
                 {
                     "type": "no_slip",
-                    "zone_indices": [1, 2]
-                },
-                {
-                    "type": "symmetry",
-                    "zone_indices": [4, 5] 
+                    "zone_indices": [1, 2, 4, 5]
                 },
                 {
                     "type": "outflow",
@@ -54,11 +50,7 @@
             "boundary_conditions": [
                 {
                     "type": "no_slip",
-                    "zone_indices": [1, 2] // note these are lin and adj
-                },
-                {
-                    "type": "symmetry",
-                    "zone_indices": [4, 5] 
+                    "zone_indices": [1, 2, 4, 5] // note these are lin and adj
                 },
                 {
                     "type": "outflow",
