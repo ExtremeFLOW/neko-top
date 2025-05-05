@@ -32,8 +32,8 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MMA_KERNEL_H
-#define MMA_KERNEL_H
+#ifndef MMA_CUDA_KERNEL_H
+#define MMA_CUDA_KERNEL_H
 template <typename T>
 __global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
      const T* __restrict__ x, const T* __restrict__ xmin,

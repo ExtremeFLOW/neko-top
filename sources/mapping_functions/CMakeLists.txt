@@ -22,7 +22,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 
-
 if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
@@ -47,4 +46,3 @@ elseif(DEVICE_TYPE STREQUAL "HIP")
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip
     )
 endif()
-
