@@ -21,7 +21,7 @@ module cylinder
    use neko_config, only : NEKO_BCKND_DEVICE
    use scratch_registry, only: neko_scratch_registry
    use field_math, only: field_addcol3, field_rzero, field_cmult, &
-      field_add2s2, field_copy
+      field_add2s2, field_copy, field_add3s2
    use math, only: glsc3
    use device_math, only: device_glsc3
    use device, only : device_memcpy, HOST_TO_DEVICE
@@ -36,8 +36,18 @@ module cylinder
    use LightKrylov_Utils
        use LightKrylov_Logger, only: log_warning, log_error, log_message, log_information, &
     &                             log_debug, stop_error, check_info, type_error
+
+   ! this my "my_eigs"
+   use LightKrylov_Timing, only: timer => global_lightkrylov_timer, time_lightkrylov
+   use stdlib_stats, only: median
+   use stdlib_sorting, only: sort_index
+   use LightKrylov_IterativeSolvers, only: write_results_cdp
+   use stdlib_linalg, only: schur
+
+
+
    implicit none
- 
+  character(len=*), parameter :: eigs_output      = 'eigs_output.txt'
    character*128, parameter, private :: this_module = 'cylinder'
  
    !------------------------------
@@ -51,14 +61,11 @@ module cylinder
    !-------------------------------------------
  
    type, extends(abstract_vector_rdp), public :: state_vector
-      ! adjoint velocity fields
-      type(field_t), pointer :: u => null()
-      type(field_t), pointer :: v => null()
-      type(field_t), pointer :: w => null()
-      type(field_t), pointer :: p => null()
+      ! velocity and pressure fields
+      type(field_t) :: u, v, w, p
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
-      logical :: initialized = .false.
+      logical, private :: initialized = .false.
       ! a way to spy on the vector (mostly for debugging)
       type(fld_file_output_t), public :: output
     contains
@@ -103,6 +110,10 @@ module cylinder
       procedure, pass(self), public :: write_linear => write_linear_wrapper
       procedure, pass(self), public :: write_adjoint => write_adjoint_wrapper
    end type neko_propagator
+
+   interface assignment(=)
+    module procedure state_vector_assignment
+   end interface
  
  contains
  
@@ -118,18 +129,20 @@ module cylinder
      class(state_vector), intent(inout) :: self
 
      ! Check for global coef
-     if (.not. self%initialized) then
+     ! if (.not. self%initialized) then
+     if (.not. allocated(self%u%x)) then
        if (.not. associated(global_coef_getter)) then
           error stop "No global coef set!"
        end if
+          call self%free()
           ! Take the global coef
           self%coef => global_coef_getter%global_coef
 
           ! initialize fields
-          allocate(self%u)
-          allocate(self%v)
-          allocate(self%w)
-          allocate(self%p)
+          ! allocate(self%u)
+          ! allocate(self%v)
+          ! allocate(self%w)
+          ! allocate(self%p)
           call self%u%init(self%coef%dof, fld_name = "state_u")
           call self%v%init(self%coef%dof, fld_name = "state_v")
           call self%w%init(self%coef%dof, fld_name = "state_w")
@@ -137,14 +150,20 @@ module cylinder
 
           ! initialize the sampler so we can spy in if needed
           call self%output%init(sp, 'state', 4)
-          call self%output%fields%assign(2, self%u)
-          call self%output%fields%assign(3, self%v)
-          call self%output%fields%assign(4, self%w)
-          call self%output%fields%assign(1, self%p)
+          call self%output%fields%assign_to_field(1, self%p)
+          call self%output%fields%assign_to_field(2, self%u)
+          call self%output%fields%assign_to_field(3, self%v)
+          call self%output%fields%assign_to_field(4, self%w)
+          
 
           ! done
           self%initialized = .true.
-          call self%zero()
+
+          ! hard code the zero so you don't go into an infinite loop
+          call field_rzero(self%u)
+          call field_rzero(self%v)
+          call field_rzero(self%w)
+          call field_rzero(self%p)
 
           if (pe_rank.eq.0) then
              print *, "im initializing myself!"
@@ -169,7 +188,9 @@ module cylinder
    subroutine zero(self)
      class(state_vector), intent(inout) :: self
      
-     ! always try initializing
+     ! If we're going to zero, we're going to completely reinitilize.
+     ! this protects us against shallow copying
+     ! call self%free()
      call self%init()
 
      call field_rzero(self%u)
@@ -236,28 +257,23 @@ module cylinder
      select type(vec)
      type is(state_vector)
         ! always try initializing
-        ! (I HOPE this is only to satisfy the intent of copy...)
         call state_vector_init_wrapper(self)
-        ! call state_vector_init_wrapper(vec)
+        call state_vector_init_wrapper(vec)
 
         alpha_rp = real(alpha, kind=rp)
         beta_rp = real(beta, kind=rp)
 
-        ! if (pe_rank.eq.0) then
-        ! print *, "axbpy, alpha = ", alpha_rp, " beta = ", beta_rp
-        ! end if
-
-        ! be careful with the order here !
-        ! notice the axpby(alpha, vec, beta, self)
-        ! in Ginzberg_landau we have:
-        ! self%state = beta*self%state + alpha*vec%state
-        call self%scal(beta)
-        call field_add2s2(self%u, vec%u, alpha_rp)
-        call field_add2s2(self%v, vec%v, alpha_rp)
-        call field_add2s2(self%w, vec%w, alpha_rp)
-        ! force 2D
-        ! call field_rzero(self%w)
-        call field_add2s2(self%p, vec%p, alpha_rp)
+        ! call self%scal(beta)
+        ! call field_add2s2(self%u, vec%u, alpha_rp)
+        ! call field_add2s2(self%v, vec%v, alpha_rp)
+        ! call field_add2s2(self%w, vec%w, alpha_rp)
+        ! ! force 2D
+        ! ! call field_rzero(self%w)
+        ! call field_add2s2(self%p, vec%p, alpha_rp)
+        call field_add3s2(self%u, self%u, vec%u, beta_rp, alpha_rp)
+        call field_add3s2(self%v, self%v, vec%v, beta_rp, alpha_rp)
+        call field_add3s2(self%w, self%w, vec%w, beta_rp, alpha_rp)
+        call field_add3s2(self%p, self%p, vec%p, beta_rp, alpha_rp)
      end select
      return
    end subroutine axpby
@@ -301,14 +317,44 @@ module cylinder
    !-----     EXTRA PROCEDURES FOR THE VECTOR     -----
    !---------------------------------------------------
 
+! Since we're using pointers, we need to make sure that a direct assignment
+! really creates NEW versions of the fields and then copies them over.
+subroutine state_vector_assignment(lhs, rhs)
+    class(state_vector), intent(out) :: lhs
+    class(state_vector), intent(in)  :: rhs
+
+    if (pe_rank.eq.0) then
+      print *, "YOU DID A HARD COPY"
+    end if
+    
+    call lhs%init()
+    call lhs%copy(rhs)
+
+end subroutine state_vector_assignment
+
    subroutine state_vector_free(self)
      class(state_vector), intent(inout) :: self
 
-     call self%u%free()
-     call self%v%free()
-     call self%w%free()
-     call self%p%free()
-     call self%coef%free()
+     !if (associated(self%u)) then
+        call self%u%free()
+        ! nullify(self%u)
+     !end if
+     !if (associated(self%v)) then
+        call self%v%free()
+        ! nullify(self%v)
+     !end if
+     !if (associated(self%w)) then
+        call self%w%free()
+        ! nullify(self%w)
+     !end if
+     !if (associated(self%p)) then
+        call self%p%free()
+        ! nullify(self%p)
+     !end if
+     self%coef => null()
+     
+
+     self%initialized = .false.
 
      return
    end subroutine state_vector_free
@@ -392,8 +438,9 @@ module cylinder
   subroutine state_vector_write(self, idx)
      class(state_vector), intent(inout) :: self
      integer :: idx
-
-     call self%output%sample(real(idx, kind=rp))
+      ! always try initializing
+      call state_vector_init_wrapper(self)
+      call self%output%sample(real(idx, kind=rp))
 
      return
    end subroutine state_vector_write
@@ -431,7 +478,7 @@ module cylinder
            call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
            call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
-           call self%write_linear(self%get_counter(.false.))
+           ! call self%write_linear(self%get_counter(.false.))
            call solve_wrapper(self%linear_case)
            ! call self%write_linear(1)
            ! Since vec_out has intent out, I HOPE we can safely assume it wont
@@ -598,7 +645,6 @@ module cylinder
      return
    end subroutine init_wrapper
 
-
     subroutine my_eigs(A, X, eigvals, residuals, info, x0, kdim, tolerance, transpose, write_intermediate)
         class(abstract_linop_rdp), intent(inout) :: A
         !! Linear operator whose leading eigenpairs need to be computed.
@@ -621,15 +667,14 @@ module cylinder
         logical, optional, intent(in) :: write_intermediate
         !! Write intermediate eigenvalues to file during iteration?
 
-        !! to spy!
-        type(state_vector) :: X_writer
-
         !--------------------------------------
         !-----     Internal variables     -----
         !--------------------------------------
 
         ! Krylov subspace and Krylov subspace dimension.
         type(state_vector), allocatable :: Xwrk(:)
+        ! something to write out the vectors
+        type(state_vector), allocatable :: X_writer
         integer :: kdim_, kstart
         ! Hessenberg matrix.
         real(dp), allocatable :: H(:, :)
@@ -638,7 +683,7 @@ module cylinder
         complex(dp), allocatable :: eigvals_wrk(:)
         real(dp), allocatable :: residuals_wrk(:)
         ! Miscellaneous.
-        character(len=*), parameter :: this_procedure = 'my_eigs'
+        character(len=*), parameter :: this_procedure = 'eigs_rdp'
         integer :: nev, conv
         integer :: i, j, k, niter, krst
         real(dp) :: tol, x0_norm
@@ -647,6 +692,7 @@ module cylinder
         logical :: outpost
         character(len=256) :: msg
 
+        if (time_lightkrylov()) call timer%start(this_procedure)
         ! Deals with optional parameters.
         nev = size(X)
         kdim_   = optval(kdim, 4*nev)
@@ -668,15 +714,13 @@ module cylinder
         allocate(eigvecs_wrk(kdim_, kdim_)) ; eigvecs_wrk = 0.0_dp
         allocate(eigvals_wrk(kdim_)) ; eigvals_wrk = 0.0_dp
         allocate(residuals_wrk(kdim_)) ; residuals_wrk = 0.0_dp
+        allocate(X_writer); call X_writer%init()
 
         ! Ritz eigenpairs computation.
         H = 0.0_dp
 
-        ! to spy
-        call X_writer%zero()
-
         kstart = 1 ; conv = 0 ; niter = 0 ; krst = 1
-
+        krylovschur: do while (conv < nev)
 
            arnoldi_factorization: do k = kstart, kdim_
                 ! Arnoldi step.
@@ -697,21 +741,8 @@ module cylinder
                     else
                         alpha = abs(eigvecs_wrk(k, i))
                     endif
-                    residuals_wrk(i) = abs(alpha*beta)
+                    residuals_wrk(i) = abs(beta*alpha)
                 enddo
-
-                ! write residual
-                if (pe_rank.eq.0) then
-                do i =1,k
-                 print *, "RESIDUAL ", i, " = ",  residuals_wrk(i)
-                end do
-                end if
-
-                ! save current space
-                  do i = 1, k
-                    call X_writer%copy(Xwrk(i))
-                    call X_writer%write(i)
-                  enddo
 
                 ! Check convergence.
                 niter = niter + 1
@@ -719,11 +750,180 @@ module cylinder
                 write(msg,'(I0,A,I0,A,I0,A)') conv, '/', nev, ' eigenvalues converged after ', niter, &
                             & ' steps of the Arnoldi process.'
                 call log_information(msg, this_module, this_procedure)
+                if (outpost) call write_results_cdp(eigs_output, eigvals_wrk(:k), residuals_wrk(:k), tol)
                 if (conv >= nev) exit arnoldi_factorization
             enddo arnoldi_factorization
+
+            write(msg,'(I0,A,I0,A,I0,A)') conv, '/', nev, ' eigenvalues converged after ', krst, &
+                            & ' Krylov-Schur restarts of the Arnoldi process.'
+            call log_information(msg, this_module, this_procedure)
+            ! Krylov-Schur restarting procedure.
+            krst  = krst + 1
+
+        if (pe_rank.eq.0) then
+          print *, "H before:"
+          do i = 1, kdim_
+            do j = 1, kdim_
+              write(*, '(F8.2)', advance="no") H(i, j)
+            end do
+            print *  ! New line after each row
+          end do
+        end if
+
+        ! take a browse first
+        do i = 1, kdim_
+           call X_writer%copy(Xwrk(i))
+           call X_writer%write(i)
+        end do
+
+        !-----------------------------------------------------------------------
+
+        !-----------------------------------------------------------------------
+
+            call my_krylov_schur_rdp(kstart, Xwrk, H, X_writer) ; kstart = kstart + 1
+
+        if (pe_rank.eq.0) then
+          print *, "H after:"
+          do i = 1, kdim_
+            do j = 1, kdim_
+              write(*, '(F8.2)', advance="no") H(i, j)
+            end do
+            print *  ! New line after each row
+          end do
+        end if
+
+        ! take a browse after
+        do i = 1, kdim_
+           call X_writer%copy(Xwrk(i))
+           call X_writer%write(i)
+        end do
             
-    end subroutine my_eigs
- 
+        end do krylovschur
+
+
+
+        !--------------------------------
+        !-----     POST-PROCESS     -----
+        !--------------------------------
+
+        block
+        integer :: indices(kdim_)
+        real(dp) :: abs_eigvals(kdim_)
+       
+        ! Re-compute eigenvalues and eigenvectors.
+        k = min(k, kdim_) ; call eig(H(:k, :k), eigvecs_wrk(:k, :k), eigvals_wrk(:k))
+        ! Sort eigenvalues.
+        abs_eigvals = abs(eigvals_wrk) ; call sort_index(abs_eigvals, indices, reverse=.true.)
+        eigvals_wrk = eigvals_wrk(indices) ; eigvecs_wrk = eigvecs_wrk(:, indices)
+        residuals_wrk = residuals_wrk(indices)
+
+        ! Store converged eigenvalues.
+        eigvals = eigvals_wrk(:nev) ; residuals = residuals_wrk(:nev)
+        end block
+
+        ! Construct eigenvectors.
+        do i = 1, nev
+            call X(i)%zero()
+            do j = 1, k
+                ! call X(i)%axpby(one_rdp, Xwrk(j), eigvecs_wrk(j, i))
+                call X(i)%axpby(eigvecs_wrk(j, i), Xwrk(j), one_rdp)
+            enddo
+            ! now look at these too
+           call X_writer%copy(X(i))
+           call X_writer%write(i)
+        enddo
+
+        info = niter
+  end subroutine my_eigs
+
+function median_selector(lambda) result(selected)
+            complex(dp), intent(in) :: lambda(:)
+            logical, allocatable :: selected(:)
+            selected = abs(lambda) > median(abs(lambda))
+end function median_selector
+
+     subroutine my_krylov_schur_rdp(n, X, H, X_writer)
+        integer, intent(out) :: n
+        !! Number eigenvalues that have been moved to the upper
+        !! left block of the Schur factorization of `H`.
+        class(abstract_vector_rdp), intent(inout) :: X(:)
+        !! Krylov basis.
+        real(dp), intent(inout) :: H(:, :)
+        !! Procedure to select the eigenvalues to move in the upper left-block.
+        type(state_vector), intent(inout) :: X_writer
+        integer :: i, j
+
+        !--------------------------------------
+        !-----     Internal variables     -----
+        !--------------------------------------
+
+        integer :: kdim
+        
+        ! Schur-related.
+        real(dp) :: Z(size(H, 2), size(H, 2)), T(size(H, 2), size(H, 2))
+        complex(dp) :: eigvals(size(H, 2))
+        logical :: selected(size(H, 2))
+       
+        ! Krylov subspace dimension.
+        kdim = size(X)-1
+
+        ! Schur decomposition of the Hessenberg matrix.
+        call schur(H(:size(H, 2), :), T, Z, eigvals) ; H(:size(H, 2), :) = T
+
+        ! Eigenvalue selection of the upper left block.
+        selected = median_selector(eigvals) ; n = count(selected)
+
+        ! Re-order the Schur decomposition and Schur basis.
+        call ordschur(H(:kdim, :), Z, selected)
+
+        ! Update the Hessenberg matrix and Krylov basis.
+        block
+        real(dp) :: b(size(H, 2))
+        class(abstract_vector_rdp), allocatable :: Xwrk(:)
+        
+        ! Update the Krylov basis.
+        ! do i = 1, kdim
+        !    call copy(X_writer, X(i))
+        !    call X_writer%write(-i-100)
+        ! end do
+        call linear_combination(Xwrk, X(:size(H, 2)), Z(:, :n))
+        ! do i = 1, kdim
+        !    call copy(X_writer, X(i))
+        !    call X_writer%write(i+100)
+        ! end do
+        !-----------------------------------------------------------------------
+          if (pe_rank.eq.0) then
+          print *, "Z: with size", n
+          do i = 1, size(H, 2)
+            do j = 1, size(H, 2)
+              write(*, '(F8.2)', advance="no") Z(i, j)
+            end do
+            print *  ! New line after each row
+          end do
+        end if
+
+                ! take a browse after
+        ! do i = 1, n
+        !    ! call X_writer%copy(Xwrk(i))
+        !    call copy(X_writer, Xwrk(i))
+        !    call X_writer%write(-i)
+        ! end do
+        !-----------------------------------------------------------------------
+        call copy(X(:n), Xwrk(:n))
+        call copy(X(n+1), X(kdim+1))
+        call zero_basis(X(n+2:))
+
+        ! Update the Hessenberg matrix.
+        b = matmul(H(kdim+1, :), Z)
+        H(n+1, :) = b
+        H(n+2:, :) = zero_rdp
+        H(:, n+1:) = zero_rdp
+        end block
+
+        return
+    end subroutine my_krylov_schur_rdp
+
+
    subroutine z_plane_fix(fld)
   type(field_t), intent(inout) :: fld
   integer :: iel, iz, iy, ix, nel

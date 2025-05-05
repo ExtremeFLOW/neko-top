@@ -70,7 +70,7 @@ program usrneko
   allocate(X(nev)); call initialize_krylov_subspace(X)
 
   !> initialize writer
-  allocate(X_writer); call X_writer%zero()
+  allocate(X_writer); call X_writer%init()
 
 
   !---------------------------------------
@@ -91,9 +91,10 @@ program usrneko
   !> Call to LightKrylov.
   ! call eigs(A, X, lambda, residuals, info)
   call eigs(A, X, lambda, residuals, info, kdim = kdim, tolerance = rtol)
-  call check_info(info, 'eigs', module=this_module, procedure='main')
+  
   ! call my_eigs(A, X, lambda, residuals, info, kdim = kdim, tolerance = rtol)
 
+  call check_info(info, 'eigs', module=this_module, procedure='main')
   !> Transform eigenspectrum from unit-disk to standard complex plane.
   lambda = log(lambda) / tau
 
@@ -101,14 +102,7 @@ program usrneko
   !-----     SAVE TO DISK     -----
   !--------------------------------
 
-  !> just write them out...
-  print *, "SPECTRA"
-  do i = 1, nev
-    print *, i, lambda(i), "residual", residuals(i)
-  enddo
-
   !> Save eigenvectors to disk.
-  ! (use the nth in the subspace for writing)
   do i = 1, nev
       call X_writer%axpby(1.0_wp, X(i), 0.0_wp)
       call X_writer%write(i)
