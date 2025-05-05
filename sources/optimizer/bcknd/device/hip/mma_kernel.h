@@ -440,6 +440,38 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
 }
 
 template< typename T >
+__global__ void mmasumHess_kernel(const T*  __restrict__ hijx,
+     const T*  __restrict__ Ljjxinv, T*  __restrict__ buf_h, const int n,
+   const int m, const int k0, const int k1) {
+
+  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  const int str = blockDim.x * gridDim.x;
+
+  const unsigned int lane = threadIdx.x % warpSize;
+  const unsigned int wid = threadIdx.x / warpSize;
+  // this is similar to mmasumAA_kernel but with Ljjxinv_d = 1/diagx
+  __shared__ T shared[32];
+  T sum = 0;
+  for (int i = idx; i < n; i += str)
+  {
+    sum += hijx[ k0 + i * m] * Ljjxinv[i]  * hijx[ k1 + i * m];
+  }
+
+  sum = reduce_warp<T>(sum);
+  if (lane == 0)
+    shared[wid] = sum;
+  __syncthreads();
+
+  sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
+  if (wid == 0)
+    sum = reduce_warp<T>(sum);
+
+  if (threadIdx.x == 0)
+    buf_h[blockIdx.x] = sum;
+
+}
+
+template< typename T >
 __global__ void mmasumAA_kernel(const T*  __restrict__ GG,
      const T*  __restrict__ diagx, T*  __restrict__ buf_h, const int n,
    const int m, const int k0, const int k1) {
