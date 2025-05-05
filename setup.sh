@@ -134,7 +134,7 @@ if [ -n "$CMAKE_VARIABLES" ]; then
 fi
 
 # Set the variables for the compilation
-[ "$CLEAN" == true ] && CMAKE_VARIABLES+=("--fresh")
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
@@ -149,8 +149,7 @@ fi
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --clean-first --parallel
-[ "$CLEAN" != true ] && cmake --build $MAIN_DIR/build --parallel
+cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
