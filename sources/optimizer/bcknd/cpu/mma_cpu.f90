@@ -166,20 +166,6 @@ contains
            mpi_real_precision, mpi_sum, neko_comm, ierr)
 
       this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
-
-      write (*, '(A)') "==============================================================="
-      write (*, '(A)') "MMA KKT MAX residuals"
-      write (*, '(A10,ES16.7E2)') "rex", maxval(abs(rex))
-      write (*, '(A10,ES16.7E2)') "rey", maxval(abs(rey))
-      write (*, '(A10,ES16.7E2)') "rez", abs(rez)
-      write (*, '(A10,ES16.7E2)') "relambda", maxval(abs(relambda))
-      write (*, '(A10,ES16.7E2)') "rexsi", maxval(abs(rexsi))
-      write (*, '(A10,ES16.7E2)') "reeta", maxval(abs(reeta))
-      write (*, '(A10,ES16.7E2)') "remu", maxval(abs(remu))
-      write (*, '(A10,ES16.7E2)') "rezeta", abs(rezeta)
-      write (*, '(A10,ES16.7E2)') "res", maxval(abs(res))
-      write (*, '(A)') "==============================================================="
-
     end associate
   end subroutine mma_dpip_KKT_cpu
 
@@ -661,8 +647,7 @@ contains
           zetaold = zeta
           sold = s
 
-          ! The innermost loop to determine the suitable step length
-          ! using the Backtracking Line Search approach
+
           new_residual = 2.0_rp * residual_norm
 
           ! Share the new_residual and steg values
@@ -671,6 +656,8 @@ contains
           call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
+          ! The innermost loop to determine the suitable step length
+          ! using the Backtracking Line Search approach
           itto = 0
           do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
              itto = itto + 1
