@@ -175,6 +175,7 @@
         "solver": {
             "type": "mma",
             "max_iterations": 100,
+            "subsolver": "dip",
             "tolerance": 1.0e-3,
             "mma": {
                 "m": 0,
