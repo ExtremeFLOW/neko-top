@@ -22,8 +22,8 @@ set(LIGHTKRYLOV_INSTALL_DIR ${CMAKE_BINARY_DIR}/lightkrylov_install)  # Use inst
 ExternalProject_Add(
     LightKrylov_ext_cyl
     PREFIX ${LIGHTKRYLOV_PREFIX}
-    GIT_REPOSITORY https://github.com/nekStab/LightKrylov.git
-    GIT_TAG dev
+    GIT_REPOSITORY https://github.com/gloopydoop/LightKrylov.git
+    GIT_TAG neko/intent
     CONFIGURE_COMMAND ""
     BUILD_COMMAND fpm build --profile release
     INSTALL_COMMAND fpm install --prefix ${LIGHTKRYLOV_INSTALL_DIR}  # Install to custom path
