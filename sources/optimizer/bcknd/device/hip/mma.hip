@@ -47,6 +47,72 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 //////
+#include <hip/hip_runtime.h>
+
+void hip_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    const int nb = ((*n) + 1024 - 1) / 1024;
+    const hipStream_t stream = (hipStream_t) glb_cmd_queue;
+    hipStreamSynchronize(stream);
+
+    if (nb > mma_red_s) {
+        mma_red_s = nb;
+        if (mma_bufred != NULL) {
+            HIP_CHECK(hipHostFree(mma_bufred));
+            HIP_CHECK(hipFree(mma_bufred_d));
+        }
+        HIP_CHECK(hipHostMalloc(&mma_bufred, nb * sizeof(real)));
+        HIP_CHECK(hipMalloc(&mma_bufred_d, nb * sizeof(real)));
+    }
+
+    for (int i = 0; i < (*m); i++) {
+        for (int j = 0; j < (*m); j++) {
+            hipLaunchKernelGGL(mmasumHess_kernel<real>, nblcks, nthrds, 0, stream,
+                (real*)hijx, (real*)Ljjxinv, mma_bufred_d, (*n), (*m), i, j);
+            HIP_CHECK(hipGetLastError());
+
+            hipLaunchKernelGGL(mmareduce_kernel<real>, dim3(1), dim3(1024), 0, stream,
+                mma_bufred_d, nb);
+            HIP_CHECK(hipGetLastError());
+
+            hipLaunchKernelGGL(mma_copy_kernel, dim3(1), dim3(1), 0, stream,
+                (real*)Hess, mma_bufred_d, 1, i + j * (*m));
+            HIP_CHECK(hipGetLastError());
+
+            hipStreamSynchronize(stream);
+        }
+    }
+}
+
+void mma_Ljjxinv_hip(void* Ljjxinv, void* pjlambda, void* qjlambda, void* x,
+    void* low, void* upp, void* alpha, void* beta, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    hipLaunchKernelGGL(mma_Ljjxinv_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue, (real*)Ljjxinv, (real*)pjlambda, (real*)qjlambda,
+        (real*)x, (real*)low, (real*)upp, (real*)alpha, (real*)beta, *n);
+    HIP_CHECK(hipGetLastError());
+}
+
+void mma_dipsolvesub1_hip(void* x, void* pjlambda, void* qjlambda, void* low,
+    void* upp, void* alpha, void* beta, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    hipLaunchKernelGGL(mma_dipsolvesub1_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue, (real*)x, (real*)pjlambda, (real*)qjlambda,
+        (real*)low, (real*)upp, (real*)alpha, (real*)beta, *n);
+    HIP_CHECK(hipGetLastError());
+}
+
+void mattrans_v_mul_hip(void* output, void* pij, void* lambda, int* m, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
+    hipLaunchKernelGGL(mattrans_v_mul_kernel<real>, nblcks, nthrds, 0,
+        (hipStream_t)glb_cmd_queue, (real*)output, (real*)pij, (real*)lambda, *m, *n);
+    HIP_CHECK(hipGetLastError());
+}
+
 void mma_gensub4_hip(void* x, void* low, void* upp, void* pij, void* qij,
      int* n, int* m, void* bi) {
   const dim3 nthrds(1024, 1, 1);
@@ -92,7 +158,6 @@ void mma_gensub4_hip(void* x, void* low, void* upp, void* pij, void* qij,
 
   hipFree(temp);
 }
-
 
 void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low,
                      void* upp, void* xmin, void* xmax, void* alpha,

@@ -38,6 +38,34 @@ module hip_mma_math
   public
 
   interface
+     subroutine hip_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) bind(c, name = 'hip_Hess')
+       import c_int, c_ptr
+       type(c_ptr), value :: Hess_d, hijx_d, Ljjxinv_d
+       integer(c_int) :: n, m
+     end subroutine hip_Hess
+
+     subroutine mma_Ljjxinv_hip(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
+          low_d, upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_Ljjxinv_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: Ljjxinv_d, x_d, pjlambda_d, qjlambda_d, low_d, &
+            upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_Ljjxinv_hip
+
+     subroutine mma_dipsolvesub1_hip(x_d, pjlambda_d, qjlambda_d, low_d, &
+          upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_dipsolvesub1_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: x_d, pjlambda_d, qjlambda_d, low_d, &
+            upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_dipsolvesub1_hip
+
+     subroutine mattrans_v_mul_hip(output_d, pij_d, lambda_d, m, n) &
+          bind(c, name = 'mattrans_v_mul_hip')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: output_d, pij_d, lambda_d
+       integer(c_int) :: m, n
+     end subroutine mattrans_v_mul_hip
      subroutine mma_gensub1_hip(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
           bind(c, name = 'mma_gensub1_hip')
        import c_rp, c_int, c_ptr
