@@ -32,61 +32,8 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MMA_CUDA_KERNEL_H
-#define MMA_CUDA_KERNEL_H
-
-template <typename T>
-__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
-     const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
-     const T* __restrict__ x, const T* __restrict__ low, const T* __restrict__ upp,
-     const T* __restrict__ alpha, const T* __restrict__ beta,
-     const int n) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    const T xt = x[tj];
-    T val = -1.0 / (2.0 * pjlambda[tj] / pow(upp[tj] - xt, 3) +
-                    2.0 * qjlambda[tj] / pow(xt - low[tj], 3));
-    // Remove the sensitivity for the active primal constraints
-    bool is_alpha = xt == alpha[tj];
-    bool is_beta  = xt == beta[tj];
-    Ljjxinv[tj] = (is_alpha || is_beta) ? T(0.0) : val;
-  }
-}
-
-
-template <typename T>
-__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
-     const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
-     const T* __restrict__ low, const T* __restrict__ upp,
-     const T* __restrict__ alpha, const T* __restrict__ beta,
-     const int n) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    T pj = sqrt(pjlambda[tj]);
-    T qj = sqrt(qjlambda[tj]);
-    T denom = pj + qj;
-    T val = (pj * low[tj] + qj * upp[tj]) / denom;
-
-    // Clamp x between alpha and beta using branchless min/max
-    x[tj] = fmax(fmin(val, beta[tj]), alpha[tj]);
-  }
-
-}
-
-template <typename T>
-__global__ void mattrans_v_mul_kernel(T* __restrict__ output,
-     const T* __restrict__ pij, const T* __restrict__ lambda,
-     const int m, const int n) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    output[tj] = 0.0;
-    for (int i = 0; i < m; i++) {
-      // output[tj] = output[tj] + pij[tj + i * n] * lambda[i];
-      output[tj] = output[tj] + pij[i + tj * m] * lambda[i];
-    }
-  }
-}
-
+#ifndef MMA_HIP_KERNEL_H
+#define MMA_HIP_KERNEL_H
 template <typename T>
 __global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
      const T* __restrict__ x, const T* __restrict__ xmin,
@@ -145,6 +92,7 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
         0.5 * xgap);
      p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
         0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
         1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
      for (int i = 0; i < m; i++) {
@@ -211,11 +159,11 @@ __global__ void sub2cons2_kernel(T* __restrict__ a, const T* __restrict__ b,
 
 template< typename T>
 __inline__ __device__ T max_reduce_warp(T val) {
-  val = max(val, __shfl_down_sync(0xffffffff, val, 16));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 8));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 4));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 2));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 1));
+  val = max(val, __shfl_down(val, 16));
+  val = max(val, __shfl_down(val, 8));
+  val = max(val, __shfl_down(val, 4));
+  val = max(val, __shfl_down(val, 2));
+  val = max(val, __shfl_down(val, 1));
   return val;
 }
 
@@ -338,11 +286,11 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
 
 template< typename T>
 __inline__ __device__ T reduce_warp(T val) {
-  val += __shfl_down_sync(0xffffffff, val, 16);
-  val += __shfl_down_sync(0xffffffff, val, 8);
-  val += __shfl_down_sync(0xffffffff, val, 4);
-  val += __shfl_down_sync(0xffffffff, val, 2);
-  val += __shfl_down_sync(0xffffffff, val, 1);
+  val += __shfl_down(val, 16);
+  val += __shfl_down(val, 8);
+  val += __shfl_down(val, 4);
+  val += __shfl_down(val, 2);
+  val += __shfl_down(val, 1);
   return val;
 }
 
@@ -421,38 +369,6 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
   for (int i = idx; i < n; i += str)
   {
     sum += GG[ k + i * m] * delx[i] / diagx[i];
-  }
-
-  sum = reduce_warp<T>(sum);
-  if (lane == 0)
-    shared[wid] = sum;
-  __syncthreads();
-
-  sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
-  if (wid == 0)
-    sum = reduce_warp<T>(sum);
-
-  if (threadIdx.x == 0)
-    buf_h[blockIdx.x] = sum;
-
-}
-
-template< typename T >
-__global__ void mmasumHess_kernel(const T*  __restrict__ hijx,
-     const T*  __restrict__ Ljjxinv, T*  __restrict__ buf_h, const int n,
-   const int m, const int k0, const int k1) {
-
-  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int str = blockDim.x * gridDim.x;
-
-  const unsigned int lane = threadIdx.x % warpSize;
-  const unsigned int wid = threadIdx.x / warpSize;
-  // this is similar to mmasumAA_kernel but with Ljjxinv_d = 1/diagx
-  __shared__ T shared[32];
-  T sum = 0;
-  for (int i = idx; i < n; i += str)
-  {
-    sum += hijx[ k0 + i * m] * Ljjxinv[i]  * hijx[ k1 + i * m];
   }
 
   sum = reduce_warp<T>(sum);
