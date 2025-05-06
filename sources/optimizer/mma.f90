@@ -41,7 +41,7 @@ module mma
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
   use comm, only: pe_rank
   use utils, only: neko_error
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
 
@@ -167,7 +167,7 @@ contains
     ! -------------------------------------------------------------------!
     real(kind=rp), dimension(n) :: xmax, xmin
     real(kind=rp), dimension(m) :: a, c, d
-    character(len=:), allocatable :: bcknd, subsolver
+    character(len=:), allocatable :: subsolver, bcknd, bcknd_default
 
     ! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
@@ -177,6 +177,13 @@ contains
 
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
          MPI_SUM, MPI_COMM_WORLD, ierr)
+
+    ! Assign default values for the backend based on the NEKO_BCKND_DEVICE
+    if (NEKO_BCKND_CUDA .eq. 1) then
+       bcknd_default = "cuda"
+    else
+       bcknd_default = "cpu"
+    end if
 
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
@@ -190,7 +197,7 @@ contains
     call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
     call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
 
-    call json_get_or_default(json, 'mma.backend', bcknd, 'cpu')
+    call json_get_or_default(json, 'mma.backend', bcknd, bcknd_default)
     call json_get_or_default(json, 'mma.subsolver', subsolver, 'dip')
 
     call json_get_or_default(json, 'mma.xmin', xmin_const, 0.0_rp)
