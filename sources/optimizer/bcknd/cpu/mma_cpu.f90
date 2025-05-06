@@ -81,7 +81,7 @@ contains
     ! The left hand sides of the KKT conditions are computed!
     ! for the following nonlinear programming problem:      !
     ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !                       sum(c_i*y_i + 0.5*d_i*(y_i)^2)!
     !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
     !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
     !        z >= 0,   y_i >= 0,         i = 1,...,m        !
@@ -646,8 +646,6 @@ contains
           zetaold = zeta
           sold = s
 
-          ! The innermost loop to determine the suitable step length
-          ! using the Backtracking Line Search approach
           new_residual = 2.0_rp * residual_norm
 
           ! Share the new_residual and steg values
@@ -656,6 +654,8 @@ contains
           call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
+          ! The innermost loop to determine the suitable step length
+          ! using the Backtracking Line Search approach
           itto = 0
           do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
              itto = itto + 1
@@ -704,12 +704,12 @@ contains
              rezeta = zeta * z - epsi
              res = lambda * s - epsi
 
-             residual_small = [rey, rez, relambda, remu, rezeta, res]
-
+             ! Compute squared norms for the residuals
              re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
              call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
+             residual_small = [rey, rez, relambda, remu, rezeta, res]
              new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp
