@@ -293,13 +293,13 @@ contains
          low => this%low%x, upp => this%upp%x, x => xdesign, &
          dfdx => dfdx%x, df0dx => df0dx%x)
 
-      p0j = (&
+      p0j = ( &
            1.001_rp * max(df0dx, 0.0_rp) &
            + 0.001_rp * max(-df0dx, 0.0_rp) &
            + 0.00001_rp / max(x_diff, 0.00001_rp) &
            ) * (upp - x)**2
 
-      q0j = (&
+      q0j = ( &
            0.001_rp * max(df0dx, 0.0_rp) &
            + 1.001_rp * max(-df0dx, 0.0_rp) &
            + 0.00001_rp / max(x_diff, 0.00001_rp)&
@@ -307,13 +307,13 @@ contains
 
       do j = 1, this%n
          do i = 1, this%m
-            pij(i, j) = (&
+            pij(i, j) = ( &
                  1.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 0.001_rp * max(-dfdx(i, j), 0.0_rp) &
                  + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
                  ) * (upp(j) - x(j))**2
 
-            qij(i, j) = (&
+            qij(i, j) = ( &
                  0.001_rp * max(dfdx(i, j), 0.0_rp) &
                  + 1.001_rp * max(-dfdx(i, j), 0.0_rp) &
                  + 0.00001_rp / max(x_diff(j), 0.00001_rp) &
@@ -724,7 +724,6 @@ contains
           residual_max = maxval(abs(residual))
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, mpi_max, neko_comm, ierr)
-
        end do
 
        epsi = 0.1_rp * epsi
