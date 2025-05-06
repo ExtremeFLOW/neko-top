@@ -171,16 +171,14 @@ extern "C" {
   }
 
   void mma_gensub2_cuda(void* low, void* upp, void* x, void* xold1,
-       void* xold2, void* xmin, void* xmax, real* asydecr,
-       real* asyincr, int* n) {
+       void* xold2, void* xdiff, real* asydecr, real* asyincr, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
     mma_sub2_kernel<real><<<nblcks, nthrds, 0,
          (cudaStream_t)glb_cmd_queue>>>(
          (real*)low, (real*)upp, (real*)x, (real*)xold1,
-         (real*)xold2, (real*)xmin, (real*)xmax, *asydecr,
-         *asyincr, *n);
+         (real*)xold2, (real*)xdiff, *asydecr, *asyincr, *n);
 
     CUDA_CHECK(cudaGetLastError());
   }

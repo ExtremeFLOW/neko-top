@@ -49,8 +49,9 @@ contains
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
     real(kind=rp), dimension(this%n), intent(inout) :: x
-    type(vector_t) :: df0dx, fval
-    type(matrix_t) :: dfdx
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     if (.not. this%is_initialized) then
        call neko_error("The MMA object is not initialized.")
@@ -80,7 +81,7 @@ contains
     ! The left hand sides of the KKT conditions are computed!
     ! for the following nonlinear programming problem:      !
     ! Minimize  f_0(x) + a_0*z +                            !
-    !                       sum( c_i*y_i + 0.5*d_i*(y_i)^2 )!
+    !                       sum(c_i*y_i + 0.5*d_i*(y_i)^2)!
     !   subject to  f_i(x) - a_i*z - y_i <= 0,  i = 1,...,m !
     !         xmax_j <= x_j <= xmin_j,    j = 1,...,n       !
     !        z >= 0,   y_i >= 0,         i = 1,...,m        !
@@ -92,8 +93,9 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
@@ -126,8 +128,9 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     real(kind=rp) :: rez, rezeta
     real(kind=rp), dimension(this%m) :: rey, relambda, remu, res
@@ -138,35 +141,31 @@ contains
     integer :: ierr
     real(kind=rp) :: re_sq_norm
 
+    rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
+         - this%xsi%x + this%eta%x
+    rey = this%c%x + this%d%x*this%y%x - this%lambda%x - this%mu%x
+    rez = this%a0 - this%zeta - dot_product(this%lambda%x, this%a%x)
 
-    associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
+    relambda = fval - this%a%x * this%z - this%y%x + this%s%x
+    rexsi = this%xsi%x * (x - this%xmin%x)
+    reeta = this%eta%x * (this%xmax%x - x)
+    remu = this%mu%x * this%y%x
+    rezeta = this%zeta * this%z
+    res = this%lambda%x * this%s%x
 
-      rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
-           - this%xsi%x + this%eta%x
-      rey = this%c%x + this%d%x*this%y%x - this%lambda%x - this%mu%x
-      rez = this%a0 - this%zeta - dot_product(this%lambda%x, this%a%x)
+    residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
+    residual_small = [rey, rez, relambda, remu, rezeta, res]
 
-      relambda = fval - this%a%x * this%z - this%y%x + this%s%x
-      rexsi = this%xsi%x * (x - this%xmin%x)
-      reeta = this%eta%x * (this%xmax%x - x)
-      remu = this%mu%x * this%y%x
-      rezeta = this%zeta * this%z
-      res = this%lambda%x * this%s%x
+    this%residumax = maxval(abs(residual))
+    re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
-      residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
-      residual_small = [rey, rez, relambda, remu, rezeta, res]
+    call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
+         mpi_real_precision, mpi_max, neko_comm, ierr)
 
-      this%residumax = maxval(abs(residual))
-      re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+    call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-      call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
-           mpi_real_precision, mpi_max, neko_comm, ierr)
-
-      call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
-           mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-      this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
-    end associate
+    this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
   end subroutine mma_dpip_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual interior
@@ -193,38 +192,39 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
     real(kind=rp), dimension(this%m) :: relambda, remu
     real(kind=rp), dimension(2*this%m) :: residual
 
 
-    associate(fval => fval%x, dfdx => dfdx%x, df0dx => df0dx%x)
-      relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
-      ! Compute residual for mu (eta in the paper)
-      remu = this%lambda%x * this%mu%x
+    relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
+    ! Compute residual for mu (eta in the paper)
+    remu = this%lambda%x * this%mu%x
 
-      residual = abs([relambda, remu])
-      this%residumax = maxval(residual)
-      this%residunorm = norm2(residual)
-    end associate
+    residual = abs([relambda, remu])
+    this%residumax = maxval(residual)
+    this%residunorm = norm2(residual)
+
   end subroutine mma_dip_KKT_cpu
 
   !============================================================================!
   ! private internal subroutines
 
   !> generat a subproblem; convex approximation of the optimization problem
-  subroutine mma_gensub_cpu(this, iter, xdesign, df0dx, fval, dfdx)
+  subroutine mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
     ! ----------------------------------------------------- !
     ! Generate the approximation sub problem by computing   !
     ! the lower and upper asymtotes and the other necessary !
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: xdesign
-    type(vector_t) :: df0dx, fval
-    type(matrix_t) :: dfdx
+    real(kind=rp), dimension(this%n), intent(in) :: x
+    real(kind=rp), dimension(this%n), intent(in) :: df0dx
+    real(kind=rp), dimension(this%m), intent(in) :: fval
+    real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
     real(kind=rp), dimension(this%n) :: x_diff
@@ -235,7 +235,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
     associate(low => this%low%x, upp => this%upp%x, &
-         x_1 => this%xold1%x, x_2 => this%xold2%x, x => xdesign)
+         x_1 => this%xold1%x, x_2 => this%xold2%x)
 
       if (iter .lt. 3) then
          ! Initialize the lower and upper asymptotes
@@ -278,7 +278,7 @@ contains
 
     associate(alpha => this%alpha%x, beta => this%beta%x, &
          xmin => this%xmin%x, xmax => this%xmax%x, &
-         low => this%low%x, upp => this%upp%x, x => xdesign)
+         low => this%low%x, upp => this%upp%x, x => x)
 
       alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
       beta = min(xmax, upp - 0.1_rp*(upp - x), x + 0.5_rp*x_diff)
@@ -290,8 +290,7 @@ contains
 
     associate(p0j => this%p0j%x, q0j => this%q0j%x, &
          pij => this%pij%x, qij => this%qij%x, &
-         low => this%low%x, upp => this%upp%x, x => xdesign, &
-         dfdx => dfdx%x, df0dx => df0dx%x)
+         low => this%low%x, upp => this%upp%x)
 
       p0j = ( &
            1.001_rp * max(df0dx, 0.0_rp) &
@@ -328,7 +327,7 @@ contains
 
     associate(bi => this%bi%x, &
          pij => this%pij%x, qij => this%qij%x, &
-         low => this%low%x, upp => this%upp%x, x => xdesign)
+         low => this%low%x, upp => this%upp%x)
 
       bi = 0.0_rp
       do i = 1, this%m
@@ -341,7 +340,7 @@ contains
 
       call MPI_Allreduce(MPI_IN_PLACE, bi, this%m, &
            mpi_real_precision, mpi_sum, neko_comm, ierr)
-      bi = bi - fval%x
+      bi = bi - fval
 
     end associate
   end subroutine mma_gensub_cpu
@@ -647,8 +646,6 @@ contains
           zetaold = zeta
           sold = s
 
-          ! The innermost loop to determine the suitable step length
-          ! using the Backtracking Line Search approach
           new_residual = 2.0_rp * residual_norm
 
           ! Share the new_residual and steg values
@@ -657,6 +654,8 @@ contains
           call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
                mpi_real_precision, mpi_min, neko_comm, ierr)
 
+          ! The innermost loop to determine the suitable step length
+          ! using the Backtracking Line Search approach
           itto = 0
           do while ((new_residual .gt. residual_norm) .and. (itto .lt. 50))
              itto = itto + 1
@@ -705,12 +704,12 @@ contains
              rezeta = zeta * z - epsi
              res = lambda * s - epsi
 
-             residual_small = [rey, rez, relambda, remu, rezeta, res]
-
+             ! Compute squared norms for the residuals
              re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
              call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
                   1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
+             residual_small = [rey, rez, relambda, remu, rezeta, res]
              new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp

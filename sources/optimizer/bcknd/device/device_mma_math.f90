@@ -174,16 +174,16 @@ contains
   end subroutine device_mma_gensub1
 
 
-  subroutine device_mma_gensub2(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, &
-       xmax_d, asydecr, asyincr, n)
-    type(c_ptr) :: low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d
+  subroutine device_mma_gensub2(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
+       asydecr, asyincr, n)
+    type(c_ptr) :: low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d
     real(c_rp) :: asydecr, asyincr
     integer :: n
 #if HAVE_HIP
     call mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d, &
          asydecr, asyincr, n)
 #elif HAVE_CUDA
-    call mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d, &
+    call mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
          asydecr, asyincr, n)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
