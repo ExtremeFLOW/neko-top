@@ -185,8 +185,7 @@ void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
     hipLaunchKernelGGL(mma_sub2_kernel<real>, nblcks, nthrds, 0,
         (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xold1,
-        (real*)xold2, (real*)xdiff, (real*)xmax, *asydecr,
-        *asyincr, *n);
+        (real*)xold2, (real*)xdiff, *asydecr, *asyincr, *n);
 
     HIP_CHECK(hipGetLastError());
 }
