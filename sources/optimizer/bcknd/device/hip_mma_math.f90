@@ -74,10 +74,10 @@ module hip_mma_math
        integer(c_int) :: n
      end subroutine mma_gensub1_hip
 
-     subroutine mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, &
-          xmax_d, asydecr, asyincr, n) bind(c, name = 'mma_gensub2_hip')
+     subroutine mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
+          asydecr, asyincr, n) bind(c, name = 'mma_gensub2_hip')
        import c_rp, c_int, c_ptr
-       type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d
+       type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d
        real(c_rp) :: asydecr, asyincr
        integer(c_int) :: n
      end subroutine mma_gensub2_hip
