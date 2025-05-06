@@ -41,7 +41,8 @@ module mma
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
   use comm, only: pe_rank
   use utils, only: neko_error
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
 
   implicit none
@@ -418,8 +419,12 @@ contains
     select case (this%bcknd)
     case ("cpu")
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
+       end if
     case ("cuda")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
+       call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     end select
 
   end subroutine mma_update_vector
