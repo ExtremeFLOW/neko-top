@@ -43,7 +43,10 @@ module mma_simcomp
   use matrix, only: matrix_t
   use mma, only: mma_t
   use time_state, only: time_state_t
+  use math, only: copy
+  use device_math, only: device_copy
 
+  use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD, &
        mpi_min, mpi_max, MPI_IN_PLACE
@@ -119,7 +122,7 @@ contains
     integer, allocatable :: recv_counts(:), displs(:)
 
     real(kind=rp) :: start_time, end_time
-    real(kind=rp), dimension(this%mma%get_n()) :: x
+    type(vector_t) :: x
     real(kind=rp) :: f0val
     type(vector_t) :: df0dx, fval
     type(matrix_t) :: dfdx
@@ -135,22 +138,25 @@ contains
     tstep = time%tstep
     dt = time%dt
 
+    call x%init(this%mma%get_n())
     call df0dx%init(this%mma%get_n())
     call fval%init(this%mma%get_m())
     call dfdx%init(this%mma%get_m(), this%mma%get_n())
 
-
     call cpu_time(start_time)
-    x = reshape(this%designx%x, [this%mma%get_n()])
+    call copy(x%x, this%designx%x, this%mma%get_n())
+    call device_memcpy(x%x, x%x_d, this%mma%get_n(), &
+         HOST_TO_DEVICE, sync = .true.)
+
     call func1(this, this%mma%get_n(), this%mma%get_m(), &
          f0val, df0dx%x, fval%x, dfdx%x)
     ! update the device pointer
     call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-         HOST_TO_DEVICE, sync = .false.)
+         HOST_TO_DEVICE, sync = .true.)
     call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-         HOST_TO_DEVICE, sync = .false.)
+         HOST_TO_DEVICE, sync = .true.)
     call device_memcpy(dfdx%x, dfdx%x_d, this%mma%get_n()*this%mma%get_m(), &
-         HOST_TO_DEVICE, sync = .false.)
+         HOST_TO_DEVICE, sync = .true.)
 
     if (pe_rank .eq. 0) then
        print *, 'iter = ', 0, &
@@ -200,19 +206,19 @@ contains
     ! The optimization loop
     do iter = 1, 100 !10
        call this%mma%update(iter, x, df0dx, fval, dfdx)
-       this%designx%x = reshape(x, shape(this%designx%x))
+       this%designx%x = reshape(x%x, shape(this%designx%x))
 
        call func1(this, this%mma%get_n(), this%mma%get_m(), &
             f0val, df0dx%x, fval%x, dfdx%x)
        ! update the device pointer
        call device_memcpy(df0dx%x, df0dx%x_d, this%mma%get_n(), &
-            HOST_TO_DEVICE, sync = .false.)
+            HOST_TO_DEVICE, sync = .true.)
        call device_memcpy(fval%x, fval%x_d, this%mma%get_m(), &
-            HOST_TO_DEVICE, sync = .false.)
+            HOST_TO_DEVICE, sync = .true.)
        call device_memcpy(dfdx%x, dfdx%x_d, &
-            this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync = .false.)
+            this%mma%get_n()*this%mma%get_m(), HOST_TO_DEVICE, sync = .true.)
 
-       call this%mma%KKT(this%designx%x, df0dx, fval, dfdx)
+       call this%mma%KKT(x, df0dx, fval, dfdx)
 
        if (pe_rank .eq. 0) then
           print *, 'iter = ', iter, &
@@ -226,8 +232,9 @@ contains
 
     call cpu_time(end_time)
 
-    print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
-    print *, "this%designx%x is updated"
+    if (pe_rank .eq. 0) then
+       print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
+    end if
 
 
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
