@@ -180,7 +180,7 @@ contains
     real(c_rp) :: asydecr, asyincr
     integer :: n
 #if HAVE_HIP
-    call mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d, &
+    call mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
          asydecr, asyincr, n)
 #elif HAVE_CUDA
     call mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
