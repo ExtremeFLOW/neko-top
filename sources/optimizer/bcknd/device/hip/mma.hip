@@ -177,7 +177,7 @@ void mma_gensub3_hip(void* x, void* df0dx, void* dfdx, void* low,
 }
 
 void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
-                     void* xold2, void* xmin, void* xmax, real* asydecr,
+                     void* xold2, void* xdiff, real* asydecr,
                      real* asyincr, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -185,7 +185,7 @@ void mma_gensub2_hip(void* low, void* upp, void* x, void* xold1,
     hipLaunchKernelGGL(mma_sub2_kernel<real>, nblcks, nthrds, 0,
         (hipStream_t)glb_cmd_queue,
         (real*)low, (real*)upp, (real*)x, (real*)xold1,
-        (real*)xold2, (real*)xmin, (real*)xmax, *asydecr,
+        (real*)xold2, (real*)xdiff, (real*)xmax, *asydecr,
         *asyincr, *n);
 
     HIP_CHECK(hipGetLastError());
