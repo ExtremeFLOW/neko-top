@@ -64,39 +64,29 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
-    real(kind=rp), dimension(this%n), intent(inout) :: x
-
-    type(vector_t) :: df0dx, fval, xdesign
-    type(matrix_t) :: dfdx
+    type(c_ptr), intent(inout) :: x
+    type(c_ptr), intent(in) :: df0dx, fval, dfdx
 
     if (.not. this%is_initialized) then
        call neko_error("The MMA object is not initialized.")
     end if
 
-
-    call xdesign%init(this%n)
-    call device_memcpy(x, xdesign%x_d, this%n, HOST_TO_DEVICE, sync = .false.)
-
     ! generate a convex approximation of the problem
-    call mma_gensub_device(this, iter, xdesign, df0dx, fval, dfdx)
+    call mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
+
     !solve the approximation problem using interior point method
     if (this%subsolver .eq. "dip") then
-       call mma_subsolve_dip_device(this, xdesign)
+       call mma_subsolve_dip_device(this, x)
     else
-       call mma_subsolve_dpip_device(this, xdesign)
+       call mma_subsolve_dpip_device(this, x)
     end if
-    !update the design vector x on the host
-    call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
     this%is_updated = .true.
-    call xdesign%free()
   end subroutine mma_update_device
 
   module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: fval, df0dx
-    type(matrix_t), intent(in) :: dfdx
+    type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
     if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
@@ -109,9 +99,7 @@ contains
   ! point method (dip) subsolve of MMA algorithm.
   module subroutine mma_dip_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: fval, df0dx
-    type(matrix_t), intent(in) :: dfdx
+    type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
     type(vector_t) :: relambda, remu
 
@@ -119,7 +107,7 @@ contains
     call remu%init(this%m)
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
-    call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp, -this%z, &
+    call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
          this%m)
     call device_sub2(relambda%x_d, this%y%x_d, this%m)
     call device_add2(relambda%x_d, this%mu%x_d, this%m)
@@ -141,11 +129,8 @@ contains
   ! point method (dpip) subsolve of MMA algorithm.
   module subroutine mma_dpip_KKT_device(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: fval, df0dx
-    type(matrix_t), intent(in) :: dfdx
+    type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
-    type(vector_t) :: designx
     real(kind=rp) :: rez, rezeta
     type(vector_t) :: rey, relambda, remu, res
     type(vector_t) :: rex, rexsi, reeta
@@ -153,13 +138,6 @@ contains
     integer :: ierr
     real(kind=rp) :: re_xstuff_squ_global
     real(kind=rp) :: globaltemp_norm
-
-    ! create a vector type x to have a c_ptr to point to the array designx
-    call designx%init(this%n)
-    designx%x = x
-    call device_memcpy(designx%x, designx%x_d, this%n, HOST_TO_DEVICE, &
-         sync = .false.)
-
 
     call rey%init(this%m)
     call relambda%init(this%m)
@@ -170,9 +148,8 @@ contains
     call rexsi%init(this%n)
     call reeta%init(this%n)
 
-    call device_kkt_rex(rex%x_d, df0dx%x_d, dfdx%x_d, this%xsi%x_d, &
+    call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
-
 
     call device_col3(rey%x_d, this%d%x_d, this%y%x_d, this%m)
     call device_add2(rey%x_d, this%c%x_d, this%m)
@@ -182,16 +159,16 @@ contains
     rez = this%a0 - this%zeta - device_lcsc2(this%lambda%x_d, this%a%x_d, &
          this%m)
 
-    call device_add3s2(relambda%x_d, fval%x_d, this%a%x_d, 1.0_rp, -this%z, &
+    call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
          this%m)
     call device_sub2(relambda%x_d, this%y%x_d, this%m)
     call device_add2(relambda%x_d, this%s%x_d, this%m)
 
 
-    call device_sub3(rexsi%x_d, designx%x_d, this%xmin%x_d, this%n)
+    call device_sub3(rexsi%x_d, x, this%xmin%x_d, this%n)
     call device_col2(rexsi%x_d, this%xsi%x_d, this%n)
 
-    call device_sub3(reeta%x_d, this%xmax%x_d, designx%x_d, this%n)
+    call device_sub3(reeta%x_d, this%xmax%x_d, x, this%n)
     call device_col2(reeta%x_d, this%eta%x_d, this%n)
 
     call device_col3(remu%x_d, this%mu%x_d, this%y%x_d, this%m)
@@ -218,7 +195,6 @@ contains
          device_norm(relambda%x_d, this%m) + device_norm(remu%x_d, this%m) + &
          rezeta**2+device_norm(res%x_d, this%m) + re_xstuff_squ_global)
 
-    call designx%free()
     call rey%free()
     call relambda%free()
     call remu%free()
@@ -239,10 +215,10 @@ contains
     ! parameters (alpha, beta, p0j, q0j, pij, qij, ...).    !
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
-    type(vector_t), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx
-    type(vector_t), intent(in) :: fval
-    type(matrix_t), intent(in) :: dfdx
+    type(c_ptr), intent(in) :: x
+    type(c_ptr), intent(in) :: df0dx
+    type(c_ptr), intent(in) :: fval
+    type(c_ptr), intent(in) :: dfdx
 
     integer, intent(in) :: iter
     integer :: ierr
@@ -255,12 +231,12 @@ contains
     ! Setup the current asymptotes
 
     if (iter .lt. 3) then
-       call device_copy(this%low%x_d, x%x_d, this%n)
+       call device_copy(this%low%x_d, x, this%n)
        call device_add2s2(this%low%x_d, x_diff%x_d, - this%asyinit, this%n)
-       call device_copy(this%upp%x_d, x%x_d, this%n)
+       call device_copy(this%upp%x_d, x, this%n)
        call device_add2s2(this%upp%x_d, x_diff%x_d, this%asyinit, this%n)
     else
-       call device_mma_gensub2(this%low%x_d, this%upp%x_d, x%x_d, &
+       call device_mma_gensub2(this%low%x_d, this%upp%x_d, x, &
             this%xold1%x_d, this%xold2%x_d, this%xmin%x_d, this%xmax%x_d, &
             this%asydecr, this%asyincr, this%n)
     end if
@@ -268,7 +244,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Calculate p0j, q0j, pij, qij, alpha, and beta
 
-    call device_mma_gensub3(x%x_d, df0dx%x_d, dfdx%x_d, this%low%x_d, &
+    call device_mma_gensub3(x, df0dx, dfdx, this%low%x_d, &
          this%upp%x_d, this%xmin%x_d, this%xmax%x_d, this%alpha%x_d, &
          this%beta%x_d, this%p0j%x_d, this%q0j%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m)
@@ -276,7 +252,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Calculate bi
 
-    call device_mma_gensub4(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, &
+    call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
     ! ------------------------------------------------------------------------ !
     ! cpu gpu transfer and global sum for bi
@@ -287,15 +263,15 @@ contains
          mpi_sum, neko_comm, ierr)
     call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
          sync = .true.)
-    call device_sub2(this%bi%x_d, fval%x_d, this%m)
+    call device_sub2(this%bi%x_d, fval, this%m)
 
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
   !! interior point method
-  subroutine mma_subsolve_dpip_device(this, designx)
+  subroutine mma_subsolve_dpip_device(this, designx_d)
     class(mma_t), intent(inout) :: this
-    type(vector_t), intent(in) :: designx
+    type(c_ptr), intent(in) :: designx_d
     integer :: iter, itto, ierr
     real(kind=rp) :: epsi, residumax, residunorm, z, zeta, rez, rezeta, &
          delz, dz, dzeta, steg, dummy_one, zold, zetaold, newresidu
@@ -756,8 +732,8 @@ contains
 
     ! Save the new designx
     call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
-    call device_copy(this%xold1%x_d, designx%x_d, this%n)
-    call device_copy(designx%x_d, x%x_d, this%n)
+    call device_copy(this%xold1%x_d, designx_d, this%n)
+    call device_copy(designx_d, x%x_d, this%n)
 
     ! update the parameters of the MMA object nesessary to compute KKT residual
     call device_copy(this%y%x_d, y%x_d, this%m)
@@ -812,9 +788,9 @@ contains
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual
   !! interior point method
-  subroutine mma_subsolve_dip_device(this, designx)
+  subroutine mma_subsolve_dip_device(this, designx_d)
     class(mma_t), intent(inout) :: this
-    type(vector_t), intent(in) :: designx
+    type(c_ptr), intent(in) :: designx_d
     integer :: iter, ierr
     real(kind=rp) :: epsi, residumax, z, steg
     ! vectors with size m
@@ -1148,8 +1124,8 @@ contains
 
     ! Save the new designx
     call device_copy(this%xold2%x_d, this%xold1%x_d, this%n)
-    call device_copy(this%xold1%x_d, designx%x_d, this%n)
-    call device_copy(designx%x_d, x%x_d, this%n)
+    call device_copy(this%xold1%x_d, designx_d, this%n)
+    call device_copy(designx_d, x%x_d, this%n)
 
     ! update the parameters of the MMA object nesessary to compute KKT residual
     call device_copy(this%y%x_d, y%x_d, this%m)

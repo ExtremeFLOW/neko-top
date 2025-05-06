@@ -42,6 +42,7 @@ module mma
   use comm, only: pe_rank
   use utils, only: neko_error
   use device, only: device_memcpy, HOST_TO_DEVICE
+  use, intrinsic :: iso_c_binding, only: c_ptr
 
   implicit none
   private
@@ -78,8 +79,15 @@ module mma
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
 
-     procedure, public, pass(this) :: KKT => mma_KKT
-     procedure, public, pass(this) :: update => mma_update
+     generic, public :: update => update_vector, update_cpu, update_device
+     procedure, pass(this) :: update_vector => mma_update_vector
+     procedure, pass(this) :: update_cpu => mma_update_cpu
+     procedure, pass(this) :: update_device => mma_update_device
+
+     generic, public :: KKT => KKT_vector, KKT_cpu, KKT_device
+     procedure, pass(this) :: KKT_vector => mma_KKT_vector
+     procedure, pass(this) :: KKT_cpu => mma_KKT_cpu
+     procedure, pass(this) :: KKT_device => mma_KKT_device
 
   end type mma_t
 
@@ -92,16 +100,18 @@ module mma
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
        real(kind=rp), dimension(this%n), intent(inout) :: x
-       type(vector_t) :: df0dx, fval
-       type(matrix_t) :: dfdx
+       real(kind=rp), dimension(this%n), intent(in) :: df0dx
+       real(kind=rp), dimension(this%m), intent(in) :: fval
+       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_update_cpu
 
      !> CPU KKT check for convergence
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
-       type(vector_t), intent(in) :: df0dx, fval
-       type(matrix_t), intent(in) :: dfdx
+       real(kind=rp), dimension(this%n), intent(in) :: df0dx
+       real(kind=rp), dimension(this%m), intent(in) :: fval
+       real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
      ! ======================================================================= !
@@ -111,17 +121,14 @@ module mma
      module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
-       real(kind=rp), dimension(this%n), intent(inout) :: x
-       type(vector_t) :: df0dx, fval
-       type(matrix_t) :: dfdx
+       type(c_ptr), intent(inout) :: x
+       type(c_ptr), intent(in) :: df0dx, fval, dfdx
      end subroutine mma_update_device
 
      !> Device KKT check for convergence
      module subroutine mma_KKT_device(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
-       real(kind=rp), dimension(this%n), intent(in) :: x
-       type(vector_t), intent(in) :: df0dx, fval
-       type(matrix_t), intent(in) :: dfdx
+       type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
      end subroutine mma_KKT_device
 
   end interface
@@ -400,41 +407,37 @@ contains
   end subroutine mma_init_from_components
 
   !> Call the update function based on the backend
-  subroutine mma_update(this, iter, x, df0dx, fval, dfdx)
+  subroutine mma_update_vector(this, iter, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
-    real(kind=rp), dimension(this%n), intent(inout) :: x
-    type(vector_t) :: df0dx, fval
-    type(matrix_t) :: dfdx
+    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(in) :: df0dx, fval
+    type(matrix_t), intent(in) :: dfdx
 
     ! Select backend type
-    select case (this%bcknd )
+    select case (this%bcknd)
     case ("cpu")
-       call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
+       call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
     case ("cuda")
-       call mma_update_device(this, iter, x, df0dx, fval, dfdx)
-    case default
-       call mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
+       call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
-  end subroutine mma_update
+
+  end subroutine mma_update_vector
 
   !> Call the KKT ckeck function based on the backend
-  subroutine mma_KKT(this, x, df0dx, fval, dfdx)
+  subroutine mma_KKT_vector(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
-    real(kind=rp), dimension(this%n), intent(in) :: x
-    type(vector_t), intent(in) :: df0dx, fval
+    type(vector_t), intent(in) :: x, df0dx, fval
     type(matrix_t), intent(in) :: dfdx
 
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
-       call mma_KKT_cpu(this, x, df0dx, fval, dfdx)
+       call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
     case ("cuda")
-       call mma_KKT_device(this, x, df0dx, fval, dfdx)
-    case default
-       call mma_KKT_cpu(this,x, df0dx, fval, dfdx)
+       call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
-  end subroutine mma_KKT
+  end subroutine mma_KKT_vector
 
   ! ========================================================================== !
   ! Getters and setters
