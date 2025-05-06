@@ -48,8 +48,8 @@ extern "C" {
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$
  */
 void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
-    const dim3 nthrds(256, 1, 1);
-    const dim3 nblcks(((*mask_size) + 256 - 1) / 256, 1, 1);
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
     if(*mask_size == 0) return;
     hipLaunchKernelGGL(copy_mask_kernel<real>, nblcks, nthrds, 0,
