@@ -224,11 +224,11 @@ __global__ void sub2cons2_kernel(T* __restrict__ a, const T* __restrict__ b,
 
 template< typename T>
 __inline__ __device__ T max_reduce_warp(T val) {
-  val = max(val, __shfl_down(val, 16));
-  val = max(val, __shfl_down(val, 8));
-  val = max(val, __shfl_down(val, 4));
-  val = max(val, __shfl_down(val, 2));
-  val = max(val, __shfl_down(val, 1));
+  val = max(val, __shfl_down(val, 16, 32));
+  val = max(val, __shfl_down(val, 8, 32));
+  val = max(val, __shfl_down(val, 4, 32));
+  val = max(val, __shfl_down(val, 2, 32));
+  val = max(val, __shfl_down(val, 1, 32));
   return val;
 }
 
@@ -351,11 +351,11 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
 
 template< typename T>
 __inline__ __device__ T reduce_warp(T val) {
-  val += __shfl_down(val, 16);
-  val += __shfl_down(val, 8);
-  val += __shfl_down(val, 4);
-  val += __shfl_down(val, 2);
-  val += __shfl_down(val, 1);
+  val += __shfl_down(val, 16, 32);
+  val += __shfl_down(val, 8, 32);
+  val += __shfl_down(val, 4, 32);
+  val += __shfl_down(val, 2, 32);
+  val += __shfl_down(val, 1, 32);
   return val;
 }
 
