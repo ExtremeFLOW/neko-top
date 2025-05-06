@@ -82,13 +82,13 @@ contains
     !solve the approximation problem using interior point method
     if (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_device(this, xdesign)
-    elseif (this%subsolver .eq. "dpip") then
+    else if (this%subsolver .eq. "dpip") then
        call mma_subsolve_dpip_device(this, xdesign)
     else
        call neko_error("Unrecognized subsolver for MMA in mma_device.")
     end if
 
-    !update the design vector x on the host
+    ! Update the design vector x on the host
     call device_memcpy(x, xdesign%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
 
     this%is_updated = .true.
@@ -219,7 +219,7 @@ contains
     call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-    this%residunorm = sqrt( ( &
+    this%residunorm = sqrt(( &
          device_norm(rey%x_d, this%m) + &
          rez**2 + &
          device_norm(relambda%x_d, this%m) + &
@@ -261,9 +261,9 @@ contains
 
     call x_diff%init(this%n)
     call device_sub3 (x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
-     call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
-        DEVICE_TO_HOST, sync = .true.)
-     ! print *, "iter=", iter, "device x_diff=", sum(x_diff%x)
+    call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
+         DEVICE_TO_HOST, sync = .true.)
+
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
 
@@ -272,11 +272,10 @@ contains
        call device_add2s2(this%low%x_d, x_diff%x_d, - this%asyinit, this%n)
        call device_copy(this%upp%x_d, x%x_d, this%n)
        call device_add2s2(this%upp%x_d, x_diff%x_d, this%asyinit, this%n)
-   
     else
        call device_mma_gensub2(this%low%x_d, this%upp%x_d, x%x_d, &
             this%xold1%x_d, this%xold2%x_d, x_diff%x_d, &
-            this%asydecr, this%asyincr, this%n) 
+            this%asydecr, this%asyincr, this%n)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -289,7 +288,6 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Computing bi as defined in page 5
-
 
     call device_mma_gensub4(x%x_d, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
@@ -324,7 +322,6 @@ contains
     type(matrix_t) :: GG
     type(matrix_t) :: AA
 
-    real(kind=rp), dimension(this%m*this%m) :: AA_buffer
     integer :: info
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_sq_norm
@@ -562,11 +559,8 @@ contains
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
 
-          AA_buffer = reshape(AA%x(1:this%m, 1:this%m), [this%m * this%m])
-          call MPI_Allreduce(MPI_IN_PLACE, AA_buffer, &
-               this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-
-          AA%x(1:this%m, 1:this%m) = reshape(AA_buffer, [this%m, this%m])
+          call MPI_Allreduce(MPI_IN_PLACE, AA%x, &
+               (this%m + 1)**2, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
           call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
                sync = .false.)

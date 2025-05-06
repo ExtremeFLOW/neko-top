@@ -647,7 +647,6 @@ contains
           zetaold = zeta
           sold = s
 
-
           new_residual = 2.0_rp * residual_norm
 
           ! Share the new_residual and steg values
