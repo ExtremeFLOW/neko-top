@@ -32,8 +32,8 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __NEKO_HIP_MATH_EXT_KERNELS__
-#define __NEKO_HIP_MATH_EXT_KERNELS__
+#ifndef __NEKO_CUDA_MATH_EXT_KERNELS__
+#define __NEKO_CUDA_MATH_EXT_KERNELS__
 
 /**
  * Device kernel for copy_mask

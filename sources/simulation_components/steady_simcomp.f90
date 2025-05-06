@@ -46,6 +46,7 @@ module steady_simcomp
   use csv_file, only : csv_file_t
   use vector, only: vector_t
   use time_state, only: time_state_t
+  use logger, only : neko_log
   implicit none
   private
 
@@ -91,6 +92,8 @@ contains
     real(kind=dp) :: tol
     integer :: log_frequency
 
+    call neko_log%message('HARRY, starting user simcomp')
+
     call this%init_base(json, case)
 
     ! Read the tolerance
@@ -111,6 +114,8 @@ contains
     this%tol = tol
     this%log_frequency = log_frequency
 
+    print *, "STARTING USER SIMCOMP"
+
     ! initialize the logger
     call this%logger%init('steady_state_data.csv')
     call this%logger%set_header('iter,time,u,v,w,p,t')
@@ -127,6 +132,8 @@ contains
        this%have_scalar = .true.
        call this%s_old%init(this%case%scalar%s%dof)
     end if
+
+    print *, "STARTING USER SIMCOMP"
 
   end subroutine steady_simcomp_init_from_attributes
 

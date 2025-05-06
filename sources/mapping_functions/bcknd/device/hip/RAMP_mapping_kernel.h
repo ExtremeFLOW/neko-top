@@ -32,8 +32,8 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __NEKO_HIP_RAMP_MAPPING_KERNELS__
-#define __NEKO_HIP_RAMP_MAPPING_KERNELS__
+#ifndef __NEKO_CUDA_RAMP_MAPPING_KERNELS__
+#define __NEKO_CUDA_RAMP_MAPPING_KERNELS__
 
 /**
  * Device kernel for RAMP (convex down) mapping

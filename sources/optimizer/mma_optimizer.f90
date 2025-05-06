@@ -192,6 +192,7 @@ contains
             scaling_factor * constraint_sensitivities)
 
        call design%update_design(x)
+       call design%write(iter)
 
        if (present(simulation)) call simulation%run_forward()
        call problem%compute(design)
