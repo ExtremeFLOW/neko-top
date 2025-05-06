@@ -226,8 +226,10 @@ contains
 
     call cpu_time(end_time)
 
-    print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
-    print *, "this%designx%x is updated"
+    if (pe_rank .eq. 0) then
+       print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
+       print *, "this%designx%x is updated"
+    end if
 
 
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
