@@ -70,30 +70,41 @@ __global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
 template< typename T >
 __global__ void mma_sub2_kernel(T* __restrict__ low, T* __restrict__ upp,
      const T* __restrict__ x, const T* __restrict__ xold1,
-     const T* __restrict__ xold2, const T* __restrict__ xmin,
-     const T* __restrict__ xmax, const T asydecr, const T asyincr,
-     const int n) {
+     const T* __restrict__ xold2, const T* __restrict__ xdiff,
+     const T asydecr, const T asyincr, const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     T xgap = xmax[tj] - xmin[tj];
-     T xdiff = (x[tj] - xold1[tj]) * (xold1[tj] - xold2[tj]);
-     if (xdiff < 0){
-        low[tj] = x[tj] - asydecr * (xold1[tj] - low[tj]);
-        upp[tj] = x[tj] + asydecr * (upp[tj] - xold1[tj]);
-     }
-     else if (xdiff > 0){
-        low[tj] = x[tj] - asyincr * (xold1[tj] - low[tj]);
-        upp[tj] = x[tj] + asyincr * (upp[tj] - xold1[tj]);
-     }
-     else {
-        low[tj] = x[tj] - (xold1[tj] - low[tj]);
-        upp[tj] = x[tj] + (upp[tj] - xold1[tj]);
-     }
-     low[tj] = max(low[tj], x[tj] - 10 * xgap);
-     low[tj] = min(low[tj], x[tj] - 0.01 * xgap);
-     upp[tj] = min(upp[tj], x[tj] + 10 * xgap);
-     upp[tj] = max(upp[tj], x[tj] - 0.01 * xgap);
-  }
+  if (tj >= n) return;
+
+  // Load data into registers for faster accessing compare to global memory 
+  // when accessing repeatedly)
+  const T xval     = x[tj];
+  const T xold1val = xold1[tj];
+  const T xold2val = xold2[tj];
+  const T lowval   = low[tj];
+  const T uppval   = upp[tj];
+  const T xdiffval = xdiff[tj];
+
+  // Compute the product
+  const T prod = (xval - xold1val) * (xold1val - xold2val);
+
+  // Compute asy_factor without branching
+  T asy_factor = (prod < T(0)) ? asydecr :
+                 (prod > T(0)) ? asyincr : T(1);
+
+  // Update low and upp using fma (fused multiply-add) for numerical stability
+  T new_low = fma(-asy_factor, (xold1val - lowval), xval);
+  T new_upp = fma(asy_factor,  (uppval - xold1val), xval);
+
+  // Apply bounds
+  new_low = max(new_low, xval - T(10.0) * xdiffval);
+  new_low = min(new_low, xval - T(0.01) * xdiffval);
+
+  new_upp = min(new_upp, xval + T(10.0) * xdiffval);
+  new_upp = max(new_upp, xval + T(0.01) * xdiffval);
+
+  // Write results back
+  low[tj] = new_low;
+  upp[tj] = new_upp;
 }
 
 template< typename T >
@@ -110,10 +121,12 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
         0.1 * (x[tj] - low[tj])), x[tj] - 0.5 * xgap);
      beta[tj] = min(min(xmax[tj], upp[tj] - 0.1 * (upp[tj] - x[tj])), x[tj] +
         0.5 * xgap);
+
      p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
         0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
         1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+        
      for (int i = 0; i < m; i++) {
         pij[i + tj*m] = pow(upp[tj] - x[tj], 2) *
          (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *
@@ -486,7 +499,7 @@ __global__ void AA_kernel(T* __restrict__ temp, const T* __restrict__ GG,
   if (tj < n) {
     for (int i0 = 0; i0 < m; i0++) {
       for (int i1 = 0; i1 < m; i1++) {
-        temp[tj + i0 * n + i1 * m * n] = GG[i0 * n + tj] *
+        temp[tj + i0 * (n + 1) + i1 * (m + 1) * (n + 1)] = GG[i0 * n + tj] *
          (1.0 / diagx[tj]) * GG[i1 * n + tj];
       }
     }

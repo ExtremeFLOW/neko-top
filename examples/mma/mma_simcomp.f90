@@ -93,7 +93,7 @@ contains
     ! initial design
     this%designx%x = 1.0
 
-    call this%mma%init( reshape(this%designx%x, [nloc]), &
+    call this%mma%init(reshape(this%designx%x, [nloc]), &
          nloc, this%m, case%params, this%scale, this%auto_scale)
   end subroutine simcomp_test_init_from_json
 
@@ -226,8 +226,10 @@ contains
 
     call cpu_time(end_time)
 
-    print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
-    print *, "this%designx%x is updated"
+    if (pe_rank .eq. 0) then
+       print *, 'Elapsed Time: ', end_time - start_time, ' seconds'
+       print *, "this%designx%x is updated"
+    end if
 
 
     stuff(:, 1) = reshape(this%designx%dof%x, [this%mma%get_n()])
