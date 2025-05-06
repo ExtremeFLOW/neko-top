@@ -59,15 +59,6 @@
             ],
             "output_control": "never",
         },
-        "simulation_components": [
-            {
-                "type": "steady",
-                "is_user": true,
-                "tol": 1e-2,
-                "compute_control": "tsteps",
-                "compute_value": 1
-            }
-        ],
         "point_zones": [
             {
                 "name": "optimization_domain",
