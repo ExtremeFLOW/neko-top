@@ -40,7 +40,6 @@ module simple_design
   use RAMP_mapping, only: RAMP_mapping_t
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
-  ! use fld_file_output, only: fld_file_output_t
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
@@ -69,9 +68,6 @@ module simple_design
 
      ! needed to write the design into a vtk file with connectivity
      integer :: nx, ny, nz
-
-     ! a field writer
-    !  type(fld_file_output_t), private :: output
 
    contains
 
@@ -135,7 +131,7 @@ contains
        call json_get(parameters, 'optimization.design.domain.ny', ny)
        call json_get(parameters, 'optimization.design.domain.nz', nz)
        call json_get(parameters, 'optimization.design.domain.limits', limits)
-       n = nx * ny * nz
+       n = (nx + 1) * (ny + 1) * (nz + 1)
        this%nx = nx
        this%ny = ny
        this%nz = nz
@@ -145,12 +141,15 @@ contains
        call y%init(n)
        call z%init(n)
        index = 1
-       do i = 1, nx
-         do j = 1, ny
-             do k = 1, nz
-               x%x(index) = limits(1) + (limits(2) - limits(1)) * real(i - 1, kind=rp) / real(nx, kind=rp)
-               y%x(index) = limits(3) + (limits(4) - limits(3)) * real(j - 1, kind=rp) / real(ny, kind=rp)
-               z%x(index) = limits(5) + (limits(6) - limits(5)) * real(k - 1, kind=rp) / real(nz, kind=rp)
+       do k = 1, nz + 1
+         do j = 1, ny + 1
+             do i = 1, nx + 1
+               x%x(index) = limits(1) + (limits(2) - limits(1)) * &
+                    real(i - 1, kind=rp) / real(nx, kind=rp)
+               y%x(index) = limits(3) + (limits(4) - limits(3)) * &
+                    real(j - 1, kind=rp) / real(ny, kind=rp)
+               z%x(index) = limits(5) + (limits(6) - limits(5)) * &
+                    real(k - 1, kind=rp) / real(nz, kind=rp)
                index = index + 1
              end do
          end do
@@ -258,9 +257,9 @@ contains
     character(len=100) :: filename
     integer :: ios
 
-    nx = this%nx
-    ny = this%ny
-    nz = this%nz
+    nx = this%nx + 1
+    ny = this%ny + 1
+    nz = this%nz + 1
     npts = nx * ny * nz
 
     write(filename, '(A,I4.4,A)') 'design_', idx, '.vtk'
@@ -294,7 +293,5 @@ contains
 
     close(10)
   end subroutine design_simple_write
-
-
 
 end module simple_design
