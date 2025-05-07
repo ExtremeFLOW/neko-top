@@ -59,8 +59,15 @@ contains
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
 
-    call object%init_from_json(parameters, problem, design, &
-         max_iterations, tolerance, simulation)
+    if (present(simulation)) then
+       call object%init_from_json(parameters, problem, design, &
+            max_iterations, tolerance, simulation)
+    else
+       call object%init_from_json(parameters, problem, design, &
+            max_iterations, tolerance)
+    end if
+
+
 
   end subroutine optimizer_factory
 
