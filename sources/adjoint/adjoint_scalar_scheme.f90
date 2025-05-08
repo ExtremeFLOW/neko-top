@@ -62,7 +62,7 @@ module adjoint_scalar_scheme
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
        user_material_properties
-  use utils, only : neko_error
+  use utils, only : neko_error, neko_warning
   use comm, only: NEKO_COMM, MPI_INTEGER, MPI_SUM
   use scalar_source_term, only : scalar_source_term_t
   use field_series, only : field_series_t
@@ -79,6 +79,7 @@ module adjoint_scalar_scheme
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
   use device, only : device_memcpy, DEVICE_TO_HOST
+  use field_math, only : field_col3, field_cmult2, field_add2, field_cfill
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
@@ -180,7 +181,7 @@ module adjoint_scalar_scheme
        import gs_t
        import mesh_t
        import user_t
-       import field_series_t
+       import field_series_t, field_t
        import time_scheme_controller_t
        import rp
        class(adjoint_scalar_scheme_t), target, intent(inout) :: this
@@ -191,7 +192,7 @@ module adjoint_scalar_scheme
        type(user_t), target, intent(in) :: user
        type(field_series_t), target, intent(in) :: ulag, vlag, wlag
        type(time_scheme_controller_t), target, intent(in) :: time_scheme
-       real(kind=rp), intent(in) :: rho
+       type(field_t), target, intent(in) :: rho
      end subroutine adjoint_scalar_scheme_init_intrf
   end interface
 

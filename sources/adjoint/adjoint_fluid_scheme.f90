@@ -80,6 +80,7 @@ module adjoint_fluid_scheme
   use shear_stress, only: shear_stress_t
   use field_list, only : field_list_t
   use gradient_jump_penalty, only: gradient_jump_penalty_t
+  use field_math, only: field_addcol3
 
   use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
   use json_utils_ext, only: json_key_fallback
