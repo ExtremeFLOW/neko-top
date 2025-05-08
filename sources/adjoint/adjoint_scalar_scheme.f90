@@ -491,6 +491,7 @@ contains
 
   !> Call user material properties routine and update the values of `lambda`
   !! if necessary.
+  !! @param[inout] this The object.
   !! @param t Time value.
   !! @param tstep Current time step.
   subroutine adjoint_scalar_scheme_update_material_properties(t, tstep, this)

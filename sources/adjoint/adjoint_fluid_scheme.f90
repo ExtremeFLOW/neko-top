@@ -946,6 +946,7 @@ contains
 
   !> Call user material properties routine and update the values of `mu`
   !! if necessary.
+  !! @param this The fluid scheme.
   !! @param t Time value.
   !! @param tstep Current time step.
   subroutine adjoint_fluid_scheme_update_material_properties(this, t, tstep)
