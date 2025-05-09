@@ -20,13 +20,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
