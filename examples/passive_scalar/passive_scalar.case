@@ -21,13 +21,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 50
             },
@@ -52,7 +56,9 @@
             "Pe": 5000.0,
             "solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": {
+                    "type": "jacobi"
+                }
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },

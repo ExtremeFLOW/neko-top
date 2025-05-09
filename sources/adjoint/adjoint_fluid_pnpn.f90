@@ -58,7 +58,8 @@ module adjoint_fluid_pnpn
   use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item, &
+       json_extract_object
   use json_module, only: json_file
   use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
@@ -294,6 +295,7 @@ contains
     character(len=:), allocatable :: solver_type, precon_type
     logical :: monitor, found
     logical :: advection
+    type(json_file) :: precon_params
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -423,8 +425,10 @@ contains
          'case.fluid.pressure_solver.max_iterations', &
          solver_maxiter, 800)
     call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
-    call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
+    call json_get(params, 'case.fluid.pressure_solver.preconditioner.type', &
          precon_type)
+    call json_extract_object(params, &
+         'case.fluid.pressure_solver.preconditioner', precon_params)
     call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
          abs_tol)
     call json_get_or_default(params, 'case.fluid.velocity_solver.monitor', &
@@ -437,7 +441,8 @@ contains
     call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
          solver_type, solver_maxiter, abs_tol, monitor)
     call this%precon_factory_(this%pc_prs, this%ksp_prs, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, &
+         precon_type, precon_params)
 
     call neko_log%end_section()
 

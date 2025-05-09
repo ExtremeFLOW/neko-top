@@ -58,7 +58,8 @@ module adjoint_scalar_scheme
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only : neko_field_registry
   use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
-  use json_utils, only : json_get, json_get_or_default, json_extract_item
+  use json_utils, only : json_get, json_get_or_default, json_extract_item, &
+       json_extract_object
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
        user_material_properties
@@ -262,6 +263,7 @@ contains
     character(len=:), allocatable :: solver_type, solver_precon
     ! real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
+    type(json_file) :: precon_params
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
@@ -274,9 +276,14 @@ contains
     ! but I think we should use the same as the forward
     call json_get(params, 'case.scalar.solver.type', solver_type)
     json_key = json_key_fallback(params, &
+         'case.adjoint_scalar.solver.preconditioner.type', &
+         'case.scalar.solver.preconditioner.type')
+    call json_get(params, json_key, solver_precon)
+
+    json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.preconditioner', &
          'case.scalar.solver.preconditioner')
-    call json_get(params, json_key, solver_precon)
+    call json_extract_object(params, json_key, precon_params)
 
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.absolute_tolerance', &
@@ -377,7 +384,8 @@ contains
     call scalar_scheme_solver_factory(this%ksp, this%dm_Xh%size(), &
          solver_type, integer_val, solver_abstol, logical_val)
     call scalar_scheme_precon_factory(this%pc, this%ksp, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, solver_precon)
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, &
+         solver_precon, precon_params)
 
     ! Initiate gradient jump penalty
     json_key = json_key_fallback(params, &
