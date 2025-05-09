@@ -314,7 +314,7 @@ contains
     integer :: integer_val
     character(len=:), allocatable :: string_val1, string_val2
     character(len=:), allocatable :: json_key
-    type(json_file) :: json_subdict, precon_params
+    type(json_file) :: json_subdict
 
     !
     ! SEM simulation fundamentals
