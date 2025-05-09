@@ -101,6 +101,9 @@ source $MAIN_DIR/scripts/dependencies.sh
 if [ -z "$CC" ]; then export CC=$(which mpicc); else export CC; fi
 if [ -z "$CXX" ]; then export CXX=$(which mpicxx); else export CXX; fi
 if [ -z "$FC" ]; then export FC=$(which mpifort); else export FC; fi
+if [ -z "$MPIFC" ]; then export MPIFC=$(which mpif90); else export MPIFC; fi
+if [ -z "$MPICC" ]; then export MPICC=$(which mpicc); else export MPICC; fi
+if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then

@@ -186,10 +186,12 @@ contains
 
        x = design%get_values()
 
+       constraint_value = scaling_factor * constraint_value
+       constraint_sensitivities = scaling_factor * constraint_sensitivities
+
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x, objective_sensitivities, &
-            scaling_factor * constraint_value, &
-            scaling_factor * constraint_sensitivities)
+            constraint_value, constraint_sensitivities)
 
        call design%update_design(x)
        call design%write(iter)

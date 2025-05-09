@@ -754,7 +754,7 @@ contains
          vel_projection_dim => this%vel_projection_dim, &
          pr_projection_dim => this%pr_projection_dim, &
          rho => this%rho, mu => this%mu, oifs => this%oifs, &
-         rho_field => this%rho_field, mu_field => this%mu_field, &
+         rho_field => this%rho, mu_field => this%mu, &
          f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
          if_variable_dt => dt_controller%if_variable_dt, &
          dt_last_change => dt_controller%dt_last_change, &
@@ -807,11 +807,11 @@ contains
          call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
               this%abx2, this%aby2, this%abz2, &
               f_x%x, f_y%x, f_z%x, &
-              rho, ext_bdf%advection_coeffs, n)
+              rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, rho, dt, &
+              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
               ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       end if
 
@@ -823,7 +823,7 @@ contains
       call this%bc_apply_prs(t, tstep)
 
       ! Update material properties if necessary
-      call this%update_material_properties()
+      call this%update_material_properties(t, tstep)
 
       ! Compute pressure residual.
       call profiler_start_region('Pressure_residual', 18)
