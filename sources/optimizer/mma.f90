@@ -419,16 +419,29 @@ contains
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: iter
     type(vector_t), intent(inout) :: x
-    type(vector_t), intent(in) :: df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+    type(vector_t), intent(inout) :: df0dx, fval
+    type(matrix_t), intent(inout) :: dfdx
 
     ! Select backend type
     select case (this%bcknd)
     case ("cpu")
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
+               sync = .true.)
+       end if
+
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
        end if
+
     case ("cuda")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
        call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
@@ -439,12 +452,23 @@ contains
   !> Call the KKT ckeck function based on the backend
   subroutine mma_KKT_vector(this, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
-    type(vector_t), intent(in) :: x, df0dx, fval
-    type(matrix_t), intent(in) :: dfdx
+    type(vector_t), intent(inout) :: x, df0dx, fval
+    type(matrix_t), intent(inout) :: dfdx
 
     ! Select backend type
     select case (this%bcknd )
     case ("cpu")
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .false.)
+          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
+               sync = .true.)
+       end if
+
        call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
     case ("cuda")
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
