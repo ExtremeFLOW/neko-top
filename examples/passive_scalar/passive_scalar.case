@@ -154,6 +154,22 @@
                     -1.0,
                     3.0
                 ]
+            },
+            {
+                "name": "initial_guess",
+                "geometry": "box",
+                "x_bounds": [
+                    4.0,
+                    5.0
+                ],
+                "y_bounds": [
+                    -1.0,
+                    1.0
+                ],
+                "z_bounds": [
+                    0.25,
+                    1.0
+                ]
             }
         ]
     },
@@ -175,8 +191,10 @@
                 }
             ],
             "initial_distribution": {
-                "type": "uniform",
-                "value": 0.0
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_guess"
             }
         },
         "solver": {
