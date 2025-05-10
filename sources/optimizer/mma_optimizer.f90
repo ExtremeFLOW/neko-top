@@ -175,7 +175,7 @@ contains
     call design%write(0)
 
     do iter = 1, this%max_iterations
-       if (this%mma%get_residumax() .lt. this%tolerance) exit
+       ! if (this%mma%get_residumax() .lt. this%tolerance) exit
 
        ! Scaling
        if (this%auto_scale .eqv. .true.) then

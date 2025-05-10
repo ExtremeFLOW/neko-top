@@ -5,7 +5,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 1.0,
+        "end_time": 9.0,
         "timestep": 1e-3,
         "numerics": {
             "time_order": 1,
@@ -50,11 +50,11 @@
                 }
             ],
             "output_control": "simulationtime",
-            "output_value": 0.1,
+            "output_value": 1.0,
         },
         "scalar": {
             "enabled": true,
-            "Pe": 1000.0,
+            "Pe": 500.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
