@@ -170,6 +170,9 @@ module adjoint_scalar_scheme
      !> Restart from a checkpoint.
      procedure(adjoint_scalar_scheme_restart_intrf), pass(this), deferred :: &
           restart
+     !> Reset to zero.
+     procedure(adjoint_scalar_scheme_reset_intrf), pass(this), deferred :: &
+          reset
   end type adjoint_scalar_scheme_t
 
   !> Abstract interface to initialize a scalar formulation
@@ -206,6 +209,14 @@ module adjoint_scalar_scheme
        class(adjoint_scalar_scheme_t), target, intent(inout) :: this
        real(kind=rp) :: dtlag(10), tlag(10)
      end subroutine adjoint_scalar_scheme_restart_intrf
+  end interface
+
+  !> Abstract interface to reset a scalar formulation
+  abstract interface
+     subroutine adjoint_scalar_scheme_reset_intrf(this)
+       import adjoint_scalar_scheme_t
+       class(adjoint_scalar_scheme_t), target, intent(inout) :: this
+     end subroutine adjoint_scalar_scheme_reset_intrf
   end interface
 
   !> Abstract interface to dealocate a scalar formulation

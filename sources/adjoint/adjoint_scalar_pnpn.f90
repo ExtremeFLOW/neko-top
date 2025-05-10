@@ -68,6 +68,7 @@ module adjoint_scalar_pnpn
   use time_step_controller, only : time_step_controller_t
   use scratch_registry, only : neko_scratch_registry
   use bc, only : bc_t
+  use field_math, only: field_rzero
   implicit none
   private
 
@@ -130,7 +131,10 @@ module adjoint_scalar_pnpn
      procedure, pass(this) :: step => adjoint_scalar_pnpn_step
      !> Setup the boundary conditions
      procedure, pass(this) :: setup_bcs_ => adjoint_scalar_pnpn_setup_bcs_
+     !> Setup the boundary conditions
+     procedure, pass(this) :: reset => adjoint_scalar_pnpn_reset
   end type adjoint_scalar_pnpn_t
+
 
   !> Boundary condition factory. Both constructs and initializes the object.
   !! @details Will mark a mesh zone for the bc and finalize.
@@ -547,5 +551,20 @@ contains
        end do
     end if
   end subroutine adjoint_scalar_pnpn_setup_bcs_
+
+  !> I envision the arguments to this func might need to be expanded
+  subroutine adjoint_scalar_pnpn_reset(this)
+    class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
+    integer :: i
+    
+    call field_rzero(this%s_adj)
+    do i = 1, this%s_adj_lag%size()
+       call field_rzero(this%s_adj_lag%lf(i))
+    end do
+    call field_rzero(this%f_Xh)
+    call field_rzero(this%abx1)
+    call field_rzero(this%abx2)
+
+  end subroutine adjoint_scalar_pnpn_reset
 
 end module adjoint_scalar_pnpn

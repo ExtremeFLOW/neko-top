@@ -198,14 +198,9 @@ contains
 
     call reset(this%neko_case)
 
-    ! TODO
-    ! reset for the adjoint
-    ! call reset(this%adjoint_case)
-    call field_rzero(this%adjoint_case%fluid_adj%u_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%v_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    if (allocated(this%neko_case%scalar)) then
-       call field_rzero(this%adjoint_case%scalar_adj%s_adj)
+    call this%adjoint_case%fluid_adj%reset()
+    if (allocated(this%adjoint_case%scalar_adj)) then
+       call this%adjoint_case%scalar_adj%reset()
     end if
 
   end subroutine simulation_reset
