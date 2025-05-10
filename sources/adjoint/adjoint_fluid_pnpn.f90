@@ -77,7 +77,7 @@ module adjoint_fluid_pnpn
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error, neko_type_error
-  use field_math, only: field_add2, field_copy
+  use field_math, only: field_add2, field_copy, field_rzero
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
@@ -239,9 +239,12 @@ module adjoint_fluid_pnpn
      !> Write a field with boundary condition specifications.
      procedure, pass(this) :: write_boundary_conditions => &
           adjoint_fluid_pnpn_write_boundary_conditions
+     !> Reset a simulation
+     procedure, pass(this) :: reset => adjoint_fluid_pnpn_reset
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
+
 
   end type adjoint_fluid_pnpn_t
 
@@ -1520,6 +1523,46 @@ contains
     !call neko_log%end_section('Power Iterations', lvl = NEKO_LOG_DEBUG)
     call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
+
+    subroutine adjoint_fluid_pnpn_reset(this)
+  class(adjoint_fluid_pnpn_t), intent(inout) :: this
+  integer :: i
+
+    ! zero out flds
+    call field_rzero(this%u_adj)
+    call field_rzero(this%v_adj)
+    call field_rzero(this%w_adj)
+    call field_rzero(this%p_adj)
+
+    ! zero out lag fields (weird notation... but this%u_adj will now be zero)
+    ! call this%ulag%set(this%u_adj)
+    ! call this%vlag%set(this%u_adj)
+    ! call this%wlag%set(this%u_adj)
+
+    ! just in case "set" doesn't work properly
+       do i = 1, this%ulag%size()
+          call field_rzero(this%ulag%lf(i))
+          call field_rzero(this%vlag%lf(i))
+          call field_rzero(this%wlag%lf(i))
+       end do
+
+    ! zero out RHS
+    call field_rzero(this%f_adj_x)
+    call field_rzero(this%f_adj_y)
+    call field_rzero(this%f_adj_z)
+
+    ! zero out time variables
+    call field_rzero(this%abx1)
+    call field_rzero(this%aby1)
+    call field_rzero(this%abz1)
+    call field_rzero(this%abx2)
+    call field_rzero(this%aby2)
+    call field_rzero(this%abz2)
+
+    ! There may be more related to the time scheme controller, but I think
+    ! this is sufficient and will be handled in the beginning of the simulation
+
+  end subroutine adjoint_fluid_pnpn_reset
 
 
 end module adjoint_fluid_pnpn
