@@ -5,8 +5,8 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 5.0,
-        "timestep": 2e-4,
+        "end_time": 1.0,
+        "timestep": 1e-3,
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
@@ -14,7 +14,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 1,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -49,16 +49,17 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never"
+            "output_control": "simulationtime",
+            "output_value": 0.1,
         },
         "scalar": {
             "enabled": true,
-            "Pe": 5000.0,
+            "Pe": 1000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
-                }
+                },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },
@@ -126,8 +127,8 @@
                 "name": "optimization_domain",
                 "geometry": "box",
                 "x_bounds": [
-                    1.5,
-                    4.5
+                    2.0,
+                    7.0
                 ],
                 "y_bounds": [
                     -1.0,
@@ -142,8 +143,8 @@
                 "name": "objective_domain",
                 "geometry": "box",
                 "x_bounds": [
-                    5.0,
-                    6.0
+                    8.0,
+                    10.0
                 ],
                 "y_bounds": [
                     -1.0,
@@ -184,7 +185,8 @@
             "tolerance": 1.0e-3,
             "mma": {
                 "m": 0,
-                "scale": 1000.0,
+                "subsolver": "dip",
+                "scale": 10.0,
                 "xmin": 0.0,
                 "xmax": 1.0
             }
@@ -194,7 +196,7 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 1.0
+                "weight": 10.0
             }
         ],
         "constraints": [ ]

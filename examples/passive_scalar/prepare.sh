@@ -26,7 +26,7 @@ function help() {
 }
 
 # Handle options
-Nx=15 && Ny=5 && Nz=5
+Nx=45 && Ny=10 && Nz=10
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -62,7 +62,7 @@ fi
 # Generate mesh and run case
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 6 0 2 0 2 $Nx $Ny $Nz .false. .false. .false.
+genmeshbox 0 9 0 2 0 2 $Nx $Ny $Nz .false. .false. .false.
 
 # End of file
 # ============================================================================ #
