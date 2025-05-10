@@ -144,7 +144,7 @@
                 "geometry": "box",
                 "x_bounds": [
                     8.0,
-                    10.0
+                    8.99
                 ],
                 "y_bounds": [
                     -1.0,
@@ -196,7 +196,7 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 10.0
+                "weight": 1.0
             }
         ],
         "constraints": [ ]

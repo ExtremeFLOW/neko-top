@@ -95,8 +95,8 @@ contains
 
     ! Initial scalar profile is a sigmoid separating the two species
     do i = 1, s%dof%size()
-       ! s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
-       s%x(i,1,1,1) = 0.0_rp
+       s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
+       ! s%x(i,1,1,1) = 0.0_rp
     end do
 
   end subroutine scalar_ic
