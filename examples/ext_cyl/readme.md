@@ -8,6 +8,33 @@ or
 [nekStab](https://github.com/nekStab/nekStab) projects with the addition of
 GPU acceleration.
 
+Converged in 76 iterations, first few eigenvalues from `eigs_output.txt` are:
+```
+  Iter                Re                Im           modulus          residual  conv
+    76   0.835448073E+00   0.773025754E+00   0.113821892E+01   0.310534793E-07     T
+    76   0.835448073E+00  -0.773025754E+00   0.113821892E+01   0.310534793E-07     T
+    76   0.698624010E+00   0.687928978E+00   0.980470187E+00   0.533291754E-04     F
+    76   0.698624010E+00  -0.687928978E+00   0.980470187E+00   0.533291754E-04     F
+    76  -0.589259735E+00   0.401569414E+00   0.713081362E+00   0.157044789E-03     F
+    76  -0.589259735E+00  -0.401569414E+00   0.713081362E+00   0.157044789E-03     F
+    76  -0.627605141E+00   0.340226066E+00   0.713892141E+00   0.170585614E-03     F
+    76  -0.627605141E+00  -0.340226066E+00   0.713892141E+00   0.170585614E-03     F
+    76   0.622820196E+00   0.677461348E+00   0.920249354E+00   0.178059467E-03     F
+    76   0.622820196E+00  -0.677461348E+00   0.920249354E+00   0.178059467E-03     F
+    76  -0.541120962E+00   0.456362159E+00   0.707868855E+00   0.184640696E-03     F
+    76  -0.541120962E+00  -0.456362159E+00   0.707868855E+00   0.184640696E-03     F
+    76  -0.357995329E+00   0.625994339E+00   0.721130756E+00   0.187603873E-03     F
+    76  -0.357995329E+00  -0.625994339E+00   0.721130756E+00   0.187603873E-03     F
+    76  -0.656165850E+00   0.276145405E+00   0.711905828E+00   0.195539330E-03     F
+```
+
+Leading mode looks reasonable too
+
+![Leading mode.](ext_cyl_leading_mode.png)
+
+\attention I still have a ton of cleaning to do, so don't peep toooo closely
+at things like `cylinder.f90` and `driver.f90` :sweat_smile:
+
 ## guide for `LightKrylov` and `neko-top` people
 `neko-top` is a framework intended to use `neko` as a library to perform topology
 optimization. Currently, the linear and adjoint solvers only exist in `neko-top`
@@ -57,41 +84,51 @@ update the linear/adjoint solver and migrate them from `neko-top` to `neko`. We
 then need to find some kind of `fpm` compatibility.
 
 ## Issues on the `LightKrylov` side
-There are a few "issues" with `LightKrylov` that have forced me to fork it as
-opposed to using the `dev` branch along.
+I wouldn't say "issues" with `LightKrylov`, but things that are slightly awkward
+that have forced me to temporarily fork it as opposed to using the `dev` branch.
 
-This is primarily with the frequent use of `intent(out)` for operations using
-`abstract_vector` types. For the `field_t` in `neko` one must first initialize
+This is due to two factors:
+-  For the `field_t` in `neko` one must first initialize
 using a `dofmap_t`, implying the `abstract_vector` we would use would ideally
-have an `init` functionality which could allocate the required fields. Indeed,
+have an `init` functionality which could allocate the required fields.
+- The frequent use of `intent(out)` for operations using `abstract_vector` types.
+
+Indeed,
 before Krylov subspace is allocated, it is followed by a `%zero()`, allowing
-us to sneak in an initialization during this call. However, the use of
-`intent(out)` in certain subroutines will deallocate the `abstract_vector` upon
-entry to the subroutine, requiring it to be re-initialized with the subroutine.
+us to sneak in an initialization during this call. However, there are still traces
+in, for instance, `copy` which piggybacks on `axpby`.
 
-On top of this, when allocating in `LightKrylov`, for example in `linear_combination` 
-it is common to use 
-```fortran
-allocate(Y(size(B, 2)), source=X(1))
-```
+Of course, all these things can be overcome by sneaking little `%init`s throughout
+ `zero`, `axpby` etc. It's just a bit awkward.
 
-Given fields are pointers in the `abstract_vector`, this `=` assignment passes
-the pointers across, implying we edit the field in `X(1)`. There was an attempt
-to reassign `=` with
+***However!!!*** at no point am I free'ing any of these fields! So I'm super
+confident this prototype is riddled with memory leaks.
 
-```fortran
-   interface assignment(=)
-    module procedure state_vector_assignment
-   end interface
-```
+Another consideration which must be addressed before moving into production
+is how device kernels are launched. Ideally, `neko` favours one BIG kernel
+launch as opposed to many small. As it stands, although most operations are
+executed on device, they are executed as many small kernel launches. In
+future iterations of this project one should rework some of the additional
+procedures avaiable by LightKrylov, especially those that are combinations
+or accumulations of type bound procedures. i.e., I'm pretty confident something
+like a `linear_combination` can be launched as a single kernel, as opposed to
+many individual kernels.
 
-But it still took the abstract class' assignment, not the derived type.
 
-Instead A VERY hacky solution of a deep copy was implemented in `abpby`.
+However, at the end of the day, given the majority of the heavy lifting
+(in terms of compute resources) is being doing by the exponential propogator,
+the linear algebra pales in comparison and so perhaps these considerations
+are a moot point.
 
-I would recommend adjusting the `abstract_vector` to do a deep copy on `=`.
+# Concluding remarks
+Overall, this has been a very nice demonstration of the abstractness of
+`LightKrylov` and the modularity of `neko`, and shows promising potential for
+performing stability related analysis with GPUs.
 
-***Edit*** This was overcome by first free'ing and then initializing every time
-`%zero()` was called to avoid a shallow copy. But now I'm suspicious that I'm
-never actually free'ing any fields, just nullifying their pointers, so there
-is potentially a massive memory leak in here...
+However, one must be cautious that, although all operations are executed on device,
+much of the memory dedicated to storing the Krylov subspace is idle during
+the execution time of the exponential propogator, ultimately limiting the
+efficiency of these tools (again, this is not GPU specific... but an unfortunate
+cosequence of memory bound problems such as these)
+
+Excited to see where this goes!!! :stuck_out_tongue_winking_eye:
