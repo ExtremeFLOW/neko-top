@@ -28,9 +28,9 @@ program usrneko
   !---------------------------------------------------
 
   !> Number of eigenvalues we wish to converge.
-  integer, parameter :: nev = 2
+  integer, parameter :: nev = 15
   !> Size of Krylov subspace.
-  integer, parameter :: kdim = 256
+  integer, parameter :: kdim = 126
   !> Krylov subspace.
   type(state_vector), allocatable :: X(:)
   !> Eigenvalues.
