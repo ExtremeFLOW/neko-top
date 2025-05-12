@@ -54,8 +54,6 @@ module device_mma_math
   implicit none
   private
 
-! #ifdef HAVE_CUDA
-! #ifdef HAVE_HIP
 
   public :: device_mma_gensub1, device_mma_gensub2, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
