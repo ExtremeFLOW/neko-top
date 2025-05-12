@@ -41,9 +41,6 @@
 
 extern "C" {
 
-#include <math/bcknd/device/device_mpi_op.h>
-#include <math/bcknd/device/device_mpi_reduce.h>
-
 /** Fortran wrapper for RAMP (convex down) mapping
  */
 void hip_convex_down_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
