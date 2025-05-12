@@ -293,7 +293,7 @@ contains
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.projection_space_size', &
          'case.scalar.solver.projection_space_size')
-    call json_get_or_default(params, json_key, this%projection_dim, 20)
+    call json_get_or_default(params, json_key, this%projection_dim, 0)
 
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.projection_hold_steps', &
