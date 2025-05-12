@@ -357,23 +357,6 @@ function find_neko() {
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j install || make -j install
 
-#        # Verify installation device type
-#        if [ "$DEVICE_TYPE" == "CUDA" ]; then
-#            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
-#            if [ -z "$(grep "NEKO_BCKND_CUDA = 1" src/config/neko_config.f90)" ]; then
-#                error "CUDA backend not found in Neko."
-#                error "Please ensure that the CUDA installation is correct."
-#                exit 1
-#            fi
-#        elif [ "$DEVICE_TYPE" == "HIP" ]; then
-#            # Look for the line "  integer, parameter :: NEKO_BCKND_CUDA = 1"
-#            if [ -z "$(grep "NEKO_BCKND_HIP = 1" src/config/neko_config.f90)" ]; then
-#                error "HIP backend not found in Neko."
-#                error "Please ensure that the HIP installation is correct."
-#                exit 1
-#            fi
-#        fi
-#
         cd $CURRENT_DIR
     fi
 
