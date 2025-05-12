@@ -63,6 +63,15 @@
             ],
             "output_control": "never",
         },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "is_user": true,
+                "tol": 1e-2,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
         "point_zones": [
             {
                 "name": "optimization_domain",
@@ -118,7 +127,6 @@
             "max_iterations": 5,
             "tolerance": 1.0e-3,
             "mma": {
-                "backend": "cpu",
                 "max_iter": 100,
                 "asyinit": 0.5,
                 "asyincr": 1.2,
