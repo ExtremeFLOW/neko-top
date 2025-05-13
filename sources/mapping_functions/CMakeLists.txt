@@ -33,4 +33,16 @@ if(DEVICE_TYPE STREQUAL "CUDA")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
     )
+
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    target_sources(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping_kernel.h
+    )
+
+    target_include_directories(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip
+    )
 endif()
