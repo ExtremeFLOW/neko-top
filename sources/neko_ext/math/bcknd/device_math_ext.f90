@@ -38,6 +38,74 @@ module device_math_ext
 
 #if HAVE_HIP
 
+  interface
+     subroutine hip_copy_mask(a_d, b_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_copy_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_copy_mask
+  end interface
+  interface
+     subroutine hip_cadd_mask(a_d, c, size, mask_d, mask_size) &
+          bind(c, name = 'hip_cadd_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       real(c_rp) :: c
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_cadd_mask
+  end interface
+  interface
+     subroutine hip_invcol1_mask(a_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_invcol1_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_invcol1_mask
+  end interface
+  interface
+     subroutine hip_col2_mask(a_d, b_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_col2_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_col2_mask
+  end interface
+  interface
+     subroutine hip_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_col3_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       type(c_ptr), value :: c_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_col3_mask
+  end interface
+  interface
+     subroutine hip_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size) &
+          bind(c, name = 'hip_sub3_mask')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: b_d
+       type(c_ptr), value :: c_d
+       integer(c_int) :: size
+       type(c_ptr), value :: mask_d
+       integer(c_int) :: mask_size
+     end subroutine hip_sub3_mask
+  end interface
+
 #elif HAVE_CUDA
 
   interface
@@ -120,7 +188,9 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_copy_mask(a_d, b_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_copy_mask(a_d, b_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_copy_mask')
@@ -133,7 +203,9 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_cadd_mask(a_d, c, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_cadd_mask(a_d, c, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_cadd_mask')
@@ -145,7 +217,9 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_invcol1_mask(a_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_invcol1_mask(a_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_invcol1_mask')
@@ -158,7 +232,9 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_col2_mask(a_d, b_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_col2_mask(a_d, b_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_col2_mask')
@@ -172,7 +248,9 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_col3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_col3_mask')
@@ -186,12 +264,13 @@ contains
     integer :: size
     type(c_ptr) :: mask_d
     integer :: mask_size
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
+#elif HAVE_CUDA
     call cuda_sub3_mask(a_d, b_d, c_d, size, mask_d, mask_size)
 #else
     call neko_error('No device backend configured for device_sub3_mask')
 #endif
   end subroutine device_sub3_mask
-
 
 end module device_math_ext

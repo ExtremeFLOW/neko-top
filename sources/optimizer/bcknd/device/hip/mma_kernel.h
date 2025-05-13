@@ -32,11 +32,11 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef MMA_CUDA_KERNEL_H
-#define MMA_CUDA_KERNEL_H
+#ifndef MMA_HIP_KERNEL_H
+#define MMA_HIP_KERNEL_H
 
 template <typename T>
-__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
+__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv, 
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ x, const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
@@ -55,7 +55,7 @@ __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
 
 
 template <typename T>
-__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
+__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x, 
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
@@ -74,7 +74,7 @@ __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
 }
 
 template <typename T>
-__global__ void mattrans_v_mul_kernel(T* __restrict__ output,
+__global__ void mattrans_v_mul_kernel(T* __restrict__ output, 
      const T* __restrict__ pij, const T* __restrict__ lambda,
      const int m, const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
@@ -159,7 +159,7 @@ __global__ void mma_sub3_kernel(const T* __restrict__ x,
         0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
      q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
         1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
-        
+
      for (int i = 0; i < m; i++) {
         pij[i + tj*m] = pow(upp[tj] - x[tj], 2) *
          (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *
@@ -224,11 +224,11 @@ __global__ void sub2cons2_kernel(T* __restrict__ a, const T* __restrict__ b,
 
 template< typename T>
 __inline__ __device__ T max_reduce_warp(T val) {
-  val = max(val, __shfl_down_sync(0xffffffff, val, 16));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 8));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 4));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 2));
-  val = max(val, __shfl_down_sync(0xffffffff, val, 1));
+  val = max(val, __shfl_down(val, 16, 32));
+  val = max(val, __shfl_down(val, 8, 32));
+  val = max(val, __shfl_down(val, 4, 32));
+  val = max(val, __shfl_down(val, 2, 32));
+  val = max(val, __shfl_down(val, 1, 32));
   return val;
 }
 
@@ -351,11 +351,11 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
 
 template< typename T>
 __inline__ __device__ T reduce_warp(T val) {
-  val += __shfl_down_sync(0xffffffff, val, 16);
-  val += __shfl_down_sync(0xffffffff, val, 8);
-  val += __shfl_down_sync(0xffffffff, val, 4);
-  val += __shfl_down_sync(0xffffffff, val, 2);
-  val += __shfl_down_sync(0xffffffff, val, 1);
+  val += __shfl_down(val, 16, 32);
+  val += __shfl_down(val, 8, 32);
+  val += __shfl_down(val, 4, 32);
+  val += __shfl_down(val, 2, 32);
+  val += __shfl_down(val, 1, 32);
   return val;
 }
 

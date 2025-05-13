@@ -43,11 +43,17 @@ module device_mma_math
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess
+  use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
+       hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
+       hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
+       hip_updateAA, hip_dx, hip_dy, hip_deta, hip_dxsi, hip_maxval2, &
+       hip_maxval3, hip_kkt_rex, mma_gensub1_hip, mma_gensub2_hip, &
+       mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
+       mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess
 
   implicit none
   private
 
-! #ifdef HAVE_CUDA
 
   public :: device_mma_gensub1, device_mma_gensub2, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
@@ -64,7 +70,7 @@ contains
     type(c_ptr):: Hess_d, hijx_d, Ljjxinv_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m)
 #elif HAVE_CUDA
     call cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m)
 #elif HAVE_OPENCL
@@ -90,7 +96,8 @@ contains
          low_d, upp_d, alpha_d, beta_d
     integer(c_int) :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_Ljjxinv_hip(Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
+         low_d, upp_d, alpha_d, beta_d, n)
 #elif HAVE_CUDA
     call mma_Ljjxinv_cuda(Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
          low_d, upp_d, alpha_d, beta_d, n)
@@ -114,7 +121,8 @@ contains
          low_d, upp_d, alpha_d, beta_d
     integer(c_int) :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_dipsolvesub1_hip(x_d, pjlambda_d, qjlambda_d, &
+         low_d, upp_d, alpha_d, beta_d, n)
 #elif HAVE_CUDA
     call mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, &
          low_d, upp_d, alpha_d, beta_d, n)
@@ -136,7 +144,7 @@ contains
     type(c_ptr) :: output_d, pij_d, lambda_d
     integer :: m, n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mattrans_v_mul_hip(output_d, pij_d, lambda_d, m, n)
 #elif HAVE_CUDA
     call mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n)
 #elif HAVE_OPENCL
@@ -153,7 +161,7 @@ contains
     real(c_rp) :: asyinit
     integer :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_gensub1_hip(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)
 #elif HAVE_CUDA
     call mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)
 #elif HAVE_OPENCL
@@ -170,7 +178,8 @@ contains
     real(c_rp) :: asydecr, asyincr
     integer :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_gensub2_hip(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
+         asydecr, asyincr, n)
 #elif HAVE_CUDA
     call mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
          asydecr, asyincr, n)
@@ -187,7 +196,8 @@ contains
          alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d
     integer :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_gensub3_hip(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, max_d, &
+         alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
 #elif HAVE_CUDA
     call mma_gensub3_cuda(x_d, df0dx_d, dfdx_d, low_d, upp_d, min_d, max_d, &
          alpha_d, beta_d, p0j_d, q0j_d, pij_d, qij_d, n, m)
@@ -202,7 +212,7 @@ contains
     type(c_ptr) :: x_d, low_d, upp_d, pij_d, qij_d, bi_d
     integer :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_gensub4_hip(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d)
 #elif HAVE_CUDA
     call mma_gensub4_cuda(x_d, low_d, upp_d, pij_d, qij_d, n, m, bi_d)
 #elif HAVE_OPENCL
@@ -216,7 +226,7 @@ contains
     type(c_ptr) :: xsi_d, x_d, alpha_d
     integer :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_mma_max(xsi_d, x_d, alpha_d, n)
 #elif HAVE_CUDA
     call cuda_mma_max(xsi_d, x_d, alpha_d, n)
 #elif HAVE_OPENCL
@@ -231,7 +241,7 @@ contains
     real(c_rp) :: b, d
     integer :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_max2(a_d, b, c_d, d, n)
 #elif HAVE_CUDA
     call cuda_max2(a_d, b, c_d, d, n)
 #elif HAVE_OPENCL
@@ -249,7 +259,8 @@ contains
          lambda_d, xsi_d, eta_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_rex(rex_d, x_d, low_d, upp_d, pij_d, p0j_d, qij_d, q0j_d, &
+         lambda_d, xsi_d, eta_d, n, m)
 #elif HAVE_CUDA
     call cuda_rex(rex_d, x_d, low_d, upp_d, pij_d, p0j_d, qij_d, q0j_d, &
          lambda_d, xsi_d, eta_d, n, m)
@@ -267,7 +278,7 @@ contains
     ! Default value in case of no valid backend (resolve compiler warning)
     res = 0.0_rp
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    res = hip_lcsc2(a_d, b_d, n)
 #elif HAVE_CUDA
     res = cuda_lcsc2(a_d, b_d, n)
 #elif HAVE_OPENCL
@@ -281,7 +292,7 @@ contains
     type(c_ptr) :: relambda_d, x_d, upp_d, low_d, pij_d, qij_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_relambda(relambda_d, x_d, upp_d, low_d, pij_d, qij_d, n, m)
 #elif HAVE_CUDA
     call cuda_relambda(relambda_d, x_d, upp_d, low_d, pij_d, qij_d, n, m)
 #elif HAVE_OPENCL
@@ -296,7 +307,7 @@ contains
     real(kind=rp) :: epsi
     integer(c_int) :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_sub2cons2(rexsi_d, xsi_d, x_d, alpha_d, epsi, n)
 #elif HAVE_CUDA
     call cuda_sub2cons2(rexsi_d, xsi_d, x_d, alpha_d, epsi, n)
 #elif HAVE_OPENCL
@@ -313,7 +324,7 @@ contains
     ! Default value in case of no valid backend (resolve compiler warning)
     res = 0.0_rp
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    res = hip_maxval(rex_d, n)
 #elif HAVE_CUDA
     res = cuda_maxval(rex_d, n)
 #elif HAVE_OPENCL
@@ -330,7 +341,7 @@ contains
     ! Default value in case of no valid backend (resolve compiler warning)
     res = 0.0_rp
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    res = hip_norm(rex_d, n)
 #elif HAVE_CUDA
     res = cuda_norm(rex_d, n)
 #elif HAVE_OPENCL
@@ -347,7 +358,8 @@ contains
     real(kind=rp) :: epsi
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_delx(delx_d, x_d, low_d, upp_d, pij_d, qij_d, p0j_d, q0j_d, &
+         alpha_d, beta_d, lambda_d, epsi, n, m)
 #elif HAVE_CUDA
     call cuda_delx(delx_d, x_d, low_d, upp_d, pij_d, qij_d, p0j_d, q0j_d, &
          alpha_d, beta_d, lambda_d, epsi, n, m)
@@ -363,7 +375,7 @@ contains
     real(kind=rp) :: c
     integer(c_int) :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_add2inv2(a_d, b_d, c, n)
 #elif HAVE_CUDA
     call cuda_add2inv2(a_d, b_d, c, n)
 #elif HAVE_OPENCL
@@ -378,7 +390,7 @@ contains
     type(c_ptr):: GG_d, x_d, low_d, upp_d, pij_d, qij_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_GG(GG_d, x_d, low_d, upp_d, pij_d, qij_d, n, m)
 #elif HAVE_CUDA
     call cuda_GG(GG_d, x_d, low_d, upp_d, pij_d, qij_d, n, m)
 #elif HAVE_OPENCL
@@ -395,7 +407,8 @@ contains
          beta_d, eta_d, lambda_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_diagx(diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, pij_d, &
+         qij_d, alpha_d, beta_d, eta_d, lambda_d, n, m)
 #elif HAVE_CUDA
     call cuda_diagx(diagx_d, x_d, xsi_d, low_d, upp_d, p0j_d, q0j_d, pij_d, &
          qij_d, alpha_d, beta_d, eta_d, lambda_d, n, m)
@@ -411,7 +424,7 @@ contains
     type(c_ptr):: bb_d, GG_d, delx_d, diagx_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_bb(bb_d, GG_d, delx_d, diagx_d, n, m)
 #elif HAVE_CUDA
     call cuda_bb(bb_d, GG_d, delx_d, diagx_d, n, m)
 #elif HAVE_OPENCL
@@ -426,7 +439,7 @@ contains
     integer(c_int) :: m
     real(c_rp) :: delz
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_updatebb(bb_d, dellambda_d, dely_d, d_d, mu_d, y_d, delz, m)
 #elif HAVE_CUDA
     call cuda_updatebb(bb_d, dellambda_d, dely_d, d_d, mu_d, y_d, delz, m)
 #elif HAVE_OPENCL
@@ -440,7 +453,7 @@ contains
     type(c_ptr):: AA_d, GG_d, diagx_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_AA(AA_d, GG_d, diagx_d, n, m)
 #elif HAVE_CUDA
     call cuda_AA(AA_d, GG_d, diagx_d, n, m)
 #elif HAVE_OPENCL
@@ -456,7 +469,8 @@ contains
     integer(c_int) :: m
     real(c_rp) :: zeta, z
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_updateAA(AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, y_d, &
+         a_d, zeta, z, m)
 #elif HAVE_CUDA
     call cuda_updateAA(AA_d, globaltmp_mm_d, s_d, lambda_d, d_d, mu_d, y_d, &
          a_d, zeta, z, m)
@@ -471,7 +485,7 @@ contains
     type(c_ptr):: dx_d, delx_d, diagx_d, GG_d, dlambda_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_dx(dx_d, delx_d, diagx_d, GG_d, dlambda_d, n, m)
 #elif HAVE_CUDA
     call cuda_dx(dx_d, delx_d, diagx_d, GG_d, dlambda_d, n, m)
 #elif HAVE_OPENCL
@@ -485,7 +499,7 @@ contains
     type(c_ptr):: dy_d, dely_d, dlambda_d, d_d, mu_d, y_d
     integer(c_int) :: n
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_dy(dy_d, dely_d, dlambda_d, d_d, mu_d, y_d, n)
 #elif HAVE_CUDA
     call cuda_dy(dy_d, dely_d, dlambda_d, d_d, mu_d, y_d, n)
 #elif HAVE_OPENCL
@@ -500,7 +514,7 @@ contains
     integer(c_int) :: n
     real(c_rp) :: epsi
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_dxsi(dxsi_d, xsi_d, dx_d, x_d, alpha_d, epsi, n)
 #elif HAVE_CUDA
     call cuda_dxsi(dxsi_d, xsi_d, dx_d, x_d, alpha_d, epsi, n)
 #elif HAVE_OPENCL
@@ -515,7 +529,7 @@ contains
     integer(c_int) :: n
     real(c_rp) :: epsi
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_deta(deta_d, eta_d, dx_d, x_d, beta_d, epsi, n)
 #elif HAVE_CUDA
     call cuda_deta(deta_d, eta_d, dx_d, x_d, beta_d, epsi, n)
 #elif HAVE_OPENCL
@@ -533,7 +547,7 @@ contains
     ! Default value in case of no valid backend (resolve compiler warning)
     res = 0.0_rp
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    res = hip_maxval2(dxx_d, xx_d, cons, n)
 #elif HAVE_CUDA
     res = cuda_maxval2(dxx_d, xx_d, cons, n)
 #elif HAVE_OPENCL
@@ -552,7 +566,7 @@ contains
     ! Default value in case of no valid backend (resolve compiler warning)
     res = 0.0_rp
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    res = hip_maxval3(dx_d, x_d, alpha_d, cons, n)
 #elif HAVE_CUDA
     res = cuda_maxval3(dx_d, x_d, alpha_d, cons, n)
 #elif HAVE_OPENCL
@@ -569,7 +583,7 @@ contains
     type(c_ptr):: rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d
     integer(c_int) :: n, m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call hip_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, n, m)
 #elif HAVE_CUDA
     call cuda_kkt_rex(rex_d, df0dx_d, dfdx_d, xsi_d, eta_d, lambda_d, n, m)
 #elif HAVE_OPENCL

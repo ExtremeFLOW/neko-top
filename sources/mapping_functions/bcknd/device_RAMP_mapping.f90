@@ -44,6 +44,64 @@ module device_RAMP_mapping
 
 #if HAVE_HIP
 
+  interface
+     subroutine hip_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+          X_out_d, X_in_d, n) &
+          bind(c, name = 'hip_convex_down_RAMP_mapping_apply')
+       import c_rp, c_ptr, c_int
+       real(c_rp) :: f_min
+       real(c_rp) :: f_max
+       real(c_rp) :: q
+       type(c_ptr), value :: X_out_d
+       type(c_ptr), value :: X_in_d
+       integer(c_int) :: n
+     end subroutine hip_convex_down_RAMP_mapping_apply
+  end interface
+
+  interface
+     subroutine hip_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+          sense_out_d, sens_in_d, X_in_d, n) &
+          bind(c, name = 'hip_convex_down_RAMP_mapping_apply_backward')
+       import c_rp, c_ptr, c_int
+       real(c_rp) :: f_min
+       real(c_rp) :: f_max
+       real(c_rp) :: q
+       type(c_ptr), value :: sense_out_d
+       type(c_ptr), value :: sens_in_d
+       type(c_ptr), value :: X_in_d
+       integer(c_int) :: n
+     end subroutine hip_convex_down_RAMP_mapping_apply_backward
+  end interface
+
+  interface
+     subroutine hip_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+          X_out_d, X_in_d, n) &
+          bind(c, name = 'hip_convex_up_RAMP_mapping_apply')
+       import c_rp, c_ptr, c_int
+       real(c_rp) :: f_min
+       real(c_rp) :: f_max
+       real(c_rp) :: q
+       type(c_ptr), value :: X_out_d
+       type(c_ptr), value :: X_in_d
+       integer(c_int) :: n
+     end subroutine hip_convex_up_RAMP_mapping_apply
+  end interface
+
+  interface
+     subroutine hip_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+          sense_out_d, sens_in_d, X_in_d, n) &
+          bind(c, name = 'hip_convex_up_RAMP_mapping_apply_backward')
+       import c_rp, c_ptr, c_int
+       real(c_rp) :: f_min
+       real(c_rp) :: f_max
+       real(c_rp) :: q
+       type(c_ptr), value :: sense_out_d
+       type(c_ptr), value :: sens_in_d
+       type(c_ptr), value :: X_in_d
+       integer(c_int) :: n
+     end subroutine hip_convex_up_RAMP_mapping_apply_backward
+  end interface
+
 #elif HAVE_CUDA
 
   interface
@@ -103,6 +161,7 @@ module device_RAMP_mapping
        integer(c_int) :: n
      end subroutine cuda_convex_up_RAMP_mapping_apply_backward
   end interface
+
 #elif HAVE_OPENCL
 
 #endif
@@ -117,7 +176,10 @@ contains
     type(c_ptr) :: X_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+         X_out_d, X_in_d, n)
+#elif HAVE_CUDA
     call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #else
@@ -134,7 +196,10 @@ contains
     type(c_ptr) :: sens_in_d
     type(c_ptr) :: X_in_d
     integer :: n
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+         sense_out_d, sens_in_d, X_in_d, n)
+#elif HAVE_CUDA
     call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
          sense_out_d, sens_in_d, X_in_d, n)
 #else
@@ -150,7 +215,10 @@ contains
     type(c_ptr) :: X_out_d
     type(c_ptr) :: X_in_d
     integer :: n
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
+         X_out_d, X_in_d, n)
+#elif HAVE_CUDA
     call cuda_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #else
@@ -167,7 +235,10 @@ contains
     type(c_ptr) :: sens_in_d
     type(c_ptr) :: X_in_d
     integer :: n
-#if HAVE_CUDA
+#if HAVE_HIP
+    call hip_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
+         sense_out_d, sens_in_d, X_in_d, n)
+#elif HAVE_CUDA
     call cuda_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
          sense_out_d, sens_in_d, X_in_d, n)
 #else
