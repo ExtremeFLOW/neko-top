@@ -9,7 +9,7 @@ function help() {
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
-    echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
+    echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
     echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
@@ -22,8 +22,10 @@ function help() {
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
+    echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
+    echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
 }
 
 # ============================================================================ #
@@ -106,6 +108,9 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+fi
+if [ "$DEVICE_TYPE" == "HIP" ]; then
+    if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
 
 # Everything past this point should be general across all setups.
