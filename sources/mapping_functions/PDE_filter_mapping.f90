@@ -150,7 +150,7 @@ contains
     character(len=*), intent(in) :: ksp_solver, precon_type
     integer :: n
 
-    this%r = r
+    this%r = r / (2.0_rp * sqrt(3.0_rp))
     this%abstol_filt = tol
     this%ksp_max_iter = max_iter
     this%ksp_solver = ksp_solver
