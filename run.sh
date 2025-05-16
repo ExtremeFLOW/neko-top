@@ -64,7 +64,7 @@ RERUN=false
 
 # List possible options
 OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
-OPT="a,c,h,n,s:,d,r"
+OPT=a,c,h,n,s:,d,r
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -86,6 +86,9 @@ while true; do
     "--") shift && break ;;
     esac
 done
+
+# Fix case of the cluster name
+CLUSTER=$(echo $CLUSTER | awk '{print toupper($0)}')
 
 # ============================================================================ #
 # Define environment
@@ -287,37 +290,34 @@ function Submit() {
 
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
-    if [ $CLUSTER == "DTU" ]; then
-        export BSUB_QUIET=Y
-        if [ ! -z "$(bjobs -J $1 2>/dev/null)" ]; then
-            bkill -J $1 1>/dev/null 2>/dev/null
-        fi
 
-        bsub -J $1 -env "all" <job_script.sh
-
-    elif [ $CLUSTER == "MN5" ]; then
+    if [ $CLUSTER == "MN5" ]; then
         if [ -z "$MN5_ACCOUNT" ]; then
             printf >&2 "No account specified for Marenostrum5.\n"
-            printf >&2 "Please set the MN5_ACCOUNT variable in the environment.\n"
-            exit 1
-        fi
-        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
-
-    elif [ $CLUSTER == "LUMI" ]; then
-        if [ -n "$LUMI_ACCOUNT" ]; then
-            sbatch -A $LUMI_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
-        elif [ -n "$SBATCH_ACCOUNT" ]; then
-            sbatch -J $1 job_script.sh 1>/dev/null 2>error.log
+            printf >&2 "Using SLURM environment variables if available\n"
+            printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
+            printf >&2 "this message."
         else
-            printf >&2 "No account specified for LUMI.\n"
-            printf >&2 "Please set the LUMI_ACCOUNT variable in the environment.\n"
-            exit 1
+            ACCOUNT="-A $MN5_ACCOUNT"
         fi
+
+    elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
+        if [ -z "$LUMI_ACCOUNT" ]; then
+            printf >&2 "No account specified for LUMI.\n"
+            printf >&2 "Using SLURM environment variables if available\n"
+            printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
+            printf >&2 "this message."
+        else
+            ACCOUNT="-A $LUMI_ACCOUNT"
+        fi
+    fi
+
+    if [ -n "$(which bsub 2>/dev/null)" ]; then
+        bsub -J $1 -env "all" <job_script.sh
+    elif [ -n "$(which sbatch 2>/dev/null)" ]; then
+        sbatch -J $1 $ACCOUNT job_script.sh 1>/dev/null 2>error.log
     else
-        printf >&2 "No or invalid cluster specified \"$CLUSTER\"\n"
-        printf >&2 "\t- DTU for the DTU cluster.\n"
-        printf >&2 "\t- MN5 for the Marenostrum5 cluster.\n"
-        printf >&2 "\t- LUMI for the LUMI supercomputer.\n"
+        printf >&2 "Unknown submission system.\n"
         exit 1
     fi
 
@@ -414,6 +414,11 @@ for case in ${example_list[@]}; do
 
     # If we are submitting to a cluster, look for the associated jobscript
     if [ -n "$CLUSTER" ]; then
+        if [ ! -d "$HPATH" ]; then
+            printf >&2 "\e[1;31mInvalid Cluster:\e[m $HPATH/$CLUSTER\n"
+            exit 1
+        fi
+
         # Find the setting file for the case recursively
         setting=$HPATH/${case%.*}.sh
         while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
