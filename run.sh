@@ -136,10 +136,10 @@ for in in $@; do
     base=$(basename $in)
 
     # Extract the examples from the input
-    matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.json"))
+    matches=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type d -name "$base"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.case"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.json"))
 
     for match in ${matches[@]}; do
         file_list=()
