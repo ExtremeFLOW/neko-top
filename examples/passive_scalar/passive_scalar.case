@@ -5,7 +5,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 1e-3,
+        "end_time": 5.0,
         "timestep": 2e-4,
         "numerics": {
             "time_order": 1,
@@ -116,9 +116,8 @@
             {
                 "type": "steady",
                 "is_user": true,
-                "tol": 1e-2,
+                "tol": 1e-7,
                 "compute_control": "tsteps",
-                "log_frequency": 1,
                 "compute_value": 1
             }
         ],
@@ -198,11 +197,6 @@
                 "weight": 1.0
             }
         ],
-        "constraints": [
-            {
-                "type": "volume",
-                "limit": 1.0
-            }
-        ]
+        "constraints": [ ]
     }
 }
