@@ -114,16 +114,12 @@ AdjointTime = AdjointTime[Valid]
 MMATime = MMATime[Valid]
 
 # Report the time spent in each experiment
-print("Time spent in each experiment:")
 for i in range(N):
-    print(f"  {nprocs[i]} procs: {TotalTime[i]:.2f} s")
-    if FluidTime[i] > 0.0:
-        print(f"    Fluid time: {FluidTime[i]:.2f} s")
-    if AdjointTime[i] > 0.0:
-        print(f"    Adjoint time: {AdjointTime[i]:.2f} s")
-    if MMATime[i] > 0.0:
-        print(f"    MMA time: {MMATime[i]:.2f} s")
-    print(f"  Total time: {TotalTime[i]:.2f} s")
+    print(f"Procs: {nprocs[i]}")
+    if FluidTime[i] > 0.0: print(f"\tFluid time: {FluidTime[i]:.2f} s")
+    if AdjointTime[i] > 0.0: print(f"\tAdjoint time: {AdjointTime[i]:.2f} s")
+    if MMATime[i] > 0.0: print(f"\tMMA time: {MMATime[i]:.2f} s")
+    print(f"\tTotal time: {TotalTime[i]:.0f} s")
 
 # Plot the total time spent in each experiment
 plt.figure(figsize=(5, 5))
@@ -156,9 +152,7 @@ ymax = np.max(TotalTime)
 ymin = 10**np.floor(np.log10(ymin))
 ymax = 10**np.ceil(np.log10(ymax))
 plt.ylim(ymin, ymax)
-
 plt.yscale("log", base=10)
-# plt.yticks(nprocs, nprocs)
 
 plt.legend()
 plt.grid()
