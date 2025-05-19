@@ -180,7 +180,7 @@ contains
 
     ! Assign default values for the backend based on the NEKO_BCKND_DEVICE
     if (NEKO_BCKND_CUDA .eq. 1) then
-       bcknd_default = "cuda"
+       bcknd_default = "device"
     else
        bcknd_default = "cpu"
     end if
@@ -353,7 +353,7 @@ contains
        if (pe_rank == 0) then
           print *, "MMA initialized with CPU backend!"
        end if
-    case ("cuda")
+    case ("device")
        ! upload all init values to device pointers
        call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, &
             HOST_TO_DEVICE, sync = .false.)
@@ -442,7 +442,7 @@ contains
           call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
        end if
 
-    case ("cuda")
+    case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
        call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     end select
@@ -470,7 +470,7 @@ contains
        end if
 
        call mma_KKT_cpu(this, x%x, df0dx%x, fval%x, dfdx%x)
-    case ("cuda")
+    case ("device")
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
   end subroutine mma_KKT_vector
