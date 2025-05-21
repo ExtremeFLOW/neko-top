@@ -1,13 +1,12 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 data = pd.read_csv('../optimization_data.csv')
 iter = pd.DataFrame(data['iter']).to_numpy()
 obj = pd.DataFrame(data[' Scalar Mixing']).to_numpy()
 KKT = pd.DataFrame(data[' KKTmax']).to_numpy()
-import matplotlib.pyplot as plt
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
-import matplotlib as mpl
 
 fig, ax = plt.subplots(2,1, figsize=(6, 7), dpi = 200)
 ax[0].plot(iter, obj, '-k')
