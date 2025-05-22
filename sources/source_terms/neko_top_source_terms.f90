@@ -32,7 +32,7 @@
 
 
 !> Neko-TOP Source term register.
-module neko_top_source_terms
+submodule(neko_top) neko_top_source_terms
   use source_term, only: source_term_t, source_term_allocate, register_source_term
 
   ! Our user-defined source terms
@@ -43,9 +43,6 @@ module neko_top_source_terms
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
 
   implicit none
-  private
-  public :: register_source_terms
-
 contains
 
   !> @brief Register the known source terms from Neko-TOP.
@@ -104,4 +101,4 @@ contains
     allocate(simple_brinkman_source_term_t::obj)
   end subroutine simple_brinkman_source_term_allocate
 
-end module neko_top_source_terms
+end submodule neko_top_source_terms

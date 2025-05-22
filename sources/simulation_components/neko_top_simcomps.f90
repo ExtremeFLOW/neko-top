@@ -32,16 +32,12 @@
 
 
 !> Neko-TOP Simulation component register.
-module neko_top_simcomps
+submodule(neko_top) neko_top_simcomps
   use simulation_component, only: simulation_component_t, &
        simulation_component_allocate, register_simulation_component
 
   ! Our user-defined simulation components
   use steady_simcomp, only: steady_simcomp_t
-
-  implicit none
-  private
-  public :: register_simcomps
 
 contains
 
@@ -65,4 +61,4 @@ contains
     allocate(steady_simcomp_t::obj)
   end subroutine steady_simcomp_allocate
 
-end module neko_top_simcomps
+end submodule neko_top_simcomps

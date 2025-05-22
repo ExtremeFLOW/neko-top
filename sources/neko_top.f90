@@ -1,6 +1,13 @@
 module neko_top
-  use neko_top_simcomps, only: register_simcomps
-  use neko_top_source_terms, only: register_source_terms
+
+  ! Define interfaces for our type registration functions.
+  interface
+     module subroutine register_simcomps()
+     end subroutine register_simcomps
+
+     module subroutine register_source_terms()
+     end subroutine register_source_terms
+  end interface
 
 contains
 
