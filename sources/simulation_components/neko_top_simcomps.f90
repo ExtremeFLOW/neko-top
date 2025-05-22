@@ -30,7 +30,6 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-
 !> Neko-TOP Simulation component register.
 submodule(neko_top) neko_top_simcomps
   use simulation_component, only: simulation_component_t, &
@@ -42,7 +41,7 @@ submodule(neko_top) neko_top_simcomps
 contains
 
   !> @brief Register the known simulation components from Neko-TOP.
-  subroutine register_simcomps()
+  module subroutine register_simcomps
     procedure(simulation_component_allocate), pointer :: steady
 
     ! Assign the pointers

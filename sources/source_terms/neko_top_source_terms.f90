@@ -32,20 +32,23 @@
 
 !> Neko-TOP Source term register.
 submodule(neko_top) neko_top_source_terms
-  use source_term, only: source_term_t, source_term_allocate, register_source_term
+  use source_term, only: source_term_t, source_term_allocate, &
+       register_source_term
 
   ! Our user-defined source terms
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
-  use adjoint_minimum_dissipation_source_term, only: adjoint_minimum_dissipation_source_term_t
-  use adjoint_mixing_scalar_source_term, only: adjoint_mixing_scalar_source_term_t
-  use adjoint_scalar_convection_source_term, only: adjoint_scalar_convection_source_term_t
+  use adjoint_minimum_dissipation_source_term, only: &
+       adjoint_minimum_dissipation_source_term_t
+  use adjoint_mixing_scalar_source_term, only: &
+       adjoint_mixing_scalar_source_term_t
+  use adjoint_scalar_convection_source_term, only: &
+       adjoint_scalar_convection_source_term_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
 
-  implicit none
 contains
 
   !> @brief Register the known source terms from Neko-TOP.
-  subroutine register_source_terms()
+  module subroutine register_source_terms()
     procedure(source_term_allocate), pointer :: adjoint_lube
     procedure(source_term_allocate), pointer :: adjoint_minimum_dissipation
     procedure(source_term_allocate), pointer :: adjoint_mixing_scalar
