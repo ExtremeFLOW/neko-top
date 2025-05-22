@@ -18,14 +18,12 @@ set_target_properties(neko-top
     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include"
 )
 
-# Add the local neko extension library
+# Add our partial libraries to the build.
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
-
-# Add the mapping extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
-
-# Add the adjoint library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
+
 
 # ============================================================================ #
 # Define the library sources and targets
@@ -62,8 +60,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90

@@ -7,6 +7,7 @@ program topopt
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
+  use neko_ext, only: neko_top_register_types
 
   use mpi_f08, only: MPI_Init
   implicit none
@@ -32,6 +33,7 @@ program topopt
   ! Initialize the MPI environment
 
   call MPI_Init(ierr)
+  call neko_top_register_types()
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
