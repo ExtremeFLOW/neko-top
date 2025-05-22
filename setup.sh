@@ -10,6 +10,7 @@ function help() {
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
+    echo -e "\t-e, --examples    Build the examples"
     echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
@@ -45,10 +46,11 @@ CLEAN_NEKO=false
 QUIET=false
 TEST=false
 DOCS=false
+EXAMPLES=false
 
 # List possible options
-OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
-OPT=h,t,c,q,d:
+OPTIONS=help,test,clean,clean-neko,quiet,device:,docs,examples
+OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -62,9 +64,10 @@ while true; do
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
+    "-e" | "--examples") EXAMPLES=true && shift ;;    # Build the examples
 
     # Purely long settings
-    "--doc") DOCS=true && shift ;;              # Build the documentation
+    "--docs") DOCS=true && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
@@ -146,18 +149,16 @@ fi
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-# Set the documentation flag
-if [ "$DOCS" == true ]; then
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
-else
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
+if [ ! -d $MAIN_DIR/build ]; then
+    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 fi
-
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
-cmake --build $MAIN_DIR/build --target Examples --parallel
+
+# Build additional components
+[ "$DOCS" == true ] && cmake --build $MAIN_DIR/build --target Documentation --parallel
+[ "$EXAMPLES" == true ] && cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build
