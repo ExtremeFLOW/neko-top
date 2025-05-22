@@ -30,7 +30,6 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-
 !> Neko-TOP Source term register.
 submodule(neko_top) neko_top_source_terms
   use source_term, only: source_term_t, source_term_allocate, register_source_term
