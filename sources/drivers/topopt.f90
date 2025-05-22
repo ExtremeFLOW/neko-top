@@ -7,7 +7,7 @@ program topopt
   use json_module, only: json_file
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
-  use neko_ext, only: neko_top_register_types
+  use neko_top, only: neko_top_register_types
 
   use mpi_f08, only: MPI_Init
   implicit none

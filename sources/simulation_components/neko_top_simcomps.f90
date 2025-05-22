@@ -43,21 +43,17 @@ module neko_top_simcomps
   private
   public :: register_simcomps
 
-  ! ========================================================================== !
-  ! List of simulation component allocators
-
-
 contains
 
   !> @brief Register the known simulation components from Neko-TOP.
   subroutine register_simcomps()
-    procedure(simulation_component_allocate), pointer :: steady_alloc
+    procedure(simulation_component_allocate), pointer :: steady
 
     ! Assign the pointers
-    steady_alloc => steady_simcomp_allocate
+    steady => steady_simcomp_allocate
 
     ! Register the simulation components
-    call register_simulation_component('steady', steady_alloc)
+    call register_simulation_component('steady', steady)
   end subroutine register_simcomps
 
   ! ========================================================================== !

@@ -22,6 +22,7 @@ set_target_properties(neko-top
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 
 
@@ -29,14 +30,9 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 # Define the library sources and targets
 target_sources(neko-top
     PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90

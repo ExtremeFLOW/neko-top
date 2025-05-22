@@ -7,7 +7,7 @@ program topopt_user
   use json_utils_ext, only: json_read_file
   use user, only: user_setup
   use design, only: design_t, design_factory
-  use neko_ext, only: neko_top_register_types
+  use neko_top, only: neko_top_register_types
 
   use mpi_f08, only: MPI_Init
 

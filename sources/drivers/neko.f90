@@ -1,7 +1,7 @@
 program plainneko
   use neko, only: neko_init, neko_solve, neko_finalize
   use case, only: case_t
-  use neko_ext, only: neko_top_register_types
+  use neko_top, only: neko_top_register_types
 
   type(case_t) :: C
 

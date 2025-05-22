@@ -24,28 +24,20 @@ module neko_ext
   use field, only: field_t
   use utils, only: neko_error
   use json_module, only : json_file
-  use neko_top_simcomps, only: register_simcomps
+
   implicit none
 
   ! ========================================================================= !
   ! Module interface
   ! ========================================================================= !
   private
-  public :: setup_iteration, reset, field_to_vector, vector_to_field, &
-       neko_top_register_types
+  public :: setup_iteration, reset, field_to_vector, vector_to_field
 
 contains
 
   ! ========================================================================= !
   ! Public routines
   ! ========================================================================= !
-
-  !> @brief Add all known types to the neko registries
-  !! @details This subroutine adds all known types to the neko registries. It
-  !! is called at the beginning of all our drivers.
-  subroutine neko_top_register_types()
-    call register_simcomps()
-  end subroutine neko_top_register_types
 
   !> @brief Reset the case data structure
   !>
