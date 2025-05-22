@@ -149,9 +149,14 @@ fi
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-if [ ! -d $MAIN_DIR/build ]; then
-    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+# Set the documentation flag
+if [ "$DOCS" == true ]; then
+    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
+else
+    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
 fi
+
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
