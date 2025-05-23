@@ -55,8 +55,6 @@ contains
   ! Compute the simcomp_test field.
   subroutine solve_adjoint(this)
     type(adjoint_case_t), intent(inout) :: this
-    real(kind=rp) :: t
-    integer :: tstep
 
     real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time
@@ -152,13 +150,6 @@ contains
 
        !  call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
        call this%output_controller%execute(this%case%time)
-
-       ! Update material properties
-       call this%case%usr%material_properties(t, tstep, this%case%fluid%rho, &
-            this%case%fluid%mu, &
-            this%scalar_adj%cp, &
-            this%scalar_adj%lambda, &
-            this%case%params)
 
        call neko_log%end_section()
 

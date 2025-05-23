@@ -58,7 +58,8 @@ module adjoint_fluid_pnpn
   use advection_adjoint_fctry, only: advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item, &
+       json_extract_object
   use json_module, only: json_file
   use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
@@ -294,6 +295,7 @@ contains
     character(len=:), allocatable :: solver_type, precon_type
     logical :: monitor, found
     logical :: advection
+    type(json_file) :: precon_params
 
     ! Temporary field pointers
     character(len=:), allocatable :: file_name
@@ -423,8 +425,10 @@ contains
          'case.fluid.pressure_solver.max_iterations', &
          solver_maxiter, 800)
     call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
-    call json_get(params, 'case.fluid.pressure_solver.preconditioner', &
+    call json_get(params, 'case.fluid.pressure_solver.preconditioner.type', &
          precon_type)
+    call json_extract_object(params, &
+         'case.fluid.pressure_solver.preconditioner', precon_params)
     call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
          abs_tol)
     call json_get_or_default(params, 'case.fluid.velocity_solver.monitor', &
@@ -437,7 +441,8 @@ contains
     call this%solver_factory(this%ksp_prs, this%dm_Xh%size(), &
          solver_type, solver_maxiter, abs_tol, monitor)
     call this%precon_factory_(this%pc_prs, this%ksp_prs, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, precon_type)
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs_prs, &
+         precon_type, precon_params)
 
     call neko_log%end_section()
 
@@ -754,7 +759,7 @@ contains
          vel_projection_dim => this%vel_projection_dim, &
          pr_projection_dim => this%pr_projection_dim, &
          rho => this%rho, mu => this%mu, oifs => this%oifs, &
-         rho_field => this%rho_field, mu_field => this%mu_field, &
+         rho_field => this%rho, mu_field => this%mu, &
          f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
          if_variable_dt => dt_controller%if_variable_dt, &
          dt_last_change => dt_controller%dt_last_change, &
@@ -807,11 +812,11 @@ contains
          call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
               this%abx2, this%aby2, this%abz2, &
               f_x%x, f_y%x, f_z%x, &
-              rho, ext_bdf%advection_coeffs, n)
+              rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, rho, dt, &
+              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
               ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       end if
 
@@ -823,7 +828,7 @@ contains
       call this%bc_apply_prs(t, tstep)
 
       ! Update material properties if necessary
-      call this%update_material_properties()
+      call this%update_material_properties(t, tstep)
 
       ! Compute pressure residual.
       call profiler_start_region('Pressure_residual', 18)

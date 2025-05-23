@@ -32,74 +32,103 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#ifndef __NEKO_CUDA_RAMP_MAPPING_KERNELS__
-#define __NEKO_CUDA_RAMP_MAPPING_KERNELS__
+#ifndef __NEKO_HIP_MATH_EXT_KERNELS__
+#define __NEKO_HIP_MATH_EXT_KERNELS__
 
 /**
- * Device kernel for RAMP (convex down) mapping
+ * Device kernel for copy_mask
  */
 template <typename T>
-__global__ void convex_down_RAMP_mapping_apply_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ X_out_d,
-    T* __restrict__ X_in_d, const int n) {
+__global__ void copy_mask_kernel(
+    T* __restrict__ a, T* __restrict__ b, const int size,
+    int* __restrict__ mask, const int mask_size) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) {
-        X_out_d[i] = f_min 
-            + (f_max - f_min) * X_in_d[i] / (1.0 + q * (1.0 - X_in_d[i]));
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = b[mask[i]-1];
     }
 }
 
 /**
- * Device kernel for RAMP (convex down) chain rule
+ * Device kernel for cadd_mask
  */
 template <typename T>
-__global__ void convex_down_RAMP_mapping_apply_backward_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ sens_out_d,
-    T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
+__global__ void cadd_mask_kernel(
+    T* __restrict__ a, const T c, const int size, int* __restrict__ mask,
+    const int mask_size) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) {
-        sens_out_d[i] = (f_max - f_min) * (q + 1.0) / (
-                (1.0 - q * (X_in_d[i] - 1.0)) * (1.0 - q * (X_in_d[i] - 1.0))
-            ) * sens_in_d[i];
-    }
-}
-/**
- * Device kernel for RAMP (convex up) mapping
- */
-template <typename T>
-__global__ void convex_up_RAMP_mapping_apply_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ X_out_d,
-    T* __restrict__ X_in_d, const int n) {
-
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int str = blockDim.x * gridDim.x;
-
-    for (int i = idx; i < n; i += str) {
-        X_out_d[i] = f_min 
-            + (f_max - f_min) * X_in_d[i] * (1.0 + q) / (X_in_d[i] + q);
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = a[mask[i]-1] + c;
     }
 }
 
 /**
- * Device kernel for RAMP (convex up) chain rule
+ * Device kernel for invcol1_mask
  */
 template <typename T>
-__global__ void convex_up_RAMP_mapping_apply_backward_kernel(
-    const T f_min, const T f_max, const T q, T* __restrict__ sens_out_d,
-    T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
+__global__ void invcol1_mask_kernel(
+    T* __restrict__ a, const int size, int* __restrict__ mask,
+    const int mask_size) {
 
     const int idx = blockIdx.x * blockDim.x + threadIdx.x;
     const int str = blockDim.x * gridDim.x;
 
-    for (int i = idx; i < n; i += str) {
-        sens_out_d[i] = (f_max - f_min) 
-            * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * sens_in_d[i];
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = 1.0 / a[mask[i]-1];
     }
 }
-#endif // __NEKO_CUDA_RAMP_MAPPING_KERNELS__
+
+/**
+ * Device kernel for col2_mask
+ */
+template <typename T>
+__global__ void col2_mask_kernel(
+    T* __restrict__ a, T* __restrict__ b, const int size,
+    int* __restrict__ mask, const int mask_size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = a[mask[i]-1] * b[mask[i]-1];
+    }
+}
+
+/**
+ * Device kernel for col3_mask
+ */
+template <typename T>
+__global__ void col3_mask_kernel(
+    T* __restrict__ a, T* __restrict__ b, T* __restrict__ c, const int size,
+    int* __restrict__ mask, const int mask_size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = b[mask[i]-1] * c[mask[i]-1];
+    }
+}
+
+/**
+ * Device kernel for sub3_mask
+ */
+template <typename T>
+__global__ void sub3_mask_kernel(
+    T* __restrict__ a, T* __restrict__ b, T* __restrict__ c, const int size,
+    int* __restrict__ mask, const int mask_size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < mask_size; i += str) {
+        a[mask[i]-1] = b[mask[i]-1] - c[mask[i]-1];
+    }
+}
+
+#endif // __NEKO_CUDA_MATH_EXT_KERNELS__
