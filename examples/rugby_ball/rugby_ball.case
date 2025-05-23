@@ -40,15 +40,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
@@ -90,8 +92,8 @@
             {
                 "name": "initial_ball",
                 "geometry": "cylinder",
-                "start": [0.5, 0.5, -0.5],
-                "end": [0.5, 0.5, 1.5],
+                "start": [ 0.5, 0.5, -0.5 ],
+                "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
             },
         ]

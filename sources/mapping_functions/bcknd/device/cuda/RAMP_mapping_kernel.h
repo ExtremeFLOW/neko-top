@@ -48,7 +48,7 @@ __global__ void convex_down_RAMP_mapping_apply_kernel(
 
     for (int i = idx; i < n; i += str) {
         X_out_d[i] = f_min 
-            + (f_max - f_min) * X_in_d[i] / (1.0 + q * (1.0 + X_in_d[i]));
+            + (f_max - f_min) * X_in_d[i] / (1.0 + q * (1.0 - X_in_d[i]));
     }
 }
 

@@ -66,14 +66,14 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
-       simulation, max_iterations, tolerance)
+       max_iterations, tolerance, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
-    type(simulation_t), intent(in) :: simulation
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
+    type(simulation_t), optional, intent(in) :: simulation
 
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
@@ -90,7 +90,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
     call this%logger%set_header(trim(optimization_header))
 
-    x = design%get_design()
+    x = design%get_values()
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
@@ -101,21 +101,21 @@ contains
     call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
-    call this%init_from_components(problem, design, simulation, &
-         max_iterations, tolerance)
+    call this%init_from_components(problem, design, &
+         max_iterations, tolerance, simulation)
 
     call x%free()
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       simulation, max_iterations, tolerance)
+       max_iterations, tolerance, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
-    type(simulation_t), intent(in) :: simulation
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
+    type(simulation_t), intent(in), optional :: simulation
 
     call this%init_base(max_iterations, tolerance)
 
@@ -126,7 +126,7 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(inout) :: design
-    type(simulation_t), intent(inout) :: simulation
+    type(simulation_t), optional, intent(inout) :: simulation
 
     type(vector_t) :: x
 
@@ -141,7 +141,6 @@ contains
 
     type(vector_t) :: log_data
 
-
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
@@ -152,10 +151,11 @@ contains
             this%max_iterations
     end if
 
-    call simulation%run_forward()
+    if (present(simulation)) call simulation%run_forward()
+
     call problem%compute(design)
 
-    call simulation%run_backward()
+    if (present(simulation)) call simulation%run_backward()
     call problem%compute_sensitivity(design)
 
     call problem%get_objective_value(objective_value)
@@ -170,7 +170,8 @@ contains
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
-    call simulation%write(0)
+    if (present(simulation)) call simulation%write(0)
+
     call design%write(0)
 
     do iter = 1, this%max_iterations
@@ -183,19 +184,21 @@ contains
           scaling_factor = abs(this%scale)
        end if
 
-       x = design%get_design()
+       x = design%get_values()
+
+       constraint_value = scaling_factor * constraint_value
+       constraint_sensitivities = scaling_factor * constraint_sensitivities
 
        ! Use scaled sensitivities to update the design variable
-       call this%mma%update(iter, x%x, objective_sensitivities, &
-            scaling_factor * constraint_value, &
-            scaling_factor * constraint_sensitivities)
+       call this%mma%update(iter, x, objective_sensitivities, &
+            constraint_value, constraint_sensitivities)
 
        call design%update_design(x)
 
-       call simulation%run_forward()
+       if (present(simulation)) call simulation%run_forward()
        call problem%compute(design)
 
-       call simulation%run_backward()
+       if (present(simulation)) call simulation%run_backward()
        call problem%compute_sensitivity(design)
 
        call problem%get_objective_value(objective_value)
@@ -204,7 +207,7 @@ contains
        call problem%get_constraint_sensitivities(constraint_sensitivities)
        call problem%get_all_objective_values(all_objectives)
 
-       call this%mma%KKT(x%x, objective_sensitivities, &
+       call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
 
        ! Stamp the i^th iteration
@@ -214,9 +217,9 @@ contains
             problem%get_n_objectives(), problem%get_n_constraints())
        call this%logger%write(log_data)
 
-       call simulation%write(iter)
+       if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
-       call simulation%reset()
+       if (present(simulation)) call simulation%reset()
     end do
 
     ! Final state after optimization

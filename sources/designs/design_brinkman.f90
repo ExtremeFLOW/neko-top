@@ -193,7 +193,14 @@ module brinkman_design
           brinkman_design_init_from_components
 
      !> Retrieve the design variables
-     procedure, pass(this) :: get_design => brinkman_design_get_design
+     procedure, pass(this) :: get_values => brinkman_design_get_design
+
+     !> Retrieve the x location of the design variables
+     procedure, pass(this) :: get_x => brinkman_design_get_x
+     !> Retrieve the y location of the design variables
+     procedure, pass(this) :: get_y => brinkman_design_get_y
+     !> Retrieve the z location of the design variables
+     procedure, pass(this) :: get_z => brinkman_design_get_z
 
      !> Update the design
      procedure, pass(this) :: update_design => brinkman_design_update_design
@@ -224,7 +231,6 @@ module brinkman_design
      ! procedure, pass(this) :: update => brinkman_design_update_design
   end type brinkman_design_t
 
-
 contains
 
   !> Initialize the design from a JSON file
@@ -239,7 +245,7 @@ contains
     if (parameters%valid_path('optimization.domain')) then
        call json_get(parameters, 'optimization.domain.type', domain_type)
        select case (trim(domain_type))
-       case('point_zone')
+       case ('point_zone')
           this%if_mask = .true.
           call json_get(parameters, 'optimization.domain.zone_name', &
                domain_name)
@@ -425,36 +431,78 @@ contains
 
   end subroutine brinkman_design_map_forward
 
-  function brinkman_design_get_design(this) result(x)
+  function brinkman_design_get_design(this) result(values)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: values
+    integer :: n
+
+    n = this%size()
+    call values%init(n)
+    call copy(values%x, this%design_indicator%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(values%x_d, this%design_indicator%x_d, n)
+    end if
+
+  end function brinkman_design_get_design
+
+  function brinkman_design_get_x(this) result(x)
     class(brinkman_design_t), intent(in) :: this
     type(vector_t) :: x
     integer :: n
 
     n = this%size()
     call x%init(n)
-    call copy(x%x, this%design_indicator%x, n)
+    call copy(x%x, this%design_indicator%dof%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(x%x_d, this%design_indicator%x_d, n)
+       call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
     end if
 
-  end function brinkman_design_get_design
+  end function brinkman_design_get_x
 
-  subroutine brinkman_design_update_design(this, x)
-    class(brinkman_design_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: x
+  function brinkman_design_get_y(this) result(y)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: y
     integer :: n
 
     n = this%size()
-    call copy(this%design_indicator%x, x%x, n)
+    call y%init(n)
+    call copy(y%x, this%design_indicator%dof%y, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%design_indicator%x_d, x%x_d, n)
+       call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
+    end if
+
+  end function brinkman_design_get_y
+
+  function brinkman_design_get_z(this) result(z)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: z
+    integer :: n
+
+    n = this%size()
+    call z%init(n)
+    call copy(z%x, this%design_indicator%dof%z, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
+    end if
+
+  end function brinkman_design_get_z
+
+  subroutine brinkman_design_update_design(this, values)
+    class(brinkman_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: values
+    integer :: n
+
+    n = this%size()
+    call copy(this%design_indicator%x, values%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%design_indicator%x_d, values%x_d, n)
     end if
 
     call this%map_forward()
 
-    call copy(x%x, this%design_indicator%x, n)
+    call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(x%x_d, this%design_indicator%x_d, n)
+       call device_copy(values%x_d, this%design_indicator%x_d, n)
     end if
 
   end subroutine brinkman_design_update_design

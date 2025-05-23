@@ -58,11 +58,12 @@ module adjoint_scalar_scheme
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only : neko_field_registry
   use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
-  use json_utils, only : json_get, json_get_or_default, json_extract_item
+  use json_utils, only : json_get, json_get_or_default, json_extract_item, &
+       json_extract_object
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
        user_material_properties
-  use utils, only : neko_error
+  use utils, only : neko_error, neko_warning
   use comm, only: NEKO_COMM, MPI_INTEGER, MPI_SUM
   use scalar_source_term, only : scalar_source_term_t
   use field_series, only : field_series_t
@@ -76,10 +77,16 @@ module adjoint_scalar_scheme
   use json_utils_ext, only: json_key_fallback
   use scalar_scheme, only: scalar_scheme_precon_factory, &
        scalar_scheme_solver_factory
+  use scratch_registry, only : neko_scratch_registry
+  use time_state, only : time_state_t
+  use device, only : device_memcpy, DEVICE_TO_HOST
+  use field_math, only : field_col3, field_cmult2, field_add2, field_cfill
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
   type, abstract :: adjoint_scalar_scheme_t
+     !> A name that can be used to distinguish this solver in e.g. user routines
+     character(len=:), allocatable :: name
      !> x-component of Velocity
      type(field_t), pointer :: u
      !> y-component of Velocity
@@ -121,21 +128,23 @@ module adjoint_scalar_scheme
      !> Mesh.
      type(mesh_t), pointer :: msh => null()
      !> Checkpoint for restarts.
-     type(chkp_t) :: chkp
-     !> Thermal diffusivity.
-     real(kind=rp) :: lambda
-     !> The variable lambda field
-     type(field_t) :: lambda_field
+     type(chkp_t), pointer :: chkp => null()
      !> The turbulent kinematic viscosity field name
      character(len=:), allocatable :: nut_field_name
      !> Density.
-     real(kind=rp) :: rho
+     type(field_t), pointer :: rho => null()
+     !> Thermal diffusivity.
+     type(field_t) :: lambda
      !> Specific heat capacity.
-     real(kind=rp) :: cp
+     type(field_t) :: cp
      !> Turbulent Prandtl number.
      real(kind=rp) :: pr_turb
+     !> Field list with cp and lambda
+     type(field_list_t) :: material_properties
      !> Is lambda varying in time? Currently only due to LES models.
      logical :: variable_material_properties = .false.
+     procedure(user_material_properties), nopass, pointer :: &
+          user_material_properties => null()
      !> Gradient jump panelty
      logical :: if_gradient_jump_penalty
      type(gradient_jump_penalty_t) :: gradient_jump_penalty
@@ -173,7 +182,7 @@ module adjoint_scalar_scheme
        import gs_t
        import mesh_t
        import user_t
-       import field_series_t
+       import field_series_t, field_t
        import time_scheme_controller_t
        import rp
        class(adjoint_scalar_scheme_t), target, intent(inout) :: this
@@ -184,7 +193,7 @@ module adjoint_scalar_scheme
        type(user_t), target, intent(in) :: user
        type(field_series_t), target, intent(in) :: ulag, vlag, wlag
        type(time_scheme_controller_t), target, intent(in) :: time_scheme
-       real(kind=rp), intent(in) :: rho
+       type(field_t), target, intent(in) :: rho
      end subroutine adjoint_scalar_scheme_init_intrf
   end interface
 
@@ -244,7 +253,7 @@ contains
     type(json_file), target, intent(inout) :: params
     character(len=*), intent(in) :: scheme
     type(user_t), target, intent(in) :: user
-    real(kind=rp), intent(in) :: rho
+    type(field_t), target, intent(in) :: rho
     ! IO buffer for log output
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
@@ -254,20 +263,27 @@ contains
     character(len=:), allocatable :: solver_type, solver_precon
     ! real(kind=rp) :: GJP_param_a, GJP_param_b
     character(len=:), allocatable :: json_key
+    type(json_file) :: precon_params
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
     this%s => neko_field_registry%get_field('s')
+    this%rho => rho
 
     call neko_log%section('Adjoint scalar')
     ! In principle this could be different,
     ! but I think we should use the same as the forward
     call json_get(params, 'case.scalar.solver.type', solver_type)
     json_key = json_key_fallback(params, &
+         'case.adjoint_scalar.solver.preconditioner.type', &
+         'case.scalar.solver.preconditioner.type')
+    call json_get(params, json_key, solver_precon)
+
+    json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.preconditioner', &
          'case.scalar.solver.preconditioner')
-    call json_get(params, json_key, solver_precon)
+    call json_extract_object(params, json_key, precon_params)
 
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.absolute_tolerance', &
@@ -277,7 +293,7 @@ contains
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.projection_space_size', &
          'case.scalar.solver.projection_space_size')
-    call json_get_or_default(params, json_key, this%projection_dim, 20)
+    call json_get_or_default(params, json_key, this%projection_dim, 0)
 
     json_key = json_key_fallback(params, &
          'case.adjoint_scalar.solver.projection_hold_steps', &
@@ -309,39 +325,41 @@ contains
     !
     ! Material properties
     !
-    this%rho = rho
     call this%set_material_properties(params, user)
-
-    write(log_buf, '(A,ES13.6)') 'rho        :', this%rho
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,ES13.6)') 'lambda     :', this%lambda
-    call neko_log%message(log_buf)
-    write(log_buf, '(A,ES13.6)') 'cp         :', this%cp
-    call neko_log%message(log_buf)
-
     !
     ! Turbulence modelling and variable material properties
     !
-    if (params%valid_path('case.scalar.nut_field')) then
-       ! these must be the same as the forward
+    if (params%valid_path('case.scalar.variable_material_properties')) then
+       call json_get(params, 'variable_material_properties', &
+            this%variable_material_properties)
+
+       ! Warn, no variable properties, but nut_field
+       if ((params%valid_path('case.scalar.nut_field')) .and. &
+            (this%variable_material_properties .eqv. .false.)) then
+          call neko_warning("You set variable_material properties to " // &
+               "false, the nut_field setting will have no effect.")
+       end if
+
+       ! Warn, no variable properties, but user routine associated
+       if ((.not. associated(user%material_properties, &
+            dummy_user_material_properties)) .and. &
+            (this%variable_material_properties .eqv. .false.)) then
+          call neko_warning("You set variable_material properties to " // &
+               "false, you can only vary rho and mu in time in the user file.")
+       end if
+    else if (params%valid_path('case.scalar.nut_field')) then
        call json_get(params, 'case.scalar.Pr_t', this%pr_turb)
        call json_get(params, 'case.scalar.nut_field', this%nut_field_name)
        this%variable_material_properties = .true.
-    else
+    else if (.not. associated(user%material_properties, &
+         dummy_user_material_properties)) then
        this%nut_field_name = ""
+       this%variable_material_properties = .true.
     end if
 
     write(log_buf, '(A,L1)') 'LES        : ', this%variable_material_properties
     call neko_log%message(log_buf)
 
-    ! Fill lambda field with the physical value
-    call this%lambda_field%init(this%dm_Xh, "lambda")
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%lambda_field%x_d, this%lambda, &
-            this%lambda_field%size())
-    else
-       call cfill(this%lambda_field%x, this%lambda, this%lambda_field%size())
-    end if
 
     !
     ! Setup right-hand side field.
@@ -366,7 +384,8 @@ contains
     call scalar_scheme_solver_factory(this%ksp, this%dm_Xh%size(), &
          solver_type, integer_val, solver_abstol, logical_val)
     call scalar_scheme_precon_factory(this%pc, this%ksp, &
-         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, solver_precon)
+         this%c_Xh, this%dm_Xh, this%gs_Xh, this%bcs, &
+         solver_precon, precon_params)
 
     ! Initiate gradient jump penalty
     json_key = json_key_fallback(params, &
@@ -423,8 +442,8 @@ contains
 
     call this%bcs%free()
 
-    call this%lambda_field%free()
-    call this%s_adj_lag%free()
+    call this%cp%free()
+    call this%lambda%free()
 
     ! Free gradient jump penalty
     if (this%if_gradient_jump_penalty .eqv. .true.) then
@@ -478,22 +497,44 @@ contains
 
   end subroutine adjoint_scalar_scheme_validate
 
-  !> Update the values of `lambda_field` if necessary.
-  subroutine adjoint_scalar_scheme_update_material_properties(this)
+  !> Call user material properties routine and update the values of `lambda`
+  !! if necessary.
+  !! @param[inout] this The object.
+  !! @param t Time value.
+  !! @param tstep Current time step.
+  subroutine adjoint_scalar_scheme_update_material_properties(t, tstep, this)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
+    real(kind=rp),intent(in) :: t
+    integer, intent(in) :: tstep
     type(field_t), pointer :: nut
-    integer :: n
+    integer :: index
     ! Factor to transform nu_t to lambda_t
-    real(kind=rp) :: lambda_factor
+    type(field_t), pointer :: lambda_factor
 
-    lambda_factor = this%rho*this%cp/this%pr_turb
-    this%lambda_field = this%lambda
+    call this%user_material_properties(t, tstep, this%name, &
+         this%material_properties)
 
-    if (this%variable_material_properties) then
-       call neko_error("variable properties not implemented for adjoint scalar")
+    ! factor = rho * cp / pr_turb
+    if (this%variable_material_properties .and. &
+         len(trim(this%nut_field_name)) > 0) then
        nut => neko_field_registry%get_field(this%nut_field_name)
-       n = nut%size()
-       call field_add2s2(this%lambda_field, nut, lambda_factor, n)
+
+       ! lambda = lambda + rho * cp * nut / pr_turb
+       call neko_scratch_registry%request_field(lambda_factor, index)
+
+       call field_col3(lambda_factor, this%cp, this%rho)
+       call field_cmult2(lambda_factor, nut, 1.0_rp / this%pr_turb)
+       call field_add2(this%lambda, lambda_factor)
+       call neko_scratch_registry%relinquish_field(index)
+    end if
+
+    ! Since cp is a fields and we use the %x(1,1,1,1) of the
+    ! host array data to pass constant  material properties
+    ! to some routines, we need to make sure that the host
+    ! values are also filled
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%cp%x, this%cp%x_d, this%cp%size(), &
+            DEVICE_TO_HOST, sync=.false.)
     end if
 
   end subroutine adjoint_scalar_scheme_update_material_properties
@@ -509,30 +550,40 @@ contains
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
     procedure(user_material_properties), pointer :: dummy_mp_ptr
-    real(kind=rp) :: dummy_mu, dummy_rho
+    real(kind=rp) :: const_cp, const_lambda
 
     ! TODO
     ! I think everything should be read from .scalar. and we shouldnt
     ! change anything, but this should be come back to.
     dummy_mp_ptr => dummy_user_material_properties
 
+    ! Fill lambda field with the physical value
+    call this%lambda%init(this%dm_Xh, "lambda")
+    call this%cp%init(this%dm_Xh, "cp")
+
+    call this%material_properties%init(2)
+    call this%material_properties%assign_to_field(1, this%cp)
+    call this%material_properties%assign_to_field(2, this%lambda)
+
     if (.not. associated(user%material_properties, dummy_mp_ptr)) then
 
-       write(log_buf, '(A)') "Material properties must be set in the user&
-       & file!"
+       write(log_buf, '(A)') "Material properties must be set in the user " // &
+            "file!"
        call neko_log%message(log_buf)
-       call user%material_properties(0.0_rp, 0, dummy_rho, dummy_mu, &
-            this%cp, this%lambda, params)
+       this%user_material_properties => user%material_properties
+       call user%material_properties(0.0_rp, 0, this%name, &
+            this%material_properties)
     else
+       this%user_material_properties => dummy_user_material_properties
        if (params%valid_path('case.scalar.Pe') .and. &
             (params%valid_path('case.scalar.lambda') .or. &
             params%valid_path('case.scalar.cp'))) then
-          call neko_error("To set the material properties for the scalar,&
-          & either provide Pe OR lambda and cp in the case file.")
+          call neko_error("To set the material properties for the scalar, " // &
+               "either provide Pe OR lambda and cp in the case file.")
           ! Non-dimensional case
        else if (params%valid_path('case.scalar.Pe')) then
-          write(log_buf, '(A)') 'Non-dimensional scalar material properties &
-          & input.'
+          write(log_buf, '(A)') 'Non-dimensional scalar material properties' //&
+               ' input.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
           write(log_buf, '(A)') 'Specific heat capacity will be set to 1,'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
@@ -540,21 +591,40 @@ contains
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Pe into lambda for further manipulation.
-          call json_get(params, 'case.scalar.Pe', this%lambda)
-          write(log_buf, '(A,ES13.6)') 'Pe         :', this%lambda
+          call json_get(params, 'case.scalar.Pe', const_lambda)
+          write(log_buf, '(A,ES13.6)') 'Pe         :', const_lambda
           call neko_log%message(log_buf)
 
           ! Set cp and rho to 1 since the setup is non-dimensional.
-          this%cp = 1.0_rp
-          this%rho = 1.0_rp
+          const_cp = 1.0_rp
           ! Invert the Pe to get conductivity
-          this%lambda = 1.0_rp/this%lambda
+          const_lambda = 1.0_rp/const_lambda
           ! Dimensional case
        else
-          call json_get(params, 'case.scalar.lambda', this%lambda)
-          call json_get(params, 'case.scalar.cp', this%cp)
+          call json_get(params, 'case.scalar.lambda', const_lambda)
+          call json_get(params, 'case.scalar.cp', const_cp)
        end if
+    end if
+    ! We need to fill the fields based on the parsed const values
+    ! if the user routine is not used.
+    if (associated(user%material_properties, dummy_mp_ptr)) then
+       ! Fill mu and rho field with the physical value
+       call field_cfill(this%lambda, const_lambda)
+       call field_cfill(this%cp, const_cp)
 
+       write(log_buf, '(A,ES13.6)') 'lambda     :', const_lambda
+       call neko_log%message(log_buf)
+       write(log_buf, '(A,ES13.6)') 'cp         :', const_cp
+       call neko_log%message(log_buf)
+    end if
+
+    ! Since cp is a field and we use the %x(1,1,1,1) of the
+    ! host array data to pass constant material properties
+    ! to some routines, we need to make sure that the host
+    ! values are also filled
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%cp%x, this%cp%x_d, this%cp%size(), &
+            DEVICE_TO_HOST, sync=.false.)
     end if
   end subroutine adjoint_scalar_scheme_set_material_properties
 

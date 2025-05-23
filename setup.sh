@@ -9,7 +9,7 @@ function help() {
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
-    echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
+    echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
     echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
@@ -22,8 +22,10 @@ function help() {
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
+    echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
+    echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
 }
 
 # ============================================================================ #
@@ -70,13 +72,14 @@ while true; do
     esac
 done
 
+[ "$CLEAN_NEKO" == true ] && CLEAN=true
+
 # Check if the device type has changed
-if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
+if [[ -f "$MAIN_DIR/build/CMakeCache.txt" && $CLEAN != true ]]; then
     CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
     if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
         echo "Device type has changed, cleaning the build directory"
         CLEAN=true
-        CLEAN_NEKO=true
     fi
 fi
 
@@ -98,10 +101,16 @@ source $MAIN_DIR/scripts/dependencies.sh
 if [ -z "$CC" ]; then export CC=$(which mpicc); else export CC; fi
 if [ -z "$CXX" ]; then export CXX=$(which mpicxx); else export CXX; fi
 if [ -z "$FC" ]; then export FC=$(which mpifort); else export FC; fi
+if [ -z "$MPIFC" ]; then export MPIFC=$(which mpif90); else export MPIFC; fi
+if [ -z "$MPICC" ]; then export MPICC=$(which mpicc); else export MPICC; fi
+if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+fi
+if [ "$DEVICE_TYPE" == "HIP" ]; then
+    if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
 
 # Everything past this point should be general across all setups.
@@ -128,11 +137,12 @@ printf "Compiling the example codes and Neko-TOP\n"
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
-if [ -n "$CMAKE_VARIABLES" ] && [ ! -z "$CMAKE_VARIABLES" ]; then
+if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
 # Set the variables for the compilation
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
@@ -144,10 +154,11 @@ else
     CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
 fi
 
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+if [ ! -d $MAIN_DIR/build ]; then
+    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
+fi
 
 # Clean the build directory if the clean flag is set
-[ "$CLEAN" == true ] && cmake --build $MAIN_DIR/build --target clean
 cmake --build $MAIN_DIR/build --parallel
 cmake --build $MAIN_DIR/build --target Examples --parallel
 
