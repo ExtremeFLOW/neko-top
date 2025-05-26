@@ -32,11 +32,14 @@
 
 module neko_top
 
-  ! Define interfaces for our type registration functions.
+  !> Registration of custom simulation components used in topology optimization.
   interface
      module subroutine register_simcomps()
      end subroutine register_simcomps
+  end interface
 
+  !> Registration of custom source terms used in topology optimization.
+  interface
      module subroutine register_source_terms()
      end subroutine register_source_terms
   end interface
