@@ -56,18 +56,28 @@ contains
     procedure(source_term_allocate), pointer :: simple_brinkman
 
     ! Assign the pointers
-    adjoint_lube => adjoint_lube_source_term_allocate
-    adjoint_minimum_dissipation => adjoint_minimum_dissipation_source_term_allocate
-    adjoint_mixing_scalar => adjoint_mixing_scalar_source_term_allocate
-    adjoint_scalar_convection => adjoint_scalar_convection_source_term_allocate
-    simple_brinkman => simple_brinkman_source_term_allocate
+    adjoint_lube => &
+         adjoint_lube_source_term_allocate
+    adjoint_minimum_dissipation => &
+         adjoint_minimum_dissipation_source_term_allocate
+    adjoint_mixing_scalar => &
+         adjoint_mixing_scalar_source_term_allocate
+    adjoint_scalar_convection => &
+         adjoint_scalar_convection_source_term_allocate
+    simple_brinkman => &
+         simple_brinkman_source_term_allocate
 
     ! Register the source terms
-    call register_source_term('adjoint_lube', adjoint_lube)
-    call register_source_term('adjoint_minimum_dissipation', adjoint_minimum_dissipation)
-    call register_source_term('adjoint_mixing_scalar', adjoint_mixing_scalar)
-    call register_source_term('adjoint_scalar_convection', adjoint_scalar_convection)
-    call register_source_term('simple_brinkman', simple_brinkman)
+    call register_source_term('adjoint_lube', &
+         adjoint_lube)
+    call register_source_term('adjoint_minimum_dissipation', &
+         adjoint_minimum_dissipation)
+    call register_source_term('adjoint_mixing_scalar', &
+         adjoint_mixing_scalar)
+    call register_source_term('adjoint_scalar_convection', &
+         adjoint_scalar_convection)
+    call register_source_term('simple_brinkman', &
+         simple_brinkman)
   end subroutine register_source_terms
 
   ! ========================================================================== !

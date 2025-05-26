@@ -41,7 +41,7 @@ submodule(neko_top) neko_top_simcomps
 contains
 
   !> @brief Register the known simulation components from Neko-TOP.
-  module subroutine register_simcomps
+  module subroutine register_simcomps()
     procedure(simulation_component_allocate), pointer :: steady
 
     ! Assign the pointers
