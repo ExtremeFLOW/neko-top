@@ -24,6 +24,7 @@ module neko_ext
   use field, only: field_t
   use utils, only: neko_error
   use json_module, only : json_file
+
   implicit none
 
   ! ========================================================================= !
