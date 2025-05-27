@@ -18,27 +18,21 @@ set_target_properties(neko-top
     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include"
 )
 
-# Add the local neko extension library
+# Add our partial libraries to the build.
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
-
-# Add the mapping extension library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
-
-# Add the adjoint library
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
+
 
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
     PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_scalar_convection_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
@@ -62,8 +56,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90

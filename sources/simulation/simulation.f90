@@ -44,7 +44,6 @@ module simulation_m
   use fluid_pnpn, only: fluid_pnpn_t
   use simulation_adjoint, only: solve_adjoint
   use fld_file_output, only: fld_file_output_t
-  use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset
   use field_math, only: field_rzero
@@ -93,24 +92,10 @@ module simulation_m
   public :: simulation_t
 contains
 
-  subroutine user_simcomp(params)
-    type(json_file), intent(inout) :: params
-    type(steady_simcomp_t), allocatable :: steady_comp
-    type(json_file) :: simcomp_settings
-
-    ! Allocate a simulation component
-    allocate(steady_comp)
-    simcomp_settings = simulation_component_user_settings("steady", params)
-    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
-
-  end subroutine user_simcomp
-
   !> Initialize the simulation
   subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-
-    this%neko_case%usr%init_user_simcomp => user_simcomp
 
     ! initialize the primal
     call neko_init(this%neko_case)
