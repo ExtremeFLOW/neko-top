@@ -8,7 +8,7 @@ function help() {
     echo -e "  mesh.sh [options] [example]"
 
     echo -e "\n\e[4mDescription:\e[0m"
-    echo -e "  This script automates the creation and convertions of meshes."
+    echo -e "  This script automates the creation and conversions of meshes."
     echo -e "  Cubit is used to create meshes from the input files."
     echo -e "  The meshes are then converted to Nek5000 format using exo2nek."
     echo -e "  Finally, the meshes are converted to Neko format using rea2nbin."
@@ -17,6 +17,14 @@ function help() {
     echo -e "  in the INPUT_PATH folder, which defaults to data. Completed"
     echo -e "  meshes are stored in the OUTPUT_PATH folder, which defaults to"
     echo -e "  data_local."
+    echo -e ""
+    echo -e "  The script additionally support the creation of box meshes"
+    echo -e "  directly from the Neko genmeshbox command."
+    echo -e "  This is done by specifying the -b option followed by:"
+    echo -e "  - Dimensions of the box: x0,x1,y0,y1,z0,z1 (Float)"
+    echo -e "  - Number of elements in each direction: nx,ny,nz (Integer)"
+    echo -e "  - Periodic boundary conditions: px,py,pz (Boolean 0/1 or false/true)"
+    echo -e "  Example: mesh.sh -b 0.0 3.0 0.0 2.0 0.0 1.0 30 20 10 0 0 1"
     echo -e ""
     echo -e "Please note, periodic boundary conditions are not supported"
     echo -e "directly."
@@ -33,21 +41,29 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all input files available."
     printf "  -%-1s, --%-10s %-60s\n" "k" "keep" "Keep logs and temporaries."
     printf "  -%-1s, --%-10s %-60s\n" "r" "remesh" "Do complete remesh."
+    printf "  -%-1s, --%-10s %-60s\n" "i" "input" "Input path for the mesh files."
+    printf "  -%-1s, --%-10s %-60s\n" "o" "output" "Output path for the meshes."
+    printf "  -%-1s, --%-10s %-60s\n" "f" "file" "Output file for the mesh."
     printf "  -%-1s, --%-10s %-60s\n" "d" "dimension" "Dimension of mesh file."
+    printf "  -%-1s, --%-10s %-60s\n" "b" "box" "Create a box mesh."
 
     exit 0
 }
 if [ $# -lt 1 ]; then help; fi
 
 # Assign default values to the options
-ALL=false    # Run all meshing
-KEEP=false   # Keep logs and temporaries
-REMESH=false # Do complete remesh
-DIMENSION=2  # Dimension of GMSH file
+ALL=false      # Run all meshing
+KEEP=false     # Keep logs and temporaries
+REMESH=false   # Do complete remesh
+DIMENSION=2    # Dimension of GMSH file
+BOX=false      # Create a box mesh
+OUTPUT_FILE="" # Output file for the mesh
+OUTPUT_PATH="" # Path to the output meshes
+INPUT_PATH=""  # Path to the input files
 
 # List possible options
-OPTIONS=help,all,keep,remesh,dimension:
-OPT=h,a,k,r,d:
+OPTIONS=help,all,keep,remesh,file,dimension:,box,input:,output:
+OPT=h,a,k,r,f,d:,b,i:,o:
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -61,6 +77,11 @@ while true; do
     "-k" | "--keep") KEEP=true && shift ;;             # Keep logs and temporaries
     "-r" | "--remesh") REMESH=true && shift ;;         # Do complete remesh
     "-d" | "--dimension") DIMENSION="$2" && shift 2 ;; # Dimension of GMSH file
+    "-b" | "--box") BOX=true && shift ;;               # Create a box mesh
+
+    "-i" | "--input") INPUT_PATH="$2" && shift 2 ;;   # Input path for the mesh files
+    "-o" | "--output") OUTPUT_PATH="$2" && shift 2 ;; # Output path for the meshes
+    "-f" | "--file") OUTPUT_FILE="$2" && shift 2 ;;   # Output file for the mesh
 
     # End of options
     "--") shift && break ;;
@@ -74,6 +95,7 @@ export ALL KEEP REMESH DIMENSION
 # Define all needed folders relative to the project folder. (without trailing /)
 export CURRENT_DIR=$(pwd)
 export MAIN_DIR=$(dirname $(realpath $0))
+export EXTERNAL_DIR="$MAIN_DIR/external"
 
 # Set the path to the input files and the output meshes
 [ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Input files
@@ -94,8 +116,49 @@ export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
 # ============================================================================ #
 # Ensure executables are available
 
+source $MAIN_DIR/prepare.env
 source $MAIN_DIR/scripts/dependencies.sh
 source $MAIN_DIR/scripts/meshing.sh
+
+# ============================================================================ #
+# Create a box mesh if requested
+
+if [ "$BOX" == "true" ]; then
+    # Create the box mesh using Neko genmeshbox
+    printf "\n\e[4mCreating box mesh.\e[0m\n"
+    mkdir -p $OUTPUT_PATH/box_mesh.tmp
+    cd $OUTPUT_PATH/box_mesh.tmp
+
+    [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="$OUTPUT_PATH/box.nmsh"
+
+    if [[ -f "$OUTPUT_FILE" && $REMESH == "false" ]]; then
+        printf '  %-11s %-67s\n' "Box Mesh:" "Already exists, skipping."
+        exit 0
+    fi
+
+    find_neko $NEKO_DIR
+    if ! command -v genmeshbox &>/dev/null; then
+        echo "Error: genmeshbox command not found."
+        echo "Please ensure Neko is installed and the path is set correctly."
+        exit 1
+    fi
+
+    genmeshbox $@ 1>box_mesh.log 2>error.log
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create box mesh."
+        exit 1
+    fi
+
+    cp box.nmsh $OUTPUT_FILE
+    printf '  %-11s %-67s\n' "Box Mesh:" "Created in $OUTPUT_FILE"
+
+    cd $CURRENT_DIR
+
+    # Clean up the temporary files
+    [ $KEEP == "false" ] && rm -fr $OUTPUT_PATH/box_mesh.tmp
+    exit 0
+fi
 
 # ============================================================================ #
 # Loop through the inputs and extract the file_list
