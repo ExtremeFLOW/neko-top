@@ -49,7 +49,7 @@ program topopt_user
   ! Initialization of the components
 
   ! initialize the user additions for the forward (through the neko interface)
-  call user_setup(sim%neko_case%usr)
+  call user_setup(sim%neko_case%user)
 
   ! initialize the simulation
   call sim%init(parameters)
