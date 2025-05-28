@@ -361,10 +361,12 @@ contains
     nullify(this%case)
     if (allocated(this%scalar_adj)) then
        call this%scalar_adj%free()
+       deallocate(this%scalar_adj)
     end if
 
     if (allocated(this%fluid_adj)) then
        call this%fluid_adj%free()
+       deallocate(this%fluid_adj)
     end if
     call this%output_controller%free()
 
