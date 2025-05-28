@@ -7,7 +7,7 @@ program usrneko
   type(case_t), target :: C
 
   call neko_top_register_types()
-  call user_setup(C%usr)
+  call user_setup(C%user)
   call neko_init(C)
   call neko_solve(C)
   call neko_finalize(C)
