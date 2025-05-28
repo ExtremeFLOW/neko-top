@@ -10,6 +10,7 @@ function help() {
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
+    echo -e "\t-e, --examples    Build the examples"
     echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
@@ -45,10 +46,11 @@ CLEAN_NEKO=false
 QUIET=false
 TEST=false
 DOCS=false
+EXAMPLES=false
 
 # List possible options
-OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
-OPT=h,t,c,q,d:
+OPTIONS=help,test,clean,clean-neko,quiet,device:,docs,examples
+OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -62,9 +64,10 @@ while true; do
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
+    "-e" | "--examples") EXAMPLES=true && shift ;;    # Build the examples
 
     # Purely long settings
-    "--doc") DOCS=true && shift ;;              # Build the documentation
+    "--docs") DOCS=true && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
@@ -78,8 +81,8 @@ done
 if [[ -f "$MAIN_DIR/build/CMakeCache.txt" && $CLEAN != true ]]; then
     CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
     if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
-        echo "Device type has changed, cleaning the build directory"
-        CLEAN=true
+        echo >&2 "Device type has changed. Please do a clean setup."
+        exit 1
     fi
 fi
 
@@ -108,8 +111,7 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
-fi
-if [ "$DEVICE_TYPE" == "HIP" ]; then
+elif [ "$DEVICE_TYPE" == "HIP" ]; then
     if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
 
@@ -160,7 +162,10 @@ fi
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
-cmake --build $MAIN_DIR/build --target Examples --parallel
+
+# Build additional components
+[ "$DOCS" == true ] && cmake --build $MAIN_DIR/build --target Documentation --parallel
+[ "$EXAMPLES" == true ] && cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build
