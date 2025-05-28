@@ -98,7 +98,8 @@ contains
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
-    call this%case%usr%user_init_modules(this%time%t, this%fluid_adj%u_adj, &
+    call this%case%user%user_init_modules(this%time%t, this%fluid_adj%u_adj, &
+
          this%fluid_adj%v_adj, this%fluid_adj%w_adj,&
          this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%case%params)
     call neko_log%end_section()
@@ -169,7 +170,8 @@ contains
        call simulation_joblimit_chkp(this%case, this%time%t)
     end if
 
-    call this%case%usr%user_finalize_modules(this%time%t, this%case%params)
+
+    call this%case%user%user_finalize_modules(this%time%t, this%case%params)
 
     call neko_log%end_section('Normal end.')
 

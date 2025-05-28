@@ -75,11 +75,12 @@ for test in ${tests[@]}; do
 
         if [ "$(head -n 1 $LPATH/$test/output.log)" = "Ready" ]; then
             printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Pending:" "$test"
-        else
+        elif [ ${#file} -gt 0 ]; then
             for f in ${file[@]}; do
                 logfile=${f%.*}.log
 
                 if [ ! -f $logfile ]; then
+                    printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Starting:" "$test"
                     continue
                 fi
 
@@ -106,6 +107,8 @@ for test in ${tests[@]}; do
                     printf " %s\n" "$test/$(basename $f)"
                 fi
             done
+        else
+            printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Starting:" "$test"
         fi
     fi
 done

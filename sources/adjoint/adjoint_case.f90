@@ -143,7 +143,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
     call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
-         neko_case%usr, neko_case%fluid%ext_bdf)
+         neko_case%user, neko_case%fluid%ext_bdf)
     !
     ! Setup adjoint scalar
     !
@@ -164,7 +164,7 @@ contains
        ! this%scalar_adj%chkp%tlag => neko_case%tlag
        ! this%scalar_adj%chkp%dtlag => neko_case%dtlag
        call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, &
-            neko_case%fluid%gs_Xh, neko_case%params, neko_case%usr, &
+            neko_case%fluid%gs_Xh, neko_case%params, neko_case%user, &
             neko_case%fluid%ulag, neko_case%fluid%vlag, &
             neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
 
@@ -237,13 +237,13 @@ contains
     !    call json_get(neko_case%params, 'case.fluid.inflow_condition.type', &
     !         string_val)
     !    if (trim(string_val) .eq. 'user') then
-    !       call neko_case%fluid%set_usr_inflow(neko_case%usr%fluid_user_if)
+    !       call neko_case%fluid%set_usr_inflow(neko_case%user%fluid_user_if)
     !    end if
     ! end if
 
     ! Setup user boundary conditions for the scalar.
     ! if (scalar_adj) then
-    !    call neko_case%scalar_adj%set_user_bc(neko_case%usr%scalar_user_bc)
+    !    call neko_case%scalar_adj%set_user_bc(neko_case%user%scalar_user_bc)
     ! end if
 
     !
@@ -264,7 +264,7 @@ contains
        call set_flow_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
-            neko_case%usr%fluid_user_ic, neko_case%params)
+            neko_case%user%fluid_user_ic, neko_case%params)
     end if
 
     call neko_log%end_section()
@@ -386,10 +386,12 @@ contains
     nullify(this%case)
     if (allocated(this%scalar_adj)) then
        call this%scalar_adj%free()
+       deallocate(this%scalar_adj)
     end if
 
     if (allocated(this%fluid_adj)) then
        call this%fluid_adj%free()
+       deallocate(this%fluid_adj)
     end if
     call this%output_controller%free()
 
