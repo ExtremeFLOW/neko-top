@@ -827,6 +827,18 @@ key components
     - the steady state adjoint solution `adjoint_fields0.nek5000`
     - the design field `design0.nek5000`
 
+Within `design0.nek5000` there are 3 fields labeled `x_velocity`, `y_velocity`
+and `z_velocity`, these fields correspond to:
+    - `x_velocity`: The unmapped design field \f$\rho \in [0,1]\f$
+    - `y_velocity`: The mapped design field \f$\chi \in [0,\chi_{\text{max}}]\f$
+    - `z_velocity`: The sensitivity \f$\partial \mathcal{F}/\partial\f$
+
+Included in this example is a folder `passive_scalar/post_processing`
+containing:
+    - `plot_convergence.py`: A python script to plot the convergence history
+    - `post_processing.pvsm`: A Paraview state file to assist you with
+    visualizing the optimized designs.
+
 
 \attention
 The remainder of this tutorial is under construction, however it intends to help
