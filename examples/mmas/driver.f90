@@ -35,15 +35,15 @@ program usrneko
   type(field_t) :: neko_field
 
   ! !> The design
-  type(simplefield_design_t) :: design
+  type(simplefield_design_t) :: des
 
   !> The problem type
-  type(problem_t) :: problem
+  type(problem_t) :: prob
   type(mma_obj), allocatable :: obj
   type(mma_con), allocatable :: con_1, con_2
 
   !> The optimizer (in this case mma)
-  class(optimizer_t), allocatable :: optimizer
+  class(optimizer_t), allocatable :: opt
 
   integer :: nloc
   type(vector_t) :: xcoord, ycoord, zcoord,  finaldesign, initdesign
@@ -74,16 +74,16 @@ program usrneko
   xcoord%x = reshape(neko_field%dof%x, [nloc])
   ycoord%x = reshape(neko_field%dof%y, [nloc])
   zcoord%x = reshape(neko_field%dof%z, [nloc])
-  call design%init_from_components(nloc, xcoord, ycoord, zcoord, neko_field)
+  call des%init_from_components(nloc, xcoord, ycoord, zcoord, neko_field)
 
-  print *, "nloc=", nloc, "number of design variables=", design%size_global()
+  print *, "nloc=", nloc, "number of design variables=", des%size_global()
   print *, "max(xcoord%x)=", maxval(xcoord%x), "min(xcoord%x)=", minval(xcoord%x), &
        "max(ycoord%x)=", maxval(ycoord%x), "min(ycoord%x)=", minval(ycoord%x), &
        "max(zcoord%x)=", maxval(zcoord%x), "min(zcoord%x)=", minval(zcoord%x)
   ! initialize the design
-  call initdesign%init(design%size())
+  call initdesign%init(des%size())
   initdesign%x = 1.0_rp
-  call design%update_design(initdesign)
+  call des%update_design(initdesign)
 
    ! -------------------------------------------------------------------------- !
   ! Construct the problem
@@ -98,47 +98,47 @@ program usrneko
   allocate(con_1)
   allocate(con_2)
 
-  call obj%init_from_components("Objective", design)
-  call con_1%init_from_components("Positive", design, 1)
-  call con_2%init_from_components("Negative", design, -1)
+  call obj%init_from_components("Objective", des)
+  call con_1%init_from_components("Positive", des, 1)
+  call con_2%init_from_components("Negative", des, -1)
   
   ! update obj and cons and sensitivities for the init design
-  call obj%update_value(design)
-  call obj%update_sensitivity(design)
-  call con_1%update_value(design)
-  call con_1%update_sensitivity(design)
-  call con_2%update_value(design)
-  call con_2%update_sensitivity(design)
+  call obj%update_value(des)
+  call obj%update_sensitivity(des)
+  call con_1%update_value(des)
+  call con_1%update_sensitivity(des)
+  call con_2%update_value(des)
+  call con_2%update_sensitivity(des)
   
   print *, "objective value for the initial design=", obj%value
 
   ! initialize the problem
-  call problem%init(parameters, design)
+  call prob%init(parameters, des)
   
-  call problem%add_objective(obj)
-  call problem%add_constraint(con_1)
-  call problem%add_constraint(con_2)
+  call prob%add_objective(obj)
+  call prob%add_constraint(con_1)
+  call prob%add_constraint(con_2)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
-  call optimizer_factory(optimizer, parameters, problem, design)
+  call optimizer_factory(opt, parameters, prob, des)
 
 
-  call optimizer%run(problem, design)
+  call opt%run(prob, des)
 
-  call finaldesign%init(design%size_global())
-  finaldesign = design%get_values()
-  print *, "min(design%values)=", minval(finaldesign%x), &
-       "max(design%values)=", maxval(finaldesign%x)
+  call finaldesign%init(des%size_global())
+  finaldesign = des%get_values()
+  print *, "min(des%values)=", minval(finaldesign%x), &
+       "max(des%values)=", maxval(finaldesign%x)
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
 
   call neko_finalize(neko_case)
-  call optimizer%free()
-  call problem%free()
-  call design%free()
+  call opt%free()
+  call prob%free()
+  call des%free()
 
-  if (allocated(optimizer)) deallocate(optimizer)
+  if (allocated(opt)) deallocate(opt)
 
 end program usrneko
