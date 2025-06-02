@@ -56,10 +56,8 @@ contains
   subroutine solve_adjoint(this)
     type(adjoint_case_t), intent(inout) :: this
 
-    real(kind=rp) :: t_adj
     real(kind=dp) :: start_time_org, start_time, end_time
     character(len=LOG_SIZE) :: log_buf
-    integer :: tstep_adj
     logical :: output_at_end
     type(time_step_controller_t) :: dt_controller
 
@@ -72,15 +70,20 @@ contains
 
     ! ------------------------------------------------------------------------ !
 
-    t_adj = 0d0
-    tstep_adj = 0
+    this%time%t = 0.0_rp
+    this%time%tstep = 0
+    this%time%dt = this%case%time%dt
+    this%time%end_time = this%case%time%end_time
+    this%time%tlag = this%case%time%tlag
+    this%time%dtlag = this%case%time%dtlag
+
     call neko_log%section('Starting adjoint')
     write(log_buf, '(A,E15.7,A,E15.7,A)') 'T : [', 0d0, ', ', &
-         this%case%time%end_time, ')'
+         this%time%end_time, ')'
     call neko_log%message(log_buf)
     call dt_controller%init(this%case%params)
     if (.not. dt_controller%if_variable_dt) then
-       write(log_buf, '(A, E15.7)') 'dt :  ', this%case%time%dt
+       write(log_buf, '(A, E15.7)') 'dt :  ', this%time%dt
        call neko_log%message(log_buf)
     else
        write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
@@ -89,13 +92,14 @@ contains
 
     !> Call stats, samplers and user-init before time loop
     call neko_log%section('Postprocessing')
-    ! call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-    call this%output_controller%execute(this%case%time)
+    ! call this%case%q%eval(this%time%t, this%time%dt, this%time%tstep)
+    call this%output_controller%execute(this%time)
 
     ! HARRY
     ! ok this I guess this is techincally where we set the initial condition
     ! of adjoint yeh?
-    call this%case%user%user_init_modules(t_adj, this%fluid_adj%u_adj, &
+    call this%case%user%user_init_modules(this%time%t, this%fluid_adj%u_adj, &
+
          this%fluid_adj%v_adj, this%fluid_adj%w_adj,&
          this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%case%params)
     call neko_log%end_section()
@@ -104,22 +108,22 @@ contains
     call profiler_start
     start_time_org = MPI_WTIME()
 
-    do while (t_adj .lt. this%case%time%end_time .and. &
+    do while (this%time%t .lt. this%time%end_time .and. &
          (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
-       tstep_adj = tstep_adj + 1
+       this%time%tstep = this%time%tstep + 1
        start_time = MPI_WTIME()
 
-       call this%case%time%status()
+       call this%time%status()
        call neko_log%message(log_buf)
        call neko_log%begin()
 
        ! write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', &
-       !  this%case%time%dt
+       !  this%time%dt
        call neko_log%message(log_buf)
-       call simulation_settime(t_adj, this%case%time%dt, &
-            this%case%fluid%ext_bdf, this%case%time%tlag, &
-            this%case%time%dtlag, tstep_adj)
+       call simulation_settime(this%time%t, this%time%dt, &
+            this%case%fluid%ext_bdf, this%time%tlag, &
+            this%time%dtlag, this%time%tstep)
 
 
        ! Scalar step
@@ -127,7 +131,7 @@ contains
        if (allocated(this%scalar_adj)) then
           start_time = MPI_WTIME()
           call neko_log%section(' Adjoint scalar')
-          call this%scalar_adj%step(t_adj, tstep_adj, this%case%time%dt, &
+          call this%scalar_adj%step(this%time%t, this%time%tstep, this%time%dt, &
                this%case%fluid%ext_bdf, dt_controller)
           end_time = MPI_WTIME()
           write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -137,7 +141,7 @@ contains
        end if
 
        call neko_log%section('Adjoint fluid')
-       call this%fluid_adj%step(t_adj, tstep_adj, this%case%time%dt, &
+       call this%fluid_adj%step(this%time%t, this%time%tstep, this%time%dt, &
             this%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7,A,E15.7)') &
@@ -148,8 +152,8 @@ contains
 
        call neko_log%section('Postprocessing')
 
-       !  call this%case%q%eval(t_adj, this%case%time%dt, tstep_adj)
-       call this%output_controller%execute(this%case%time)
+       !  call this%case%q%eval(this%time%t, this%time%dt, this%time%tstep)
+       call this%output_controller%execute(this%time)
 
        call neko_log%end_section()
 
@@ -160,13 +164,14 @@ contains
 
     call json_get_or_default(this%case%params, 'case.output_at_end',&
          output_at_end, .true.)
-    call this%output_controller%execute(this%case%time, output_at_end)
+    call this%output_controller%execute(this%time, output_at_end)
 
-    if (.not. (output_at_end) .and. t_adj .lt. this%case%time%end_time) then
-       call simulation_joblimit_chkp(this%case, t_adj)
+    if (.not. (output_at_end) .and. this%time%t .lt. this%time%end_time) then
+       call simulation_joblimit_chkp(this%case, this%time%t)
     end if
 
-    call this%case%user%user_finalize_modules(t_adj, this%case%params)
+
+    call this%case%user%user_finalize_modules(this%time%t, this%case%params)
 
     call neko_log%end_section('Normal end.')
 
