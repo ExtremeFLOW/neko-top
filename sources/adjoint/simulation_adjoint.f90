@@ -70,11 +70,11 @@ contains
 
     ! ------------------------------------------------------------------------ !
 
-    this%time%t = 0.0_rp
+    this%time%t = this%case%time%end_time
     this%time%tstep = 0
     this%time%dt = this%case%time%dt
     this%time%end_time = this%case%time%end_time
-    this%time%tlag = this%case%time%tlag
+    this%time%tlag = this%case%time%end_time
     this%time%dtlag = this%case%time%dtlag
 
     call neko_log%section('Starting adjoint')
@@ -108,7 +108,7 @@ contains
     call profiler_start
     start_time_org = MPI_WTIME()
 
-    do while (this%time%t .lt. this%time%end_time .and. &
+    do while (this%time%t .gt. 0.0_rp .and. &
          (.not. jobctrl_time_limit()))
        call profiler_start_region('Time-Step')
        this%time%tstep = this%time%tstep + 1
@@ -197,7 +197,7 @@ contains
        tlag(2) = t
     end if
 
-    t = t + dt
+    t = t - dt
 
     call ext_bdf%set_coeffs(dtlag)
 
