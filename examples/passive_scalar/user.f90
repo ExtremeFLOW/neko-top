@@ -1,6 +1,6 @@
 ! User module for the user defined simulation component
 module user
-  use user_intf, only: user_t, simulation_component_user_settings
+  use user_intf, only: user_t
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
