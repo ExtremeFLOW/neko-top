@@ -9,7 +9,6 @@
         "simulation_components": [
             {
                 "type": "mma",
-                "is_user": true,
                 "tol": 1e-6,
                 "m": 2,
                 "a0_const": 1.0,
