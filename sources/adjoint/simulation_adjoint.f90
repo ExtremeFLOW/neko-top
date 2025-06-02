@@ -125,7 +125,6 @@ contains
             this%case%fluid%ext_bdf, this%time%tlag, &
             this%time%dtlag, this%time%tstep)
 
-
        ! Scalar step
        ! (Note that for the adjoint we should the scalar_adj first)
        if (allocated(this%scalar_adj)) then
@@ -169,7 +168,6 @@ contains
     if (.not. (output_at_end) .and. this%time%t .lt. this%time%end_time) then
        call simulation_joblimit_chkp(this%case, this%time%t)
     end if
-
 
     call this%case%user%user_finalize_modules(this%time%t, this%case%params)
 
