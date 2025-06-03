@@ -115,7 +115,6 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "is_user": true,
                 "tol": 1e-7,
                 "compute_control": "tsteps",
                 "compute_value": 1
