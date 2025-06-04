@@ -320,14 +320,16 @@ contains
          this%full_stress_formulation, .false.)
 
     if (this%full_stress_formulation .eqv. .true.) then
-       ! Setup backend dependent Ax routines
-       call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
+       call neko_error( &
+            "Full stress formulation is not supported in the adjoint module.")
+       !  ! Setup backend dependent Ax routines
+       !  call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
 
-       ! Setup backend dependent prs residual routines
-       call pnpn_prs_res_stress_factory(this%prs_res)
+       !  ! Setup backend dependent prs residual routines
+       !  call pnpn_prs_res_stress_factory(this%prs_res)
 
-       ! Setup backend dependent vel residual routines
-       call pnpn_vel_res_stress_factory(this%vel_res)
+       !  ! Setup backend dependent vel residual routines
+       !  call pnpn_vel_res_stress_factory(this%vel_res)
     else
        ! Setup backend dependent Ax routines
        call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
