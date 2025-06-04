@@ -262,6 +262,8 @@ contains
     !
     ! Setup initial conditions
     !
+
+    call neko_log%section("Adjoint initial condition")
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 

@@ -437,6 +437,7 @@ contains
     call neko_log%end_section()
 
     ! Initialize the advection factory
+    call neko_log%section("Advection factory")
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
     call json_extract_object(params, 'case.numerics', numerics_params)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
