@@ -159,14 +159,16 @@ contains
   !! @param[in] coef The coefficients of the mesh.
   !! @param[in] gs The gather-scatter.
   !! @param[inout] params The case parameter file in json.
+  !! @param[inout] numerics_params The numerical parameters in json.
   !! @param[in] user Type with user-defined procedures.
+  !! @param[inout] chkp The checkpoint object.
   !! @param[in] ulag Lag arrays for the x velocity component.
   !! @param[in] vlag Lag arrays for the y velocity component.
   !! @param[in] wlag Lag arrays for the z velocity component.
   !! @param[in] time_scheme The time-integration controller.
   !! @param[in] rho The fluid density.
-  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, numerics_params, &
-       user, chkp, ulag, vlag, wlag, time_scheme, rho)
+  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, &
+       numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef

@@ -53,8 +53,8 @@ module advection_adjoint
   end type advection_adjoint_t
 
   interface
-     !> A factory for \ref advection_t decendants. Both creates and initializes
-     !! the object.
+     !> A factory for \ref advection_adjoint_t descendants. Both creates and
+     !! initializes the object.
      !! @param object The object allocated by the factory.
      !! @param json The parameter file.
      !! @param coef The coefficients of the (space, mesh) pair.

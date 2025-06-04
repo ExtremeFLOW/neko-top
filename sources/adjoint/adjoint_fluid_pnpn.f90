@@ -669,10 +669,7 @@ contains
 
   !> Advance fluid simulation in time.
   !! @param this The fluid simulation object.
-  !! @param t The time value.
-  !! @param tstep The current interation.
-  !! @param dt The timestep
-  !! @param ext_bdf Time integration logic.
+  !! @param time The time state object.
   !! @param dt_controller timestep controller
   subroutine adjoint_fluid_pnpn_step(this, time, dt_controller)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
