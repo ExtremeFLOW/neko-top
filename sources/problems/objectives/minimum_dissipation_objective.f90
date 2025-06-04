@@ -66,6 +66,7 @@ module minimum_dissipation_objective
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
        field_copy
   use operators, only: grad
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
        adjoint_minimum_dissipation_source_term_t
@@ -193,7 +194,10 @@ contains
          this%c_Xh)
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_fluid%source_term%add_source_term(adjoint_forcing)
+    select type (f => simulation%adjoint_fluid)
+    type is (adjoint_fluid_pnpn_t)
+       call f%source_term%add_source_term(adjoint_forcing)
+    end select
 
   end subroutine minimum_dissipation_init_attributes
 

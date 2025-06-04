@@ -37,6 +37,7 @@ module brinkman_design
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
   use point_zone_registry, only: neko_point_zone_registry
@@ -412,7 +413,12 @@ contains
          simulation%adjoint_fluid%w_adj, &
          simulation%adjoint_fluid%c_Xh)
     ! append brinkman source term based on design
-    call simulation%adjoint_fluid%source_term%add(adjoint_brinkman)
+
+    select type (f => simulation%adjoint_fluid)
+    type is (adjoint_fluid_pnpn_t)
+       call f%source_term%add(adjoint_brinkman)
+    class default
+    end select
 
   end subroutine brinkman_design_init_from_components
 
