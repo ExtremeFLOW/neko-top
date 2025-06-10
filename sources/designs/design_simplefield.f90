@@ -45,6 +45,7 @@ module simplefield_design
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE
+  use device_math, only: device_copy
   use design, only: design_t
   use math, only: rzero
   use simulation_m, only: simulation_t
