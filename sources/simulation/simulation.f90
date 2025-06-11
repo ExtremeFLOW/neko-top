@@ -42,15 +42,20 @@ module simulation_m
   use scalar_pnpn, only: scalar_pnpn_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use fluid_pnpn, only: fluid_pnpn_t
-  use simulation_adjoint, only: solve_adjoint
+  use time_step_controller, only: time_step_controller_t
   use fld_file_output, only: fld_file_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset
   use field_math, only: field_rzero
   use json_file_module, only: json_file
   use json_utils, only: json_extract_item
-  use num_types, only: rp, sp
-  use user_intf, only: user_t, simulation_component_user_settings
+  use num_types, only: rp, sp, dp
+  use logger, only: LOG_SIZE
+  use mpi_f08, only: MPI_WTIME
+  use jobctrl, only: jobctrl_time_limit
+  use profiler, only: profiler_start, profiler_stop
+  use simulation_adjoint, only: simulation_adjoint_init, &
+       simulation_adjoint_step, simulation_adjoint_finalize
   implicit none
   private
 
@@ -171,9 +176,26 @@ contains
   !> Run the simulation
   subroutine simulation_run_backward(this)
     class(simulation_t), intent(inout) :: this
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: tstep_loop_start_time
+    real(kind=rp) :: cfl
 
-    ! run the adjoint
-    call solve_adjoint(this%adjoint_case)
+    call dt_controller%init(this%neko_case%params)
+
+    call simulation_adjoint_init(this%adjoint_case, dt_controller)
+
+    call profiler_start
+    cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
+    tstep_loop_start_time = MPI_WTIME()
+
+    do while (this%adjoint_case%time%t .lt. this%adjoint_case%time%end_time &
+         .and. (.not. jobctrl_time_limit()))
+       call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
+            tstep_loop_start_time)
+    end do
+    call profiler_stop
+
+    call simulation_adjoint_finalize(this%adjoint_case)
 
   end subroutine simulation_run_backward
 

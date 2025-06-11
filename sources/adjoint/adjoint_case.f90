@@ -47,6 +47,7 @@ module adjoint_case
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
+  use time_state, only : time_state_t
   use utils, only: neko_error
   use adjoint_scalar_convection_source_term, only: &
        adjoint_scalar_convection_source_term_t
@@ -67,6 +68,7 @@ module adjoint_case
      type(adjoint_scalar_convection_source_term_t), allocatable :: &
           adjoint_convection_term
      type(case_t), pointer :: case
+     type(time_state_t) :: time
 
      ! Fields
      real(kind=rp) :: tol
@@ -129,7 +131,7 @@ contains
     integer :: precision
 
     ! extra things for json
-    type(json_file) :: ic_json
+    type(json_file) :: ic_json, numerics_params
     character(len=:), allocatable :: json_key
 
     !
@@ -140,8 +142,12 @@ contains
 
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
-    call this%fluid_adj%init(neko_case%msh, lx, neko_case%params, &
-         neko_case%user, neko_case%fluid%ext_bdf)
+
+    select type (f => this%fluid_adj)
+    type is (adjoint_fluid_pnpn_t)
+       call f%init(neko_case%msh, lx, neko_case%params, &
+            neko_case%user, neko_case%chkp)
+    end select
     !
     ! Setup adjoint scalar
     !
@@ -155,6 +161,9 @@ contains
 
     if (this%have_scalar) then
        allocate(this%scalar_adj)
+       call json_extract_object(neko_case%params, 'case.numerics', &
+            numerics_params)
+
        ! @todo
        ! these tlag and dtlag are new, we likely need to update the standard
        ! fluid in a different PR.
@@ -162,9 +171,11 @@ contains
        ! this%scalar_adj%chkp%tlag => neko_case%tlag
        ! this%scalar_adj%chkp%dtlag => neko_case%dtlag
        call this%scalar_adj%init(neko_case%msh, neko_case%fluid%c_Xh, &
-            neko_case%fluid%gs_Xh, neko_case%params, neko_case%user, &
+            neko_case%fluid%gs_Xh, neko_case%params, numerics_params, &
+            neko_case%user, neko_case%chkp, &
             neko_case%fluid%ulag, neko_case%fluid%vlag, &
             neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+
 
        ! call neko_case%fluid%chkp%add_scalar(this%scalar_adj%s_adj)
 
@@ -207,9 +218,30 @@ contains
             this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
             this%fluid_adj%f_adj_z, this%case%scalar%s, &
             this%scalar_adj%s_adj, this%fluid_adj%c_Xh)
-       ! append the coupling term to the adjoint velocity equation
-       call this%fluid_adj%source_term%add(this%adjoint_convection_term)
+
+       select type (f => this%fluid_adj)
+       type is (adjoint_fluid_pnpn_t)
+          ! append the coupling term to the adjoint velocity equation
+          call f%source_term%add(this%adjoint_convection_term)
+       end select
     end if
+
+    !
+    ! Time step
+    !
+    ! call json_get_or_default(neko_case%params, 'case.variable_timestep', &
+    !      logical_val, .false.)
+    ! if (.not. logical_val) then
+    call json_get(neko_case%params, 'case.timestep', this%time%dt)
+    ! else
+    !    ! randomly set an initial dt to get cfl when dt is variable
+    !    this%time%dt = 1.0_rp
+    ! end if
+
+    !
+    ! End time
+    !
+    call json_get(neko_case%params, 'case.end_time', this%time%end_time)
 
     !
     ! Setup user defined conditions
@@ -230,6 +262,8 @@ contains
     !
     ! Setup initial conditions
     !
+
+    call neko_log%section("Adjoint initial condition")
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
@@ -352,6 +386,12 @@ contains
     !   call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
     ! end if
 
+    !
+    ! Initialize time and step
+    !
+    this%time%t = 0d0
+    this%time%tstep = 0
+
   end subroutine adjoint_case_init_common
 
   ! Destructor.
@@ -361,10 +401,12 @@ contains
     nullify(this%case)
     if (allocated(this%scalar_adj)) then
        call this%scalar_adj%free()
+       deallocate(this%scalar_adj)
     end if
 
     if (allocated(this%fluid_adj)) then
        call this%fluid_adj%free()
+       deallocate(this%fluid_adj)
     end if
     call this%output_controller%free()
 

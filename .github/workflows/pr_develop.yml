@@ -45,7 +45,7 @@ on:
 env:
   PFUNIT_VERSION: main
   JSON_FORTRAN_VERSION: master
-  NEKO_VERSION: develop
+  NEKO_VERSION: neko-top
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
