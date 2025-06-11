@@ -8,7 +8,7 @@ module json_utils_ext
   implicit none
   private
 
-  public :: json_key_fallback, json_read_file
+  public :: json_key_fallback, json_key_fallback_two_jsons, json_read_file
 
 contains
 
@@ -31,6 +31,27 @@ contains
     end if
 
   end function json_key_fallback
+
+  !> Create a json_string based on fallback logic.
+  !! If the key is present in the lookup json object, return it.
+  !! If the key is present in the fallback json object, return it.
+  !! Otherwise, return the lookup key.
+  function json_key_fallback_two_jsons(lookup_json, fallback_json, key) &
+     result(json_pointer)
+    type(json_file), target, intent(inout) :: lookup_json
+    type(json_file), target, intent(inout) :: fallback_json
+    character(len=*), intent(in) :: key
+    type(json_file), pointer :: json_pointer
+
+    if ((key .in. lookup_json)) then
+       json_pointer => lookup_json
+    else if (key .in. fallback_json) then
+       json_pointer => fallback_json
+    else
+       json_pointer => lookup_json
+    end if
+
+  end function json_key_fallback_two_jsons
 
   !> Read a json file taking mpi into account.
   !! This function reads a json file and broadcasts it to all ranks.

@@ -140,11 +140,11 @@ contains
     call neko_log%message(log_buf)
 
     ! Scalar step
-    ! (Note that for the adjoint we should the scalar_adj first)
-    if (allocated(C%scalar_adj)) then
+    ! (Note that for the adjoint we should the adjoint_scalars first)
+    if (allocated(C%adjoint_scalars)) then
        start_time = MPI_WTIME()
        call neko_log%section('Adjoint scalar')
-       call C%scalar_adj%step(C%time, &
+       call C%adjoint_scalars%step(C%time, &
             C%case%fluid%ext_bdf, dt_controller)
        end_time = MPI_WTIME()
        write(log_buf, '(A,E15.7)') &
@@ -244,7 +244,7 @@ contains
 
     call C%fluid_adj%restart(C%case%chkp)
     call C%case%fluid%chkp%previous_mesh%free()
-    if (allocated(C%scalar_adj)) call C%scalar_adj%restart(C%scalar_adj%chkp)
+    ! if (allocated(C%adjoint_scalars)) call C%adjoint_scalars%restart(C%chkp)
 
     C%time%t = C%case%fluid%chkp%restart_time()
     call neko_log%section('Restarting from checkpoint')

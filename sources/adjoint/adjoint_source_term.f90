@@ -74,7 +74,8 @@ contains
     call rhs_fields%assign(2, f_y)
     call rhs_fields%assign(3, f_z)
 
-    call this%init_base(rhs_fields, coef, user)
+    ! is this ever used??
+    call this%init_base(rhs_fields, coef, user, 'temp')
   end subroutine adjoint_source_term_init
 
   !> Initialize the user source term.
@@ -84,12 +85,14 @@ contains
   !! @param type The type of the user source term, "user_vector" or
   !! "user_poinwise".
   !! @param user The user type containing the user source term routines.
-  subroutine adjoint_init_user_source(source_term, rhs_fields, coef, type, user)
+  subroutine adjoint_init_user_source(source_term, rhs_fields, coef, type, &
+     user, variable_name)
     class(source_term_t), allocatable, intent(inout) :: source_term
     type(field_list_t) :: rhs_fields
     type(coef_t), intent(in) :: coef
     character(len=*) :: type
     type(user_t), intent(in) :: user
+    character(len=*), intent(in) :: variable_name
 
     allocate(fluid_user_source_term_t::source_term)
 
