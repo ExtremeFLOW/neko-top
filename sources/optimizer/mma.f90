@@ -41,7 +41,9 @@ module mma
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
   use comm, only: pe_rank
   use utils, only: neko_error
-  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
+       NEKO_BCKND_OPENCL, NEKO_BCKND_SX, NEKO_BCKND_XSMM
+
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
 
@@ -370,7 +372,15 @@ contains
        call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, &
             sync = .false.)
        if (pe_rank == 0) then
-          print *, "MMA initialized with CUDA backend!"
+          if (NEKO_BCKND_CUDA .eq. 1) then
+             print *, "MMA initialized with CUDA backend!"
+          else if (NEKO_BCKND_HIP .eq. 1) then
+             print *, "MMA initialized with HIP backend!"
+          else if (NEKO_BCKND_OPENCL .eq. 1) then
+             print *, "MMA initialized with OPENCL backend!"
+          else
+             call neko_error('The backend device is unknown mma_init_attribute')
+          end if
        end if
     case default
        call neko_error('Unknown backend in mma_init_attributes')
