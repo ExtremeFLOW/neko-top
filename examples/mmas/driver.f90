@@ -7,7 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init
+  use mpi_f08, only: MPI_Init,  MPI_Wtime
 
 
   use example_problem, only: mma_obj, mma_con
@@ -19,6 +19,10 @@ program usrneko
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
+
+  use comm, only: pe_rank
+  use device, only: device_memcpy, HOST_TO_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE
 
   implicit none
 
@@ -46,7 +50,8 @@ program usrneko
   class(optimizer_t), allocatable :: opt
 
   integer :: nloc
-  type(vector_t) :: xcoord, ycoord, zcoord,  finaldesign, initdesign
+  type(vector_t) :: xcoord, ycoord, zcoord, initdesign
+  real(kind=rp) :: t_start, t_end
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -74,18 +79,31 @@ program usrneko
   xcoord%x = reshape(neko_field%dof%x, [nloc])
   ycoord%x = reshape(neko_field%dof%y, [nloc])
   zcoord%x = reshape(neko_field%dof%z, [nloc])
+
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+     call device_memcpy(xcoord%x, xcoord%x_d, nloc, &
+          HOST_TO_DEVICE, sync = .true.)
+     call device_memcpy(ycoord%x, ycoord%x_d, nloc, &
+          HOST_TO_DEVICE, sync = .true.)
+     call device_memcpy(zcoord%x, zcoord%x_d, nloc, &
+          HOST_TO_DEVICE, sync = .true.)
+  end if
   call des%init_from_components(nloc, xcoord, ycoord, zcoord, neko_field)
 
-  print *, "nloc=", nloc, "number of design variables=", des%size_global()
-  print *, "max(xcoord%x)=", maxval(xcoord%x), "min(xcoord%x)=", minval(xcoord%x), &
-       "max(ycoord%x)=", maxval(ycoord%x), "min(ycoord%x)=", minval(ycoord%x), &
-       "max(zcoord%x)=", maxval(zcoord%x), "min(zcoord%x)=", minval(zcoord%x)
+  if (pe_rank == 0) then
+     print *, "nloc=", nloc, "number of design variables=", des%size_global()
+     print *, "max(xcoord%x)=", maxval(xcoord%x), "min(xcoord%x)=", &
+          minval(xcoord%x), "max(ycoord%x)=", maxval(ycoord%x), &
+          "min(ycoord%x)=", minval(ycoord%x), "max(zcoord%x)=", &
+          maxval(zcoord%x), "min(zcoord%x)=", minval(zcoord%x)
+  end if
+
   ! initialize the design
   call initdesign%init(des%size())
-  initdesign%x = 1.0_rp
+  initdesign = 1.0_rp
   call des%update_design(initdesign)
 
-   ! -------------------------------------------------------------------------- !
+  ! -------------------------------------------------------------------------- !
   ! Construct the problem
   !
   ! This subroutine calculates function values and gradients
@@ -110,7 +128,10 @@ program usrneko
   call con_2%update_value(des)
   call con_2%update_sensitivity(des)
   
-  print *, "objective value for the initial design=", obj%value
+  if (pe_rank == 0) then
+     print *, "objective value for the initial design=", obj%value, &
+        "Positive=", con_1%value, "Negative=", con_2%value
+  end if
 
   ! initialize the problem
   call prob%init(parameters, des)
@@ -123,13 +144,14 @@ program usrneko
   ! Execute the optimization
   call optimizer_factory(opt, parameters, prob, des)
 
-
+  t_start = MPI_Wtime()
   call opt%run(prob, des)
+  t_end = MPI_Wtime()
 
-  call finaldesign%init(des%size_global())
-  finaldesign = des%get_values()
-  print *, "min(des%values)=", minval(finaldesign%x), &
-       "max(des%values)=", maxval(finaldesign%x)
+  if (pe_rank == 0) then
+     print *, "opt%run execution time:", t_end - t_start, "seconds"
+  end if
+
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
