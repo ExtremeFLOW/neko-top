@@ -155,9 +155,9 @@ contains
   !! @param[in] msh The mesh.
   !! @param[in] coef The coefficients of the mesh.
   !! @param[in] gs The gather-scatter.
-  !! @param[inout] params_adjoint The case parameter file in json.
-  !! @param[inout] params_primal The case parameter file in json.
-  !! @param[inout] numerics_params The numerical parameters in json.
+  !! @param[inout] params_adjoint The snippet of the json for the adjoint scalar.
+  !! @param[inout] params_primal The snippet of the json for the primal scalar.
+  !! @param[inout] numerics_params The whole json.
   !! @param[in] user Type with user-defined procedures.
   !! @param[inout] chkp The checkpoint object.
   !! @param[in] ulag Lag arrays for the x velocity component.
@@ -186,6 +186,10 @@ contains
 
     call this%free()
 
+           print *, 'BEFORE GOING INTO SCHEME INIT'
+       call params_adjoint%print()
+       print *, 'PRIMAL'
+       call params_primal%print()
     ! Initiliaze base type.
     call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, scheme, user, rho)
 
@@ -244,9 +248,11 @@ contains
          this%projection_activ_step)
 
     ! Determine the time-interpolation scheme
-    call json_get_or_default(params_adjoint, 'case.numerics.oifs', this%oifs, .false.)
+    call json_get_or_default(numerics_params, 'case.numerics.oifs', this%oifs, .false.)
+    
     ! Point to case checkpoint
-    ! this%chkp => chkp
+    this%chkp => chkp
+
     ! Initialize advection factory
     call json_get_or_default(params_adjoint, 'advection', advection, .true.)
 

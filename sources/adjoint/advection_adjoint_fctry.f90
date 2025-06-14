@@ -92,6 +92,8 @@ contains
 
     call json_get_or_default(json, 'target_cfl', ctarget, 1.9_rp)
 
+    print *, 'yofammmm'
+
     if (oifs) then
        call neko_error("OIFS advection is not supported in the adjoint module.")
     else
@@ -101,6 +103,8 @@ contains
           allocate(adv_lin_no_dealias_t::object)
        end if
     end if
+
+    print *, 'yofammmm22'
 
     select type (adv => object)
     type is (adv_lin_dealias_t)

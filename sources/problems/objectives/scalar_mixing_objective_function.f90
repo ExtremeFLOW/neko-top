@@ -149,7 +149,7 @@ contains
     character(len=*), intent(in) :: scalar_name
     
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
-    integer :: i_scalar, i_adjoint_scalar, i
+    integer :: i_scalar, i_adjoint_scalar
 
     ! Start by checking if the adjoint scalar has been initialized
     if (.not.allocated(simulation%adjoint_case%adjoint_scalars)) then

@@ -134,7 +134,7 @@ contains
     !---------------------------------------------------------
     ! Allocate the output type
     n_scalars = 0
-    if (allocated(this%neko_case%scalars%scalar_fields)) then
+    if (allocated(this%neko_case%scalars)) then
        n_scalars = size(this%neko_case%scalars%scalar_fields)
     end if
     call this%output_forward%init(sp, 'forward_fields', 4 + n_scalars)
@@ -145,14 +145,14 @@ contains
     call this%output_forward%fields%assign(4, this%fluid%w)
 
     ! Assign all scalar fields
-    if (allocated(this%neko_case%scalars%scalar_fields)) then
+    if (allocated(this%neko_case%scalars)) then
        do i = 1, n_scalars
           call this%output_forward%fields%assign(4 + i, this%scalars%scalar_fields(i)%s)
        end do
     end if
 
     n_scalars = 0
-    if (allocated(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)) then
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
     end if
     call this%output_adjoint%init(sp, 'adjoint_fields', 4 + n_scalars)
@@ -162,7 +162,7 @@ contains
     call this%output_adjoint%fields%assign(4, this%adjoint_fluid%w_adj)
 
     ! Assign all scalar fields
-    if (allocated(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)) then
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
        do i = 1, n_scalars
           call this%output_adjoint%fields%assign(4 + i, this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
@@ -203,6 +203,8 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     tstep_loop_start_time = MPI_WTIME()
 
+    print *, "YOOOOOOOFAM", this%adjoint_case%time%t, this%adjoint_case%time%end_time
+
     do while (this%adjoint_case%time%t .lt. this%adjoint_case%time%end_time &
          .and. (.not. jobctrl_time_limit()))
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
@@ -228,7 +230,7 @@ contains
     call field_rzero(this%adjoint_case%fluid_adj%v_adj)
     call field_rzero(this%adjoint_case%fluid_adj%w_adj)
     n_scalars = 0
-    if (allocated(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)) then
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
        do i = 1, n_scalars
           call field_rzero(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)

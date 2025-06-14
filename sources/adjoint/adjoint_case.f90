@@ -119,6 +119,8 @@ contains
     call json_get(neko_case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%fluid_adj, trim(string_val))
 
+    call json_extract_object(neko_case%params, 'case.numerics', numerics_params)
+
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
 
@@ -160,14 +162,18 @@ contains
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
           call json_extract_object(neko_case%params, 'case.adjoint_scalar', scalar_params_adjoint)
+          call json_extract_object(neko_case%params, 'case.scalar', scalar_params_primal)
+          call scalar_params_adjoint%print()
+          call scalar_params_primal%print()
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
-            neko_case%fluid%gs_Xh, neko_case%params, scalar_params_adjoint, &
-            scalar_params_primal, neko_case%user, neko_case%chkp, &
+            neko_case%fluid%gs_Xh, scalar_params_adjoint, &
+            scalar_params_primal, numerics_params, neko_case%user, neko_case%chkp, &
             neko_case%fluid%ulag, neko_case%fluid%vlag, &
             neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
                       ! allocate the coupling term
        allocate(this%adjoint_convection_term)
        ! initialize the coupling term
+       print *
        call this%adjoint_convection_term%init_from_components( &
             this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
             this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
@@ -185,12 +191,13 @@ contains
           call json_extract_object(this%case%params, 'case.scalars', scalar_params_primal)
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-               json_subdict, scalar_params_adjoint, scalar_params_primal, &
+               scalar_params_adjoint, scalar_params_primal, numerics_params, &
                neko_case%user, neko_case%chkp, neko_case%fluid%ulag, &
                neko_case%fluid%vlag, neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
                neko_case%fluid%rho)
           call neko_error('The adjoint scaling coupling term must be implemented for multiple scalars')
        end if
+   end if
 
     !
     ! Time step
@@ -292,7 +299,6 @@ contains
           end do
        end if
     end if
-    end if
 
     ! Add initial conditions to BDF fluid_adj (if present)
     select type (f => this%fluid_adj)
@@ -376,6 +382,8 @@ contains
     !
     this%time%t = 0d0
     this%time%tstep = 0
+
+    print *, 'you did it homie'
 
   end subroutine adjoint_case_init_common
 

@@ -46,6 +46,7 @@ module steady_simcomp
   use csv_file, only : csv_file_t
   use vector, only: vector_t
   use time_state, only: time_state_t
+  use utils, only: neko_error
   implicit none
   private
 

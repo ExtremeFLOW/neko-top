@@ -42,6 +42,7 @@ module adjoint_scalar_convection_source_term
   use coefs, only: coef_t
   use field_math, only: field_subcol3
   use operators, only: grad
+  use math, only: glmax
   implicit none
   private
 
@@ -128,6 +129,8 @@ contains
     this%s_adj => s_adj
     this%s => s
 
+    print *, "initing"
+
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.
@@ -176,6 +179,8 @@ contains
     call field_subcol3(fu, this%s_adj, dsdx)
     call field_subcol3(fv, this%s_adj, dsdy)
     call field_subcol3(fw, this%s_adj, dsdz)
+
+    print *, "computing", glmax(fu%x, fu%size()), glmax(fv%x, fu%size()), glmax(fw%x, fu%size())
 
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)

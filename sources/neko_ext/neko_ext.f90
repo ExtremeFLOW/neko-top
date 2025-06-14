@@ -8,7 +8,8 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
+     json_extract_item
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -158,7 +159,7 @@ contains
        call neko_case%params%info('case.scalars', n_children = n_scalars)
 
           do i = 1, n_scalars
-             call json_extract_item(neko_case, 'case.adjoint_scalars', i, scalar_params)
+             call json_extract_item(neko_case%params, 'case.adjoint_scalars', i, scalar_params)
              call json_get(scalar_params, 'initial_condition.type', string_val)
              call json_extract_object(scalar_params, 'initial_condition', json_subdict)
 
