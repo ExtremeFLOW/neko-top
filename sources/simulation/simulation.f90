@@ -202,11 +202,6 @@ contains
     real(kind=rp) :: cfl
 
     call dt_controller%init(this%neko_case%params)
-    ! set adjoint time to zero (NOTE, Tim will replace this as we go backward)
-    this%adjoint_case%time%t = 0.0_rp
-    this%adjoint_case%time%tstep = 0
-
-
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 

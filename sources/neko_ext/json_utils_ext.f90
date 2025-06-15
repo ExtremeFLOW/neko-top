@@ -8,7 +8,12 @@ module json_utils_ext
   implicit none
   private
 
-  public :: json_key_fallback, json_key_fallback_two_jsons, json_read_file
+  public :: json_key_fallback, json_read_file
+
+  interface json_key_fallback
+  module procedure json_key_fallback_string
+  module procedure json_key_fallback_json
+  end interface
 
 contains
 
@@ -16,7 +21,7 @@ contains
   !! If the lookup key is present in the json object, return it.
   !! If the fallback key is present in the json object, return it.
   !! Otherwise, return the lookup key.
-  function json_key_fallback(json, lookup, fallback) result(string)
+  function json_key_fallback_string(json, lookup, fallback) result(string)
     type(json_file), intent(inout) :: json
     character(len=*), intent(in) :: lookup
     character(len=*), intent(in) :: fallback
@@ -30,16 +35,16 @@ contains
        string = lookup
     end if
 
-  end function json_key_fallback
+  end function json_key_fallback_string
 
   !> Create a json object based on fallback logic.
   !! If the key is present in the lookup json object, point to this object.
   !! If the key is present in the fallback json object, point to this object.
   !! Otherwise, point to the lookup object.
-  !! @params[inout] json_pointer return json object
+  !! @params[inout] json_pointer json object pointing in the correct location
   !! @params[inout] lookup_json lookup json object
   !! @params[inout] fallback_pointer fallback json object
-  subroutine json_key_fallback_two_jsons(json_pointer, lookup_json, &
+  subroutine json_key_fallback_json(json_pointer, lookup_json, &
   fallback_json, key)
   type(json_file), pointer, intent(inout) :: json_pointer
     type(json_file), target, intent(inout) :: lookup_json
@@ -54,7 +59,7 @@ contains
        json_pointer => lookup_json
     end if
 
-  end subroutine json_key_fallback_two_jsons
+  end subroutine json_key_fallback_json
 
   !> Read a json file taking mpi into account.
   !! This function reads a json file and broadcasts it to all ranks.

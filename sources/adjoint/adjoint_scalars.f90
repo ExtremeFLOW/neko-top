@@ -186,13 +186,15 @@ contains
           call json_subdict_adjoint%add('primal_name', primal_name)
        end if
 
-       call this%adjoint_scalar_fields(i)%init(msh, coef, gs, json_subdict_adjoint, json_subdict_primal, numerics_params, &
+       call this%adjoint_scalar_fields(i)%init(msh, coef, gs, &
+       json_subdict_adjoint, json_subdict_primal, numerics_params, &
             user, chkp, ulag, vlag, wlag, time_scheme, rho)
     end do
   end subroutine adjoint_scalars_init
 
-  subroutine adjoint_scalars_init_single(this, msh, coef, gs, params_adjoint, params_primal, numerics_params, &
-       user, chkp, ulag, vlag, wlag, time_scheme, rho)
+  subroutine adjoint_scalars_init_single(this, msh, coef, gs, params_adjoint, &
+  params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
+  rho)
     class(adjoint_scalars_t), intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
@@ -217,8 +219,9 @@ contains
     ! we'll need to catch that before entering this subroutine.
 
     ! Initialize it directly with the params
-    call this%adjoint_scalar_fields(1)%init(msh, coef, gs, params_adjoint, params_primal, numerics_params, user, &
-         chkp, ulag, vlag, wlag, time_scheme, rho)
+    call this%adjoint_scalar_fields(1)%init(msh, coef, gs, params_adjoint, &
+    params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
+    rho)
   end subroutine adjoint_scalars_init_single
 
   !> Perform a time step for all scalar fields

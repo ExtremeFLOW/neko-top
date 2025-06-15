@@ -74,7 +74,7 @@ module adjoint_scalar_scheme
   use neko_config, only : NEKO_BCKND_DEVICE
   use field_series, only : field_series_t
   use time_step_controller, only : time_step_controller_t
-  use json_utils_ext, only: json_key_fallback, json_key_fallback_two_jsons
+  use json_utils_ext, only: json_key_fallback
   use scalar_scheme, only: scalar_scheme_precon_factory, &
        scalar_scheme_solver_factory
   use scratch_registry, only : neko_scratch_registry
@@ -276,28 +276,35 @@ contains
     ! get the primal adjoint's name
     call json_get(params_adjoint, 'primal_name', this%primal_name)
     ! Assign a name
-    call json_get_or_default(params_adjoint, 'name', this%name, 'scalar adjoint')
+    call json_get_or_default(params_adjoint, 'name', this%name, &
+    'scalar adjoint')
 
     call neko_log%section('Adjoint scalar')
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.type')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.type')
     call json_get(params_selected, 'solver.type', solver_type)
 
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.preconditioner.type')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.preconditioner.type')
     call json_get(params_selected, 'solver.preconditioner.type', solver_precon)
 
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.preconditioner')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.preconditioner')
     call json_extract_object(params_selected, 'solver.preconditioner', precon_params)
 
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.absolute_tolerance')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.absolute_tolerance')
     call json_get(params_selected, 'solver.absolute_tolerance', &
          solver_abstol)
 
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.projection_space_size')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.projection_space_size')
     call json_get_or_default(params_selected, &
          'solver.projection_space_size', &
          this%projection_dim, 0)
 
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.projection_hold_steps')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.projection_hold_steps')
     call json_get_or_default(params_selected, &
          'solver.projection_hold_steps', &
          this%projection_activ_step, 5)
@@ -339,7 +346,8 @@ contains
     !
     ! Turbulence modelling and variable material properties
     !
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'variable_material_properties')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'variable_material_properties')
     if (params_selected%valid_path('variable_material_properties')) then
        call neko_error('variable material properties no supported for adjoint')
     end if
@@ -359,11 +367,13 @@ contains
     call this%source_term%add(params_primal, 'source_terms')
 
     ! todo parameter file ksp tol should be added
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.max_iterations')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.max_iterations')
     call json_get_or_default(params_selected, &
          'solver.max_iterations', &
          integer_val, KSP_MAX_ITER)
-    call json_key_fallback_two_jsons(params_selected, params_adjoint, params_primal, 'solver.monitor')
+    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    'solver.monitor')
     call json_get_or_default(params_selected, &
          'solver.monitor', &
          logical_val, .false.)
@@ -543,7 +553,8 @@ contains
   !! @param[inout] this The object.
   !! @param params_primal The case file configuration dictionary.
   !! @param user The user interface.
-  subroutine adjoint_scalar_scheme_set_material_properties(this, params_primal, user)
+  subroutine adjoint_scalar_scheme_set_material_properties(this, &
+  params_primal, user)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
     type(json_file), intent(inout) :: params_primal
     type(user_t), target, intent(in) :: user
