@@ -189,7 +189,7 @@ contains
 
     ! Initiliaze base type.
     call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, &
-    scheme, user, rho)
+         scheme, user, rho)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -247,7 +247,7 @@ contains
 
     ! Determine the time-interpolation scheme
     call json_get_or_default(numerics_params, 'oifs', this%oifs, .false.)
-    
+
     ! Point to case checkpoint
     this%chkp => chkp
 

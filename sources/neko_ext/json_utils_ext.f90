@@ -11,9 +11,9 @@ module json_utils_ext
   public :: json_key_fallback, json_read_file
 
   interface json_key_fallback
-  module procedure json_key_fallback_string
-  module procedure json_key_fallback_json
-  end interface
+     module procedure json_key_fallback_string
+     module procedure json_key_fallback_json
+  end interface json_key_fallback
 
 contains
 
@@ -45,8 +45,8 @@ contains
   !! @params[inout] lookup_json lookup json object
   !! @params[inout] fallback_pointer fallback json object
   subroutine json_key_fallback_json(json_pointer, lookup_json, &
-  fallback_json, key)
-  type(json_file), pointer, intent(inout) :: json_pointer
+       fallback_json, key)
+    type(json_file), pointer, intent(inout) :: json_pointer
     type(json_file), target, intent(inout) :: lookup_json
     type(json_file), target, intent(inout) :: fallback_json
     character(len=*), intent(in) :: key

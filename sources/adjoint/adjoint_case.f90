@@ -44,7 +44,7 @@ module adjoint_case
   use file, only: file_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-     json_extract_item
+       json_extract_item
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
@@ -137,12 +137,12 @@ contains
     n_scalars_adjoint = 0
     if (neko_case%params%valid_path('case.adjoint_scalar')) then
        call json_get_or_default(neko_case%params, &
-       'case.adjoint_scalar.enabled', scalar, .true.)
+            'case.adjoint_scalar.enabled', scalar, .true.)
        n_scalars_adjoint = 1
        n_scalars_primal = 1
     else if (neko_case%params%valid_path('case.adjoint_scalars')) then
        call neko_case%params%info('case.adjoint_scalars', &
-       n_children = n_scalars_adjoint)
+            n_children = n_scalars_adjoint)
        call neko_case%params%info('case.scalars', n_children = n_scalars_primal)
        if (n_scalars_adjoint > 0) then
           scalar = .true.
@@ -153,45 +153,45 @@ contains
 
 
 
-    
+
 
 
     if (this%have_scalar) then
        allocate(this%adjoint_scalars)
        call json_extract_object(neko_case%params, 'case.numerics', &
-       numerics_params)
+            numerics_params)
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
           call json_extract_object(neko_case%params, 'case.adjoint_scalar', &
-          scalar_params_adjoint)
+               scalar_params_adjoint)
           call json_extract_object(neko_case%params, 'case.scalar', &
-          scalar_params_primal)
+               scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
-            neko_case%fluid%gs_Xh, scalar_params_adjoint, &
-            scalar_params_primal, numerics_params, neko_case%user, neko_case%chkp, &
-            neko_case%fluid%ulag, neko_case%fluid%vlag, &
-            neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
-                      ! allocate the coupling term
-       allocate(this%adjoint_convection_term)
-       ! initialize the coupling term
-       call this%adjoint_convection_term%init_from_components( &
-            this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
-            this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
-            this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-            this%fluid_adj%c_Xh)
+               neko_case%fluid%gs_Xh, scalar_params_adjoint, &
+               scalar_params_primal, numerics_params, neko_case%user, neko_case%chkp, &
+               neko_case%fluid%ulag, neko_case%fluid%vlag, &
+               neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+          ! allocate the coupling term
+          allocate(this%adjoint_convection_term)
+          ! initialize the coupling term
+          call this%adjoint_convection_term%init_from_components( &
+               this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
+               this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
+               this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+               this%fluid_adj%c_Xh)
 
-       select type (f => this%fluid_adj)
-       type is (adjoint_fluid_pnpn_t)
-          ! append the coupling term to the adjoint velocity equation
-          call f%source_term%add(this%adjoint_convection_term)
-       end select
+          select type (f => this%fluid_adj)
+          type is (adjoint_fluid_pnpn_t)
+             ! append the coupling term to the adjoint velocity equation
+             call f%source_term%add(this%adjoint_convection_term)
+          end select
        else
           ! Multiple scalars
-          
+
           call json_extract_object(this%case%params, &
-          'case.adjoint_scalars', scalar_params_adjoint)
+               'case.adjoint_scalars', scalar_params_adjoint)
           call json_extract_object(this%case%params, &
-          'case.scalars', scalar_params_primal)
+               'case.scalars', scalar_params_primal)
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
@@ -200,7 +200,7 @@ contains
                neko_case%fluid%rho)
           call neko_error('The adjoint scaling coupling term must be implemented for multiple scalars')
        end if
-   end if
+    end if
 
     !
     ! Time step
@@ -263,43 +263,43 @@ contains
     if (this%have_scalar) then
 
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
-       ! we shouldn't fallback to the primal here.
-       call json_get(neko_case%params, &
-            'case.adjoint_scalar.initial_condition.type', string_val)
-       call json_extract_object(neko_case%params, &
-            'case.adjoint_scalar.initial_condition', ic_json)
+          ! we shouldn't fallback to the primal here.
+          call json_get(neko_case%params, &
+               'case.adjoint_scalar.initial_condition.type', string_val)
+          call json_extract_object(neko_case%params, &
+               'case.adjoint_scalar.initial_condition', ic_json)
 
-       !call neko_log%section("Adjoint scalar initial condition ")
+          !call neko_log%section("Adjoint scalar initial condition ")
 
-       if (trim(string_val) .ne. 'user') then
-          call set_scalar_ic(this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-               this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
-               this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, string_val, ic_json)
+          if (trim(string_val) .ne. 'user') then
+             call set_scalar_ic(this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                  this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
+                  this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, string_val, ic_json)
+          else
+             call neko_error("user defined ICs not implemented for adjoint scalar")
+             ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
+             !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
+             !      this%usr%scalar_user_ic, neko_case%params)
+          end if
+
+          ! call neko_log%end_section()
        else
-          call neko_error("user defined ICs not implemented for adjoint scalar")
-          ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
-          !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
-          !      this%usr%scalar_user_ic, neko_case%params)
-       end if
 
-       ! call neko_log%end_section()
-       else
-
-         ! Handle multiple scalars
+          ! Handle multiple scalars
           do i = 1, n_scalars_adjoint
              call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
-             i, scalar_params_adjoint)
+                  i, scalar_params_adjoint)
              call json_get(scalar_params_adjoint, &
-             'initial_condition.type', string_val)
+                  'initial_condition.type', string_val)
              call json_extract_object(scalar_params_adjoint, &
-             'initial_condition', json_subdict)
+                  'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
                 call set_scalar_ic(&
-                this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
-                    this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
-                    this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
-                    string_val, json_subdict)
+                     this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                     this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                     this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                     string_val, json_subdict)
              else
                 call neko_error("user defined ICs not implemented for adjoint scalar")
              end if

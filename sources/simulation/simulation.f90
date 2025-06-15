@@ -148,7 +148,7 @@ contains
     if (allocated(this%neko_case%scalars)) then
        do i = 1, n_scalars
           call this%output_forward%fields%assign(4 + i, &
-          this%scalars%scalar_fields(i)%s)
+               this%scalars%scalar_fields(i)%s)
        end do
     end if
 
@@ -166,7 +166,7 @@ contains
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        do i = 1, n_scalars
           call this%output_adjoint%fields%assign(4 + i, &
-          this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+               this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
     end if
 
@@ -241,7 +241,7 @@ contains
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
        do i = 1, n_scalars
           call field_rzero(&
-          this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+               this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
     end if
 

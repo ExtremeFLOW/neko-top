@@ -86,7 +86,7 @@ contains
   !! "user_poinwise".
   !! @param user The user type containing the user source term routines.
   subroutine adjoint_init_user_source(source_term, rhs_fields, coef, type, &
-     user, variable_name)
+       user, variable_name)
     class(source_term_t), allocatable, intent(inout) :: source_term
     type(field_list_t) :: rhs_fields
     type(coef_t), intent(in) :: coef

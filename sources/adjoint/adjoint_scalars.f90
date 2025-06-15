@@ -43,7 +43,7 @@ module adjoint_scalars
   use time_step_controller, only: time_step_controller_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-                        json_extract_item
+       json_extract_item
   use field, only: field_t
   use field_series, only: field_series_t
   use field_registry, only: neko_field_registry
@@ -104,9 +104,9 @@ contains
     logical :: found_primal
 
     if (n_adjoint_scalars .gt. n_primal_scalars) then
-        call neko_error("More adjoint scalars than forward scalars")
-        ! Note. This assumes every adjoint scalar must have a corresponding
-        ! primal scalar, but not the other way around.
+       call neko_error("More adjoint scalars than forward scalars")
+       ! Note. This assumes every adjoint scalar must have a corresponding
+       ! primal scalar, but not the other way around.
     end if
 
     ! Allocate the scalar fields
@@ -187,14 +187,14 @@ contains
        end if
 
        call this%adjoint_scalar_fields(i)%init(msh, coef, gs, &
-       json_subdict_adjoint, json_subdict_primal, numerics_params, &
+            json_subdict_adjoint, json_subdict_primal, numerics_params, &
             user, chkp, ulag, vlag, wlag, time_scheme, rho)
     end do
   end subroutine adjoint_scalars_init
 
   subroutine adjoint_scalars_init_single(this, msh, coef, gs, params_adjoint, &
-  params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
-  rho)
+       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
+       rho)
     class(adjoint_scalars_t), intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
@@ -220,8 +220,8 @@ contains
 
     ! Initialize it directly with the params
     call this%adjoint_scalar_fields(1)%init(msh, coef, gs, params_adjoint, &
-    params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
-    rho)
+         params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
+         rho)
   end subroutine adjoint_scalars_init_single
 
   !> Perform a time step for all scalar fields

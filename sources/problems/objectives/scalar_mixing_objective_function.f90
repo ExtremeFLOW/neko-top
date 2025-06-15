@@ -147,7 +147,7 @@ contains
     character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: scalar_name
-    
+
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     integer :: i_scalar, i_adjoint_scalar
 
@@ -173,12 +173,12 @@ contains
 
     ! figure out the index associated with the scalar and adjoint scalar.
     if (size(simulation%scalars%scalar_fields) == 1 &
-       .and. size(simulation%adjoint_scalars%adjoint_scalar_fields) == 1) then
+         .and. size(simulation%adjoint_scalars%adjoint_scalar_fields) == 1) then
        i_scalar = 1
        i_adjoint_scalar = 1
     else
        call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
-       simulation%adjoint_scalars, this%scalar_name)
+            simulation%adjoint_scalars, this%scalar_name)
     end if
 
     !> Associate the RHS of the passive scalar equation
