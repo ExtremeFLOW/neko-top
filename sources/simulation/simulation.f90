@@ -147,7 +147,8 @@ contains
     ! Assign all scalar fields
     if (allocated(this%neko_case%scalars)) then
        do i = 1, n_scalars
-          call this%output_forward%fields%assign(4 + i, this%scalars%scalar_fields(i)%s)
+          call this%output_forward%fields%assign(4 + i, &
+          this%scalars%scalar_fields(i)%s)
        end do
     end if
 
@@ -164,7 +165,8 @@ contains
     ! Assign all scalar fields
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        do i = 1, n_scalars
-          call this%output_adjoint%fields%assign(4 + i, this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+          call this%output_adjoint%fields%assign(4 + i, &
+          this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
     end if
 
@@ -183,6 +185,10 @@ contains
   subroutine simulation_run_forward(this)
     class(simulation_t), intent(inout) :: this
 
+    ! set forward time to zero
+    this%neko_case%time%t = 0.0_rp
+    this%neko_case%time%tstep = 0
+
     ! run the primal
     call neko_solve(this%neko_case)
 
@@ -196,14 +202,17 @@ contains
     real(kind=rp) :: cfl
 
     call dt_controller%init(this%neko_case%params)
+    ! set adjoint time to zero (NOTE, Tim will replace this as we go backward)
+    this%adjoint_case%time%t = 0.0_rp
+    this%adjoint_case%time%tstep = 0
+
+
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
     call profiler_start
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     tstep_loop_start_time = MPI_WTIME()
-
-    print *, "YOOOOOOOFAM", this%adjoint_case%time%t, this%adjoint_case%time%end_time
 
     do while (this%adjoint_case%time%t .lt. this%adjoint_case%time%end_time &
          .and. (.not. jobctrl_time_limit()))
@@ -233,7 +242,8 @@ contains
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
        do i = 1, n_scalars
-          call field_rzero(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+          call field_rzero(&
+          this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
     end if
 

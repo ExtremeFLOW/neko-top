@@ -132,7 +132,7 @@ contains
     ! cfl = C%fluid_adj%compute_cfl(C%time%dt)
 
     ! Advance time step from t to t+dt and print the status
-    call simulation_settime(C%time, C%case%fluid%ext_bdf)
+    call simulation_settime(C%time, C%fluid_adj%ext_bdf)
     call C%time%status()
     call neko_log%begin()
 

@@ -119,8 +119,6 @@ contains
     call json_get(neko_case%params, 'case.fluid.scheme', string_val)
     call adjoint_fluid_scheme_factory(this%fluid_adj, trim(string_val))
 
-    call json_extract_object(neko_case%params, 'case.numerics', numerics_params)
-
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
 
@@ -138,12 +136,13 @@ contains
     scalar = .false.
     n_scalars_adjoint = 0
     if (neko_case%params%valid_path('case.adjoint_scalar')) then
-       call json_get_or_default(neko_case%params, 'case.adjoint_scalar.enabled', scalar, &
-            .true.)
+       call json_get_or_default(neko_case%params, &
+       'case.adjoint_scalar.enabled', scalar, .true.)
        n_scalars_adjoint = 1
        n_scalars_primal = 1
     else if (neko_case%params%valid_path('case.adjoint_scalars')) then
-       call neko_case%params%info('case.adjoint_scalars', n_children = n_scalars_adjoint)
+       call neko_case%params%info('case.adjoint_scalars', &
+       n_children = n_scalars_adjoint)
        call neko_case%params%info('case.scalars', n_children = n_scalars_primal)
        if (n_scalars_adjoint > 0) then
           scalar = .true.
@@ -159,12 +158,14 @@ contains
 
     if (this%have_scalar) then
        allocate(this%adjoint_scalars)
+       call json_extract_object(neko_case%params, 'case.numerics', &
+       numerics_params)
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
-          call json_extract_object(neko_case%params, 'case.adjoint_scalar', scalar_params_adjoint)
-          call json_extract_object(neko_case%params, 'case.scalar', scalar_params_primal)
-          call scalar_params_adjoint%print()
-          call scalar_params_primal%print()
+          call json_extract_object(neko_case%params, 'case.adjoint_scalar', &
+          scalar_params_adjoint)
+          call json_extract_object(neko_case%params, 'case.scalar', &
+          scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
             neko_case%fluid%gs_Xh, scalar_params_adjoint, &
             scalar_params_primal, numerics_params, neko_case%user, neko_case%chkp, &
@@ -173,11 +174,11 @@ contains
                       ! allocate the coupling term
        allocate(this%adjoint_convection_term)
        ! initialize the coupling term
-       print *
        call this%adjoint_convection_term%init_from_components( &
             this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
             this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
-            this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, this%fluid_adj%c_Xh)
+            this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+            this%fluid_adj%c_Xh)
 
        select type (f => this%fluid_adj)
        type is (adjoint_fluid_pnpn_t)
@@ -187,8 +188,10 @@ contains
        else
           ! Multiple scalars
           
-          call json_extract_object(this%case%params, 'case.adjoint_scalars', scalar_params_adjoint)
-          call json_extract_object(this%case%params, 'case.scalars', scalar_params_primal)
+          call json_extract_object(this%case%params, &
+          'case.adjoint_scalars', scalar_params_adjoint)
+          call json_extract_object(this%case%params, &
+          'case.scalars', scalar_params_primal)
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
@@ -284,12 +287,16 @@ contains
 
          ! Handle multiple scalars
           do i = 1, n_scalars_adjoint
-             call json_extract_item(neko_case%params, 'case.adjoint_scalars', i, scalar_params_adjoint)
-             call json_get(scalar_params_adjoint, 'initial_condition.type', string_val)
-             call json_extract_object(scalar_params_adjoint, 'initial_condition', json_subdict)
+             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
+             i, scalar_params_adjoint)
+             call json_get(scalar_params_adjoint, &
+             'initial_condition.type', string_val)
+             call json_extract_object(scalar_params_adjoint, &
+             'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                call set_scalar_ic(&
+                this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
                     this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
                     this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
                     string_val, json_subdict)
@@ -382,8 +389,6 @@ contains
     !
     this%time%t = 0d0
     this%time%tstep = 0
-
-    print *, 'you did it homie'
 
   end subroutine adjoint_case_init_common
 

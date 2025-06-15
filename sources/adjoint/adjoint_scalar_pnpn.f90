@@ -157,7 +157,7 @@ contains
   !! @param[in] gs The gather-scatter.
   !! @param[inout] params_adjoint The snippet of the json for the adjoint scalar.
   !! @param[inout] params_primal The snippet of the json for the primal scalar.
-  !! @param[inout] numerics_params The whole json.
+  !! @param[inout] numerics_params The numeric parameters json.
   !! @param[in] user Type with user-defined procedures.
   !! @param[inout] chkp The checkpoint object.
   !! @param[in] ulag Lag arrays for the x velocity component.
@@ -166,7 +166,8 @@ contains
   !! @param[in] time_scheme The time-integration controller.
   !! @param[in] rho The fluid density.
   subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params_adjoint, &
-       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
+       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, &
+       time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
@@ -186,12 +187,9 @@ contains
 
     call this%free()
 
-           print *, 'BEFORE GOING INTO SCHEME INIT'
-       call params_adjoint%print()
-       print *, 'PRIMAL'
-       call params_primal%print()
     ! Initiliaze base type.
-    call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, scheme, user, rho)
+    call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, &
+    scheme, user, rho)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -248,7 +246,7 @@ contains
          this%projection_activ_step)
 
     ! Determine the time-interpolation scheme
-    call json_get_or_default(numerics_params, 'case.numerics.oifs', this%oifs, .false.)
+    call json_get_or_default(numerics_params, 'oifs', this%oifs, .false.)
     
     ! Point to case checkpoint
     this%chkp => chkp
@@ -419,7 +417,8 @@ contains
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
+           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), &
+           dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
