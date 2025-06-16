@@ -42,7 +42,6 @@ module adjoint_scalar_convection_source_term
   use coefs, only: coef_t
   use field_math, only: field_subcol3
   use operators, only: grad
-  use math, only: glmax
   implicit none
   private
 

@@ -183,7 +183,8 @@ contains
 
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
-    associate(f_phi_adj => simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
+    associate(f_phi_adj => &
+         simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref
@@ -198,7 +199,8 @@ contains
     end associate
 
     ! append adjoint source term to the adjoint passive scalar equation
-    call simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar)%source_term%add_source_term(adjoint_forcing)
+    call simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar) &
+         %source_term%add_source_term(adjoint_forcing)
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS
