@@ -57,11 +57,18 @@ module adjoint_output
 
 contains
 
-  function adjoint_output_init(precision, adjoint, adjoint_scalar_fields, name, path) &
-       result(this)
+  !> Constructor.
+  !! @details initialize the output.
+  !! @param[inout] precision The precision of the output fields.
+  !! @param[in] adjoint The adjoint fluid scheme.
+  !! @param[in] adjoint_scalars The adjoint scalar schemes.
+  !! @param[in] name The name of the .fld file.
+  !! @param[in] path The path to save the .fld files.
+  function adjoint_output_init(precision, adjoint, adjoint_scalars, &
+       name, path) result(this)
     integer, intent(inout) :: precision
     class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
-    class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalar_fields
+    class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalars
     character(len=*), intent(in), optional :: name
     character(len=*), intent(in), optional :: path
     type(adjoint_output_t) :: this
@@ -82,8 +89,8 @@ contains
 
     ! Calculate total number of fields
     n_scalars = 0
-    if (present(adjoint_scalar_fields)) then
-       n_scalars = size(adjoint_scalar_fields%adjoint_scalar_fields)
+    if (present(adjoint_scalar)) then
+       n_scalars = size(adjoint_scalars%adjoint_scalar_fields)
     end if
 
     ! Initialize field list with appropriate size
@@ -97,13 +104,16 @@ contains
     ! Assign all scalar fields
     if (present(adjoint_scalar_fields)) then
        do i = 1, n_scalars
-          call this%adjoint%assign(4 + i, adjoint_scalar_fields%adjoint_scalar_fields(i)%s_adj)
+          call this%adjoint%assign(4 + i, &
+               adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
     end if
 
   end function adjoint_output_init
 
   !> Sample a adjoint solution at time @a t
+  !! @param[inout] this The output sampler.
+  !! @param[in] t The time.
   subroutine adjoint_output_sample(this, t)
     class(adjoint_output_t), intent(inout) :: this
     real(kind=rp), intent(in) :: t
