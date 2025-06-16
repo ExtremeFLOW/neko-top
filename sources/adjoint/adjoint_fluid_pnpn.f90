@@ -85,7 +85,7 @@ module adjoint_fluid_pnpn
   use time_state, only: time_state_t
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult, glmax
+  use math, only: vlsc3, cmult
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
@@ -743,7 +743,6 @@ contains
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
               u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
               ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
-
       end if
 
       call ulag%update()
