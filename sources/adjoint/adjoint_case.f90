@@ -205,21 +205,10 @@ contains
     end if
 
     !
-    ! Time step
+    ! Time control
     !
-    ! call json_get_or_default(neko_case%params, 'case.variable_timestep', &
-    !      logical_val, .false.)
-    ! if (.not. logical_val) then
-    call json_get(neko_case%params, 'case.timestep', this%time%dt)
-    ! else
-    !    ! randomly set an initial dt to get cfl when dt is variable
-    !    this%time%dt = 1.0_rp
-    ! end if
-
-    !
-    ! End time
-    !
-    call json_get(neko_case%params, 'case.end_time', this%time%end_time)
+    call json_extract_object(this%case%params, 'case.time', json_subdict)
+    call this%time%init(json_subdict)
 
     !
     ! Setup user defined conditions
