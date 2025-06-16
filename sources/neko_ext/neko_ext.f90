@@ -272,12 +272,13 @@ contains
   end subroutine field_to_vector
 
   !> @brief get scalar indicies
-  !!
   !! @details Given a primal scalar name, return the indicies in the scalars
   !! and adjoint_scalars list corresponding to this pair.
-  !!
-  !! @param[out] vector the output vector.
-  !! @param[in] field the input field.
+  !! @param[out] i_primal Index in the primal scalar list.
+  !! @param[out] i_adjoint Index in the adjoint scalar list.
+  !! @param[inout] scalars Primal scalars list.
+  !! @param[inout] adjoint_scalars Adjoint scalars list.
+  !! @param[in] primal_name Name of the primal scalar.
   subroutine get_scalar_indicies(i_primal, i_adjoint, scalars, &
        adjoint_scalars, primal_name)
     integer, intent(out) :: i_primal
