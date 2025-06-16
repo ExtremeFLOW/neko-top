@@ -89,7 +89,7 @@ contains
 
     ! Calculate total number of fields
     n_scalars = 0
-    if (present(adjoint_scalar)) then
+    if (present(adjoint_scalars)) then
        n_scalars = size(adjoint_scalars%adjoint_scalar_fields)
     end if
 
@@ -102,7 +102,7 @@ contains
     call this%adjoint%assign(4, adjoint%w_adj)
 
     ! Assign all scalar fields
-    if (present(adjoint_scalar_fields)) then
+    if (present(adjoint_scalars)) then
        do i = 1, n_scalars
           call this%adjoint%assign(4 + i, &
                adjoint_scalars%adjoint_scalar_fields(i)%s_adj)

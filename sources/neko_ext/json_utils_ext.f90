@@ -41,14 +41,11 @@ contains
   !! If the key is present in the lookup json object, point to this object.
   !! If the key is present in the fallback json object, point to this object.
   !! Otherwise, point to the lookup object.
-  !! @params[inout] json_pointer json object pointing in the correct location
-  !! @params[inout] lookup_json lookup json object
-  !! @params[inout] fallback_pointer fallback json object
-  subroutine json_key_fallback_json(json_pointer, lookup_json, &
-       fallback_json, key)
-    type(json_file), pointer, intent(inout) :: json_pointer
+  function json_key_fallback_json(lookup_json, fallback_json, key) &
+       result(json_pointer)
     type(json_file), target, intent(inout) :: lookup_json
     type(json_file), target, intent(inout) :: fallback_json
+    type(json_file), pointer :: json_pointer
     character(len=*), intent(in) :: key
 
     if ((key .in. lookup_json)) then
@@ -59,7 +56,7 @@ contains
        json_pointer => lookup_json
     end if
 
-  end subroutine json_key_fallback_json
+  end function json_key_fallback_json
 
   !> Read a json file taking mpi into account.
   !! This function reads a json file and broadcasts it to all ranks.

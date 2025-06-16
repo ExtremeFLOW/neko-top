@@ -281,31 +281,31 @@ contains
          'scalar adjoint')
 
     call neko_log%section('Adjoint scalar')
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.type')
     call json_get(params_selected, 'solver.type', solver_type)
 
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.preconditioner.type')
     call json_get(params_selected, 'solver.preconditioner.type', solver_precon)
 
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.preconditioner')
     call json_extract_object(params_selected, 'solver.preconditioner', &
          precon_params)
 
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.absolute_tolerance')
     call json_get(params_selected, 'solver.absolute_tolerance', &
          solver_abstol)
 
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.projection_space_size')
     call json_get_or_default(params_selected, &
          'solver.projection_space_size', &
          this%projection_dim, 0)
 
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.projection_hold_steps')
     call json_get_or_default(params_selected, &
          'solver.projection_hold_steps', &
@@ -348,7 +348,7 @@ contains
     !
     ! Turbulence modelling and variable material properties
     !
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'variable_material_properties')
     if (params_selected%valid_path('variable_material_properties')) then
        call neko_error('variable material properties no supported for adjoint')
@@ -369,12 +369,12 @@ contains
     call this%source_term%add(params_primal, 'source_terms')
 
     ! todo parameter file ksp tol should be added
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.max_iterations')
     call json_get_or_default(params_selected, &
          'solver.max_iterations', &
          integer_val, KSP_MAX_ITER)
-    call json_key_fallback(params_selected, params_adjoint, params_primal, &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.monitor')
     call json_get_or_default(params_selected, &
          'solver.monitor', &
