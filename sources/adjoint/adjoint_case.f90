@@ -168,9 +168,10 @@ contains
                scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
-               scalar_params_primal, numerics_params, neko_case%user, neko_case%chkp, &
-               neko_case%fluid%ulag, neko_case%fluid%vlag, &
-               neko_case%fluid%wlag, neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+               scalar_params_primal, numerics_params, neko_case%user, &
+               neko_case%chkp, neko_case%fluid%ulag, neko_case%fluid%vlag, &
+               neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
+               neko_case%fluid%rho)
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! initialize the coupling term
@@ -196,9 +197,10 @@ contains
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
                scalar_params_adjoint, scalar_params_primal, numerics_params, &
                neko_case%user, neko_case%chkp, neko_case%fluid%ulag, &
-               neko_case%fluid%vlag, neko_case%fluid%wlag, neko_case%fluid%ext_bdf, &
-               neko_case%fluid%rho)
-          call neko_error('The adjoint scaling coupling term must be implemented for multiple scalars')
+               neko_case%fluid%vlag, neko_case%fluid%wlag, &
+               neko_case%fluid%ext_bdf, neko_case%fluid%rho)
+          call neko_error('The adjoint scaling coupling term have not yet' // & 
+               'been implemented for multiple scalars')
        end if
     end if
 
@@ -232,7 +234,8 @@ contains
 
     ! Setup user boundary conditions for the scalar.
     ! if (adjoint_scalars) then
-    !    call neko_case%adjoint_scalars%set_user_bc(neko_case%user%scalar_user_bc)
+    !    call neko_case%adjoint_scalars%set_user_bc(&
+    !         neko_case%user%scalar_user_bc)
     ! end if
 
     !
@@ -272,11 +275,13 @@ contains
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+             call set_scalar_ic(&
+                  this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                   this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, string_val, ic_json)
+                  this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
+                  string_val, ic_json)
           else
-             call neko_error("user defined ICs not implemented for adjoint scalar")
+             call neko_error("user ICs not implemented for adjoint scalar")
              ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
              !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
              !      this%usr%scalar_user_ic, neko_case%params)
@@ -301,7 +306,7 @@ contains
                      this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
                      string_val, json_subdict)
              else
-                call neko_error("user defined ICs not implemented for adjoint scalar")
+                call neko_error("user ICs not implemented for adjoint scalar")
              end if
           end do
        end if
