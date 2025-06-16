@@ -66,10 +66,10 @@ contains
     write(log_buf, '(A, E15.7,A,E15.7,A)') &
          'T  : [', C%time%t, ',', C%time%end_time, ']'
     call neko_log%message(log_buf)
-    if (.not. dt_controller%if_variable_dt) then
+    if (.not. dt_controller%is_variable_dt) then
        write(log_buf, '(A, E15.7)') 'dt :  ', C%time%dt
     else
-       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%set_cfl
+       write(log_buf, '(A, E15.7)') 'CFL :  ', dt_controller%cfl_trg
     end if
     call neko_log%message(log_buf)
 
@@ -107,14 +107,12 @@ contains
   end subroutine simulation_adjoint_finalize
 
   !> Compute a single time-step of an adjoint case
-  subroutine simulation_adjoint_step(C, dt_controller, cfl, &
-       tstep_loop_start_time)
+  subroutine simulation_adjoint_step(C, dt_controller, cfl, tstep_loop_start_time)
     type(adjoint_case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
     real(kind=dp) :: start_time, end_time, tstep_start_time
-    real(kind=rp) :: cfl_avrg
     character(len=LOG_SIZE) :: log_buf
 
     ! Setup the time step, and start time
@@ -124,10 +122,11 @@ contains
     tstep_start_time = start_time
 
     ! Compute the next time step
-    if (dt_controller%dt_last_change .eq. 0) then
-       cfl_avrg = cfl
-    end if
-    call dt_controller%set_dt(C%time%dt, cfl, cfl_avrg, C%time%tstep)
+    ! NOTE. we should be wary here since CFL is based on the convective velocity
+    ! not the adjoint velocity
+    cfl = C%fluid_adj%compute_cfl(C%time%dt)
+    call dt_controller%set_dt(C%time, cfl)
+    if (dt_controller%is_variable_dt) cfl = C%fluid_adj%compute_cfl(C%time%dt)
 
     ! Calculate the cfl after the possibly varied dt
     ! cfl = C%fluid_adj%compute_cfl(C%time%dt)
