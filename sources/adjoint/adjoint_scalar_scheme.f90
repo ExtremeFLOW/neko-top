@@ -175,8 +175,9 @@ module adjoint_scalar_scheme
 
   !> Abstract interface to initialize a scalar formulation
   abstract interface
-     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, params_adjoint, &
-          params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
+     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, &
+          params_adjoint, params_primal, numerics_params, user, chkp, ulag, &
+          vlag, wlag, time_scheme, rho)
        import adjoint_scalar_scheme_t
        import json_file
        import coef_t
@@ -248,8 +249,8 @@ contains
   !! @param scheme The name of the scalar scheme.
   !! @param user Type with user-defined procedures.
   !! @param rho The density of the fluid.
-  subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, params_adjoint, &
-       params_primal, scheme, user, rho)
+  subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, &
+       params_adjoint, params_primal, scheme, user, rho)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: c_Xh
@@ -290,7 +291,8 @@ contains
 
     call json_key_fallback(params_selected, params_adjoint, params_primal, &
          'solver.preconditioner')
-    call json_extract_object(params_selected, 'solver.preconditioner', precon_params)
+    call json_extract_object(params_selected, 'solver.preconditioner', &
+         precon_params)
 
     call json_key_fallback(params_selected, params_adjoint, params_primal, &
          'solver.absolute_tolerance')
@@ -478,8 +480,8 @@ contains
   end subroutine adjoint_scalar_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, bclst, &
-       pctype, pcparams)
+  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, &
+       bclst, pctype, pcparams)
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
     type(coef_t), target, intent(in) :: coef
