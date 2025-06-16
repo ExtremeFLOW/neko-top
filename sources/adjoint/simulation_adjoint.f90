@@ -108,7 +108,7 @@ contains
 
   !> Compute a single time-step of an adjoint case
   subroutine simulation_adjoint_step(C, dt_controller, cfl, &
-        tstep_loop_start_time)
+       tstep_loop_start_time)
     type(adjoint_case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller

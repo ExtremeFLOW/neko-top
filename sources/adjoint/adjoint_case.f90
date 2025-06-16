@@ -199,7 +199,7 @@ contains
                neko_case%user, neko_case%chkp, neko_case%fluid%ulag, &
                neko_case%fluid%vlag, neko_case%fluid%wlag, &
                neko_case%fluid%ext_bdf, neko_case%fluid%rho)
-          call neko_error('The adjoint scaling coupling term have not yet' // & 
+          call neko_error('The adjoint scaling coupling term have not yet' // &
                'been implemented for multiple scalars')
        end if
     end if

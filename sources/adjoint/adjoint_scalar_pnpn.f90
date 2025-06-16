@@ -402,7 +402,7 @@ contains
 
       ! Add the RHS contributions coming from the BDF scheme.
       call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
-      rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
