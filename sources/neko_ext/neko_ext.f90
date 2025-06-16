@@ -143,10 +143,12 @@ contains
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, neko_case%fluid%c_Xh, &
-                  neko_case%fluid%gs_Xh, string_val, json_subdict)
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict)
           else
-             call neko_error("user defined ICs not implemented for adjoint scalar")
+             call neko_error("user defined ICs not implemented for " // &
+                  "adjoint scalar")
              ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
              !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
              !      this%usr%scalar_user_ic, neko_case%params)
@@ -159,16 +161,20 @@ contains
           call neko_case%params%info('case.scalars', n_children = n_scalars)
 
           do i = 1, n_scalars
-             call json_extract_item(neko_case%params, 'case.adjoint_scalars', i, scalar_params)
+             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
+                  i, scalar_params)
              call json_get(scalar_params, 'initial_condition.type', string_val)
-             call json_extract_object(scalar_params, 'initial_condition', json_subdict)
+             call json_extract_object(scalar_params, 'initial_condition', &
+                  json_subdict)
 
              if (trim(string_val) .ne. 'user') then
                 call set_scalar_ic(neko_case%scalars%scalar_fields(i)%s, &
-                     neko_case%scalars%scalar_fields(i)%c_Xh, neko_case%scalars%scalar_fields(i)%gs_Xh, &
-                     string_val, json_subdict)
+                     neko_case%scalars%scalar_fields(i)%c_Xh, &
+                     neko_case%scalars%scalar_fields(i)%gs_Xh, string_val, &
+                     json_subdict)
              else
-                call neko_error("user defined ICs not implemented for adjoint scalar")
+                call neko_error("user defined ICs not implemented for " // &
+                     "adjoint scalar")
              end if
           end do
        end if
@@ -272,8 +278,8 @@ contains
   !!
   !! @param[out] vector the output vector.
   !! @param[in] field the input field.
-  subroutine get_scalar_indicies(i_primal, i_adjoint, scalars, adjoint_scalars, &
-       primal_name)
+  subroutine get_scalar_indicies(i_primal, i_adjoint, scalars, &
+       adjoint_scalars, primal_name)
     integer, intent(out) :: i_primal
     integer, intent(out) :: i_adjoint
     type(scalars_t), intent(inout) :: scalars
@@ -284,7 +290,8 @@ contains
     i_primal = -1
     i_adjoint = -1
     do i = 1, size(adjoint_scalars%adjoint_scalar_fields)
-       if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name == primal_name) then
+       if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name &
+            == primal_name) then
           i_adjoint = i
           exit
        end if
@@ -300,7 +307,8 @@ contains
     if (i_primal .gt. 0 .and. i_adjoint .gt. 0) then
        ! we found them !
     else
-       call neko_error('could not find matching primal and adjoint scalar fields')
+       call neko_error('could not find matching primal and adjoint' // &
+            ' scalar fields')
     end if
 
   end subroutine get_scalar_indicies

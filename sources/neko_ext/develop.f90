@@ -287,7 +287,8 @@ contains
 
     ! Find the outlet temperature at the supplied list of points
     call interpolator%find_points_xyz(facet_centers, N_facets)
-    call interpolator%evaluate(temperature_local, neko_case%scalars%scalar_fields(1)%s%x)
+    call interpolator%evaluate(temperature_local, &
+         neko_case%scalars%scalar_fields(1)%s%x)
 
     temperature_local = temperature_local - target_temperature
     temperature_mean = average_weighted(temperature_local, facet_area)
