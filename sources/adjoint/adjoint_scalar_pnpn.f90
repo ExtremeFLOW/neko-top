@@ -397,12 +397,12 @@ contains
       ! the scalar field from the previous time-step.
       ! Now, this value is used in the explicit time scheme to advance these
       ! terms in time.
-      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho%x(1,1,1,1), &
-           ext_bdf%advection_coeffs, n)
+      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, &
+           rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
 
       ! Add the RHS contributions coming from the BDF scheme.
-      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho%x(1,1,1,1), &
-           dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
+      rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
@@ -553,7 +553,8 @@ contains
        do i = 1, size(this%msh%labeled_zones)
           if (this%msh%labeled_zones(i)%size .gt. 0) then
              write(error_unit, '(A, A, A)') "*** ERROR ***: ", &
-                  "No boundary_conditions entry in the case file for adjoint scalar ", &
+                  "No boundary_conditions entry in the case file for " // &
+                  " adjoint scalar ", &
                   this%s%name
              error stop
           end if
