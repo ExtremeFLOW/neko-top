@@ -80,7 +80,22 @@ module adjoint_scalars
 
 contains
 
-  !> Initialize the adjoint_scalars container
+  !> Constructor.
+  !! @details Initialize the adjoint_scalars container.
+  !! @param[inout] this The adjoint_scalars container.
+  !! @param[in] n_adjoint_scalars The number of adjoint scalars.
+  !! @param[in] n_primal_scalars The number of primal scalars.
+  !! @param[in] msh The mesh structure used to define the field topology.
+  !! @param coef The SEM coeffcients.
+  !! @param[inout] gs Gather scatter object.
+  !! @param[inout] params_adjoint JSON parameters specific to the adjoint scalars.
+  !! @param[inout] params_primal JSON parameters specific to the primal scalars.
+  !! @param[inout] numerics_params JSON structure containing numerics parameters.
+  !! @param[in] user User-defined interface.
+  !! @param[inout] chkp Checkpointing structure.
+  !! @param[in] ulag, vlag, wlag Field history of the primal velocity fields.
+  !! @param[in] time_scheme Time scheme controller.
+  !! @param[in] rho Density field.
   subroutine adjoint_scalars_init(this, n_adjoint_scalars, n_primal_scalars, &
        msh, coef, gs, params_adjoint, params_primal, &
        numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
@@ -110,8 +125,10 @@ contains
     end if
 
     ! Allocate the scalar fields
-    ! If there are more adjoint_scalar_scheme_t types, add a factory function here
-    allocate(adjoint_scalar_pnpn_t::this%adjoint_scalar_fields(n_adjoint_scalars))
+    ! If there are more adjoint_scalar_scheme_t types, add a factory function
+    ! here
+    allocate( &
+         adjoint_scalar_pnpn_t::this%adjoint_scalar_fields(n_adjoint_scalars))
 
     allocate(field_names(n_adjoint_scalars))
 
@@ -161,7 +178,8 @@ contains
 
        ! Before initializing, find the corresponding primal scalar, and find
        ! its subdict
-       ! note: the default primal name is s. So we search for it if not specified
+       ! note: the default primal name is s.
+       ! So we search for it if not specified
        call json_get_or_default(params_adjoint, 'primal_name', primal_name, 's')
 
        found_primal = .false.
@@ -192,9 +210,23 @@ contains
     end do
   end subroutine adjoint_scalars_init
 
+  !> Constructor.
+  !! @details Initialize a single adjoint_scalar for backwards compatibility.
+  !! @param[inout] this The adjoint_scalars container.
+  !! @param[in] msh The mesh structure used to define the field topology.
+  !! @param coef The SEM coeffcients.
+  !! @param[inout] gs Gather scatter object.
+  !! @param[inout] params_adjoint JSON parameters specific to the adjoint scalars.
+  !! @param[inout] params_primal JSON parameters specific to the primal scalars.
+  !! @param[inout] numerics_params JSON structure containing numerics parameters.
+  !! @param[in] user User-defined interface.
+  !! @param[inout] chkp Checkpointing structure.
+  !! @param[in] ulag, vlag, wlag Field history of the primal velocity fields.
+  !! @param[in] time_scheme Time scheme controller.
+  !! @param[in] rho Density field.
   subroutine adjoint_scalars_init_single(this, msh, coef, gs, params_adjoint, &
-       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
-       rho)
+       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, &
+       time_scheme, rho)
     class(adjoint_scalars_t), intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
@@ -220,8 +252,8 @@ contains
 
     ! Initialize it directly with the params
     call this%adjoint_scalar_fields(1)%init(msh, coef, gs, params_adjoint, &
-         params_primal, numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, &
-         rho)
+         params_primal, numerics_params, user, chkp, ulag, vlag, wlag, &
+         time_scheme, rho)
   end subroutine adjoint_scalars_init_single
 
   !> Perform a time step for all scalar fields
@@ -255,7 +287,8 @@ contains
     integer :: i
     ! Iterate through all scalar fields
     do i = 1, size(this%adjoint_scalar_fields)
-       call this%adjoint_scalar_fields(i)%s_adj_lag%set(this%adjoint_scalar_fields(i)%s_adj)
+       call this%adjoint_scalar_fields(i)%s_adj_lag%set(&
+            this%adjoint_scalar_fields(i)%s_adj)
        call this%adjoint_scalar_fields(i)%validate()
     end do
   end subroutine adjoint_scalars_validate
