@@ -299,7 +299,7 @@ contains
     end do
 
     do i = 1, size(scalars%scalar_fields)
-       if (scalars%scalar_fields(i)%name == primal_name) then
+       if (scalars%scalar_fields(i)%name .eq. primal_name) then
           i_primal = i
           exit
        end if
