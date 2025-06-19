@@ -30,7 +30,6 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-! Implements the `mma_comp_t` type.
 module example_problem
   use num_types, only: rp
 
@@ -41,6 +40,9 @@ module example_problem
   use math, only: glsum
   use json_module, only: json_file
   use vector, only: vector_t
+
+  use device, only: device_memcpy, DEVICE_TO_HOST
+  use neko_config, only: NEKO_BCKND_DEVICE
 
   implicit none
   private
@@ -121,6 +123,12 @@ contains
     type(vector_t) :: design_values
 
     design_values = design%get_values()
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_memcpy(design_values%x, &
+             design_values%x_d, design%size(), &
+             DEVICE_TO_HOST, sync = .false.)
+    end if
     this%value = glsum(design_values%x, design%size()) &
          / real(design%size_global(), kind=rp)
 
@@ -174,9 +182,18 @@ contains
     type(vector_t) :: difference
 
     difference = design%get_values() - design%get_x()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(difference%x, &
+            difference%x_d, design%size(), &
+            DEVICE_TO_HOST, sync = .false.)
+    end if
+
     difference%x = difference%x * difference%x
 
-    this%value = this%sign * glsum(difference%x, design%size())
+    ! Note that we divide by n to make a fair comparison when ploting the 
+    ! scaling plots with respect to n (KKT tol is effected by this)
+    this%value = this%sign * glsum(difference%x, design%size()) / &
+         real(design%size_global(), kind=rp)
 
   end subroutine mma_con_update_value
 
@@ -187,7 +204,8 @@ contains
 
     difference = design%get_values() - design%get_x()
 
-    this%sensitivity = this%sign * 2.0_rp * difference
+    this%sensitivity = this%sign * 2.0_rp * difference / &
+         real(design%size_global(), kind=rp)
 
   end subroutine mma_con_update_sensitivity
 end module example_problem

@@ -37,6 +37,7 @@ contains
     character(len=:), allocatable :: type
     integer :: max_iterations
     real(kind=rp) :: tolerance
+    logical :: performance
 
     if (allocated(object)) then
        call object%free()
@@ -49,6 +50,8 @@ contains
          max_iterations, 100)
     call json_get_or_default(parameters, "optimization.solver.tolerance", &
          tolerance, 1.0e-3_rp)
+    call json_get_or_default(parameters, "optimization.solver.performance", &
+         performance, .false.)
 
     ! Select the optimizer type
     select case (trim(type))
@@ -61,10 +64,10 @@ contains
 
     if (present(simulation)) then
        call object%init_from_json(parameters, problem, design, &
-            max_iterations, tolerance, simulation)
+            max_iterations, tolerance, performance, simulation)
     else
        call object%init_from_json(parameters, problem, design, &
-            max_iterations, tolerance)
+            max_iterations, tolerance, performance)
     end if
 
 

@@ -41,13 +41,16 @@ module mma_optimizer
      type(mma_t) :: mma
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
-     !! Note that the values are not updated but they are scaled when passed
-     !! to the optimizer.
-     !! (if auto_scale then constraint_value%x=scale else constraint_value%x=scale*constraint_value%x)
+     !! (if auto_scale then constraint_value%x=scale else 
+     !! constraint_value%x=scale*constraint_value%x)
      !! When auto_scale is true, we use an adaptable scale for
-     !! constraint_value%x and constraint_sensitivities%x in every iteration (variable scale factors)
+     !! constraint_value%x and constraint_sensitivities%x 
+     !! in every iteration (variable scale factors)
      real(kind=rp) :: scale
      logical :: auto_scale
+     
+     ! when true, then we remove IO loggings for optimal performance
+     logical :: performance
 
    contains
 
@@ -66,7 +69,7 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
-       max_iterations, tolerance, simulation)
+       max_iterations, tolerance, performance, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
@@ -74,6 +77,7 @@ contains
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     type(simulation_t), optional, intent(in) :: simulation
+    logical, intent(in) :: performance
 
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
@@ -83,6 +87,7 @@ contains
 
     ! Initialize the logger
     call this%logger%init('optimization_data.csv')
+
 
     ! Write the header
     problem_header = problem%get_log_header()
@@ -102,20 +107,24 @@ contains
          solver_parameters, this%scale, this%auto_scale)
 
     call this%init_from_components(problem, design, &
-         max_iterations, tolerance, simulation)
+         max_iterations, tolerance, performance, simulation)
 
     call x%free()
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       max_iterations, tolerance, simulation)
+       max_iterations, tolerance, performance, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     type(simulation_t), intent(in), optional :: simulation
+    logical, intent(in) :: performance
+
+    !set the performance flag
+    this%performance = performance
 
     call this%init_base(max_iterations, tolerance)
 
@@ -170,9 +179,13 @@ contains
          problem%get_n_objectives(), problem%get_n_constraints())
     call this%logger%write(log_data)
 
-    if (present(simulation)) call simulation%write(0)
+    if (present(simulation)) then
+       if (.not. this%performance) then
+          call simulation%write(0)
+       end if
+    end if
 
-    call design%write(0)
+    if (.not. this%performance) call design%write(0)
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -217,8 +230,12 @@ contains
             problem%get_n_objectives(), problem%get_n_constraints())
        call this%logger%write(log_data)
 
-       if (present(simulation)) call simulation%write(iter)
-       call design%write(iter)
+       if (present(simulation)) then
+          if (.not. this%performance) then
+             call simulation%write(iter)
+          end if
+       end if
+       if (.not. this%performance) call design%write(iter)
        if (present(simulation)) call simulation%reset()
     end do
 
