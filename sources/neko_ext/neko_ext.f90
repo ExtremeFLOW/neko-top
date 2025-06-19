@@ -271,7 +271,7 @@ contains
 
   end subroutine field_to_vector
 
-  !> @brief get scalar indicies
+  !> @brief get scalar indices
   !! @details Given a primal scalar name, return the indicies in the scalars
   !! and adjoint_scalars list corresponding to this pair.
   !! @param[out] i_primal Index in the primal scalar list.
