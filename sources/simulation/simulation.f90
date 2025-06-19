@@ -236,7 +236,6 @@ contains
     call field_rzero(this%adjoint_case%fluid_adj%u_adj)
     call field_rzero(this%adjoint_case%fluid_adj%v_adj)
     call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    n_scalars = 0
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
        do i = 1, n_scalars
