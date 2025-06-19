@@ -271,8 +271,8 @@ contains
 
   end subroutine field_to_vector
 
-  !> @brief get scalar indicies
-  !! @details Given a primal scalar name, return the indicies in the scalars
+  !> @brief get scalar indices
+  !! @details Given a primal scalar name, return the indices in the scalars
   !! and adjoint_scalars list corresponding to this pair.
   !! @param[out] i_primal Index in the primal scalar list.
   !! @param[out] i_adjoint Index in the adjoint scalar list.
@@ -300,25 +300,21 @@ contains
     end if
 
     do i = 1, n_adjoint_scalars
-    print *, adjoint_scalars%adjoint_scalar_fields(i)%primal_name, primal_name
        if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name &
-            == primal_name) then
+            .eq. primal_name) then
           i_adjoint = i
           exit
        end if
     end do
 
     do i = 1, n_primal_scalars
-       if (scalars%scalar_fields(i)%name == primal_name) then
-       print *, scalars%scalar_fields(i)%name, primal_name
+       if (scalars%scalar_fields(i)%name .eq. primal_name) then
           i_primal = i
           exit
        end if
     end do
 
-    if (i_primal .gt. 0 .and. i_adjoint .gt. 0) then
-       ! we found them !
-    else
+    if (i_primal .le. 0 .or. i_adjoint .le. 0) then
        call neko_error('could not find matching primal and adjoint' // &
             ' scalar fields')
     end if

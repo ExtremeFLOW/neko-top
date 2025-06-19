@@ -86,7 +86,7 @@ contains
   !! @param[in] n_adjoint_scalars The number of adjoint scalars.
   !! @param[in] n_primal_scalars The number of primal scalars.
   !! @param[in] msh The mesh structure used to define the field topology.
-  !! @param coef The SEM coeffcients.
+  !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
   !! @param[inout] params_adjoint JSON parameters specific to the 
   !!     adjoint scalars.
@@ -216,7 +216,7 @@ contains
   !! @details Initialize a single adjoint_scalar for backwards compatibility.
   !! @param[inout] this The adjoint_scalars container.
   !! @param[in] msh The mesh structure used to define the field topology.
-  !! @param coef The SEM coeffcients.
+  !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
   !! @param[inout] params_adjoint JSON parameters specific to the adjoint 
   !!     scalars.

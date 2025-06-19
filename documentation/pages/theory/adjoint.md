@@ -144,15 +144,14 @@ the adjoint velocity momentum equation will contain the summation over all the
 additional coupling terms
 
 \f[
-    -\int_\Omega \mathbf{v}\cdot {\frac {\partial \mathbf {u}^\dagger }
-    {\partial t}}
-    + \int_\Omega \mathbf{v}\cdot (\nabla \mathbf {u})^T \mathbf {u}^\dagger
-    + \int_\Omega \nabla \mathbf{v}\cdot  (\mathbf {u} \otimes \mathbf {u}^\dagger )
-    \underline{+ \sum_i \int_\Omega (\mathbf{v}\cdot \nabla \phi_i ) \phi_i^\dagger}
+    - \int_\Omega \mathbf{v} \cdot \frac{\partial \mathbf{u}^\dagger}{\partial t}
+    + \int_\Omega \mathbf{v} \cdot (\nabla \mathbf{u})^T \mathbf{u}^\dagger
+    + \int_\Omega \nabla \mathbf{v} \cdot (\mathbf{u} \otimes \mathbf{u}^\dagger)
+    + \underline{\sum_i \int_\Omega (\mathbf{v} \cdot \nabla \phi_i) \phi_i^\dagger}
     =
-    -\int_\Omega \mathbf{v}\cdot \nabla p^\dagger
-    +{\frac {1}{Re}}\int_\Omega \nabla \mathbf{v}\cdot \nabla \mathbf {u}^\dagger
-    + \int_\Omega \mathbf{v}\cdot  \mathbf{f}^\dagger.
+    - \int_\Omega \mathbf{v} \cdot \nabla p^\dagger
+    + \frac{1}{Re} \int_\Omega \nabla \mathbf{v} \cdot \nabla \mathbf{u}^\dagger
+    + \int_\Omega \mathbf{v} \cdot \mathbf{f}^\dagger.
 \f]
 
 \note If a given \f$\phi_i(\mathbf{x},t)\f$ is not contained in the
