@@ -45,8 +45,8 @@ contains
        result(json_pointer)
     type(json_file), target, intent(inout) :: lookup_json
     type(json_file), target, intent(inout) :: fallback_json
-    type(json_file), pointer :: json_pointer
     character(len=*), intent(in) :: key
+    type(json_file), pointer :: json_pointer
 
     if ((key .in. lookup_json)) then
        json_pointer => lookup_json
