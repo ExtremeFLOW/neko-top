@@ -286,11 +286,21 @@ contains
     type(scalars_t), intent(inout) :: scalars
     type(adjoint_scalars_t), intent(inout) :: adjoint_scalars
     character(len=*), intent(in) :: primal_name
-    integer :: i
+    integer :: i, n_primal_scalars, n_adjoint_scalars
 
     i_primal = -1
     i_adjoint = -1
-    do i = 1, size(adjoint_scalars%adjoint_scalar_fields)
+    n_adjoint_scalars = size(adjoint_scalars%adjoint_scalar_fields)
+    n_primal_scalars =  size(scalars%scalar_fields)
+
+    if ((n_adjoint_scalars .eq. 1) .and. (n_primal_scalars .eq. 1)) then
+       i_primal = 1
+       i_adjoint = 1
+       return
+    end if
+
+    do i = 1, n_adjoint_scalars
+    print *, adjoint_scalars%adjoint_scalar_fields(i)%primal_name, primal_name
        if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name &
             == primal_name) then
           i_adjoint = i
@@ -298,8 +308,9 @@ contains
        end if
     end do
 
-    do i = 1, size(scalars%scalar_fields)
+    do i = 1, n_primal_scalars
        if (scalars%scalar_fields(i)%name == primal_name) then
+       print *, scalars%scalar_fields(i)%name, primal_name
           i_primal = i
           exit
        end if
