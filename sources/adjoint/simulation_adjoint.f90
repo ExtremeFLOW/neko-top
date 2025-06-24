@@ -245,7 +245,7 @@ contains
     call C%fluid_adj%restart(C%case%chkp)
     call C%case%fluid%chkp%previous_mesh%free()
     if (allocated(C%adjoint_scalars)) then
-        call C%adjoint_scalars%restart(C%case%chkp)
+       call C%adjoint_scalars%restart(C%case%chkp)
     end if
 
     C%time%t = C%case%fluid%chkp%restart_time()

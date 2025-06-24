@@ -88,10 +88,10 @@ contains
   !! @param[in] msh The mesh structure used to define the field topology.
   !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
-  !! @param[inout] params_adjoint JSON parameters specific to the 
+  !! @param[inout] params_adjoint JSON parameters specific to the
   !!     adjoint scalars.
   !! @param[inout] params_primal JSON parameters specific to the primal scalars.
-  !! @param[inout] numerics_params JSON structure containing 
+  !! @param[inout] numerics_params JSON structure containing
   !!     numerics parameters.
   !! @param[in] user User-defined interface.
   !! @param[inout] chkp Checkpointing structure.
@@ -218,10 +218,10 @@ contains
   !! @param[in] msh The mesh structure used to define the field topology.
   !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
-  !! @param[inout] params_adjoint JSON parameters specific to the adjoint 
+  !! @param[inout] params_adjoint JSON parameters specific to the adjoint
   !!     scalars.
   !! @param[inout] params_primal JSON parameters specific to the primal scalars.
-  !! @param[inout] numerics_params JSON structure containing numerics 
+  !! @param[inout] numerics_params JSON structure containing numerics
   !!     parameters.
   !! @param[in] user User-defined interface.
   !! @param[inout] chkp Checkpointing structure.

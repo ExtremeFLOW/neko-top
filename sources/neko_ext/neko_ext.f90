@@ -291,7 +291,7 @@ contains
     i_primal = -1
     i_adjoint = -1
     n_adjoint_scalars = size(adjoint_scalars%adjoint_scalar_fields)
-    n_primal_scalars =  size(scalars%scalar_fields)
+    n_primal_scalars = size(scalars%scalar_fields)
 
     if ((n_adjoint_scalars .eq. 1) .and. (n_primal_scalars .eq. 1)) then
        i_primal = 1
