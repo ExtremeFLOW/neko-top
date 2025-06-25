@@ -67,7 +67,7 @@
             "performance": false,
             "mma": {
                 "max_iter": 100,
-                "backend": "device",
+                // "backend": "device",
                 "subsolver": "dpip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
