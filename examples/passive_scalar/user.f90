@@ -67,7 +67,9 @@ contains
   end subroutine user_inflow_eval
 
   !> user-defined boundary condition
-  subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
+  subroutine scalar_bc(scalar_name, s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, &
+       tstep)
+    character(len=*), intent(in) :: scalar_name
     real(kind=rp), intent(inout) :: s
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in) :: y

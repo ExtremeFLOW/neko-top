@@ -68,7 +68,8 @@ module adjoint_scalar_scheme
   use scalar_source_term, only : scalar_source_term_t
   use field_series, only : field_series_t
   use math, only : cfill, add2s2
-  use field_math, only : field_add2s2
+  use field_math, only : field_cmult, field_col3, field_cfill, field_add2, &
+       field_col2
   use device_math, only : device_cfill, device_add2s2
   use neko_config, only : NEKO_BCKND_DEVICE
   use field_series, only : field_series_t
@@ -86,6 +87,8 @@ module adjoint_scalar_scheme
   type, abstract :: adjoint_scalar_scheme_t
      !> A name that can be used to distinguish this solver in e.g. user routines
      character(len=:), allocatable :: name
+     !> The name of the corresponding primal scalar
+     character(len=:), allocatable :: primal_name
      !> x-component of Velocity
      type(field_t), pointer :: u
      !> y-component of Velocity
@@ -142,6 +145,8 @@ module adjoint_scalar_scheme
      type(field_list_t) :: material_properties
      !> Is lambda varying in time? Currently only due to LES models.
      logical :: variable_material_properties = .false.
+     ! Lag arrays for the RHS.
+     type(field_t) :: abx1, abx2
      procedure(user_material_properties), nopass, pointer :: &
           user_material_properties => null()
    contains
@@ -170,8 +175,9 @@ module adjoint_scalar_scheme
 
   !> Abstract interface to initialize a scalar formulation
   abstract interface
-     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, params, &
-          numerics_params, user, chkp, ulag, vlag, wlag, time_scheme, rho)
+     subroutine adjoint_scalar_scheme_init_intrf(this, msh, coef, gs, &
+          params_adjoint, params_primal, numerics_params, user, chkp, ulag, &
+          vlag, wlag, time_scheme, rho)
        import adjoint_scalar_scheme_t
        import json_file
        import coef_t
@@ -186,7 +192,8 @@ module adjoint_scalar_scheme
        type(mesh_t), target, intent(in) :: msh
        type(coef_t), target, intent(in) :: coef
        type(gs_t), target, intent(inout) :: gs
-       type(json_file), target, intent(inout) :: params
+       type(json_file), target, intent(inout) :: params_adjoint
+       type(json_file), target, intent(inout) :: params_primal
        type(json_file), target, intent(inout) :: numerics_params
        type(user_t), target, intent(in) :: user
        type(chkp_t), target, intent(inout) :: chkp
@@ -237,65 +244,72 @@ contains
   !! @param msh The mesh.
   !! @param c_Xh The coefficients.
   !! @param gs_Xh The gather-scatter.
-  !! @param params The parameter dictionary in json.
+  !! @param params_adjoint The parameter dictionary in json for the adjoint.
+  !! @param params_primal The parameter dictionary in json for the primal.
   !! @param scheme The name of the scalar scheme.
   !! @param user Type with user-defined procedures.
   !! @param rho The density of the fluid.
-  subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, params, &
-       scheme, user, rho)
+  subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, &
+       params_adjoint, params_primal, scheme, user, rho)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: c_Xh
     type(gs_t), target, intent(inout) :: gs_Xh
-    type(json_file), target, intent(inout) :: params
+    type(json_file), target, intent(inout) :: params_primal, params_adjoint
     character(len=*), intent(in) :: scheme
     type(user_t), target, intent(in) :: user
     type(field_t), target, intent(in) :: rho
+    type(json_file), pointer :: params_selected
     ! IO buffer for log output
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
     logical :: logical_val
     real(kind=rp) :: solver_abstol
     integer :: integer_val
-    character(len=:), allocatable :: solver_type, solver_precon, field_name
-    character(len=:), allocatable :: json_key
+    character(len=:), allocatable :: solver_type, solver_precon
     type(json_file) :: precon_params
 
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%s => neko_field_registry%get_field('s')
     this%rho => rho
 
+    ! get the primal adjoint's name
+    call json_get(params_adjoint, 'primal_name', this%primal_name)
     ! Assign a name
-    call json_get_or_default(params, 'name', this%name, 'scalar adjoint')
+    call json_get_or_default(params_adjoint, 'name', this%name, &
+         'scalar adjoint')
 
     call neko_log%section('Adjoint scalar')
-    call json_get(params, 'solver.type', solver_type)
-    json_key = json_key_fallback(params, &
-         'case.adjoint_scalar.solver.preconditioner.type', &
-         'case.scalar.solver.preconditioner.type')
-    call json_get(params, json_key, solver_precon)
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.type')
+    call json_get(params_selected, 'solver.type', solver_type)
 
-    json_key = json_key_fallback(params, &
-         'case.adjoint_scalar.solver.preconditioner', &
-         'case.scalar.solver.preconditioner')
-    call json_extract_object(params, json_key, precon_params)
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.preconditioner.type')
+    call json_get(params_selected, 'solver.preconditioner.type', solver_precon)
 
-    json_key = json_key_fallback(params, &
-         'case.adjoint_scalar.solver.absolute_tolerance', &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.preconditioner')
+    call json_extract_object(params_selected, 'solver.preconditioner', &
+         precon_params)
+
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.absolute_tolerance')
-    call json_get(params, json_key, solver_abstol)
+    call json_get(params_selected, 'solver.absolute_tolerance', &
+         solver_abstol)
 
-    json_key = json_key_fallback(params, &
-         'case.adjoint_scalar.solver.projection_space_size', &
-         'case.scalar.solver.projection_space_size')
-    call json_get_or_default(params, json_key, this%projection_dim, 0)
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.projection_space_size')
+    call json_get_or_default(params_selected, &
+         'solver.projection_space_size', &
+         this%projection_dim, 0)
 
-    json_key = json_key_fallback(params, &
-         'case.adjoint_scalar.solver.projection_hold_steps', &
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.projection_hold_steps')
-    call json_get_or_default(params, json_key, this%projection_activ_step, 5)
+    call json_get_or_default(params_selected, &
+         'solver.projection_hold_steps', &
+         this%projection_activ_step, 5)
 
 
     write(log_buf, '(A, A)') 'Type       : ', trim(scheme)
@@ -309,18 +323,18 @@ contains
 
     this%Xh => this%u%Xh
     this%dm_Xh => this%u%dof
-    this%params => params
+    this%params => params_adjoint
     this%msh => msh
 
-    call json_get_or_default(params, 'field_name', field_name, 's_adj')
-
-    if (.not. neko_field_registry%field_exists(field_name)) then
-       call neko_field_registry%add_field(this%dm_Xh, field_name)
+    if (.not. neko_field_registry%field_exists(this%name)) then
+       call neko_field_registry%add_field(this%dm_Xh, this%name)
     end if
 
-    this%s_adj => neko_field_registry%get_field(field_name)
+    this%s_adj => neko_field_registry%get_field(this%name)
 
     call this%s_adj_lag%init(this%s_adj, 2)
+
+    this%s => neko_field_registry%get_field(this%primal_name)
 
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh
@@ -328,37 +342,16 @@ contains
     !
     ! Material properties
     !
-    call this%set_material_properties(params, user)
+    call this%set_material_properties(params_primal, user)
+
 
     !
     ! Turbulence modelling and variable material properties
     !
-    if (params%valid_path('case.scalar.variable_material_properties')) then
-       call json_get(params, 'variable_material_properties', &
-            this%variable_material_properties)
-
-       ! Warn, no variable properties, but nut_field
-       if ((params%valid_path('case.scalar.nut_field')) .and. &
-            (this%variable_material_properties .eqv. .false.)) then
-          call neko_warning("You set variable_material properties to " // &
-               "false, the nut_field setting will have no effect.")
-       end if
-
-       ! Warn, no variable properties, but user routine associated
-       if ((.not. associated(user%material_properties, &
-            dummy_user_material_properties)) .and. &
-            (this%variable_material_properties .eqv. .false.)) then
-          call neko_warning("You set variable_material properties to " // &
-               "false, you can only vary rho and mu in time in the user file.")
-       end if
-    else if (params%valid_path('case.scalar.nut_field')) then
-       call json_get(params, 'case.scalar.Pr_t', this%pr_turb)
-       call json_get(params, 'case.scalar.nut_field', this%nut_field_name)
-       this%variable_material_properties = .true.
-    else if (.not. associated(user%material_properties, &
-         dummy_user_material_properties)) then
-       this%nut_field_name = ""
-       this%variable_material_properties = .true.
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'variable_material_properties')
+    if (params_selected%valid_path('variable_material_properties')) then
+       call neko_error('variable material properties no supported for adjoint')
     end if
 
     write(log_buf, '(A,L1)') 'LES        : ', this%variable_material_properties
@@ -371,19 +364,21 @@ contains
     call this%f_Xh%init(this%dm_Xh, fld_name = "adjoint_scalar_rhs")
 
     ! Initialize the source term
-    call this%source_term%init(this%f_Xh, this%c_Xh, user)
+    call this%source_term%init(this%f_Xh, this%c_Xh, user, this%name)
     ! We should ONLY read the adjoint
-    call this%source_term%add(params, 'case.adjoint_scalar.source_terms')
+    call this%source_term%add(params_primal, 'source_terms')
 
     ! todo parameter file ksp tol should be added
-    json_key = json_key_fallback(params, &
-         'case.adjoint_fluid.velocity_solver.max_iterations', &
-         'case.fluid.velocity_solver.max_iterations')
-    call json_get_or_default(params, json_key, integer_val, KSP_MAX_ITER)
-    json_key = json_key_fallback(params, &
-         'case.adjoint_fluid.velocity_solver.monitor', &
-         'case.fluid.velocity_solver.monitor')
-    call json_get_or_default(params, json_key, logical_val, .false.)
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.max_iterations')
+    call json_get_or_default(params_selected, &
+         'solver.max_iterations', &
+         integer_val, KSP_MAX_ITER)
+    params_selected => json_key_fallback(params_adjoint, params_primal, &
+         'solver.monitor')
+    call json_get_or_default(params_selected, &
+         'solver.monitor', &
+         logical_val, .false.)
     call adjoint_scalar_scheme_solver_factory(this%ksp, this%dm_Xh%size(), &
          solver_type, integer_val, solver_abstol, logical_val)
     call scalar_scheme_precon_factory(this%pc, this%ksp, &
@@ -421,6 +416,7 @@ contains
 
     call this%cp%free()
     call this%lambda%free()
+    call this%s_adj_lag%free()
 
   end subroutine adjoint_scalar_scheme_free
 
@@ -484,8 +480,8 @@ contains
   end subroutine adjoint_scalar_scheme_solver_factory
 
   !> Initialize a Krylov preconditioner
-  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, bclst, &
-       pctype, pcparams)
+  subroutine adjoint_scalar_scheme_precon_factory(pc, ksp, coef, dof, gs, &
+       bclst, pctype, pcparams)
     class(pc_t), allocatable, target, intent(inout) :: pc
     class(ksp_t), target, intent(inout) :: ksp
     type(coef_t), target, intent(in) :: coef
@@ -538,7 +534,8 @@ contains
        call neko_scratch_registry%request_field(lambda_factor, index)
 
        call field_col3(lambda_factor, this%cp, this%rho)
-       call field_cmult2(lambda_factor, nut, 1.0_rp / this%pr_turb)
+       call field_col2(lambda_factor, nut)
+       call field_cmult(lambda_factor, 1.0_rp / this%pr_turb)
        call field_add2(this%lambda, lambda_factor)
        call neko_scratch_registry%relinquish_field(index)
     end if
@@ -556,11 +553,12 @@ contains
 
   !> Set lamdba and cp.
   !! @param[inout] this The object.
-  !! @param params The case file configuration dictionary.
+  !! @param params_primal The case file configuration dictionary.
   !! @param user The user interface.
-  subroutine adjoint_scalar_scheme_set_material_properties(this, params, user)
+  subroutine adjoint_scalar_scheme_set_material_properties(this, &
+       params_primal, user)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
-    type(json_file), intent(inout) :: params
+    type(json_file), intent(inout) :: params_primal
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
@@ -587,13 +585,13 @@ contains
             this%material_properties)
     else
        this%user_material_properties => dummy_user_material_properties
-       if (params%valid_path('Pe') .and. &
-            (params%valid_path('lambda') .or. &
-            params%valid_path('cp'))) then
+       if (params_primal%valid_path('Pe') .and. &
+            (params_primal%valid_path('lambda') .or. &
+            params_primal%valid_path('cp'))) then
           call neko_error("To set the material properties for the scalar, " // &
                "either provide Pe OR lambda and cp in the case file.")
           ! Non-dimensional case
-       else if (params%valid_path('Pe')) then
+       else if (params_primal%valid_path('Pe')) then
           write(log_buf, '(A)') 'Non-dimensional scalar material properties' //&
                ' input.'
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
@@ -603,7 +601,7 @@ contains
           call neko_log%message(log_buf, lvl = NEKO_LOG_VERBOSE)
 
           ! Read Pe into lambda for further manipulation.
-          call json_get(params, 'Pe', const_lambda)
+          call json_get(params_primal, 'Pe', const_lambda)
           write(log_buf, '(A,ES13.6)') 'Pe         :', const_lambda
           call neko_log%message(log_buf)
 
@@ -613,8 +611,8 @@ contains
           const_lambda = 1.0_rp/const_lambda
           ! Dimensional case
        else
-          call json_get(params, 'lambda', const_lambda)
-          call json_get(params, 'cp', const_cp)
+          call json_get(params_primal, 'lambda', const_lambda)
+          call json_get(params_primal, 'cp', const_cp)
        end if
     end if
     ! We need to fill the fields based on the parsed const values

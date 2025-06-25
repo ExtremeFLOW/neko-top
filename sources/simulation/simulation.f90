@@ -41,6 +41,8 @@ module simulation_m
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use adjoint_scalars, only: adjoint_scalars_t
+  use scalars, only: scalars_t
   use fluid_pnpn, only: fluid_pnpn_t
   use time_step_controller, only: time_step_controller_t
   use fld_file_output, only: fld_file_output_t
@@ -67,11 +69,11 @@ module simulation_m
      !> The fluid
      class(fluid_scheme_incompressible_t), public, pointer :: fluid => null()
      !> The scalar
-     type(scalar_pnpn_t), public, pointer :: scalar => null()
+     type(scalars_t), public, pointer :: scalars => null()
      !> The adjoint fluid
      class(adjoint_fluid_scheme_t), public, pointer :: adjoint_fluid => null()
      !> The adjoint scalar
-     type(adjoint_scalar_pnpn_t), public, pointer :: adjoint_scalar => null()
+     type(adjoint_scalars_t), public, pointer :: adjoint_scalars => null()
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_forward
@@ -101,6 +103,7 @@ contains
   subroutine simulation_init(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
+    integer :: i, n_scalars
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -119,39 +122,53 @@ contains
 
     end select
 
-    if (allocated(this%neko_case%scalar)) then
-       this%scalar => this%neko_case%scalar
+    if (allocated(this%neko_case%scalars)) then
+       this%scalars => this%neko_case%scalars
     end if
 
-    if (allocated(this%adjoint_case%scalar_adj)) then
-       this%adjoint_scalar => this%adjoint_case%scalar_adj
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       this%adjoint_scalars => this%adjoint_case%adjoint_scalars
     end if
 
     ! init the sampler
     !---------------------------------------------------------
     ! Allocate the output type
-    if (allocated(this%neko_case%scalar)) then
-       call this%output_forward%init(sp, 'forward_fields', 5)
-       call this%output_forward%fields%assign(5, this%scalar%s)
-    else
-       call this%output_forward%init(sp, 'forward_fields', 4)
+    n_scalars = 0
+    if (allocated(this%neko_case%scalars)) then
+       n_scalars = size(this%neko_case%scalars%scalar_fields)
     end if
+    call this%output_forward%init(sp, 'forward_fields', 4 + n_scalars)
 
     call this%output_forward%fields%assign(1, this%fluid%p)
     call this%output_forward%fields%assign(2, this%fluid%u)
     call this%output_forward%fields%assign(3, this%fluid%v)
     call this%output_forward%fields%assign(4, this%fluid%w)
 
-    if (allocated(this%adjoint_case%scalar_adj)) then
-       call this%output_adjoint%init(sp, 'adjoint_fields', 5)
-       call this%output_adjoint%fields%assign(5, this%adjoint_scalar%s_adj)
-    else
-       call this%output_adjoint%init(sp, 'adjoint_fields', 4)
+    ! Assign all scalar fields
+    if (allocated(this%neko_case%scalars)) then
+       do i = 1, n_scalars
+          call this%output_forward%fields%assign(4 + i, &
+               this%scalars%scalar_fields(i)%s)
+       end do
     end if
+
+    n_scalars = 0
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
+    end if
+    call this%output_adjoint%init(sp, 'adjoint_fields', 4 + n_scalars)
     call this%output_adjoint%fields%assign(1, this%adjoint_fluid%p_adj)
     call this%output_adjoint%fields%assign(2, this%adjoint_fluid%u_adj)
     call this%output_adjoint%fields%assign(3, this%adjoint_fluid%v_adj)
     call this%output_adjoint%fields%assign(4, this%adjoint_fluid%w_adj)
+
+    ! Assign all scalar fields
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       do i = 1, n_scalars
+          call this%output_adjoint%fields%assign(4 + i, &
+               this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+       end do
+    end if
 
   end subroutine simulation_init
 
@@ -167,6 +184,10 @@ contains
   !> Run the simulation
   subroutine simulation_run_forward(this)
     class(simulation_t), intent(inout) :: this
+
+    ! set forward time to zero
+    this%neko_case%time%t = 0.0_rp
+    this%neko_case%time%tstep = 0
 
     ! run the primal
     call neko_solve(this%neko_case)
@@ -202,6 +223,7 @@ contains
   !> Reset the simulation
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
+    integer :: i, n_scalars
 
     call reset(this%neko_case)
 
@@ -214,8 +236,12 @@ contains
     call field_rzero(this%adjoint_case%fluid_adj%u_adj)
     call field_rzero(this%adjoint_case%fluid_adj%v_adj)
     call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    if (allocated(this%neko_case%scalar)) then
-       call field_rzero(this%adjoint_case%scalar_adj%s_adj)
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
+       do i = 1, n_scalars
+          call field_rzero(&
+               this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+       end do
     end if
 
   end subroutine simulation_reset

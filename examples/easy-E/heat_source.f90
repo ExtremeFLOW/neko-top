@@ -57,10 +57,11 @@ contains
   end subroutine set_material_properties
 
   !> Heat source
-  subroutine heat_source(rhs, t)
+  subroutine heat_source(field_name, rhs, t)
     use math_ext, only: sub3_mask
     use device_math_ext, only: device_sub3_mask
 
+    character(len=*), intent(in) :: field_name
     class(scalar_user_source_term_t), intent(inout) :: rhs
     real(kind=rp), intent(in) :: t
     type(field_t), pointer :: s
