@@ -81,6 +81,9 @@ module mma
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
+     procedure, public, pass(this) :: get_backend_and_subsolver => &
+          mma_get_backend_and_subsolver
+
 
      generic, public :: update => update_vector, update_cpu, update_device
      procedure, pass(this) :: update_vector => mma_update_vector
@@ -212,7 +215,6 @@ contains
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .false.)
 
-    call json_get_or_default(json, 'mma.epsimin', epsimin, 1.0e-9_rp)
     ! Initialize the MMA object with the parsed parameters
     a = a_const
     c = c_const
@@ -359,7 +361,7 @@ contains
        ! upload all init values to device pointers
        call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, &
             HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%xold1%x, this%xold2%x_d, this%n, &
+       call device_memcpy(this%xold2%x, this%xold2%x_d, this%n, &
             HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, &
             sync = .false.)
@@ -454,7 +456,7 @@ contains
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
-       call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
+       !  call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     end select
 
   end subroutine mma_update_vector
@@ -523,5 +525,12 @@ contains
     max_iter_value = this%max_iter
   end function mma_get_max_iter
 
+  !> Get the maximum number of iterations for the mma_subsolve inner loop
+  pure function mma_get_backend_and_subsolver(this) result(backend_subsolver)
+    class(mma_t), intent(in) :: this
+    character(len=:), allocatable :: backend_subsolver
+    backend_subsolver = ', backend:' // this%bcknd // ',subsolver:' // &
+         this%subsolver
+  end function mma_get_backend_and_subsolver
 end module mma
 

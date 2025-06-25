@@ -36,69 +36,108 @@
 #define MMA_HIP_KERNEL_H
 
 template <typename T>
-__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv, 
+__global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ x, const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
      const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    const T xt = x[tj];
-    T val = -1.0 / (2.0 * pjlambda[tj] / pow(upp[tj] - xt, 3) +
-                    2.0 * qjlambda[tj] / pow(xt - low[tj], 3));
-    // Remove the sensitivity for the active primal constraints
-    bool is_alpha = xt == alpha[tj];
-    bool is_beta  = xt == beta[tj];
-    Ljjxinv[tj] = (is_alpha || is_beta) ? T(0.0) : val;
-  }
+  if (tj >= n) return;
+
+  // Load inputs into registers
+  const T xt    = x[tj];
+  const T low_t = low[tj];
+  const T upp_t = upp[tj];
+  const T pj    = pjlambda[tj];
+  const T qj    = qjlambda[tj];
+
+  // Precompute reused differences
+  const T diff_u = upp_t - xt;
+  const T diff_l = xt - low_t;
+
+  // Cube once (avoiding pow for speed)
+  const T diff_u3 = diff_u * diff_u * diff_u;
+  const T diff_l3 = diff_l * diff_l * diff_l;
+
+  // Compute inverse value safely
+  T denom = 2.0 * pj / diff_u3 + 2.0 * qj / diff_l3;
+  T val = -1.0 / denom;
+
+  // Mask out active primal constraints
+  bool active = (xt == alpha[tj]) || (xt == beta[tj]);
+  Ljjxinv[tj] = active ? T(0.0) : val;
 }
 
-
 template <typename T>
-__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x, 
+__global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
      const int n) {
+  
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    T pj = sqrt(pjlambda[tj]);
-    T qj = sqrt(qjlambda[tj]);
-    T denom = pj + qj;
-    T val = (pj * low[tj] + qj * upp[tj]) / denom;
+  if (tj >= n) return;
 
-    // Clamp x between alpha and beta using branchless min/max
-    x[tj] = fmax(fmin(val, beta[tj]), alpha[tj]);
-  }
+  // Load inputs into registers
+  const T pj_sqrt = sqrt(pjlambda[tj]);
+  const T qj_sqrt = sqrt(qjlambda[tj]);
+  const T denom   = pj_sqrt + qj_sqrt;
 
+  const T low_t   = low[tj];
+  const T upp_t   = upp[tj];
+  const T alpha_t = alpha[tj];
+  const T beta_t  = beta[tj];
+
+  // Weighted average
+  const T val = (pj_sqrt * low_t + qj_sqrt * upp_t) / denom;
+
+  // Clamp x between alpha and beta using branchless min/max
+  x[tj] = fmin(fmax(val, alpha_t), beta_t);
 }
 
 template <typename T>
-__global__ void mattrans_v_mul_kernel(T* __restrict__ output, 
+__global__ void mattrans_v_mul_kernel(T* __restrict__ output,
      const T* __restrict__ pij, const T* __restrict__ lambda,
      const int m, const int n) {
+
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    output[tj] = 0.0;
-    for (int i = 0; i < m; i++) {
-      // output[tj] = output[tj] + pij[tj + i * n] * lambda[i];
-      output[tj] = output[tj] + pij[i + tj * m] * lambda[i];
-    }
+  if (tj >= n) return;
+
+  T acc = 0.0;
+
+  // Use register accumulation
+  for (int i = 0; i < m; ++i) {
+    acc += pij[i + tj * m] * lambda[i];
   }
+
+  output[tj] = acc;
 }
+
 
 template <typename T>
-__global__ void mma_sub1_kernel(T* __restrict__ xlow, T* __restrict__ xupp,
-     const T* __restrict__ x, const T* __restrict__ xmin,
-     const T* __restrict__ xmax, const T asyinit, const int n) {
+__global__ void mma_sub1_kernel(
+    T* __restrict__ xlow, 
+    T* __restrict__ xupp,
+    const T* __restrict__ x, 
+    const T* __restrict__ xmin,
+    const T* __restrict__ xmax, 
+    const T asyinit, 
+    const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     T xgap = xmax[tj] - xmin[tj];
-     xlow[tj] = x[tj] - asyinit * xgap;
-     xupp[tj] = x[tj] + asyinit * xgap;
-  }
-}
+  if (tj >= n) return;
 
+  // Load values once into registers (global memory is slow)
+  const T xt    = x[tj];
+  const T xmin_t = xmin[tj];
+  const T xmax_t = xmax[tj];
+
+  // Reuse xgap calculation
+  const T xgap = xmax_t - xmin_t;
+  const T offset = asyinit * xgap;
+
+  xlow[tj] = xt - offset;
+  xupp[tj] = xt + offset;
+}
 
 template< typename T >
 __global__ void mma_sub2_kernel(T* __restrict__ low, T* __restrict__ upp,
@@ -140,86 +179,168 @@ __global__ void mma_sub2_kernel(T* __restrict__ low, T* __restrict__ upp,
   upp[tj] = new_upp;
 }
 
-template< typename T >
-__global__ void mma_sub3_kernel(const T* __restrict__ x,
-     const T* __restrict__ df0dx, const T* __restrict__ dfdx,
-     T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
-   const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
-   T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
-   T* __restrict__ qij, const int n, const int m) {
+template <typename T>
+__global__ void mma_sub3_kernel( const T* __restrict__ x,
+    const T* __restrict__ df0dx, const T* __restrict__ dfdx,
+    T* __restrict__ low, T* __restrict__ upp, const T* __restrict__ xmin,
+    const T* __restrict__ xmax, T* __restrict__ alpha, T* __restrict__ beta,
+    T* __restrict__ p0j, T* __restrict__ q0j, T* __restrict__ pij,
+    T* __restrict__ qij, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     T xgap = xmax[tj] - xmin[tj];
-     alpha[tj] = max(max(xmin[tj], low[tj] +
-        0.1 * (x[tj] - low[tj])), x[tj] - 0.5 * xgap);
-     beta[tj] = min(min(xmax[tj], upp[tj] - 0.1 * (upp[tj] - x[tj])), x[tj] +
-        0.5 * xgap);
+  if (tj >= n) return;
 
-     p0j[tj] = pow(upp[tj] - x[tj], 2) * (1.001 * max(df0dx[tj], 0.0) +
-        0.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
-     q0j[tj] = pow(x[tj] - low[tj], 2) * (0.001 * max(df0dx[tj], 0.0) +
-        1.001 * max(-df0dx[tj], 0.0) + 0.00001 / max(0.00001, xgap));
+  // Load into registers once
+  const T xt    = x[tj];
+  const T xmin_t = xmin[tj];
+  const T xmax_t = xmax[tj];
+  const T low_t = low[tj];
+  const T upp_t = upp[tj];
+  const T df0 = df0dx[tj];
+  const T xgap = xmax_t - xmin_t;
 
-     for (int i = 0; i < m; i++) {
-        pij[i + tj*m] = pow(upp[tj] - x[tj], 2) *
-         (1.001 * max(dfdx[i + tj*m], 0.0) + 0.001 *
-         max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
-        qij[i + tj*m] = pow(x[tj] - low[tj], 2) *
-         (0.001 * max(dfdx[i + tj*m], 0.0) + 1.001 *
-       max(-dfdx[i + tj*m], 0.0) + 0.00001 / max(0.00001, xgap));
-     }
+  // Clamp helpers
+  const T half_xgap = 0.5 * xgap;
+  const T tenth_low_diff = 0.1 * (xt - low_t);
+  const T tenth_upp_diff = 0.1 * (upp_t - xt);
+
+  // Compute alpha and beta with fused max/min and fewer calls
+  T alpha_val = max(max(xmin_t, low_t + tenth_low_diff), xt - half_xgap);
+  T beta_val = min(min(xmax_t, upp_t - tenth_upp_diff), xt + half_xgap);
+
+  alpha[tj] = alpha_val;
+  beta[tj] = beta_val;
+
+  // Avoid multiple pow calls, compute once
+  const T upp_minus_x = upp_t - xt;
+  const T x_minus_low = xt - low_t;
+  const T upp_minus_x_sq = upp_minus_x * upp_minus_x;
+  const T x_minus_low_sq = x_minus_low * x_minus_low;
+
+  // Small epsilon for numerical stability
+  const T eps = 1e-5;
+  const T inv_xgap = 1.0 / max(eps, xgap);
+
+  // Compute terms reused multiple times
+  const T max_df0_pos = max(df0, T(0));
+  const T max_df0_neg = max(-df0, T(0));
+
+  p0j[tj] = upp_minus_x_sq * (1.001 * max_df0_pos + 
+       0.001 * max_df0_neg + eps * inv_xgap);
+  q0j[tj] = x_minus_low_sq * (0.001 * max_df0_pos + 
+       1.001 * max_df0_neg + eps * inv_xgap);
+
+  // Loop over m for pij and qij
+  for (int i = 0; i < m; ++i) {
+    int idx = i + tj * m;
+
+    T dfdx_val = dfdx[idx];
+    T max_pos = max(dfdx_val, T(0));
+    T max_neg = max(-dfdx_val, T(0));
+
+    pij[idx] = upp_minus_x_sq * (1.001 * max_pos + 
+         0.001 * max_neg + eps * inv_xgap);
+    qij[idx] = x_minus_low_sq * (0.001 * max_pos + 
+         1.001 * max_neg + eps * inv_xgap);
   }
 }
 
+template <typename T>
+__global__ void mma_sub4_kernel(
+    const T* __restrict__ x,
+    const T* __restrict__ low,
+    const T* __restrict__ upp,
+    const T* __restrict__ pij,
+    const T* __restrict__ qij,
+    T* __restrict__ temp,
+    const int n,
+    const int m) {
 
-template< typename T >
-__global__ void mma_sub4_kernel(const T* __restrict__ x, T* __restrict__ low,
-     T* __restrict__ upp, T* __restrict__ pij, T* __restrict__ qij,
-     T* __restrict__ temp, const int n, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     for (int i = 0; i < m; i++) {
-        temp[i + tj*m] = pij[i + tj*m] / (upp[tj] - x[tj]) +
-         qij[i + tj*m] / (x[tj] - low[tj]);
-     }
+  if (tj >= n) return;
+
+  // Register caching
+  const T xt     = x[tj];
+  const T low_t  = low[tj];
+  const T upp_t  = upp[tj];
+
+  const T denom_upp = upp_t - xt;
+  const T denom_low = xt - low_t;
+
+  const T eps = T(1e-12);  // Precision-dependent epsilon
+  const T inv_denom_upp = T(1) / max(denom_upp, eps);
+  const T inv_denom_low = T(1) / max(denom_low, eps);
+
+  const int base_idx = tj * m;
+
+  for (int i = 0; i < m; ++i) {
+    int idx = base_idx + i;
+    temp[idx] = pij[idx] * inv_denom_upp + qij[idx] * inv_denom_low;
   }
 }
 
 
 template <typename T>
-__global__ void mma_max2_kernel(T* __restrict__ xsi, const T* __restrict__ x,
-     T* __restrict__ alpha, const int n) {
+__global__ void mma_max2_kernel(
+    T* __restrict__ xsi,
+    const T* __restrict__ x,
+    const T* __restrict__ alpha,
+    const int n) {
+
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     xsi[tj] = max(1.0, 1.0 / (x[tj] - alpha[tj]));
+  if (tj >= n) return;
+
+  const T eps = T(1e-12);
+  T denom = max(x[tj] - alpha[tj], eps);
+  xsi[tj] = max(T(1), T(1) / denom);
+}
+
+template <typename T>
+__global__ void relambda_kernel(
+    T* __restrict__ temp,
+    const T* __restrict__ x,
+    const T* __restrict__ xupp,
+    const T* __restrict__ xlow,
+    const T* __restrict__ pij,
+    const T* __restrict__ qij,
+    const int n,
+    const int m) {
+
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= n) return;
+
+  const T xt = x[tj];
+  const T xup = xupp[tj];
+  const T xlo = xlow[tj];
+
+  // Prevent divide-by-zero using small epsilon
+  const T eps = T(1e-12);
+  const T inv_denom_upp = T(1) / max(xup - xt, eps);
+  const T inv_denom_low = T(1) / max(xt - xlo, eps);
+
+  int base_idx = tj * m;
+  for (int i = 0; i < m; ++i) {
+    int idx = base_idx + i;
+    temp[idx] = pij[idx] * inv_denom_upp + qij[idx] * inv_denom_low;
   }
 }
 
 
-
 template <typename T>
-__global__ void relambda_kernel(T* __restrict__ temp, const T* __restrict__ x,
-     const T* __restrict__ xupp, const T* __restrict__ xlow,
-     const T* __restrict__ pij, const T* __restrict__ qij, const int n,
-   const int m) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     for (int i = 0; i < m; i++) {
-        temp[i + tj*m] = pij[i + tj*m] / (xupp[tj] - x[tj]) +
-         qij[i + tj*m] / (x[tj] - xlow[tj]);
-     }
-  }
-}
+__global__ void sub2cons2_kernel(
+    T* __restrict__ a,
+    const T* __restrict__ b,
+    const T* __restrict__ c,
+    const T* __restrict__ d,
+    const T e,
+    const int n) {
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx >= n) return;
 
+    const T bt = b[idx];
+    const T ct = c[idx];
+    const T dt = d[idx];
 
-template <typename T>
-__global__ void sub2cons2_kernel(T* __restrict__ a, const T* __restrict__ b,
-     const T* __restrict__ c, const T* __restrict__ d,
-     const T e, const int n) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-     a[tj] = b[tj]*(c[tj]-d[tj])-e;
-  }
+    a[idx] = bt * (ct - dt) - e;
 }
 
 template< typename T>
@@ -231,8 +352,6 @@ __inline__ __device__ T max_reduce_warp(T val) {
   val = max(val, __shfl_down(val, 1, 32));
   return val;
 }
-
-
 
 template< typename T >
 __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
@@ -263,69 +382,130 @@ __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
 
 }
 
+
 template <typename T>
-__global__ void max_reduce_kernel(T*  __restrict__ bufred, const int n) {
+__global__ void max_reduce_kernel(T* __restrict__ bufred, const int n) {
 
-  T maxval = 0.0;
-  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int str = blockDim.x * gridDim.x;
-  for (int i = idx; i < n; i += str)
-  {
-    maxval =max(maxval, bufred[i]);
-  }
+    T maxval = T(0);
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
 
-  __shared__ T shared[32];
-  unsigned int lane = threadIdx.x % warpSize;
-  unsigned int wid = threadIdx.x / warpSize;
+    // Grid-stride loop to cover all elements
+    for (int i = idx; i < n; i += stride) {
+        maxval = max(maxval, bufred[i]);
+    }
 
-  maxval = max_reduce_warp<T>(maxval);
-  if (lane == 0)
-    shared[wid] = maxval;
-  __syncthreads();
+    __shared__ T shared[32];  // One slot per warp (max 1024 threads/block)
 
-  maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0.0;
-  if (wid == 0)
+    unsigned int lane = threadIdx.x % warpSize;
+    unsigned int wid = threadIdx.x / warpSize;
+
+    // Warp-level max reduction
     maxval = max_reduce_warp<T>(maxval);
 
-  if (threadIdx.x == 0)
-    bufred[blockIdx.x] = maxval;
+    // Store each warp's max value in shared memory
+    if (lane == 0) {
+        shared[wid] = maxval;
+    }
+    __syncthreads();
+
+    // Let the first warp reduce the warp-level maxima
+    maxval = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : T(0);
+    if (wid == 0) {
+        maxval = max_reduce_warp<T>(maxval);
+    }
+
+    // Write the block's maximum value back to bufred[blockIdx.x]
+    if (threadIdx.x == 0) {
+        bufred[blockIdx.x] = maxval;
+    }
+}
+
+
+template <typename T>
+__global__ void delx_kernel(
+    T* __restrict__ delx,
+    const T* __restrict__ x,
+    const T* __restrict__ xlow,
+    const T* __restrict__ xupp,
+    const T* __restrict__ pij,
+    const T* __restrict__ qij,
+    const T* __restrict__ p0j,
+    const T* __restrict__ q0j,
+    const T* __restrict__ alpha,
+    const T* __restrict__ beta,
+    const T* __restrict__ lambda,
+    const T epsi,
+    const int n,
+    const int m) 
+{
+    int tj = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tj < n) {
+        T xt = x[tj];
+        T xlow_t = xlow[tj];
+        T xupp_t = xupp[tj];
+        T alpha_t = alpha[tj];
+        T beta_t = beta[tj];
+        
+        // Precompute denominators squared for better performance
+        T denom_low = xt - xlow_t;
+        T denom_upp = xupp_t - xt;
+        T denom_alpha = xt - alpha_t;
+        T denom_beta = beta_t - xt;
+
+        const T small_eps = T(1e-12);
+        denom_low = (abs(denom_low) < small_eps) ? small_eps : denom_low;
+        denom_upp = (abs(denom_upp) < small_eps) ? small_eps : denom_upp;
+        denom_alpha = (abs(denom_alpha) < small_eps) ? small_eps : denom_alpha;
+        denom_beta = (abs(denom_beta) < small_eps) ? small_eps : denom_beta;
+
+        T sum = T(0);
+        for (int i = 0; i < m; i++) {
+            T lambda_i = lambda[i];
+            sum += pij[i + tj * m] * lambda_i / (denom_upp * denom_upp)
+                 - qij[i + tj * m] * lambda_i / (denom_low * denom_low);
+        }
+        sum += p0j[tj] / (denom_upp * denom_upp)
+             - q0j[tj] / (denom_low * denom_low)
+             - epsi / denom_alpha
+             + epsi / denom_beta;
+
+        delx[tj] = sum;
+    }
 }
 
 template <typename T>
-__global__ void delx_kernel(T* __restrict__ delx, const T* __restrict__ x,
-     const T* __restrict__ xlow, const T* __restrict__ xupp,
-     const T* __restrict__ pij, const T* __restrict__ qij,
-   const T* __restrict__ p0j, const T* __restrict__ q0j,
-     const T* __restrict__ alpha, const T* __restrict__ beta,
-   const T* __restrict__ lambda, const T epsi, const int n, const int m) {
+__global__ void GG_kernel(
+    T* __restrict__ GG,
+    const T* __restrict__ x,
+    const T* __restrict__ xlow,
+    const T* __restrict__ xupp,
+    const T* __restrict__ pij,
+    const T* __restrict__ qij,
+    const int n,
+    const int m) {
+
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
-    delx[tj]=0;
+    T xt = x[tj];
+    T xlow_t = xlow[tj];
+    T xupp_t = xupp[tj];
+
+    // Distances from bounds
+    T diff_upper = xupp_t - xt;
+    T diff_lower = xt - xlow_t;
+
+    // Squared distances
+    T diff_upper2 = diff_upper * diff_upper;
+    T diff_lower2 = diff_lower * diff_lower;
+
     for (int i = 0; i < m; i++) {
-      delx[tj] = delx[tj] + pij[i + tj * m] *
-         lambda[i] / pow(xupp[tj] - x[tj], 2) -
-           qij[i + tj * m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
-    }
-    delx[tj] = delx[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) -
-       q0j[tj] / pow(x[tj] - xlow[tj], 2) - epsi / (x[tj] - alpha[tj])
-         + epsi / (beta[tj] - x[tj]);
-  }
-}
-
-
-template <typename T>
-__global__ void GG_kernel(T* __restrict__ GG, const T* __restrict__ x,
-     const T* __restrict__ xlow, const T* __restrict__ xupp,
-     const T* __restrict__ pij, const T* __restrict__ qij, const int n,
-     const int m) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    for (int ggdumiter = 0; ggdumiter < m; ggdumiter++) {
-      GG[ggdumiter  + m*tj] = pij[ggdumiter + m*tj] / pow(xupp[tj] - x[tj], 2) -
-         qij[ggdumiter + m*tj] / pow(x[tj] - xlow[tj], 2);
+      int idx = i + tj * m;
+      GG[idx] = pij[idx] / diff_upper2 - qij[idx] / diff_lower2;
     }
   }
 }
+
 template <typename T>
 __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
      const T* __restrict__ xsi, const T* __restrict__ xlow,
@@ -450,36 +630,55 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
 
 }
 
-template< typename T >
-__global__ void mmasumHess_kernel(const T*  __restrict__ hijx,
-     const T*  __restrict__ Ljjxinv, T*  __restrict__ buf_h, const int n,
-   const int m, const int k0, const int k1) {
+template <typename T>
+__global__ void mmasumHess_kernel(
+    const T* __restrict__ hijx,
+    const T* __restrict__ Ljjxinv,
+    T* __restrict__ buf_h,
+    const int n,
+    const int m,
+    const int k0,
+    const int k1)
+{
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int stride = blockDim.x * gridDim.x;
 
-  const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  const int str = blockDim.x * gridDim.x;
+    // Warp lane and warp id within the block
+    const unsigned int lane = threadIdx.x % warpSize;
+    const unsigned int wid = threadIdx.x / warpSize;
 
-  const unsigned int lane = threadIdx.x % warpSize;
-  const unsigned int wid = threadIdx.x / warpSize;
-  // this is similar to mmasumAA_kernel but with Ljjxinv_d = 1/diagx
-  __shared__ T shared[32];
-  T sum = 0;
-  for (int i = idx; i < n; i += str)
-  {
-    sum += hijx[ k0 + i * m] * Ljjxinv[i]  * hijx[ k1 + i * m];
-  }
+    // Shared memory sized by number of warps per block
+    extern __shared__ T shared[]; 
 
-  sum = reduce_warp<T>(sum);
-  if (lane == 0)
-    shared[wid] = sum;
-  __syncthreads();
+    T sum = T(0);
 
-  sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : 0;
-  if (wid == 0)
+    // Grid-stride loop for global reduction
+    for (int i = idx; i < n; i += stride) {
+        // hijx is indexed as hijx[offset + row * m]
+        T val0 = hijx[k0 + i * m];
+        T val1 = hijx[k1 + i * m];
+        sum += val0 * Ljjxinv[i] * val1;
+    }
+
+    // Warp-level reduction using your reduce_warp implementation
     sum = reduce_warp<T>(sum);
 
-  if (threadIdx.x == 0)
-    buf_h[blockIdx.x] = sum;
+    // Write each warp's partial sum to shared memory
+    if (lane == 0) {
+        shared[wid] = sum;
+    }
+    __syncthreads();
 
+    // First warp reduces the warp sums in shared memory
+    sum = (threadIdx.x < blockDim.x / warpSize) ? shared[lane] : T(0);
+    if (wid == 0) {
+        sum = reduce_warp<T>(sum);
+    }
+
+    // Write final result from first thread of block
+    if (threadIdx.x == 0) {
+        buf_h[blockIdx.x] = sum;
+    }
 }
 
 template< typename T >
@@ -576,26 +775,40 @@ __global__ void deta_kernel(T* __restrict__ deta, const T* __restrict__ eta,
   }
 }
 
-
-
 template <typename T>
-__global__ void RexCalculation_kernel(T* __restrict__ rex,
-     const T* __restrict__ x, const T* __restrict__ xlow,
-   const T* __restrict__ xupp, const T* __restrict__ pij,
-   const T* __restrict__ p0j, const T* __restrict__ qij,
-   const T* __restrict__ q0j, const T* __restrict__ lambda,
-   const T* __restrict__ xsi, const T* __restrict__ eta, const int n,
-   const int m) {
-  int tj = blockIdx.x * blockDim.x + threadIdx.x;
-  if (tj < n) {
-    rex[tj] = 0.0;
-    for (int i = 0; i < m; i++) {
-      rex[tj] = rex[tj] + pij[i +tj*m] * lambda[i] / pow(xupp[tj] - x[tj], 2) -
-         qij[i +tj*m] * lambda[i] / pow(x[tj] - xlow[tj], 2);
+__global__ void RexCalculation_kernel(
+    T* __restrict__ rex,
+    const T* __restrict__ x,
+    const T* __restrict__ xlow,
+    const T* __restrict__ xupp,
+    const T* __restrict__ pij,
+    const T* __restrict__ p0j,
+    const T* __restrict__ qij,
+    const T* __restrict__ q0j,
+    const T* __restrict__ lambda,
+    const T* __restrict__ xsi,
+    const T* __restrict__ eta,
+    const int n,
+    const int m) 
+{
+    int tj = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tj < n) {
+        T upp_diff = xupp[tj] - x[tj];
+        T low_diff = x[tj] - xlow[tj];
+        T upp_diff_sq = upp_diff * upp_diff;
+        T low_diff_sq = low_diff * low_diff;
+
+        T sum = 0.0;
+        for (int i = 0; i < m; ++i) {
+            sum += pij[i + tj * m] * lambda[i] / upp_diff_sq
+                 - qij[i + tj * m] * lambda[i] / low_diff_sq;
+        }
+
+        rex[tj] = sum
+                 + p0j[tj] / upp_diff_sq
+                 - q0j[tj] / low_diff_sq
+                 - xsi[tj] + eta[tj];
     }
-    rex[tj] = rex[tj] + p0j[tj] / pow(xupp[tj] - x[tj], 2) -
-       q0j[tj] / pow(x[tj] - xlow[tj], 2) - xsi[tj] + eta[tj];
-  }
 }
 
 template <typename T>

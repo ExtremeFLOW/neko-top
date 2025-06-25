@@ -93,7 +93,7 @@ contains
     problem_header = problem%get_log_header()
     optimization_header = 'iter, ' // trim(problem_header) // &
          ', KKTmax, KKTnorm2, scaling factor'
-    call this%logger%set_header(trim(optimization_header))
+   !  call this%logger%set_header(trim(optimization_header))
 
     x = design%get_values()
 
@@ -109,6 +109,8 @@ contains
     call this%init_from_components(problem, design, &
          max_iterations, tolerance, performance, simulation)
 
+    call this%logger%set_header(trim(optimization_header) // &
+         this%mma%get_backend_and_subsolver())
     call x%free()
   end subroutine mma_optimizer_init_from_json
 
