@@ -687,7 +687,7 @@ contains
 
     n = this%dm_Xh%size()
 
-    call profiler_start_region('Adjoint', 1)
+    call profiler_start_region('Adjoint', 13)
     associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
          p => this%p_adj, &
          u_e => this%u_adj_e, v_e => this%v_adj_e, w_e => this%w_adj_e, &
@@ -857,7 +857,7 @@ contains
            this%full_stress_formulation, this%strict_convergence)
 
     end associate
-    call profiler_end_region('Adjoint', 1)
+    call profiler_end_region('Adjoint', 13)
 
   end subroutine adjoint_fluid_pnpn_step
 
