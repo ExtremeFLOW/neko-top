@@ -489,7 +489,7 @@ contains
     ! Build the header
     call json_get_or_default(params, 'output_file', &
          file_name, 'power_iterations.csv')
-    this%file_output = file_t(trim(file_name))
+    call this%file_output%init(trim(file_name))
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
 
@@ -687,7 +687,7 @@ contains
 
     n = this%dm_Xh%size()
 
-    call profiler_start_region('Adjoint', 1)
+    call profiler_start_region('Adjoint', 13)
     associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
          p => this%p_adj, &
          u_e => this%u_adj_e, v_e => this%v_adj_e, w_e => this%w_adj_e, &
@@ -857,7 +857,7 @@ contains
            this%full_stress_formulation, this%strict_convergence)
 
     end associate
-    call profiler_end_region('Adjoint', 1)
+    call profiler_end_region('Adjoint', 13)
 
   end subroutine adjoint_fluid_pnpn_step
 
@@ -1222,7 +1222,7 @@ contains
     end do
 
 
-    bdry_file = file_t('boundary_adjoint.fld')
+    call bdry_file%init('boundary_adjoint.fld')
     call bdry_file%write(bdry_field)
 
     call this%scratch%relinquish_field(temp_index)
