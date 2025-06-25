@@ -132,6 +132,33 @@ adjoint the opposite occurs as the equation for \f$\mathbf{u}^\dagger\f$ depends
 on \f$\phi^\dagger\f$, hence in `neko-top` we first solve for the adjoint scalar
 and then solve for the adjoint velocity.
 
+### Multiple scalars
+In the case of using multiple scalar transport equations involving multiple
+scalar fields \f$\phi_i(\mathbf{x},t)\f$, the assumption is made that
+all scalars are passive, that is, coupled in one way to the velocity, and,
+in no way coupled to one another. If this is not the case, additional care
+must be taken by the user when deriving their adjoint equations, and will likely
+introduce additional coupling terms in the adjoint equations. In lieu of this,
+each adjoint equation will take an identical form to that stated above, and
+the adjoint velocity momentum equation will contain the summation over all the
+additional coupling terms
+
+\f[
+    - \int_\Omega \mathbf{v} \cdot \frac{\partial \mathbf{u}^\dagger}{\partial t}
+    + \int_\Omega \mathbf{v} \cdot (\nabla \mathbf{u})^T \mathbf{u}^\dagger
+    + \int_\Omega \nabla \mathbf{v} \cdot (\mathbf{u} \otimes \mathbf{u}^\dagger)
+    + \underline{\sum_i \int_\Omega (\mathbf{v} \cdot \nabla \phi_i) \phi_i^\dagger}
+    =
+    - \int_\Omega \mathbf{v} \cdot \nabla p^\dagger
+    + \frac{1}{Re} \int_\Omega \nabla \mathbf{v} \cdot \nabla \mathbf{u}^\dagger
+    + \int_\Omega \mathbf{v} \cdot \mathbf{f}^\dagger.
+\f]
+
+\note If a given \f$\phi_i(\mathbf{x},t)\f$ is not contained in the
+objective, there will be no resulting forcing to drive the adjoint scalar
+equation, effectively yielding \f$\phi_i(\mathbf{x},t)^\dagger = \mathbf{0}\f$,
+and hence, will in theory have no contribution to the adjoint momentum equation.
+
 ## Immersed Boundary Methods
 Following a Brinkman style immersed boundary method, the presence of an
 immersed object is imposed by the Brinkman forcing term \f$\mathbf{f} = - \chi
