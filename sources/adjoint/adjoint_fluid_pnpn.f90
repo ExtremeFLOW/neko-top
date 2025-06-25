@@ -489,7 +489,7 @@ contains
     ! Build the header
     call json_get_or_default(params, 'output_file', &
          file_name, 'power_iterations.csv')
-    this%file_output = file_t(trim(file_name))
+    call this%file_output%init(trim(file_name))
     write(header_line, '(A)') 'Time, Norm, Scaling'
     call this%file_output%set_header(header_line)
 
@@ -1222,7 +1222,7 @@ contains
     end do
 
 
-    bdry_file = file_t('boundary_adjoint.fld')
+    call bdry_file%init('boundary_adjoint.fld')
     call bdry_file%write(bdry_field)
 
     call this%scratch%relinquish_field(temp_index)
