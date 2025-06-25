@@ -102,6 +102,7 @@ contains
   !! @param this The source term.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, &
        json, fields, coef, variable_name)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
