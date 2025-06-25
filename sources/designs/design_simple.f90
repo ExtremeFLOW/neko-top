@@ -54,6 +54,8 @@ module simple_design
   use vector, only: vector_t
   use math, only: copy
   use field_registry, only: neko_field_registry
+  use mpi_f08, only: MPI_Comm_size, MPI_COMM_WORLD
+  use utils, only: neko_error
   implicit none
   private
 
@@ -142,17 +144,17 @@ contains
        call z%init(n)
        index = 1
        do k = 1, nz + 1
-         do j = 1, ny + 1
+          do j = 1, ny + 1
              do i = 1, nx + 1
-               x%x(index) = limits(1) + (limits(2) - limits(1)) * &
-                    real(i - 1, kind=rp) / real(nx, kind=rp)
-               y%x(index) = limits(3) + (limits(4) - limits(3)) * &
-                    real(j - 1, kind=rp) / real(ny, kind=rp)
-               z%x(index) = limits(5) + (limits(6) - limits(5)) * &
-                    real(k - 1, kind=rp) / real(nz, kind=rp)
-               index = index + 1
+                x%x(index) = limits(1) + (limits(2) - limits(1)) * &
+                     real(i - 1, kind=rp) / real(nx, kind=rp)
+                y%x(index) = limits(3) + (limits(4) - limits(3)) * &
+                     real(j - 1, kind=rp) / real(ny, kind=rp)
+                z%x(index) = limits(5) + (limits(6) - limits(5)) * &
+                     real(k - 1, kind=rp) / real(nz, kind=rp)
+                index = index + 1
              end do
-         end do
+          end do
        end do
 
     end select
@@ -165,10 +167,21 @@ contains
     class(simple_design_t), intent(inout) :: this
     integer, intent(in) :: n
     type(vector_t), intent(in) :: x, y, z
+    integer :: nproc, ierr
+
+    ! Throw an error if we run on multiple MPI ranks
+    call MPI_Comm_size(MPI_COMM_WORLD, nproc, ierr)
+    if (nproc .gt. 1) then
+       call neko_error('simple_design_t can only be used on a single MPI rank')
+    end if
 
     call this%init_base(n)
 
     call this%values%init(n)
+    call this%x%init(n)
+    call this%y%init(n)
+    call this%z%init(n)
+
     this%x = x
     this%y = y
     this%z = z
@@ -266,8 +279,8 @@ contains
 
     open(unit=10, file=filename, status='replace', action='write', iostat=ios)
     if (ios /= 0) then
-        print *, 'Error opening file ', filename
-        stop
+       print *, 'Error opening file ', filename
+       stop
     end if
 
     ! Header
@@ -280,7 +293,7 @@ contains
     ! Points
     write(10,'(A,1X,I0,1X,A)') 'POINTS', npts, 'float'
     do i = 1, npts
-        write(10,'(3(F20.12,1X))') this%x%x(i), this%y%x(i), this%z%x(i)
+       write(10,'(3(F20.12,1X))') this%x%x(i), this%y%x(i), this%z%x(i)
     end do
 
     ! Scalars
@@ -288,7 +301,7 @@ contains
     write(10,'(A)') 'SCALARS density float 1'
     write(10,'(A)') 'LOOKUP_TABLE default'
     do i = 1, npts
-        write(10,'(F20.12)') this%values%x(i)
+       write(10,'(F20.12)') this%values%x(i)
     end do
 
     close(10)
