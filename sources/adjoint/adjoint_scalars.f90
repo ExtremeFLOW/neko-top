@@ -88,9 +88,11 @@ contains
   !! @param[in] msh The mesh structure used to define the field topology.
   !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
-  !! @param[inout] params_adjoint JSON parameters specific to the adjoint scalars.
+  !! @param[inout] params_adjoint JSON parameters specific to the
+  !!     adjoint scalars.
   !! @param[inout] params_primal JSON parameters specific to the primal scalars.
-  !! @param[inout] numerics_params JSON structure containing numerics parameters.
+  !! @param[inout] numerics_params JSON structure containing
+  !!     numerics parameters.
   !! @param[in] user User-defined interface.
   !! @param[inout] chkp Checkpointing structure.
   !! @param[in] ulag, vlag, wlag Field history of the primal velocity fields.
@@ -216,9 +218,17 @@ contains
   !! @param[in] msh The mesh structure used to define the field topology.
   !! @param coef The SEM coefficients.
   !! @param[inout] gs Gather scatter object.
+  <<<<<<< HEAD
   !! @param[inout] params_adjoint JSON parameters specific to the adjoint scalars.
   !! @param[inout] params_primal JSON parameters specific to the primal scalars.
   !! @param[inout] numerics_params JSON structure containing numerics parameters.
+  =======
+  !! @param[inout] params_adjoint JSON parameters specific to the adjoint
+  !!     scalars.
+  !! @param[inout] params_primal JSON parameters specific to the primal scalars.
+  !! @param[inout] numerics_params JSON structure containing numerics
+  !!     parameters.
+  >>>>>>> develop
   !! @param[in] user User-defined interface.
   !! @param[inout] chkp Checkpointing structure.
   !! @param[in] ulag, vlag, wlag Field history of the primal velocity fields.

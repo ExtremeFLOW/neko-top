@@ -121,7 +121,7 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
-    call json_get_or_default(json, "scalar_name", scalar_name, "s1")
+    call json_get_or_default(json, "scalar_name", scalar_name, "s")
 
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &
@@ -172,14 +172,8 @@ contains
     this%scalar_name = trim(scalar_name)
 
     ! figure out the index associated with the scalar and adjoint scalar.
-    if (size(simulation%scalars%scalar_fields) == 1 &
-         .and. size(simulation%adjoint_scalars%adjoint_scalar_fields) == 1) then
-       i_scalar = 1
-       i_adjoint_scalar = 1
-    else
-       call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
-            simulation%adjoint_scalars, this%scalar_name)
-    end if
+    call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
+         simulation%adjoint_scalars, this%scalar_name)
 
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
