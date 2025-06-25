@@ -46,6 +46,7 @@ module steady_simcomp
   use csv_file, only : csv_file_t
   use vector, only: vector_t
   use time_state, only: time_state_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -125,7 +126,7 @@ contains
 
     ! Check if the scalar field is allocated
     if (this%have_scalar) then
-       call this%s_old%init(this%case%scalar%s%dof)
+       call this%s_old%init(this%case%scalars%scalar_fields(1)%s%dof)
     end if
 
   end subroutine steady_simcomp_init_from_attributes
@@ -176,7 +177,10 @@ contains
     p => this%case%fluid%p
 
     if (this%have_scalar) then
-       s => this%case%scalar%s
+       if (size(this%case%scalars%scalar_fields) .gt. 1) then
+          call neko_error('steady simcomp only works for a single scalar')
+       end if
+       s => this%case%scalars%scalar_fields(1)%s
     else
        s => null()
     end if
@@ -262,4 +266,3 @@ contains
 
 
 end module steady_simcomp
-
