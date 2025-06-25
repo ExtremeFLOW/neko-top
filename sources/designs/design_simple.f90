@@ -44,7 +44,7 @@ module simple_design
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use design, only: design_t
   use math, only: rzero
   use simulation_m, only: simulation_t
@@ -156,6 +156,12 @@ contains
              end do
           end do
        end do
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
+          call device_memcpy(y%x, y%x_d, n, HOST_TO_DEVICE, sync = .false.)
+          call device_memcpy(z%x, z%x_d, n, HOST_TO_DEVICE, sync = .true.)
+       end if
 
     end select
 
@@ -274,6 +280,18 @@ contains
     ny = this%ny + 1
     nz = this%nz + 1
     npts = nx * ny * nz
+
+    ! Synchronize the device memory if using a GPU backend is enabled
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%x%x, this%x%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%y%x, this%y%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%z%x, this%z%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%values%x, this%values%x_d, npts, &
+            DEVICE_TO_HOST, sync = .true.)
+    end if
 
     write(filename, '(A,I4.4,A)') 'design_', idx, '.vtk'
 

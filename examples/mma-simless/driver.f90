@@ -11,6 +11,8 @@ program usrneko
   use vector, only: vector_t
   use num_types, only: rp
   use comm, only: pe_rank
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
 
   implicit none
 
@@ -56,10 +58,13 @@ program usrneko
   ! initialize the design
   call initdesign%init(design%size_global())
   initdesign%x = 1.0_rp
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+     call device_memcpy(initdesign%x, initdesign%x_d, design%size_global(), &
+          HOST_TO_DEVICE, sync = .true.)
+  end if
   call design%update_design(initdesign)
   ! write the initial design
   call design%write(0)
-
 
   ! -------------------------------------------------------------------------- !
   ! Construct the problem
@@ -95,19 +100,19 @@ program usrneko
   call problem%add_constraint(con_1)
   call problem%add_constraint(con_2)
 
-
-
-
-
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
   call optimizer_factory(optimizer, parameters, problem, design)
-
 
   call optimizer%run(problem, design)
 
   call finaldesign%init(design%size_global())
   finaldesign = design%get_values()
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+     call device_memcpy(finaldesign%x, finaldesign%x_d, design%size_global(), &
+          DEVICE_TO_HOST, sync = .true.)
+  end if
+
   print *, "min(design%values)=", minval(finaldesign%x), &
        "max(design%values)=", maxval(finaldesign%x)
   ! -------------------------------------------------------------------------- !
