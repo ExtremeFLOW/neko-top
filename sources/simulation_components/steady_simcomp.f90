@@ -86,7 +86,7 @@ contains
 
   ! Constructor from json.
   subroutine steady_simcomp_init_from_json(this, json, case)
-    class(steady_simcomp_t), intent(inout) :: this
+    class(steady_simcomp_t), intent(inout), target :: this
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
     real(kind=dp) :: tol
