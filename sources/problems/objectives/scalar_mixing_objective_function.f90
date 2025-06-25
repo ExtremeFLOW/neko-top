@@ -51,6 +51,7 @@ module scalar_mixing_objective
   use utils, only: neko_error
   use adjoint_mixing_scalar_source_term, only: &
        adjoint_mixing_scalar_source_term_t
+  use neko_ext, only: get_scalar_indicies
   ! delete after the simulation computes u u_adj
   use field_math, only: field_addcol3, field_col3
   implicit none
@@ -70,6 +71,8 @@ module scalar_mixing_objective
      class(coef_t), pointer :: coef
      !> Volume of the domain \f$|\Omega_{obj}|\f$
      real(kind=rp) :: domain_volume
+     !> name of the scalar field being acted on
+     character(len=:), allocatable :: scalar_name
 
      ! -----------------------------------------------------------------
      ! THESE SHOULD BE DELETED WHEN THE DESIGN UPDATE COMES IN.
@@ -112,15 +115,17 @@ contains
     real(kind=rp) :: phi_ref
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
+    character(len=:), allocatable :: scalar_name
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
+    call json_get_or_default(json, "scalar_name", scalar_name, "s")
 
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, phi_ref)
+         mask_name, phi_ref, scalar_name)
   end subroutine scalar_mixing_init_json_sim
 
   !> The actual constructor.
@@ -131,8 +136,9 @@ contains
   !! @param name the name of the objective function.
   !! @param mask_name the name of the mask.
   !! @param phi_ref target concentration used in the objective function.
+  !! @param scalar_name name of the scalar field.
   subroutine scalar_mixing_init_attributes(this, design, simulation, weight, &
-       name, mask_name, phi_ref)
+       name, mask_name, phi_ref, scalar_name)
     class(scalar_mixing_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -140,10 +146,13 @@ contains
     real(kind=rp), intent(in) :: phi_ref
     character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: scalar_name
+
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
+    integer :: i_scalar, i_adjoint_scalar
 
     ! Start by checking if the adjoint scalar has been initialized
-    if (.not.allocated(simulation%adjoint_case%scalar_adj)) then
+    if (.not.allocated(simulation%adjoint_case%adjoint_scalars)) then
        call neko_error("adjoint passive scalar not initialized")
     end if
 
@@ -160,15 +169,22 @@ contains
        this%domain_volume = this%coef%volume
     end if
 
+    this%scalar_name = trim(scalar_name)
+
+    ! figure out the index associated with the scalar and adjoint scalar.
+    call get_scalar_indicies(i_scalar, i_adjoint_scalar, simulation%scalars, &
+         simulation%adjoint_scalars, this%scalar_name)
+
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
-    associate(f_phi_adj => simulation%adjoint_scalar%f_Xh)
+    associate(f_phi_adj => &
+         simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref
 
       ! Associate forward passive scalar
-      this%phi => simulation%scalar%s
+      this%phi => simulation%scalars%scalar_fields(i_scalar)%s
 
       ! Initialize the scalar mixing adjoint source term
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
@@ -177,7 +193,8 @@ contains
     end associate
 
     ! append adjoint source term to the adjoint passive scalar equation
-    call simulation%adjoint_scalar%source_term%add_source_term(adjoint_forcing)
+    call simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar) &
+         %source_term%add_source_term(adjoint_forcing)
 
     !--------------------------------------------------------------------------
     ! THIS SHOULD BE REPLACED WHEN THE DESIGN UPDATE OCCURS

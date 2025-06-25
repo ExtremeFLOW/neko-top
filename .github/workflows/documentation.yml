@@ -1,0 +1,87 @@
+name: Documentation
+
+# Runs on every push to the develop branch. Since the develop branch is
+# protected, only pull requests can be merged into it. This ensures that the
+# documentation is only built and deployed when a pull request is merged.
+on:
+  workflow_call:
+  pull_request:
+    branches:
+      - "develop"
+  push:
+    branches:
+      - "develop"
+
+# Set workflow concurrency to prevent multiple runs from being triggered
+# simultaneously for the same branch.
+concurrency:
+  group: "documentation-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+
+  # -------------------------------------------------------------------------- #
+  # Build Documentation job
+
+  build-docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup system
+        shell: bash
+        run: |
+          sudo apt install git cmake doxygen graphviz
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure documentation
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          BUILD_TYPE=Develop
+          if [ "$BRANCH_NAME" == "develop" ]; then
+            echo "Building documentation for the develop branch"
+            BUILD_TYPE=Release
+          else
+            echo "Skipping documentation build for the $BRANCH_NAME branch"
+          fi
+          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+
+      - name: Build documentation
+        run: |
+          cmake --build build --target Documentation
+
+      - name: Upload static files as artifact
+        id: deployment
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: documentation/html/
+
+  # -------------------------------------------------------------------------- #
+  # Deploy documentation job
+
+  deploy-docs:
+    name: Deploy documentation
+    # If the job is triggered by a pull request, it will not run.
+    # If the job is triggered by a push to the develop branch, it will run.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    needs: build-docs
+
+    # Define the deployment environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+      # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    # Define the deployment strategy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
