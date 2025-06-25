@@ -10,6 +10,7 @@ program usrneko
   use json_utils_ext, only: json_read_file
   use vector, only: vector_t
   use num_types, only: rp
+  use comm, only: pe_rank
 
   implicit none
 
@@ -47,7 +48,9 @@ program usrneko
 
   call design_factory(design, parameters)
 
-  print *, "number of design variables=", design%size_global()
+  if (pe_rank .eq. 0) then
+     print *, "number of design variables=", design%size_global()
+  end if
 
 
   ! initialize the design
@@ -74,7 +77,7 @@ program usrneko
   call obj%init_from_components("Objective", design)
   call con_1%init_from_components("Positive", design, 1)
   call con_2%init_from_components("Negative", design, -1)
-  
+
   ! update obj and cons and sensitivities for the init design
   call obj%update_value(design)
   call obj%update_sensitivity(design)
@@ -82,7 +85,7 @@ program usrneko
   call con_1%update_sensitivity(design)
   call con_2%update_value(design)
   call con_2%update_sensitivity(design)
-  
+
   print *, "objective value for the initial design=", obj%value
 
   ! initialize the problem
