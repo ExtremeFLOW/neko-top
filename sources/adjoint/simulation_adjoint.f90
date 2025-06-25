@@ -224,7 +224,7 @@ contains
     call C%case%params%get('case.restart_mesh_file', restart_mesh_file, found)
 
     if (found) then
-       previous_meshf = file_t(trim(restart_mesh_file))
+       call previous_meshf%init(trim(restart_mesh_file))
        call previous_meshf%read(C%fluid_adj%chkp%previous_mesh)
     end if
 
@@ -232,7 +232,7 @@ contains
 
     if (found) C%case%fluid%chkp%mesh2mesh_tol = tol
 
-    chkpf = file_t(trim(restart_file))
+    call chkpf%init(trim(restart_file))
     call chkpf%read(C%fluid_adj%chkp)
     C%time%dtlag = C%fluid_adj%chkp%dtlag
     C%time%tlag = C%fluid_adj%chkp%tlag
@@ -277,7 +277,7 @@ contains
           format_str = '.h5'
        end if
     end if
-    chkpf = file_t(C%case%output_directory // 'joblimit' // trim(format_str))
+    call chkpf%init(C%case%output_directory // 'joblimit' // trim(format_str))
     call chkpf%write(C%case%fluid%chkp, t)
     write(log_buf, '(A)') '! saving checkpoint >>>'
     call neko_log%message(log_buf)
