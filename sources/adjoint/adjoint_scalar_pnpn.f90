@@ -446,7 +446,7 @@ contains
          call add2s2(s_adj%x, ds_adj%x, 1.0_rp, n)
       end if
 
-      call scalar_step_info(tstep, t, dt, ksp_results)
+      call scalar_step_info(time, ksp_results)
 
     end associate
     call profiler_end_region('Scalar', 2)
