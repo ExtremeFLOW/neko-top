@@ -853,7 +853,7 @@ contains
 
       end if
 
-      call fluid_step_info(tstep, t, dt, ksp_results, &
+      call fluid_step_info(time, ksp_results, &
            this%full_stress_formulation, this%strict_convergence)
 
     end associate
