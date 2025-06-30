@@ -1,0 +1,75 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "data_local/petsc_static_mixer/domain_256.nmsh", //
+        "output_directory": "fields",
+        "output_at_end": true,
+        "output_boundary": true,
+        "end_time": 2.0,
+        "timestep": 5e-4,
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 7,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 1000.0,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "inflow_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": "jacobi",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": "hsmg",
+                "projection_space_size": 0,
+                "absolute_tolerance": 1e-7,
+                "max_iterations": 800
+            },
+            "output_control": "nsamples",
+            "output_value": 250,
+            "boundary_types": [
+                "v",
+                "v",
+                "o",
+                "w"
+            ],
+            "source_terms": [
+                {
+                    "type": "brinkman",
+                    "objects": [
+                        {
+                            "type": "boundary_mesh",
+                            "name": "data_local/petsc_static_mixer/surface_low_95.stl",
+                            "distance_transform": {
+                                "type": "smooth_step",
+                                "value": 0.1
+                            }
+                        }
+                    ],
+                    "brinkman": {
+                        "limits": [ 0.0, 100.0 ],
+                        "penalty": 1.0
+                    }
+                }
+            ]
+        }
+    }
+}
