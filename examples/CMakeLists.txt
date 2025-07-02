@@ -29,7 +29,8 @@ set(EXAMPLES_DIR ${CMAKE_CURRENT_SOURCE_DIR} CACHE INTERNAL "Examples directory"
 add_custom_target(Examples
     COMMENT "Build all the examples."
     DEPENDS neko-top
-    )
+)
+set_target_properties(Examples PROPERTIES FOLDER "Examples")
 
 # Add the documentation target to ALL if we have "BUILD_EXAMPLES" enabled
 if (BUILD_EXAMPLES)

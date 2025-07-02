@@ -93,7 +93,7 @@ function(build_example)
     # Construct example name from the folder structure relative to EXAMPLES_DIR.
     set(TARGET_DIRECTORY ${EXAMPLES_DIR}/${EXAMPLE_NAME})
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
-    string(CONCAT EXAMPLE_NAME "Examples-" ${EXAMPLE_NAME})
+    string(CONCAT EXAMPLE_NAME ${EXAMPLE_NAME})
 
     add_executable(${EXAMPLE_NAME}
         EXCLUDE_FROM_ALL
@@ -107,6 +107,7 @@ function(build_example)
         PROPERTIES
         OUTPUT_NAME "neko"
         RUNTIME_OUTPUT_DIRECTORY "${TARGET_DIRECTORY}"
+        FOLDER "Examples/${EXAMPLE_NAME}"
     )
 
     # ........................................................................ #
@@ -119,14 +120,6 @@ function(build_example)
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     )
-
-    # Import the neko-top static library
-    add_library(neko-top-a STATIC IMPORTED)
-    set_target_properties(neko-top-a PROPERTIES
-        IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libneko-top.a"
-    )
-
-    add_dependencies(${EXAMPLE_NAME} neko-top)
 
     # Link our local Neko-TOP library to the driver
     target_link_libraries(${EXAMPLE_NAME} neko-top-a)
