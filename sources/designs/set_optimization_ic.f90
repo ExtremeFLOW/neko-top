@@ -338,7 +338,7 @@ contains
        end select
 
        ! Generates an interpolator object and performs the point search
-       global_interp = fld_data%generate_interpolator(fld%dof, fld%msh, &
+       call fld_data%generate_interpolator(global_interp, fld%dof, fld%msh, &
             tolerance)
 
        ! Evaluate design
