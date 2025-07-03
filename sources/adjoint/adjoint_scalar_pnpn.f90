@@ -436,6 +436,8 @@ contains
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Adjoint_scalar_solve', 21)
 
+      ksp_results(1)%name = 'Adjoint Scalar'
+
       call this%proj_s%post_solving(ds_adj%x, Ax, c_Xh, this%bclst_ds, gs_Xh, &
            n, tstep, dt_controller)
 
