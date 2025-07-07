@@ -135,6 +135,9 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 printf "=%.0s" {1..80} && printf "\n"
 printf "Compiling the example codes and Neko-TOP\n"
 
+# Clean the build directory if the clean flag is set
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+
 # Set CMAKE_VARIABLES to pass to the cmake command
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
@@ -143,18 +146,14 @@ if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
-# Set the variables for the compilation
-[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+# Enable desired features
+[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
+[ "$EXAMPLES" == true ] && CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=ON")
+
+# Set the variables for the compilation
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 [ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
-
-# Set the documentation flag
-if [ "$DOCS" == true ]; then
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
-else
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
-fi
 
 if [ ! -d $MAIN_DIR/build ]; then
     cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
@@ -162,10 +161,6 @@ fi
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
-
-# Build additional components
-[ "$DOCS" == true ] && cmake --build $MAIN_DIR/build --target Documentation --parallel
-[ "$EXAMPLES" == true ] && cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build
