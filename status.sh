@@ -90,7 +90,7 @@ for test in ${tests[@]}; do
                     stat="Running:"
                     progress=$(
                         tail -n 100 "${f%.*}.log" |        # Get the last 1000 lines
-                            grep '^\s*t = ' |              # Get all timestamps
+                            grep '^\s*Step = ' |           # Get all timestamps
                             tail -n 1 |                    # Get the last line
                             sed -e 's/.*\[\(.*\)].*/\1/' | # Get the progress
                             xargs                          # Trim whitespace
