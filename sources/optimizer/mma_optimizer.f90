@@ -175,14 +175,15 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
-    ! Stamp the initial condition
-    call mma_logger_assemble_data(log_data, 0, objective_value, &
-         all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
-         problem%get_n_objectives(), problem%get_n_constraints())
-    call this%logger%write(log_data)
 
-    if (present(simulation)) then
-       if (.not. this%performance) then
+    if (.not. this%performance) then
+       ! Stamp the initial condition
+       call mma_logger_assemble_data(log_data, 0, objective_value, &
+            all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
+            problem%get_n_objectives(), problem%get_n_constraints())
+       call this%logger%write(log_data)
+
+       if (present(simulation)) then
           call simulation%write(0)
        end if
     end if
@@ -225,18 +226,20 @@ contains
        call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
 
-       ! Stamp the i^th iteration
-       call mma_logger_assemble_data(log_data, iter, objective_value, &
-            all_objectives, constraint_value, this%mma%get_residumax(), &
-            this%mma%get_residunorm(), scaling_factor, &
-            problem%get_n_objectives(), problem%get_n_constraints())
-       call this%logger%write(log_data)
+       
+       if (.not. this%performance) then
+          ! Stamp the i^th iteration
+          call mma_logger_assemble_data(log_data, iter, objective_value, &
+               all_objectives, constraint_value, this%mma%get_residumax(), &
+               this%mma%get_residunorm(), scaling_factor, &
+               problem%get_n_objectives(), problem%get_n_constraints())
+          call this%logger%write(log_data)
 
-       if (present(simulation)) then
-          if (.not. this%performance) then
+          if (present(simulation)) then
              call simulation%write(iter)
           end if
        end if
+
        if (.not. this%performance) call design%write(iter)
        if (present(simulation)) call simulation%reset()
     end do

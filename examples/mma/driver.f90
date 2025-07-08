@@ -7,7 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init,  MPI_Wtime
+  use mpi_f08, only: MPI_Init,  MPI_Wtime, MPI_COMM_WORLD
 
 
   use example_problem, only: mma_obj, mma_con
@@ -144,9 +144,15 @@ program usrneko
   ! Execute the optimization
   call optimizer_factory(opt, parameters, prob, des)
 
+  call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_start = MPI_Wtime()
+  
   call opt%run(prob, des)
+
+  call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_end = MPI_Wtime()
+
+
 
   if (pe_rank == 0) then
      print *, "opt%run execution time:", t_end - t_start, "seconds"
