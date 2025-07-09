@@ -108,3 +108,34 @@ For the default bounds `"xmin": 0.0` and `"xmax": 5.0`, if the mesh $x$-coordina
 - `box.nmsh`: Mesh file defining the spectral element grid.
 
 ---
+
+## Mesh Generation
+
+The mesh file `box.nmsh` can be generated using the `mesh.sh` script with the following syntax:
+
+```bash
+./mesh.sh -b x0 x1 y0 y1 z0 z1 nelx nely nelz periodic_x periodic_y periodic_z
+```
+For detailed usage, refer to the `mesh.sh` documentation in the `neko-top` repository.
+
+A quick example of how to use mesh.sh:
+```bash
+./mesh.sh -b 0 10 0 1 0 1 64 4 4 .false. .false. .false.
+```
+This creates a 3D box mesh with:
+- **Physical dimensions:** `x = 0–10`, `y = 0–1`, `z = 0–1`
+- **Element counts:** `64` elements along `x`, `4` along `y`, and `4` along `z`
+- **Periodicity:** No periodicity in any direction
+
+The output mesh is saved at:
+```pgsql
+/path/to/neko-top/data_local/box.nmsh
+```
+Ensure the environment is correctly set up before running the script. 
+Typically, this can be done by creating a `prepare.env` file in the main directory of `neko-top` to configure the necessary dependency paths for `mesh.sh`:
+```pgsql
+export NEKO_DIR=/path/to/neko-top/external/neko
+export JSON_FORTRAN_DIR=/path/to/neko-top/external/json-fortran
+export HDF5_DIR=/path/to/neko-top/external/hdf5
+```
+
