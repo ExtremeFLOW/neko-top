@@ -190,8 +190,6 @@ contains
 
     difference%x = difference%x * difference%x
 
-    ! Note that we divide by n to make a fair comparison when ploting the 
-    ! scaling plots with respect to n (KKT tol is effected by this)
     this%value = this%sign * glsum(difference%x, design%size()) / &
          real(design%size_global(), kind=rp)
 

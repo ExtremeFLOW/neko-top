@@ -44,7 +44,7 @@ program usrneko
   !> The problem type
   type(problem_t) :: prob
   type(mma_obj), allocatable :: obj
-  type(mma_con), allocatable :: con_1, con_2
+  type(mma_con), allocatable :: con_1 !, con_2
 
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
@@ -114,23 +114,20 @@ program usrneko
 
   allocate(obj)
   allocate(con_1)
-  allocate(con_2)
+
 
   call obj%init_from_components("Objective", des)
-  call con_1%init_from_components("Positive", des, 1)
-  call con_2%init_from_components("Negative", des, -1)
+  call con_1%init_from_components("Constraint", des, 1)
   
   ! update obj and cons and sensitivities for the init design
   call obj%update_value(des)
   call obj%update_sensitivity(des)
   call con_1%update_value(des)
   call con_1%update_sensitivity(des)
-  call con_2%update_value(des)
-  call con_2%update_sensitivity(des)
-  
+   
   if (pe_rank == 0) then
      print *, "objective value for the initial design=", obj%value, &
-        "Positive=", con_1%value, "Negative=", con_2%value
+        "Positive=", con_1%value
   end if
 
   ! initialize the problem
@@ -138,7 +135,6 @@ program usrneko
   
   call prob%add_objective(obj)
   call prob%add_constraint(con_1)
-  call prob%add_constraint(con_2)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
