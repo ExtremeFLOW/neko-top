@@ -3,8 +3,9 @@ program topopt_user
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
   use json_module, only: json_file
-  use utils, only: neko_error
+  use json_utils, only: json_extract_object
   use json_utils_ext, only: json_read_file
+  use utils, only: neko_error
   use user, only: user_setup
   use design, only: design_t, design_factory
   use neko_top, only: neko_top_register_types
