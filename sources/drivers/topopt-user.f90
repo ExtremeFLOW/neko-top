@@ -15,8 +15,8 @@ program topopt_user
 
   ! JSON related arguments
   integer :: argc
-  type(json_file) :: parameters
   character(len=256) :: parameter_file
+  type(json_file) :: parameters, design_parameters
 
   ! MPI parameters
   integer :: ierr
@@ -44,6 +44,7 @@ program topopt_user
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
+  call json_extract_object(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
