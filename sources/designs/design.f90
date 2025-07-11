@@ -124,17 +124,17 @@ module design
      procedure, public, pass(this) :: size_global => design_size_global
 
      !> Getter of x vector
-     procedure, private, pass(this) :: design_get_x
+     procedure, pass(this) :: design_get_x
      !> Getter of i'th element of x
-     procedure, private, pass(this) :: design_get_x_i
+     procedure, pass(this) :: design_get_x_i
      !> Getter of y vector
-     procedure, private, pass(this) :: design_get_y
+     procedure, pass(this) :: design_get_y
      !> Getter of i'th element of y
-     procedure, private, pass(this) :: design_get_y_i
+     procedure, pass(this) :: design_get_y_i
      !> Getter of z vector
-     procedure, private, pass(this) :: design_get_z
+     procedure, pass(this) :: design_get_z
      !> Getter of i'th element of z
-     procedure, private, pass(this) :: design_get_z_i
+     procedure, pass(this) :: design_get_z_i
   end type design_t
 
   ! ========================================================================== !
