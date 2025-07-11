@@ -82,8 +82,8 @@ module volume_constraint
      procedure, public, pass(this) :: init_json_sim => &
           volume_constraint_init_json_sim
      !> The direct initializer from attributes.
-     procedure, public, pass(this) :: init_from_attributes => &
-          volume_constraint_init_attributes
+     procedure, public, pass(this) :: init_from_components => &
+          volume_constraint_init_from_components
      !> Destructor.
      procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
@@ -121,7 +121,7 @@ contains
     call json_get_or_default(json, "is_max", is_max, .false.)
     call json_get(json, "limit", limit)
 
-    call this%init_from_attributes(design, simulation, name, mask_name, &
+    call this%init_from_components(design, simulation, name, mask_name, &
          is_max, limit)
   end subroutine volume_constraint_init_json_sim
 
@@ -133,7 +133,7 @@ contains
   !! @param mask_name the name of the mask.
   !! @param is_max whether it is a maximum volume constraint.
   !! @param limit The volume limit value.
-  subroutine volume_constraint_init_attributes(this, design, simulation, &
+  subroutine volume_constraint_init_from_components(this, design, simulation, &
        name, mask_name, is_max, limit)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -205,7 +205,7 @@ contains
        call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
     end if
 
-  end subroutine volume_constraint_init_attributes
+  end subroutine volume_constraint_init_from_components
 
   !> Destructor.
   subroutine volume_constraint_free(this)
