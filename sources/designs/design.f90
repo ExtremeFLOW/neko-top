@@ -226,6 +226,7 @@ contains
 
   !> Initialize the base design
   !! @param this The design object.
+  !! @param name The name of the design.
   !! @param n The number of design variables.
   subroutine design_init_base(this, name, n)
     class(design_t), intent(inout) :: this
