@@ -26,15 +26,15 @@
 
 name: Compilation
 on:
-  pull_request:
-    branches: [develop, ci-test]
+  workflow_run:
+    workflows:
+      - "Code style"
+      - "Documentation"
+    branches:
+      - "develop"
+      - "ci-test"
     types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-  merge_group:
-    types: [checks_requested]
+      - completed
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other
@@ -53,7 +53,7 @@ env:
 # newer one is available.
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 # ---------------------------------------------------------------------------- #
@@ -74,8 +74,8 @@ jobs:
       - name: Check if PR is a draft
         shell: bash
         run: |
-          if [ "${{ github.event.pull_request.draft }}" == "true" ]; then
-            echo "PR is a draft" >&2
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "Previous workflow did not complete successfully" >&2
             exit 1
           fi
 
