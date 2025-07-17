@@ -1,0 +1,123 @@
+# File: code_style.yml
+# Date: 2025-07-17
+# ---------------------------------------------------------------------------- #
+# Workflow Overview
+# ---------------------------------------------------------------------------- #
+# This file contains the workflow that checks PRs for the develop branch. It
+# checks for linting, formatting, and compilation. The workflow is triggered
+# when a PR is opened, synchronized, reopened, or ready for review.
+
+# The workflow is split into multiple jobs:
+# - Prepare: Checks if the PR is a draft and stores global environment variables.
+# - Linting: Lints the PR for any changes.
+# - Formatting: Formats the PR for any changes.
+
+# The jobs are run in a sequence, where the Prepare job is run first. The Linting,
+# Formatting, and Compilation jobs run in parallel, and the Complete job runs last.
+
+# The workflow uses the following environment variables:
+# - FLINT_GLOBAL_MINIMUM: The minimum global linting score.
+# - FLINT_CHANGED_FILES_MINIMUM: The minimum linting score for changed files.
+# - PFUNIT_VERSION: The version of pFUnit to use.
+# - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
+# - NEKO_VERSION: The version of Neko to use.
+
+name: Develop PR Checks
+on:
+  pull_request:
+    branches: [develop]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  merge_group:
+    types: [checks_requested]
+
+# ---------------------------------------------------------------------------- #
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. We do not wish to waste time on old runs if a
+# newer one is available.
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+# sequence, where the Prepare job is run first. The Linting, Formatting, and
+# Compilation jobs run in parallel, and the Complete job runs last.
+
+jobs:
+  prepare:
+    name: Prepare the environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check if PR is a draft
+        shell: bash
+        run: |
+          if [ "${{ github.event.pull_request.draft }}" == "true" ]; then
+            echo "PR is a draft" >&2
+            exit 1
+          fi
+
+  check_lint:
+    name: Linting
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_lint.yml
+
+  check_format:
+    name: Formatting
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_formatting.yml
+
+  # -------------------------------------------------------------------------- #
+  # Check if all previous jobs passed. If any of the previous jobs failed, the
+  # Complete job will fail and print out the failed jobs.
+
+  check_complete:
+    if: ${{ always() }}
+    name: Develop PR Ready
+    needs:
+      - prepare
+      - check_lint
+      - check_format
+
+    runs-on: ubuntu-latest
+    env:
+      draft_status: ${{ needs.prepare.result }}
+      flint_status: ${{ needs.check_lint.result }}
+      format_status: ${{ needs.check_format.result }}
+
+    steps:
+      - name: Check status of previous jobs
+        run: |
+          success=true
+          fail=()
+
+          if [ "$draft_status" != "success" ]; then
+            fail+=("\t- Draft check: $draft_status")
+            success=false
+          fi
+
+          if [ "$flint_status" != "success" ]; then
+            fail+=("\t- Linting check: $flint_status")
+            success=false
+          fi
+
+          if [ "$format_status" != "success" ]; then
+            fail+=("\t- Formatting check: $format_status")
+            success=false
+          fi
+
+          if [ "$success" == false ]; then
+            >&2 echo "The following checks did not succeed:"
+            for i in "${fail[@]}"; do
+              >&2 printf "$i\n"
+            done
+            exit 1
+          fi
+          echo "All checks passed"
