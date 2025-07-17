@@ -1,6 +1,6 @@
 # Neko-TOP (Topology Optimization in Neko)
 
-![Documentation](https://github.com/github/docs/actions/workflows/documentation.yml/badge.svg?event=push&branch=develop)
+[![Documentation](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml/badge.svg?branch=develop&event=push)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml)
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
