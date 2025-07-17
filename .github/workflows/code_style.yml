@@ -81,7 +81,7 @@ jobs:
 
   check_complete:
     if: ${{ always() }}
-    name: Develop PR Ready
+    name: Code style checks complete
     needs:
       - prepare
       - check_lint
