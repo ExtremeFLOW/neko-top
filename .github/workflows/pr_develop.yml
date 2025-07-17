@@ -109,7 +109,6 @@ jobs:
 
   # -------------------------------------------------------------------------- #
   # Define the checks to run for the Neko-TOP library.
-  # This job will compile the Neko-TOP library.
 
   check_compile:
     name: Compile Neko-TOP
@@ -118,7 +117,6 @@ jobs:
     uses: ./.github/workflows/check_compile.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
-      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
 
   # -------------------------------------------------------------------------- #

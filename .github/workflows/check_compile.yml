@@ -10,10 +10,6 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
-      pfunit-version:
-        description: "The version of pFUnit to use."
-        required: true
-        type: string
       json-fortran-version:
         description: "The version of json-fortran to use."
         required: true
