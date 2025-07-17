@@ -9,19 +9,11 @@
 # review. The workflow is also triggered when a merge group is requested.
 
 # The workflow is split into multiple jobs:
-# - Prepare: Checks if the PR is a draft and stores global environment variables.
 # - Linting: Lints the PR for any changes.
 # - Formatting: Formats the PR for any changes.
 
-# The jobs are run in a sequence, where the Prepare job is run first. The Linting,
-# Formatting, and Compilation jobs run in parallel, and the Complete job runs last.
-
-# The workflow uses the following environment variables:
-# - FLINT_GLOBAL_MINIMUM: The minimum global linting score.
-# - FLINT_CHANGED_FILES_MINIMUM: The minimum linting score for changed files.
-# - PFUNIT_VERSION: The version of pFUnit to use.
-# - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
-# - NEKO_VERSION: The version of Neko to use.
+# The jobs are run in parallel, and the Complete job runs last to check if all
+# previous jobs passed.
 
 name: Code style
 on:
@@ -50,29 +42,12 @@ concurrency:
 # Compilation jobs run in parallel, and the Complete job runs last.
 
 jobs:
-  prepare:
-    name: Prepare the environment
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Check if PR is a draft
-        shell: bash
-        run: |
-          if [ "${{ github.event.pull_request.draft }}" == "true" ]; then
-            echo "PR is a draft" >&2
-            exit 1
-          fi
-
   check_lint:
     name: Linting
-    needs:
-      - prepare
     uses: ./.github/workflows/check_lint.yml
 
   check_format:
     name: Formatting
-    needs:
-      - prepare
     uses: ./.github/workflows/check_formatting.yml
 
   # -------------------------------------------------------------------------- #
@@ -81,15 +56,13 @@ jobs:
 
   check_complete:
     if: ${{ always() }}
-    name: Code style checks complete
+    name: Code style checks
     needs:
-      - prepare
       - check_lint
       - check_format
 
     runs-on: ubuntu-latest
     env:
-      draft_status: ${{ needs.prepare.result }}
       flint_status: ${{ needs.check_lint.result }}
       format_status: ${{ needs.check_format.result }}
 
@@ -98,11 +71,6 @@ jobs:
         run: |
           success=true
           fail=()
-
-          if [ "$draft_status" != "success" ]; then
-            fail+=("\t- Draft check: $draft_status")
-            success=false
-          fi
 
           if [ "$flint_status" != "success" ]; then
             fail+=("\t- Linting check: $flint_status")

@@ -86,18 +86,6 @@ jobs:
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
           echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
 
-  check_lint:
-    name: Linting
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_lint.yml
-
-  check_format:
-    name: Formatting
-    needs:
-      - prepare
-    uses: ./.github/workflows/check_formatting.yml
-
   # -------------------------------------------------------------------------- #
   # Define the checks to run for the Neko-TOP library.
   # This job will compile the Neko-TOP library.
@@ -121,15 +109,11 @@ jobs:
     name: Develop PR Ready
     needs:
       - prepare
-      - check_lint
-      - check_format
       - check_neko-top
 
     runs-on: ubuntu-latest
     env:
       draft_status: ${{ needs.prepare.result }}
-      flint_status: ${{ needs.check_lint.result }}
-      format_status: ${{ needs.check_format.result }}
       compile_status: ${{ needs.check_neko-top.result }}
 
     steps:
@@ -140,16 +124,6 @@ jobs:
 
           if [ "$draft_status" != "success" ]; then
             fail+=("\t- Draft check: $draft_status")
-            success=false
-          fi
-
-          if [ "$flint_status" != "success" ]; then
-            fail+=("\t- Linting check: $flint_status")
-            success=false
-          fi
-
-          if [ "$format_status" != "success" ]; then
-            fail+=("\t- Formatting check: $format_status")
             success=false
           fi
 
