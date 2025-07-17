@@ -25,7 +25,7 @@
 name: Develop PR Checks
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, ci-test]
     types:
       - opened
       - synchronize
