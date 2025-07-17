@@ -93,7 +93,7 @@ jobs:
     name: Linting
     needs:
       - prepare
-    uses: ./.github/workflows/check_lint.yml
+    uses: ./.github/workflows/check_linting.yml
 
   check_format:
     name: Formatting
