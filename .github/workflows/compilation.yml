@@ -30,9 +30,6 @@ on:
     workflows:
       - "Code style"
       - "Documentation"
-    branches:
-      - "develop"
-      - "ci-test"
     types:
       - completed
 
