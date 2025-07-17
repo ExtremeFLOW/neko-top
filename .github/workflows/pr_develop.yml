@@ -98,6 +98,10 @@ jobs:
       - prepare
     uses: ./.github/workflows/check_formatting.yml
 
+  # -------------------------------------------------------------------------- #
+  # Define the checks to run for the Neko-TOP library.
+  # This job will compile the Neko-TOP library.
+
   check_neko-top:
     name: Neko-TOP Library
     needs:
