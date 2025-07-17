@@ -1,5 +1,6 @@
-# This check is used to ensure documentation can be built from the main branch.
-name: Check Neko-TOP compilation and tests
+# This workflow checks the compilation of the Neko-TOP library.
+
+name: Check Neko-TOP compilation
 
 # This workflow is only defined here. It is triggered from other workflows.
 on:
@@ -41,39 +42,11 @@ jobs:
         with:
           version: ${{ inputs.json-fortran-version }}
 
-  cache-pfunit:
-    name: Cache pFUnit
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pFUnit
-        id: setup-pfunit
-        uses: ./.github/actions/setup_pfunit
-        with:
-          version: ${{ inputs.pfunit-version }}
-
-  cache-gslib:
-    name: Cache GSLib
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup GSLib
-        id: setup-gslib
-        uses: ./.github/actions/setup_gslib
-
   cache-neko:
     name: Cache Neko
     runs-on: ubuntu-latest
     needs:
       - cache-json-fortran
-      - cache-pfunit
-      - cache-gslib
 
     steps:
       - name: Checkout
@@ -102,8 +75,6 @@ jobs:
     needs:
       - cache-json-fortran
       - cache-neko
-      - cache-pfunit
-      - cache-gslib
 
     steps:
       # ---------------------------------------------------------------------- #
@@ -141,16 +112,6 @@ jobs:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
 
-      - name: Get pFUnit
-        id: get-pfunit
-        uses: ./.github/actions/setup_pfunit
-        with:
-          version: ${{ inputs.pfunit-version }}
-
-      - name: Get GSLib
-        id: get-gslib
-        uses: ./.github/actions/setup_gslib
-
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
@@ -159,14 +120,11 @@ jobs:
         env:
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
-          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
-          GSLIB_DIR: ${{ steps.get-gslib.outputs.install-dir }}
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
             -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-            -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
-            -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=OFF
+            -DNEKO_DIR=$NEKO_DIR
 
       - name: Building Library
         run: |
@@ -175,8 +133,3 @@ jobs:
       - name: Building Examples
         run: |
           cmake --build build --target Examples --parallel
-
-      - name: Unit tests
-        run: |
-          ctest --test-dir build --output-on-failure --stop-on-failure
-

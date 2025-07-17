@@ -111,11 +111,11 @@ jobs:
   # Define the checks to run for the Neko-TOP library.
   # This job will compile the Neko-TOP library.
 
-  check_neko-top:
-    name: Neko-TOP Library
+  check_compile:
+    name: Compile Neko-TOP
     needs:
       - prepare
-    uses: ./.github/workflows/check_neko-top.yml
+    uses: ./.github/workflows/check_compile.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
@@ -135,7 +135,7 @@ jobs:
       - check_format
       - check_documentation
       # Neko-TOP library checks
-      - check_neko-top
+      - check_compile
 
     runs-on: ubuntu-latest
     env:
@@ -143,7 +143,7 @@ jobs:
       lint_status: ${{ needs.check_lint.result }}
       format_status: ${{ needs.check_format.result }}
       documentation_status: ${{ needs.check_documentation.result }}
-      compile_status: ${{ needs.check_neko-top.result }}
+      compile_status: ${{ needs.check_compile.result }}
 
     steps:
       - name: Check status of previous jobs
