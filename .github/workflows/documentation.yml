@@ -6,9 +6,6 @@ name: Documentation
 on:
   workflow_call:
   pull_request:
-    branches:
-      - "develop"
-      - "ci-test"
   push:
     branches:
       - "develop"
@@ -67,7 +64,7 @@ jobs:
     name: Deploy documentation
     # If the job is triggered by a pull request, it will not run.
     # If the job is triggered by a push to the develop branch, it will run.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    # if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     needs: build-docs
 
     # Define the deployment environment
