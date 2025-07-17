@@ -17,15 +17,9 @@
 
 name: Code style
 on:
-  pull_request:
-    branches: [develop, ci-test]
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - ready_for_review
-  merge_group:
-    types: [checks_requested]
+  workflow_call:
+  push:
+    branches: [develop]
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run

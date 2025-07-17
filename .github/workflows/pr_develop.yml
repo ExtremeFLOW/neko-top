@@ -26,12 +26,15 @@
 
 name: Compilation
 on:
-  workflow_run:
-    workflows:
-      - "Code style"
-      - "Documentation"
+  pull_request:
+    branches: [develop]
     types:
-      - completed
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  merge_group:
+    types: [checks_requested]
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other

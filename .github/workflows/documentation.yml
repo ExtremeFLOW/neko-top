@@ -5,11 +5,8 @@ name: Documentation
 # documentation is only built and deployed when a pull request is merged.
 on:
   workflow_call:
-  pull_request:
   push:
-    branches:
-      - "develop"
-      - "ci-test"
+    branches: [develop]
 
 # Set workflow concurrency to prevent multiple runs from being triggered
 # simultaneously for the same branch.
@@ -64,7 +61,7 @@ jobs:
     name: Deploy documentation
     # If the job is triggered by a pull request, it will not run.
     # If the job is triggered by a push to the develop branch, it will run.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    if: github.ref == 'refs/heads/develop'
     needs: build-docs
 
     # Define the deployment environment
