@@ -24,10 +24,10 @@
 # - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
 # - NEKO_VERSION: The version of Neko to use.
 
-name: Develop PR Checks
+name: Compilation
 on:
   pull_request:
-    branches: [develop]
+    branches: [develop, ci-test]
     types:
       - opened
       - synchronize
