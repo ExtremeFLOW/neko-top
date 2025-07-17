@@ -25,56 +25,12 @@ on:
 jobs:
 
   # -------------------------------------------------------------------------- #
-  # Define the dependency cache jobs that will be run in this workflow. Each of
-  # these jobs will cache the dependencies for a specific library.
-
-  cache-json-fortran:
-    name: Cache JSON-Fortran
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup json-fortran
-        id: setup-json-fortran
-        uses: ./.github/actions/setup_json-fortran
-        with:
-          version: ${{ inputs.json-fortran-version }}
-
-  cache-neko:
-    name: Cache Neko
-    runs-on: ubuntu-latest
-    needs:
-      - cache-json-fortran
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Get json-fortran
-        id: get-json-fortran
-        uses: ./.github/actions/setup_json-fortran
-        with:
-          version: ${{ inputs.json-fortran-version }}
-
-      - name: Setup neko
-        id: setup-neko
-        uses: ./.github/actions/setup_neko
-        with:
-          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
-          version: ${{ inputs.neko-version }}
-
-  # -------------------------------------------------------------------------- #
   # Define the compilation and testing job that will be run in this workflow.
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
 
   neko-top-debug:
-    name: Test Neko-TOP
+    name: Compile Neko-TOP
     runs-on: ubuntu-latest
-    needs:
-      - cache-json-fortran
-      - cache-neko
 
     steps:
       # ---------------------------------------------------------------------- #
