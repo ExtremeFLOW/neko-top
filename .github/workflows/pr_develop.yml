@@ -24,7 +24,7 @@
 # - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
 # - NEKO_VERSION: The version of Neko to use.
 
-name: Compilation
+name: Check PR for Develop Branch
 on:
   pull_request:
     branches: [develop, ci-test]
