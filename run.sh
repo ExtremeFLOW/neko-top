@@ -338,7 +338,7 @@ trap 'handler' SIGINT
 # ============================================================================ #
 # Compile the example executables
 
-if [ "$NEKO" != true ]; then
+if [[ "$NEKO" != true && -d $MAIN_DIR/build ]]; then
     printf "\n\e[4mCompiling the examples.\e[0m\n"
     cmake --build $MAIN_DIR/build --target Examples --parallel
 
