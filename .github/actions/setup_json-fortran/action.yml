@@ -118,9 +118,9 @@ runs:
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
+          --install-prefix $INSTALL_DIR \
           -DCMAKE_Fortran_COMPILER=$FC \
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
           -DUSE_GNU_INSTALL_CONVENTION=ON \
           -DSKIP_DOC_GEN=ON
 
