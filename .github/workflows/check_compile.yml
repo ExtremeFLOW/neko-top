@@ -75,6 +75,7 @@ jobs:
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON \
             -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
             -DNEKO_DIR=$NEKO_DIR
 
@@ -85,3 +86,7 @@ jobs:
       - name: Building Examples
         run: |
           cmake --build build --target Examples --parallel
+
+      - name: Running Tests
+        run: |
+          ctest --test-dir build --output-on-failure --parallel
