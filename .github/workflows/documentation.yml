@@ -31,8 +31,7 @@ jobs:
         shell: bash
         run: |
           # Get the GIT sha for the current commit
-          SHA=$(git ls-remote ${GITHUB_REPOSITORY} HEAD | awk '{print $1}')
-          key="documentation-$SHA"
+          key="documentation-$(git rev-parse HEAD)"
           printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
       - name: Create cache the documentation
