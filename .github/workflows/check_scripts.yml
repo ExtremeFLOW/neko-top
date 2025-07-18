@@ -145,8 +145,6 @@ jobs:
             fi
           done
 
-          exit 1
-
       - name: Save logs as artifact
         if: failure()
         uses: actions/upload-artifact@v4
