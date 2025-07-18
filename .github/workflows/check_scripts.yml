@@ -25,7 +25,7 @@ jobs:
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
 
   neko-top-debug:
-    name: Compile Neko-TOP
+    name: Check setup and run scripts
     runs-on: ubuntu-latest
 
     steps:
@@ -58,3 +58,12 @@ jobs:
       - name: Run TGV test
         shell: bash
         run: ./run.sh -nrc tgv
+
+      - name: Run Rugby Ball test
+        shell: bash
+        run: |
+          # Adjust the end time and max iterations for the rugby ball case
+          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+
+          ./run.sh -rc rugby_ball
