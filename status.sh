@@ -24,6 +24,7 @@ RPATH=$MAIN_DIR/$RPATH
 LPATH=$MAIN_DIR/$LPATH
 
 [ ! -d $LPATH ] && exit 0
+EXIT_STATUS=0
 
 # ============================================================================ #
 # Keywords
@@ -121,6 +122,7 @@ for test in ${tests[@]}; do
             printf '\t\e[1;31m%-12s\e[m %-s\n' "Interrupted:" "$test"
         else
             printf '\t\e[1;31m%-12s\e[m %-s\n' "Error:" "$test"
+            EXIT_STATUS=1
         fi
     fi
 done
@@ -163,4 +165,6 @@ printf "\n"
 
 # Remove all empty folders in the logs folder
 find $LPATH -type d -empty -delete
+
+exit $EXIT_STATUS
 # # EOF # #
