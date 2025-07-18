@@ -121,7 +121,7 @@ jobs:
 
 
   check_scripts:
-    name: Check Neko-TOP scripts
+    name: Scripting
     needs:
       - prepare
     uses: ./.github/workflows/check_scripts.yml
