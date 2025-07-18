@@ -134,7 +134,7 @@ jobs:
         if: failure()
         run: |
           echo "Errors encountered during script execution. Please check the logs for details."
-          logs=$(find . -name "*.log" -print0 | xargs -0 cat)
+          logs=$(find . -name "*.log" -print0)
 
           for file in $logs; do
             if [[ -s $file ]]; then
