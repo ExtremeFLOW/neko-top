@@ -109,7 +109,13 @@ runs:
         REPO: https://github.com/ExtremeFLOW/neko-top.git
         VERSION: ${{ inputs.version }}
       run: |
-        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+        if [ -d $WORKING_DIR ]; then
+          echo "Working directory already exists. Skipping clone."
+          git checkout $VERSION
+          git pull origin $VERSION
+        else
+          git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+        fi
 
     # ------------------------------------------------------------------------ #
     # Setup system dependencies for the Neko-TOP library.
