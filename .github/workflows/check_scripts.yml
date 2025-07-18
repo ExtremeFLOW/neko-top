@@ -134,7 +134,7 @@ jobs:
         if: failure()
         run: |
           echo "Errors encountered during script execution. Please check the logs for details."
-          logs=$(find . -name "*.log")
+          logs=$(find . -name "error.log")
 
           for file in $logs[@]; do
             if [[ -s $file ]]; then
@@ -146,3 +146,11 @@ jobs:
           done
 
           exit 1
+
+      - name: Save logs as artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: script-logs
+          path: logs/**/*.log
+          overwrite: true
