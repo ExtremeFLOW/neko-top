@@ -109,11 +109,14 @@ runs:
     # ------------------------------------------------------------------------ #
     # Setup system dependencies for the Neko-TOP library.
 
-    - name: Setup system dependencies
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        sudo apt install cmake ninja-build ${{ inputs.compiler }}
+    - name: Get system cache
+      uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: openmpi-bin pkg-config liblapack-dev ninja-build
+        version: 1.0
+
+    - name: Setup non-cache dependencies
+      run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
     # Configure, build, and install the Neko-TOP library.
