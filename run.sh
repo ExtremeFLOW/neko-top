@@ -473,6 +473,7 @@ done
 
 if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
+    exit $?
 fi
 
 printf "\n"
