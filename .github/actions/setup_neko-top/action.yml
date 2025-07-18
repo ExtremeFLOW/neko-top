@@ -163,14 +163,6 @@ runs:
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
 
-    - name: Cleanup
-      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
-          rm -rf ${{ inputs.working-dir }}
-        fi
-
     - name: Set output
       id: set-output
       shell: bash
