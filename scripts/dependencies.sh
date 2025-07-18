@@ -403,7 +403,6 @@ function find_neko() {
             PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
         fi
         NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
-        fi
 
         if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
             error "Neko device type does not match the requested device type."
