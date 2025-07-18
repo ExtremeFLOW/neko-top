@@ -116,3 +116,10 @@ jobs:
           sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
 
           ./run.sh -rc rugby_ball
+
+      - name: Report errors
+        if: failure()
+        run: |
+          echo "Errors encountered during script execution. Please check the logs for details."
+          ./status.sh
+          exit 1
