@@ -102,9 +102,7 @@ jobs:
     uses: ./.github/workflows/check_formatting.yml
 
   check_documentation:
-    name: Documentation
-    needs:
-      - prepare
+    needs: prepare
     uses: ./.github/workflows/documentation.yml
 
   # -------------------------------------------------------------------------- #
