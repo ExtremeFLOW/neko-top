@@ -111,7 +111,7 @@ jobs:
   # Define the checks to run for the Neko-TOP library.
 
   check_compile:
-    name: Compile Neko-TOP
+    name: Compilation
     needs:
       - prepare
     uses: ./.github/workflows/check_compile.yml
@@ -121,7 +121,7 @@ jobs:
 
 
   check_scripts:
-    name: Check Neko-TOP compilation script
+    name: Check Neko-TOP scripts
     needs:
       - prepare
     uses: ./.github/workflows/check_scripts.yml

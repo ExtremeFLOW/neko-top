@@ -48,38 +48,13 @@ jobs:
           sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
       # ---------------------------------------------------------------------- #
-      # Setup the external dependencies
-      # ---------------------------------------------------------------------- #
-
-      - name: Get json-fortran
-        id: get-json-fortran
-        uses: ./.github/actions/setup_json-fortran
-        with:
-          version: ${{ inputs.json-fortran-version }}
-
-      - name: Get neko
-        id: get-neko
-        uses: ./.github/actions/setup_neko
-        with:
-          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
-          version: ${{ inputs.neko-version }}
-
-      # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
 
       - name: Setup Neko-TOP
-        env:
-          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
-          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
-        run: |
-          ./setup.sh
-          echo "Neko-TOP setup complete."
+        shell: bash
+        run: ./setup.sh
 
       - name: Run TGV test
-        env:
-          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
-          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
-        run: |
-          ./run.sh -nrc tgv
-          echo "TGV test completed."
+        shell: bash
+        run: ./run.sh -nrc tgv
