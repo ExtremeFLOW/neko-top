@@ -134,14 +134,13 @@ jobs:
         if: failure()
         run: |
           echo "Errors encountered during script execution. Please check the logs for details."
-          logs=($(find . -name "error.log"))
+          logs=($(find logs/ -name "error.log"))
 
           for file in ${logs[@]}; do
             if [[ -s $file ]]; then
               echo "Contents of $file:" >&2
               cat $file >&2
             elif [ -f $file ]; then
-              echo "File $file is empty." >&2
               rm -fr $(dirname $file)
             fi
           done
