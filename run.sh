@@ -341,12 +341,12 @@ trap 'handler' SIGINT
 if [ "$NEKO" != true ]; then
     printf "\n\e[4mCompiling the examples.\e[0m\n"
     cmake --build $MAIN_DIR/build --target Examples --parallel
-fi
 
-# Check if the compilation was successful
-if [ $? -ne 0 ]; then
-    printf >&2 "\e[1;31mCompilation failed.\e[m\n"
-    exit 1
+    # Check if the compilation was successful
+    if [ $? -ne 0 ]; then
+        printf >&2 "\e[1;31mCompilation failed.\e[m\n"
+        exit 1
+    fi
 fi
 
 # ============================================================================ #
