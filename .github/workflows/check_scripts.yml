@@ -1,0 +1,85 @@
+# This workflow checks the compilation of the Neko-TOP library.
+
+name: Check Neko-TOP compilation script
+
+# This workflow is only defined here. It is triggered from other workflows.
+on:
+  workflow_call:
+    inputs:
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
+      json-fortran-version:
+        description: "The version of json-fortran to use."
+        required: true
+        type: string
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+
+jobs:
+
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
+  # This job will build the Neko-TOP code in debug mode and run the unit tests.
+
+  neko-top-debug:
+    name: Compile Neko-TOP
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get system cache
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: openmpi-bin pkg-config liblapack-dev ninja-build
+          version: 1.0
+
+      - name: Setup non-cache dependencies
+        shell: bash
+        run: |
+          sudo apt-get install -y libopenblas-dev libopenmpi-dev
+
+      # ---------------------------------------------------------------------- #
+      # Setup the external dependencies
+      # ---------------------------------------------------------------------- #
+
+      - name: Get json-fortran
+        id: get-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
+
+      - name: Get neko
+        id: get-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          version: ${{ inputs.neko-version }}
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
+
+      - name: Setup Neko-TOP
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+        run: |
+          ./setup.sh
+          echo "Neko-TOP setup complete."
+
+      - name: Run TGV test
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+        run: |
+          ./run.sh -nrc tgv
+          echo "TGV test completed."

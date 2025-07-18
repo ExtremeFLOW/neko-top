@@ -119,6 +119,16 @@ jobs:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
 
+
+  check_scripts:
+    name: Check Neko-TOP compilation script
+    needs:
+      - prepare
+    uses: ./.github/workflows/check_scripts.yml
+    with:
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+
   # -------------------------------------------------------------------------- #
   # Check if all previous jobs passed. If any of the previous jobs failed, the
   # Complete job will fail and print out the failed jobs.
@@ -134,6 +144,7 @@ jobs:
       - check_documentation
       # Neko-TOP library checks
       - check_compile
+      - check_scripts
 
     runs-on: ubuntu-latest
     env:
@@ -142,12 +153,16 @@ jobs:
       format_status: ${{ needs.check_format.result }}
       documentation_status: ${{ needs.check_documentation.result }}
       compile_status: ${{ needs.check_compile.result }}
+      scripts_status: ${{ needs.check_scripts.result }}
 
     steps:
       - name: Check status of previous jobs
         run: |
           success=true
           fail=()
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Code style and documentation checks.
 
           if [ "$draft_status" != "success" ]; then
             fail+=("\t- Draft check: $draft_status")
@@ -169,10 +184,23 @@ jobs:
             success=false
           fi
 
+          # ------------------------------------------------------------------ #
+          # Check the status of our Neko-TOP library checks.
+
           if [ "$compile_status" != "success" ]; then
             fail+=("\t- Compilation check: $compile_status")
             success=false
           fi
+
+          if [ "$scripts_status" != "success" ]; then
+            fail+=("\t- Scripts check: $scripts_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # If any of the checks failed, print the failed checks and exit with
+          # a non-zero status code. If all checks passed, print a success
+          # message.
 
           if [ "$success" == false ]; then
             >&2 echo "The following checks did not succeed:"
