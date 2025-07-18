@@ -111,8 +111,6 @@ runs:
       run: |
         if [ -d $WORKING_DIR ]; then
           echo "Working directory already exists. Skipping clone."
-          git checkout $VERSION
-          git pull origin $VERSION
         else
           git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
         fi
