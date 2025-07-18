@@ -91,17 +91,16 @@ jobs:
 
   check_lint:
     name: Linting
-    needs:
-      - prepare
+    needs: prepare
     uses: ./.github/workflows/check_linting.yml
 
   check_format:
     name: Formatting
-    needs:
-      - prepare
+    needs: prepare
     uses: ./.github/workflows/check_formatting.yml
 
   check_documentation:
+    name: Documentation
     needs: prepare
     uses: ./.github/workflows/documentation.yml
 
@@ -110,8 +109,7 @@ jobs:
 
   check_compile:
     name: Compilation
-    needs:
-      - prepare
+    needs: prepare
     uses: ./.github/workflows/check_compile.yml
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
@@ -120,8 +118,7 @@ jobs:
 
   check_scripts:
     name: Scripting
-    needs:
-      - prepare
+    needs: prepare
     uses: ./.github/workflows/check_scripts.yml
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
