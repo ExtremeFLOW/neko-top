@@ -13,11 +13,6 @@ inputs:
     required: false
     default: "/home/runner/pkg/neko"
 
-  working-dir:
-    description: "The directory to work in when compiling Neko."
-    required: false
-    default: "/home/runner/tmp/neko"
-
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: false
@@ -109,22 +104,21 @@ runs:
       if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
-        WORKING_DIR: ${{ inputs.working-dir }}
+        INSTALL_DIR: ${{ inputs.install-dir }}
         REPO: https://github.com/ExtremeFLOW/neko.git
         VERSION: ${{ inputs.version }}
       run: |
-        git clone --depth 1 --branch $VERSION $REPO $WORKING_DIR
+        git clone --depth 1 --branch $VERSION $REPO $INSTALL_DIR
 
     - name: Configure and install neko
       if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         INSTALL_DIR: ${{ inputs.install-dir }}
-        WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
-        cd $WORKING_DIR
+        cd $INSTALL_DIR
         ./regen.sh
         ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS="$FCFLAGS"
         make install ${{ inputs.build-options }}
@@ -133,20 +127,6 @@ runs:
     # Cleanup and outputs
     #
     # This step cleans up the working directory and sets the output.
-
-    - name: Cleanup
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
-      shell: bash
-      env:
-        INSTALL_DIR: ${{ inputs.install-dir }}
-        WORKING_DIR: ${{ inputs.working-dir }}
-      run: |
-        echo "INSTALL_DIR: $INSTALL_DIR"
-        echo "WORKING_DIR: $WORKING_DIR"
-
-        if [ $(echo "$INSTALL_DIR" | grep -q "$WORKING_DIR") ]; then
-          rm -rf $WORKING_DIR
-        fi
 
     - name: Set output
       id: set-output
