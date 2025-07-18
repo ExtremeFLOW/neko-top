@@ -15,8 +15,7 @@ inputs:
 
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
-    required: false
-    default: "/home/runner/pkg/json-fortran"
+    required: true
 
   os:
     description: "The operating system to use."

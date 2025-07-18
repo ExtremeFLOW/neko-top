@@ -97,9 +97,14 @@ function find_nek5000() {
 
     # Determine the Nek5000 installation directory
     if [[ $# -ge 1 ]]; then
-        NEK5000_DIR="$(realpath $1)"
-    elif [ -z "$NEK5000_DIR" ]; then
-        NEK5000_DIR="$(realpath $EXTERNAL_DIR/nek5000)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            NEK5000_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            NEK5000_DIR="$(realpath $1)"
+        fi
+    else
+        export NEK5000_DIR=""
+        return
     fi
 
     if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
@@ -117,9 +122,14 @@ function find_gslib() {
 
     # Determine the GSLib installation directory
     if [[ $# -ge 1 ]]; then
-        GSLIB_DIR="$(realpath $1)"
-    elif [ -z "$GSLIB_DIR" ]; then
-        GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            GSLIB_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            GSLIB_DIR="$(realpath $1)"
+        fi
+    else
+        export GSLIB_DIR=""
+        return
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -232,9 +242,14 @@ function find_hdf5() {
 
     # Determine the HDF5 installation directory
     if [[ $# -ge 1 ]]; then
-        HDF5_DIR="$(realpath $1)"
-    elif [ -z "$HDF5_DIR" ]; then
-        HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            HDF5_DIR="$(realpath $1)"
+        fi
+    else
+        export HDF5_DIR=""
+        return
     fi
 
     # Ensure HDF5 is installed, if not install it.
