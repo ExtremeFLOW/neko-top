@@ -456,7 +456,7 @@ done
 # If we are just doing a dry-run, we exit here
 if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
-    exit 0
+    exit $?
 fi
 
 for example in $QUEUE; do

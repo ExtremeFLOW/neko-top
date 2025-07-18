@@ -96,6 +96,7 @@ jobs:
         id: get-neko-top
         uses: ./.github/actions/setup_neko-top
         with:
+          working-dir: ${{ github.workspace }}
           version: ${{ inputs.neko-top-version }}
           neko-dir: ${{ steps.get-neko.outputs.install-dir }}
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
@@ -122,5 +123,16 @@ jobs:
         if: failure()
         run: |
           echo "Errors encountered during script execution. Please check the logs for details."
-          ./status.sh
+
+          logs=$(find . -name "*.log" -print0 | xargs -0 cat)
+
+          for file in $logs; do
+            if [[ -s $file ]]; then
+              echo "Contents of $file:" >&2
+              cat $file >&2
+            else
+              echo "File $file is empty." >&2
+            fi
+          done
+
           exit 1
