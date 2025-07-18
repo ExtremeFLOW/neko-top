@@ -136,10 +136,10 @@ runs:
         JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
+          --prefix=$INSTALL_DIR \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_Fortran_COMPILER=$FC \
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
           -DNEKO_DIR=$NEKO_DIR
 
