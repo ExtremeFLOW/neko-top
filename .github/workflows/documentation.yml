@@ -23,37 +23,42 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Setup system
-        shell: bash
-        run: |
-          sudo apt install git cmake doxygen graphviz
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
+      - name: Create cache key based on commit SHA
+        id: create-key
+        shell: bash
         run: |
-          BUILD_TYPE=Develop
-          if [ "$BRANCH_NAME" == "develop" ]; then
-            echo "Building documentation for the develop branch"
-            BUILD_TYPE=Release
-          else
-            echo "Skipping documentation build for the $BRANCH_NAME branch"
-          fi
-          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          # Get the GIT sha for the current commit
+          SHA=$(git ls-remote | awk '{print $1}')
+          key="documentation-$SHA"
+          printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
+
+      - name: Create cache the documentation
+        id: cache-documentation
+        uses: actions/cache@v4
+        with:
+          path: documentation/html/
+          key: ${{ steps.create-key.outputs.key }}
+
+      - name: Setup system
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: sudo apt install git cmake doxygen graphviz
+
+      - name: Configure
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: cmake -DONLY_DOCS=ON -B build -S .
 
       - name: Build
-        run: |
-          cmake --build build --target Documentation
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: cmake --build build --target Documentation
 
       - name: Upload artifact
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
           path: documentation/html/
-
   # -------------------------------------------------------------------------- #
   # Deploy documentation job
 
