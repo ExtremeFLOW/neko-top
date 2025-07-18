@@ -115,7 +115,6 @@ jobs:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
 
-
   check_scripts:
     name: Scripting
     needs: prepare
@@ -123,6 +122,7 @@ jobs:
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       neko-version: ${{ needs.prepare.outputs.neko-version }}
+      neko-top-version: ${{ github.ref_name }}
 
   # -------------------------------------------------------------------------- #
   # Check if all previous jobs passed. If any of the previous jobs failed, the

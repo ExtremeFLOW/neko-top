@@ -14,6 +14,10 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
+      neko-top-version:
+        description: "The version of Neko-TOP to use."
+        required: true
+        type: string
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -92,7 +96,7 @@ jobs:
         id: get-neko-top
         uses: ./.github/actions/setup_neko-top
         with:
-          version: ${{ github.ref_name }}
+          version: ${{ inputs.neko-top-version }}
           neko-dir: ${{ steps.get-neko.outputs.install-dir }}
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
 
