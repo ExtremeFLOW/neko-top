@@ -99,6 +99,7 @@ jobs:
           version: ${{ inputs.neko-top-version }}
           neko-dir: ${{ steps.get-neko.outputs.install-dir }}
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          configure-options: "-DBUILD_EXAMPLES=ON"
 
       - name: Run TGV
         env:

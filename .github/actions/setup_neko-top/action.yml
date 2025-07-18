@@ -43,6 +43,11 @@ inputs:
     required: false
     default: "-O3"
 
+  configure-options:
+    description: "The configuration options to use."
+    required: false
+    default: ""
+
   build-options:
     description: "The build option to use."
     required: false
@@ -134,6 +139,7 @@ runs:
         FCFLAGS: ${{ inputs.compiler-flags }}
         NEKO_DIR: ${{ inputs.neko-dir }}
         JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
+        CONFIGURE_OPTIONS: ${{ inputs.configure-options }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
           --install-prefix $INSTALL_DIR \
@@ -141,7 +147,8 @@ runs:
           -DCMAKE_Fortran_COMPILER=$FC \
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-          -DNEKO_DIR=$NEKO_DIR
+          -DNEKO_DIR=$NEKO_DIR \
+          $CONFIGURE_OPTIONS
 
     - name: Build
       if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
