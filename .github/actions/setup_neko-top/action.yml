@@ -110,12 +110,15 @@ runs:
     # Setup system dependencies for the Neko-TOP library.
 
     - name: Get system cache
+      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
       uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: openmpi-bin pkg-config liblapack-dev ninja-build
         version: 1.0
 
     - name: Setup non-cache dependencies
+      if: ${{ steps.cache-neko-top.outputs.cache-hit != 'true' }}
+      shell: bash
       run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
     # ------------------------------------------------------------------------ #
