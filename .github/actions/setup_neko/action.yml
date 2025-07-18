@@ -80,7 +80,7 @@ runs:
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
