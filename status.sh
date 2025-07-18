@@ -145,6 +145,7 @@ for test in ${tests[@]}; do
         # Print the error messagge, sitting between *** ERROR and ERROR STOP
         start_line=$(grep -n '\*\*\* ERROR' $LPATH/$test/error.log | cut -d: -f1)
         end_line=$(grep -n 'ERROR STOP' $LPATH/$test/error.log | cut -d: -f1)
+        end_line=$((end_line - 1)) # Remove the line with ERROR STOP
 
         if [ -z "$start_line" ] || [ -z "$end_line" ]; then
             printf "No error message found.\n"
