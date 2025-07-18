@@ -10,12 +10,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/math_ext.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_math_ext.f90
 )
-
-target_include_directories(neko-top
-    PRIVATE
-        ${NEKO_DIR}/src
-)
-
 if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
