@@ -136,7 +136,7 @@ jobs:
           echo "Errors encountered during script execution. Please check the logs for details."
           logs=$(find . -name "error.log")
 
-          for file in $logs[@]; do
+          for file in ${logs[@]}; do
             if [[ -s $file ]]; then
               echo "Contents of $file:" >&2
               cat $file >&2
