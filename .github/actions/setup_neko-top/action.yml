@@ -56,7 +56,7 @@ inputs:
   version:
     description: "The version of the Neko-TOP library to use."
     required: false
-    default: "8.3.0"
+    default: "develop"
 
 outputs:
   install-dir:
