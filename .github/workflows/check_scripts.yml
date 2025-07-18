@@ -79,6 +79,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # ---------------------------------------------------------------------- #
+      # Setup the external dependencies
+      # ---------------------------------------------------------------------- #
+
       - name: Get json-fortran
         id: get-json-fortran
         uses: ./.github/actions/setup_json-fortran
@@ -91,6 +95,10 @@ jobs:
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
 
       - name: Get neko-top
         id: get-neko-top
@@ -119,11 +127,13 @@ jobs:
 
           ./run.sh -rc rugby_ball
 
+      # ---------------------------------------------------------------------- #
+      # Report errors if any step fails
+      # ---------------------------------------------------------------------- #
       - name: Report errors
         if: failure()
         run: |
           echo "Errors encountered during script execution. Please check the logs for details."
-
           logs=$(find . -name "*.log" -print0 | xargs -0 cat)
 
           for file in $logs; do
