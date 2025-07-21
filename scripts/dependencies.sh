@@ -97,9 +97,14 @@ function find_nek5000() {
 
     # Determine the Nek5000 installation directory
     if [[ $# -ge 1 ]]; then
-        NEK5000_DIR="$(realpath $1)"
-    elif [ -z "$NEK5000_DIR" ]; then
-        NEK5000_DIR="$(realpath $EXTERNAL_DIR/nek5000)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            NEK5000_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            NEK5000_DIR="$(realpath $1)"
+        fi
+    else
+        export NEK5000_DIR=""
+        return
     fi
 
     if [[ ! -d "$NEK5000_DIR" || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
@@ -117,9 +122,14 @@ function find_gslib() {
 
     # Determine the GSLib installation directory
     if [[ $# -ge 1 ]]; then
-        GSLIB_DIR="$(realpath $1)"
-    elif [ -z "$GSLIB_DIR" ]; then
-        GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            GSLIB_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            GSLIB_DIR="$(realpath $1)"
+        fi
+    else
+        export GSLIB_DIR=""
+        return
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -232,9 +242,14 @@ function find_hdf5() {
 
     # Determine the HDF5 installation directory
     if [[ $# -ge 1 ]]; then
-        HDF5_DIR="$(realpath $1)"
-    elif [ -z "$HDF5_DIR" ]; then
-        HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
+        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+            HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
+        else
+            HDF5_DIR="$(realpath $1)"
+        fi
+    else
+        export HDF5_DIR=""
+        return
     fi
 
     # Ensure HDF5 is installed, if not install it.
@@ -381,23 +396,25 @@ function find_neko() {
     fi
 
     # Check the device type supported by neko
-    if [ "$DEVICE_TYPE" == "NONE" ]; then
-        PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
-    else
-        PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
-    fi
-    NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
+    if [ -f "$NEKO_DIR/src/config/neko_config.f90" ]; then
+        if [ "$DEVICE_TYPE" == "NONE" ]; then
+            PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
+        else
+            PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
+        fi
+        NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
 
-    if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
-        error "Neko device type does not match the requested device type."
-        error "Please ensure that the Neko installation is correct."
-        error "Requested device type: $DEVICE_TYPE"
-        exit 1
-    elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
-        error "Neko device type does not match the requested device type."
-        error "Please ensure that the Neko installation is correct."
-        error "Requested device type: $DEVICE_TYPE"
-        exit 1
+        if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+            error "Neko device type does not match the requested device type."
+            error "Please ensure that the Neko installation is correct."
+            error "Requested device type: $DEVICE_TYPE"
+            exit 1
+        elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
+            error "Neko device type does not match the requested device type."
+            error "Please ensure that the Neko installation is correct."
+            error "Requested device type: $DEVICE_TYPE"
+            exit 1
+        fi
     fi
 
     export NEKO_DIR=$(realpath $NEKO_LIB/../)

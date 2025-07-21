@@ -99,7 +99,7 @@ function(build_example)
         EXCLUDE_FROM_ALL
         ${DRIVER}
         ${EXTRA_SOURCES}
-        )
+    )
     add_dependencies(Examples ${EXAMPLE_NAME})
 
     # Set the output directory of the executable.

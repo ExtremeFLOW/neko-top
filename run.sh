@@ -338,15 +338,15 @@ trap 'handler' SIGINT
 # ============================================================================ #
 # Compile the example executables
 
-if [ "$NEKO" != true ]; then
+if [[ "$NEKO" != true && -d $MAIN_DIR/build ]]; then
     printf "\n\e[4mCompiling the examples.\e[0m\n"
     cmake --build $MAIN_DIR/build --target Examples --parallel
-fi
 
-# Check if the compilation was successful
-if [ $? -ne 0 ]; then
-    printf >&2 "\e[1;31mCompilation failed.\e[m\n"
-    exit 1
+    # Check if the compilation was successful
+    if [ $? -ne 0 ]; then
+        printf >&2 "\e[1;31mCompilation failed.\e[m\n"
+        exit 1
+    fi
 fi
 
 # ============================================================================ #
@@ -456,7 +456,7 @@ done
 # If we are just doing a dry-run, we exit here
 if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
-    exit 0
+    exit $?
 fi
 
 for example in $QUEUE; do
@@ -473,6 +473,7 @@ done
 
 if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
+    exit $?
 fi
 
 printf "\n"
