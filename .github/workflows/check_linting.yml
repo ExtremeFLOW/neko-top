@@ -221,6 +221,7 @@ jobs:
         with:
           name: linter-report
           path: linter-report.txt
+          if-no-files-found: ignore
 
   # Create a badge for the flint score
   create-badge-lint:
