@@ -76,7 +76,7 @@ runs:
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="json-fortran-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="json-fortran-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
@@ -118,9 +118,9 @@ runs:
         FCFLAGS: ${{ inputs.compiler-flags }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
+          --install-prefix $INSTALL_DIR \
           -DCMAKE_Fortran_COMPILER=$FC \
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
-          -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
           -DUSE_GNU_INSTALL_CONVENTION=ON \
           -DSKIP_DOC_GEN=ON
 
@@ -143,14 +143,6 @@ runs:
 
     # ------------------------------------------------------------------------ #
     # Cleanup and set the output.
-
-    - name: Cleanup
-      if: ${{ steps.cache-json-fortran.outputs.cache-hit != 'true' }}
-      shell: bash
-      run: |
-        if [ ${{ inputs.install-dir }} != ${{ inputs.working-dir }} ]; then
-          rm -rf ${{ inputs.working-dir }}
-        fi
 
     - name: Set output
       id: set-output

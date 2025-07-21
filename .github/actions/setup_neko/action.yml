@@ -20,8 +20,7 @@ inputs:
 
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
-    required: false
-    default: "/home/runner/pkg/json-fortran"
+    required: true
 
   os:
     description: "The operating system to use."
@@ -80,7 +79,7 @@ runs:
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -133,20 +132,6 @@ runs:
     # Cleanup and outputs
     #
     # This step cleans up the working directory and sets the output.
-
-    - name: Cleanup
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
-      shell: bash
-      env:
-        INSTALL_DIR: ${{ inputs.install-dir }}
-        WORKING_DIR: ${{ inputs.working-dir }}
-      run: |
-        echo "INSTALL_DIR: $INSTALL_DIR"
-        echo "WORKING_DIR: $WORKING_DIR"
-
-        if [ $(echo "$INSTALL_DIR" | grep -q "$WORKING_DIR") ]; then
-          rm -rf $WORKING_DIR
-        fi
 
     - name: Set output
       id: set-output
