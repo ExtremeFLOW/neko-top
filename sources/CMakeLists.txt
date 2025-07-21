@@ -97,9 +97,16 @@ target_link_libraries(neko-top
 # ============================================================================ #
 # Specify installation instructions
 
+# Install the neko-top library and its modules.
+# These should adhere to the CMake installation conventions.
+
 install(TARGETS neko-top
-    DESTINATION ${CMAKE_SOURCE_DIR}/lib/
+    EXPORT neko-top-targets
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
 )
-install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}
+install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.mod"
 )
