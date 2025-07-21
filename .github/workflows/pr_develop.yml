@@ -27,7 +27,7 @@
 name: Check PR for Develop Branch
 on:
   pull_request:
-    branches: [develop, ci-test]
+    branches: [develop]
     types:
       - opened
       - synchronize
@@ -117,7 +117,9 @@ jobs:
 
   check_scripts:
     name: Scripting
-    needs: prepare
+    needs:
+      - prepare
+      - check_compile
     uses: ./.github/workflows/check_scripts.yml
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}

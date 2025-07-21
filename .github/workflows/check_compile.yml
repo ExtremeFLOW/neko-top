@@ -90,3 +90,44 @@ jobs:
       - name: Running Tests
         run: |
           ctest --test-dir build --output-on-failure --parallel
+
+      # ---------------------------------------------------------------------- #
+      # Run a rugby ball example to ensure everything works as expected
+      # ---------------------------------------------------------------------- #
+
+      - name: Run Rugby Ball
+        env:
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+        run: |
+          # Adjust the end time and max iterations for the rugby ball case
+          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+
+          ./run.sh -rc rugby_ball
+
+      # ---------------------------------------------------------------------- #
+      # Report errors if any step fails
+      # ---------------------------------------------------------------------- #
+      - name: Report errors
+        if: failure()
+        run: |
+          echo "Errors encountered during script execution. Please check the logs for details."
+          logs=($(find logs/ -name "error.log"))
+
+          for file in ${logs[@]}; do
+            if [[ -s $file ]]; then
+              printf "\nContents of $file:\n" >&2
+              cat $file >&2
+            elif [ -f $file ]; then
+              rm -fr $(dirname $file)
+            fi
+          done
+
+      - name: Save logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-compile-logs
+          path: logs/**/*.log
+          overwrite: true
