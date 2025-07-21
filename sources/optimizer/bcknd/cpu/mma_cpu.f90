@@ -32,8 +32,10 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_Barrier
   use comm, only: neko_comm, pe_rank, mpi_real_precision
+  use comm, only: pe_rank, pe_size
+  use math, only: NEKO_EPS
   implicit none
 
 contains
@@ -102,6 +104,7 @@ contains
     else
        call mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
     end if
+
   end subroutine mma_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -138,7 +141,7 @@ contains
     real(kind=rp), dimension(3*this%n+4*this%m+2) :: residual
 
     real(kind=rp), dimension(4*this%m+2) :: residual_small
-    integer :: ierr
+    integer :: ierr, ip, i
     real(kind=rp) :: re_sq_norm
 
     rex = df0dx + matmul(transpose(dfdx), this%lambda%x) &
@@ -166,6 +169,42 @@ contains
          mpi_real_precision, mpi_sum, neko_comm, ierr)
 
     this%residunorm = sqrt(norm2(residual_small)**2 + re_sq_norm)
+
+    ! Do some debug printing
+    call MPI_Barrier(neko_comm, ierr)
+    ip = 0
+    do while (ip < pe_size)
+       if (pe_rank == ip) then
+          write(*, *) ""
+          write(*, *) "--------------------------------------------------"
+          write(*, '(A18,12X,I0)') "KKT Residual rank:", pe_rank
+          write(*, '(4X,A17,9X,E20.10)') "KKT Residual max:", this%residumax
+          write(*, '(4X,A18,8X,E20.10)') "KKT Residual norm:", this%residunorm
+          write(*, '(4X,A17,9X,E20.10)') "KKT Residual rex:", norm2(rex)
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,2X,E20.10)') "KKT Residual rey(", i, "):", rey(i)
+          end do
+          write(*, '(4X,A17,9X,E20.10)') "KKT Residual rez:", rez
+          do i = 1, this%m
+             write(*, '(4X,A22,I1,A2,1X,E20.10)') "KKT Residual relambda(", i, "):", relambda(i)
+          end do
+          write(*, '(4X,A19,7X,E20.10)') "KKT Residual rexsi:", norm2(rexsi)
+          write(*, '(4X,A19,7X,E20.10)') "KKT Residual reeta:", norm2(reeta)
+          do i = 1, this%m
+             write(*, '(4X,A18,I1,A2,5X, E20.10)') "KKT Residual remu(", i, "):", remu(i)
+          end do
+          write(*, '(4X,A20,E20.10)') "KKT Residual rezeta:", rezeta
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,E20.10)') "KKT Residual res(", i, "):", res(i)
+          end do
+          ip = ip + 1
+       end if
+
+       call MPI_Barrier(neko_comm, ierr)
+       call MPI_Allreduce(MPI_IN_PLACE, ip, 1, MPI_INTEGER, MPI_MAX, &
+            neko_comm, ierr)
+    end do
+
   end subroutine mma_dpip_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual interior
@@ -198,6 +237,7 @@ contains
 
     real(kind=rp), dimension(this%m) :: relambda, remu
     real(kind=rp), dimension(2*this%m) :: residual
+    integer :: ip, i, ierr
 
 
     relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
@@ -207,6 +247,51 @@ contains
     residual = abs([relambda, remu])
     this%residumax = maxval(residual)
     this%residunorm = norm2(residual)
+
+    ! Do some debug printing
+    ip = 0
+    call MPI_Barrier(neko_comm, ierr)
+    do while (ip < pe_size)
+       if (pe_rank == ip) then
+          write(*, *) ""
+          write(*, *) "--------------------------------------------------"
+          write(*, '(A18,20X,I0)') "KKT Residual rank:", pe_rank
+          write(*, '(4X,A17,9X,E20.10)') "KKT Residual max:", this%residumax
+          write(*, '(4X,A18,8X,E20.10)') "KKT Residual norm:", this%residunorm
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,2X,E20.10)') &
+                  "KKT Residual fval(", i, "):", fval(i)
+          end do
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,2X,E20.10)') &
+                  "KKT Residual a(", i, "):", this%a%x(i)
+          end do
+          write(*, '(4X,A17,5X,E20.10)') "KKT Residual z:", this%z
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,2X,E20.10)') &
+                  "KKT Residual y(", i, "):", this%y%x(i)
+          end do
+          do i = 1, this%m
+             write(*, '(4X,A17,I1,A2,2X,E20.10)') &
+                  "KKT Residual mu(", i, "):", this%mu%x(i)
+          end do
+          do i = 1, this%m
+             write(*, '(4X,A22,I1,A2,1X,E20.10)') &
+                  "KKT Residual relambda(", i, "):", relambda(i)
+          end do
+          do i = 1, this%m
+             write(*, '(4X,A18,I1,A2,5X, E20.10)') &
+                  "KKT Residual remu(", i, "):", remu(i)
+          end do
+
+          call sleep(1)
+          ip = ip + 1
+       end if
+
+       call MPI_Barrier(neko_comm, ierr)
+       call MPI_Allreduce(MPI_IN_PLACE, ip, 1, MPI_INTEGER, MPI_MAX, &
+            neko_comm, ierr)
+    end do
 
   end subroutine mma_dip_KKT_cpu
 
@@ -760,7 +845,7 @@ contains
     !                   + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / (x_j - l_j) ]!
     !       - sum_{i=1}^{m} λ_i * b_i                                          !
     !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ]          !
-    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z                              !
+    !       + (a_0 - sum_{i=1}^{m} ��_i * a_i) * z                              !
     !                                                                          !
     ! Breakdown of terms:                                                      !
     !   - Terms related to x:  L_x (the first three lines of L(x, y, z, λ))    !
@@ -859,20 +944,18 @@ contains
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          do i=1, this%m
-            if (abs(d(i)) < 1.0e-15_rp) then
-               ! to avoid devision by zero in case d=0
-               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
-               ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
-            else
-               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
-            end if
+            y(i) = max(0.0_rp, (lambda(i) - c(i)) / &
+                 sign(max(abs(d(i)), NEKO_EPS), d(i)))
+
+            write(*,*) i, "y = (lambda - c) / d", &
+                 y(i), lambda(i), c(i), d(i)
          end do
 
          ! Comput the value of z that minimizes L_z for the current λ
          ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
          ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
          ! ensure z>=0
-         z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
+         z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) > 0.0_rp)
 
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
@@ -927,8 +1010,8 @@ contains
                  (2.0_rp*qjlambda/(x - low)**3))
 
             ! Remove the sensitivity for the active primal constraints
-            Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < 1.0e-15_rp)
-            Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < 1.0e-15_rp)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < 0.0_rp)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < 0.0_rp)
 
             do i = 1, this%m
                hijx(i,:) = pij(i,:) / (upp - x)**2 &
@@ -961,11 +1044,8 @@ contains
             ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
-                  if (abs(d(i)) < 1.0e-15_rp) then
-                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
-                  else
-                     Hess(i, i) = Hess(i, i) - 1.0_rp/d(i)
-                  end if
+                  Hess(i, i) = Hess(i, i) - 1.0_rp / &
+                       sign(max(abs(d(i)), NEKO_EPS), d(i))
                end if
                ! Based on eq(10), note the term (-\Omega \Lambda)
                Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
@@ -979,7 +1059,7 @@ contains
             end do
             do i=1, this%m
                Hess(i,i) = Hess(i, i) - &
-                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+                    max(-1.0e-4_rp*Hesstrace / real(this%m, kind=rp), 1.0e-7_rp)
             end do
 
             call DGESV(this%m , 1, Hess, this%m , ipiv, &
@@ -1009,27 +1089,27 @@ contains
             lambda = lambda + steg*dlambda
             mu = mu + steg*dmu
 
+            do i = 1, this%m
+               write(*,*) i, "lambda = steg * dlambda ", &
+                    lambda(i), steg, dlambda(i)
+            end do
+
             ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
             ! the updated values of λ
 
             ! Comput the value of y that minimizes L_y for the current λ
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-            do i=1, this%m
-               if (abs(d(i)) < 1.0e-15_rp) then
-                  ! to avoid devision by zero in case d=0
-                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
-                  ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
-               else
-                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
-               end if
+            do i = 1, this%m
+               y(i) = max(0.0_rp, (lambda(i) - c(i)) / &
+                    sign(max(abs(d(i)), NEKO_EPS), d(i)))
             end do
 
             ! Comput the value of z that minimizes L_z for the current λ
             ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
             ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
             ! ensure z>=0
-            z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
+            z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) > 0.0_rp)
 
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
@@ -1060,6 +1140,11 @@ contains
 
        epsi = 0.1_rp * epsi
     end do
+
+    ! ------------------------------------------------------------------------ !
+    ! Check for feasibility of the solution
+
+
 
     ! Save the new designx
     this%xold2%x = this%xold1%x

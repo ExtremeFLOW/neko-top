@@ -125,8 +125,8 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
-            "tolerance": 1.0e-3,
+            "max_iterations": 100,
+            "tolerance": 1.0e-8,
             "mma": {
                 "max_iter": 100,
                 "asyinit": 0.5,
@@ -139,7 +139,7 @@
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 100.0,
+                "c": 10.0,
                 "d": 0.0
             }
         },
