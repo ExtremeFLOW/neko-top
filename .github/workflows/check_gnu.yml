@@ -94,6 +94,20 @@ jobs:
               echo "nproc=$(sysctl -n hw.ncpu)" >> $GITHUB_OUTPUT
               echo "os-version=$(sw_vers -productName)-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
 
+          - backend: cuda
+            setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y nvidia-cuda-toolkit
+              echo "backend-path=/usr" >> $GITHUB_OUTPUT
+
+          - backend: hip
+            setup-backend: |
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+              sudo apt install ./amdgpu-install_*.deb
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              ROCM_DIR=$(ls -d /opt/rocm-*)
+              echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
+
     name: ${{ matrix.os }} - ${{ matrix.compiler }} - ${{ matrix.backend }} - ${{ matrix.precision }}
     env:
       FC: ${{ matrix.compiler }}
@@ -119,20 +133,8 @@ jobs:
 
       - name: Setup Backend
         id: setup-backend
-        env:
-          BACKEND: ${{ matrix.backend }}
-        run: |
-          if [ "$BACKEND" == "cuda" ]; then
-            sudo apt-get update
-            sudo apt-get install -y nvidia-cuda-toolkit
-            echo "backend-path=/usr" >> $GITHUB_OUTPUT
-          elif [ "$BACKEND" == "hip" ]; then
-            wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/focal/
-            sudo apt install ./amdgpu-install_*.deb
-            sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
-            ROCM_DIR=$(ls -d /opt/rocm-*)
-            echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
-          fi
+        run: ${{ matrix.setup-backend }}
+        if: ${{ matrix.backend != 'cpu' }}
 
       # ---------------------------------------------------------------------- #
       # Setup the external dependencies
