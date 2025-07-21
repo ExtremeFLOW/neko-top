@@ -124,7 +124,7 @@ jobs:
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       neko-version: ${{ needs.prepare.outputs.neko-version }}
-      neko-top-version: ${{ github.event.pull_request.head.ref }}
+      neko-top-version: ${{ github.head_ref || github.ref_name }}
 
   # -------------------------------------------------------------------------- #
   # Check if all previous jobs passed. If any of the previous jobs failed, the
