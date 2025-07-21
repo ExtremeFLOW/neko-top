@@ -30,8 +30,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
-        # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
         compiler: [gfortran-12, gfortran-13, gfortran-14]
         backend: [cpu, cuda, hip, opencl]
         precision: [sp, dp]
