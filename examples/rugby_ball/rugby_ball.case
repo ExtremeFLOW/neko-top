@@ -132,15 +132,14 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "m": 1,
-                "scale": 1.0,
+                "scale": 10.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 10.0,
-                "d": 0.0
+                "c": 1000.0,
+                "d": 1.0
             }
         },
         "objectives": [
