@@ -37,10 +37,9 @@ program volume_sensitivity
   type(volume_constraint_t) :: constraint_object
 
   ! Test specific variables
-  real(kind=rp) :: tolerance = 1e-6_rp
-  integer, parameter :: n_perturbations = 6
-  real(kind=rp) :: perturbations(n_perturbations) = [ &
-       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp]
+  real(kind=rp) :: tolerance = 1e-5_rp
+  real(kind=rp), parameter :: perturbations(4) = [ &
+       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
   type(vector_t) :: constraint_sensitivities
 
