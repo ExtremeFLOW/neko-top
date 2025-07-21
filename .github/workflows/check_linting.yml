@@ -252,3 +252,4 @@ jobs:
         with:
           name: lint-badge
           path: doc/media/lint-badge.svg
+          if-no-files-found: ignore
