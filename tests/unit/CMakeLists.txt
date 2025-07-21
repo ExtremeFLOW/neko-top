@@ -26,9 +26,6 @@ else()
     return()
 endif()
 
-find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
-
-
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES
     # Add the .pf unit test files here.
@@ -40,6 +37,9 @@ set(PFUNIT_TEST_SOURCES
 if (NOT PFUNIT_TEST_SOURCES)
     return()
 endif()
+
+# Find the pFUnit package. This is required to build the unit tests.
+find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
 
 foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Ensure the path is relative to the tests/unit directory.
