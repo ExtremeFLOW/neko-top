@@ -85,7 +85,7 @@ jobs:
             fi
           done
 
-      - name: Save logs as artifact
+      - name: Save logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
@@ -165,7 +165,7 @@ jobs:
             fi
           done
 
-      - name: Save logs as artifact
+      - name: Save logs
         if: failure()
         uses: actions/upload-artifact@v4
         with:
