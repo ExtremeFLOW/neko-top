@@ -18,7 +18,16 @@
 # command, which creates a CTest target for the test. The tests are organized
 # into a "Tests/Unit" folder in the CMake project for better organization.
 
+if (BUILD_TESTING)
+    # Ensure that the BUILD_TESTING option is enabled.
+    message(STATUS "Building Neko-TOP unit tests.")
+else()
+    message(STATUS "Skipping Neko-TOP unit tests as BUILD_TESTING is OFF.")
+    return()
+endif()
+
 find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
+
 
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES
