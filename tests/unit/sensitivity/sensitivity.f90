@@ -22,7 +22,7 @@ contains
     character(len=*), parameter :: fmt_data = '(4X,4E15.6E3)'
 
     integer :: n_perturbations, ip
-    real(kind=rp) :: perturb
+    real(kind=rp) :: perturb, tol
     type(vector_t) :: design_vector, design_perturbed
     real(kind=rp) :: constraint, perturbed_constraint
     type(vector_t) :: constraint_sensitivities
@@ -43,6 +43,7 @@ contains
     n_perturbations = size(perturbations)
     do ip = 1, n_perturbations
        perturb = perturbations(ip)
+       tol = perturb / maxval(perturbations) * tolerance
 
        ! Ensure the perturbation stays within the bounds of the design variable
        if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
@@ -66,7 +67,7 @@ contains
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
-       if (abs(fd_error) .gt. tolerance) then
+       if (abs(fd_error) .gt. tol) then
           call neko_error('Finite difference estimate does not match sensitivity')
        end if
     end do
