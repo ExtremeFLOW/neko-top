@@ -14,7 +14,7 @@ compiler. The action will also cache the build to speed up future builds.
 | `compiler`         | Yes      | The compiler to use for building Neko-TOP. The compiler should be available in the PATH.           | `gfortran`.                 |
 | `compiler-options` | Yes      | The compiler options to use for building Neko-TOP.                                                 | `-O3`                       |
 | `build-options`    | Yes      | The build options to use for building Neko-TOP.                                                    | `--parallel=$(nproc)`.      |
-| `version`          | Yes      | The version of Neko-TOP to build.                                                                  | `8.3.0`.                    |
+| `version`          | Yes      | The version of Neko-TOP to build.                                                                  | `develop`.                  |
 
 ## Outputs
 
