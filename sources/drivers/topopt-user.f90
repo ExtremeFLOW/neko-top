@@ -3,8 +3,9 @@ program topopt_user
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
   use json_module, only: json_file
-  use utils, only: neko_error
+  use json_utils, only: json_extract_object
   use json_utils_ext, only: json_read_file
+  use utils, only: neko_error
   use user, only: user_setup
   use design, only: design_t, design_factory
   use neko_top, only: neko_top_register_types
@@ -15,8 +16,8 @@ program topopt_user
 
   ! JSON related arguments
   integer :: argc
-  type(json_file) :: parameters
   character(len=256) :: parameter_file
+  type(json_file) :: parameters, design_parameters
 
   ! MPI parameters
   integer :: ierr
@@ -44,6 +45,7 @@ program topopt_user
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
+  call json_extract_object(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
