@@ -1,4 +1,4 @@
-# Examples {#examples}
+# Running examples {#examples}
 \tableofcontents
 
 The execution of examples have been automated to allow for easy testing and
@@ -12,9 +12,6 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ```sh
 ./run.sh [-h] [--help]
 ```
-
-<!-- Include the list of examples -->
-\include{doc} "examples/examples.md"
 
 ## Execution of examples {#examples-running}
 
