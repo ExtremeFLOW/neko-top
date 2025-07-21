@@ -2,14 +2,13 @@
 #
 # This workflow checks the formatting of the source files in the repository. It
 # uses the `findent` tool to format the Fortran source files. This allow us to
-# enforce rather strickt formatting rules.
+# enforce rather strict formatting rules.
 
 name: Check Formatting
 
 on:
-  # Allow the workflow to be called from other workflows.
-  # This is useful when we want to run the workflow on a specific event.
   workflow_call:
+  workflow_dispatch:
 
 jobs:
   check-formatting:
