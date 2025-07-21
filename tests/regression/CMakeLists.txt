@@ -10,5 +10,3 @@ set_target_properties(Regression PROPERTIES
 )
 add_dependencies(Tests Regression)
 
-# List of regression tests
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sensitivity)

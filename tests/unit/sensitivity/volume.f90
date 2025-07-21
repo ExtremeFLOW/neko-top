@@ -18,6 +18,7 @@ program volume_sensitivity
   use vector, only: vector_t
   use matrix, only: matrix_t
   use math, only: abscmp
+  use sensitivity, only: compute_sensitivity
   implicit none
 
   ! JSON related arguments
@@ -41,18 +42,9 @@ program volume_sensitivity
   real(kind=rp) :: perturbations(n_perturbations) = [ &
        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp]
 
-  real(kind=rp) :: fd_estimate, fd_error
-  real(kind=rp) :: perturb
-  type(vector_t) :: design_vector
-  type(vector_t) :: design_perturbed
-
-  real(kind=rp) :: constraint, perturbed_constraint
   type(vector_t) :: constraint_sensitivities
 
-  character(len=*), parameter :: fmt_header = '(4X,A12,4X,A10,6X,A11,5X,A5,10X)'
-  character(len=*), parameter :: fmt_data = '(4X,4E15.6E3)'
-
-  integer :: ip, i_max, i, n_elements
+  integer :: i_max
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -88,65 +80,17 @@ program volume_sensitivity
   call constraint_object%update_value(des)
   call sim%run_backward()
   call constraint_object%update_sensitivity(des)
-
-  constraint = constraint_object%get_value()
-  constraint_sensitivities = constraint_object%get_sensitivity()
-
   call sim%reset()
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
   ! the sensitivity computed by our method.
 
-  n_elements = des%size()
-
-  ! Determine the largest sensitivity to perturb the design variable
+  constraint_sensitivities = constraint_object%get_sensitivity()
   i_max = maxloc(abs(constraint_sensitivities%x), dim=1)
+  call compute_sensitivity(constraint_object, sim, des, i_max, perturbations, &
+       tolerance)
 
-  ! Get the design vector for reference
-  ! This is the design vector we will perturb
-  design_vector = des%get_values()
-
-  ! do i = 1, n_elements,
-
-  i = i_max
-
-  write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
-       i, 'Design variable ', design_vector%x(i), &
-       'Location [', des%get_x(i), des%get_y(i), des%get_z(i), ']'
-  write(*, fmt_header) "Perturbation", "Constraint", "FD Estimate", "Error"
-  write(*, fmt_data) 0.0_rp, constraint, constraint_sensitivities%x(i), 0.0_rp
-
-  do ip = 1, n_perturbations
-     perturb = perturbations(ip)
-
-     ! Ensure the perturbation stays within the bounds of the design variable
-     if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
-
-     ! Reset and Perturb the design field by a small amount
-     design_perturbed = design_vector
-     design_perturbed%x(i) = design_vector%x(i) + perturb
-     call des%update_design(design_perturbed)
-
-     ! Compute the objective value of the perturbed design
-     call sim%run_forward()
-     call constraint_object%update_value(des)
-     perturbed_constraint = constraint_object%get_value()
-     call sim%reset()
-
-     fd_estimate = perturbed_constraint - constraint
-     if (.not. abscmp(fd_estimate, 0.0_rp)) fd_estimate = fd_estimate / perturb
-
-     fd_error = (fd_estimate - constraint_sensitivities%x(i)) / &
-          constraint_sensitivities%x(i)
-
-     write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
-
-     if (abs(fd_error) .gt. tolerance) then
-        call neko_error('Finite difference estimate does not match sensitivity')
-     end if
-  end do
-  ! end do
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
