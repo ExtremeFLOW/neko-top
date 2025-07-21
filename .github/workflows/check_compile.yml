@@ -83,10 +83,6 @@ jobs:
         run: |
           cmake --build build --parallel
 
-      - name: Building Examples
-        run: |
-          cmake --build build --target Examples --parallel
-
       - name: Running Tests
         run: |
           ctest --test-dir build --output-on-failure --parallel
@@ -94,6 +90,10 @@ jobs:
       # ---------------------------------------------------------------------- #
       # Run a rugby ball example to ensure everything works as expected
       # ---------------------------------------------------------------------- #
+
+      - name: Building Examples
+        run: |
+          cmake --build build --target Examples --parallel
 
       - name: Run Rugby Ball
         env:
