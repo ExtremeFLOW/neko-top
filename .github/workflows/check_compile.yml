@@ -14,6 +14,10 @@ on:
         description: "The version of json-fortran to use."
         required: true
         type: string
+      pfunit-version:
+        description: "The version of pFUnit to use."
+        required: true
+        type: string
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -64,6 +68,12 @@ jobs:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
 
+      - name: Get pfunit
+        id: get-pfunit
+        uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ inputs.pfunit-version }}
+
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
@@ -72,20 +82,22 @@ jobs:
         env:
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
             -DBUILD_TESTING=ON \
             -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-            -DNEKO_DIR=$NEKO_DIR
+            -DNEKO_DIR=$NEKO_DIR \
+            -DPFUNIT_DIR=$PFUNIT_DIR
 
       - name: Building Library
         run: |
           cmake --build build --parallel
 
-      - name: Running Tests
+      - name: Running Unit Tests
         run: |
-          ctest --test-dir build --output-on-failure --parallel
+          ctest --test-dir build --output-on-failure --parallel -L "Unit"
 
       # ---------------------------------------------------------------------- #
       # Run a rugby ball example to ensure everything works as expected

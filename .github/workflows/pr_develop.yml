@@ -43,7 +43,7 @@ on:
 # will store them in a file that the other jobs can read.
 
 env:
-  PFUNIT_VERSION: main
+  PFUNIT_VERSION: v4.12.0
   JSON_FORTRAN_VERSION: master
   NEKO_VERSION: neko-top
 
@@ -114,6 +114,7 @@ jobs:
     with:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
 
   check_scripts:
     name: Scripting

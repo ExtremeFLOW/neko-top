@@ -5,10 +5,10 @@ name: Test Scripts
 
 # This workflow is only defined here. It is triggered from other workflows.
 on:
-  push:
-    branches:
-      - test/*
-      - cicd/*
+  # push:
+  #   branches:
+  #     - test/*
+  #     - cicd/*
   workflow_call:
   merge_group:
     types: [checks_requested]
