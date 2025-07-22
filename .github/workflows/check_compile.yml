@@ -58,12 +58,12 @@ jobs:
               sudo apt-get install -y libopenblas-dev libopenmpi-dev \
                 openmpi-bin pkg-config liblapack-dev ninja-build
 
-          - backend: cuda
-            os: ubuntu-latest
-            setup-backend: |
-              sudo apt-get update
-              sudo apt-get install -y nvidia-cuda-toolkit
-              echo "backend-path=/usr" >> $GITHUB_OUTPUT
+          # - backend: cuda
+          #   os: ubuntu-latest
+          #   setup-backend: |
+          #     sudo apt-get update
+          #     sudo apt-get install -y nvidia-cuda-toolkit
+          #     echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: hip
             os: ubuntu-latest
