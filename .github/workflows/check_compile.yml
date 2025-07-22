@@ -37,8 +37,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+
+        # Minimal matrix for debugging
         os: [ubuntu-latest]
-        precision: [sp, dp]
+        precision: [dp]
+        compiler: [gfortran-14]
+
+        # Full matrix
+        # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        # precision: [sp, dp]
+        # compiler: [gfortran-12, gfortran-13, gfortran-14]
+        # backend: [cpu, cuda, hip, opencl]
 
         # Define the setup jobs
         include:
@@ -85,9 +94,9 @@ jobs:
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           os: ${{ matrix.os }}
+          compiler: ${{ matrix.compiler }}
 
 
-          # compiler: ${{ matrix.compiler }}
           # backend: ${{ matrix.backend }}
           # backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
@@ -110,10 +119,8 @@ jobs:
         run: |
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON \
-            -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
-            -DNEKO_DIR=$NEKO_DIR \
-            -DPFUNIT_DIR=$PFUNIT_DIR
+            -DCMAKE_Fortran_COMPILER=${{ matrix.compiler }} \
+            -DBUILD_TESTING=ON
 
       - name: Building Library
         run: |
