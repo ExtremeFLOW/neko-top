@@ -170,7 +170,7 @@ jobs:
         if: failure()
         run: |
           echo "Errors encountered during script execution."
-          ëcho "Please check the logs for details."
+          echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log" 2>/dev/null))
 
           for file in ${logs[@]}; do
