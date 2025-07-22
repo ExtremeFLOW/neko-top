@@ -8,12 +8,18 @@ module sensitivity
   use vector, only: vector_t
   implicit none
 
+  interface compute_sensitivity
+     module procedure compute_sensitivity_i, compute_sensitivity_list
+  end interface compute_sensitivity
+
 contains
 
-  subroutine compute_sensitivity(object, sim, des, i, perturbations, tolerance)
+  subroutine compute_sensitivity_i(object, sim, des, target_sensitivities, i, &
+       perturbations, tolerance)
     class(base_functional_t), intent(inout) :: object
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
+    type(vector_t), intent(in) :: target_sensitivities
     integer, intent(in) :: i
     real(kind=rp), intent(in) :: perturbations(:)
     real(kind=rp), intent(in) :: tolerance
@@ -25,20 +31,18 @@ contains
     real(kind=rp) :: perturb, tol
     type(vector_t) :: design_vector, design_perturbed
     real(kind=rp) :: constraint, perturbed_constraint
-    type(vector_t) :: constraint_sensitivities
     real(kind=rp) :: fd_estimate, fd_error
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
     design_vector = des%get_values()
     constraint = object%get_value()
-    constraint_sensitivities = object%get_sensitivity()
 
     write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
          i, 'Design variable ', design_vector%x(i), &
          'Location [', des%get_x(i), des%get_y(i), des%get_z(i), ']'
     write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
-    write(*, fmt_data) 0.0_rp, constraint, constraint_sensitivities%x(i), 0.0_rp
+    write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
 
     n_perturbations = size(perturbations)
     do ip = 1, n_perturbations
@@ -60,18 +64,40 @@ contains
        call sim%reset()
 
        fd_estimate = perturbed_constraint - constraint
-       if (.not. abscmp(fd_estimate, 0.0_rp)) fd_estimate = fd_estimate / perturb
+       if (.not. abscmp(fd_estimate, 0.0_rp)) then
+          fd_estimate = fd_estimate / perturb
+       end if
 
-       fd_error = (fd_estimate - constraint_sensitivities%x(i)) / &
-            constraint_sensitivities%x(i)
+       fd_error = (fd_estimate - target_sensitivities%x(i)) / &
+            target_sensitivities%x(i)
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
        if (abs(fd_error) .gt. tol) then
-          call neko_error('Finite difference estimate does not match sensitivity')
+          call neko_error('Finite difference estimate does not match ' // &
+               'sensitivity')
        end if
     end do
 
-  end subroutine compute_sensitivity
+  end subroutine compute_sensitivity_i
+
+  subroutine compute_sensitivity_list(object, sim, des, target_sensitivities, &
+       list, perturbations, tolerance)
+    class(base_functional_t), intent(inout) :: object
+    type(simulation_t), intent(inout) :: sim
+    class(design_t), intent(inout) :: des
+    type(vector_t), intent(in) :: target_sensitivities
+    integer, dimension(:), intent(in) :: list
+    real(kind=rp), dimension(:), intent(in) :: perturbations
+    real(kind=rp), intent(in) :: tolerance
+
+    integer :: i, n
+
+    n = size(list)
+    do i = 1, n
+       call compute_sensitivity_i(object, sim, des, target_sensitivities, &
+            list(i), perturbations, tolerance)
+    end do
+  end subroutine compute_sensitivity_list
 
 end module sensitivity

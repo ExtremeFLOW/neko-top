@@ -6,7 +6,7 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 # Define the list of sensitivity tests
 # each of these should be a custom driver.
 set(test_list
-    "volume"
+    "volume.f90"
 )
 
 # ============================================================================ #
@@ -77,27 +77,29 @@ add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 # ============================================================================ #
 # Define the test itself
 
-foreach(test_name ${test_list})
-    add_executable(${test_name}_test_bin EXCLUDE_FROM_ALL
-        ${CMAKE_CURRENT_SOURCE_DIR}/${test_name}.f90
+foreach(test ${test_list})
+    # Extract the test name from the file name
+    get_filename_component(test_name ${test} NAME_WE)
+    add_executable(${test_name}_sensitivity_bin EXCLUDE_FROM_ALL
+        ${CMAKE_CURRENT_SOURCE_DIR}/${test}
         ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
     )
 
-    add_dependencies(Unit ${test_name}_test_bin)
+    add_dependencies(Unit ${test_name}_sensitivity_bin)
 
     # Add the test to CTest
-    add_test(NAME ${test_name}_test
-        COMMAND $<TARGET_FILE:${test_name}_test_bin> sensitivity.case
+    add_test(NAME ${test_name}_sensitivity
+        COMMAND $<TARGET_FILE:${test_name}_sensitivity_bin> sensitivity.case
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    set_tests_properties(${test_name}_test
+    set_tests_properties(${test_name}_sensitivity
         PROPERTIES
-            DEPENDS "${test_name}_test_bin;sensitivity_test_prepare"
+            DEPENDS "${test_name}_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
             TIMEOUT 300
     )
-    set_target_properties(${test_name}_test_bin PROPERTIES
+    set_target_properties(${test_name}_sensitivity_bin PROPERTIES
         FOLDER "Tests/Unit/Sensitivity"
     )
 endforeach()

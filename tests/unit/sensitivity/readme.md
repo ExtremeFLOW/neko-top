@@ -20,3 +20,18 @@ The test is done through a few common files:
 Currently, we have added tests for the following components:
 
 - `volume_constraint_t`
+
+## Adding New Tests
+
+To add a new sensitivity test, follow these steps:
+1. Create a Fortran file containing the program logic for the test.
+2. Add the test to the `test_list` variable in the `CMakeLists.txt` file.
+   Assuming the Fortran file is named `new_sensitivity.f90`, you would add:
+   ```cmake
+   # Define the list of sensitivity tests
+   # each of these should be a custom driver.
+   set(test_list
+       "volume.f90"
+       "new_sensitivity.f90"  # Add your new test here
+   )
+   ```

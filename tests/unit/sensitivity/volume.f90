@@ -80,15 +80,15 @@ program volume_sensitivity
   call sim%run_backward()
   call constraint_object%update_sensitivity(des)
   call sim%reset()
+  constraint_sensitivities = constraint_object%get_sensitivity()
+  i_max = maxloc(abs(constraint_sensitivities%x), dim=1)
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
   ! the sensitivity computed by our method.
 
-  constraint_sensitivities = constraint_object%get_sensitivity()
-  i_max = maxloc(abs(constraint_sensitivities%x), dim=1)
-  call compute_sensitivity(constraint_object, sim, des, i_max, perturbations, &
-       tolerance)
+  call compute_sensitivity(constraint_object, sim, des, &
+       constraint_sensitivities, i_max, perturbations, tolerance)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
