@@ -2,10 +2,6 @@ name: GNU Fortran
 
 # Controls when the action will run.
 on:
-  push:
-    branches:
-      - cicd/*
-
   workflow_call:
     inputs:
       json-fortran-version:
