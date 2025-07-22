@@ -137,14 +137,15 @@ jobs:
         run: |
           cmake --build build --parallel
 
+      # ---------------------------------------------------------------------- #
+      # Run the tests, which is only done on the CPU backend as the github
+      # runner does not have a GPU available.
+      # ---------------------------------------------------------------------- #
+
       - name: Running Unit Tests
         if: ${{ matrix.backend == 'cpu' }}
         run: |
           ctest --test-dir build --output-on-failure --parallel -L "Unit"
-
-      # ---------------------------------------------------------------------- #
-      # Run a rugby ball example to ensure everything works as expected
-      # ---------------------------------------------------------------------- #
 
       - name: Building Examples
         run: |
