@@ -6,6 +6,8 @@ module sensitivity
   use num_types, only: rp
   use math, only: abscmp
   use vector, only: vector_t
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   implicit none
 
   interface compute_sensitivity
@@ -19,7 +21,7 @@ contains
     class(base_functional_t), intent(inout) :: object
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
-    type(vector_t), intent(in) :: target_sensitivities
+    type(vector_t), intent(inout) :: target_sensitivities
     integer, intent(in) :: i
     real(kind=rp), intent(in) :: perturbations(:)
     real(kind=rp), intent(in) :: tolerance
@@ -37,6 +39,15 @@ contains
     ! This is the design vector we will perturb
     design_vector = des%get_values()
     constraint = object%get_value()
+    call design_perturbed%init(design_vector%size())
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(design_vector%x, design_vector%x_d, &
+            design_vector%size(), DEVICE_TO_HOST, .true.)
+       call device_memcpy(target_sensitivities%x, &
+            target_sensitivities%x_d, target_sensitivities%size(), &
+            DEVICE_TO_HOST, .true.)
+    end if
 
     write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
          i, 'Design variable ', design_vector%x(i), &
@@ -53,8 +64,12 @@ contains
        if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
 
        ! Reset and Perturb the design field by a small amount
-       design_perturbed = design_vector
+       design_perturbed%x = design_vector%x
        design_perturbed%x(i) = design_vector%x(i) + perturb
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(design_perturbed%x, design_perturbed%x_d, &
+               design_perturbed%size(), HOST_TO_DEVICE, .true.)
+       end if
        call des%update_design(design_perturbed)
 
        ! Compute the objective value of the perturbed design
@@ -86,7 +101,7 @@ contains
     class(base_functional_t), intent(inout) :: object
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
-    type(vector_t), intent(in) :: target_sensitivities
+    type(vector_t), intent(inout) :: target_sensitivities
     integer, dimension(:), intent(in) :: list
     real(kind=rp), dimension(:), intent(in) :: perturbations
     real(kind=rp), intent(in) :: tolerance

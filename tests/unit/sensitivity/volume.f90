@@ -12,6 +12,8 @@ program volume_sensitivity
   use neko_top, only: neko_top_register_types
   use mpi_f08, only: MPI_Init
   use mask_ops, only: mask_exterior_const
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST
 
   ! Modules specific to this test
   use num_types, only: rp
@@ -81,6 +83,12 @@ program volume_sensitivity
   call constraint_object%update_sensitivity(des)
   call sim%reset()
   constraint_sensitivities = constraint_object%get_sensitivity()
+  if (NEKO_BCKND_DEVICE .eq. 1) then
+     call device_memcpy(constraint_sensitivities%x, &
+          constraint_sensitivities%x_d, constraint_sensitivities%size(), &
+          DEVICE_TO_HOST, .true.)
+  end if
+
   i_max = maxloc(abs(constraint_sensitivities%x), dim=1)
 
   ! -------------------------------------------------------------------------- !
