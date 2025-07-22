@@ -40,7 +40,7 @@ jobs:
 
         # Minimal matrix for debugging
         os: [ubuntu-latest]
-        precision: [dp]
+        precision: [dp, sp]
         compiler: [gfortran-13]
         backend: [cuda]
 
@@ -59,6 +59,8 @@ jobs:
                 openmpi-bin pkg-config liblapack-dev ninja-build
 
           - backend: cuda
+            os: ubuntu-latest
+            precision: sp
             setup-backend: |
               sudo apt-get update
               sudo apt-get install -y nvidia-cuda-toolkit
@@ -83,6 +85,7 @@ jobs:
         run: ${{ matrix.setup-env }}
 
       - name: Setup backend
+        id: setup-backend
         shell: bash
         run: ${{ matrix.setup-backend }}
 
