@@ -42,7 +42,7 @@ jobs:
         os: [ubuntu-latest]
         precision: [dp, sp]
         compiler: [gfortran-13]
-        backend: [cuda]
+        backend: [cuda, hip]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -65,6 +65,14 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y nvidia-cuda-toolkit
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
+
+          - backend: hip
+            setup-backend: |
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+              sudo apt install ./amdgpu-install_*.deb
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              ROCM_DIR=$(ls -d /opt/rocm-*)
+              echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
 
     # ------------------------------------------------------------------------ #
     # Define the job itself.
