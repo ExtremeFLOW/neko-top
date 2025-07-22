@@ -324,8 +324,8 @@ function find_neko() {
         fi
 
         # Determine available features
-        FEATURES="--enable-contrib "
-        [ -n "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
+        FEATURES="--enable-contrib"
+        [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
 
@@ -348,7 +348,7 @@ function find_neko() {
                 error "the HIP installation."
                 exit 1
             fi
-        elif [ "$DEVICE_TYPE" != "NONE" ]; then
+        elif [ "$DEVICE_TYPE" != "CPU" ]; then
             printf "Device type not recognized: $DEVICE_TYPE\n"
             printf "\tValid options are: CUDA, HIP or NONE\n"
             printf "\tPlease submit an issue if you would like to see"
