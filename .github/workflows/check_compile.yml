@@ -40,9 +40,9 @@ jobs:
 
         # Minimal matrix for debugging
         os: [ubuntu-latest]
-        precision: [dp, sp]
+        precision: [dp]
         compiler: [gfortran-13]
-        backend: [cuda, hip]
+        backend: [hip]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -60,13 +60,13 @@ jobs:
 
           - backend: cuda
             os: ubuntu-latest
-            precision: sp
             setup-backend: |
               sudo apt-get update
               sudo apt-get install -y nvidia-cuda-toolkit
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: hip
+            os: ubuntu-latest
             setup-backend: |
               wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
               sudo apt install ./amdgpu-install_*.deb
@@ -119,7 +119,6 @@ jobs:
           compiler: ${{ matrix.compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
-
 
       - name: Get pfunit
         id: get-pfunit
