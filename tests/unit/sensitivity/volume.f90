@@ -35,15 +35,15 @@ program volume_sensitivity
   type(simulation_t) :: sim
   !> The design type
   type(brinkman_design_t) :: des
-  !> The volume constraint_object object
-  type(volume_constraint_t) :: constraint_object
+  !> The object to be tested
+  type(volume_constraint_t) :: object
 
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
   real(kind=rp), parameter :: perturbations(4) = [ &
        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
-  type(vector_t) :: constraint_sensitivities
+  type(vector_t) :: sensitivities
 
   integer :: i_max
 
@@ -71,37 +71,36 @@ program volume_sensitivity
   call des%init(design_parameters, sim)
 
   ! Initialize our constraint object
-  call constraint_object%init_from_components(des, sim, &
+  call object%init_from_components(des, sim, &
        "Volume", "optimization_domain", is_max = .true., limit = 0.2_rp)
 
   ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
 
   call sim%run_forward()
-  call constraint_object%update_value(des)
+  call object%update_value(des)
   call sim%run_backward()
-  call constraint_object%update_sensitivity(des)
+  call object%update_sensitivity(des)
   call sim%reset()
-  constraint_sensitivities = constraint_object%get_sensitivity()
+  sensitivities = object%get_sensitivity()
   if (NEKO_BCKND_DEVICE .eq. 1) then
-     call device_memcpy(constraint_sensitivities%x, &
-          constraint_sensitivities%x_d, constraint_sensitivities%size(), &
-          DEVICE_TO_HOST, .true.)
+     call device_memcpy(sensitivities%x, sensitivities%x_d, &
+          sensitivities%size(), DEVICE_TO_HOST, .true.)
   end if
 
-  i_max = maxloc(abs(constraint_sensitivities%x), dim=1)
+  i_max = maxloc(abs(sensitivities%x), dim=1)
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
   ! the sensitivity computed by our method.
 
-  call compute_sensitivity(constraint_object, sim, des, &
-       constraint_sensitivities, i_max, perturbations, tolerance)
+  call compute_sensitivity(object, sim, des, &
+       sensitivities, i_max, perturbations, tolerance)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call constraint_object%free()
+  call object%free()
   call des%free()
   call sim%free()
 
