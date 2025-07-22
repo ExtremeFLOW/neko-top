@@ -149,7 +149,8 @@ runs:
         if [ "$BACKEND" == "cuda" ]; then
           BACKEND_FLAGS="--with-cuda=$BACKEND_PATH"
         elif [ "$BACKEND" == "hip" ]; then
-          BACKEND_FLAGS="HIP_HIPCC_FLAGS=\"-O2 -fPIE\" --with-hip=$BACKEND_PATH"
+          BACKEND_FLAGS="--with-hip=$BACKEND_PATH"
+          HIP_HIPCC_FLAGS="-O2 -fPIE"
         elif [ "$BACKEND" == "opencl" ]; then
           BACKEND_FLAGS="--with-opencl"
         fi
