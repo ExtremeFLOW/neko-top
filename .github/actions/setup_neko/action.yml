@@ -146,11 +146,11 @@ runs:
         RP: ${{ inputs.precision }}
       run: |
         BACKEND_FLAGS=""
-        if [ "${{ inputs.backend }}" == "cuda" ]; then
+        if [ "$BACKEND" == "cuda" ]; then
           BACKEND_FLAGS="--with-cuda=$BACKEND_PATH"
-        elif [ "${{ inputs.backend }}" == "hip" ]; then
+        elif [ "$BACKEND" == "hip" ]; then
           BACKEND_FLAGS="--with-hip=$BACKEND_PATH"
-        elif [ "${{ inputs.backend }}" == "opencl" ]; then
+        elif [ "$BACKEND" == "opencl" ]; then
           BACKEND_FLAGS="--with-opencl"
         fi
 
