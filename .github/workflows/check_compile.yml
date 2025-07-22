@@ -41,7 +41,7 @@ jobs:
         # Minimal matrix for debugging
         os: [ubuntu-latest]
         precision: [dp]
-        compiler: [gfortran-14]
+        compiler: [gfortran-13]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -60,9 +60,8 @@ jobs:
     # ------------------------------------------------------------------------ #
     # Define the job itself.
     # ------------------------------------------------------------------------ #
-    name: ${{matrix.os}}/${{matrix.precision}}
+    name: ${{matrix.os}} / ${{matrix.precision}} / ${{matrix.compiler}}
     runs-on: ${{matrix.os}}
-
 
     steps:
       # ---------------------------------------------------------------------- #
