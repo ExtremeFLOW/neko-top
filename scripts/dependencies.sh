@@ -397,19 +397,19 @@ function find_neko() {
 
     # Check the device type supported by neko
     if [ -f "$NEKO_DIR/src/config/neko_config.f90" ]; then
-        if [ "$DEVICE_TYPE" == "NONE" ]; then
+        if [ "$DEVICE_TYPE" == "CPU" ]; then
             PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
         else
             PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
         fi
         NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
 
-        if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+        if [[ "$DEVICE_TYPE" == "CPU" && $NEKO_DEVICE_TYPE == 1 ]]; then
             error "Neko device type does not match the requested device type."
             error "Please ensure that the Neko installation is correct."
             error "Requested device type: $DEVICE_TYPE"
             exit 1
-        elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
+        elif [[ "$DEVICE_TYPE" != "CPU" && $NEKO_DEVICE_TYPE == 0 ]]; then
             error "Neko device type does not match the requested device type."
             error "Please ensure that the Neko installation is correct."
             error "Requested device type: $DEVICE_TYPE"
