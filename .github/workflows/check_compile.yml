@@ -42,6 +42,7 @@ jobs:
         os: [ubuntu-latest]
         precision: [dp]
         compiler: [gfortran-13]
+        backend: [cuda]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -56,6 +57,12 @@ jobs:
               sudo apt-get update
               sudo apt-get install -y libopenblas-dev libopenmpi-dev \
                 openmpi-bin pkg-config liblapack-dev ninja-build
+
+          - backend: cuda
+            setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y nvidia-cuda-toolkit
+              echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
     # ------------------------------------------------------------------------ #
     # Define the job itself.
@@ -74,6 +81,10 @@ jobs:
       - name: Setup non-cache dependencies
         shell: bash
         run: ${{ matrix.setup-env }}
+
+      - name: Setup backend
+        shell: bash
+        run: ${{ matrix.setup-backend }}
 
       # ---------------------------------------------------------------------- #
       # Setup the external dependencies
@@ -94,10 +105,8 @@ jobs:
           precision: ${{ matrix.precision }}
           os: ${{ matrix.os }}
           compiler: ${{ matrix.compiler }}
-
-
-          # backend: ${{ matrix.backend }}
-          # backend-path: ${{ steps.setup-backend.outputs.backend-path }}
+          backend: ${{ matrix.backend }}
+          backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
 
       - name: Get pfunit
