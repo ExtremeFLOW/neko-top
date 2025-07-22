@@ -116,8 +116,8 @@ module minimum_dissipation_objective
      procedure, public, pass(this) :: init_json_sim => &
           minimum_dissipation_init_json_sim
      !> The direct initializer from attributes.
-     procedure, public, pass(this) :: init_from_attributes => &
-          minimum_dissipation_init_attributes
+     procedure, public, pass(this) :: init_from_components => &
+          minimum_dissipation_init_from_components
      !> Destructor.
      procedure, public, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
@@ -150,7 +150,7 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
 
-    call this%init_from_attributes(design, simulation, weight, name, mask_name)
+    call this%init_from_components(design, simulation, weight, name, mask_name)
   end subroutine minimum_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -160,7 +160,7 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  subroutine minimum_dissipation_init_attributes(this, design, simulation, &
+  subroutine minimum_dissipation_init_from_components(this, design, simulation, &
        weight, name, mask_name)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -199,7 +199,7 @@ contains
        call f%source_term%add_source_term(adjoint_forcing)
     end select
 
-  end subroutine minimum_dissipation_init_attributes
+  end subroutine minimum_dissipation_init_from_components
 
   !> Destructor.
   subroutine minimum_dissipation_free(this)
