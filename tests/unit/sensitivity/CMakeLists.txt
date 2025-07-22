@@ -14,15 +14,6 @@ set(test_list
 
 # Get the Neko-TOP module directory
 get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
-include_directories(${NEKO_TOP_MODDIR})
-link_libraries(
-    neko-top-a
-    PkgConfig::neko
-    PkgConfig::json-fortran
-    MPI::MPI_Fortran
-    $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
-    $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-)
 
 # ============================================================================ #
 # Define the test preparation to be run before the test
@@ -31,6 +22,21 @@ link_libraries(
 # Ensure everything is built before running the test
 add_custom_target(sensitivity_test_prepare
     COMMENT "Preparing sensitivity test files")
+
+# Ensure the sensitivity utils library is built
+add_library(sensitivity_utils EXCLUDE_FROM_ALL
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90)
+target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
+target_link_libraries(sensitivity_utils
+    PUBLIC
+        neko-top-a
+        PkgConfig::neko
+        PkgConfig::json-fortran
+        MPI::MPI_Fortran
+        $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
+        $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+)
+add_dependencies(sensitivity_test_prepare sensitivity_utils)
 
 # Locate the case file
 add_custom_target(
@@ -82,9 +88,10 @@ foreach(test ${test_list})
     get_filename_component(test_name ${test} NAME_WE)
     add_executable(${test_name}_sensitivity_bin EXCLUDE_FROM_ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/${test}
-        ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
     )
-
+    target_link_libraries(${test_name}_sensitivity_bin
+        sensitivity_utils
+    )
     add_dependencies(Unit ${test_name}_sensitivity_bin)
 
     # Add the test to CTest
