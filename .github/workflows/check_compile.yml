@@ -69,7 +69,7 @@ jobs:
     # ------------------------------------------------------------------------ #
     # Define the job itself.
     # ------------------------------------------------------------------------ #
-    name: ${{matrix.os}} / ${{matrix.precision}} / ${{matrix.compiler}}
+    name: ${{matrix.os}} - ${{matrix.precision}} - ${{matrix.compiler}}
     runs-on: ${{matrix.os}}
 
     steps:
