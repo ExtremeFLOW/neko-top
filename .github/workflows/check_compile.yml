@@ -38,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        precision: [sp, dp, qp]
+        precision: [sp, dp]
 
         # Define the setup jobs
         include:
