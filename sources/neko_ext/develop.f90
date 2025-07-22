@@ -6,7 +6,7 @@ module develop
   use global_interpolation, only: global_interpolation_t
   use json_utils, only: json_get_or_default
   use logger, only: neko_log, LOG_SIZE
-  use num_types, only: rp, dp
+  use num_types, only: rp
   use tuple, only: tuple4_i4_t
   use utils, only: neko_error
   use hex, only: hex_t
@@ -191,7 +191,7 @@ contains
     type(case_t), intent(in) :: C
     integer, intent(in) :: element_id
     integer, intent(in) :: facet_id
-    real(kind=dp), dimension(:, :), allocatable, intent(out) :: nodes
+    real(kind=rp), dimension(:, :), allocatable, intent(out) :: nodes
 
     ! Local variables
     integer :: n, v
@@ -240,9 +240,9 @@ contains
 
     integer, allocatable :: facet_list(:, :)
 
-    real(kind=dp), dimension(:, :), allocatable :: facet_nodes
-    real(kind=dp), dimension(:, :), allocatable :: facet_centers
-    real(kind=dp), dimension(:), allocatable :: facet_area
+    real(kind=rp), dimension(:, :), allocatable :: facet_nodes
+    real(kind=rp), dimension(:, :), allocatable :: facet_centers
+    real(kind=rp), dimension(:), allocatable :: facet_area
 
     integer :: element_id, facet_id
     integer :: N_facets
