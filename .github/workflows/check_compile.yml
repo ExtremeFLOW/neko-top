@@ -71,7 +71,8 @@ jobs:
     # ------------------------------------------------------------------------ #
     name: ${{matrix.os}} - ${{matrix.precision}} - ${{matrix.compiler}} - ${{matrix.backend}}
     runs-on: ${{matrix.os}}
-
+    env:
+      JOB_NAME: ${{matrix.os}}-${{matrix.precision}}-${{matrix.compiler}}-${{matrix.backend}}
     steps:
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
@@ -186,6 +187,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: check-compile-logs
+          name: ${{ env.JOB_NAME }}-logs
           path: logs/**/*.log
           overwrite: true
+          if-no-files-found: ignore
