@@ -38,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        precision: [sp, dp]
+        precision: [sp, dp, qp]
 
         # Define the setup jobs
         include:
@@ -86,11 +86,8 @@ jobs:
           precision: ${{ matrix.precision }}
           os: ${{ matrix.os }}
 
-          # json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
-          # version: ${{ steps.setup-deps.outputs.neko-version }}
-          # os: ${{ steps.setup-env.outputs.os-version }}
+
           # compiler: ${{ matrix.compiler }}
-          # precision: ${{ matrix.precision }}
           # backend: ${{ matrix.backend }}
           # backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
