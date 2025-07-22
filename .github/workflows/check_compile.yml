@@ -170,9 +170,10 @@ jobs:
       - name: Report errors
         if: failure()
         run: |
+          [ ! -d logs ] && exit
           echo "Errors encountered during script execution."
           echo "Please check the logs for details."
-          logs=($(find logs/ -name "error.log" 2>/dev/null))
+          logs=($(find logs/ -name "error.log"))
 
           for file in ${logs[@]}; do
             if [[ -s $file ]]; then
