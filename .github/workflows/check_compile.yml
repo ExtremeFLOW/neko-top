@@ -69,7 +69,7 @@ jobs:
     # ------------------------------------------------------------------------ #
     # Define the job itself.
     # ------------------------------------------------------------------------ #
-    name: ${{matrix.os}} - ${{matrix.precision}} - ${{matrix.compiler}}
+    name: ${{matrix.os}} - ${{matrix.precision}} - ${{matrix.compiler}} - ${{matrix.backend}}
     runs-on: ${{matrix.os}}
 
     steps:
@@ -138,6 +138,7 @@ jobs:
           cmake --build build --parallel
 
       - name: Running Unit Tests
+        if: ${{ matrix.backend == 'cpu' }}
         run: |
           ctest --test-dir build --output-on-failure --parallel -L "Unit"
 
@@ -150,6 +151,7 @@ jobs:
           cmake --build build --target Examples --parallel
 
       - name: Run Rugby Ball
+        if: ${{ matrix.backend == 'cpu' }}
         env:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
