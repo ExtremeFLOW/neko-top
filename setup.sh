@@ -40,7 +40,7 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Parse the options
 
 # Assign default values to the options
-DEVICE_TYPE="NONE"
+DEVICE_TYPE="CPU"
 CLEAN=false
 CLEAN_NEKO=false
 QUIET=false

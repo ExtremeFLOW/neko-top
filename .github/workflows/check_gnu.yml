@@ -1,0 +1,208 @@
+name: GNU Fortran
+
+# Controls when the action will run.
+on:
+  workflow_call:
+    inputs:
+      json-fortran-version:
+        description: "The version of the JSON-Fortran library to use."
+        type: string
+        required: false
+        default: "8.3.0"
+      pfunit-version:
+        description: "The version of the pFUnit library to use."
+        type: string
+        required: false
+        default: "v4.4.2"
+      neko-version:
+        description: "The version of Neko to use."
+        required: false
+        type: string
+        default: "develop"
+
+jobs:
+  GNU:
+    runs-on: ${{matrix.os}}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+        compiler: [gfortran-12, gfortran-13, gfortran-14]
+        backend: [cpu, cuda, hip, opencl]
+        precision: [sp, dp]
+        exclude:
+          - os: ubuntu-latest
+            backend: opencl
+
+          - os: ubuntu-24.04-arm
+            backend: cuda
+          - os: ubuntu-24.04-arm
+            backend: hip
+          - os: ubuntu-24.04-arm
+            backend: opencl
+          - os: ubuntu-24.04-arm
+            compiler: gfortran-12
+          - os: ubuntu-24.04-arm
+            compiler: gfortran-13
+            backend: hip
+
+          - os: macos-latest
+            compiler: gfortran-12
+          - os: macos-latest
+            compiler: gfortran-13
+          - os: macos-latest
+            backend: cuda
+          - os: macos-latest
+            backend: hip
+          - compiler: gfortran-12
+            backend: cuda
+          - compiler: gfortran-12
+            backend: hip
+          - compiler: gfortran-13
+            backend: cuda
+          - compiler: gfortran-13
+            backend: hip
+
+        include:
+          - os: ubuntu-latest
+            setup-env: |
+              sudo apt-get update
+              sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+                ninja-build libopenblas-dev libopenmpi-dev
+              echo "nproc=$(nproc)" >> $GITHUB_OUTPUT
+              echo "os-version=$(lsb_release -ds | tr " " -)" >> $GITHUB_OUTPUT
+
+          - os: ubuntu-24.04-arm
+            setup-env: |
+              sudo apt-get update
+              sudo apt-get install -y openmpi-bin pkg-config liblapack-dev \
+                ninja-build libopenblas-dev libopenmpi-dev
+              echo "nproc=$(nproc)" >> $GITHUB_OUTPUT
+              echo "os-version=$(lsb_release -ds | tr " " -)" >> $GITHUB_OUTPUT
+
+          - os: macos-latest
+            setup-env: |
+              export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+              brew install openmpi
+              brew install automake
+              brew install libtool
+              echo "nproc=$(sysctl -n hw.ncpu)" >> $GITHUB_OUTPUT
+              echo "os-version=$(sw_vers -productName)-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+
+          - backend: cuda
+            setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y nvidia-cuda-toolkit
+              echo "backend-path=/usr" >> $GITHUB_OUTPUT
+
+          - backend: hip
+            setup-backend: |
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+              sudo apt install ./amdgpu-install_*.deb
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              ROCM_DIR=$(ls -d /opt/rocm-*)
+              echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
+
+    name: ${{ matrix.os }} - ${{ matrix.compiler }} - ${{ matrix.backend }} - ${{ matrix.precision }}
+    env:
+      FC: ${{ matrix.compiler }}
+      OMPI_FC: ${{ matrix.compiler }}
+      OMPI_ALLOW_RUN_AS_ROOT: 1
+      OMPI_ALLOW_RUN_AS_ROOT_CONFIRM: 1
+      OMPI_MCA_btl_vader_single_copy_mechanism: none
+      RP: ${{ matrix.precision }}
+
+    steps:
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup env.
+        id: setup-env
+        run: ${{ matrix.setup-env }}
+
+      - name: Setup Backend
+        id: setup-backend
+        run: ${{ matrix.setup-backend }}
+        if: ${{ matrix.backend != 'cpu' }}
+
+      # ---------------------------------------------------------------------- #
+      # Setup the external dependencies
+      # ---------------------------------------------------------------------- #
+
+      - name: Setup dependencies
+        id: setup-deps
+        env:
+          PFUNIT_VERSION: ${{ inputs.pfunit-version }}
+          JSON_FORTRAN_VERSION: ${{ inputs.json-fortran-version }}
+          NEKO_VERSION: ${{ inputs.neko-version }}
+        run: |
+          if [ -z "$PFUNIT_VERSION" ]; then PFUNIT_VERSION="v4.4.2"; fi
+          if [ -z "$JSON_FORTRAN_VERSION" ]; then JSON_FORTRAN_VERSION="8.3.0"; fi
+          if [ -z "$NEKO_VERSION" ]; then NEKO_VERSION="develop"; fi
+
+          echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
+          echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Get pFunit
+        id: get-pfunit
+        uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ steps.setup-deps.outputs.pfunit-version }}
+          os: ${{ steps.setup-env.outputs.os-version }}
+          compiler: ${{ matrix.compiler }}
+
+      - name: Get json-fortran
+        id: get-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ steps.setup-deps.outputs.json-fortran-version }}
+          os: ${{ steps.setup-env.outputs.os-version }}
+          compiler: ${{ matrix.compiler }}
+
+      - name: Get neko
+        id: get-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          version: ${{ steps.setup-deps.outputs.neko-version }}
+          os: ${{ steps.setup-env.outputs.os-version }}
+          compiler: ${{ matrix.compiler }}
+          precision: ${{ matrix.precision }}
+          backend: ${{ matrix.backend }}
+          backend-path: ${{ steps.setup-backend.outputs.backend-path }}
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
+
+      - name: Configuration
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+          DEVICE: ${{ matrix.backend }}
+        run: |
+          cmake -B build -S . -G Ninja --fresh \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
+            -DNEKO_DIR=$NEKO_DIR -DPFUNIT_DIR=$PFUNIT_DIR \
+            -DBUILD_DOCS=OFF -DBUILD_TESTING=ON -DDEVICE_TYPE=$DEVICE
+
+      - name: Building Library
+        run: |
+          cmake --build build --parallel
+
+      - name: Building Examples
+        run: |
+          cmake --build build --target Examples --parallel
+
+      - name: Unit tests
+        run: |
+          ctest --test-dir build --output-on-failure --stop-on-failure

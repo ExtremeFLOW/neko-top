@@ -230,7 +230,7 @@ contains
     ! TODO
     ! reset for the adjoint
     ! call reset(this%adjoint_case)
-    this%adjoint_case%time%t = 0.0_dp
+    this%adjoint_case%time%t = 0.0_rp
     this%adjoint_case%time%tstep = 0
 
     call field_rzero(this%adjoint_case%fluid_adj%u_adj)

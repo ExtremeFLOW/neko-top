@@ -129,6 +129,6 @@ contains
 
     call MPI_Allreduce(MPI_IN_PLACE, tmp, 1, &
          MPI_EXTRA_PRECISION, MPI_SUM, NEKO_COMM, ierr)
-    glsc2_mask = tmp
+    glsc2_mask = real(tmp, kind=rp)
   end function glsc2_mask
 end module math_ext

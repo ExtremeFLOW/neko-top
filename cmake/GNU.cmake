@@ -22,6 +22,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-function-elimination>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-missing-include-dirs>
         $<$<COMPILE_LANGUAGE:Fortran>:-Wcompare-reals>
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wconversion>
         $<$<COMPILE_LANGUAGE:Fortran>:-pedantic-errors>
     )
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
