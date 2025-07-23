@@ -161,9 +161,9 @@ runs:
 
         cd $WORKING_DIR
         ./regen.sh
-        ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS="$FCFLAGS" \
+        ./configure --prefix=$INSTALL_DIR \
           HIP_HIPCC_FLAGS="$HIP_HIPCC_FLAGS" \
-          $BACKEND_FLAGS --enable-real=${RP}
+          $BACKEND_FLAGS $CONFIG_FLAGS
         make ${{ inputs.build-options }}
         make install
 
