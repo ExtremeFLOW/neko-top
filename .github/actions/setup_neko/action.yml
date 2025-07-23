@@ -165,10 +165,11 @@ runs:
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
 
+        $FC --version
+
         cd $WORKING_DIR
         ./regen.sh
-        ./configure --prefix=$INSTALL_DIR \
-          $BACKEND_FLAGS $CONFIG_FLAGS
+        ./configure $BACKEND_FLAGS $CONFIG_FLAGS
         make ${{ inputs.build-options }}
         make install
 
