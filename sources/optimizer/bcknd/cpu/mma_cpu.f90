@@ -34,6 +34,7 @@ submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use comm, only: neko_comm, pe_rank, mpi_real_precision
+  use math, only: NEKO_EPS
   implicit none
 
 contains
@@ -417,7 +418,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    minimal_epsilon = max(0.9_rp * this%epsimin, NEKO_EPS)
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
@@ -831,7 +832,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    minimal_epsilon = max(0.9_rp * this%epsimin, NEKO_EPS)
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
@@ -859,7 +860,7 @@ contains
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          do i=1, this%m
-            if (abs(d(i)) < 1.0e-15_rp) then
+            if (abs(d(i)) < NEKO_EPS) then
                ! to avoid devision by zero in case d=0
                y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
                ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
@@ -888,7 +889,8 @@ contains
          x = merge(beta, x, x .gt. beta)
 
          ! Compute the residual for the lambda and mu using eq(9) and eq(15)
-         relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
+         relambda = matmul(pij, 1.0_rp / (upp - x)) + &
+              matmul(qij, 1.0_rp / (x - low))
 
          ! Global comminucation for relambda values
          call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
@@ -909,7 +911,8 @@ contains
 
             ! Compute dL(x, y, z, λ)/dλ for the updated x(λ), y(λ), z(λ)
 
-            gradlambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
+            gradlambda = matmul(pij, 1.0_rp / (upp - x)) + &
+                 matmul(qij, 1.0_rp/(x - low))
 
             ! Global comminucation for gradlambda values
             call MPI_Allreduce(MPI_IN_PLACE, gradlambda, this%m, &
@@ -923,12 +926,13 @@ contains
             !! https://doi.org/10.1007/s00158-012-0869-2
 
             !--------------contributions of x terms to Hess--------------------!
-            Ljjxinv= - 1.0_rp / ( (2*pjlambda/(upp - x)**3) + &
-                 (2.0_rp*qjlambda/(x - low)**3))
+            Ljjxinv= - 1.0_rp / ( (2.0_rp * pjlambda/(upp - x)**3) + &
+                 (2.0_rp * qjlambda/(x - low)**3))
+
 
             ! Remove the sensitivity for the active primal constraints
-            Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < 1.0e-15_rp)
-            Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < 1.0e-15_rp)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, x - alpha < NEKO_EPS)
+            Ljjxinv = merge(0.0_rp, Ljjxinv, beta - x < NEKO_EPS)
 
             do i = 1, this%m
                hijx(i,:) = pij(i,:) / (upp - x)**2 &
@@ -961,7 +965,7 @@ contains
             ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
-                  if (abs(d(i)) < 1.0e-15_rp) then
+                  if (abs(d(i)) < NEKO_EPS) then
                      ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
                   else
                      Hess(i, i) = Hess(i, i) - 1.0_rp/d(i)
@@ -1016,7 +1020,7 @@ contains
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
             do i=1, this%m
-               if (abs(d(i)) < 1.0e-15_rp) then
+               if (abs(d(i)) < NEKO_EPS) then
                   ! to avoid devision by zero in case d=0
                   y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
                   ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
@@ -1045,7 +1049,8 @@ contains
             x = merge(beta, x, x .gt. beta)
 
             ! Compute the residual for the lambda and mu using eq(9) and eq(15)
-            relambda = matmul(pij, 1/(upp - x)) + matmul(qij, 1/(x - low))
+            relambda = matmul(pij, 1.0_rp / (upp - x)) + &
+                 matmul(qij, 1.0_rp / (x - low))
             ! Global comminucation for relambda values
             call MPI_Allreduce(MPI_IN_PLACE, relambda, this%m, &
                  mpi_real_precision, mpi_sum, neko_comm, ierr)
