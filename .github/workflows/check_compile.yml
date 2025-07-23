@@ -41,7 +41,7 @@ jobs:
         # Minimal matrix for debugging
         os: [ubuntu-latest]
         precision: [sp, dp]
-        compiler: [gfortran-13, gfortran-14, gfortran-15]
+        compiler: [gfortran]
         backend: [cpu, cuda, hip]
 
         # Full matrix
@@ -73,12 +73,6 @@ jobs:
               sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
               ROCM_DIR=$(ls -d /opt/rocm-*)
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
-
-        exclude:
-          - backend: hip
-            compiler: [gfortran-12, gfortran-13, gfortran-14]
-          - backend: cuda
-            compiler: [gfortran-12, gfortran-13, gfortran-14]
 
 
     # ------------------------------------------------------------------------ #
