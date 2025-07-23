@@ -418,7 +418,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, NEKO_EPS)
+    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
@@ -832,7 +832,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
-    minimal_epsilon = max(0.9_rp * this%epsimin, NEKO_EPS)
+    minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
     call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
          mpi_real_precision, mpi_min, neko_comm, ierr)
 
