@@ -150,19 +150,24 @@ runs:
           BACKEND_FLAGS="--with-cuda=$BACKEND_PATH"
         elif [ "$BACKEND" == "hip" ]; then
           BACKEND_FLAGS="--with-hip=$BACKEND_PATH"
-          HIP_HIPCC_FLAGS="-O2 -fPIE"
+          export HIP_HIPCC_FLAGS="-O2 -fPIE"
         elif [ "$BACKEND" == "opencl" ]; then
           BACKEND_FLAGS="--with-opencl"
         fi
 
-        CONFIG_FLAGS="--prefix=$INSTALL_DIR FC=$FC FCFLAGS=\"$FCFLAGS\""
+        if [ $FC == "ifx" ]; then
+          CC="icc"
+          MPIFC="mpiifort -fc=${FC}"
+          FCFLAGS="-O2 -stand f08 -warn errors `pkg-config --cflags json-fortran`"
+        fi
+
+        CONFIG_FLAGS="--prefix=$INSTALL_DIR"
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
 
         cd $WORKING_DIR
         ./regen.sh
         ./configure --prefix=$INSTALL_DIR \
-          HIP_HIPCC_FLAGS="$HIP_HIPCC_FLAGS" \
           $BACKEND_FLAGS $CONFIG_FLAGS
         make ${{ inputs.build-options }}
         make install
