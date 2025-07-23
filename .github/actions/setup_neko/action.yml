@@ -155,17 +155,9 @@ runs:
           BACKEND_FLAGS="--with-opencl"
         fi
 
-        if [ $FC == "ifx" ]; then
-          CC="icc"
-          MPIFC="mpiifort -fc=${FC}"
-          FCFLAGS="-O2 -stand f08 -warn errors `pkg-config --cflags json-fortran`"
-        fi
-
         CONFIG_FLAGS="--prefix=$INSTALL_DIR"
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
-
-        $FC --version
 
         cd $WORKING_DIR
         ./regen.sh

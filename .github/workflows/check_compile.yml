@@ -41,8 +41,8 @@ jobs:
         # Minimal matrix for debugging
         os: [ubuntu-latest]
         precision: [sp, dp]
-        compiler: [gfortran, ifx]
-        backend: [cpu]
+        compiler: [gfortran]
+        backend: [cpu, hip, cuda]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -58,32 +58,13 @@ jobs:
               sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
                 openmpi-bin pkg-config liblapack-dev ninja-build
 
-          - compiler: ifx
-            setup-compiler: |
-              wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null
-              echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
-              sudo apt-get update -y
-              sudo apt install -y --no-install-recommends intel-oneapi-compiler-fortran intel-oneapi-mpi intel-oneapi-mpi-devel intel-oneapi-compiler-dpcpp-cpp-and-cpp-classic
-              source /opt/intel/oneapi/setvars.sh
-              sudo apt install -y ca-certificates
-              INTEL_PATH=$(find /opt/intel/oneapi/compiler/ -name "ifx" -type f | xargs dirname)
-              export PATH=$INTEL_PATH:${PATH}
-              printenv >> $GITHUB_ENV
-              echo "os-version=$(lsb_release -ds | tr " " -)" >> $GITHUB_OUTPUT
-
           - backend: cuda
-            os: ubuntu-latest
-            precision: dp
-            compiler: gfortran
             setup-backend: |
               sudo apt-get update
               sudo apt-get install -y nvidia-cuda-toolkit
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: hip
-            os: ubuntu-latest
-            precision: dp
-            compiler: gfortran
             setup-backend: |
               wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
               sudo apt install ./amdgpu-install_*.deb
@@ -111,10 +92,6 @@ jobs:
       - name: Setup system dependencies
         shell: bash
         run: ${{ matrix.setup-env }}
-
-      - name: Setup compiler
-        shell: bash
-        run: ${{ matrix.setup-compiler }}
 
       - name: Setup backend
         id: setup-backend
