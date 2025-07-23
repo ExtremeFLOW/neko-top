@@ -42,7 +42,7 @@ jobs:
         os: [ubuntu-latest]
         precision: [sp, dp]
         compiler: [gfortran-13, gfortran-14, gfortran-15]
-        backend: [cpu]
+        backend: [cpu, cuda, hip]
 
         # Full matrix
         # os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
@@ -52,11 +52,6 @@ jobs:
 
         # Define the setup jobs
         include:
-          - os: ubuntu-latest
-            precision: sp
-            compiler: gfortran-13
-            backend: cuda
-
           - os: ubuntu-latest
             setup-env: |
               sudo apt-get update
@@ -72,14 +67,19 @@ jobs:
 
           - backend: hip
             os: ubuntu-latest
-            precision: dp
-            compiler: gfortran-14
             setup-backend: |
               wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
               sudo apt install ./amdgpu-install_*.deb
               sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
               ROCM_DIR=$(ls -d /opt/rocm-*)
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
+
+        exclude:
+          - backend: hip
+            compiler: [gfortran-12, gfortran-13, gfortran-14]
+          - backend: cuda
+            compiler: [gfortran-12, gfortran-13, gfortran-14]
+
 
     # ------------------------------------------------------------------------ #
     # Define the job itself.
