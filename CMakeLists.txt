@@ -41,13 +41,20 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # Enable devices
-set(DEVICE_TYPE "NONE" CACHE STRING "Device type to use")
-if (DEVICE_TYPE STREQUAL "CUDA")
+set(DEVICE_TYPE "CPU" CACHE STRING "Device type to use")
+
+string(TOUPPER "${DEVICE_TYPE}" DEVICE_TYPE)
+if (DEVICE_TYPE STREQUAL "CPU")
+    add_compile_definitions(HAVE_CUDA=0)
+    add_compile_definitions(HAVE_HIP=0)
+elseif (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
 elseif(DEVICE_TYPE STREQUAL "HIP")
     enable_language(HIP)
     add_compile_definitions(HAVE_HIP=1)
+else()
+    message(FATAL_ERROR "Unknown device type: ${DEVICE_TYPE}")
 endif()
 
 # ............................................................................ #

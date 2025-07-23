@@ -248,7 +248,7 @@ contains
        call C%adjoint_scalars%restart(C%case%chkp)
     end if
 
-    C%time%t = C%case%fluid%chkp%restart_time()
+    C%time%t = real(C%case%fluid%chkp%restart_time(), kind=rp)
     call neko_log%section('Restarting from checkpoint')
     write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
     call neko_log%message(log_buf)
