@@ -155,7 +155,7 @@ runs:
           BACKEND_FLAGS="--with-opencl"
         fi
 
-        CONFIG_FLAGS="--prefix=$INSTALL_DIR FC=$FC FCFLAGS=$FCFLAGS"
+        CONFIG_FLAGS="--prefix=$INSTALL_DIR FC=$FC FCFLAGS=\"$FCFLAGS\""
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
 
