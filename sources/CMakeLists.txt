@@ -95,6 +95,10 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
 
+if (DEVICE_TYPE STREQUAL "HIP")
+    target_link_libraries(neko-top HIP::hip)
+endif()
+
 # ============================================================================ #
 # Specify installation instructions
 
