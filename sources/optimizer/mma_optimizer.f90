@@ -144,6 +144,13 @@ contains
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
+    ! Initialize the vectors
+    call x%init(n)
+    call all_objectives%init(problem%get_n_objectives())
+    call constraint_value%init(problem%get_n_constraints())
+    call objective_sensitivities%init(n)
+    call constraint_sensitivities%init(problem%get_n_constraints(), n)
+
     !>initializing the scaling factor
     scaling_factor = 1.0_rp
     if (pe_rank .eq. 0) then
@@ -151,12 +158,8 @@ contains
             this%max_iterations
     end if
 
-    if (present(simulation)) call simulation%run_forward()
-
-    call problem%compute(design)
-
-    if (present(simulation)) call simulation%run_backward()
-    call problem%compute_sensitivity(design)
+    call problem%compute(design, simulation)
+    call problem%compute_sensitivity(design, simulation)
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -171,7 +174,6 @@ contains
     call this%logger%write(log_data)
 
     if (present(simulation)) call simulation%write(0)
-
     call design%write(0)
 
     do iter = 1, this%max_iterations
@@ -195,11 +197,8 @@ contains
 
        call design%update_design(x)
 
-       if (present(simulation)) call simulation%run_forward()
-       call problem%compute(design)
-
-       if (present(simulation)) call simulation%run_backward()
-       call problem%compute_sensitivity(design)
+       call problem%compute(design, simulation)
+       call problem%compute_sensitivity(design, simulation)
 
        call problem%get_objective_value(objective_value)
        call problem%get_constraint_values(constraint_value)
@@ -219,7 +218,6 @@ contains
 
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
-       if (present(simulation)) call simulation%reset()
     end do
 
     ! Final state after optimization
@@ -227,6 +225,10 @@ contains
        print *, "MMA Optimization completed after", iter-1, "iterations."
     end if
 
+    ! Free local resources
+    call x%free()
+    call log_data%free()
+    call all_objectives%free()
     call constraint_value%free()
     call objective_sensitivities%free()
     call constraint_sensitivities%free()
