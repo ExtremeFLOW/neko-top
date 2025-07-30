@@ -32,10 +32,10 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <hip/hip_runtime.h>
 #include "RAMP_mapping_kernel.h"
-#include <device/hip/check.h>
-#include <device/device_config.h>
+#include <hip/hip_runtime.h>
+#include <neko/device/hip/check.h>
+#include <neko/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
