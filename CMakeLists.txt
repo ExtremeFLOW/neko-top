@@ -40,23 +40,6 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
 
-# Enable devices
-set(DEVICE_TYPE "CPU" CACHE STRING "Device type to use")
-
-string(TOUPPER "${DEVICE_TYPE}" DEVICE_TYPE)
-if (DEVICE_TYPE STREQUAL "CPU")
-    add_compile_definitions(HAVE_CUDA=0)
-    add_compile_definitions(HAVE_HIP=0)
-elseif (DEVICE_TYPE STREQUAL "CUDA")
-    enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA=1)
-elseif(DEVICE_TYPE STREQUAL "HIP")
-    enable_language(HIP)
-    add_compile_definitions(HAVE_HIP=1)
-else()
-    message(FATAL_ERROR "Unknown device type: ${DEVICE_TYPE}")
-endif()
-
 # ............................................................................ #
 # Options
 
@@ -149,6 +132,28 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
+
+# ............................................................................ #
+# Enable devices
+
+pkg_get_variable(NEKO_BACKEND neko backend)
+
+if (NEKO_BACKEND STREQUAL "CPU")
+    set(DEVICE_TYPE "CPU")
+elseif (NEKO_BACKEND STREQUAL "CUDA")
+    set(DEVICE_TYPE "CUDA")
+
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    add_compile_definitions(HAVE_CUDA=1)
+elseif(NEKO_BACKEND STREQUAL "HIP")
+    set(DEVICE_TYPE "HIP")
+
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
+else()
+    message(FATAL_ERROR "Unsupported device type: ${NEKO_BACKEND}")
+endif()
 
 # ............................................................................ #
 # Setup PFUnit
