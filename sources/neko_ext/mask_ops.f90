@@ -83,7 +83,7 @@ contains
     ! sizes are different
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    if (vec%n .ne. work%size()) then
+    if (vec%size() .ne. work%size()) then
        call neko_error('vector and field are of incompatible dimension')
     end if
 
