@@ -87,12 +87,7 @@ target_link_libraries(neko-top
     MPI::MPI_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
-
-if (DEVICE_TYPE STREQUAL "HIP")
-    target_link_libraries(neko-top HIP::host)
-endif()
 
 # ============================================================================ #
 # Specify installation instructions

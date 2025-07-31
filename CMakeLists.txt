@@ -149,7 +149,6 @@ elseif (NEKO_BACKEND STREQUAL "CUDA")
     set(DEVICE_TYPE "CUDA")
 
     enable_language(CUDA)
-    find_package(CUDAToolkit REQUIRED)
     add_compile_definitions(HAVE_CUDA=1)
 elseif(NEKO_BACKEND STREQUAL "HIP")
     set(DEVICE_TYPE "HIP")
