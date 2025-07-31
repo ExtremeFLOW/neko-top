@@ -25,7 +25,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 
-
 # ============================================================================ #
 # Define the library sources and targets
 target_sources(neko-top
@@ -77,11 +76,7 @@ target_sources(neko-top
 # ============================================================================ #
 # Specify compile options
 
-target_include_directories(neko-top
-    PUBLIC
-        ${CMAKE_Fortran_MODULE_DIRECTORY}
-)
-
+target_include_directories(neko-top PUBLIC ${CMAKE_Fortran_MODULE_DIRECTORY})
 
 # ............................................................................ #
 # Link to the required libraries.
@@ -95,9 +90,9 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
 
-# if (DEVICE_TYPE STREQUAL "HIP")
-#     target_link_libraries(neko-top HIP::hip)
-# endif()
+if (DEVICE_TYPE STREQUAL "HIP")
+    target_link_libraries(neko-top HIP::host)
+endif()
 
 # ============================================================================ #
 # Specify installation instructions
