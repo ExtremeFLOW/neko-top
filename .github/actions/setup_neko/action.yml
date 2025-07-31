@@ -146,12 +146,12 @@ runs:
         RP: ${{ inputs.precision }}
       run: |
         BACKEND_FLAGS=""
-        if [ "$BACKEND" == "cuda" ]; then
+        if [ "$BACKEND" == "CUDA" ]; then
           BACKEND_FLAGS="--with-cuda=$BACKEND_PATH"
-        elif [ "$BACKEND" == "hip" ]; then
+        elif [ "$BACKEND" == "HIP" ]; then
           BACKEND_FLAGS="--with-hip=$BACKEND_PATH"
           export HIP_HIPCC_FLAGS="-O2 -fPIE"
-        elif [ "$BACKEND" == "opencl" ]; then
+        elif [ "$BACKEND" == "OpenCL" ]; then
           BACKEND_FLAGS="--with-opencl"
         fi
 
@@ -161,7 +161,7 @@ runs:
 
         cd $WORKING_DIR
         ./regen.sh
-        ./configure $BACKEND_FLAGS $CONFIG_FLAGS
+        ./configure $CONFIG_FLAGS
         make ${{ inputs.build-options }}
         make install
 

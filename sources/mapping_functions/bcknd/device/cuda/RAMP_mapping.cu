@@ -33,8 +33,8 @@
 */
 
 #include "RAMP_mapping_kernel.h"
-#include <device/cuda/check.h>
-#include <device/device_config.h>
+#include <neko/device/cuda/check.h>
+#include <neko/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
