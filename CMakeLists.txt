@@ -49,7 +49,7 @@ option(BUILD_EXAMPLES "Build the examples" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
 # ............................................................................ #
-# Define compiler flags
+# Define cmake variables
 
 # Define the list of available build types
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
@@ -58,19 +58,8 @@ set(CMAKE_BUILD_TYPE_LIST
     Release
     Testing
 )
-
-# Set the compiler flags
-if (EXISTS "${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
-    include("${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
-else()
-    message(WARNING "No specific compiler flags found for "
-        "${CMAKE_Fortran_COMPILER_ID}. Using defaults.")
-endif()
-
-# ============================================================================ #
-# Set some generic flags
-
 set(CMAKE_Fortran_PREPROCESS ON)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # ============================================================================ #
 # Documentation
@@ -84,7 +73,7 @@ endif()
 
 # ============================================================================ #
 # Setup External Libraries
-# ............................................................................ #
+# ============================================================================ #
 # Check for the required libraries.
 find_package(BLAS QUIET)
 find_package(LAPACK QUIET)
@@ -136,6 +125,24 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
 # ............................................................................ #
+# Setup PFUnit
+
+set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
+    CACHE STRING "Path to the pFUnit installation")
+
+# ============================================================================ #
+# Setup compiler specific options
+# ============================================================================ #
+
+# Set the compiler flags
+if (EXISTS "${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
+    include(${CMAKE_Fortran_COMPILER_ID})
+else()
+    message(WARNING "No specific compiler flags found for "
+        "${CMAKE_Fortran_COMPILER_ID}. Using defaults.")
+endif()
+
+# ............................................................................ #
 # Enable devices
 
 pkg_get_variable(NEKO_BACKEND neko backend)
@@ -158,13 +165,6 @@ elseif(NEKO_BACKEND STREQUAL "HIP")
 else()
     message(FATAL_ERROR "Unsupported device type: ${NEKO_BACKEND}")
 endif()
-
-# ............................................................................ #
-# Setup PFUnit
-
-set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
-
 # ============================================================================ #
 # Setup the Neko-TOP library
 # ============================================================================ #
@@ -205,7 +205,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 
     string(REPEAT "=" 80 BARRIER)
 
-    message(STATUS "")
     message(STATUS ${BARRIER})
     message(STATUS "Neko-TOP: Neko Topology Optimization Package")
     message(STATUS "")
