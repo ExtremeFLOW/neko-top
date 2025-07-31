@@ -135,36 +135,29 @@ set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
 # ============================================================================ #
 
 # Set the compiler flags
-if (EXISTS "${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
-    include(${CMAKE_Fortran_COMPILER_ID})
-else()
+include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_found)
+if (NOT compiler_flags_found)
     message(WARNING "No specific compiler flags found for "
-        "${CMAKE_Fortran_COMPILER_ID}. Using defaults.")
+        "${CMAKE_Fortran_COMPILER_ID}.")
 endif()
 
 # ............................................................................ #
 # Enable devices
 
-pkg_get_variable(NEKO_BACKEND neko backend)
-
-if (NEKO_BACKEND STREQUAL "CPU")
-    set(DEVICE_TYPE "CPU")
-elseif (NEKO_BACKEND STREQUAL "CUDA")
-    set(DEVICE_TYPE "CUDA")
-
+pkg_get_variable(DEVICE_TYPE neko backend)
+if (DEVICE_TYPE STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
-elseif(NEKO_BACKEND STREQUAL "HIP")
-    set(DEVICE_TYPE "HIP")
-
+elseif(DEVICE_TYPE STREQUAL "HIP")
     enable_language(HIP)
     add_compile_definitions(HAVE_HIP=1)
-    add_compile_options(
-        $<$<COMPILE_LANGUAGE:HIP>:-fPIE>
-    )
-else()
-    message(FATAL_ERROR "Unsupported device type: ${NEKO_BACKEND}")
+
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+elseif(NOT DEVICE_TYPE STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
 endif()
+
 # ============================================================================ #
 # Setup the Neko-TOP library
 # ============================================================================ #
