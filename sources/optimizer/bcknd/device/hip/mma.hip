@@ -33,19 +33,21 @@
 */
 
 #include <hip/hip_runtime.h>
-#include <neko/device/hip/check.h"
-#include <neko/device_config.h"
-#include <neko/math/bcknd/device/device_mpi_op.h"
+#include "device/hip/check.h"
+#include "mma_kernel.h"
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "mma_kernel.h"
-
 extern "C" {
+#include "math/bcknd/device/device_mpi_reduce.h"
+#include "math/bcknd/device/device_mpi_op.h"
+#include "device/device_config.h"
 
 int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
+//////
+#include <hip/hip_runtime.h>
 
 void hip_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
     const dim3 nthrds(1024, 1, 1);
@@ -467,7 +469,7 @@ void hip_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu, int* 
 }
 
 
- // a_d = b_d * c_d - d
+ ////// a_d = b_d * c_d - d
 void hip_sub2cons(void *a, void *b, void *c, real *d, int *n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -478,7 +480,7 @@ void hip_sub2cons(void *a, void *b, void *c, real *d, int *n) {
 }
 
 
-// sum(a^2)
+////// sum(a^2)
 real hip_norm(void* a, int* n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -599,7 +601,7 @@ void hip_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
 }
 
 
-// a_d = max(b, c * d_d)
+////// a_d = max(b, c * d_d)
 void hip_maxcons(void* a, real* b, real* c, void* d, int* n) {
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -709,4 +711,5 @@ void hip_dy(void* dy, void* dely, void* dlambda, void* d,
                        (real*)mu, (real*)y, *n);
     HIP_CHECK(hipGetLastError());
 }
+
 }

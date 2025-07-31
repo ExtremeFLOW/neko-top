@@ -33,17 +33,16 @@
 */
 
 #include <hip/hip_runtime.h>
-#include <neko/device_config.h>
-#include <neko/device/hip/check.h>
-#include <neko/math/bcknd/device/device_mpi_op.h>
-#include <neko/math/bcknd/device/device_mpi_reduce.h>
+#include "math_ext_kernel.h"
+#include <device/hip/check.h>
+#include <device/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "math_ext_kernel.h"
-
 extern "C" {
 
+#include <math/bcknd/device/device_mpi_op.h>
+#include <math/bcknd/device/device_mpi_reduce.h>
 
 /** Fortran wrapper for copy_mask
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$
