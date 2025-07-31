@@ -104,11 +104,6 @@ module adjoint_fluid_pnpn
      !! respect to the previous time-step.
      type(field_t) :: dp, du, dv, dw
 
-     type(field_t), pointer :: u_b => null() !< x-component of baseflow velocity
-     type(field_t), pointer :: v_b => null() !< y-component of baseflow Velocity
-     type(field_t), pointer :: w_b => null() !< z-component of baseflow Velocity
-     type(field_t), pointer :: p_b => null() !< Baseflow pressure
-
      !
      ! Implicit operators, i.e. the left-hand-side of the Helmholz problem.
      !
