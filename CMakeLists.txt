@@ -155,6 +155,9 @@ elseif(NEKO_BACKEND STREQUAL "HIP")
 
     enable_language(HIP)
     add_compile_definitions(HAVE_HIP=1)
+    add_compile_options(
+        $<$<COMPILE_LANGUAGE:HIP>:-fPIE>
+    )
 else()
     message(FATAL_ERROR "Unsupported device type: ${NEKO_BACKEND}")
 endif()
