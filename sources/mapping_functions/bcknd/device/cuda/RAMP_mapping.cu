@@ -32,11 +32,19 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "RAMP_mapping_kernel.h"
-#include <neko/device/cuda/check.h>
-#include <neko/device_config.h>
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
+
+// Device includes
+#include <cuda_runtime.h>
+
+// Neko includes
+#include <neko/device/cuda/check.h>
+#include <neko/device_config.h>
+
+// Local includes
+#include "RAMP_mapping_kernel.h"
 
 extern "C" {
 

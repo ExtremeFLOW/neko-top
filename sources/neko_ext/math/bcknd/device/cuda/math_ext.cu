@@ -32,16 +32,25 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "math_ext_kernel.h"
-#include <neko/device/cuda/check.h>
-#include <neko/device_config.h>
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" {
+// Device includes
+#include <cuda_runtime.h>
 
+// Neko includes
+#include <neko/device_config.h>
+#include <neko/device/cuda/check.h>
 #include <neko/math/bcknd/device/device_mpi_op.h>
 #include <neko/math/bcknd/device/device_mpi_reduce.h>
+
+// Local includes
+#include "math_ext_kernel.h"
+
+
+extern "C" {
+
 
 /** Fortran wrapper for copy_mask
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$
