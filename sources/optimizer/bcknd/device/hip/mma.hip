@@ -32,13 +32,14 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "mma_kernel.h"
 #include <hip/hip_runtime.h>
 #include <neko/device/hip/check.h"
 #include <neko/device_config.h"
 #include <neko/math/bcknd/device/device_mpi_op.h"
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "mma_kernel.h"
 
 extern "C" {
 

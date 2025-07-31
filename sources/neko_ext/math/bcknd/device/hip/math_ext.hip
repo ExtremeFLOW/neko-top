@@ -32,7 +32,6 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "math_ext_kernel.h"
 #include <hip/hip_runtime.h>
 #include <neko/device_config.h>
 #include <neko/device/hip/check.h>
@@ -40,6 +39,8 @@
 #include <neko/math/bcknd/device/device_mpi_reduce.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "math_ext_kernel.h"
 
 extern "C" {
 

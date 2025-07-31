@@ -32,13 +32,14 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "math_ext_kernel.h"
 #include <neko/device_config.h>
 #include <neko/device/cuda/check.h>
 #include <neko/math/bcknd/device/device_mpi_op.h>
 #include <neko/math/bcknd/device/device_mpi_reduce.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include "math_ext_kernel.h"
 
 extern "C" {
 

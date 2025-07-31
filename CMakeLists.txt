@@ -63,7 +63,12 @@ set(CMAKE_BUILD_TYPE_LIST
 )
 
 # Set the compiler flags
-include(cmake/${CMAKE_Fortran_COMPILER_ID}.cmake)
+if (EXISTS "${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
+    include("${CMAKE_SOURCE_DIR}/cmake/${CMAKE_Fortran_COMPILER_ID}.cmake")
+else()
+    message(WARNING "No specific compiler flags found for "
+        "${CMAKE_Fortran_COMPILER_ID}. Using defaults.")
+endif()
 
 # ============================================================================ #
 # Set some generic flags
@@ -150,7 +155,6 @@ elseif(NEKO_BACKEND STREQUAL "HIP")
     set(DEVICE_TYPE "HIP")
 
     enable_language(HIP)
-    find_package(hip REQUIRED)
     add_compile_definitions(HAVE_HIP=1)
 else()
     message(FATAL_ERROR "Unsupported device type: ${NEKO_BACKEND}")
