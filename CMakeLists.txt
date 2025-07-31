@@ -52,10 +52,7 @@ option(ONLY_DOCS "Only build the documentation" OFF)
 # Define compiler flags
 
 # Define the list of available build types
-if (CMAKE_BUILD_TYPE STREQUAL "")
-    set(CMAKE_BUILD_TYPE "Release"
-        CACHE STRING "Choose the type of build" FORCE)
-endif()
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
 set(CMAKE_BUILD_TYPE_LIST
     Debug
     Release
@@ -216,6 +213,7 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
+    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
     message(STATUS "")
     message(STATUS "External dependencies:")
