@@ -41,7 +41,7 @@
 extern "C" {
 #include "neko/math/bcknd/device/device_mpi_reduce.h"
 #include "neko/math/bcknd/device/device_mpi_op.h"
-#include "neko/device/device_config.h"
+#include "neko/device_config.h"
 
 int mma_red_s = 0;
 real * mma_bufred = NULL;

@@ -34,14 +34,14 @@
 
 #include "math_ext_kernel.h"
 #include <neko/device/cuda/check.h>
-#include <neko/device/device_config.h>
+#include <neko/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 extern "C" {
 
-#include <math/bcknd/device/device_mpi_op.h>
-#include <math/bcknd/device/device_mpi_reduce.h>
+#include <neko/math/bcknd/device/device_mpi_op.h>
+#include <neko/math/bcknd/device/device_mpi_reduce.h>
 
 /** Fortran wrapper for copy_mask
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$

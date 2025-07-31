@@ -34,7 +34,7 @@
 
 #include "RAMP_mapping_kernel.h"
 #include <neko/device/cuda/check.h>
-#include <neko/device/device_config.h>
+#include <neko/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 

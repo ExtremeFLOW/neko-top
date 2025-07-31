@@ -35,7 +35,7 @@
 #include <hip/hip_runtime.h>
 #include "math_ext_kernel.h"
 #include <neko/device/hip/check.h>
-#include <neko/device/device_config.h>
+#include <neko/device_config.h>
 #include <stdio.h>
 #include <stdlib.h>
 
