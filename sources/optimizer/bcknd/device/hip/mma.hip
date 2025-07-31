@@ -33,15 +33,15 @@
 */
 
 #include <hip/hip_runtime.h>
-#include "device/hip/check.h"
+#include "neko/device/hip/check.h"
 #include "mma_kernel.h"
 #include <stdio.h>
 #include <stdlib.h>
 
 extern "C" {
-#include "math/bcknd/device/device_mpi_reduce.h"
-#include "math/bcknd/device/device_mpi_op.h"
-#include "device/device_config.h"
+#include "neko/math/bcknd/device/device_mpi_reduce.h"
+#include "neko/math/bcknd/device/device_mpi_op.h"
+#include "neko/device_config.h"
 
 int mma_red_s = 0;
 real * mma_bufred = NULL;

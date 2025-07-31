@@ -38,8 +38,17 @@ jobs:
       fail-fast: true
       matrix:
 
+        # Default matrix
         precision: [dp]
-        backend: [CPU, HIP, CUDA]
+        backend: [CPU, CUDA, HIP]
+        compiler: [gfortran-13, gfortran-14]
+
+        # Exclude specific combinations
+        exclude:
+          - backend: CUDA
+            compiler: gfortran-13
+          - backend: HIP
+            compiler: gfortran-13
 
         # Define the setup jobs
         include:
@@ -57,14 +66,13 @@ jobs:
               ROCM_DIR=$(ls -d /opt/rocm-*)
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
 
-
     # ------------------------------------------------------------------------ #
     # Define the job itself.
     # ------------------------------------------------------------------------ #
-    name: ${{ matrix.backend }} - ${{ matrix.precision }}
+    name: ${{ matrix.backend }} - ${{ matrix.compiler }} - ${{ matrix.precision }}
     runs-on: ubuntu-latest
     env:
-      JOB_NAME: ${{ matrix.backend }}-${{ matrix.precision }}
+      JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}
     steps:
 
       # ---------------------------------------------------------------------- #
@@ -95,6 +103,7 @@ jobs:
         uses: ./.github/actions/setup_json-fortran
         with:
           version: ${{ inputs.json-fortran-version }}
+          compiler: ${{ matrix.compiler }}
 
       - name: Get neko
         id: get-neko
@@ -103,6 +112,7 @@ jobs:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
+          compiler: ${{ matrix.compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
