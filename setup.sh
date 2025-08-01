@@ -77,15 +77,6 @@ done
 
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
 
-# Check if the device type has changed
-if [[ -f "$MAIN_DIR/build/CMakeCache.txt" && $CLEAN != true ]]; then
-    CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
-    if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
-        echo >&2 "Device type has changed. Please do a clean setup."
-        exit 1
-    fi
-fi
-
 export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 
 # ============================================================================ #
@@ -152,7 +143,6 @@ fi
 
 # Set the variables for the compilation
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-[ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
 if [ ! -d $MAIN_DIR/build ]; then
     cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
