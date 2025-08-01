@@ -56,8 +56,8 @@ program checkpointing_test
   ! Objects for the consistency check
   type(file_t) :: chkp_file
   real(kind=rp) :: norm_ref_p, norm_ref_vel, norm_diff_p, norm_diff_vel
-  real(kind=rp) :: p_tol = 1.0e-9_rp
-  real(kind=rp) :: vel_tol = 1.0e-9_rp
+  real(kind=rp), parameter :: p_tol = 1.0e-9_rp
+  real(kind=rp), parameter :: vel_tol = 1.0e-9_rp
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment

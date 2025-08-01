@@ -398,7 +398,7 @@ contains
        ! During the first timestep we also initialize the checkpoint output
        if (this%n_saves_disc .eq. 0) then
           write(chkp_file_name, '(A13,I5.5)') 'forward_chkp_', time%tstep
-          call this%chkp_output%init(this%neko_case%chkp, chkp_file_name)
+          call this%chkp_output%init(this%neko_case%chkp, chkp_file_name, overwrite=.true.)
        end if
 
        call this%chkp_output%sample(time%t)
