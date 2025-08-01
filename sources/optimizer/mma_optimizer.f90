@@ -57,8 +57,9 @@ module mma_optimizer
      procedure, pass(this) :: init_from_components => &
           mma_optimizer_init_from_components
 
-     procedure :: run => mma_optimizer_run
-     procedure :: free => mma_optimizer_free
+     procedure, pass(this) :: run => mma_optimizer_run
+     procedure, pass(this) :: validate => mma_optimizer_validate
+     procedure, pass(this) :: free => mma_optimizer_free
 
   end type mma_optimizer_t
 
@@ -220,6 +221,8 @@ contains
        call design%write(iter)
     end do
 
+    call this%validate(problem, design)
+
     ! Final state after optimization
     if (pe_rank .eq. 0) then
        print *, "MMA Optimization completed after", iter-1, "iterations."
@@ -234,6 +237,31 @@ contains
     call constraint_sensitivities%free()
 
   end subroutine mma_optimizer_run
+
+  !> Validate the solution for the MMA optimizer
+  subroutine mma_optimizer_validate(this, problem, design)
+    class(mma_optimizer_t), intent(inout) :: this
+    class(problem_t), intent(in) :: problem
+    class(design_t), intent(in) :: design
+
+    type(vector_t) :: constraint_values
+
+    call constraint_values%init(problem%get_n_constraints())
+    call problem%get_constraint_values(constraint_values)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(constraint_values%x, constraint_values%x_d, &
+            constraint_values%size(), HOST_TO_DEVICE, .true.)
+    end if
+
+    if (any(constraint_values%x .gt. 0.0_rp)) then
+       call neko_error("MMA optimizer validation failed: " // &
+            "Constraints are not satisfied.")
+    end if
+
+    ! Free local resources
+    call constraint_values%free()
+
+  end subroutine mma_optimizer_validate
 
   ! Free resources associated with the MMA optimizer
   subroutine mma_optimizer_free(this)
