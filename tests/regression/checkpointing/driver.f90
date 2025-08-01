@@ -51,7 +51,6 @@ program checkpointing_test
   ! Objects required for the forward simulation
   type(time_step_controller_t) :: dt_controller
   real(kind=dp) :: loop_start
-  type(chkp_output_t) :: chkp_output
   character(len=256) :: chkp_file_name
 
   ! Objects for the consistency check
@@ -91,9 +90,9 @@ program checkpointing_test
   v => sim%neko_case%fluid%v
   w => sim%neko_case%fluid%w
 
-  sim%first_valid_save_state = 2
+  sim%first_valid_timestep = 2
 
-  n_timesteps = int(3.5 * real(sim%n_checkpoints))
+  n_timesteps = int(3.5 * real(sim%n_saves_memory))
   allocate(p_fields(n_timesteps + 1))
   allocate(u_fields(n_timesteps + 1))
   allocate(v_fields(n_timesteps + 1))
@@ -117,35 +116,24 @@ program checkpointing_test
      write(*, '(A)') repeat('-', 80)
      write(*, '(A)') 'Running the forward simulation...'
      write(*, '(A,I0)') 'Number of time steps: ', n_timesteps
-     write(*, '(A,I0)') 'Number of checkpoints: ', sim%n_checkpoints
+     write(*, '(A,I0)') 'Number of checkpoints: ', sim%n_saves_memory
   end if
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
 
-  write(chkp_file_name, '(A)') 'forward_chkp_'
-  call chkp_output%init(sim%neko_case%chkp, chkp_file_name)
-
   loop_start = MPI_WTIME()
 
-  sim%n_save_states = 0
+  sim%n_saves_disc = 0
   do i = 1, n_timesteps
      call simulation_step(sim%neko_case, dt_controller, loop_start)
+
      call field_copy(p_fields(i), p)
      call field_copy(u_fields(i), u)
      call field_copy(v_fields(i), v)
      call field_copy(w_fields(i), w)
 
-     ! Sample the checkpoint
-     if (modulo(sim%neko_case%time%tstep, sim%n_checkpoints) .eq. 0 &
-          .or. i .eq. sim%first_valid_save_state) then
-        call chkp_output%sample(sim%neko_case%time%t)
-        sim%n_save_states = sim%n_save_states + 1
-
-        if (pe_rank .eq. 0) then
-           write(*, '(4X, A, I0)') 'Checkpoint saved at time step ', i
-        end if
-     end if
+     call sim%save_state(sim%neko_case%time)
   end do
 
   call simulation_finalize(sim%neko_case)
@@ -156,16 +144,16 @@ program checkpointing_test
   if (pe_rank .eq. 0) then
      write(*, '(A)') repeat('-', 80)
      write(*, '(A)') 'Checking the consistency of the save states...'
-     write(*, '(A,I0)') 'Number of save states: ', sim%n_save_states
+     write(*, '(A,I0)') 'Number of save states: ', sim%n_saves_disc
   end if
-  if (sim%n_save_states .eq. 0) then
+  if (sim%n_saves_disc .eq. 0) then
      call neko_error('No save states found.')
   end if
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
 
-  do i = 1, sim%n_save_states
+  do i = 1, sim%n_saves_disc
      write(chkp_file_name, '(A,I5.5,A)') 'forward_chkp_', i - 1, '.chkp'
      call chkp_file%init(chkp_file_name)
      call chkp_file%read(sim%neko_case%chkp)
@@ -213,10 +201,10 @@ program checkpointing_test
   call simulation_init(sim%neko_case, dt_controller)
   sim%loaded_checkpoint = -1
 
-  do i = n_timesteps, sim%first_valid_save_state, -1
-     ! do i = sim%first_valid_save_state, n_timesteps
+  do i = n_timesteps, sim%first_valid_timestep, -1
+     ! do i = sim%first_valid_timestep, n_timesteps
      if (pe_rank .eq. 0) write(*, '(A,I0)') 'Checking time step ', i
-     call sim%restore_forward(i)
+     call sim%restore_state(i)
 
      ! Compute the l2 norm of the u field and the original one
      norm_ref_p = sqrt(field_glsc2(p_fields(i), p_fields(i)))
