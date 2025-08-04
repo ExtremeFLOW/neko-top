@@ -88,8 +88,6 @@ program checkpointing_test
   v => sim%neko_case%fluid%v
   w => sim%neko_case%fluid%w
 
-  sim%first_valid_timestep = 4
-
   n_timesteps = int(3.5 * real(sim%n_saves_memory))
   allocate(p_fields(n_timesteps + 1))
   allocate(u_fields(n_timesteps + 1))

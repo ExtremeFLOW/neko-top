@@ -144,6 +144,7 @@ contains
     integer :: i, j, n_scalars
     class(scalar_scheme_t), pointer :: scalar_i
     character(len=10) :: str
+    character(len=:), allocatable :: chkp_file_name
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -215,15 +216,14 @@ contains
 
     if (.not. this%is_steady) then
        ! Read options related to check pointing
-       call json_get_or_default(parameters, "checkpoints.n", &
+       call json_get_or_default(parameters, "checkpoints.n_memory", &
             this%n_saves_memory, 10)
+       call json_get_or_default(parameters, "checkpoint.filename", &
+            chkp_file_name, "forward_chkp_")
 
-       call this%chkp_output%init(this%neko_case%chkp, 'forward_chkp_')
+       call this%chkp_output%init(this%neko_case%chkp, chkp_file_name)
 
        ! Allocate the RAM Checkpoints
-       this%n_saves_disc = 0
-       this%n_timesteps = 0
-       this%loaded_checkpoint = -1
        allocate(this%p_list(this%n_saves_memory))
        allocate(this%u_list(this%n_saves_memory))
        allocate(this%v_list(this%n_saves_memory))
@@ -259,25 +259,33 @@ contains
     integer :: i, n_scalars
 
     ! Free the RAM Checkpoints
-    do i = 1, this%n_saves_memory
-       call this%p_list(i)%free()
-       call this%u_list(i)%free()
-       call this%v_list(i)%free()
-       call this%w_list(i)%free()
-    end do
-
-    if (this%have_scalar) then
-       n_scalars = size(this%s_list)
-       do i = 1, n_scalars
-          call this%s_list(i)%free()
+    if (.not. this%is_steady) then
+       do i = 1, this%n_saves_memory
+          call this%p_list(i)%free()
+          call this%u_list(i)%free()
+          call this%v_list(i)%free()
+          call this%w_list(i)%free()
        end do
-    end if
 
-    if (allocated(this%p_list)) deallocate(this%p_list)
-    if (allocated(this%u_list)) deallocate(this%u_list)
-    if (allocated(this%v_list)) deallocate(this%v_list)
-    if (allocated(this%w_list)) deallocate(this%w_list)
-    if (allocated(this%s_list)) deallocate(this%s_list)
+       if (this%have_scalar) then
+          n_scalars = size(this%s_list)
+          do i = 1, n_scalars * this%n_saves_memory
+             call this%s_list(i)%free()
+          end do
+       end if
+
+       if (allocated(this%p_list)) deallocate(this%p_list)
+       if (allocated(this%u_list)) deallocate(this%u_list)
+       if (allocated(this%v_list)) deallocate(this%v_list)
+       if (allocated(this%w_list)) deallocate(this%w_list)
+       if (allocated(this%s_list)) deallocate(this%s_list)
+
+       this%is_steady = .false.
+       this%n_saves_memory = 0
+       this%n_saves_disc = 0
+       this%n_timesteps = 0
+       this%loaded_checkpoint = -1
+    end if
 
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
