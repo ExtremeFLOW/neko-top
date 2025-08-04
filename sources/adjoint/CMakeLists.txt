@@ -1,7 +1,7 @@
 # Contains the Neko-TOP adjoint functionality
 #
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_case.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_output.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme.f90
