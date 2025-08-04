@@ -83,17 +83,11 @@ program minimum_dissipation_sensitivity
   call object%update_sensitivity(des)
   ! --------------------------------------
   ! First we map backwards (design now holds the sensitivity)
-  print *, "1"
   tmp = object%get_sensitivity()
-  print *, "2"
   call des%map_backward(tmp)
-  print *, "3"
   sensitivities = des%get_sensitivity()
-  print *, "4"
   call sim%write(1)
-  print *, "5"
   call des%write(1)
-  print *, "6"
   ! --------------------------------------
   call sim%reset()
 

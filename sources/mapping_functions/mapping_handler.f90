@@ -176,12 +176,12 @@ contains
     ! cascade.
     call field_copy(tmp_fld_out, sens_in)
 
-    ! pre-multiply by mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
-    else
-       call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
-    end if
+   !  ! pre-multiply by mass matrix
+   !  if (NEKO_BCKND_DEVICE .eq. 1) then
+   !     call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
+   !  else
+   !     call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
+   !  end if
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
@@ -197,6 +197,13 @@ contains
 
        end do
 
+    end if
+
+    ! post-multiply by mass matrix
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
+    else
+       call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
     end if
 
     ! our final mapping should now live in tmp_fld_out
