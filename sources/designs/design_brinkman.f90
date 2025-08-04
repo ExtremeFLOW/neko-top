@@ -195,6 +195,8 @@ module brinkman_design
 
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => brinkman_design_get_design
+     !> Retrieve the sensitivity
+     procedure, pass(this) :: get_sensitivity => brinkman_design_get_sensitivity
 
      !> Retrieve the x location of the design variables
      procedure, pass(this) :: design_get_x => brinkman_design_get_x
@@ -457,6 +459,20 @@ contains
     end if
 
   end function brinkman_design_get_design
+
+  function brinkman_design_get_sensitivity(this) result(values)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: values
+    integer :: n
+
+    n = this%size()
+    call values%init(n)
+    call copy(values%x, this%sensitivity%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(values%x_d, this%sensitivity%x_d, n)
+    end if
+
+  end function brinkman_design_get_sensitivity
 
   function brinkman_design_get_x(this) result(x)
     class(brinkman_design_t), intent(in) :: this
