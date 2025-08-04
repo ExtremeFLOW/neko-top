@@ -80,7 +80,7 @@ module lube_term_objective
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
   use math_ext, only: glsc2_mask
-  use field_math, only: field_col3, field_addcol3, field_cmult
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
@@ -240,9 +240,10 @@ contains
     ! I feel like every objective function should have internal pointers to
     ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
     ! (the whole design, so we get all the coeffients)
-    call field_col3(work, this%u, this%brinkman_amplitude)
-    call field_addcol3(work, this%v, this%brinkman_amplitude)
-    call field_addcol3(work, this%w, this%brinkman_amplitude)
+    call field_col3(work, this%u, this%u)
+    call field_addcol3(work, this%v, this%v)
+    call field_addcol3(work, this%w, this%w)
+    call field_col2(work, this%brinkman_amplitude)
 
     if (this%has_mask) then
        if (NEKO_BCKND_DEVICE .eq. 1) then

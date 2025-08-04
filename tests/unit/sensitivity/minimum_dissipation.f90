@@ -43,7 +43,7 @@ program minimum_dissipation_sensitivity
   real(kind=rp), parameter :: perturbations(4) = [ &
        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
-  type(vector_t) :: sensitivities
+  type(vector_t) :: sensitivities, tmp
 
   integer :: i_max
 
@@ -72,7 +72,7 @@ program minimum_dissipation_sensitivity
 
   ! Initialize our constraint object
   call object%init_from_components(des, sim, 1.0_rp, &
-       "Volume", "")
+       "Dissipation", "")
 
   ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
@@ -81,8 +81,22 @@ program minimum_dissipation_sensitivity
   call object%update_value(des)
   call sim%run_backward()
   call object%update_sensitivity(des)
+  ! --------------------------------------
+  ! First we map backwards (design now holds the sensitivity)
+  print *, "1"
+  tmp = object%get_sensitivity()
+  print *, "2"
+  call des%map_backward(tmp)
+  print *, "3"
+  sensitivities = des%get_sensitivity()
+  print *, "4"
+  call sim%write(1)
+  print *, "5"
+  call des%write(1)
+  print *, "6"
+  ! --------------------------------------
   call sim%reset()
-  sensitivities = object%get_sensitivity()
+
   if (NEKO_BCKND_DEVICE .eq. 1) then
      call device_memcpy(sensitivities%x, &
           sensitivities%x_d, sensitivities%size(), &

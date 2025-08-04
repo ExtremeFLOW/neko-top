@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 2.0,
+            "end_time": 3.0,
             "timestep": 1e-4
         },
         "numerics": {
@@ -63,7 +63,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-2,
+                "tol": 1e-6,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
@@ -92,16 +92,16 @@
         },
         "design": {
             "type": "brinkman",
-            // "mapping": [
-            // {
-            //     "type": "PDE_filter",
-            //     "r": 0.01
-            // },
-            // {
-            //     "type": "RAMP",
-            //     "f_max": 1000
-            // }
-            // ],
+             "mapping": [
+             {
+                 "type": "PDE_filter",
+                 "r": 0.01
+             },
+             {
+                 "type": "RAMP",
+                 "f_max": 1000
+             }
+             ],
             "initial_distribution": {
                 "type": "point_zone",
                 "base_value": 0.0,
@@ -129,15 +129,7 @@
             }
         },
         "objectives": [
-            {
-                "type": "minimum_dissipation",
-                "weight": 1.0
-            },
-            {
-                "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
-            }
+            // empty so we don't double up
         ],
         "constraints": [
             {

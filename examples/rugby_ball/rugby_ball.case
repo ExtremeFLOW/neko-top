@@ -109,7 +109,7 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.01
+                    "r": 0.1
                 },
                 {
                     "type": "RAMP",

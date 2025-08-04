@@ -258,17 +258,17 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
+          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n) / 2.0_rp
        else
           this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
-               n, this%mask%mask, this%mask%size)
+               n, this%mask%mask, this%mask%size) / 2.0_rp
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n)
+               this%C_Xh%b_d, n) /2.0_rp
        else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%C_Xh%b, n) / 2.0_rp
        end if
     end if
 

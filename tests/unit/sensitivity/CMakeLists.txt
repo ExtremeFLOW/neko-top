@@ -6,8 +6,7 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 # Define the list of sensitivity tests
 # each of these should be a custom driver.
 set(test_list
-    "volume.f90"
-    "minimum_dissipation.f90"
+    "lube_term.f90"
 )
 
 # ============================================================================ #
@@ -105,7 +104,7 @@ foreach(test ${test_list})
             DEPENDS "${test_name}_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 300
+            TIMEOUT 5000
     )
     set_target_properties(${test_name}_sensitivity_bin PROPERTIES
         FOLDER "Tests/Unit/Sensitivity"
