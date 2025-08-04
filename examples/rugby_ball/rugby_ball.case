@@ -109,11 +109,11 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.1
+                    "r": 0.05
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 1000,
                 }
             ],
             "initial_distribution": {
