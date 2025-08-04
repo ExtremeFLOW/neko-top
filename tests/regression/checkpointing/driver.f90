@@ -42,7 +42,7 @@ program checkpointing_test
   !> Log message for errors
   character(len=256) :: log_msg
 
-  integer :: n_timesteps, i,j
+  integer :: n_timesteps, i
   type(field_t), pointer :: p, u, v, w
   type(field_t), allocatable, dimension(:) :: p_fields, &
        u_fields, v_fields, w_fields
@@ -51,10 +51,8 @@ program checkpointing_test
   ! Objects required for the forward simulation
   type(time_step_controller_t) :: dt_controller
   real(kind=dp) :: loop_start
-  character(len=256) :: chkp_file_name
 
   ! Objects for the consistency check
-  type(file_t) :: chkp_file
   real(kind=rp) :: norm_ref_p, norm_ref_vel, norm_diff_p, norm_diff_vel
   real(kind=rp), parameter :: p_tol = 1.0e-9_rp
   real(kind=rp), parameter :: vel_tol = 1.0e-9_rp
@@ -90,7 +88,7 @@ program checkpointing_test
   v => sim%neko_case%fluid%v
   w => sim%neko_case%fluid%w
 
-  sim%first_valid_timestep = 2
+  sim%first_valid_timestep = 4
 
   n_timesteps = int(3.5 * real(sim%n_saves_memory))
   allocate(p_fields(n_timesteps + 1))
@@ -139,56 +137,6 @@ program checkpointing_test
   call simulation_finalize(sim%neko_case)
 
   ! -------------------------------------------------------------------------- !
-  ! Load each checkpoint and check the consistency of the u fields
-
-  if (pe_rank .eq. 0) then
-     write(*, '(A)') repeat('-', 80)
-     write(*, '(A)') 'Checking the consistency of the save states...'
-     write(*, '(A,I0)') 'Number of save states: ', sim%n_saves_disc
-  end if
-  if (sim%n_saves_disc .eq. 0) then
-     call neko_error('No save states found.')
-  end if
-
-  call dt_controller%init(sim%neko_case%params)
-  call simulation_init(sim%neko_case, dt_controller)
-
-  do i = 1, sim%n_saves_disc
-     write(chkp_file_name, '(A,I5.5,A)') 'forward_chkp_', i - 1, '.chkp'
-     call chkp_file%init(chkp_file_name)
-     call chkp_file%read(sim%neko_case%chkp)
-     call simulation_restart(sim%neko_case, sim%neko_case%chkp)
-     j = sim%neko_case%time%tstep
-
-     ! Compute the l2 norm of the u field and the original one
-     norm_ref_p = sqrt(field_glsc2(p_fields(j), p_fields(j)))
-     norm_ref_vel = (sqrt(field_glsc2(u_fields(j), u_fields(j))) &
-          + sqrt(field_glsc2(v_fields(j), v_fields(j))) &
-          + sqrt(field_glsc2(w_fields(j), w_fields(j)))) / 3.0_rp
-     norm_diff_p = field_glsubnorm(p_fields(j), p) / norm_ref_p
-     norm_diff_vel = (field_glsubnorm(u_fields(j), u) &
-          + field_glsubnorm(v_fields(j), v) &
-          + field_glsubnorm(w_fields(j), w)) / (3.0_rp * norm_ref_vel)
-
-     if (.not. abscmp(norm_diff_p, 0.0_rp, p_tol)) then
-        write(log_msg, '(A,A,E12.5)') &
-             'Inconsistency found in save state pressure: ', &
-             trim(chkp_file_name), norm_diff_p
-        call neko_error(trim(log_msg))
-     else if (.not. abscmp(norm_diff_vel, 0.0_rp, vel_tol)) then
-        write(log_msg, '(A,A,E12.5)') &
-             'Inconsistency found in save state velocity: ', &
-             trim(chkp_file_name), norm_diff_vel
-        call neko_error(trim(log_msg))
-     else
-        if (pe_rank .eq. 0) then
-           write(*, '(A,A,A)') 'Save state ', trim(chkp_file_name), &
-                ' is consistent'
-        end if
-     end if
-  end do
-
-  ! -------------------------------------------------------------------------- !
   ! Restore to each time step and check the consistency of the u fields
 
   if (pe_rank .eq. 0) then
@@ -201,7 +149,7 @@ program checkpointing_test
   call simulation_init(sim%neko_case, dt_controller)
   sim%loaded_checkpoint = -1
 
-  do i = n_timesteps, sim%first_valid_timestep, -1
+  do i = n_timesteps, 1, -1
      ! do i = sim%first_valid_timestep, n_timesteps
      if (pe_rank .eq. 0) write(*, '(A,I0)') 'Checking time step ', i
      call sim%restore_state(i)
