@@ -16,7 +16,6 @@
 
 # ============================================================================ #
 # Include the build_example function
-list(APPEND CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 include(build_example)
 
 # Set the examples directory
@@ -42,26 +41,10 @@ endif()
 # ============================================================================ #
 # Add the example directories.
 
-# Find all subdirectories in the examples directory
-file(GLOB_RECURSE CASE_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} */*.case)
-
-# Save only the directory names
-foreach(EXAMPLE_DIR ${CASE_FILES})
-    get_filename_component(DIRECTORY ${EXAMPLE_DIR} DIRECTORY)
-    # If the directory is already in the list, don't add it again
-    list(FIND EXAMPLES_DIRS ${DIRECTORY} INDEX)
-    if(${INDEX} EQUAL -1)
-        list(APPEND EXAMPLES_DIRS ${DIRECTORY})
-    endif()
-endforeach()
-
-# Add each subdirectory, if it contains a CMakelists.txt file otherwise call the
-# build_example function.
-foreach(EXAMPLE_DIR ${EXAMPLES_DIRS})
-
-    # Check if the example directory contains a CMakeLists.txt file
-    if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_DIR}/CMakeLists.txt)
-        add_subdirectory(${EXAMPLE_DIR})
-    endif()
-
-endforeach()
+add_subdirectory(${EXAMPLES_DIR}/easy-E)
+add_subdirectory(${EXAMPLES_DIR}/mma)
+add_subdirectory(${EXAMPLES_DIR}/mma_cpu)
+add_subdirectory(${EXAMPLES_DIR}/passive_scalar)
+add_subdirectory(${EXAMPLES_DIR}/rugby_ball)
+add_subdirectory(${EXAMPLES_DIR}/rugby_verification)
+add_subdirectory(${EXAMPLES_DIR}/thermal_mix_channel)

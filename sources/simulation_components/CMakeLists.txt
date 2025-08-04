@@ -9,7 +9,7 @@
 
 # Add the neko-ext library which collects all the extensions.
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top_simcomps.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/steady_simcomp.f90
 )
