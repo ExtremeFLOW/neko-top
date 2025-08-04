@@ -287,8 +287,6 @@ contains
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    type(chkp_output_t) :: chkp_output
-    character(len=256) :: chkp_file
 
     call dt_controller%init(this%neko_case%params)
 
@@ -398,7 +396,8 @@ contains
        ! During the first timestep we also initialize the checkpoint output
        if (this%n_saves_disc .eq. 0) then
           write(chkp_file_name, '(A13,I5.5)') 'forward_chkp_', time%tstep
-          call this%chkp_output%init(this%neko_case%chkp, chkp_file_name, overwrite=.true.)
+          call this%chkp_output%init(this%neko_case%chkp, chkp_file_name, &
+               overwrite = .true.)
        end if
 
        call this%chkp_output%sample(time%t)
