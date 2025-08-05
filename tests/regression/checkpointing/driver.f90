@@ -72,6 +72,7 @@ program checkpointing_test
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
+  call parameters%add('checkpoints.enable', .true.)
   call json_extract_object(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !

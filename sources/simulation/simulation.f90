@@ -102,7 +102,7 @@ module simulation_m
      ! to be able to restart the simulation from there. This is used for the
      ! adjoint simulation.
      logical :: checkpoint_enable = .false.
-     integer :: n_saves_memory = 0
+     integer :: n_saves_memory = 10
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
      integer :: first_valid_timestep = 2
