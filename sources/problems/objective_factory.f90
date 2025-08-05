@@ -39,6 +39,7 @@ submodule (objective) objective_factory_mod
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
   use lube_term_objective, only: lube_term_objective_t
   use scalar_mixing_objective, only: scalar_mixing_objective_t
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
 
   implicit none
 
@@ -46,7 +47,9 @@ submodule (objective) objective_factory_mod
   character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
        "minimum_dissipation", &
        "scalar_mixing", &
-       "lube_term"]
+       "lube_term", &
+       "augmented_lagrangian" ]
+
 
 contains
 
@@ -79,6 +82,8 @@ contains
        allocate(scalar_mixing_objective_t::object)
     case ("lube_term")
        allocate(lube_term_objective_t::object)
+    case ("augmented_lagrangian")
+       allocate(augmented_lagrangian_objective_t::object)
 
     case default
        call neko_type_error("Objective", type, KNOWN_TYPES)

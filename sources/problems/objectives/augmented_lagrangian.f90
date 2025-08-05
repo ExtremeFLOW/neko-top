@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `minimum_dissipation_objective_t` type.
+!> Implements the `augmented_lagrangian_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -60,7 +60,7 @@
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module minimum_dissipation_objective
+module augmented_lagrangian
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
@@ -68,8 +68,8 @@ module minimum_dissipation_objective
   use operators, only: grad
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, only: &
-       adjoint_minimum_dissipation_source_term_t
+  use adjoint_augmented_lagrangian_source_term, only: &
+       adjoint_augmented_lagrangian_source_term_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
@@ -92,7 +92,7 @@ module minimum_dissipation_objective
   !> An objective function corresponding to minimum dissipation
   !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   !! |\mathbf{u}|^2 d \Omega \f$
-  type, public, extends(objective_t) :: minimum_dissipation_objective_t
+  type, public, extends(objective_t) :: augmented_lagrangian_t
      private
 
      !> Pointer to the u field.
@@ -101,8 +101,6 @@ module minimum_dissipation_objective
      type(field_t), pointer :: v => null()
      !> Pointer to the w field.
      type(field_t), pointer :: w => null()
-     !> Pointer to the coefficient field.
-     type(coef_t), pointer :: c_Xh => null()
 
      !> Pointer to adjoint u field.
      type(field_t), pointer :: adjoint_u => null()
@@ -114,20 +112,20 @@ module minimum_dissipation_objective
    contains
      !> The common constructor using a JSON object.
      procedure, public, pass(this) :: init_json_sim => &
-          minimum_dissipation_init_json_sim
+          augmented_lagrangian_init_json_sim
      !> The direct initializer from attributes.
      procedure, public, pass(this) :: init_from_attributes => &
-          minimum_dissipation_init_attributes
+          augmented_lagrangian_init_attributes
      !> Destructor.
-     procedure, public, pass(this) :: free => minimum_dissipation_free
+     procedure, public, pass(this) :: free => augmented_lagrangian_free
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
-          minimum_dissipation_update_value
+          augmented_lagrangian_update_value
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
-          minimum_dissipation_update_sensitivity
+          augmented_lagrangian_update_sensitivity
 
-  end type minimum_dissipation_objective_t
+  end type augmented_lagrangian_t
 
 contains
 
@@ -136,8 +134,8 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine minimum_dissipation_init_json_sim(this, json, design, simulation)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine augmented_lagrangian_init_json_sim(this, json, design, simulation)
+    class(augmented_lagrangian_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -148,10 +146,10 @@ contains
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "name", name, "Dissipation")
+    call json_get_or_default(json, "name", name, "Augmented Lagrangian")
 
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
-  end subroutine minimum_dissipation_init_json_sim
+  end subroutine augmented_lagrangian_init_json_sim
 
   !> The actual constructor.
   !! @param this the objective.
@@ -160,16 +158,14 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  subroutine minimum_dissipation_init_attributes(this, design, simulation, &
+  subroutine augmented_lagrangian_init_attributes(this, design, simulation, &
        weight, name, mask_name)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+    class(augmented_lagrangian_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
-
-    type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
 
@@ -177,114 +173,62 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%fluid%c_Xh
     this%adjoint_u => neko_field_registry%get_field('u_adj')
     this%adjoint_v => neko_field_registry%get_field('v_adj')
     this%adjoint_w => neko_field_registry%get_field('w_adj')
 
-    ! you will need to init this!
-    ! append a source term based on the minimum dissipation
-    ! init the adjoint forcing term for the adjoint
-    call adjoint_forcing%init_from_components( &
-         simulation%adjoint_fluid%f_adj_x, &
-         simulation%adjoint_fluid%f_adj_y, &
-         simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight, &
-         this%mask, this%has_mask, &
-         this%c_Xh)
-
-    ! append adjoint forcing term based on objective function
-    select type (f => simulation%adjoint_fluid)
-    type is (adjoint_fluid_pnpn_t)
-       call f%source_term%add_source_term(adjoint_forcing)
-    end select
-
-  end subroutine minimum_dissipation_init_attributes
+  end subroutine augmented_lagrangian_init_attributes
 
   !> Destructor.
-  subroutine minimum_dissipation_free(this)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine augmented_lagrangian_free(this)
+    class(augmented_lagrangian_t), intent(inout) :: this
     call this%free_base()
 
     if (associated(this%u)) nullify(this%u)
     if (associated(this%v)) nullify(this%v)
     if (associated(this%w)) nullify(this%w)
-    if (associated(this%c_Xh)) nullify(this%c_Xh)
 
     if (associated(this%adjoint_u)) nullify(this%adjoint_u)
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
-  end subroutine minimum_dissipation_free
+  end subroutine augmented_lagrangian_free
 
   !> Compute the objective function.
   !! @param this the objective.
   !! @param design the design.
-  subroutine minimum_dissipation_update_value(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine augmented_lagrangian_update_value(this, design)
+    class(augmented_lagrangian_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: wo1, wo2, wo3, work
-    type(field_t), pointer :: objective_field
-    integer :: temp_indices(5)
-    integer n
 
-    call neko_scratch_registry%request_field(wo1, temp_indices(1))
-    call neko_scratch_registry%request_field(wo2, temp_indices(2))
-    call neko_scratch_registry%request_field(wo3, temp_indices(3))
-    call neko_scratch_registry%request_field(objective_field, temp_indices(4))
-    call neko_scratch_registry%request_field(work, temp_indices(5))
-
-    ! update_value the objective function.
-    call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)
-    call field_col3(objective_field, wo1, wo1)
-    call field_addcol3(objective_field, wo2, wo2)
-    call field_addcol3(objective_field, wo3, wo3)
-
-    call grad(wo1%x, wo2%x, wo3%x, this%v%x, this%c_Xh)
-    call field_addcol3(objective_field, wo1, wo1)
-    call field_addcol3(objective_field, wo2, wo2)
-    call field_addcol3(objective_field, wo3, wo3)
-
-    call grad(wo1%x, wo2%x, wo3%x, this%w%x, this%c_Xh)
-    call field_addcol3(objective_field, wo1, wo1)
-    call field_addcol3(objective_field, wo2, wo2)
-    call field_addcol3(objective_field, wo3, wo3)
-
-    ! integrate the field
-    n = wo1%size()
-    if (this%has_mask) then
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          ! note, this could be done more elagantly by writing
-          ! device_glsc2_mask
-          call field_copy(work, objective_field)
-          call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
-       else
-          this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
-               n, this%mask%mask, this%mask%size)
-       end if
-    else
-       if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n)
-       else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
-       end if
-    end if
-
-    this%value = this%value * 0.5_rp
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
-
-  end subroutine minimum_dissipation_update_value
+  end subroutine augmented_lagrangian_update_value
 
   !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
   !! @param this the objective.
   !! @param design the design.
-  subroutine minimum_dissipation_update_sensitivity(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine augmented_lagrangian_update_sensitivity(this, design)
+    class(augmented_lagrangian_t), intent(inout) :: this
     class(design_t), intent(in) :: design
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
 
-  end subroutine minimum_dissipation_update_sensitivity
+    call neko_scratch_registry%request_field(work, temp_indices(1))
 
-end module minimum_dissipation_objective
+    ! here it should just be an inner product between the forward and adjoint
+    call field_col3(work, this%u, this%adjoint_u)
+    call field_addcol3(work, this%v, this%adjoint_v)
+    call field_addcol3(work, this%w, this%adjoint_w)
+    ! but negative
+    call field_cmult(work, -1.0_rp)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
+    else
+       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine augmented_lagrangian_update_sensitivity
+
+end module augmented_lagrangian
