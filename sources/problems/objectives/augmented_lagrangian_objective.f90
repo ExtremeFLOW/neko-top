@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `augmented_lagrangian_t` type.
+!> Implements the `augmented_lagrangian_objective_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -60,7 +60,7 @@
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module augmented_lagrangian
+module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
@@ -68,8 +68,6 @@ module augmented_lagrangian
   use operators, only: grad
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
-  use adjoint_augmented_lagrangian_source_term, only: &
-       adjoint_augmented_lagrangian_source_term_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
@@ -92,7 +90,7 @@ module augmented_lagrangian
   !> An objective function corresponding to minimum dissipation
   !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
   !! |\mathbf{u}|^2 d \Omega \f$
-  type, public, extends(objective_t) :: augmented_lagrangian_t
+  type, public, extends(objective_t) :: augmented_lagrangian_objective_t
      private
 
      !> Pointer to the u field.
@@ -125,7 +123,7 @@ module augmented_lagrangian
      procedure, public, pass(this) :: update_sensitivity => &
           augmented_lagrangian_update_sensitivity
 
-  end type augmented_lagrangian_t
+  end type augmented_lagrangian_objective_t
 
 contains
 
@@ -135,7 +133,7 @@ contains
   !! @param design the design.
   !! @param simulation the simulation.
   subroutine augmented_lagrangian_init_json_sim(this, json, design, simulation)
-    class(augmented_lagrangian_t), intent(inout) :: this
+    class(augmented_lagrangian_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -160,7 +158,7 @@ contains
   !! @param mask_name the name of the mask.
   subroutine augmented_lagrangian_init_attributes(this, design, simulation, &
        weight, name, mask_name)
-    class(augmented_lagrangian_t), intent(inout) :: this
+    class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
@@ -170,18 +168,18 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
-    this%adjoint_u => neko_field_registry%get_field('u_adj')
-    this%adjoint_v => neko_field_registry%get_field('v_adj')
-    this%adjoint_w => neko_field_registry%get_field('w_adj')
+    this%u => simulation%neko_case%fluid%u
+    this%v => simulation%neko_case%fluid%v
+    this%w => simulation%neko_case%fluid%w
+    this%adjoint_u => simulation%adjoint_case%fluid_adj%u_adj
+    this%adjoint_v => simulation%adjoint_case%fluid_adj%v_adj
+    this%adjoint_w => simulation%adjoint_case%fluid_adj%w_adj
 
   end subroutine augmented_lagrangian_init_attributes
 
   !> Destructor.
   subroutine augmented_lagrangian_free(this)
-    class(augmented_lagrangian_t), intent(inout) :: this
+    class(augmented_lagrangian_objective_t), intent(inout) :: this
     call this%free_base()
 
     if (associated(this%u)) nullify(this%u)
@@ -198,7 +196,7 @@ contains
   !! @param this the objective.
   !! @param design the design.
   subroutine augmented_lagrangian_update_value(this, design)
-    class(augmented_lagrangian_t), intent(inout) :: this
+    class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
   end subroutine augmented_lagrangian_update_value
@@ -207,7 +205,7 @@ contains
   !! @param this the objective.
   !! @param design the design.
   subroutine augmented_lagrangian_update_sensitivity(this, design)
-    class(augmented_lagrangian_t), intent(inout) :: this
+    class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -231,4 +229,4 @@ contains
 
   end subroutine augmented_lagrangian_update_sensitivity
 
-end module augmented_lagrangian
+end module augmented_lagrangian_objective

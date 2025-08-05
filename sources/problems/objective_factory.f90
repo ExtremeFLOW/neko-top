@@ -44,7 +44,7 @@ submodule (objective) objective_factory_mod
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
+  character(len=25), parameter :: KNOWN_TYPES(4) = [ character(len=25) :: &
        "minimum_dissipation", &
        "scalar_mixing", &
        "lube_term", &
