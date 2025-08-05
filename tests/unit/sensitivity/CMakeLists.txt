@@ -29,7 +29,7 @@ add_library(sensitivity_utils EXCLUDE_FROM_ALL
 target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
 target_link_libraries(sensitivity_utils
     PUBLIC
-        neko-top-a
+        Neko-TOP::neko-top
         PkgConfig::neko
         PkgConfig::json-fortran
         MPI::MPI_Fortran
