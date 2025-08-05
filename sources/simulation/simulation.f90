@@ -416,22 +416,11 @@ contains
     type(time_step_controller_t) :: dt_controller
     type(file_t) :: chkp_file
     character(len=256) :: chkp_file_name
-    character(len=LOG_SIZE) :: log_msg
     real(kind=dp) :: loop_start
     integer :: j, k, previous_save_state, next_save_state
     integer :: i_scalars, n_scalars
     type(field_t), pointer :: u, v, w, p, s
 
-    if (tstep .lt. this%first_valid_timestep) then
-       write(log_msg, '(A,I0,A,I0)') &
-            'Attempting to restore save state ', tstep, &
-            ' which is before the first valid save state ', &
-            this%first_valid_timestep
-       call neko_warning(log_msg)
-    else
-       write(*, '(A,I0)') 'Restoring state: ', tstep
-       !  call neko_log%message(log_msg)
-    end if
     loop_start = MPI_WTIME()
 
     u => this%neko_case%fluid%u
@@ -467,7 +456,7 @@ contains
        this%neko_case%time%tstep = previous_save_state
        this%loaded_checkpoint = this%neko_case%time%tstep
 
-       do k = previous_save_state, next_save_state - 1
+       do k = previous_save_state, min(next_save_state - 1, this%n_timesteps)
 
           if (k .ne. previous_save_state) then
              if (this%neko_case%time%t .ge. this%neko_case%time%end_time) exit
