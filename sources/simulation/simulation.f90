@@ -101,7 +101,7 @@ module simulation_m
      ! This is used to save the state of the simulation at certain time steps
      ! to be able to restart the simulation from there. This is used for the
      ! adjoint simulation.
-     logical :: is_steady = .true.
+     logical :: checkpoint_enable = .false.
      integer :: n_saves_memory = 0
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
@@ -212,9 +212,10 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Handle unsteady simulation
 
-    call json_get_or_default(parameters, "case.steady", this%is_steady, .false.)
+    call json_get_or_default(parameters, "checkpoints.enable", &
+         this%checkpoint_enable, .false.)
 
-    if (.not. this%is_steady) then
+    if (this%checkpoint_enable) then
        ! Read options related to check pointing
        call json_get_or_default(parameters, "checkpoints.n_memory", &
             this%n_saves_memory, 10)
@@ -259,7 +260,7 @@ contains
     integer :: i, n_scalars
 
     ! Free the RAM Checkpoints
-    if (.not. this%is_steady) then
+    if (this%checkpoint_enable) then
        do i = 1, this%n_saves_memory
           call this%p_list(i)%free()
           call this%u_list(i)%free()
@@ -280,7 +281,7 @@ contains
        if (allocated(this%w_list)) deallocate(this%w_list)
        if (allocated(this%s_list)) deallocate(this%s_list)
 
-       this%is_steady = .false.
+       this%checkpoint_enable = .false.
        this%n_saves_memory = 0
        this%n_saves_disc = 0
        this%n_timesteps = 0
@@ -307,7 +308,7 @@ contains
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (.not. this%is_steady) call this%save_state(this%neko_case%time)
+       if (this%checkpoint_enable) call this%save_state(this%neko_case%time)
     end do
     call profiler_stop
 
@@ -332,7 +333,7 @@ contains
     loop_start = MPI_WTIME()
 
     do i = this%n_timesteps, 1, -1
-       if (.not. this%is_steady) call this%restore_state(i)
+       if (this%checkpoint_enable) call this%restore_state(i)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -369,7 +370,7 @@ contains
     end if
 
     ! Reset our checkpoints
-    if (.not. this%is_steady) then
+    if (this%checkpoint_enable) then
        this%n_saves_disc = 0
        this%loaded_checkpoint = -1
        this%n_timesteps = 0
