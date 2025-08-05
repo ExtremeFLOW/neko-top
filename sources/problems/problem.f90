@@ -37,6 +37,7 @@ module problem
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -220,7 +221,7 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    class(objective_t), allocatable :: objective
+    class(objective_t), allocatable :: objective, ALO
     type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single objective term as its own json_file.
@@ -247,6 +248,16 @@ contains
     end if
 
     call neko_log%end_section()
+
+    if (present(simulation)) then
+       allocate(augmented_lagrangian_objective_t::ALO)
+       select type(tmp => ALO)
+       class is (augmented_lagrangian_objective_t)
+          call tmp%init_from_attributes(design, simulation, &
+               weight = 1.0_rp, name = "Augmented Lagrangian", mask_name = "")
+       end select
+       call this%add_objective(ALO)
+    end if
 
   end subroutine problem_read_objectives
 
