@@ -14,5 +14,5 @@ set_target_properties(Tests PROPERTIES
 # Add subdirectories for unit and regression tests.
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/unit)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/regression/checkpointing)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/regression)
 

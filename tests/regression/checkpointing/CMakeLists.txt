@@ -1,16 +1,17 @@
 # Define the CTest for checkpointing
+set(CMAKE_FOLDER "Tests/Regression/Checkpointing")
 
 # ============================================================================ #
 # Define the executable used for the checkpointing test
-
 set(BASE_EXAMPLE "rugby_ball")
 set(BASE_CASE_NAME "rugby_ball.case")
 set(BASE_EXAMPLE_DIR "${CMAKE_SOURCE_DIR}/examples/${BASE_EXAMPLE}")
 
-add_executable(checkpointing_test
+add_executable(checkpointing_exe EXCLUDE_FROM_ALL
     ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90
 )
-target_link_libraries(checkpointing_test
+add_dependencies(Regression checkpointing_exe)
+target_link_libraries(checkpointing_exe
     PRIVATE
         PkgConfig::neko
         PkgConfig::json-fortran
@@ -25,45 +26,34 @@ set(neko_PATH "${neko_PREFIX}/bin:$ENV{PATH}")
 string(REPLACE ";" ":"
     neko_LD_LIBRARY_PATH "${neko_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
 
-
 # ============================================================================ #
 # Define the test preparation to be run before the test
 # This test requires the neko library to be built and installed
-
-# Ensure everything is built before running the test
-add_custom_target(prepare_checkpointing_test
-    COMMENT "Preparing checkpointing test files"
-)
-add_dependencies(checkpointing_test
-    prepare_checkpointing_test
-)
 
 # Locate the case file
 if (NOT EXISTS "${BASE_EXAMPLE_DIR}/${BASE_CASE_NAME}")
     message(FATAL_ERROR "The case file ${BASE_CASE_NAME} does not exist in "
         "${BASE_EXAMPLE_DIR}.")
 endif()
-add_custom_target(
-    checkpoint_case_file
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.case
     COMMENT "Copying case file to the test directory"
-    SOURCES ${BASE_EXAMPLE_DIR}/${BASE_CASE_NAME}
-    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.case
     COMMAND
         ${CMAKE_COMMAND} -E copy_if_different
         ${BASE_EXAMPLE_DIR}/${BASE_CASE_NAME}
         ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.case
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-add_dependencies(prepare_checkpointing_test
-    checkpoint_case_file
+add_custom_target(checkpointing_case
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.case
 )
+add_dependencies(checkpointing_exe checkpointing_case)
 
 # If a prepare script exists, copy it to the test directory and run it
 if (EXISTS "${BASE_EXAMPLE_DIR}/prepare.sh")
-    add_custom_target(
-        checkpoint_prepare_script
+    add_custom_command(
+        OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
         COMMENT "Copying and execute prepare script"
-        SOURCES ${BASE_EXAMPLE_DIR}/prepare.sh
         COMMAND
             ${CMAKE_COMMAND} -E copy_if_different
             ${BASE_EXAMPLE_DIR}/prepare.sh
@@ -73,9 +63,10 @@ if (EXISTS "${BASE_EXAMPLE_DIR}/prepare.sh")
             ./prepare.sh > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    add_dependencies(prepare_checkpointing_test
-        checkpoint_prepare_script
+    add_custom_target(checkpointing_prepare
+        DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     )
+    add_dependencies(checkpointing_exe checkpointing_prepare)
 else()
     message(WARNING "No prepare script found in ${BASE_EXAMPLE_DIR}.")
 endif()
@@ -85,7 +76,7 @@ endif()
 
 # Add the test to CTest
 add_test(NAME checkpointing_test
-    COMMAND $<TARGET_FILE:checkpointing_test> checkpoint.case
+    COMMAND $<TARGET_FILE:checkpointing_exe> checkpoint.case
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 # Set the environment variables for the test
