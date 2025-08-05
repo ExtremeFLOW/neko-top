@@ -443,9 +443,6 @@ contains
     end if
 
     if (this%loaded_checkpoint .ne. previous_save_state) then
-       write(*, '(A,I0,A,I0)') &
-            '    Restoring from checkpoint ', previous_save_state, &
-            ' to ', next_save_state - 1
        write(chkp_file_name, '(A,I5.5,A)') 'forward_chkp_', &
             previous_save_state, '.chkp'
 
@@ -465,7 +462,6 @@ contains
           end if
 
           j = modulo(k, this%n_saves_memory) + 1
-          write(*, '(A,I0,A,I0)') '    Saving time step ', k, ' to RAM checkpoint ', j
           call field_copy(this%p_list(j), p)
           call field_copy(this%u_list(j), u)
           call field_copy(this%v_list(j), v)
@@ -482,7 +478,6 @@ contains
     end if
 
     j = modulo(tstep, this%n_saves_memory) + 1
-    write(*, '(A,I0,A,I0)') '    Restoring time step ', tstep, ' from RAM checkpoint ', j
 
     call field_copy(p, this%p_list(j))
     call field_copy(u, this%u_list(j))
