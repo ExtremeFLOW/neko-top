@@ -76,6 +76,7 @@ module adjoint_fluid_scheme_incompressible
   use utils, only: neko_error, neko_warning
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
+  use time_state, only: time_state_t
   use field_math, only: field_cfill, field_add2s2
   use wall_model_bc, only: wall_model_bc_t
   use shear_stress, only: shear_stress_t
@@ -500,10 +501,9 @@ contains
   !! Here we perform additional gs operations to take care of
   !! shared points between elements that have different BCs, as done in Nek5000.
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_fluid_scheme_bc_apply_vel(this, t, tstep, strong)
+  subroutine adjoint_fluid_scheme_bc_apply_vel(this, time, strong)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     logical, intent(in) :: strong
 
     integer :: i
@@ -511,7 +511,7 @@ contains
 
     call this%bcs_vel%apply_vector(&
          this%u_adj%x, this%v_adj%x, this%w_adj%x, this%dm_Xh%size(), &
-         t, tstep, strong)
+         time, strong)
     call this%gs_Xh%op(this%u_adj, GS_OP_MIN, glb_cmd_event)
     call this%gs_Xh%op(this%v_adj, GS_OP_MIN, glb_cmd_event)
     call this%gs_Xh%op(this%w_adj, GS_OP_MIN, glb_cmd_event)
@@ -519,7 +519,7 @@ contains
 
     call this%bcs_vel%apply_vector(&
          this%u_adj%x, this%v_adj%x, this%w_adj%x, this%dm_Xh%size(), &
-         t, tstep, strong)
+         time, strong)
     call this%gs_Xh%op(this%u_adj, GS_OP_MAX, glb_cmd_event)
     call this%gs_Xh%op(this%v_adj, GS_OP_MAX, glb_cmd_event)
     call this%gs_Xh%op(this%w_adj, GS_OP_MAX, glb_cmd_event)
@@ -536,19 +536,18 @@ contains
 
   !> Apply all boundary conditions defined for pressure
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_fluid_scheme_bc_apply_prs(this, t, tstep)
+  subroutine adjoint_fluid_scheme_bc_apply_prs(this, time)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
 
     integer :: i
     class(bc_t), pointer :: b => null()
 
-    call this%bcs_prs%apply(this%p_adj, t, tstep)
+    call this%bcs_prs%apply(this%p_adj, time)
     call this%gs_Xh%op(this%p_adj, GS_OP_MIN, glb_cmd_event)
     call device_event_sync(glb_cmd_event)
 
-    call this%bcs_prs%apply(this%p_adj, t, tstep)
+    call this%bcs_prs%apply(this%p_adj, time)
     call this%gs_Xh%op(this%p_adj, GS_OP_MAX, glb_cmd_event)
     call device_event_sync(glb_cmd_event)
 

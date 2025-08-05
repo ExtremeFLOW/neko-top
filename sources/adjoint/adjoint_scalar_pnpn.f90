@@ -375,7 +375,7 @@ contains
       call this%source_term%compute(t, tstep)
 
       ! Apply weak boundary conditions, that contribute to the source terms.
-      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), t, tstep, .false.)
+      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), time, .false.)
 
       ! if (oifs) then
       !    call neko_error("oifs not implemented for adjoint scalar")
@@ -408,7 +408,7 @@ contains
       call s_adj_lag%update()
 
       !> Apply strong boundary conditions.
-      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), t, tstep, &
+      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), time, &
            .true.)
 
       ! Update material properties if necessary
