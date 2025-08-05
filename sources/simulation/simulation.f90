@@ -101,7 +101,7 @@ module simulation_m
      ! This is used to save the state of the simulation at certain time steps
      ! to be able to restart the simulation from there. This is used for the
      ! adjoint simulation.
-     logical :: is_steady = .false.
+     logical :: is_steady = .true.
      integer :: n_saves_memory = 0
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
