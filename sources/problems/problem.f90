@@ -221,7 +221,7 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    class(objective_t), allocatable :: objective, ALO
+    class(objective_t), allocatable :: objective
     type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single objective term as its own json_file.
@@ -247,17 +247,18 @@ contains
        end do
     end if
 
-    call neko_log%end_section()
-
     if (present(simulation)) then
-       allocate(augmented_lagrangian_objective_t::ALO)
-       select type(tmp => ALO)
+       if (allocated(objective)) deallocate(objective)
+       allocate(augmented_lagrangian_objective_t::objective)
+       select type(ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          call tmp%init_from_attributes(design, simulation, &
+          call ALO%init_from_attributes(design, simulation, &
                weight = 1.0_rp, name = "Augmented Lagrangian", mask_name = "")
        end select
-       call this%add_objective(ALO)
+       call this%add_objective(objective)
     end if
+
+    call neko_log%end_section()
 
   end subroutine problem_read_objectives
 
