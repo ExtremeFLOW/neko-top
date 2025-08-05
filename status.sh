@@ -148,7 +148,7 @@ for test in ${tests[@]}; do
         end_line=$((end_line - 1)) # Remove the line with ERROR STOP
 
         if [ -z "$start_line" ] || [ -z "$end_line" ]; then
-            printf "No error message found.\n"
+            head -n 20 $LPATH/$test/error.log
         else
             sed -n "${start_line},${end_line}p" $LPATH/$test/error.log
         fi
