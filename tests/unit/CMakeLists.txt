@@ -21,6 +21,7 @@
 if (BUILD_TESTING)
     # Ensure that the BUILD_TESTING option is enabled.
     message(STATUS "Building Neko-TOP unit tests.")
+
 else()
     return()
 endif()
