@@ -167,7 +167,7 @@ contains
                work%size())
        else
           this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
-               design%size(), this%mask%mask, this%mask%size)
+               design%size(), this%mask%mask%get(), this%mask%size)
        end if
 
        call neko_scratch_registry%relinquish_field(temp_indices)
@@ -294,8 +294,8 @@ contains
 
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          volume = glsc2_mask(values%x, this%c_Xh%B, design%size(), &
-               this%mask%mask, this%mask%size)
+          volume = glsc2_mask(design_indicator%x, &
+               this%c_Xh%B, design%size(), this%mask%mask%get(), this%mask%size)
        end if
 
     else
