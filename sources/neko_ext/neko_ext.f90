@@ -122,7 +122,7 @@ contains
     else
        call set_flow_ic(u, v, w, p, &
             neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-            neko_case%user%fluid_user_ic, neko_case%params)
+            neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
     ! ------------------------------------------------------------------------ !
