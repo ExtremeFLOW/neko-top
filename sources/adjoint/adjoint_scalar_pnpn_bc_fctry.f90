@@ -38,9 +38,7 @@
 submodule(adjoint_scalar_pnpn) adjoint_scalar_pnpn_bc_fctry
   use dirichlet, only : dirichlet_t
   use neumann, only : neumann_t
-  use usr_scalar, only : usr_scalar_t
   use user_intf, only : user_t
-  use usr_scalar, only : usr_scalar_t
   use utils, only : neko_type_error
   use field_dirichlet, only : field_dirichlet_t
   implicit none

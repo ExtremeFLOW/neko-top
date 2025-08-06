@@ -46,7 +46,6 @@ module adjoint_fluid_scheme
   use zero_dirichlet, only: zero_dirichlet_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
-  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
   use dirichlet, only: dirichlet_t
   use field_dirichlet, only: field_dirichlet_t
   use field_dirichlet_vector, only: field_dirichlet_vector_t

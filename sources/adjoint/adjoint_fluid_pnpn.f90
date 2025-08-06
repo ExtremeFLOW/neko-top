@@ -82,6 +82,11 @@ module adjoint_fluid_pnpn
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
+  use inflow, only: inflow_t
+  use field_dirichlet, only: field_dirichlet_t
+  use blasius, only: blasius_t
+  use field_dirichlet_vector, only: field_dirichlet_vector_t
+  use dong_outflow, only: dong_outflow_t
   use time_state, only: time_state_t
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult
@@ -1093,12 +1098,6 @@ contains
 
   !> Write a field with boundary condition specifications
   subroutine adjoint_fluid_pnpn_write_boundary_conditions(this)
-    use inflow, only: inflow_t
-    use field_dirichlet, only: field_dirichlet_t
-    use blasius, only: blasius_t
-    use field_dirichlet_vector, only: field_dirichlet_vector_t
-    use usr_inflow, only: usr_inflow_t
-    use dong_outflow, only: dong_outflow_t
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(dirichlet_t) :: bdry_mask
     type(field_t), pointer :: bdry_field
@@ -1189,12 +1188,6 @@ contains
           call bdry_mask%free()
        type is (symmetry_t)
           call bdry_mask%init_from_components(this%c_Xh, 4.0_rp)
-          call bdry_mask%mark_facets(bci%marked_facet)
-          call bdry_mask%finalize()
-          call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
-          call bdry_mask%free()
-       type is (usr_inflow_t)
-          call bdry_mask%init_from_components(this%c_Xh, 5.0_rp)
           call bdry_mask%mark_facets(bci%marked_facet)
           call bdry_mask%finalize()
           call bdry_mask%apply_scalar(bdry_field%x, this%dm_Xh%size())
