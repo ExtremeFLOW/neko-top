@@ -87,7 +87,7 @@ contains
   !! @param type The type of the user source term, "user_vector" or
   !! "user_poinwise".
   !! @param user The user type containing the user source term routines.
-  !! @param variable_name The name of the field variable.
+  !! @param scheme_name The name of the scheme to apply to.
   subroutine adjoint_init_user_source(source_term, rhs_fields, coef, user, &
        scheme_name)
     class(source_term_t), allocatable, intent(inout) :: source_term
