@@ -31,65 +31,24 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `augmented_lagrangian_objective_t` type.
-!
-! I promise I'll write this document properly in the future...
-!
-! But the Borval Peterson (I think) paper had an objective function
-! that had 2 terms, dissipation and this term they claimed represented
-! out of plane stresses.
-! I never really understood that extra term, I also don't think it
-! applies to 3D cases, but everyone includes it anyway.
-!
-! It appears to me to be basically a heuristic penality that targets
-! non-binary designs
-!
-! so let's call
-!
-! F = \int |\nabla u|^2  + K \int \chi \u^2
-!
-!      | dissipation |     |"lube term"|
-!
-! I say "lube term" because they said it came from lubrication theory...
-! Anyway, we can change all this later (especially the names!)
-
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
-!
-! for the lube term, the adjoint forcing is \chi u
-!
-! This has always annoyed me...
-! because now I see one objective and one constraint
-!
 module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
-       field_copy
-  use operators, only: grad
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+  use field_math, only: field_col3, field_addcol3, field_cmult
   use scratch_registry, only: neko_scratch_registry
   use objective, only: objective_t
   use simulation_m, only: simulation_t
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
-  use coefs, only: coef_t
-  use field_registry, only: neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: glsc2, copy
-  use device_math, only: device_copy, device_glsc2
+  use math, only: copy
+  use device_math, only: device_copy
   use design, only: design_t
-  use brinkman_design, only: brinkman_design_t
-  use point_zone, only: point_zone_t
-  use mask_ops, only: mask_exterior_const
-  use math_ext, only: glsc2_mask
-  use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   implicit none
   private
 
-  !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !> An objective function implementing our augmented lagrangian sensitivity
+  !! contribution.
   type, public, extends(objective_t) :: augmented_lagrangian_objective_t
      private
 
