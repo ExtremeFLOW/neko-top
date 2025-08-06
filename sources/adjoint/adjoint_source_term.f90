@@ -84,8 +84,6 @@ contains
   !! @param source_term The allocatable source term to be initialized to a user.
   !! @param rhs_fields The field list with the 3 right-hand-side components.
   !! @param coef The SEM coefs.
-  !! @param type The type of the user source term, "user_vector" or
-  !! "user_poinwise".
   !! @param user The user type containing the user source term routines.
   !! @param scheme_name The name of the scheme to apply to.
   subroutine adjoint_init_user_source(source_term, rhs_fields, coef, user, &
