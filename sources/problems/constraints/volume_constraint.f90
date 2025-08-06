@@ -294,7 +294,7 @@ contains
 
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          volume = glsc2_mask(design_indicator%x, &
+          volume = glsc2_mask(values%x, &
                this%c_Xh%B, design%size(), this%mask%mask%get(), this%mask%size)
        end if
 
