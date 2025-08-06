@@ -254,7 +254,7 @@ contains
        call set_flow_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
-            neko_case%user%fluid_user_ic, neko_case%params)
+            neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
     call neko_log%end_section()
