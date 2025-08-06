@@ -510,8 +510,7 @@ contains
   !> Call user material properties routine and update the values of `lambda`
   !! if necessary.
   !! @param[inout] this The object.
-  !! @param t Time value.
-  !! @param tstep Current time step.
+  !! @param time The time state.
   subroutine adjoint_scalar_scheme_update_material_properties(this, time)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time

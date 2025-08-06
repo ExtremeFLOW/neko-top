@@ -636,8 +636,7 @@ contains
   !> Call user material properties routine and update the values of `mu`
   !! if necessary.
   !! @param this The fluid scheme.
-  !! @param t Time value.
-  !! @param tstep Current time step.
+  !! @param time The time state.
   subroutine adjoint_fluid_scheme_update_material_properties(this, time)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
