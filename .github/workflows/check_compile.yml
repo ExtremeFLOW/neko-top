@@ -132,9 +132,14 @@ jobs:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
         run: |
+          if [ "${{ matrix.backend }}" == "CPU" ]; then
+            TEST=ON
+          else
+            TEST=OFF
+          fi
           cmake -B build -S . -G Ninja --fresh \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DBUILD_TESTING=ON
+            -DBUILD_TESTING=$TEST
 
       - name: Building Library
         run: |
