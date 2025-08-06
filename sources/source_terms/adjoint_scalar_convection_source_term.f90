@@ -38,6 +38,7 @@ module adjoint_scalar_convection_source_term
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
   use json_module, only: json_file
+  use time_state, only: time_state_t
   use source_term, only: source_term_t
   use coefs, only: coef_t
   use field_math, only: field_subcol3
@@ -143,10 +144,9 @@ contains
   !! @param this The object.
   !! @param t The time value.
   !! @param tstep The current time-step.
-  subroutine adjoint_scalar_convection_source_term_compute(this, t, tstep)
+  subroutine adjoint_scalar_convection_source_term_compute(this, time)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz

@@ -49,6 +49,7 @@ module adjoint_lube_source_term
   use source_term, only: source_term_t
   use coefs, only: coef_t
   use field, only: field_t
+  use time_state, only: time_state_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use field_math, only: field_addcol3, field_copy, field_cmult
@@ -190,10 +191,9 @@ contains
   !! @param this The source term.
   !! @param t The time value.
   !! @param tstep The current time-step.
-  subroutine adjoint_lube_source_term_compute(this, t, tstep)
+  subroutine adjoint_lube_source_term_compute(this, time)
     class(adjoint_lube_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)

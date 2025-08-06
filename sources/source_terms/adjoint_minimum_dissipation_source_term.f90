@@ -48,6 +48,7 @@ module adjoint_minimum_dissipation_source_term
   use field, only: field_t
   use field_math, only: field_subcol3, field_add2, field_add2s2
   use json_module, only: json_file
+  use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
   use fluid_user_source_term, only: fluid_user_source_term_t
@@ -182,10 +183,9 @@ contains
   !! @param this The source term.
   !! @param t The time value.
   !! @param tstep The current time-step.
-  subroutine adjoint_minimum_dissipation_source_term_compute(this, t, tstep)
+  subroutine adjoint_minimum_dissipation_source_term_compute(this, time)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
     !type(field_t), pointer :: dudx, dudy, dudz
