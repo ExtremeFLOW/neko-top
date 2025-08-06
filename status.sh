@@ -143,8 +143,8 @@ for test in ${tests[@]}; do
         printf '\e[4;31m%.0s_\e[m' $(seq 1 $((80 - ${#test}))) && printf '\n'
 
         # Print the error messagge, sitting between *** ERROR and ERROR STOP
-        start_line=$(grep -n '\*\*\* ERROR' $LPATH/$test/error.log | cut -d: -f1)
-        end_line=$(grep -n 'ERROR STOP' $LPATH/$test/error.log | cut -d: -f1)
+        start_line=$(grep -n '\*\*\* ERROR' $LPATH/$test/error.log | head -n 1 | cut -d: -f1)
+        end_line=$(grep -n 'ERROR STOP' $LPATH/$test/error.log | head -n 1 | cut -d: -f1)
         end_line=$((end_line - 1)) # Remove the line with ERROR STOP
 
         if [ -z "$start_line" ] || [ -z "$end_line" ]; then
