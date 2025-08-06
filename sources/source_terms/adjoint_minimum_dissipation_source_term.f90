@@ -51,7 +51,7 @@ module adjoint_minimum_dissipation_source_term
   use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
+  use user_source_term, only: user_source_term_t
   use num_types, only: rp
   use field, only: field_t
   use field_registry, only: neko_field_registry

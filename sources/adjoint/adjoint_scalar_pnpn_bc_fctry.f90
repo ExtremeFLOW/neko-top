@@ -74,17 +74,11 @@ contains
     call json_get(json, "type", type)
 
     select case (trim(type))
-    case ("user_pointwise")
-       allocate(usr_scalar_t::object)
-       select type (obj => object)
-       type is (usr_scalar_t)
-          call obj%set_eval(user%scalar_user_bc)
-       end select
     case ("user")
        allocate(field_dirichlet_t::object)
        select type (obj => object)
        type is (field_dirichlet_t)
-          obj%update => user%user_dirichlet_update
+          obj%update => user%dirichlet_conditions
           ! Add the name of the dummy field in the bc, matching the scalar
           ! solved for.
           call json%add("field_name", scheme%s_adj%name)

@@ -94,7 +94,7 @@ contains
        allocate(field_dirichlet_t::object)
        select type (obj => object)
        type is (field_dirichlet_t)
-          obj%update => user%user_dirichlet_update
+          obj%update => user%dirichlet_conditions
           call json%add("field_name", scheme%p_adj%name)
        end select
 
@@ -169,7 +169,7 @@ contains
        allocate(field_dirichlet_vector_t::object)
        select type (obj => object)
        type is (field_dirichlet_vector_t)
-          obj%update => user%user_dirichlet_update
+          obj%update => user%dirichlet_conditions
        end select
 
        ! case ("user_velocity_pointwise")
