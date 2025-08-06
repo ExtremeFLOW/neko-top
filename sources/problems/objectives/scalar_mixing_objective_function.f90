@@ -271,11 +271,6 @@ contains
     class(scalar_mixing_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-    !--------------------------------------------------------------------------
-    ! THIS SHOULD BE REPLACED WITH A ZERO CONTRIBUTION AFTER THE DESIGN UPDATE
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
-
   end subroutine scalar_mixing_update_sensitivity
 
 end module scalar_mixing_objective
