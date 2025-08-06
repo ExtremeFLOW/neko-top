@@ -144,7 +144,7 @@ contains
 
   !> @brief Force everything outside the mask to be a background field
   !! @param[in,out] fld The field being masked
-  !! @param[in,out] mask The zone being applied.
+  !! @param[in,out] zone The zone being applied.
   !! @param[in] background The background field
   subroutine mask_exterior_fld(fld, zone, background)
     type(field_t), intent(inout) :: fld
