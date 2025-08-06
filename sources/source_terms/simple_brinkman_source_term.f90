@@ -145,8 +145,7 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
+  !! @param time The time state.
   subroutine simple_brinkman_source_term_compute(this, time)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time

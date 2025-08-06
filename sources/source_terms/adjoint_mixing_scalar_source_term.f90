@@ -156,8 +156,7 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The object.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
+  !! @param time The time state.
   subroutine adjoint_mixing_scalar_source_term_compute(this, time)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
