@@ -108,6 +108,11 @@ module adjoint_fluid_scheme
      type(field_t), pointer :: p_adj => null() !< Pressure
      type(field_series_t) :: ulag, vlag, wlag !< fluid field (lag)
 
+     type(field_t), pointer :: u_b => null() !< x-component of baseflow velocity
+     type(field_t), pointer :: v_b => null() !< y-component of baseflow Velocity
+     type(field_t), pointer :: w_b => null() !< z-component of baseflow Velocity
+     type(field_t), pointer :: p_b => null() !< Baseflow pressure
+
      !> Checkpoint
      type(chkp_t), pointer :: chkp => null()
 
