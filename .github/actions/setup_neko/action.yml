@@ -20,8 +20,7 @@ inputs:
 
   json-fortran-dir:
     description: "The directory where the JSON-Fortran library was installed."
-    required: false
-    default: "/home/runner/pkg/json-fortran"
+    required: true
 
   os:
     description: "The operating system to use."
@@ -47,6 +46,21 @@ inputs:
     description: "The version of the Neko library to use."
     required: false
     default: "v0.7.2"
+
+  precision:
+    description: "The precision to use."
+    required: false
+    default: "dp"
+
+  backend:
+    description: "The backend to use."
+    required: false
+    default: "cpu"
+
+  backend-path:
+    description: "The path to the backend."
+    required: false
+    default: ""
 
 outputs:
   install-dir:
@@ -76,11 +90,15 @@ runs:
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        RP: ${{ inputs.precision }}
+        BACKEND: ${{ inputs.backend }}
         REPO: https://github.com/ExtremeFLOW/neko.git
       run: |
         # Get the GIT sha for the current commit
         SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
-        key="neko-$VERSION-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="neko-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        [ -n "$RP" ] && key="$key-$RP"
+        [ -n "$BACKEND" ] && key="$key-$BACKEND"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Create cache for the Neko library
@@ -123,30 +141,34 @@ runs:
         WORKING_DIR: ${{ inputs.working-dir }}
         FC: ${{ inputs.compiler }}
         FCFLAGS: ${{ inputs.compiler-flags }}
+        BACKEND: ${{ inputs.backend }}
+        BACKEND_PATH: ${{ inputs.backend-path }}
+        RP: ${{ inputs.precision }}
       run: |
+        BACKEND_FLAGS=""
+        if [ "$BACKEND" == "CUDA" ]; then
+          BACKEND_FLAGS="--with-cuda=$BACKEND_PATH"
+        elif [ "$BACKEND" == "HIP" ]; then
+          BACKEND_FLAGS="--with-hip=$BACKEND_PATH"
+          export HIP_HIPCC_FLAGS="-O2 -fPIE"
+        elif [ "$BACKEND" == "OpenCL" ]; then
+          BACKEND_FLAGS="--with-opencl"
+        fi
+
+        CONFIG_FLAGS="--prefix=$INSTALL_DIR"
+        [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
+        [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
+
         cd $WORKING_DIR
         ./regen.sh
-        ./configure --prefix=$INSTALL_DIR FC=$FC FCFLAGS="$FCFLAGS"
-        make install ${{ inputs.build-options }}
+        ./configure $CONFIG_FLAGS
+        make ${{ inputs.build-options }}
+        make install
 
     # ------------------------------------------------------------------------ #
     # Cleanup and outputs
     #
     # This step cleans up the working directory and sets the output.
-
-    - name: Cleanup
-      if: ${{ steps.cache-neko.outputs.cache-hit != 'true' }}
-      shell: bash
-      env:
-        INSTALL_DIR: ${{ inputs.install-dir }}
-        WORKING_DIR: ${{ inputs.working-dir }}
-      run: |
-        echo "INSTALL_DIR: $INSTALL_DIR"
-        echo "WORKING_DIR: $WORKING_DIR"
-
-        if [ $(echo "$INSTALL_DIR" | grep -q "$WORKING_DIR") ]; then
-          rm -rf $WORKING_DIR
-        fi
 
     - name: Set output
       id: set-output

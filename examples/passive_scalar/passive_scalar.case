@@ -5,8 +5,10 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 5.0,
-        "timestep": 2e-4,
+        "time": {
+            "end_time": 5.0,
+            "timestep": 2e-4
+        },
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
@@ -58,7 +60,7 @@
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
-                }
+                },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },
@@ -115,7 +117,6 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "is_user": true,
                 "tol": 1e-7,
                 "compute_control": "tsteps",
                 "compute_value": 1

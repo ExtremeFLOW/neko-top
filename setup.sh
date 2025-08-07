@@ -9,7 +9,8 @@ function help() {
     echo -e "\t-t, --test        Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
-    echo -e "\t-d, --device      Device type to compile for (off, CUDA)"
+    echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
+    echo -e "\t-e, --examples    Build the examples"
     echo -e "\t    --doc         Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
@@ -22,8 +23,10 @@ function help() {
     echo -e "\tPFUNIT_DIR        The directory where PFUnit is installed"
     echo -e "\tGSLIB_DIR         The directory where GSLIB is installed"
     echo -e "\tCUDA_DIR          The directory where CUDA is installed"
+    echo -e "\tHIP_DIR           The directory where HIP is installed"
     echo -e "\tBLAS_DIR          The directory where BLAS is installed"
     echo -e "\tCMAKE_VARIABLES   Additional variables to pass to CMake"
+    echo -e "\tNEKO_CONFIG_FLAGS Additional features to pass to neko configure"
 }
 
 # ============================================================================ #
@@ -37,16 +40,17 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Parse the options
 
 # Assign default values to the options
-DEVICE_TYPE="NONE"
+DEVICE_TYPE="CPU"
 CLEAN=false
 CLEAN_NEKO=false
 QUIET=false
 TEST=false
 DOCS=false
+EXAMPLES=false
 
 # List possible options
-OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
-OPT=h,t,c,q,d:
+OPTIONS=help,test,clean,clean-neko,quiet,device:,docs,examples
+OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -60,9 +64,10 @@ while true; do
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
+    "-e" | "--examples") EXAMPLES=true && shift ;;    # Build the examples
 
     # Purely long settings
-    "--doc") DOCS=true && shift ;;              # Build the documentation
+    "--docs") DOCS=true && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
@@ -71,15 +76,6 @@ while true; do
 done
 
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
-
-# Check if the device type has changed
-if [ -f "$MAIN_DIR/build/CMakeCache.txt" ]; then
-    CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
-    if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
-        echo "Device type has changed, cleaning the build directory"
-        CLEAN=true
-    fi
-fi
 
 export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 
@@ -106,6 +102,8 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+elif [ "$DEVICE_TYPE" == "HIP" ]; then
+    if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
 
 # Everything past this point should be general across all setups.
@@ -117,7 +115,6 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
@@ -128,6 +125,9 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 printf "=%.0s" {1..80} && printf "\n"
 printf "Compiling the example codes and Neko-TOP\n"
 
+# Clean the build directory if the clean flag is set
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+
 # Set CMAKE_VARIABLES to pass to the cmake command
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
@@ -136,24 +136,20 @@ if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
-# Set the variables for the compilation
-[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+# Enable desired features
+[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
+[ "$EXAMPLES" == true ] && CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=ON")
+
+# Set the variables for the compilation
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-[ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
 
-# Set the documentation flag
-if [ "$DOCS" == true ]; then
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
-else
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
+if [ ! -d $MAIN_DIR/build ]; then
+    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 fi
-
-cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
-cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build
@@ -168,5 +164,5 @@ printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDevice: $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
 if [ "$TEST" == true ]; then
-    ctest -C Debug --output-on-failure --test-dir $MAIN_DIR/build --parallel
+    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
 fi

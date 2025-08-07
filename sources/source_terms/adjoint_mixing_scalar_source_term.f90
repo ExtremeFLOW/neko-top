@@ -39,6 +39,7 @@ module adjoint_mixing_scalar_source_term
   use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
   use json_module, only : json_file
+  use time_state, only: time_state_t
   use json_utils, only: json_get, json_get_or_default
   use source_term, only : source_term_t
   use coefs, only : coef_t
@@ -90,12 +91,14 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine adjoint_mixing_scalar_source_term_init_from_json(this, &
-       json, fields, coef)
+       json, fields, coef, variable_name)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
+    character(len=*), intent(in) :: variable_name
 
 
   end subroutine adjoint_mixing_scalar_source_term_init_from_json
@@ -153,12 +156,10 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The object.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
-  subroutine adjoint_mixing_scalar_source_term_compute(this, t, tstep)
+  !! @param time The time state.
+  subroutine adjoint_mixing_scalar_source_term_compute(this, time)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fs
     type(field_t), pointer :: work
     integer :: temp_indices(1)

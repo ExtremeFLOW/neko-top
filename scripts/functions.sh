@@ -44,10 +44,10 @@ function run {
     if [ -f "run.sh" ]; then
         ./run.sh 2>error.log
 
-    elif [ ! -z "$SLURM_JOB_NAME" ]; then
-        srun --gpu-bind=single:1 $neko $casefile 2>error.log
+    elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+        srun --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
 
-    elif [ ! -z "$(srun 2>/dev/null)" ]; then
+    elif command -v srun 2>&1 1>/dev/null; then
         srun $neko $casefile 2>error.log
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
@@ -68,7 +68,11 @@ function run {
             ncores=1
         fi
 
-        mpirun -n $ncores $neko $casefile 2>error.log
+        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+
+        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
+        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
+        sed -i 's/\[1,0\]<stderr>://g' error.log
 
     else
         $neko $casefile 2>error.log
@@ -82,12 +86,6 @@ function run {
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
-        return 1
-    fi
-
-    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" ]]; then
-        printf >&2 "ERROR: Neko did not end normally.\n"
         return 1
     fi
 
@@ -164,7 +162,12 @@ function prepare {
         printf "Running user provided preparation script.\n"
         printf "=%.0s" {1..80} && printf "\n"
 
-        ./prepare.sh
+        if [[ -n "$SLURM_JOB_NAME" && -f "select_gpu" && -n "$CPU_BIND" ]]; then
+            srun --ntasks=1 --cpu-bind=${CPU_BIND} ./select_gpu ./prepare.sh
+            sleep 1 # Make sure SLURM have time to clean up.
+        else
+            ./prepare.sh
+        fi
 
     fi
 
@@ -183,7 +186,7 @@ function prepare {
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
-        $NEKO_DIR/bin/makeneko *.f90
+        $NEKO_DIR/bin/makeneko *.f90 || echo "makeneko failed" >&2
         neko=$(realpath ./neko)
 
     else
@@ -195,6 +198,11 @@ function prepare {
         printf >&2 "ERROR: Neko executable not found."
         return 1
     fi
+
+    if [ -f "./select_gpu" ]; then
+        neko="./select_gpu $neko"
+    fi
+
     export neko
 }
 

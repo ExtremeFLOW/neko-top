@@ -40,45 +40,26 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
 
-# Enable devices
-set(DEVICE_TYPE "NONE" CACHE STRING "Device type to use")
-if (DEVICE_TYPE STREQUAL "CUDA")
-    enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA=1)
-endif()
-
 # ............................................................................ #
 # Options
 
 option(BUILD_DOCS "Build documentation" OFF)
 option(BUILD_TESTING "Build the tests" OFF)
+option(BUILD_EXAMPLES "Build the examples" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
-
-set(PFUNIT_DIR       ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
-
 # ............................................................................ #
-# Define compiler flags
+# Define cmake variables
 
 # Define the list of available build types
-if (CMAKE_BUILD_TYPE STREQUAL "")
-    set(CMAKE_BUILD_TYPE "Release"
-        CACHE STRING "Choose the type of build" FORCE)
-endif()
+set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build")
 set(CMAKE_BUILD_TYPE_LIST
     Debug
     Release
     Testing
 )
-
-# Set the compiler flags
-include(cmake/${CMAKE_Fortran_COMPILER_ID}.cmake)
-
-# ============================================================================ #
-# Set some generic flags
-
 set(CMAKE_Fortran_PREPROCESS ON)
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # ============================================================================ #
 # Documentation
@@ -92,7 +73,7 @@ endif()
 
 # ============================================================================ #
 # Setup External Libraries
-# ............................................................................ #
+# ============================================================================ #
 # Check for the required libraries.
 find_package(BLAS QUIET)
 find_package(LAPACK QUIET)
@@ -143,11 +124,57 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 
+# ............................................................................ #
+# Setup PFUnit
+
+set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
+    CACHE STRING "Path to the pFUnit installation")
+
+# ============================================================================ #
+# Setup compiler specific options
+# ============================================================================ #
+
+# Set the compiler flags
+include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_found)
+if (NOT compiler_flags_found)
+    message(WARNING "No specific compiler flags found for "
+        "${CMAKE_Fortran_COMPILER_ID}.")
+endif()
+
+# ............................................................................ #
+# Enable devices
+
+pkg_get_variable(DEVICE_TYPE neko backend)
+if (DEVICE_TYPE STREQUAL "CUDA")
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
+
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+elseif(NOT DEVICE_TYPE STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
+endif()
+
 # ============================================================================ #
 # Setup the Neko-TOP library
 # ============================================================================ #
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/sources)
+
+# Add a static library target for use in examples and tests
+# This ensures the complete Neko-TOP library is built and linked before any
+# examples or tests are built.
+add_library(neko-top-a STATIC IMPORTED)
+set_target_properties(neko-top-a PROPERTIES
+    IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libneko-top.a"
+)
+add_custom_target(neko-top_ready
+    DEPENDS neko-top
+    COMMENT "Neko-TOP library is ready.")
+add_dependencies(neko-top-a neko-top_ready)
 
 # ============================================================================ #
 # Build the examples
@@ -161,12 +188,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/examples)
 
 # Setup testing
 include(CTest)
-if (BUILD_TESTING)
-    find_package(PFUNIT REQUIRED
-        HINTS ${PFUNIT_DIR}
-    )
-    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
-endif()
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
 
 # ============================================================================ #
 # Write messages to the user about the options and paths if we are at the top
@@ -176,7 +198,6 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
 
     string(REPEAT "=" 80 BARRIER)
 
-    message(STATUS "")
     message(STATUS ${BARRIER})
     message(STATUS "Neko-TOP: Neko Topology Optimization Package")
     message(STATUS "")
@@ -184,6 +205,7 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
     message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
     message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
+    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
     message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
     message(STATUS "")
     message(STATUS "External dependencies:")

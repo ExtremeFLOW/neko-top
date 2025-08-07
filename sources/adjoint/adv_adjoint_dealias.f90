@@ -44,6 +44,7 @@ module adv_lin_dealias
   use interpolation, only: interpolator_t
   use device_math, only: device_vdot3, device_sub2, device_col3, device_add4
   use device, only: device_map
+  use utils, only: neko_error
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
@@ -716,12 +717,37 @@ contains
 
     associate(c_GL => this%coef_GL)
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         !! TODO
+         ! Map baseflow to GL
+         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+
+         ! Map adjoint scalar to GL (use tx as adjoint scalar array)
+         call this%GLL_to_GL%map(this%tx, s%x, nel, this%Xh_GL)
+
+         ! Outer product (use duxb, duyb, duzb as temporary arrays)
+         call device_col3(this%duxb_d, this%tx_d, this%txb_d, n_GL)
+         call device_col3(this%duyb_d, this%tx_d, this%tyb_d, n_GL)
+         call device_col3(this%duzb_d, this%tx_d, this%tzb_d, n_GL)
+
+         ! D^T
+         ! vr,vs,vt are temporary arrays
+         call cdtp(this%vr, this%duxb, c_GL%drdx, c_GL%dsdx, c_GL%dtdx, c_GL)
+         call cdtp(this%vs, this%duyb, c_GL%drdy, c_GL%dsdy, c_GL%dtdy, c_GL)
+         call cdtp(this%vt, this%duzb, c_GL%drdz, c_GL%dsdz, c_GL%dtdz, c_GL)
+
+         ! reuse duxb as a temp for summing them
+         call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
+
+         ! map back to GLL
+         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+
+         !apply
+         call device_sub2(fs%x_d, this%temp_d, n)
 
 
       else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
-         !! TODO
-
+         call neko_error("Adjoint scalar not implemented for SX")
       else
          do e = 1, coef%msh%nelv
             ! Map baseflow to GL

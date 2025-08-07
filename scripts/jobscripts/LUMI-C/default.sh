@@ -17,10 +17,11 @@
 #SBATCH --partition=standard
 
 # Ask for n cores placed on R host.
-#SBATCH --ntasks 2
+#SBATCH --nodes=1
+#SBATCH --tasks-per-node=128
 
-# Time specifications (hh:mm)
-#SBATCH --time 00-00:10:00
+# Time specifications (dd-hh:mm:ss)
+#SBATCH --time 00-00:05:00
 
 # -- Notification options
 
@@ -47,6 +48,8 @@ else
     exit 1
 fi
 
+# ============================================================================ #
+# Select which GPU to map to which core
 source functions.sh
 run $example
 

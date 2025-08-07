@@ -39,10 +39,10 @@ module adjoint_scalar_pnpn
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
        rhs_maker_ext_fctry, rhs_maker_bdf_fctry, rhs_maker_oifs_fctry
   use adjoint_scalar_scheme, only : adjoint_scalar_scheme_t
+  use checkpoint, only : chkp_t
   use field, only : field_t
   use bc_list, only : bc_list_t
   use mesh, only : mesh_t
-  use checkpoint, only : chkp_t
   use coefs, only : coef_t
   use device, only : HOST_TO_DEVICE, device_memcpy
   use gather_scatter, only : gs_t, GS_OP_ADD
@@ -57,8 +57,7 @@ module adjoint_scalar_pnpn
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use advection_adjoint, only : advection_adjoint_t
-  use advection_adjoint_fctry, only: advection_adjoint_factory
+  use advection_adjoint, only : advection_adjoint_t, advection_adjoint_factory
   use profiler, only : profiler_start_region, profiler_end_region
   use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file, json_core, json_value
@@ -67,6 +66,7 @@ module adjoint_scalar_pnpn
   use zero_dirichlet, only : zero_dirichlet_t
   use time_step_controller, only : time_step_controller_t
   use scratch_registry, only : neko_scratch_registry
+  use time_state, only : time_state_t
   use bc, only : bc_t
   use field_math, only: field_rzero
   implicit none
@@ -94,6 +94,8 @@ module adjoint_scalar_pnpn
 
      !> A bc list for the bc_res. Contains only that, essentially just to wrap
      !! the if statement determining whether to apply on the device or CPU.
+     !! Also needed since a bc_list is the type that is sent to, e.g. solvers,
+     !! cannot just send `bc_res` on its own.
      type(bc_list_t) :: bclst_ds
 
      !> Advection operator.
@@ -101,9 +103,6 @@ module adjoint_scalar_pnpn
 
      ! Time interpolation scheme
      logical :: oifs
-
-     ! Lag arrays for the RHS.
-     type(field_t) :: abx1, abx2
 
      ! Advection terms for the oifs method
      type(field_t) :: advs
@@ -135,7 +134,6 @@ module adjoint_scalar_pnpn
      procedure, pass(this) :: reset => adjoint_scalar_pnpn_reset
   end type adjoint_scalar_pnpn_t
 
-
   !> Boundary condition factory. Both constructs and initializes the object.
   !! @details Will mark a mesh zone for the bc and finalize.
   !! @param[inout] object The object to be allocated.
@@ -160,32 +158,41 @@ contains
   !! @param[in] msh The mesh.
   !! @param[in] coef The coefficients of the mesh.
   !! @param[in] gs The gather-scatter.
-  !! @param[inout] params The case parameter file in json.
+  !! @param[inout] params_adjoint The snippet of the json for the adjoint scalar.
+  !! @param[inout] params_primal The snippet of the json for the primal scalar.
+  !! @param[inout] numerics_params The numeric parameters json.
   !! @param[in] user Type with user-defined procedures.
+  !! @param[inout] chkp The checkpoint object.
   !! @param[in] ulag Lag arrays for the x velocity component.
   !! @param[in] vlag Lag arrays for the y velocity component.
   !! @param[in] wlag Lag arrays for the z velocity component.
   !! @param[in] time_scheme The time-integration controller.
   !! @param[in] rho The fluid density.
-  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params, user, &
-       ulag, vlag, wlag, time_scheme, rho)
+  subroutine adjoint_scalar_pnpn_init(this, msh, coef, gs, params_adjoint, &
+       params_primal, numerics_params, user, chkp, ulag, vlag, wlag, &
+       time_scheme, rho)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: coef
     type(gs_t), target, intent(inout) :: gs
-    type(json_file), target, intent(inout) :: params
+    type(json_file), target, intent(inout) :: params_adjoint
+    type(json_file), target, intent(inout) :: params_primal
+    type(json_file), target, intent(inout) :: numerics_params
     type(user_t), target, intent(in) :: user
+    type(chkp_t), target, intent(inout) :: chkp
     type(field_series_t), target, intent(in) :: ulag, vlag, wlag
     type(time_scheme_controller_t), target, intent(in) :: time_scheme
     type(field_t), target, intent(in) :: rho
     integer :: i
     class(bc_t), pointer :: bc_i
     character(len=15), parameter :: scheme = 'Modular (Pn/Pn)'
+    logical :: advection
 
     call this%free()
 
     ! Initiliaze base type.
-    call this%scheme_init(msh, coef, gs, params, scheme, user, rho)
+    call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, &
+         scheme, user, rho)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -222,7 +229,7 @@ contains
     call this%setup_bcs_(user)
 
     ! Initialize dirichlet bcs for scalar residual
-    call this%bc_res%init(this%c_Xh, params)
+    call this%bc_res%init(this%c_Xh, params_adjoint)
     do i = 1, this%bcs%size()
        if (this%bcs%strong(i)) then
           bc_i => this%bcs%get(i)
@@ -241,31 +248,38 @@ contains
     call this%proj_s%init(this%dm_Xh%size(), this%projection_dim, &
          this%projection_activ_step)
 
-    ! Add lagged term to checkpoint
-    ! @todo Init chkp object, note, adding 3 slags
-    ! call this%chkp%add_lag(this%s_adj_lag, this%s_adj_lag, this%s_adj_lag)
-
     ! Determine the time-interpolation scheme
-    call json_get_or_default(params, 'case.numerics.oifs', this%oifs, .false.)
+    call json_get_or_default(numerics_params, 'oifs', this%oifs, .false.)
+
+    ! Point to case checkpoint
+    this%chkp => chkp
 
     ! Initialize advection factory
-    ! call json_get_or_default(params, 'case.scalar.advection', advection, &
-    ! .true.)
-    ! call advection_adjoint_factory(this%adv, params, this%c_Xh, &
-    !                        ulag, vlag, wlag, this%chkp%dtlag, &
-    !                         this%chkp%tlag, time_scheme, .not. advection, &
-    !                        this%s_adj_lag)
-    ! @todo NOTE:
-    ! This is changed a fair amount and I suspect it's due oifs
-    call advection_adjoint_factory(this%adv, params, this%c_Xh)
+    call json_get_or_default(params_adjoint, 'advection', advection, .true.)
+
+    call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
+         ulag, vlag, wlag, this%chkp%dtlag, &
+         this%chkp%tlag, time_scheme, .not. advection, &
+         this%s_adj_lag)
+    ! Add lagged term to checkpoint
+    ! @todo Init chkp object, note, adding 3 slags
+
+    ! Add scalar info to checkpoint
+    ! call this%chkp%add_scalar(this%s)
+    ! this%chkp%abs1 => this%abx1
+    ! this%chkp%abs2 => this%abx2
+    ! this%chkp%slag => this%slag
+
   end subroutine adjoint_scalar_pnpn_init
 
   !> I envision the arguments to this func might need to be expanded
-  subroutine adjoint_scalar_pnpn_restart(this, dtlag, tlag)
+  subroutine adjoint_scalar_pnpn_restart(this, chkp)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
+    type(chkp_t), intent(inout) :: chkp
     real(kind=rp) :: dtlag(10), tlag(10)
     integer :: n
-
+    dtlag = chkp%dtlag
+    tlag = chkp%tlag
 
     n = this%s_adj%dof%size()
 
@@ -333,12 +347,9 @@ contains
 
   end subroutine adjoint_scalar_pnpn_free
 
-  subroutine adjoint_scalar_pnpn_step(this, t, tstep, dt, ext_bdf, &
-       dt_controller)
+  subroutine adjoint_scalar_pnpn_step(this, time, ext_bdf, dt_controller)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     type(time_scheme_controller_t), intent(in) :: ext_bdf
     type(time_step_controller_t), intent(in) :: dt_controller
     ! Number of degrees of freedom
@@ -350,33 +361,24 @@ contains
 
     call profiler_start_region('Scalar', 2)
     associate(u => this%u, v => this%v, w => this%w, s_adj => this%s_adj, &
-         cp => this%cp, rho => this%rho, &
+         cp => this%cp, rho => this%rho, lambda => this%lambda, &
          ds_adj => this%ds_adj, &
          s_adj_res => this%s_adj_res, &
          Ax => this%Ax, f_Xh => this%f_Xh, Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          s_adj_lag => this%s_adj_lag, oifs => this%oifs, &
-         lambda_field => this%lambda, &
          projection_dim => this%projection_dim, &
          msh => this%msh, res => this%res, makeoifs => this%makeoifs, &
          makeext => this%makeext, makebdf => this%makebdf, &
-         if_variable_dt => dt_controller%if_variable_dt, &
-         dt_last_change => dt_controller%dt_last_change)
+         t => time%t, tstep => time%tstep, dt => time%dt)
 
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)
       ! Compute the source terms
-      call this%source_term%compute(t, tstep)
-
-      ! Compute the grandient jump penalty term
-      if (this%if_gradient_jump_penalty .eqv. .true.) then
-         call neko_error("gradient jump not implemented for adjoint scalar")
-         ! call this%gradient_jump_penalty%compute(u, v, w, s_adj)
-         ! call this%gradient_jump_penalty%perform(f_Xh)
-      end if
+      call this%source_term%compute(time)
 
       ! Apply weak boundary conditions, that contribute to the source terms.
-      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), t, tstep, .false.)
+      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), time, .false.)
 
       ! if (oifs) then
       !    call neko_error("oifs not implemented for adjoint scalar")
@@ -398,27 +400,28 @@ contains
       ! the scalar field from the previous time-step.
       ! Now, this value is used in the explicit time scheme to advance these
       ! terms in time.
-      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, rho%x(1,1,1,1), &
-           ext_bdf%advection_coeffs, n)
+      call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, &
+           rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
 
       ! Add the RHS contributions coming from the BDF scheme.
-      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, rho%x(1,1,1,1), &
-           dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+      call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
+           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
 
       !> Apply strong boundary conditions.
-      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), t, tstep, &
+      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), time, &
            .true.)
 
       ! Update material properties if necessary
-      call this%update_material_properties(t, tstep)
+      call this%update_material_properties(time)
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda_field, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), dt, dm_Xh%size())
+           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), &
+           dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
 
@@ -436,6 +439,8 @@ contains
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Adjoint_scalar_solve', 21)
 
+      ksp_results(1)%name = 'Adjoint Scalar'
+
       call this%proj_s%post_solving(ds_adj%x, Ax, c_Xh, this%bclst_ds, gs_Xh, &
            n, tstep, dt_controller)
 
@@ -446,7 +451,7 @@ contains
          call add2s2(s_adj%x, ds_adj%x, 1.0_rp, n)
       end if
 
-      call scalar_step_info(tstep, t, dt, ksp_results)
+      call scalar_step_info(time, ksp_results)
 
     end associate
     call profiler_end_region('Scalar', 2)
@@ -454,6 +459,7 @@ contains
 
   subroutine print_debug(this)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
+    ! character(len=LOG_SIZE) :: log_buf
     integer :: n
 
     n = this%dm_Xh%size()
@@ -485,13 +491,11 @@ contains
     logical, allocatable :: marked_zones(:)
     integer, allocatable :: zone_indices(:)
 
-
-    if (this%params%valid_path('case.adjoint_scalar.boundary_conditions')) then
-       call this%params%info('case.adjoint_scalar.boundary_conditions', &
+    if (this%params%valid_path('boundary_conditions')) then
+       call this%params%info('boundary_conditions', &
             n_children = n_bcs)
        call this%params%get_core(core)
-       call this%params%get('case.adjoint_scalar.boundary_conditions', &
-            bc_object, found)
+       call this%params%get('boundary_conditions', bc_object, found)
 
        call this%bcs%init(n_bcs)
 
@@ -516,7 +520,7 @@ contains
                 write(error_unit, '(A, A, I0, A, A, I0, A)') "*** ERROR ***: ",&
                      "Zone index ", zone_indices(j), &
                      " is invalid as this zone has 0 size, meaning it ", &
-                     "does not in the mesh. Check adjoint scalar BC ", &
+                     "does not exist in the mesh. Check adjoint scalar BC ", &
                      i, "."
                 error stop
              end if
@@ -549,6 +553,17 @@ contains
              error stop
           end if
        end do
+    else
+       ! Check that there are no labeled zones, i.e. all are periodic.
+       do i = 1, size(this%msh%labeled_zones)
+          if (this%msh%labeled_zones(i)%size .gt. 0) then
+             write(error_unit, '(A, A, A)') "*** ERROR ***: ", &
+                  "No boundary_conditions entry in the case file for " // &
+                  " adjoint scalar ", &
+                  this%s%name
+             error stop
+          end if
+       end do
     end if
   end subroutine adjoint_scalar_pnpn_setup_bcs_
 
@@ -556,7 +571,7 @@ contains
   subroutine adjoint_scalar_pnpn_reset(this)
     class(adjoint_scalar_pnpn_t), target, intent(inout) :: this
     integer :: i
-    
+
     call field_rzero(this%s_adj)
     do i = 1, this%s_adj_lag%size()
        call field_rzero(this%s_adj_lag%lf(i))

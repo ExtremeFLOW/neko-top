@@ -8,7 +8,8 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
+       json_extract_item
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -24,13 +25,17 @@ module neko_ext
   use field, only: field_t
   use utils, only: neko_error
   use json_module, only : json_file
+  use scalars, only: scalars_t
+  use adjoint_scalars, only: adjoint_scalars_t
+
   implicit none
 
   ! ========================================================================= !
   ! Module interface
   ! ========================================================================= !
   private
-  public :: setup_iteration, reset, field_to_vector, vector_to_field
+  public :: setup_iteration, reset, field_to_vector, vector_to_field, &
+       get_scalar_indicies
 
 contains
 
@@ -49,13 +54,11 @@ contains
   subroutine reset(neko_case)
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
-    integer :: i
+    integer :: i, n_scalars
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
-    type(json_file) :: json_subdict
-
-    t = 0.0_rp
+    type(json_file) :: json_subdict, scalar_params
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
@@ -65,8 +68,8 @@ contains
     v => neko_case%fluid%v
     w => neko_case%fluid%w
     p => neko_case%fluid%p
-    if (allocated(neko_case%scalar)) then
-       s => neko_case%scalar%s
+    if (allocated(neko_case%scalars)) then
+       s => neko_case%scalars%scalar_fields(1)%s
     else
        nullify(s)
     end if
@@ -75,9 +78,13 @@ contains
     ! Reset the timing parameters
     ! ------------------------------------------------------------------------ !
 
+    t = 0.0_rp
+    neko_case%time%t = t
+    neko_case%time%tstep = 0
+
     ! Setup lagged time step parameters
-    neko_case%time%tlag(:) = t
-    neko_case%time%dtlag(:) = neko_case%time%dt
+    neko_case%time%tlag = t
+    neko_case%time%dtlag = neko_case%time%dt
     do i = 1, size(neko_case%time%tlag)
        neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
     end do
@@ -87,8 +94,8 @@ contains
 
     ! Restart the fields
     call neko_case%fluid%restart(neko_case%chkp)
-    if (allocated(neko_case%scalar)) then
-       call neko_case%scalar%restart(neko_case%chkp)
+    if (allocated(neko_case%scalars)) then
+       call neko_case%scalars%restart(neko_case%chkp)
     end if
 
     ! Reset the external BDF coefficients
@@ -115,7 +122,7 @@ contains
     else
        call set_flow_ic(u, v, w, p, &
             neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
-            neko_case%usr%fluid_user_ic, neko_case%params)
+            neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -126,21 +133,50 @@ contains
          'case.scalar.enabled', has_scalar, .false.)
 
     if (has_scalar) then
-       call json_get(neko_case%params, &
-            'case.scalar.initial_condition.type', string_val)
-       call json_extract_object(neko_case%params, &
-            'case.scalar.initial_condition', json_subdict)
+       if (neko_case%params%valid_path('case.adjoint_scalar')) then
+          ! we shouldn't fallback to the primal here.
+          call json_get(neko_case%params, &
+               'case.adjoint_scalar.initial_condition.type', string_val)
+          call json_extract_object(neko_case%params, &
+               'case.adjoint_scalar.initial_condition', json_subdict)
 
-       if (trim(string_val) .ne. 'user') then
-          call set_scalar_ic(s, &
-               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-               string_val, &
-               json_subdict)
+          !call neko_log%section("Adjoint scalar initial condition ")
+
+          if (trim(string_val) .ne. 'user') then
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict)
+          else
+             call neko_error("user defined ICs not implemented for " // &
+                  "adjoint scalar")
+             ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
+             !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
+             !      this%usr%scalar_user_ic, neko_case%params)
+          end if
+
+          ! call neko_log%end_section()
        else
-          call set_scalar_ic(s, &
-               neko_case%scalar%c_Xh, neko_case%scalar%gs_Xh, &
-               neko_case%usr%scalar_user_ic, &
-               neko_case%params)
+
+          ! Handle multiple scalars
+          call neko_case%params%info('case.scalars', n_children = n_scalars)
+
+          do i = 1, n_scalars
+             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
+                  i, scalar_params)
+             call json_get(scalar_params, 'initial_condition.type', string_val)
+             call json_extract_object(scalar_params, 'initial_condition', &
+                  json_subdict)
+
+             if (trim(string_val) .ne. 'user') then
+                call set_scalar_ic(neko_case%scalars%scalar_fields(i)%s, &
+                     neko_case%scalars%scalar_fields(i)%c_Xh, &
+                     neko_case%scalars%scalar_fields(i)%gs_Xh, string_val, &
+                     json_subdict)
+             else
+                call neko_error("user defined ICs not implemented for " // &
+                     "adjoint scalar")
+             end if
+          end do
        end if
     end if
 
@@ -234,5 +270,55 @@ contains
     end if
 
   end subroutine field_to_vector
+
+  !> @brief get scalar indices
+  !! @details Given a primal scalar name, return the indices in the scalars
+  !! and adjoint_scalars list corresponding to this pair.
+  !! @param[out] i_primal Index in the primal scalar list.
+  !! @param[out] i_adjoint Index in the adjoint scalar list.
+  !! @param[inout] scalars Primal scalars list.
+  !! @param[inout] adjoint_scalars Adjoint scalars list.
+  !! @param[in] primal_name Name of the primal scalar.
+  subroutine get_scalar_indicies(i_primal, i_adjoint, scalars, &
+       adjoint_scalars, primal_name)
+    integer, intent(out) :: i_primal
+    integer, intent(out) :: i_adjoint
+    type(scalars_t), intent(inout) :: scalars
+    type(adjoint_scalars_t), intent(inout) :: adjoint_scalars
+    character(len=*), intent(in) :: primal_name
+    integer :: i, n_primal_scalars, n_adjoint_scalars
+
+    i_primal = -1
+    i_adjoint = -1
+    n_adjoint_scalars = size(adjoint_scalars%adjoint_scalar_fields)
+    n_primal_scalars = size(scalars%scalar_fields)
+
+    if ((n_adjoint_scalars .eq. 1) .and. (n_primal_scalars .eq. 1)) then
+       i_primal = 1
+       i_adjoint = 1
+       return
+    end if
+
+    do i = 1, n_adjoint_scalars
+       if (adjoint_scalars%adjoint_scalar_fields(i)%primal_name &
+            .eq. primal_name) then
+          i_adjoint = i
+          exit
+       end if
+    end do
+
+    do i = 1, n_primal_scalars
+       if (scalars%scalar_fields(i)%name .eq. primal_name) then
+          i_primal = i
+          exit
+       end if
+    end do
+
+    if (i_primal .le. 0 .or. i_adjoint .le. 0) then
+       call neko_error('could not find matching primal and adjoint' // &
+            ' scalar fields')
+    end if
+
+  end subroutine get_scalar_indicies
 
 end module neko_ext

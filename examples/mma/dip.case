@@ -4,12 +4,13 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "end_time": 1e-5,
-        "timestep": 1e-5,
+        "time": {
+            "end_time": 1e-5,
+            "timestep": 1e-5
+        },
         "simulation_components": [
             {
                 "type": "mma",
-                "is_user": true,
                 "tol": 1e-6,
                 "m": 2,
                 "a0_const": 1.0,
@@ -105,7 +106,7 @@
     },
     "mma": {
         "max_iter": 100,
-        "backend": "cuda",
+        "backend": "device",
         "subsolver": "dip",
         "asyinit": 0.5,
         "asyincr": 1.2,

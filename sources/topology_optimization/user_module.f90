@@ -40,7 +40,7 @@ contains
     type(case_t), intent(inout) :: neko_case
 
     ! Set the properties for the fluid
-    neko_case%usr%scalar_user_ic => scalar_z_split_ic
+    ! neko_case%user%initial_conditions => scalar_z_split_ic
 
   end subroutine neko_user_init
 

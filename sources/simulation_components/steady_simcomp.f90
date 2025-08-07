@@ -46,6 +46,7 @@ module steady_simcomp
   use csv_file, only : csv_file_t
   use vector, only: vector_t
   use time_state, only: time_state_t
+  use utils, only: neko_error
   implicit none
   private
 
@@ -85,7 +86,7 @@ contains
 
   ! Constructor from json.
   subroutine steady_simcomp_init_from_json(this, json, case)
-    class(steady_simcomp_t), intent(inout) :: this
+    class(steady_simcomp_t), intent(inout), target :: this
     type(json_file), intent(inout) :: json
     class(case_t), intent(inout), target :: case
     real(kind=dp) :: tol
@@ -97,6 +98,7 @@ contains
     call json_get_or_default(json, "tol", tol, 1.0e-6_dp)
     ! Read the log frequency
     call json_get_or_default(json, "log_frequency", log_frequency, 50)
+    call json_get_or_default(json, "scalar_coupled", this%have_scalar, .false.)
 
     call this%init_from_attributes(tol, log_frequency)
 
@@ -123,9 +125,8 @@ contains
     call this%p_old%init(this%case%fluid%p%dof)
 
     ! Check if the scalar field is allocated
-    if (allocated(this%case%scalar)) then
-       this%have_scalar = .true.
-       call this%s_old%init(this%case%scalar%s%dof)
+    if (this%have_scalar) then
+       call this%s_old%init(this%case%scalars%scalar_fields(1)%s%dof)
     end if
 
   end subroutine steady_simcomp_init_from_attributes
@@ -138,9 +139,7 @@ contains
     call this%v_old%free()
     call this%w_old%free()
     call this%p_old%free()
-    if (this%have_scalar) then
-       call this%s_old%free()
-    end if
+    call this%s_old%free()
     call this%log_data%free()
 
     call this%free_base()
@@ -178,7 +177,10 @@ contains
     p => this%case%fluid%p
 
     if (this%have_scalar) then
-       s => this%case%scalar%s
+       if (size(this%case%scalars%scalar_fields) .gt. 1) then
+          call neko_error('steady simcomp only works for a single scalar')
+       end if
+       s => this%case%scalars%scalar_fields(1)%s
     else
        s => null()
     end if
@@ -194,17 +196,12 @@ contains
 
     ! Here we compute the squared difference between the old and new fields
     ! and store the result in the `normed_diff` array.
-    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, &
-         this%case%time%dt)
-    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, &
-         this%case%time%dt)
-    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, &
-         this%case%time%dt)
-    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, &
-         this%case%time%dt)
+    normed_diff(1) = energy_norm(this%u_old, this%case%fluid%C_Xh, dt)
+    normed_diff(2) = energy_norm(this%v_old, this%case%fluid%C_Xh, dt)
+    normed_diff(3) = energy_norm(this%w_old, this%case%fluid%C_Xh, dt)
+    normed_diff(4) = energy_norm(this%p_old, this%case%fluid%C_Xh, dt)
     if (this%have_scalar) then
-       normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, &
-            this%case%time%dt)
+       normed_diff(5) = energy_norm(this%s_old, this%case%fluid%C_Xh, dt)
     else
        normed_diff(5) = 0.0_rp
     end if
@@ -257,17 +254,15 @@ contains
     real(kind=rp) :: energy_norm, tmp
     integer :: n
 
-    tmp = 0.0_rp
     n = delta_fld%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        tmp = device_glsc3(delta_fld%x_d, delta_fld%x_d, coef%B_d, n)
     else
        tmp = glsc3(delta_fld%x, delta_fld%x, coef%B, n)
     end if
-    energy_norm = sqrt(tmp)/dt/coef%volume
+    energy_norm = sqrt(tmp) / dt / coef%volume
 
   end function energy_norm
 
 
 end module steady_simcomp
-

@@ -12,7 +12,7 @@
 # - sigmoid/heavyside step
 
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/mapping_handler.f90
@@ -26,11 +26,21 @@ if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping.cu
-            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping_kernel.h
     )
 
     target_include_directories(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda
+    )
+
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    target_sources(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
+    )
+
+    target_include_directories(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip
     )
 endif()

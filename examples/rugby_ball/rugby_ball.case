@@ -5,8 +5,10 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": true,
-        "end_time": 0.1,
-        "timestep": 1e-4,
+        "time": {
+            "end_time": 0.1,
+            "timestep": 1e-4
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -66,7 +68,6 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "is_user": true,
                 "tol": 1e-2,
                 "compute_control": "tsteps",
                 "compute_value": 1
@@ -131,15 +132,14 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "m": 1,
-                "scale": 1.0,
+                "scale": 10.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 100.0,
-                "d": 0.0
+                "c": 1000.0,
+                "d": 1.0
             }
         },
         "objectives": [

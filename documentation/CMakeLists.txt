@@ -53,6 +53,7 @@ add_custom_target(
     COMMENT "Generating API documentation with Doxygen"
     VERBATIM
 )
+set_target_properties(Documentation PROPERTIES FOLDER "Documentation")
 
 # Add the documentation target to ALL if we have "BUILD_DOCS" enabled
 if (BUILD_DOCS)

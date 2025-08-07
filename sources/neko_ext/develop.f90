@@ -224,7 +224,7 @@ contains
        call ele%facet_order(t_hex, facet_id)
        do n = 1, N_nodes
           v = t_hex%x(n)
-          nodes(:, n) = C%msh%points(v)%x
+          nodes(:, n) = real(C%msh%points(v)%x, kind=rp)
        end do
     end select
 
@@ -255,7 +255,7 @@ contains
          target_temperature, 0.5_rp)
 
     ! Initialize the global interpolation
-    call interpolator%init(neko_case%scalar%dm_xh)
+    call interpolator%init(neko_case%scalars%scalar_fields(1)%dm_xh)
 
     ! Get the list of outlet facets
     call get_facets(neko_case, facet_list)
@@ -287,7 +287,8 @@ contains
 
     ! Find the outlet temperature at the supplied list of points
     call interpolator%find_points_xyz(facet_centers, N_facets)
-    call interpolator%evaluate(temperature_local, neko_case%scalar%s%x)
+    call interpolator%evaluate(temperature_local, &
+         neko_case%scalars%scalar_fields(1)%s%x)
 
     temperature_local = temperature_local - target_temperature
     temperature_mean = average_weighted(temperature_local, facet_area)
