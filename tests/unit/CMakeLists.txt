@@ -17,6 +17,9 @@
 # test is then added to the CMake project using the `add_pfunit_ctest`
 # command, which creates a CTest target for the test. The tests are organized
 # into a "Tests/Unit" folder in the CMake project for better organization.
+#
+# In addition to the simple unit tests using PFUnit, this file also includes
+# the subdirectory for sensitivity tests and other more complex tests.
 
 if (BUILD_TESTING)
     # Ensure that the BUILD_TESTING option is enabled.
@@ -25,10 +28,20 @@ else()
     return()
 endif()
 
+add_custom_target(Unit COMMENT "Build all unit tests.")
+set_target_properties(Unit PROPERTIES
+    FOLDER "Tests/Unit"
+    EXCLUDE_FROM_ALL $<IF:$<BOOL:BUILD_TESTING>,FALSE,TRUE>
+)
+add_dependencies(Tests Unit)
+
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES
     # Add the .pf unit test files here.
 )
+
+# Add the more complex tests that require additional setup or dependencies.
+add_subdirectory(sensitivity)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
@@ -36,6 +49,7 @@ set(PFUNIT_TEST_SOURCES
 if (NOT PFUNIT_TEST_SOURCES)
     return()
 endif()
+
 
 # Find the pFUnit package. This is required to build the unit tests.
 find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
@@ -72,6 +86,7 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
         FOLDER "Tests/Unit"
     )
     set_tests_properties(${test_name} PROPERTIES
-        LABELS "Unit"
+        LABELS "unit"
     )
+    add_dependencies(Unit ${test_name})
 endforeach()
