@@ -208,9 +208,13 @@ program checkpointing_test
   do i = 1, n_timesteps
      call p_fields(i)%free()
      call u_fields(i)%free()
+     call v_fields(i)%free()
+     call w_fields(i)%free()
   end do
   deallocate(p_fields)
   deallocate(u_fields)
+  deallocate(v_fields)
+  deallocate(w_fields)
 
   call opt%free()
   call prob%free()
