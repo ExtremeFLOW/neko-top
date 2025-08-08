@@ -15,7 +15,7 @@ program checkpointing_test
   use chkp_output, only: chkp_output_t
   use field, only: field_t
   use field_math, only: field_copy, field_glsubnorm, field_cfill, field_glsc2
-  use math, only: relcmp, abscmp
+  use math, only: relcmp, abscmp, NEKO_EPS
   use file, only: file_t
   use comm, only: pe_rank
   use mpi_f08, only: MPI_Init, MPI_Wtime
@@ -53,9 +53,9 @@ program checkpointing_test
   real(kind=dp) :: loop_start
 
   ! Objects for the consistency check
-  real(kind=rp) :: norm_ref_p, norm_ref_vel, norm_diff_p, norm_diff_vel
-  real(kind=rp), parameter :: p_tol = 1.0e-9_rp
-  real(kind=rp), parameter :: vel_tol = 1.0e-9_rp
+  real(kind=rp) :: error_p, error_u, error_v, error_w
+
+  logical :: error
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -149,51 +149,56 @@ program checkpointing_test
   sim%loaded_checkpoint = -1
 
   do i = n_timesteps, 1, -1
-     ! do i = sim%first_valid_timestep, n_timesteps
-     if (pe_rank .eq. 0) write(*, '(A,I0)') 'Checking time step ', i
      call sim%restore_state(i)
 
-     ! Compute the l2 norm of the u field and the original one
-     norm_ref_p = sqrt(field_glsc2(p_fields(i), p_fields(i)))
-     norm_ref_vel = (sqrt(field_glsc2(u_fields(i), u_fields(i))) &
-          + sqrt(field_glsc2(v_fields(i), v_fields(i))) &
-          + sqrt(field_glsc2(w_fields(i), w_fields(i)))) / 3.0_rp
-     norm_diff_p = field_glsubnorm(p_fields(i), p)
-     norm_diff_vel = (field_glsubnorm(u_fields(i), u) &
-          + field_glsubnorm(v_fields(i), v) &
-          + field_glsubnorm(w_fields(i), w)) / 3.0_rp
+     !  Compute the relative error of the fields
+     error_p = field_glsubnorm(p_fields(i), p) / &
+          max(sqrt(field_glsc2(p_fields(i), p_fields(i))), NEKO_EPS)
+     error_u = field_glsubnorm(u_fields(i), u) / &
+          max(sqrt(field_glsc2(u_fields(i), u_fields(i))), NEKO_EPS)
+     error_v = field_glsubnorm(v_fields(i), v) / &
+          max(sqrt(field_glsc2(v_fields(i), v_fields(i))), NEKO_EPS)
+     error_w = field_glsubnorm(w_fields(i), w) / &
+          max(sqrt(field_glsc2(w_fields(i), w_fields(i))), NEKO_EPS)
 
+     error = .false.
 
-     if (.not. abscmp(norm_diff_p / norm_ref_p, 0.0_rp, p_tol)) then
+     if (.not. abscmp(error_p, 0.0_rp, NEKO_EPS)) then
+        error = .true.
         write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step pressure: ', i, norm_diff_p
-
-        if (pe_rank .eq. 0) then
-           write(*, '(A,E12.5)') 'Norm difference in pressure: ', norm_diff_p
-           write(*, '(A,E12.5)') 'Norm reference pressure: ', norm_ref_p
-           write(*, '(A,E12.5)') 'Relative difference: ', &
-                norm_diff_p / norm_ref_p
-        end if
-
-        call neko_error(trim(log_msg))
-     else if (.not. abscmp(norm_diff_vel / norm_ref_vel, 0.0_rp, vel_tol)) then
-
-        write(log_msg, '(A,I0,E12.5)') &
-             'Inconsistency found in time step velocity: ', i, norm_diff_vel
+             'Inconsistency found in time step pressure: ', i, error_p
         call neko_warning(trim(log_msg))
+     end if
 
-        if (pe_rank .eq. 0) then
-           write(*, '(A,E12.5)') 'Norm difference in velocity: ', norm_diff_vel
-           write(*, '(A,E12.5)') 'Norm reference velocity: ', norm_ref_vel
-           write(*, '(A,E12.5)') 'Relative difference: ', &
-                norm_diff_p / norm_ref_p
-        end if
+     if (.not. abscmp(error_u, 0.0_rp, NEKO_EPS)) then
+        error = .true.
+        write(log_msg, '(A,I0,E12.5)') &
+             'Inconsistency found in time step velocity u: ', i, error_u
+        call neko_warning(trim(log_msg))
+     end if
 
-        call neko_error(trim(log_msg))
-     else
+     if (.not. abscmp(error_v, 0.0_rp, NEKO_EPS)) then
+        error = .true.
+        write(log_msg, '(A,I0,E12.5)') &
+             'Inconsistency found in time step velocity v: ', i, error_v
+        call neko_warning(trim(log_msg))
+     end if
+
+     if (.not. abscmp(error_w, 0.0_rp, NEKO_EPS)) then
+        error = .true.
+        write(log_msg, '(A,I0,E12.5)') &
+             'Inconsistency found in time step velocity w: ', i, error_w
+        call neko_warning(trim(log_msg))
+     end if
+
+     if (error) then
         if (pe_rank .eq. 0) then
-           write(*, '(A,I0,A)') 'Timestep ', i, ' is consistent'
+           write(*, '(A,E12.5)') '    Error for pressure:   ', error_p
+           write(*, '(A,E12.5)') '    Error for velocity u: ', error_u
+           write(*, '(A,E12.5)') '    Error for velocity v: ', error_v
+           write(*, '(A,E12.5)') '    Error for velocity w: ', error_w
         end if
+        call neko_error('Inconsistency found in the time step')
      end if
   end do
 
