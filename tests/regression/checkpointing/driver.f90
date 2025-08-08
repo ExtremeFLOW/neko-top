@@ -202,6 +202,11 @@ program checkpointing_test
      end if
   end do
 
+  if (pe_rank .eq. 0) then
+     write(*, '(A)') 'All time steps are consistent.'
+     write(*, '(A)') repeat('-', 80)
+  end if
+
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
