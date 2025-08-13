@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 3.0,
-            "timestep": 1e-4
+            "end_time": 0.001,
+            "timestep": 0.001
         },
         "numerics": {
             "time_order": 3,
@@ -94,10 +94,6 @@
             "type": "brinkman",
              "mapping": [
              {
-                 "type": "PDE_filter",
-                 "r": 0.1
-             },
-             {
                  "type": "RAMP",
                  "f_max": 1000
              }
@@ -136,7 +132,14 @@
                 "type": "volume",
                 "mask_name": "optimization_domain",
                 "limit": 0.2,
-                "is_max": false
+                "is_max": false,
+                "mapping": [
+                    {
+                        "type": "PDE_filter",
+                        "r": 0.2,
+                        "tol": 1.0e-15
+                    }
+                ]
             }
         ]
     }

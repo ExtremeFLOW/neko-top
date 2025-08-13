@@ -6,7 +6,7 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 # Define the list of sensitivity tests
 # each of these should be a custom driver.
 set(test_list
-    "minimum_dissipation.f90"
+    "volume_filtered.f90"
 )
 
 # ============================================================================ #

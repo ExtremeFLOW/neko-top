@@ -48,6 +48,8 @@ module mapping_handler
   use device_math, only: device_col2
   use scratch_registry, only: neko_scratch_registry
   use utils, only: neko_warning
+  use vector, only:vector_t
+  use neko_ext, only: field_to_vector, vector_to_field
   implicit none
   private
 
@@ -73,10 +75,16 @@ module mapping_handler
      !> Destructor.
      procedure, pass(this) :: free => mapping_handler_free
      !> Cycle through all the mapping_cascade and return the final field
-     procedure, pass(this) :: apply_forward => mapping_handler_apply_forward
+     generic :: apply_forward => mapping_handler_apply_forward_field, &
+        mapping_handler_apply_forward_vector
+     procedure, pass(this) ::  mapping_handler_apply_forward_field
+     procedure, pass(this) ::  mapping_handler_apply_forward_vector
      !> Cycle backwards through all the mapping_cascade and return the
      !! sensitivity
-     procedure, pass(this) :: apply_backward => mapping_handler_apply_backward
+     generic :: apply_backward => mapping_handler_apply_backward_field, &
+     mapping_handler_apply_backward_vector
+     procedure, pass(this) :: mapping_handler_apply_backward_field
+     procedure, pass(this) :: mapping_handler_apply_backward_vector
      !> Generic interface to add a mapping to the list.
      generic :: add => add_mapping, add_json_mappings
      !> Append a new mapping to the mapping_cascade array.
@@ -119,7 +127,7 @@ contains
   !! @param this The handler object
   !! @param X_out The mapped field (\f$\tilde{\rho}\f$)
   !! @param X_in The unmapped field (\f$\rho\f$)
-  subroutine mapping_handler_apply_forward(this, X_out, X_in)
+  subroutine mapping_handler_apply_forward_field(this, X_out, X_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -153,7 +161,31 @@ contains
     ! free the scratch.
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine mapping_handler_apply_forward
+  end subroutine mapping_handler_apply_forward_field
+
+  !> apply the cascade of mapping_cascade.
+  !! @param this The handler object
+  !! @param X_out The mapped vector (\f$\tilde{\rho}\f$)
+  !! @param X_in The unmapped vector (\f$\rho\f$)
+  subroutine mapping_handler_apply_forward_vector(this, X_out, X_in)
+    class(mapping_handler_t), intent(inout) :: this
+    type(vector_t), intent(in) :: X_in
+    type(vector_t), intent(inout) :: X_out
+    integer :: i
+    type(field_t), pointer :: tmp_fld_in, tmp_fld_out
+    integer :: temp_indices(2)
+
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+
+    call vector_to_field(tmp_fld_in, X_in)
+    call mapping_handler_apply_forward_field(this, tmp_fld_out, tmp_fld_in)
+    call field_to_vector(X_out, tmp_fld_out)
+
+    ! free the scratch.
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine mapping_handler_apply_forward_vector
 
   !> Apply the cascade of mapping_cascade.
   !! @param this The handler object
@@ -161,7 +193,7 @@ contains
   !! (\f$\frac{\partial F}{\partial \rho}\f$)
   !! @param sens_in The sensitivity before applying the chain rule
   !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
-  subroutine mapping_handler_apply_backward(this, sens_out, sens_in)
+  subroutine mapping_handler_apply_backward_field(this, sens_out, sens_in)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), intent(inout) :: sens_out
     type(field_t), intent(in) :: sens_in
@@ -213,7 +245,33 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
 
-  end subroutine mapping_handler_apply_backward
+  end subroutine mapping_handler_apply_backward_field
+
+    !> apply the cascade of mapping_cascade.
+  !! @param this The handler object
+  !! @param sens_out The sensitivity after applying the chain rule
+  !! (\f$\frac{\partial F}{\partial \rho}\f$)
+  !! @param sens_in The sensitivity before applying the chain rule
+  !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
+  subroutine mapping_handler_apply_backward_vector(this, X_out, X_in)
+    class(mapping_handler_t), intent(inout) :: this
+    type(vector_t), intent(in) :: X_in
+    type(vector_t), intent(inout) :: X_out
+    integer :: i
+    type(field_t), pointer :: tmp_fld_in, tmp_fld_out
+    integer :: temp_indices(2)
+
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+
+    call vector_to_field(tmp_fld_in, X_in)
+    call mapping_handler_apply_backward_field(this, tmp_fld_out, tmp_fld_in)
+    call field_to_vector(X_out, tmp_fld_out)
+
+    ! free the scratch.
+    call neko_scratch_registry%relinquish_field(temp_indices)
+
+  end subroutine mapping_handler_apply_backward_vector
 
   !> Read from the json file and initialize the mapping_cascade.
   subroutine mapping_handler_add_json_mappings(this, json, name)

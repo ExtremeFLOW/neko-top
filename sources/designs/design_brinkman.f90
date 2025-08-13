@@ -276,7 +276,6 @@ contains
          gs => simulation%neko_case%fluid%gs_Xh)
 
       if ('mapping' .in. parameters) then
-         call json_extract_object(parameters, 'mapping', json_subdict)
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
       end if
