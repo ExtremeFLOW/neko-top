@@ -116,8 +116,8 @@ module minimum_dissipation_objective
      procedure, public, pass(this) :: init_json_sim => &
           minimum_dissipation_init_json_sim
      !> The direct initializer from attributes.
-     procedure, public, pass(this) :: init_from_components => &
-          minimum_dissipation_init_from_components
+     procedure, public, pass(this) :: init_from_attributes => &
+          minimum_dissipation_init_attributes
      !> Destructor.
      procedure, public, pass(this) :: free => minimum_dissipation_free
      !> Computes the value of the objective function.
@@ -150,7 +150,7 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
 
-    call this%init_from_components(design, simulation, weight, name, mask_name)
+    call this%init_from_attributes(design, simulation, weight, name, mask_name)
   end subroutine minimum_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -160,7 +160,7 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  subroutine minimum_dissipation_init_from_components(this, design, simulation, &
+  subroutine minimum_dissipation_init_attributes(this, design, simulation, &
        weight, name, mask_name)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -199,7 +199,7 @@ contains
        call f%source_term%add_source_term(adjoint_forcing)
     end select
 
-  end subroutine minimum_dissipation_init_from_components
+  end subroutine minimum_dissipation_init_attributes
 
   !> Destructor.
   subroutine minimum_dissipation_free(this)
@@ -258,19 +258,21 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n) / 2.0_rp
+          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
           this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
-               n, this%mask%mask, this%mask%size) / 2.0_rp
+               n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n) /2.0_rp
+               this%C_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n) / 2.0_rp
+          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
        end if
     end if
+
+    this%value = this%value * 0.5_rp
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -282,25 +284,6 @@ contains
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
-
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-
-    ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%u, this%adjoint_u)
-    call field_addcol3(work, this%v, this%adjoint_v)
-    call field_addcol3(work, this%w, this%adjoint_w)
-    ! but negative
-    call field_cmult(work, -1.0_rp)
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
-    else
-       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
-    end if
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_update_sensitivity
 
