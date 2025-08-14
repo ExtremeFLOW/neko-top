@@ -1,31 +1,31 @@
 # Define the CTest for sensitivity
-
-# Set the CMake folder for organization
 set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
-# Define the list of sensitivity tests
-# each of these should be a custom driver.
+# Provide a list of case files instead of .f90 files
 set(test_list
-    "volume_filtered.f90"
+    "lube_term.case"
+    "minimum_dissipation.case"
+    "min_dis_and_lube.case"
+    "min_dis_and_lube_weights.case"
 )
+
+# Path to the common driver source
+set(SENSITIVITY_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90)
 
 # ============================================================================ #
 # Ensure the neko library is found correctly
-
-# Get the Neko-TOP module directory
 get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
 
 # ============================================================================ #
-# Define the test preparation to be run before the test
-# This test requires the neko library to be built and installed
-
-# Ensure everything is built before running the test
+# Preparation target
 add_custom_target(sensitivity_test_prepare
-    COMMENT "Preparing sensitivity test files")
+    COMMENT "Preparing sensitivity test files"
+)
 
-# Ensure the sensitivity utils library is built
+# Sensitivity utils library
 add_library(sensitivity_utils EXCLUDE_FROM_ALL
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90)
+    ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
+)
 target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
 target_link_libraries(sensitivity_utils
     PUBLIC
@@ -38,25 +38,14 @@ target_link_libraries(sensitivity_utils
 )
 add_dependencies(sensitivity_test_prepare sensitivity_utils)
 
-# Locate the case file
-add_custom_target(
-    sensitivity_case_file
-    COMMENT "Copying case file to the test directory"
-    SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.case
-    BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/sensitivity.case
-    COMMAND
-        ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.case
-        ${CMAKE_CURRENT_BINARY_DIR}/sensitivity.case
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-)
-
-# Ensure the Neko binaries can be added to the PATH and the library directories
+# ============================================================================ #
+# Neko environment
 set(neko_PATH "${neko_PREFIX}/bin:$ENV{PATH}")
 string(REPLACE ";" ":"
-    neko_LD_LIBRARY_PATH "${neko_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}")
+    neko_LD_LIBRARY_PATH "${neko_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}"
+)
 
-# If a prepare script exists, copy it to the test directory and run it
+# Prepare script (if exists)
 add_custom_target(
     sensitivity_prepare_script
     COMMENT "Copying and execute prepare script"
@@ -71,42 +60,52 @@ add_custom_target(
         ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-
-# ============================================================================ #
-# Define the dependency list
-
-# Ensure the test preparation is run before the test
-add_dependencies(Unit sensitivity_test_prepare)
-add_dependencies(sensitivity_test_prepare sensitivity_case_file)
 add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 
 # ============================================================================ #
-# Define the test itself
+# Build the single driver executable
+add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
+    ${SENSITIVITY_DRIVER}
+)
+target_link_libraries(problem_tester_sensitivity_bin
+    sensitivity_utils
+)
+add_dependencies(Unit problem_tester_sensitivity_bin)
 
-foreach(test ${test_list})
-    # Extract the test name from the file name
-    get_filename_component(test_name ${test} NAME_WE)
-    add_executable(${test_name}_sensitivity_bin EXCLUDE_FROM_ALL
-        ${CMAKE_CURRENT_SOURCE_DIR}/${test}
-    )
-    target_link_libraries(${test_name}_sensitivity_bin
-        sensitivity_utils
-    )
-    add_dependencies(Unit ${test_name}_sensitivity_bin)
+# ============================================================================ #
+# Loop over all case files and create tests
+foreach(case_file ${test_list})
+    # Get the case name without extension
+    get_filename_component(case_name ${case_file} NAME_WE)
 
-    # Add the test to CTest
-    add_test(NAME ${test_name}_sensitivity
-        COMMAND $<TARGET_FILE:${test_name}_sensitivity_bin> sensitivity.case
+    # Copy case file
+    add_custom_target(
+        ${case_name}_case_file
+        COMMENT "Copying case file ${case_file} to the test directory"
+        SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
+        BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
+        COMMAND
+            ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
+            ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    set_tests_properties(${test_name}_sensitivity
+    add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
+
+    # Add test for this case
+    add_test(NAME ${case_name}_sensitivity
+        COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_file}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    )
+    set_tests_properties(${case_name}_sensitivity
         PROPERTIES
-            DEPENDS "${test_name}_sensitivity_bin;sensitivity_test_prepare"
+            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 5000
-    )
-    set_target_properties(${test_name}_sensitivity_bin PROPERTIES
-        FOLDER "Tests/Unit/Sensitivity"
+            TIMEOUT 300
     )
 endforeach()
+
+# ============================================================================ #
+# Final dependencies
+add_dependencies(Unit sensitivity_test_prepare)
