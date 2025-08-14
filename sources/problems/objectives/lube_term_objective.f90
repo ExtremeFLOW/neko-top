@@ -91,9 +91,6 @@ module lube_term_objective
   type, public, extends(objective_t) :: lube_term_objective_t
      private
 
-     !> The coefficient for the lube term.
-     real(kind=rp) :: K
-
      !> Pointer to the u field.
      type(field_t), pointer :: u => null()
      !> Pointer to the v field.
@@ -138,15 +135,14 @@ contains
 
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
-    real(kind=rp) :: weight, K
+    real(kind=rp) :: weight
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Out of plane stresses")
-    call json_get_or_default(json, "K", K, 1.0_rp)
 
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, K)
+         mask_name)
   end subroutine lube_term_init_json_sim
 
   !> The actual constructor.
@@ -156,23 +152,18 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  !! @param K the coefficient for the lube term.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       name, mask_name, K)
+       name, mask_name)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
-    real(kind=rp), intent(in) :: K
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
-
-    ! Set the coefficient for the lube term
-    this%K = K
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
@@ -198,7 +189,7 @@ contains
          c_Xh => simulation%adjoint_fluid%c_Xh)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%k * this%weight, this%u, this%v, this%w, this%mask, &
+           this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, c_Xh)
 
     end associate
@@ -235,11 +226,6 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! it's becoming so stupid to pass the whole fluid and adjoint and
-    ! design through
-    ! I feel like every objective function should have internal pointers to
-    ! u,v,w and u_adj, v_adj, w_adj and perhaps the design
-    ! (the whole design, so we get all the coeffients)
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
     call field_addcol3(work, this%w, this%w)
@@ -262,7 +248,7 @@ contains
           this%value = glsc2(work%x, this%c_Xh%B, design%size())
        end if
     end if
-    this%value = 0.5 * this%K * this%value
+    this%value = 0.5 * this%value
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -278,18 +264,13 @@ contains
     integer :: temp_indices(1)
 
     ! if we have the lube term we also get an extra term in the sensitivity
-    ! K * u^2
-    ! TODO
-    ! omfg be so careful with non-dimensionalization etc
-    ! I bet this is scaled a smidge wrong (ie, track if it's 1/2 or not etc)
-    ! do this later
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
     call field_addcol3(work, this%w, this%w)
-    call field_cmult(work, this%K)
+    call field_cmult(work, this%weight * 0.5_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
