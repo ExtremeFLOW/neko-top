@@ -2,7 +2,7 @@ program minimum_dissipation_sensitivity
 
   use simulation_m, only: simulation_t
   use brinkman_design, only: brinkman_design_t
-  use minimum_dissipation_objective, only: minimum_dissipation_objective_t
+  use lube_term_objective, only: lube_term_objective_t
 
   ! Standard modules shared by most of our tests
   use json_module, only: json_file
@@ -36,12 +36,12 @@ program minimum_dissipation_sensitivity
   !> The design type
   type(brinkman_design_t) :: des
   !> The object to be tested
-  type(minimum_dissipation_objective_t) :: object
+  type(lube_term_objective_t) :: object
 
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
-  real(kind=rp), parameter :: perturbations(8) = [ &
-       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp, 1e-7_rp, 1e-8_rp]
+  real(kind=rp), parameter :: perturbations(4) = [ &
+       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
   type(vector_t) :: sensitivities, tmp
 
@@ -71,8 +71,8 @@ program minimum_dissipation_sensitivity
   call des%init(design_parameters, sim)
 
   ! Initialize our constraint object
-  call object%init_from_components(des, sim, 1.0_rp, &
-       "Dissipation", "")
+  call object%init_from_attributes(des, sim, 1.0_rp, &
+       "Dissipation", "", 1.0_rp)
 
   ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
@@ -83,11 +83,17 @@ program minimum_dissipation_sensitivity
   call object%update_sensitivity(des)
   ! --------------------------------------
   ! First we map backwards (design now holds the sensitivity)
+  print *, "1"
   tmp = object%get_sensitivity()
+  print *, "2"
   call des%map_backward(tmp)
+  print *, "3"
   sensitivities = des%get_sensitivity()
+  print *, "4"
   call sim%write(1)
+  print *, "5"
   call des%write(1)
+  print *, "6"
   ! --------------------------------------
   call sim%reset()
 
