@@ -9,6 +9,7 @@ module sensitivity
   use neko_config, only: NEKO_BCKND_DEVICE
   use problem, only : problem_t
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
+  use csv_file, only : csv_file_t
   implicit none
 
   interface compute_sensitivity
@@ -118,7 +119,7 @@ contains
   end subroutine compute_sensitivity_list
 
   subroutine compute_problem_sensitivity_i(problem, sim, des, target_sensitivities, i, &
-       perturbations, tolerance)
+       perturbations, tolerance, file_name)
     class(problem_t), intent(inout) :: problem
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
@@ -126,15 +127,17 @@ contains
     integer, intent(in) :: i
     real(kind=rp), intent(in) :: perturbations(:)
     real(kind=rp), intent(in) :: tolerance
+    character(len=*), intent(in) :: file_name
 
     character(len=*), parameter :: fmt_head = '(4X,A12,4X,A10,6X,A11,5X,A5,10X)'
     character(len=*), parameter :: fmt_data = '(4X,4E15.6E3)'
 
     integer :: n_perturbations, ip
     real(kind=rp) :: perturb, tol
-    type(vector_t) :: design_vector, design_perturbed
+    type(vector_t) :: design_vector, design_perturbed, log_data
     real(kind=rp) :: constraint, perturbed_constraint
     real(kind=rp) :: fd_estimate, fd_error
+    type(csv_file_t) :: logger
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
@@ -155,6 +158,11 @@ contains
          'Location [', des%get_x(i), des%get_y(i), des%get_z(i), ']'
     write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
     write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
+
+    ! Init the csv writer
+    call logger%init('FD_check_'//trim(file_name)//'.csv')
+    call logger%set_header('perturbation,F,dFdx,error')
+    call log_data%init(4)
 
     n_perturbations = size(perturbations)
     do ip = 1, n_perturbations
@@ -189,6 +197,12 @@ contains
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
+       log_data%x(1) = perturb
+       log_data%x(2) = perturbed_constraint
+       log_data%x(3) = fd_estimate
+       log_data%x(4) = fd_error
+       call logger%write(log_data)
+
        if (abs(fd_error) .gt. tol) then
           !call neko_error('Finite difference estimate does not match ' // &
           !     'sensitivity')
@@ -198,7 +212,7 @@ contains
   end subroutine compute_problem_sensitivity_i
 
   subroutine compute_problem_sensitivity_list(problem, sim, des, target_sensitivities, &
-       list, perturbations, tolerance)
+       list, perturbations, tolerance, file_name)
     class(problem_t), intent(inout) :: problem
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
@@ -206,13 +220,14 @@ contains
     integer, dimension(:), intent(in) :: list
     real(kind=rp), dimension(:), intent(in) :: perturbations
     real(kind=rp), intent(in) :: tolerance
+    character(len=*), intent(in) :: file_name
 
     integer :: i, n
 
     n = size(list)
     do i = 1, n
        call compute_problem_sensitivity_i(problem, sim, des, target_sensitivities, &
-            list(i), perturbations, tolerance)
+            list(i), perturbations, tolerance, file_name)
     end do
   end subroutine compute_problem_sensitivity_list
 

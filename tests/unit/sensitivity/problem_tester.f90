@@ -43,7 +43,7 @@ program minimum_dissipation_sensitivity
   real(kind=rp), parameter :: perturbations(8) = [ &
        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp, 1e-7_rp, 1e-8_rp]
 
-  type(vector_t) :: sensitivities, tmp
+  type(vector_t) :: sensitivities, tmp, log_data
 
   integer :: i_max
 
@@ -95,7 +95,7 @@ program minimum_dissipation_sensitivity
   ! the sensitivity computed by our method.
 
   call compute_sensitivity(prob, sim, des, &
-       sensitivities, i_max, perturbations, tolerance)
+       sensitivities, i_max, perturbations, tolerance, trim(parameter_file))
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
