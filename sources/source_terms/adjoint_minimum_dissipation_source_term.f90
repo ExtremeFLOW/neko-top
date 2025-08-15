@@ -54,13 +54,15 @@ module adjoint_minimum_dissipation_source_term
   use num_types, only: rp
   use field, only: field_t
   use field_registry, only: neko_field_registry
-  use math, only: rzero, copy, chsign, invcol2
-  use device_math, only: device_copy, device_cmult, device_invcol2
+  use math, only: rzero, copy, chsign, cfill, invcol2
+  use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: opgrad, cdtp
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
+  use ax_product, only : ax_t, ax_helm_factory
+
   implicit none
   private
 
@@ -80,6 +82,8 @@ module adjoint_minimum_dissipation_source_term
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
+     !> an ax_helm type to compute weak laplacian
+     class(ax_t), allocatable :: Ax
 
    contains
      !> The common constructor using a JSON object.
@@ -169,6 +173,9 @@ contains
        this%mask => mask
     end if
 
+    ! Initialize the ax_helm object
+    call ax_helm_factory(this%Ax, full_formulation = .false.)
+
   end subroutine adjoint_minimum_dissipation_source_term_init_from_components
 
   !> Destructor.
@@ -188,12 +195,9 @@ contains
     integer, intent(in) :: tstep
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
-    type(field_t), pointer :: dudx, dudy, dudz
-    type(field_t), pointer :: dvdx, dvdy, dvdz
-    type(field_t), pointer :: dwdx, dwdy, dwdz
     type(field_t), pointer :: work, result
     type(field_t), pointer :: t1 , t2
-    integer :: temp_indices(11)
+    integer :: temp_indices(2)
     integer n
 
 
@@ -203,54 +207,30 @@ contains
 
     n = fu%size()
 
-    ! fuck I'm not sure about this... I need a pen and paper
-    ! also there should be a way to pre-process this forcing term...
-    ! instead of recalculating it every time
     u => this%u
     v => this%v
     w => this%w
-    call neko_scratch_registry%request_field(dudx, temp_indices(1))
-    call neko_scratch_registry%request_field(dudy, temp_indices(2))
-    call neko_scratch_registry%request_field(dudz, temp_indices(3))
-    call neko_scratch_registry%request_field(dvdx, temp_indices(4))
-    call neko_scratch_registry%request_field(dvdy, temp_indices(5))
-    call neko_scratch_registry%request_field(dvdz, temp_indices(6))
-    call neko_scratch_registry%request_field(dwdx , temp_indices(7))
-    call neko_scratch_registry%request_field(dwdy , temp_indices(8))
-    call neko_scratch_registry%request_field(dwdz , temp_indices(9))
-    call neko_scratch_registry%request_field(work , temp_indices(10))
-    call neko_scratch_registry%request_field(result , temp_indices(11))
+
+    call neko_scratch_registry%request_field(work , temp_indices(1))
+    call neko_scratch_registry%request_field(result , temp_indices(2))
+
+    associate(coef => this%coef)
 
 
-    ! The forcing term, in weak form is \nabla u . \nabla v 
-    ! Note that in neko all forces are assumed to be in strong form and are
-    ! hence multiplied with the mass matrix before adding to the RHS, which
-    ! we need to undo in preparation.
-    !
-    ! Discretely this is D^T G D u (see Deville pg)
-
-    associate (coef => this%coef)
-
-    ! G D u
-    call opgrad(dudx%x, dudy%x, dudz%x, u%x, coef)
-    call opgrad(dvdx%x, dvdy%x, dvdz%x, v%x, coef)
-    call opgrad(dwdx%x, dwdy%x, dwdz%x, w%x, coef)
-
+    ! note that axhelm computes h1 * lap u + h2 * u
+    ! we set h1 = 1 and h2 = 0 to compute the weak laplacian.
     if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_col2(dudx%x_d, coef%g_11_d, result%size())
-        call device_col2(dudx%x_d, coef%g_11_d, result%size())
+        call device_cfill(coef%h1_d, 1.0_rp, n)
+        call device_cfill(coef%h2_d, 0.0_rp, n)
     else
-        call invcol2(result%x, coef%B, result%size())
+        call cfill(coef%h1, 1.0_rp, n)
+        call cfill(coef%h2, 0.0_rp, n)
     end if
-    !--------------------------
-    ! u component of D^T G D u
-    call field_rzero(result)
-    call cdtp(work%x, dudx%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dvdx%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dwdx%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
-    call field_add2(result, work)
+    coef%ifh2 = .false.
+
+    ! u
+    ! --------------------------------------------------------------------------
+    call  this%Ax%compute(result%x, u%x, coef, coef%msh, coef%xh)
 
     ! pre-divide out the mass matrix to counteract it's multiplication
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -267,15 +247,9 @@ contains
     ! add to RHS
     call field_add2s2(fu, result, this%obj_scale)
 
-    !--------------------------
-    ! v component of D^T G D u
-    call field_rzero(result)
-    call cdtp(work%x, dudy%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dvdy%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dwdy%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
-    call field_add2(result, work)
+    ! v
+    ! --------------------------------------------------------------------------
+    call  this%Ax%compute(result%x, v%x, coef, coef%msh, coef%xh)
 
     ! pre-divide out the mass matrix to counteract it's multiplication
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -292,15 +266,9 @@ contains
     ! add to RHS
     call field_add2s2(fv, result, this%obj_scale)
 
-    !--------------------------
-    ! w component of D^T G D u
-    call field_rzero(result)
-    call cdtp(work%x, dudz%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dvdz%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
-    call field_add2(result, work)
-    call cdtp(work%x, dwdz%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
-    call field_add2(result, work)
+    ! w
+    ! --------------------------------------------------------------------------
+    call  this%Ax%compute(result%x, w%x, coef, coef%msh, coef%xh)
 
     ! pre-divide out the mass matrix to counteract it's multiplication
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -317,9 +285,9 @@ contains
     ! add to RHS
     call field_add2s2(fw, result, this%obj_scale)
 
-    end associate
-
     call neko_scratch_registry%relinquish_field(temp_indices)
+
+    end associate
 
   end subroutine adjoint_minimum_dissipation_source_term_compute
 
