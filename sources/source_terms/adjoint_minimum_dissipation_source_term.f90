@@ -46,7 +46,7 @@ module adjoint_minimum_dissipation_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error
   use field, only: field_t
-  use field_math, only: field_subcol3, field_add2, field_add2s2
+  use field_math, only: field_subcol3, field_add2, field_add2s2, field_rzero
   use json_module, only: json_file
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
@@ -54,10 +54,10 @@ module adjoint_minimum_dissipation_source_term
   use num_types, only: rp
   use field, only: field_t
   use field_registry, only: neko_field_registry
-  use math, only: rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
+  use math, only: rzero, copy, chsign, invcol2
+  use device_math, only: device_copy, device_cmult, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl
+  use operators, only: opgrad, cdtp
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
@@ -188,12 +188,12 @@ contains
     integer, intent(in) :: tstep
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
-    !type(field_t), pointer :: dudx, dudy, dudz
-    !type(field_t), pointer :: dvdx, dvdy, dvdz
-    !type(field_t), pointer :: dwdx, dwdy, dwdz
-    type(field_t), pointer :: wo1, wo2, wo3, wo4, wo5, wo6
+    type(field_t), pointer :: dudx, dudy, dudz
+    type(field_t), pointer :: dvdx, dvdy, dvdz
+    type(field_t), pointer :: dwdx, dwdy, dwdz
+    type(field_t), pointer :: work, result
     type(field_t), pointer :: t1 , t2
-    integer :: temp_indices(8)
+    integer :: temp_indices(11)
     integer n
 
 
@@ -209,50 +209,115 @@ contains
     u => this%u
     v => this%v
     w => this%w
-    call neko_scratch_registry%request_field(wo1, temp_indices(1))
-    call neko_scratch_registry%request_field(wo2, temp_indices(2))
-    call neko_scratch_registry%request_field(wo3, temp_indices(3))
-    call neko_scratch_registry%request_field(wo4, temp_indices(4))
-    call neko_scratch_registry%request_field(wo5, temp_indices(5))
-    call neko_scratch_registry%request_field(wo6, temp_indices(6))
-    call neko_scratch_registry%request_field(t1 , temp_indices(7))
-    call neko_scratch_registry%request_field(t2 , temp_indices(8))
+    call neko_scratch_registry%request_field(dudx, temp_indices(1))
+    call neko_scratch_registry%request_field(dudy, temp_indices(2))
+    call neko_scratch_registry%request_field(dudz, temp_indices(3))
+    call neko_scratch_registry%request_field(dvdx, temp_indices(4))
+    call neko_scratch_registry%request_field(dvdy, temp_indices(5))
+    call neko_scratch_registry%request_field(dvdz, temp_indices(6))
+    call neko_scratch_registry%request_field(dwdx , temp_indices(7))
+    call neko_scratch_registry%request_field(dwdy , temp_indices(8))
+    call neko_scratch_registry%request_field(dwdz , temp_indices(9))
+    call neko_scratch_registry%request_field(work , temp_indices(10))
+    call neko_scratch_registry%request_field(result , temp_indices(11))
 
-    ! TODO
-    ! ok we're computing gradients at every timestep... which is stupid...
-    ! BUT
-    ! if this was unsteady we would have to do this.
 
-    ! TODO
-    ! this is cheating a little bit...
-    ! in strong form, \nabla u . \nabla v => - v . \nabla^2 u + bdry
+    ! The forcing term, in weak form is \nabla u . \nabla v 
+    ! Note that in neko all forces are assumed to be in strong form and are
+    ! hence multiplied with the mass matrix before adding to the RHS, which
+    ! we need to undo in preparation.
     !
-    ! we can do this properly later in weak form, ideally using ax_helm or so
-    !
-    ! for now we'll work in strong form and ignore the bdry
-    ! and suffer the double derivative :/
-    !
-    ! in fact, we'll go even quicker and use
-    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u ))
-    ! and assume divergence free u
+    ! Discretely this is D^T G D u (see Deville pg)
 
-    ! => - \nabla ^2 u =  curl ( curl (u ))
+    associate (coef => this%coef)
 
-    call curl(wo1, wo2, wo3, u, v, w, t1, t2, this%coef)
-    call curl(wo4, wo5, wo6, wo1, wo2, wo3, t1, t2, this%coef)
+    ! G D u
+    call opgrad(dudx%x, dudy%x, dudz%x, u%x, coef)
+    call opgrad(dvdx%x, dvdy%x, dvdz%x, v%x, coef)
+    call opgrad(dwdx%x, dwdy%x, dwdz%x, w%x, coef)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_col2(dudx%x_d, coef%g_11_d, result%size())
+        call device_col2(dudx%x_d, coef%g_11_d, result%size())
+    else
+        call invcol2(result%x, coef%B, result%size())
+    end if
+    !--------------------------
+    ! u component of D^T G D u
+    call field_rzero(result)
+    call cdtp(work%x, dudx%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dvdx%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dwdx%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
+    call field_add2(result, work)
+
+    ! pre-divide out the mass matrix to counteract it's multiplication
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_invcol2(result%x_d, coef%B_d, result%size())
+    else
+        call invcol2(result%x, coef%B, result%size())
+    end if
 
     ! mask
     if (this%if_mask) then
-       call mask_exterior_const(wo4, this%mask, 0.0_rp)
-       call mask_exterior_const(wo5, this%mask, 0.0_rp)
-       call mask_exterior_const(wo6, this%mask, 0.0_rp)
+       call mask_exterior_const(result, this%mask, 0.0_rp)
     end if
 
-    call field_add2s2(fu, wo4, this%obj_scale)
-    call field_add2s2(fv, wo5, this%obj_scale)
-    call field_add2s2(fw, wo6, this%obj_scale)
+    ! add to RHS
+    call field_add2s2(fu, result, this%obj_scale)
 
-    ! don't worry... we'll write this MUCH cleaner in the final version
+    !--------------------------
+    ! v component of D^T G D u
+    call field_rzero(result)
+    call cdtp(work%x, dudy%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dvdy%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dwdy%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
+    call field_add2(result, work)
+
+    ! pre-divide out the mass matrix to counteract it's multiplication
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_invcol2(result%x_d, coef%B_d, result%size())
+    else
+        call invcol2(result%x, coef%B, result%size())
+    end if
+
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(result, this%mask, 0.0_rp)
+    end if
+
+    ! add to RHS
+    call field_add2s2(fv, result, this%obj_scale)
+
+    !--------------------------
+    ! w component of D^T G D u
+    call field_rzero(result)
+    call cdtp(work%x, dudz%x, coef%drdx, coef%dsdx, coef%dtdx, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dvdz%x, coef%drdy, coef%dsdy, coef%dtdy, coef)
+    call field_add2(result, work)
+    call cdtp(work%x, dwdz%x, coef%drdz, coef%dsdz, coef%dtdz, coef)
+    call field_add2(result, work)
+
+    ! pre-divide out the mass matrix to counteract it's multiplication
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_invcol2(result%x_d, coef%B_d, result%size())
+    else
+        call invcol2(result%x, coef%B, result%size())
+    end if
+
+    ! mask
+    if (this%if_mask) then
+       call mask_exterior_const(result, this%mask, 0.0_rp)
+    end if
+
+    ! add to RHS
+    call field_add2s2(fw, result, this%obj_scale)
+
+    end associate
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
