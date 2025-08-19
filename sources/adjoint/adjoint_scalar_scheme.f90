@@ -63,7 +63,7 @@ module adjoint_scalar_scheme
   use user_intf, only : user_t, dummy_user_material_properties, &
        user_material_properties_intf
   use utils, only : neko_error, neko_warning
-  use comm, only: NEKO_COMM, MPI_INTEGER, MPI_SUM
+  use comm, only: NEKO_COMM
   use scalar_source_term, only : scalar_source_term_t
   use field_series, only : field_series_t
   use math, only : cfill, add2s2
@@ -80,6 +80,7 @@ module adjoint_scalar_scheme
   use time_state, only : time_state_t
   use device, only : device_memcpy, DEVICE_TO_HOST
   use field_math, only : field_col3, field_cmult2, field_add2, field_cfill
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
