@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0,
+            "end_time": 2.0,
             "timestep": 1.0e-4
         },
         "numerics": {
@@ -40,7 +40,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-16,
                 "max_iterations": 800
             },
             "pressure_solver": {
@@ -48,7 +48,7 @@
                 "preconditioner": {
                     "type": "hsmg"
                 },
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-12,
                 "max_iterations": 800
             },
             "boundary_conditions": [
@@ -63,7 +63,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-6,
+                "tol": 1e-14,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
@@ -93,10 +93,6 @@
         "design": {
             "type": "brinkman",
              "mapping": [
-                {
-                    "type": "PDE_filter",
-                    "r": 0.2
-                },
              {
                  "type": "RAMP",
                  "f_max": 100
@@ -132,14 +128,6 @@
             {
                 "type": "lube_term",
                 "weight": 1.0,
-            }
-        ],
-        "constraints": [
-            {
-                "type": "volume",
-                "mask_name": "optimization_domain",
-                "limit": 0.2,
-                "is_max": false,
             }
         ]
     }
