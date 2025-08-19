@@ -149,8 +149,7 @@
             },
             {
                 "type": "lube_term",
-                "weight": 1.0,
-                "K": 10.0
+                "weight": 1.0
             }
         ],
         "constraints": [
