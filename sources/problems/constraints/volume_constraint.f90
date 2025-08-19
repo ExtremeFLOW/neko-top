@@ -114,11 +114,10 @@ contains
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
-    type(json_file) :: json_subdict
 
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
-    logical :: is_max, has_mask
+    logical :: is_max
     real(kind=rp) :: limit
 
     call json_get_or_default(json, "name", name, "Volume constraint")
