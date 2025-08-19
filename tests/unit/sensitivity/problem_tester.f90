@@ -19,7 +19,7 @@ program minimum_dissipation_sensitivity
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp
+  use math, only: abscmp, copy
   use sensitivity, only: compute_sensitivity
   implicit none
 
@@ -40,12 +40,19 @@ program minimum_dissipation_sensitivity
 
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
+!   real(kind=rp), parameter :: perturbations(8) = [ &
+!        1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp, 1e-7_rp, 1e-8_rp]
   real(kind=rp), parameter :: perturbations(8) = [ &
-       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp, 1e-7_rp, 1e-8_rp]
+       5e-1_rp, 1e-1_rp, 5e-2_rp, 1e-2_rp, 5e-3_rp, 1e-3_rp, 5e-4_rp, 1e-4_rp]
 
   type(vector_t) :: sensitivities, tmp, log_data
+  type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
+
+  ! True => testing an objective, F => testing a constraint
+  logical :: is_objective
+  character(len=12) :: nobj_str, ncon_str
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -72,11 +79,34 @@ program minimum_dissipation_sensitivity
   call prob%init(parameters, des, sim)
 
   ! -------------------------------------------------------------------------- !
+  ! Determine if objective or constraint
+  if ((prob%get_n_objectives() .gt. 0) .and. (prob%get_n_constraints() .eq. 0)) then
+     is_objective = .true.
+  else if (prob%get_n_constraints() .eq. 1) then
+     ! note we always have a dummy objective
+     is_objective = .false.
+  else
+     write(nobj_str, '(I0)') prob%get_n_objectives()
+     write(ncon_str, '(I0)') prob%get_n_constraints()
+     call neko_error("Specify a) a single constraint b) multiple " // &
+        "objectives. You have" // nobj_str // &
+        "objectives and " // ncon_str // " constraints.")
+  end if
+
+  ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
 
   call prob%compute(des, sim)
   call prob%compute_sensitivity(des, sim)
-  sensitivities = des%get_sensitivity()
+  if (is_objective) then
+     sensitivities = des%get_sensitivity()
+  else
+     call prob%get_constraint_sensitivities(constraint_sensitivity)
+     call sensitivities%init(constraint_sensitivity%size())
+     call copy(sensitivities%x, constraint_sensitivity%x, &
+        constraint_sensitivity%size())
+  end if
+
   call des%write(1)
   ! --------------------------------------
   ! Reset the simulation
@@ -88,14 +118,15 @@ program minimum_dissipation_sensitivity
           DEVICE_TO_HOST, .true.)
   end if
 
+  ! BE SO CAREFUL THIS DOESN*T WORK IN PARALLEL !
   i_max = maxloc(abs(sensitivities%x), dim=1)
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
   ! the sensitivity computed by our method.
 
-  call compute_sensitivity(prob, sim, des, &
-       sensitivities, i_max, perturbations, tolerance, trim(parameter_file))
+  call compute_sensitivity(prob, sim, des, sensitivities, &
+       i_max, perturbations, tolerance, trim(parameter_file), is_objective)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components

@@ -119,7 +119,7 @@ contains
   end subroutine compute_sensitivity_list
 
   subroutine compute_problem_sensitivity_i(problem, sim, des, target_sensitivities, i, &
-       perturbations, tolerance, file_name)
+       perturbations, tolerance, file_name, is_objective)
     class(problem_t), intent(inout) :: problem
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
@@ -128,13 +128,14 @@ contains
     real(kind=rp), intent(in) :: perturbations(:)
     real(kind=rp), intent(in) :: tolerance
     character(len=*), intent(in) :: file_name
+    logical, intent(in) :: is_objective
 
     character(len=*), parameter :: fmt_head = '(4X,A12,4X,A10,6X,A11,5X,A5,10X)'
     character(len=*), parameter :: fmt_data = '(4X,4E15.6E3)'
 
     integer :: n_perturbations, ip
     real(kind=rp) :: perturb, tol
-    type(vector_t) :: design_vector, design_perturbed, log_data
+    type(vector_t) :: design_vector, design_perturbed, log_data, constraint_vec
     real(kind=rp) :: constraint, perturbed_constraint
     real(kind=rp) :: fd_estimate, fd_error
     type(csv_file_t) :: logger
@@ -142,7 +143,14 @@ contains
     ! Get the design vector for reference
     ! This is the design vector we will perturb
     design_vector = des%get_values()
-    call problem%get_objective_value(constraint)
+
+    if (is_objective) then
+       call problem%get_objective_value(constraint)
+    else
+       call problem%get_constraint_values(constraint_vec)
+       constraint = constraint_vec%x(1)
+    end if
+    
     call design_perturbed%init(design_vector%size())
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -184,6 +192,12 @@ contains
        ! Compute the objective value of the perturbed design
        call problem%compute(des, sim)
        call problem%get_objective_value(perturbed_constraint)
+           if (is_objective) then
+               call problem%get_objective_value(perturbed_constraint)
+            else
+               call problem%get_constraint_values(constraint_vec)
+               perturbed_constraint = constraint_vec%x(1)
+            end if
        call sim%write(ip)
        call sim%reset()
 
@@ -212,7 +226,7 @@ contains
   end subroutine compute_problem_sensitivity_i
 
   subroutine compute_problem_sensitivity_list(problem, sim, des, target_sensitivities, &
-       list, perturbations, tolerance, file_name)
+       list, perturbations, tolerance, file_name, is_objective)
     class(problem_t), intent(inout) :: problem
     type(simulation_t), intent(inout) :: sim
     class(design_t), intent(inout) :: des
@@ -221,13 +235,14 @@ contains
     real(kind=rp), dimension(:), intent(in) :: perturbations
     real(kind=rp), intent(in) :: tolerance
     character(len=*), intent(in) :: file_name
+    logical, intent(in) :: is_objective
 
     integer :: i, n
 
     n = size(list)
     do i = 1, n
        call compute_problem_sensitivity_i(problem, sim, des, target_sensitivities, &
-            list(i), perturbations, tolerance, file_name)
+            list(i), perturbations, tolerance, file_name, is_objective)
     end do
   end subroutine compute_problem_sensitivity_list
 

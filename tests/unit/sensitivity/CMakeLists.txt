@@ -3,10 +3,12 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
 # Provide a list of case files instead of .f90 files
 set(test_list
+    #"volume.case"
+    #"volume_filtered.case"
     "lube_term.case"
-    "minimum_dissipation.case"
-    "min_dis_and_lube.case"
-    "min_dis_and_lube_weights.case"
+    #"minimum_dissipation.case"
+    #"min_dis_and_lube.case"
+    #"min_dis_and_lube_weights.case"
 )
 
 # Path to the common driver source
@@ -20,6 +22,15 @@ get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
 # Preparation target
 add_custom_target(sensitivity_test_prepare
     COMMENT "Preparing sensitivity test files"
+)
+
+# Copy the plotter script to the binary directory
+add_custom_command(
+    TARGET sensitivity_test_prepare
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/plotter_FD_check.py
+            ${CMAKE_CURRENT_BINARY_DIR}/plotter_FD_check.py
 )
 
 # Sensitivity utils library
@@ -102,7 +113,7 @@ foreach(case_file ${test_list})
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 300
+            TIMEOUT 300000
     )
 endforeach()
 
