@@ -592,16 +592,6 @@ contains
 
     call this%mapping%apply_backward(this%sensitivity, tmp_fld)
 
-    ! TODO
-    ! DELETE THIS LATER
-    !
-    ! When Abbas writes the interface for the optimization
-    ! module this may be a moot point, because we would only really collect
-    ! the sensitivity of the design variables inside the mask.
-    !
-    ! Note for Abbas,
-    ! I'm NOT doing this because I'm too lazy and I just need masks so I can
-    ! test something in the passive scalar.
     if (this%has_mask) then
        call mask_exterior_const(this%sensitivity, this%optimization_domain, &
             0.0_rp)

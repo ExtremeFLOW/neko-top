@@ -64,8 +64,6 @@ module mapping_handler
      !! @note the order really matter's here since they'll be executed in
      !! sequence.
      class(mapping_wrapper_t), allocatable :: mapping_cascade(:)
-     !> The right-hand side.
-     type(field_list_t) :: rhs_fields
      !> The coefficients of the (space, mesh) pair.
      type(coef_t), pointer :: coef
 
