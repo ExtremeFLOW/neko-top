@@ -14,6 +14,7 @@ module mma_optimizer
 
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use vector_math, only: vector_add2, vector_cmult
 
   !only to print nglobal when running in parallel
   use comm, only: neko_comm, pe_rank
@@ -23,8 +24,8 @@ module mma_optimizer
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
-  use math, only: copy, cmult
-  use device_math, only: device_copy
+  use math, only: copy, cmult, cmult2
+  use device_math, only: device_copy, device_cmult2
   use field_math, only: field_rzero
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
@@ -206,8 +207,17 @@ contains
 
        x = design%get_values()
 
-       constraint_value = scaling_factor * constraint_value
-       constraint_sensitivities = scaling_factor * constraint_sensitivities
+       call vector_cmult(constraint_value, scaling_factor)
+       !call matrix_cmult(constraint_sensitivities, scaling_factor)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_cmult2(constraint_sensitivities%x_d, &
+                 constraint_sensitivities%x_d, scaling_factor, &
+                 constraint_sensitivities%size())
+         else
+            call cmult2(constraint_sensitivities%x, &
+                 constraint_sensitivities%x, scaling_factor, &
+                 constraint_sensitivities%size())
+       end if
 
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x, objective_sensitivities, &

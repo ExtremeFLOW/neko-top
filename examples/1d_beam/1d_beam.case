@@ -1,0 +1,87 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "box.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": true,
+        "time": {
+            "end_time": 1e-5,
+            "timestep": 1e-5
+        },
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 2,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 100.0,
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    1.0,
+                    0.0,
+                    0.0
+                ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-8,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-7,
+                "max_iterations": 800
+            },
+            "output_control": "nsamples",
+            "output_value": 250,
+            "boundary_conditions": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1, 2 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 3 ]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 4, 5, 6 ]
+                }
+            ]
+        },
+    },
+    "optimization": {
+        "solver": {
+            "type": "mma",
+            "max_iterations": 100,
+            "tolerance": 1.0e-4,
+            "performance": false,
+            "mma": {
+                "max_iter": 100,
+                "backend": "cpu",
+                "subsolver": "dpip",
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1000.0,
+                "auto_scale": false,
+                "xmin": 0.0,
+                "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
+                "c": 1000.0,
+                "d": 1.0
+            }
+        },
+    },
+
+}

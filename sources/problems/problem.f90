@@ -40,6 +40,7 @@ module problem
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use vector_math, only: vector_add2
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
@@ -47,7 +48,6 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-  use vector, only: vector_t
 
   implicit none
   private
@@ -527,7 +527,7 @@ contains
 
     call sensitivity%init(this%n_design)
     do i = 1, this%n_objectives
-       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
+       call vector_add2(sensitivity, this%objective_list(i)%objective%sensitivity)
     end do
 
   end subroutine problem_get_objective_sensitivities

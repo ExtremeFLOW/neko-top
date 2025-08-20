@@ -25,6 +25,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_3dto1d.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_brinkman.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
