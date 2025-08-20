@@ -77,9 +77,7 @@ contains
     call neko_log%section('Postprocessing')
     call C%output_controller%execute(C%time)
 
-    call C%case%user%user_init_modules(C%time%t, C%fluid_adj%u_adj, &
-         C%fluid_adj%v_adj, C%fluid_adj%w_adj, &
-         C%fluid_adj%p_adj, C%fluid_adj%c_Xh, C%case%params)
+    call C%case%user%initialize(C%time)
     call neko_log%end_section()
     call neko_log%newline()
 
@@ -100,7 +98,7 @@ contains
     end if
 
     ! Finalize the user modules
-    call C%case%user%user_finalize_modules(C%time%t, C%case%params)
+    call C%case%user%finalize(C%time)
 
     call neko_log%end_section('Normal end.')
 
@@ -248,7 +246,7 @@ contains
        call C%adjoint_scalars%restart(C%case%chkp)
     end if
 
-    C%time%t = C%case%fluid%chkp%restart_time()
+    C%time%t = real(C%case%fluid%chkp%restart_time(), kind=rp)
     call neko_log%section('Restarting from checkpoint')
     write(log_buf, '(A,A)') 'File :   ', trim(restart_file)
     call neko_log%message(log_buf)

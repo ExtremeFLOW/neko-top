@@ -83,8 +83,8 @@ function(build_example)
 
     # If the example contains extra sources, set the module directory.
     if (DEFINED EXTRA_SOURCES)
-        set(CMAKE_Fortran_MODULE_DIRECTORY
-            ${CMAKE_Fortran_MODULE_DIRECTORY}/${EXAMPLE_NAME})
+        set(OLD_MODULE_DIR ${CMAKE_Fortran_MODULE_DIRECTORY})
+        set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         # Create the module directory.
         file(MAKE_DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY})
     endif()
@@ -99,7 +99,7 @@ function(build_example)
         EXCLUDE_FROM_ALL
         ${DRIVER}
         ${EXTRA_SOURCES}
-        )
+    )
     add_dependencies(Examples ${EXAMPLE_NAME})
 
     # Set the output directory of the executable.
@@ -116,17 +116,15 @@ function(build_example)
     target_link_libraries(${EXAMPLE_NAME}
         PkgConfig::neko
         PkgConfig::json-fortran
+        Neko-TOP::neko-top
         MPI::MPI_Fortran
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     )
 
-    # Link our local Neko-TOP library to the driver
-    target_link_libraries(${EXAMPLE_NAME} neko-top-a)
-    target_include_directories(${EXAMPLE_NAME}
-        PRIVATE
-            ${CMAKE_BINARY_DIR}/modules
-            ${CMAKE_Fortran_MODULE_DIRECTORY}
-    )
+    # Reset the module directory if we set it earlier.
+    if (DEFINED EXTRA_SOURCES)
+        set(CMAKE_Fortran_MODULE_DIRECTORY ${OLD_MODULE_DIR})
+    endif()
 
 endfunction()

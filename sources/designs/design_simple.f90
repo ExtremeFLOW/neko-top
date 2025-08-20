@@ -34,7 +34,6 @@
 module simple_design
   use num_types, only: rp, sp
   use field, only: field_t
-  use json_module, only: json_file
   use mapping, only: mapping_t
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
@@ -48,8 +47,9 @@ module simple_design
   use design, only: design_t
   use math, only: rzero
   use simulation_m, only: simulation_t
+  use comm, only: pe_size
   use json_module, only: json_file
-  use json_utils, only: json_get
+  use json_utils, only: json_get, json_get_or_default
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
@@ -91,11 +91,11 @@ module simple_design
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => design_simple_get_values
      !> Retrieve the x location of the design variables
-     procedure, pass(this) :: get_x => design_simple_get_x
+     procedure, pass(this) :: design_get_x => design_simple_get_x
      !> Retrieve the y location of the design variables
-     procedure, pass(this) :: get_y => design_simple_get_y
+     procedure, pass(this) :: design_get_y => design_simple_get_y
      !> Retrieve the z location of the design variables
-     procedure, pass(this) :: get_z => design_simple_get_z
+     procedure, pass(this) :: design_get_z => design_simple_get_z
 
      !> Update the design
      procedure, pass(this) :: update_design => design_simple_update_design
@@ -125,7 +125,8 @@ contains
     real(kind=rp), dimension(:), allocatable :: limits
     type(vector_t) :: x, y, z
 
-    call json_get(parameters, 'optimization.design.domain.type', type)
+    call json_get(parameters, 'domain.type', type)
+    call json_get_or_default(parameters, 'name', name, 'Simple Design')
 
     select case (trim(type))
     case ("box")
@@ -165,12 +166,13 @@ contains
 
     end select
 
-    call this%init_from_components(n, x, y, z)
+    call this%init_from_components(name, n, x, y, z)
 
   end subroutine design_simple_init_from_json
 
-  subroutine design_simple_init_from_components(this, n, x, y, z)
+  subroutine design_simple_init_from_components(this, name, n, x, y, z)
     class(simple_design_t), intent(inout) :: this
+    character(len=*), intent(in) :: name
     integer, intent(in) :: n
     type(vector_t), intent(in) :: x, y, z
     integer :: nproc, ierr
@@ -181,7 +183,12 @@ contains
        call neko_error('simple_design_t can only be used on a single MPI rank')
     end if
 
-    call this%init_base(n)
+    if (pe_size .ne. 1) then
+       call neko_error("Simple design can only be used with a single MPI " // &
+            "process.")
+    end if
+
+    call this%init_base(name, n)
 
     call this%values%init(n)
     call this%x%init(n)

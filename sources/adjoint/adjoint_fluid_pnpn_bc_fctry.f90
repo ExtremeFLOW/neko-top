@@ -37,7 +37,6 @@ submodule(adjoint_fluid_pnpn) adjoint_fluid_pnpn_bc_fctry
   use utils, only: neko_type_error
   use field_dirichlet, only: field_dirichlet_t
   use inflow, only: inflow_t
-  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
   use blasius, only: blasius_t
   use dirichlet, only: dirichlet_t
   use dong_outflow, only: dong_outflow_t
@@ -94,7 +93,7 @@ contains
        allocate(field_dirichlet_t::object)
        select type (obj => object)
        type is (field_dirichlet_t)
-          obj%update => user%user_dirichlet_update
+          obj%update => user%dirichlet_conditions
           call json%add("field_name", scheme%p_adj%name)
        end select
 
@@ -169,7 +168,7 @@ contains
        allocate(field_dirichlet_vector_t::object)
        select type (obj => object)
        type is (field_dirichlet_vector_t)
-          obj%update => user%user_dirichlet_update
+          obj%update => user%dirichlet_conditions
        end select
 
        ! case ("user_velocity_pointwise")

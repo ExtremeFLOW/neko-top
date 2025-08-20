@@ -34,6 +34,9 @@ module optimizer
      !> Free resources.
      procedure(optimizer_free), pass(this), public, deferred :: free
 
+     !> Validate the solution
+     procedure(optimizer_validate), pass(this), public, deferred :: validate
+
      !> The base initializer
      procedure, pass(this) :: init_base => optimizer_init_base
 
@@ -72,6 +75,14 @@ module optimizer
        import optimizer_t
        class(optimizer_t), intent(inout) :: this
      end subroutine optimizer_free
+
+     !> Interface for validating the solution
+     subroutine optimizer_validate(this, problem, design)
+       import optimizer_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       class(problem_t), intent(in) :: problem
+       class(design_t), intent(in) :: design
+     end subroutine optimizer_validate
   end interface
 
   ! -------------------------------------------------------------------------- !

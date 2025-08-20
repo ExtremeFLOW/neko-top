@@ -12,6 +12,7 @@ user interface.
 - \subpage user_guide
   - [Installation](@ref installation)
   - [Examples](@ref examples)
+  - \subpage examples-list
 - \subpage dev_guide
   - [Contributing](@ref contributing)
   - [Code structure](@ref code-structure)
