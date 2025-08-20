@@ -120,7 +120,7 @@ contains
   subroutine design_simple_init_from_json(this, parameters)
     class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    character(len=:), allocatable :: type
+    character(len=:), allocatable :: type, name
     integer :: n, nx, ny, nz, i, j, k, index
     real(kind=rp), dimension(:), allocatable :: limits
     type(vector_t) :: x, y, z

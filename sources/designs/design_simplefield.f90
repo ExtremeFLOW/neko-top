@@ -91,12 +91,12 @@ module simplefield_design
 
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => design_simple_get_values
-     !> Retrieve the x location of the design variables
-     procedure, pass(this) :: get_x => design_simple_get_x
-     !> Retrieve the y location of the design variables
-     procedure, pass(this) :: get_y => design_simple_get_y
-     !> Retrieve the z location of the design variables
-     procedure, pass(this) :: get_z => design_simple_get_z
+    !  !> Retrieve the x location of the design variables
+    !  procedure, pass(this) :: get_x => design_simple_get_x
+    !  !> Retrieve the y location of the design variables
+    !  procedure, pass(this) :: get_y => design_simple_get_y
+    !  !> Retrieve the z location of the design variables
+    !  procedure, pass(this) :: get_z => design_simple_get_z
 
      !> Update the design
      procedure, pass(this) :: update_design => design_simple_update_design
@@ -124,7 +124,7 @@ contains
     type(vector_t), intent(in) :: x, y, z
     type(field_t) :: neko_field
 
-    call this%init_base(n)
+    call this%init_base('simplefield_design', n)
 
     call this%values%init(n)
     this%x = x
@@ -171,29 +171,29 @@ contains
 
   end function design_simple_get_values
 
-  function design_simple_get_x(this) result(x)
-    class(simplefield_design_t), intent(in) :: this
-    type(vector_t) :: x
+  ! function design_simple_get_x(this) result(x)
+  !   class(simplefield_design_t), intent(in) :: this
+  !   type(vector_t) :: x
 
-    x = this%x
+  !   x = this%x
 
-  end function design_simple_get_x
+  ! end function design_simple_get_x
 
-  function design_simple_get_y(this) result(y)
-    class(simplefield_design_t), intent(in) :: this
-    type(vector_t) :: y
+  ! function design_simple_get_y(this) result(y)
+  !   class(simplefield_design_t), intent(in) :: this
+  !   type(vector_t) :: y
 
-    y = this%y
+  !   y = this%y
 
-  end function design_simple_get_y
+  ! end function design_simple_get_y
 
-  function design_simple_get_z(this) result(z)
-    class(simplefield_design_t), intent(in) :: this
-    type(vector_t) :: z
+  ! function design_simple_get_z(this) result(z)
+  !   class(simplefield_design_t), intent(in) :: this
+  !   type(vector_t) :: z
 
-    z = this%z
+  !   z = this%z
 
-  end function design_simple_get_z
+  ! end function design_simple_get_z
 
   subroutine design_simple_update_design(this, values)
     class(simplefield_design_t), intent(inout) :: this
