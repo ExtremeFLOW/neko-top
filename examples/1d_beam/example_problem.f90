@@ -41,12 +41,14 @@ module example_problem
   use json_module, only: json_file
   use vector, only: vector_t
 
-  use device, only: device_memcpy, DEVICE_TO_HOST
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
 
   use mpi_f08, only: mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
   use comm, only: pe_rank, pe_size, neko_comm, mpi_real_precision
-  use vector_math, only:  vector_glsum, vector_cmult, vector_cadd
+  use vector_math, only:  vector_glsum, vector_cmult, vector_cadd, &
+       vector_col2, vector_invcol2, vector_copy
+
   implicit none
   private
 
@@ -59,7 +61,7 @@ module example_problem
   real(rp), public :: P         = 1000.0_rp   ! tip load (N)
   real(rp), public :: h_min     = 0.005_rp    ! min height (m)
   real(rp), public :: h_max     = 0.05_rp     ! max height (m)
-
+  real(rp), public :: u_tip_max = 0.25_rp     ! max tip deflection (m)
   ! ========================================================================== !
   ! Objective: tip deflection
   type, public, extends(objective_t) :: mma_obj
@@ -132,50 +134,117 @@ contains
   subroutine mma_obj_update_value(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: design_values !h = (h_max-h_min) x + h_min
-    integer :: offset, ierr, n, k
-    real(rp) :: u_local, u_global, I_k, Delta_k, x_k, x_km1, Le
+    type(vector_t) :: h, I, contrib
+    integer :: ierr, n, offset, k
+    real(rp) :: Le, u_global
+    real(rp), allocatable :: Delta(:)
 
-    ! Get local design values
-    design_values = design%get_values()
+    ! Local design values
+    h = design%get_values()
     n = design%size()
 
-    ! Project design variables to physical height
-    call vector_cmult(design_values, (h_max - h_min) )
-    call vector_cadd(design_values, h_min)
-    
-
-    ! Exclusive prefix sum for global indexing
-    call MPI_Exscan(n, offset, 1, MPI_INTEGER, MPI_SUM, neko_comm, ierr)
-    if (pe_rank == 0) offset = 0
+    ! Project design variables to physical height h = (h_max - h_min)*x + h_min
+    call vector_cmult(h, (h_max - h_min), n)
+    call vector_cadd(h, h_min, n)
 
     ! Global element length
     Le = L_total / real(design%size_global(), kind=rp)
 
-    ! Local contribution to tip deflection
-    u_local = 0.0_rp
+    ! Exclusive prefix sum for global offset
+    call MPI_Exscan(n, offset, 1, MPI_INTEGER, MPI_SUM, neko_comm, ierr)
+    if (pe_rank == 0) offset = 0
+
+    ! Build elementwise Δ_k on host (geometry-related, not design-related)
+    allocate(Delta(n))
     do k = 1, n
-      x_km1 = Le * real(offset + k - 1, kind=rp)
-      x_k   = Le * real(offset + k, kind=rp)
-      Delta_k = ((L_total - x_km1)**3 - (L_total - x_k)**3)/3.0_rp
-      I_k = b * design_values%x(k)**3 / 12.0_rp
-      u_local = u_local + Delta_k / (E * I_k)
+      Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+                  (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
     end do
 
-    ! Reduce to global tip deflection
-    call MPI_Allreduce(u_local, u_global, 1, mpi_real_precision, MPI_SUM, &
-         neko_comm, ierr)
+    call I%init(n)
+
+    ! Now compute I_k = b * h^3 / 12
+    call vector_copy(I, h, n)             ! I = h
+    call vector_col2(I, h, n)             ! I = h^2
+    call vector_col2(I, h, n)             ! I = h^3
+    call vector_cmult(I, b/12.0_rp, n)    ! I = b * h^3 / 12
+
+    ! contrib = Δ / (E * I)
+    call contrib%init(n)
+    
+    contrib%x = Delta                    ! copy Δ into contrib
+    if (neko_bcknd_device .eq. 1) then
+       call device_memcpy(contrib%x,contrib%x_d, n, &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
+    call vector_invcol2(contrib, I, n)   ! contrib = contrib / I
+    call vector_cmult(contrib, P/E, n)   ! contrib = contrib * P / E
+
+    ! Global sum
+    u_global = vector_glsum(contrib, n)
+
+    if (pe_rank == 0) print *, "Global tip deflection =", u_global
+
+    ! Normalizing with u_tip_max
+    u_global = u_global/u_tip_max - 1
+
     this%value = u_global
 
-    if (pe_rank == 0) print *, "Global tip deflection =", this%value
+    if (pe_rank == 0) print *, "Normalized Global tip deflection =", this%value
+
+    deallocate(Delta)
   end subroutine mma_obj_update_value
+ 
 
   subroutine mma_obj_update_sensitivity(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-    this%sensitivity = 1.0_rp / real(design%size_global(), kind=rp)
+    real(rp) :: Le
+    type(vector_t) :: h, sensitivity
+    integer :: ierr, n, offset, k
+    real(rp), allocatable :: Delta(:)
 
+    ! Local design values
+    h = design%get_values()
+    n = design%size()
+    call sensitivity%init(n)
+    
+    ! Project design variables to physical height
+    call vector_cmult(h, (h_max - h_min), n)
+    call vector_cadd(h, h_min, n)
+
+    ! Global element length
+    Le = L_total / real(design%size_global(), kind=rp)
+
+    ! Exclusive prefix sum for global offset
+    call MPI_Exscan(n, offset, 1, MPI_INTEGER, MPI_SUM, neko_comm, ierr)
+    if (pe_rank == 0) offset = 0
+
+    ! Build elementwise Δ_k
+    allocate(Delta(n))
+    do k = 1, n
+      Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+                  (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
+    end do
+
+    ! Compute sensitivity: 
+    ! dg/dx = P * Δ * (-36.0 / (E * b * h^4)) * (h_max - h_min)
+    do k = 1, n
+      sensitivity%x(k) = P * Delta(k) * (-36.0_rp) / &
+           (E * b * h%x(k)**4) * (h_max - h_min)
+    end do
+    if (neko_bcknd_device .eq. 1) then
+       call device_memcpy(sensitivity%x,sensitivity%x_d, n, &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
+
+    ! Normalize by u_tip_max
+    call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
+    
+    call vector_copy(this%sensitivity, sensitivity, n)
+
+    deallocate(Delta)
   end subroutine mma_obj_update_sensitivity
 
   ! ========================================================================== !
@@ -220,11 +289,6 @@ contains
     call vector_cmult(design_values, (h_max - h_min) )
     call vector_cadd(design_values, h_min)
 
-
-    ! Exclusive prefix sum for global indexing
-    call MPI_Exscan(n, offset, 1, MPI_INTEGER, MPI_SUM, neko_comm, ierr)
-    if (pe_rank == 0) offset = 0
-
     ! Global element length
     Le = L_total / real(design%size_global(), kind=rp)
 
@@ -246,7 +310,11 @@ contains
     Le = L_total / real(design%size_global(), kind=rp)
 
     ! Sensitivity: dm/dh_k = rho * b * Le
-    this%sensitivity = rho * b * Le
+    this%sensitivity%x = rho * b * Le * (h_max - h_min)
+    if (neko_bcknd_device .eq. 1) then
+       call device_memcpy(this%sensitivity%x,this%sensitivity%x_d, n, &
+            HOST_TO_DEVICE, sync = .false.)
+    end if
   end subroutine beamweight_update_sensitivity
 
   ! ========================================================================== !

@@ -103,8 +103,19 @@ program usrneko
   ! update obj and cons and sensitivities for the init design
   call deflection%update_value(des)
   call beamweight%update_value(des)
+  
+  call deflection%update_sensitivity(des)
+  call beamweight%update_sensitivity(des)
 
-!   call obj%update_sensitivity(des)
+  ! -------------------------------------------------------------------------- !
+  ! Perform finite difference validation
+  !   if (pe_rank == 0) then
+  !      print *, "Performing finite difference validation..."
+  !   endif
+  !   call finite_difference_validation(des, 1, 1.0e-6_rp)
+
+
+
 !   call con_1%update_value(des)
 !   call con_1%update_sensitivity(des)
    
@@ -149,3 +160,87 @@ program usrneko
 !   if (allocated(opt)) deallocate(opt)
 
 end program usrneko
+
+
+
+! ========================================================================== !
+! Finite difference validation subroutines
+! ========================================================================== !
+
+subroutine finite_difference_validation(des, k_test, delta)
+  use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_DOUBLE_PRECISION
+  use comm, only: pe_rank, pe_size, neko_comm
+  use example_problem, only: mma_obj
+  use design_3dto1d, only: design_3dto1d_t
+  use num_types, only: rp
+  use vector, only: vector_t
+  
+  type(design_3dto1d_t), intent(in) :: des
+  integer, intent(in) :: k_test
+  real(rp), intent(in) :: delta
+  
+  type(vector_t) :: designvec
+  type(design_3dto1d_t) :: pert_design
+  type(mma_obj) :: obj
+  real(rp) :: f_original, f_perturbed, fd_derivative, analytical_derivative
+  real(rp) :: error, rel_error
+  integer :: n, i, ierr
+  real(rp), allocatable :: sensitivities(:)
+  
+  ! Initialize objective
+  call obj%init_from_components("test_obj", des, 1.0_rp)
+  
+  ! Get original value and sensitivities
+  call obj%update_value(des)
+  call obj%update_sensitivity(des)
+  f_original = obj%value
+  
+  n = des%size()
+  allocate(sensitivities(n))
+  sensitivities = obj%sensitivity%x
+  
+  ! Create perturbed design
+  call pert_design%init_from_components(n)
+  call designvec%init(n)
+  designvec = des%get_values()
+  if (k_test >= 1 .and. k_test <= n) then
+    designvec%x(k_test) = designvec%x(k_test) + delta
+  endif
+  call pert_design%update_design(designvec)
+
+
+  ! Compute perturbed value
+  call obj%update_value(pert_design)
+  f_perturbed = obj%value
+  
+  ! Finite difference derivative
+  fd_derivative = (f_perturbed - f_original) / delta
+  analytical_derivative = sensitivities(k_test)
+  
+  ! Calculate error
+  error = abs(fd_derivative - analytical_derivative)
+  if (abs(analytical_derivative) > 1e-12) then
+    rel_error = error / abs(analytical_derivative)
+  else
+    rel_error = error
+  endif
+  
+  ! Output results
+  if (pe_rank == 0) then
+    print *, "=============================================="
+    print *, "FINITE DIFFERENCE VALIDATION"
+    print *, "=============================================="
+    print *, "Test variable index:      ", k_test
+    print *, "Perturbation size (delta):", delta
+    print *, "Original function value:  ", f_original
+    print *, "Perturbed function value: ", f_perturbed
+    print *, "Finite difference deriv:  ", fd_derivative
+    print *, "Analytical derivative:    ", analytical_derivative
+    print *, "Absolute error:           ", error
+    print *, "Relative error:           ", rel_error
+    print *, "=============================================="
+  endif
+  
+  deallocate(sensitivities)
+  call obj%free()
+end subroutine finite_difference_validation
