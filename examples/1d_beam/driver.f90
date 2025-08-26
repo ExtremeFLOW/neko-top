@@ -11,7 +11,7 @@ program usrneko
        mpi_allreduce, mpi_exscan
 
 
-  use example_problem, only: mma_obj, beamweight_obj, mma_con
+  use example_problem, only: mma_obj, beamweight_obj, stress_con
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -21,7 +21,7 @@ program usrneko
   use vector, only: vector_t
   use matrix, only: matrix_t
 
-  use comm, only: pe_rank
+  use comm, only: pe_rank, neko_comm
   use device, only: device_memcpy, HOST_TO_DEVICE
   use neko_config, only: NEKO_BCKND_DEVICE
 
@@ -46,14 +46,23 @@ program usrneko
   type(problem_t) :: prob
   type(mma_obj), allocatable :: deflection
   type(beamweight_obj), allocatable :: beamweight
-  type(mma_con), allocatable :: con_1 !, con_2
+  type(stress_con), allocatable :: stress_constraints(:)
 
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
-  integer :: nloc
+  integer :: nloc, i
   type(vector_t) :: initdesign
   real(kind=rp) :: t_start, t_end
+
+  !> Stress constraints
+  character(len=20) :: index_str
+  integer :: stress_global_indices(9)
+  real(rp) :: stress_sigma_max(9)
+
+  !> For getting objectives and constraints values though getters in problem_t
+  type(vector_t) :: all_objectives, constraint_value
+  real(rp) :: objective_value
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -92,21 +101,41 @@ program usrneko
 
   allocate(deflection)
   allocate(beamweight)
-  allocate(con_1)
 
+  ! add constraints on global indices
+  stress_global_indices = [1, 2, 3, 3, 4, 5, des%size_global()-1 , des%size_global(), 150000]
+  stress_sigma_max = 250e6_rp  ! Same max stress for all
+  
+  allocate(stress_constraints(size(stress_global_indices)))
 
   call deflection%init_from_components("tip_deflection", des, 1.0_rp)
   call beamweight%init_from_components("beamweight", des, 1.0_rp)
   
-!   call con_1%init_from_components("Constraint", des, 1)
+  ! Add each constraint to the problem
+  do i = 1, size(stress_constraints)
+     write(index_str, '(I0)') stress_global_indices(i)  ! I0 format for minimal length
+     !   write(index_str, '(I0)') i  ! I0 format for minimal length
+     call stress_constraints(i)%init_stress_con( &
+          "stress_con_"//trim(index_str), &
+          des, stress_global_indices(i), stress_sigma_max(i))
+
+     call prob%add_constraint(stress_constraints(i))
+  end do
+
+  ! Add objectives to the problem
+  call prob%add_objective(deflection)
+  call prob%add_objective(beamweight)
+
+
+  call MPI_Barrier(neko_comm, ierr)
+  if (pe_rank == 0) print *, "Constraints distribution complete!"
+  if (pe_rank == 0) print *, "number of problem objectives=", prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
   
   ! update obj and cons and sensitivities for the init design
-  call deflection%update_value(des)
-  call beamweight%update_value(des)
-  
-  call deflection%update_sensitivity(des)
-  call beamweight%update_sensitivity(des)
-
+   !   call deflection%update_value(des)
+   !   call beamweight%update_value(des)
+   !   call deflection%update_sensitivity(des)
+   !   call beamweight%update_sensitivity(des)
   ! -------------------------------------------------------------------------- !
   ! Perform finite difference validation
   !   if (pe_rank == 0) then
@@ -114,21 +143,34 @@ program usrneko
   !   endif
   !   call finite_difference_validation(des, 1, 1.0e-6_rp)
 
+  ! Update values and sensitivities
+  !   do i = 1, size(stress_constraints)
+  !      call stress_constraints(i)%update_value(des)
+  !      call stress_constraints(i)%update_sensitivity(des)
+  !   end do
+   call prob%update_objectives(des)
+   call prob%update_objective_sensitivities(des)
+   call prob%update_constraints(des)
+   call prob%update_constraint_sensitivities(des)
 
-
-!   call con_1%update_value(des)
-!   call con_1%update_sensitivity(des)
-   
-!   if (pe_rank == 0) then
-!      print *, "objective value for the initial design=", obj%value, &
-!         "Positive=", con_1%value
-!   end if
+  !   call con_1%update_value(des)
+  !   call con_1%update_sensitivity(des)
+  call prob%get_all_objective_values(all_objectives)
+  call prob%get_constraint_values(constraint_value)
+  call prob%get_objective_value(objective_value)
+  if (pe_rank == 0) then
+     print *, "nobject=", prob%get_n_objectives(), "nconstraint=", prob%get_n_constraints(), &
+        "total objective=", objective_value, &
+        "all_objectives%x=", all_objectives%x, "constraint_value", constraint_value%x
+  end if
 
 !   ! initialize the problem
 !   call prob%init(parameters, des)
   
 !   call prob%add_objective(obj)
 !   call prob%add_constraint(con_1)
+
+
 
 !   ! -------------------------------------------------------------------------- !
 !   ! Execute the optimization
