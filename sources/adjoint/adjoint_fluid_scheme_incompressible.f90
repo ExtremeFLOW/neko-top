@@ -190,11 +190,12 @@ contains
     lxd = (3 * (lx + 1)) / 2
     if (msh%gdim .eq. 2) then
        call this%Xh%init(GLL, lx, lx)
-       call this%Xh_GL%init(GL, lxd, lxd)
+       ! call this%Xh_GL%init(GL, lxd, lxd)
     else
        call this%Xh%init(GLL, lx, lx, lx)
-       call this%Xh_GL%init(GL, lxd, lxd, lxd)
+       ! call this%Xh_GL%init(GL, lxd, lxd, lxd)
     end if
+    call this%Xh_GL%init(GL, lxd, lxd, lxd)
 
     ! NOTE. This shouldn't require remaking all this stuff. What should be
     ! changed on the neko side is a way of initializing a coef FULLY (ie, Bs)

@@ -213,7 +213,7 @@ contains
 
     ! do it on the dealiased mesh!
     nel = this%c_Xh_GLL%msh%nelv
-    n_GL = this%Xh_GL%lxyz
+    n_GL = nel * this%Xh_GL%lxyz
     call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
     call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
     call col3(accumulate, fld_GL, adjoint_fld_GL, n_GL)

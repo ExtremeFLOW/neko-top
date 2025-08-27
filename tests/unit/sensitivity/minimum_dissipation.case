@@ -12,7 +12,7 @@
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
-            "dealias": false
+            "dealias": true
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -30,7 +30,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 1,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -40,7 +40,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-16,
+                "absolute_tolerance": 1e-18,
                 "max_iterations": 800
             },
             "pressure_solver": {
@@ -63,7 +63,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-14,
+                "tol": 1e-8,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
@@ -95,7 +95,7 @@
              "mapping": [
                                 {
                     "type": "PDE_filter",
-                    "r": 0.2,
+                    "r": 0.05,
                     "tol": 1.0e-20,
                     "max_iter": 600
                 },

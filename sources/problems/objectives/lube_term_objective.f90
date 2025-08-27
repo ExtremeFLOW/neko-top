@@ -79,7 +79,7 @@ module lube_term_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use math, only: glsc2, copy, col3, addcol3, col2
+  use math, only: glsc2, copy, col3, addcol3, col2, invcol2, cmult
   use device_math, only: device_copy, device_glsc2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
@@ -103,15 +103,15 @@ module lube_term_objective
      type(field_t), pointer :: brinkman_amplitude => null()
 
      ! ---- everything GLL ----
+     !> The coefs
+     type(coef_t), pointer :: c_Xh_GLL
      !> The original space used in the simulation
      type(space_t), pointer :: Xh_GLL
-     !> cfs of the original space in the simulation
-     type(coef_t), pointer :: c_Xh_GLL
 
      ! ---- everything for GL ----
      !> The additional higher-order space used in dealiasing
      type(space_t), pointer :: Xh_GL
-     !> cfs of the higher-order space
+     !> coefs of the higher-order space
      type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
@@ -196,11 +196,11 @@ contains
     
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
-    this%Xh_GLL => this%c_Xh_GLL%Xh
+    this%Xh_GLL => simulation%neko_case%fluid%c_Xh%Xh
 
     ! GL
-    this%c_Xh_GLL => simulation%adjoint_case%fluid_adj%c_Xh_GL
-    this%Xh_GL => this%c_Xh_GLL%Xh
+    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
 
     ! GLL to GL
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
@@ -213,7 +213,7 @@ contains
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
-           this%has_mask, this%c_Xh_GLL)
+           this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL)
 
     end associate
 
@@ -297,6 +297,8 @@ contains
     ! call field_addcol3(work, this%v, this%v)
     ! call field_addcol3(work, this%w, this%w)
     ! call field_cmult(work, this%weight * 0.5_rp)
+    ! ! scale
+    ! call field_cmult(work, this%weight * 0.5_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
          call neko_error("dealiased sensitivity not implemented on device")
@@ -311,12 +313,16 @@ contains
     call addcol3(accumulate, fld_GL, fld_GL, n_GL)
     call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
     call addcol3(accumulate, fld_GL, fld_GL, n_GL)
+    ! scale
+    call cmult(accumulate, this%weight * 0.5_rp, n_GL)
+
     ! multiply by GL mass matrix
-    call col2(accumulate, this%c_Xh_GLL%B, n_GL)
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
     ! map back to GLL
     call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! scale
-    call field_cmult(work, this%weight * 0.5_rp)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%c_Xh_GLL%B, work%size())
+
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())

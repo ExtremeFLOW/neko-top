@@ -260,15 +260,15 @@ contains
           call mask_exterior_const(work, this%mask, 0.0_rp)
           this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
                n, this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n)
+               this%c_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
        end if
     end if
 
