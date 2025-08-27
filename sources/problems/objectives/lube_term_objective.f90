@@ -76,8 +76,10 @@ module lube_term_objective
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use field_registry, only: neko_field_registry
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use coefs, only: coef_t
-  use math, only: glsc2, copy
+  use math, only: glsc2, copy, col3, addcol3, col2
   use device_math, only: device_copy, device_glsc2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
@@ -97,10 +99,22 @@ module lube_term_objective
      type(field_t), pointer :: v => null()
      !> Pointer to the w field.
      type(field_t), pointer :: w => null()
-     !> Pointer to the coefficient field.
-     type(coef_t), pointer :: c_Xh => null()
      !> Pointer to the brinkman amplitude field.
      type(field_t), pointer :: brinkman_amplitude => null()
+
+     ! ---- everything GLL ----
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> cfs of the original space in the simulation
+     type(coef_t), pointer :: c_Xh_GLL
+
+     ! ---- everything for GL ----
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
 
    contains
 
@@ -179,18 +193,27 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%neko_case%fluid%c_Xh
+    
+    ! GLL
+    this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
+    this%Xh_GLL => this%c_Xh_GLL%Xh
+
+    ! GL
+    this%c_Xh_GLL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GLL%Xh
+
+    ! GLL to GL
+    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
 
     ! if we have the lube term we need to initialize and append that too
 
     associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
          f_adj_y => simulation%adjoint_fluid%f_adj_y, &
-         f_adj_z => simulation%adjoint_fluid%f_adj_z, &
-         c_Xh => simulation%adjoint_fluid%c_Xh)
+         f_adj_z => simulation%adjoint_fluid%f_adj_z)
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
-           this%has_mask, c_Xh)
+           this%has_mask, this%c_Xh_GLL)
 
     end associate
 
@@ -210,7 +233,7 @@ contains
     this%u => null()
     this%v => null()
     this%w => null()
-    this%c_Xh => null()
+    this%c_Xh_GLL => null()
     this%brinkman_amplitude => null()
 
   end subroutine lube_term_free
@@ -236,16 +259,16 @@ contains
           ! note, this could be done more elagantly by writing
           ! device_glsc2_mask
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
        else
-          this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
+          this%value = glsc2_mask(work%x, this%c_Xh_GLL%B, design%size(), &
                this%mask%mask, this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
+          this%value = device_glsc2(work%x_d, this%c_Xh_GLL%B_d, design%size())
        else
-          this%value = glsc2(work%x, this%c_Xh%B, design%size())
+          this%value = glsc2(work%x, this%c_Xh_GLL%B, design%size())
        end if
     end if
     this%value = 0.5 * this%value
@@ -262,14 +285,37 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
+       accumulate, fld_GL
+    integer :: n_GL, nel
 
     ! if we have the lube term we also get an extra term in the sensitivity
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    call field_col3(work, this%u, this%u)
-    call field_addcol3(work, this%v, this%v)
-    call field_addcol3(work, this%w, this%w)
+    ! call field_col3(work, this%u, this%u)
+    ! call field_addcol3(work, this%v, this%v)
+    ! call field_addcol3(work, this%w, this%w)
+    ! call field_cmult(work, this%weight * 0.5_rp)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased sensitivity not implemented on device")
+    end if
+
+    ! do it on the dealiased mesh!
+    nel = this%c_Xh_GLL%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, fld_GL, fld_GL, n_GL)
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call addcol3(accumulate, fld_GL, fld_GL, n_GL)
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call addcol3(accumulate, fld_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GLL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! scale
     call field_cmult(work, this%weight * 0.5_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then

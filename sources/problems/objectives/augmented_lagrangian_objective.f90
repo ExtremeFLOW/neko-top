@@ -72,18 +72,14 @@ module augmented_lagrangian_objective
      ! ---- everything GLL ----
      !> The original space used in the simulation
      type(space_t), pointer :: Xh_GLL
-     !> Coeffs of the original space in the simulation
-     type(coef_t), pointer :: coef_GLL
+     !> cfs of the original space in the simulation
+     type(coef_t), pointer :: c_Xh_GLL
 
      ! ---- everything for GL ----
-     ! NOTE: There must be a better way on the neko side to allow initializing
-     ! a coef that includes the mass matrix without rebuilding gs etc.
-     ! for now this is just for testing.
-
      !> The additional higher-order space used in dealiasing
      type(space_t), pointer :: Xh_GL
-     !> Coeffs of the higher-order space
-     type(coef_t), pointer :: coef_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
      
@@ -157,12 +153,14 @@ contains
     this%adjoint_w => simulation%adjoint_case%fluid_adj%w_adj
 
     ! GLL
-    this%coef_GLL => simulation%neko_case%fluid%c_Xh
-    this%Xh_GLL => this%coef_GLL%Xh
+    this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
+    this%Xh_GLL => this%c_Xh_GLL%Xh
 
     ! GL
-    this%coef_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
-    this%Xh_GL => this%coef_GL%Xh
+    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+
+    ! GLL to GL
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
 
   end subroutine augmented_lagrangian_init_attributes
@@ -199,8 +197,9 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef_GLL%msh%nelv) :: accumulate, u_GL, adjoint_u_GL
-    integer :: n_GL
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
+       accumulate, fld_GL, adjoint_fld_GL
+    integer :: n_GL, nel
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
@@ -208,27 +207,31 @@ contains
     ! call field_col3(work, this%u, this%adjoint_u)
     ! call field_addcol3(work, this%v, this%adjoint_v)
     ! call field_addcol3(work, this%w, this%adjoint_w)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased sensitivity not implemented on device")
+    end if
 
     ! do it on the dealiased mesh!
-    n_GL = this%coef_GLL%msh%nelv * this%Xh_GL%lxyz
-    call this%GLL_to_GL%map(u_GL, this%u%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call this%GLL_to_GL%map(adjoint_u_GL, this%adjoint_u%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call col3(accumulate, u_GL, adjoint_u_GL, n_GL)
+    nel = this%c_Xh_GLL%msh%nelv
+    n_GL = this%Xh_GL%lxyz
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
+    call col3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
 
-    call this%GLL_to_GL%map(u_GL, this%v%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call this%GLL_to_GL%map(adjoint_u_GL, this%adjoint_v%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call addcol3(accumulate, u_GL, adjoint_u_GL, n_GL)
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
+    call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
 
-    call this%GLL_to_GL%map(u_GL, this%w%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call this%GLL_to_GL%map(adjoint_u_GL, this%adjoint_w%x, this%coef_GLL%msh%nelv, this%Xh_GL)
-    call addcol3(accumulate, u_GL, adjoint_u_GL, n_GL)
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
+    call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
 
     ! multiply by GL mass matrix
-    call col2(accumulate, this%coef_GL%B, n_GL)
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
     ! map back to GLL
-    call this%GLL_to_GL%map(work%x, accumulate, this%coef_GLL%msh%nelv, this%Xh_GLL)
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
     ! preempt the GLL mass matrix
-    call invcol2(work%x, this%coef_GLL%B, work%size())
+    call invcol2(work%x, this%c_Xh_GLL%B, work%size())
 
 
     ! but negative
