@@ -43,6 +43,10 @@ module simple_brinkman_source_term
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
+  use math, only: col2, invcol2, sub2, col3
+  use scratch_registry, only: neko_scratch_registry
   implicit none
   private
 
@@ -57,6 +61,15 @@ module simple_brinkman_source_term
      type(field_t), pointer :: v => null()
      !> the fields corresponding to w
      type(field_t), pointer :: w => null()
+     ! --- for over-integration
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -99,12 +112,16 @@ contains
   !! @param chi the brinkman amplitude field.
   !! @param u, v, w the velocity field (either primal or adjoint).
   !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
   subroutine simple_brinkman_source_term_init_from_components(this, &
-       f_x, f_y, f_z, chi, u, v, w, coef)
+       f_x, f_y, f_z, chi, u, v, w, coef, c_Xh_GL, GLL_to_GL)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
-    type(coef_t) :: coef
+    type(coef_t), intent(in) :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
@@ -132,6 +149,11 @@ contains
     this%w => w
     ! and get chi out of the design
     this%chi => chi
+    ! for over integration
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
 
   end subroutine simple_brinkman_source_term_init_from_components
 
@@ -151,14 +173,60 @@ contains
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     type(field_t), pointer :: fu, fv, fw
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
+       accumulate, fld_GL, chi_GL
+    integer :: n_GL, nel
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
 
-    call field_subcol3(fu, this%u, this%chi)
-    call field_subcol3(fv, this%v, this%chi)
-    call field_subcol3(fw, this%w, this%chi)
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+    call this%GLL_to_GL%map(chi_GL, this%chi%x, nel, this%Xh_GL)
+
+    ! u
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fu%x, work%x, work%size())
+
+    ! v
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fv%x, work%x, work%size())
+
+    ! w
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fv%x, work%x, work%size())
+
+    ! call field_subcol3(fu, this%u, this%chi)
+    ! call field_subcol3(fv, this%v, this%chi)
+    ! call field_subcol3(fw, this%w, this%chi)
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine simple_brinkman_source_term_compute
 

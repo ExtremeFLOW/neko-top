@@ -241,53 +241,51 @@ contains
     end if
 
     ! multiple and add the RHS
-    call field_addcol3(fu, this%u, work)
-    call field_addcol3(fv, this%v, work)
-    call field_addcol3(fw, this%w, work)
+    ! call field_addcol3(fu, this%u, work)
+    ! call field_addcol3(fv, this%v, work)
+    ! call field_addcol3(fw, this%w, work)
     
-    ! ! do it on the dealiased mesh!
-    ! if (NEKO_BCKND_DEVICE .eq. 1) then
-    !      call neko_error("dealiased lube source term not implemented on device")
-    ! end if
+    ! do it on the dealiased mesh!
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased lube source term not implemented on device")
+    end if
 
-    ! ! BE SO CAREFUL
-    ! ! this is a triple term, so really you should be 4N/2 + 1
-    ! nel = this%coef%msh%nelv
-    ! n_GL = nel * this%Xh_GL%lxyz
-    ! call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
+    nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+    call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
 
-    ! ! u
-    ! call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call add2(fu%x, work%x, work%size())
+    ! u
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fu%x, work%x, work%size())
 
-    ! ! v
-    ! call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call add2(fv%x, work%x, work%size())
+    ! v
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fv%x, work%x, work%size())
 
-    ! ! w
-    ! call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call add2(fw%x, work%x, work%size())
+    ! w
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fw%x, work%x, work%size())
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
