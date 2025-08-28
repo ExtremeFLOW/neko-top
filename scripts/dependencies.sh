@@ -324,8 +324,8 @@ function find_neko() {
         fi
 
         # Determine available features
-        FEATURES="--enable-contrib "
-        [ -n "$GSLIB_DIR" ] && FEATURES+="--with-gslib=$GSLIB_DIR"
+        FEATURES="--enable-contrib"
+        [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
 
@@ -348,7 +348,7 @@ function find_neko() {
                 error "the HIP installation."
                 exit 1
             fi
-        elif [ "$DEVICE_TYPE" != "NONE" ]; then
+        elif [ "$DEVICE_TYPE" != "CPU" ]; then
             printf "Device type not recognized: $DEVICE_TYPE\n"
             printf "\tValid options are: CUDA, HIP or NONE\n"
             printf "\tPlease submit an issue if you would like to see"
@@ -396,23 +396,15 @@ function find_neko() {
     fi
 
     # Check the device type supported by neko
-    if [ -f "$NEKO_DIR/src/config/neko_config.f90" ]; then
-        if [ "$DEVICE_TYPE" == "NONE" ]; then
-            PATTERN="(?<=NEKO_BCKND_DEVICE = )[01]"
-        else
-            PATTERN="(?<=NEKO_BCKND_${DEVICE_TYPE} = )[01]"
-        fi
-        NEKO_DEVICE_TYPE=$(grep -oP "$PATTERN" $NEKO_DIR/src/config/neko_config.f90)
+    if [[ -n "$DEVICE_TYPE" && -f "$NEKO_LIB/pkgconfig/neko.pc" ]]; then
+        PATTERN="(?<=backend=).*"
+        NEKO_DEVICE=$(grep -oP "$PATTERN" $NEKO_LIB/pkgconfig/neko.pc) || true
 
-        if [[ "$DEVICE_TYPE" == "NONE" && $NEKO_DEVICE_TYPE == 1 ]]; then
+        if [[ -n "$NEKO_DEVICE" && "$DEVICE_TYPE" != "$NEKO_DEVICE" ]]; then
             error "Neko device type does not match the requested device type."
             error "Please ensure that the Neko installation is correct."
             error "Requested device type: $DEVICE_TYPE"
-            exit 1
-        elif [[ "$DEVICE_TYPE" != "NONE" && $NEKO_DEVICE_TYPE == 0 ]]; then
-            error "Neko device type does not match the requested device type."
-            error "Please ensure that the Neko installation is correct."
-            error "Requested device type: $DEVICE_TYPE"
+            error "Neko device type: $NEKO_DEVICE"
             exit 1
         fi
     fi

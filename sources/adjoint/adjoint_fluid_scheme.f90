@@ -46,7 +46,6 @@ module adjoint_fluid_scheme
   use zero_dirichlet, only: zero_dirichlet_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
-  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
   use dirichlet, only: dirichlet_t
   use field_dirichlet, only: field_dirichlet_t
   use field_dirichlet_vector, only: field_dirichlet_vector_t
@@ -61,6 +60,7 @@ module adjoint_fluid_scheme
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use math, only: cfill, add2s2, glsum
   use device_math, only: device_cfill, device_add2s2
+  use time_state, only: time_state_t
   use time_scheme_controller, only: time_scheme_controller_t
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
@@ -70,7 +70,7 @@ module adjoint_fluid_scheme
   use json_module, only: json_file, json_core, json_value
   use scratch_registry, only: scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
-       user_material_properties
+       user_material_properties_intf
   use utils, only: neko_error, neko_warning
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
@@ -120,6 +120,11 @@ module adjoint_fluid_scheme
      type(field_t), pointer :: p_adj => null() !< Pressure
      type(field_series_t) :: ulag, vlag, wlag !< fluid field (lag)
 
+     type(field_t), pointer :: u_b => null() !< x-component of baseflow velocity
+     type(field_t), pointer :: v_b => null() !< y-component of baseflow Velocity
+     type(field_t), pointer :: w_b => null() !< z-component of baseflow Velocity
+     type(field_t), pointer :: p_b => null() !< Baseflow pressure
+
      !> Checkpoint
      type(chkp_t), pointer :: chkp => null()
 
@@ -155,7 +160,7 @@ module adjoint_fluid_scheme
      logical :: freeze = .false.
 
      !> User material properties routine
-     procedure(user_material_properties), nopass, pointer :: &
+     procedure(user_material_properties_intf), nopass, pointer :: &
           user_material_properties => null()
 
    contains
@@ -312,11 +317,10 @@ module adjoint_fluid_scheme
 
   !> Abstract interface to sets rho and mu
   abstract interface
-     subroutine update_material_properties(this, t, tstep)
-       import adjoint_fluid_scheme_t, rp
+     subroutine update_material_properties(this, time)
+       import adjoint_fluid_scheme_t, time_state_t
        class(adjoint_fluid_scheme_t), intent(inout) :: this
-       real(kind=rp),intent(in) :: t
-       integer, intent(in) :: tstep
+       type(time_state_t), intent(in) :: time
      end subroutine update_material_properties
   end interface
 

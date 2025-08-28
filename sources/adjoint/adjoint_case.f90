@@ -39,6 +39,8 @@ module adjoint_case
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use adjoint_output, only: adjoint_output_t
   use scalar_ic, only: set_scalar_ic
+  use checkpoint, only: chkp_t
+  use chkp_output, only: chkp_output_t
   use flow_ic, only: set_flow_ic
   use output_controller, only: output_controller_t
   use file, only: file_t
@@ -71,6 +73,8 @@ module adjoint_case
           adjoint_convection_term
      type(case_t), pointer :: case
      type(time_state_t) :: time
+     type(chkp_t) :: chkp
+     type(chkp_output_t) :: chkp_out
 
      ! Fields
      real(kind=rp) :: tol
@@ -99,7 +103,7 @@ contains
 
   !> Initialize a neko_case from its (loaded) params object
   subroutine adjoint_case_init_common(this, neko_case)
-    class(adjoint_case_t), intent(inout) :: this
+    class(adjoint_case_t), target, intent(inout) :: this
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
     real(kind=rp) :: real_val = 0.0_rp
@@ -122,10 +126,13 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
 
+    this%chkp%tlag => this%time%tlag
+    this%chkp%dtlag => this%time%dtlag
+
     select type (f => this%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        call f%init(neko_case%msh, lx, neko_case%params, &
-            neko_case%user, neko_case%chkp)
+            neko_case%user, this%chkp)
     end select
     !
     ! Setup adjoint scalar
@@ -247,7 +254,7 @@ contains
        call set_flow_ic( &
             this%fluid_adj%u_adj, this%fluid_adj%v_adj, this%fluid_adj%w_adj, &
             this%fluid_adj%p_adj, this%fluid_adj%c_Xh, this%fluid_adj%gs_Xh, &
-            neko_case%user%fluid_user_ic, neko_case%params)
+            neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
     call neko_log%end_section()
@@ -333,7 +340,7 @@ contains
     !
     ! Setup output_controller
     !
-    call this%output_controller%init(neko_case%time%end_time)
+    call this%output_controller%init(this%time%end_time)
     if (this%have_scalar) then
        this%f_out = adjoint_output_t(precision, this%fluid_adj, &
             this%adjoint_scalars, path = trim(neko_case%output_directory))
@@ -375,7 +382,7 @@ contains
     !    call json_get_or_default(neko_case%params, 'case.checkpoint_value', &
     ! real_val,&
     !         1e10_rp)
-    !   call this%output_controller%add(neko_case%f_chkp, real_val, string_val)
+    !   call this%output_controller%add(this%f_chkp, real_val, string_val)
     ! end if
 
     !

@@ -1,6 +1,10 @@
 # CMakeLists.txt for the tests directory.
 # This file is used to define the tests for the Neko-TOP library.
 
+if (NOT BUILD_TESTING)
+    return()
+endif()
+
 add_custom_target(Tests
     COMMENT "Build all tests."
     DEPENDS neko-top

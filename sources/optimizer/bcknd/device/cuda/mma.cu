@@ -32,22 +32,29 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "device/cuda/check.h"
-#include "mma_kernel.h"
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
 
+// Device includes
+#include <cuda_runtime.h>
+
+// Neko includes
+#include <neko/device/device_config.h>
+#include <neko/device/cuda/check.h>
+#include <neko/math/bcknd/device/device_mpi_reduce.h>
+#include <neko/math/bcknd/device/device_mpi_op.h>
+
+// Local includes
+#include "mma_kernel.h"
+
 
 extern "C" {
-#include "math/bcknd/device/device_mpi_reduce.h"
-#include "math/bcknd/device/device_mpi_op.h"
-#include "device/device_config.h"
-
 
   int mma_red_s = 0;
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
- //////
+
  void cuda_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
      const dim3 nthrds(1024, 1, 1);
      const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -153,7 +160,6 @@ extern "C" {
     cudaFree(temp);
   }
 
- //////
    void mma_gensub3_cuda(void* x, void* df0dx, void* dfdx, void* low,
        void* upp, void* xmin, void* xmax, void* alpha, void* beta,
        void* p0j, void* q0j, void* pij, void* qij, int* n, int* m) {
@@ -182,8 +188,6 @@ extern "C" {
 
     CUDA_CHECK(cudaGetLastError());
   }
-
-
 
   void mma_gensub1_cuda(void* low, void* upp, void* x, void* xmin, void* xmax,
        real* asyinit, int* n) {
@@ -248,7 +252,7 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
- //////////////max abs values of input
+ //max abs values of input
  real cuda_maxval(void* a, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
@@ -281,7 +285,6 @@ extern "C" {
     return mma_bufred[0];
   }
 
-
   void cuda_delx(void* delx, void* x, void* xlow, void* xupp, void* pij,
        void* qij, void* p0j, void* q0j, void* alpha, void* beta, void* lambda,
        real* epsi, int* n, int* m) {
@@ -296,7 +299,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
   void cuda_GG(void* GG, void* x, void* xlow, void* xupp,
        void* pij, void* qij, int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
@@ -306,7 +308,6 @@ extern "C" {
          (real*)pij, (real*) qij, *n,*m);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_diagx(void* diagx, void* x, void* xsi,void* xlow, void* xupp,
        void* p0j, void* q0j, void* pij, void* qij, void* alpha, void* beta,
@@ -319,7 +320,6 @@ extern "C" {
          (real*)alpha, (real*) beta, (real*)eta, (real*) lambda, *n,*m);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_bb(void* bb, void* GG, void* delx,void* diagx, int *n, int *m) {
     const dim3 nthrds(1024, 1, 1);
@@ -347,7 +347,6 @@ extern "C" {
        cudaStreamSynchronize(stream);
     }
   }
-
 
   void cuda_AA(void* AA, void* GG, void* diagx, int *n, int *m) {
     const dim3 nthrds(1024, 1, 1);
@@ -379,7 +378,6 @@ extern "C" {
     }
   }
 
-
   void cuda_dx(void* dx,void* delx, void* diagx, void* GG, void* dlambda,
        int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
@@ -389,7 +387,6 @@ extern "C" {
          *n,*m);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_dxsi(void* dxsi, void* xsi, void* dx,void* x,
     void* alpha, real*epsi, int* n) {
@@ -401,7 +398,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
   void cuda_deta(void* deta, void* eta, void* dx, void* x,
        void* beta, real* epsi, int* n) {
     const dim3 nthrds(1024, 1, 1);
@@ -411,7 +407,6 @@ extern "C" {
          (real*)beta, *epsi, *n);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_rex(void* rex, void* x, void* xlow, void* xupp, void* pij,
        void* p0j, void* qij, void* q0j, void* lambda, void* xsi, void* eta,
@@ -425,7 +420,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
   void cuda_rey(void* rey, void* c, void* d, void* y, void* lambda, void* mu,
        int* n) {
     const dim3 nthrds(1024, 1, 1);
@@ -437,7 +431,6 @@ extern "C" {
   }
 
 
-  /////a_d=b_d*c_d-d
   void cuda_sub2cons(void * a,void * b,void * c, real *d, int * n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -446,8 +439,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
-  /////sum(a^2)
   real cuda_norm(void* a, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -473,7 +464,6 @@ extern "C" {
     return mma_bufred[0];
   }
 
-
   void cuda_dely(void* dely, void* c, void* d, void* y, void* lambda,
        real* epsi, int* n) {
     const dim3 nthrds(1024, 1, 1);
@@ -482,7 +472,6 @@ extern "C" {
          ((real*)dely,(real*)c, (real*)d, (real*)y, (real*)lambda,*epsi, * n);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   real cuda_maxval2(void* a, void* b, real* cons, int* n) {
     const dim3 nthrds(1024, 1, 1);
@@ -509,7 +498,6 @@ extern "C" {
     return mma_bufred[0];
   }
 
-
   real cuda_maxval3(void* a, void* b, void* c, real* cons, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
@@ -534,7 +522,6 @@ extern "C" {
     return mma_bufred[0];
   }
 
-
   void cuda_kkt_rex(void* rex, void* df0dx, void* dfdx, void* xsi,
        void* eta, void* lambda, int* n, int* m) {
     const dim3 nthrds(1024, 1, 1);
@@ -545,8 +532,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
-  //////a_d=max(b,c*d_d)
   void cuda_maxcons(void* a, real* b, real* c, void* d, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -554,7 +539,6 @@ extern "C" {
          ((real*)a, *b, *c, (real*)d, *n);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   real cuda_lcsc2(void *a, void*b, int *n) {
     const dim3 nthrds(1024, 1, 1);
@@ -581,7 +565,6 @@ extern "C" {
     return mma_bufred[0];
   }
 
-
   void cuda_mpisum(void *a, int *n) {
 #ifdef HAVE_DEVICE_MPI
     real* temp=(real*)a;
@@ -589,7 +572,6 @@ extern "C" {
     device_mpi_allreduce_inplace(temp, *n, sizeof(real), DEVICE_MPI_SUM);
 #endif
   }
-
 
   void cuda_add2inv2(void* a, void *b, real* c, int* n) {
     const dim3 nthrds(1024, 1, 1);
@@ -599,7 +581,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
   void cuda_max2(void* a, real* b, void* c, real* d, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -607,7 +588,6 @@ extern "C" {
          ((real*)a, *b, (real*)c,*d, *n);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_updatebb(void* bb, void* dellambda, void* dely,void* d,
        void* mu, void* y, real* delz, int *m) {
@@ -619,7 +599,6 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-
   void cuda_updateAA(void* AA, void* globaltmp_mm, void* s, void* lambda,
        void* d, void*mu,void* y,void* a, real* zeta, real* z, int* m) {
     const dim3 nthrds(1024, 1, 1);
@@ -629,7 +608,6 @@ extern "C" {
          (real*)mu,(real*) y, (real*)a, *zeta, *z, *m);
     CUDA_CHECK(cudaGetLastError());
   }
-
 
   void cuda_dy(void* dy, void* dely, void* dlambda,void* d, void* mu,
        void* y,  int* n) {
@@ -642,4 +620,3 @@ extern "C" {
   }
 
 }/* extern "C" */
-

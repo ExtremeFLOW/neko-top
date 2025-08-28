@@ -40,6 +40,7 @@ module simple_brinkman_source_term
   use source_term, only: source_term_t
   use coefs, only: coef_t
   use neko_config, only: NEKO_BCKND_DEVICE
+  use time_state, only: time_state_t
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3
@@ -166,12 +167,10 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
-  subroutine simple_brinkman_source_term_compute(this, t, tstep)
+  !! @param time The time state.
+  subroutine simple_brinkman_source_term_compute(this, time)
     class(simple_brinkman_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)

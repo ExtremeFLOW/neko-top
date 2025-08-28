@@ -33,7 +33,8 @@
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
 module adjoint_scalar_pnpn
-  use comm, only: MPI_INTEGER, MPI_MAX, NEKO_COMM, neko_error
+  use comm, only: NEKO_COMM
+  use utils, only: neko_error
   use num_types, only: rp
   use, intrinsic :: iso_fortran_env, only: error_unit
   use rhs_maker, only : rhs_maker_bdf_t, rhs_maker_ext_t, rhs_maker_oifs_t, &
@@ -68,6 +69,7 @@ module adjoint_scalar_pnpn
   use scratch_registry, only : neko_scratch_registry
   use time_state, only : time_state_t
   use bc, only : bc_t
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_MAX
   implicit none
   private
 
@@ -372,10 +374,10 @@ contains
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)
       ! Compute the source terms
-      call this%source_term%compute(t, tstep)
+      call this%source_term%compute(time)
 
       ! Apply weak boundary conditions, that contribute to the source terms.
-      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), t, tstep, .false.)
+      call this%bcs%apply_scalar(this%f_Xh%x, dm_Xh%size(), time, .false.)
 
       ! if (oifs) then
       !    call neko_error("oifs not implemented for adjoint scalar")
@@ -408,11 +410,11 @@ contains
       call s_adj_lag%update()
 
       !> Apply strong boundary conditions.
-      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), t, tstep, &
+      call this%bcs%apply_scalar(this%s_adj%x, this%dm_Xh%size(), time, &
            .true.)
 
       ! Update material properties if necessary
-      call this%update_material_properties(t, tstep)
+      call this%update_material_properties(time)
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual', 20)
