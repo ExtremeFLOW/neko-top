@@ -54,6 +54,9 @@ module design_3dto1d
   use vector, only: vector_t
   use math, only: copy
 
+  use mpi_f08, only: mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
+  use comm, only: pe_rank, pe_size, neko_comm, mpi_real_precision
+
   use fld_file_output, only: fld_file_output_t
 
   implicit none
@@ -153,10 +156,70 @@ contains
   end subroutine design_3dto1d_update_design
 
 
+  ! subroutine design_3dto1d_write(this, idx)
+  !   class(design_3dto1d_t), intent(inout) :: this
+  !   integer, intent(in) :: idx
+  !   if (pe_rank == 0) print *, "write is not supported yet for design_3dto1d_t"
+  ! end subroutine design_3dto1d_write
+
   subroutine design_3dto1d_write(this, idx)
     class(design_3dto1d_t), intent(inout) :: this
     integer, intent(in) :: idx
-    print *, "write is not supported yet for design_3dto1d_t"
+    
+    character(len=100) :: filename
+    integer :: i, iunit, ierr
+    real(rp) :: Le, x_pos
+    real(rp), allocatable :: global_values(:)
+    real(rp), allocatable :: global_x(:)
+    integer :: global_size
+    real(rp) :: L_total
+
+    L_total = 2.0_rp
+
+    ! Only rank 0 will write the file
+    if (pe_rank == 0) then
+      ! Get global size
+      global_size = this%size_global()
+      allocate(global_values(global_size))
+      allocate(global_x(global_size))
+      
+      ! Calculate element length and x positions
+      Le = L_total / real(global_size, kind=rp)
+      do i = 1, global_size
+        global_x(i) = Le * (i - 0.5_rp)  ! Center of each element
+      end do
+    endif
+    
+    ! Gather design values from all ranks to rank 0
+    call MPI_Gather(this%values%x, this%size(), mpi_real_precision, &
+                  global_values, this%size(), mpi_real_precision, &
+                  0, neko_comm, ierr)
+    
+    if (pe_rank == 0) then
+      ! Create filename with iteration index
+      write(filename, '(A,I0.6,A)') 'design_iter_', idx, '.txt'
+      
+      ! Open file for writing
+      open(newunit=iunit, file=trim(filename), status='replace', action='write')
+      
+      ! Write header
+      write(iunit, '(A,I0)') '# Iteration: ', idx
+      write(iunit, '(A)') '# x_position height'
+      
+      ! Write data
+      do i = 1, global_size
+        write(iunit, '(2E16.8)') global_x(i), global_values(i)
+      end do
+      
+      close(iunit)
+      
+      deallocate(global_values)
+      deallocate(global_x)
+      
+      print *, "Design written to ", trim(filename)
+    endif
+    
   end subroutine design_3dto1d_write
+
 
 end module design_3dto1d

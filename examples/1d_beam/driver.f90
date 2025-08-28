@@ -57,8 +57,9 @@ program usrneko
 
   !> Stress constraints
   character(len=20) :: index_str
-  integer :: stress_global_indices(9)
-  real(rp) :: stress_sigma_max(9)
+  integer, allocatable :: stress_global_indices(:)
+  real(rp), allocatable :: stress_sigma_max(:)
+  integer :: num_constraints, num_constraint_partitions
 
   !> For getting objectives and constraints values though getters in problem_t
   type(vector_t) :: all_objectives, constraint_value
@@ -99,11 +100,22 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Construct the problem
 
+  ! initialize the problem
+  call prob%init(parameters, des)
+
   allocate(deflection)
   allocate(beamweight)
 
-  ! add constraints on global indices
-  stress_global_indices = [1, 2, 3, 3, 4, 5, des%size_global()-1 , des%size_global(), 150000]
+  ! Set up distributed stress constraints
+  num_constraints = 100
+  num_constraint_partitions=10
+  allocate(stress_global_indices(num_constraints))
+  allocate(stress_sigma_max(num_constraints))
+  ! Add constraints on global indices
+  call fill_constraint_indices(stress_global_indices, num_constraints, &
+       num_constraint_partitions, des%size_global())
+  ! print *, "stress_global_indices=" ,stress_global_indices                                   
+
   stress_sigma_max = 250e6_rp  ! Same max stress for all
   
   allocate(stress_constraints(size(stress_global_indices)))
@@ -132,10 +144,10 @@ program usrneko
   if (pe_rank == 0) print *, "number of problem objectives=", prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
   
   ! update obj and cons and sensitivities for the init design
-   !   call deflection%update_value(des)
-   !   call beamweight%update_value(des)
-   !   call deflection%update_sensitivity(des)
-   !   call beamweight%update_sensitivity(des)
+  !   call deflection%update_value(des)
+  !   call beamweight%update_value(des)
+  !   call deflection%update_sensitivity(des)
+  !   call beamweight%update_sensitivity(des)
   ! -------------------------------------------------------------------------- !
   ! Perform finite difference validation
   !   if (pe_rank == 0) then
@@ -143,18 +155,12 @@ program usrneko
   !   endif
   !   call finite_difference_validation(des, 1, 1.0e-6_rp)
 
-  ! Update values and sensitivities
-  !   do i = 1, size(stress_constraints)
-  !      call stress_constraints(i)%update_value(des)
-  !      call stress_constraints(i)%update_sensitivity(des)
-  !   end do
-   call prob%update_objectives(des)
-   call prob%update_objective_sensitivities(des)
-   call prob%update_constraints(des)
-   call prob%update_constraint_sensitivities(des)
+  call prob%update_objectives(des)
+  call prob%update_objective_sensitivities(des)
+  call prob%update_constraints(des)
+  call prob%update_constraint_sensitivities(des)
 
-  !   call con_1%update_value(des)
-  !   call con_1%update_sensitivity(des)
+
   call prob%get_all_objective_values(all_objectives)
   call prob%get_constraint_values(constraint_value)
   call prob%get_objective_value(objective_value)
@@ -164,42 +170,32 @@ program usrneko
         "all_objectives%x=", all_objectives%x, "constraint_value", constraint_value%x
   end if
 
-!   ! initialize the problem
-!   call prob%init(parameters, des)
+  ! -------------------------------------------------------------------------- !
+  ! Execute the optimization
+  call optimizer_factory(opt, parameters, prob, des)
+
+  call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  t_start = MPI_Wtime()
   
-!   call prob%add_objective(obj)
-!   call prob%add_constraint(con_1)
+  call opt%run(prob, des)
+
+  call MPI_Barrier(MPI_COMM_WORLD, ierr)
+  t_end = MPI_Wtime()
 
 
 
-!   ! -------------------------------------------------------------------------- !
-!   ! Execute the optimization
-!   call optimizer_factory(opt, parameters, prob, des)
-
-!   call MPI_Barrier(MPI_COMM_WORLD, ierr)
-!   t_start = MPI_Wtime()
-  
-!   call opt%run(prob, des)
-
-!   call MPI_Barrier(MPI_COMM_WORLD, ierr)
-!   t_end = MPI_Wtime()
-
-
-
-!   if (pe_rank == 0) then
-!      print *, "opt%run execution time:", t_end - t_start, "seconds"
-!   end if
+  if (pe_rank == 0) then
+     print *, "opt%run execution time:", t_end - t_start, "seconds"
+  end if
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
+  call neko_finalize(neko_case)
+  call opt%free()
+  call prob%free()
+  call des%free()
 
-
-!   call neko_finalize(neko_case)
-!   call opt%free()
-!   call prob%free()
-!   call des%free()
-
-!   if (allocated(opt)) deallocate(opt)
+  if (allocated(opt)) deallocate(opt)
 
 end program usrneko
 
@@ -286,3 +282,63 @@ subroutine finite_difference_validation(des, k_test, delta)
   deallocate(sensitivities)
   call obj%free()
 end subroutine finite_difference_validation
+
+subroutine fill_constraint_indices(stress_global_indices, num_constraints, &
+                                   num_constraint_partitions, design_size)
+  use num_types, only: rp
+  implicit none
+
+  integer, intent(in) :: num_constraints, num_constraint_partitions, design_size
+  integer, intent(out) :: stress_global_indices(num_constraints)
+
+  integer :: base_size, remainder_size
+  integer :: constraints_per_partition, remainder_constraints
+  integer :: i, j, idx, partition_start, partition_end
+  integer :: partition_constraints, partition_size
+  integer :: cum_start
+
+  ! --- partitioning of constraints ---
+  constraints_per_partition = num_constraints / num_constraint_partitions
+  remainder_constraints     = mod(num_constraints, num_constraint_partitions)
+
+  ! --- partitioning of design variables ---
+  base_size     = design_size / num_constraint_partitions
+  remainder_size = mod(design_size, num_constraint_partitions)
+
+  idx = 1
+  cum_start = 1
+
+  do i = 1, num_constraint_partitions
+    ! how many constraints in this partition
+    if (i <= remainder_constraints) then
+      partition_constraints = constraints_per_partition + 1
+    else
+      partition_constraints = constraints_per_partition
+    endif
+
+    ! how many design variables in this partition
+    if (i <= remainder_size) then
+      partition_size = base_size + 1
+    else
+      partition_size = base_size
+    endif
+
+    partition_start = cum_start
+    partition_end   = partition_start + partition_size - 1
+
+    ! print *, "chunk num=", i, "starts from", partition_start, &
+    !          "ends at", partition_end, "ncloc=", partition_end - partition_start + 1
+
+    ! pick consecutive indices in this partition
+    do j = 1, partition_constraints
+      if (idx > num_constraints) exit
+      stress_global_indices(idx) = min(partition_start + (j-1), partition_end)
+      idx = idx + 1
+    end do
+
+    cum_start = partition_end + 1
+  end do
+
+end subroutine fill_constraint_indices
+
+

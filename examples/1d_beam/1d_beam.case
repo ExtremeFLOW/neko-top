@@ -62,7 +62,7 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 100,
+            "max_iterations": 15,
             "tolerance": 1.0e-4,
             "performance": false,
             "mma": {
@@ -72,7 +72,7 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 1000.0,
+                "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
