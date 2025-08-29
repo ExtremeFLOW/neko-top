@@ -101,7 +101,7 @@ module simulation_m
      ! This is used to save the state of the simulation at certain time steps
      ! to be able to restart the simulation from there. This is used for the
      ! adjoint simulation.
-     logical :: checkpoint_enable = .false.
+     logical :: unsteady = .false.
      integer :: n_saves_memory = 10
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
@@ -209,17 +209,38 @@ contains
        end do
     end if
 
-    ! ------------------------------------------------------------------------ !
-    ! Handle unsteady simulation
 
-    call json_get_or_default(parameters, "checkpoints.enable", &
-         this%checkpoint_enable, .false.)
+    call json_get_or_default(parameters, "unsteady.enable", &
+         this%unsteady, .false.)
 
-    if (this%checkpoint_enable) then
+    if (this%unsteady) then
+       ! --------------------------------------------------------------------- !
+       ! Handle unsteady simulation
+       ! this needs some refactoring, but I envision the json going:
+       ! unsteady.strategy.type
+       ! 
+       ! type has options
+       ! - RAM (implying we just save everything to RAM, what we have rn)
+       ! - DISK (implying we save uniformly to disk)
+       ! - REVOLVE (self explanitory)
+       ! - POD (sneaky POD idea)
+       !
+       ! Based on this we can read parameters specific to the checkpointing
+       ! strategy.
+       !
+       ! then the functions 
+       ! - simulation_save_state 
+       ! - simulation_restore_state
+       !
+       ! point to unique ways in which each of these checkpointing strategies
+       ! save and restore u,v,w. Maybe we can even have a dedicated checkpoint
+       ! object with proceedure save and restore, and we use a factory to
+       ! build the various kinds.
+
        ! Read options related to check pointing
-       call json_get_or_default(parameters, "checkpoints.n_memory", &
+       call json_get_or_default(parameters, "unsteady.n_memory", &
             this%n_saves_memory, 10)
-       call json_get_or_default(parameters, "checkpoint.filename", &
+       call json_get_or_default(parameters, "unsteady.filename", &
             chkp_file_name, "forward_chkp_")
 
        call this%chkp_output%init(this%neko_case%chkp, chkp_file_name)
@@ -250,6 +271,10 @@ contains
              end do
           end if
        end do
+    else
+       ! --------------------------------------------------------------------- !
+       ! Handle steady simulation
+       ! this would be a good place to append the steady simcomp
     end if
 
   end subroutine simulation_initialize
@@ -260,7 +285,7 @@ contains
     integer :: i, n_scalars
 
     ! Free the RAM Checkpoints
-    if (this%checkpoint_enable) then
+    if (this%unsteady) then
        do i = 1, this%n_saves_memory
           call this%p_list(i)%free()
           call this%u_list(i)%free()
@@ -281,7 +306,7 @@ contains
        if (allocated(this%w_list)) deallocate(this%w_list)
        if (allocated(this%s_list)) deallocate(this%s_list)
 
-       this%checkpoint_enable = .false.
+       this%unsteady = .false.
        this%n_saves_memory = 0
        this%n_saves_disc = 0
        this%n_timesteps = 0
@@ -308,7 +333,7 @@ contains
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (this%checkpoint_enable) call this%save_state(this%neko_case%time)
+       if (this%unsteady) call this%save_state(this%neko_case%time)
     end do
     call profiler_stop
 
@@ -322,7 +347,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    integer :: i
+    integer :: i, total_timesteps
 
     call dt_controller%init(this%neko_case%params)
 
@@ -332,8 +357,9 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
-    do i = this%n_timesteps, 1, -1
-       if (this%checkpoint_enable) call this%restore_state(i)
+    total_timesteps = int(this%neko_case%time%end_time / this%adjoint_case%time%dt)
+    do i = total_timesteps, 1, -1
+       if (this%unsteady) call this%restore_state(i)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -369,8 +395,8 @@ contains
        end do
     end if
 
-    ! Reset our checkpoints
-    if (this%checkpoint_enable) then
+    ! Reset our unsteady
+    if (this%unsteady) then
        this%n_saves_disc = 0
        this%loaded_checkpoint = -1
        this%n_timesteps = 0
