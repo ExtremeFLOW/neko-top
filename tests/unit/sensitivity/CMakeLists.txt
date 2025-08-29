@@ -5,10 +5,11 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 set(test_list
     #"volume.case"
     #"volume_filtered.case"
-    "lube_term.case"
+    #"lube_term.case"
     #"minimum_dissipation.case"
     #"min_dis_and_lube.case"
     #"min_dis_and_lube_weights.case"
+    passive_scalar.case
 )
 
 # Path to the common driver source
@@ -36,11 +37,12 @@ add_custom_command(
 # Sensitivity utils library
 add_library(sensitivity_utils EXCLUDE_FROM_ALL
     ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
 )
 target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
 target_link_libraries(sensitivity_utils
     PUBLIC
-        neko-top-a
+        neko-top
         PkgConfig::neko
         PkgConfig::json-fortran
         MPI::MPI_Fortran

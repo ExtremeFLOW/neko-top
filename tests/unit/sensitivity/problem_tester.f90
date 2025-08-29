@@ -21,6 +21,7 @@ program minimum_dissipation_sensitivity
   use matrix, only: matrix_t
   use math, only: abscmp, copy
   use sensitivity, only: compute_sensitivity
+  use user, only: user_setup
   implicit none
 
   ! JSON related arguments
@@ -73,7 +74,7 @@ program minimum_dissipation_sensitivity
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
-
+  call user_setup(sim%neko_case%user)
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
