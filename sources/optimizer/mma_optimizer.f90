@@ -24,13 +24,13 @@ module mma_optimizer
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
   use math, only: copy, cmult
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_cmult
   use field_math, only: field_rzero
+  use vector_math, only: vector_cmult
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
-  use device_math, only: device_copy
   implicit none
   private
   public :: mma_optimizer_t
@@ -189,8 +189,15 @@ contains
 
        x = design%get_values()
 
-       constraint_value = scaling_factor * constraint_value
-       constraint_sensitivities = scaling_factor * constraint_sensitivities
+       call vector_cmult(constraint_value, scaling_factor)
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_cmult(constraint_sensitivities%x_d, scaling_factor, &
+               constraint_sensitivities%size())
+       else
+          call cmult(constraint_sensitivities%x, scaling_factor, &
+               constraint_sensitivities%size())
+       end if
 
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x, objective_sensitivities, &
