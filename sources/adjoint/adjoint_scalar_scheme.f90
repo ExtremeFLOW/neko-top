@@ -57,14 +57,13 @@ module adjoint_scalar_scheme
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only : neko_field_registry
-  use usr_scalar, only : usr_scalar_t, usr_scalar_bc_eval
   use json_utils, only : json_get, json_get_or_default, json_extract_item, &
        json_extract_object
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
-       user_material_properties
+       user_material_properties_intf
   use utils, only : neko_error, neko_warning
-  use comm, only: NEKO_COMM, MPI_INTEGER, MPI_SUM
+  use comm, only: NEKO_COMM
   use scalar_source_term, only : scalar_source_term_t
   use field_series, only : field_series_t
   use math, only : cfill, add2s2
@@ -81,6 +80,7 @@ module adjoint_scalar_scheme
   use time_state, only : time_state_t
   use device, only : device_memcpy, DEVICE_TO_HOST
   use field_math, only : field_col3, field_cmult2, field_add2, field_cfill
+  use mpi_f08, only: MPI_INTEGER, MPI_SUM
   implicit none
 
   !> Base type for a scalar advection-diffusion solver.
@@ -147,7 +147,7 @@ module adjoint_scalar_scheme
      logical :: variable_material_properties = .false.
      ! Lag arrays for the RHS.
      type(field_t) :: abx1, abx2
-     procedure(user_material_properties), nopass, pointer :: &
+     procedure(user_material_properties_intf), nopass, pointer :: &
           user_material_properties => null()
    contains
      !> Constructor for the base type.
@@ -511,19 +511,17 @@ contains
   !> Call user material properties routine and update the values of `lambda`
   !! if necessary.
   !! @param[inout] this The object.
-  !! @param t Time value.
-  !! @param tstep Current time step.
-  subroutine adjoint_scalar_scheme_update_material_properties(t, tstep, this)
+  !! @param time The time state.
+  subroutine adjoint_scalar_scheme_update_material_properties(this, time)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
-    real(kind=rp),intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: nut
     integer :: index
     ! Factor to transform nu_t to lambda_t
     type(field_t), pointer :: lambda_factor
 
-    call this%user_material_properties(t, tstep, this%name, &
-         this%material_properties)
+    call this%user_material_properties(this%name, this%material_properties, &
+         time)
 
     ! factor = rho * cp / pr_turb
     if (this%variable_material_properties .and. &
@@ -562,8 +560,10 @@ contains
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
-    procedure(user_material_properties), pointer :: dummy_mp_ptr
+    procedure(user_material_properties_intf), pointer :: dummy_mp_ptr
     real(kind=rp) :: const_cp, const_lambda
+    ! Dummy time state set to 0
+    type(time_state_t) :: time
 
     dummy_mp_ptr => dummy_user_material_properties
 
@@ -581,8 +581,7 @@ contains
             "file!"
        call neko_log%message(log_buf)
        this%user_material_properties => user%material_properties
-       call user%material_properties(0.0_rp, 0, this%name, &
-            this%material_properties)
+       call user%material_properties(this%name, this%material_properties, time)
     else
        this%user_material_properties => dummy_user_material_properties
        if (params_primal%valid_path('Pe') .and. &

@@ -261,7 +261,7 @@ contains
           this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
           this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
-               n, this%mask%mask, this%mask%size)
+               n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
@@ -271,6 +271,8 @@ contains
           this%value = glsc2(objective_field%x, this%C_Xh%b, n)
        end if
     end if
+
+    this%value = this%value * 0.5_rp
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

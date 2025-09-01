@@ -31,13 +31,19 @@
  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  POSSIBILITY OF SUCH DAMAGE.
 */
-
-#include <hip/hip_runtime.h>
-#include "RAMP_mapping_kernel.h"
-#include <neko/device/hip/check.h>
-#include <neko/device_config.h>
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
+
+// Device includes
+#include <hip/hip_runtime.h>
+
+// Neko includes
+#include <neko/device/device_config.h>
+#include <neko/device/hip/check.h>
+
+// Local includes
+#include "RAMP_mapping_kernel.h"
 
 extern "C" {
 

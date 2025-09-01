@@ -164,5 +164,5 @@ printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDevice: $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
 if [ "$TEST" == true ]; then
-    ctest -C Debug --output-on-failure --test-dir $MAIN_DIR/build --parallel
+    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
 fi

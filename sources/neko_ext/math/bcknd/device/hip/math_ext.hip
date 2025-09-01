@@ -32,17 +32,23 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include <hip/hip_runtime.h>
-#include "math_ext_kernel.h"
-#include <neko/device/hip/check.h>
-#include <neko/device_config.h>
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" {
+// Device includes
+#include <hip/hip_runtime.h>
 
+// Neko includes
+#include <neko/device/device_config.h>
+#include <neko/device/hip/check.h>
 #include <neko/math/bcknd/device/device_mpi_op.h>
 #include <neko/math/bcknd/device/device_mpi_reduce.h>
+
+// Local includes
+#include "math_ext_kernel.h"
+
+extern "C" {
 
 /** Fortran wrapper for copy_mask
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$
