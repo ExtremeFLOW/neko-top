@@ -48,7 +48,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-  use vector, only: vector_t
+  use vector_math, only: vector_add2
 
   implicit none
   private
@@ -539,7 +539,8 @@ contains
 
     call sensitivity%init(this%n_design)
     do i = 1, this%n_objectives
-       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
+       call vector_add2(sensitivity, &
+            this%objective_list(i)%objective%sensitivity)
     end do
 
   end subroutine problem_get_objective_sensitivities
