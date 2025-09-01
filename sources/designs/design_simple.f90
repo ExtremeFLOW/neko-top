@@ -64,9 +64,9 @@ module simple_design
      private
 
      type(vector_t) :: values
-     type(vector_t) :: x
-     type(vector_t) :: y
-     type(vector_t) :: z
+     type(vector_t) :: x_coord
+     type(vector_t) :: y_coord
+     type(vector_t) :: z_coord
 
    contains
 
@@ -170,9 +170,9 @@ contains
     call this%init_base(name, n)
 
     call this%values%init(n)
-    this%x = x
-    this%y = y
-    this%z = z
+    this%x_coord = x
+    this%y_coord = y
+    this%z_coord = z
 
   end subroutine design_simple_init_from_components
 
@@ -182,9 +182,9 @@ contains
 
     call this%free_base()
     call this%values%free()
-    call this%x%free()
-    call this%y%free()
-    call this%z%free()
+    call this%x_coord%free()
+    call this%y_coord%free()
+    call this%z_coord%free()
 
   end subroutine design_simple_free
 
@@ -203,37 +203,37 @@ contains
 
   end subroutine design_simple_map_forward
 
-  function design_simple_get_values(this) result(values)
+  subroutine design_simple_get_values(this, values)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
 
     values = this%values
 
-  end function design_simple_get_values
+  end subroutine design_simple_get_values
 
-  function design_simple_get_x(this) result(x)
+  subroutine design_simple_get_x(this, x)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: x
+    type(vector_t), intent(inout) :: x
 
-    x = this%x
+    x = this%x_coord
 
-  end function design_simple_get_x
+  end subroutine design_simple_get_x
 
-  function design_simple_get_y(this) result(y)
+  subroutine design_simple_get_y(this, y)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: y
+    type(vector_t), intent(inout) :: y
 
-    y = this%y
+    y = this%y_coord
 
-  end function design_simple_get_y
+  end subroutine design_simple_get_y
 
-  function design_simple_get_z(this) result(z)
+  subroutine design_simple_get_z(this, z)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: z
+    type(vector_t), intent(inout) :: z
 
-    z = this%z
+    z = this%z_coord
 
-  end function design_simple_get_z
+  end subroutine design_simple_get_z
 
   subroutine design_simple_update_design(this, values)
     class(simple_design_t), intent(inout) :: this
