@@ -41,14 +41,6 @@ project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
 set(CMAKE_Fortran_STANDARD 2008)
 
 # ............................................................................ #
-# Options
-
-option(BUILD_DOCS "Build documentation" OFF)
-option(BUILD_TESTING "Build the tests" OFF)
-option(BUILD_EXAMPLES "Build the examples" OFF)
-option(ONLY_DOCS "Only build the documentation" OFF)
-
-# ............................................................................ #
 # Define cmake variables
 
 # Define the list of available build types
@@ -60,6 +52,19 @@ set(CMAKE_BUILD_TYPE_LIST
 )
 set(CMAKE_Fortran_PREPROCESS ON)
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+
+# ............................................................................ #
+# Options
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    option(BUILD_EXAMPLES "Build the examples" ON)
+else()
+    option(BUILD_EXAMPLES "Build the examples" OFF)
+endif()
+
+option(BUILD_DOCS "Build documentation" OFF)
+option(BUILD_TESTING "Build the tests" OFF)
+option(ONLY_DOCS "Only build the documentation" OFF)
 
 # ============================================================================ #
 # Documentation
