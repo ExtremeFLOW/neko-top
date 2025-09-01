@@ -57,6 +57,8 @@ module objective
      procedure, pass(this) :: init_base => objective_init_base
      !> Destructor of the base class
      procedure, pass(this) :: free_base => objective_free_base
+     !> Get the weight of the objective
+     procedure, pass(this) :: get_weight => objective_get_weight
 
   end type objective_t
 
@@ -135,6 +137,13 @@ contains
        deallocate(this%objective)
     end if
   end subroutine objective_wrapper_free
+
+  !> Get the weight of the objective
+  pure function objective_get_weight(this) result(w)
+    class(objective_t), intent(in) :: this
+    real(kind=rp) :: w
+    w = this%weight
+  end function objective_get_weight
 
 end module objective
 
