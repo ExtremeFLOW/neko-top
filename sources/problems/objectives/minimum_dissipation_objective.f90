@@ -284,25 +284,6 @@ contains
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
-
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-
-    ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%u, this%adjoint_u)
-    call field_addcol3(work, this%v, this%adjoint_v)
-    call field_addcol3(work, this%w, this%adjoint_w)
-    ! but negative
-    call field_cmult(work, -1.0_rp)
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
-    else
-       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
-    end if
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_update_sensitivity
 
