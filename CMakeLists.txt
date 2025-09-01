@@ -56,14 +56,23 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # ............................................................................ #
 # Options
 
+# Assign default values to options
+set(DEFAULT_EXAMPLES OFF)
+set(DEFAULT_TESTING OFF)
+set(DEFAULT_DOCS OFF)
+
+# Modify default options based on the build type
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    option(BUILD_EXAMPLES "Build the examples" ON)
-else()
-    option(BUILD_EXAMPLES "Build the examples" OFF)
+    set(DEFAULT_EXAMPLES ON)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
+    set(DEFAULT_TESTING ON)
+    set(DEFAULT_DOCS ON)
+    set(DEFAULT_EXAMPLES ON)
 endif()
 
-option(BUILD_DOCS "Build documentation" OFF)
-option(BUILD_TESTING "Build the tests" OFF)
+option(BUILD_EXAMPLES "Build the examples" ${DEFAULT_EXAMPLES})
+option(BUILD_DOCS "Build documentation" ${DEFAULT_DOCS})
+option(BUILD_TESTING "Build the tests" ${DEFAULT_TESTING})
 option(ONLY_DOCS "Only build the documentation" OFF)
 
 # ============================================================================ #
