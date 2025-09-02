@@ -1,5 +1,5 @@
 program checkpointing_test
-  use simulation_m, only: simulation_t
+  use simulation_m, only: simulation_t, simulation_checkpoint_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
@@ -38,6 +38,8 @@ program checkpointing_test
   type(problem_t) :: prob
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
+  !> The simulation checkpointing object
+  type(simulation_checkpoint_t) :: chkp
 
   !> Log message for errors
   character(len=256) :: log_msg
@@ -72,7 +74,6 @@ program checkpointing_test
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
-  call parameters%add('checkpoints.enable', .true.)
   call json_extract_object(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
@@ -83,13 +84,15 @@ program checkpointing_test
   call prob%init(parameters, des, sim)
   call optimizer_factory(opt, parameters, prob, des, sim)
 
+  call chkp%init(parameters, sim%neko_case)
+
   ! Save some pointers and allocate the fields required for the testing
   p => sim%neko_case%fluid%p
   u => sim%neko_case%fluid%u
   v => sim%neko_case%fluid%v
   w => sim%neko_case%fluid%w
 
-  n_timesteps = int(3.5 * real(sim%n_saves_memory))
+  n_timesteps = int(3.5 * real(chkp%n_saves_memory))
   allocate(p_fields(n_timesteps + 1))
   allocate(u_fields(n_timesteps + 1))
   allocate(v_fields(n_timesteps + 1))
@@ -113,7 +116,7 @@ program checkpointing_test
      write(*, '(A)') repeat('-', 80)
      write(*, '(A)') 'Running the forward simulation...'
      write(*, '(A,I0)') 'Number of time steps: ', n_timesteps
-     write(*, '(A,I0)') 'Number of checkpoints: ', sim%n_saves_memory
+     write(*, '(A,I0)') 'Number of checkpoints: ', chkp%n_saves_memory
   end if
 
   call dt_controller%init(sim%neko_case%params)
@@ -121,7 +124,7 @@ program checkpointing_test
 
   loop_start = MPI_WTIME()
 
-  sim%n_saves_disc = 0
+  chkp%n_saves_disc = 0
   do i = 1, n_timesteps
      call simulation_step(sim%neko_case, dt_controller, loop_start)
 
@@ -130,7 +133,7 @@ program checkpointing_test
      call field_copy(v_fields(i), v)
      call field_copy(w_fields(i), w)
 
-     call sim%save_state(sim%neko_case%time)
+     call chkp%save(sim%neko_case, sim%neko_case%time)
   end do
 
   call simulation_finalize(sim%neko_case)
@@ -146,10 +149,10 @@ program checkpointing_test
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
-  sim%loaded_checkpoint = -1
+  chkp%loaded_checkpoint = -1
 
   do i = n_timesteps, 1, -1
-     call sim%restore_state(i)
+     call chkp%restore(sim%neko_case, i)
 
      !  Compute the relative error of the fields
      error_p = field_glsubnorm(p_fields(i), p) / &
