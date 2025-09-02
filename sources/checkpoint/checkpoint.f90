@@ -44,17 +44,20 @@ module simulation_checkpoint
   use mpi_f08, only: MPI_WTIME
   use simulation, only: simulation_step, simulation_restart
   use field_math, only: field_copy, field_rzero
+  use utils, only: neko_error
   implicit none
   private
 
   type, public :: simulation_checkpoint_t
 
-     logical :: checkpoint_enable = .false.
+     character(len=256) :: algorithm = "linear"
+     character(len=256) :: filename = "checkpoint_"
      integer :: n_saves_memory = 10
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
+
      type(chkp_output_t) :: chkp_output
      type(field_t), dimension(:), allocatable :: p_list
      type(field_t), dimension(:), allocatable :: u_list
@@ -66,7 +69,10 @@ module simulation_checkpoint
 
    contains
      !> Initialization
-     procedure, pass(this) :: init => checkpoint_init
+     generic :: init => init_from_json, init_from_components
+     procedure, pass(this) :: init_from_json => checkpoint_init_from_json
+     procedure, pass(this) :: init_from_components => &
+          checkpoint_init_from_components
      !> Free
      procedure, pass(this) :: free => checkpoint_free
      !> Reset the checkpoint data
@@ -78,28 +84,68 @@ module simulation_checkpoint
 
   end type simulation_checkpoint_t
 
+  ! ========================================================================== !
+  ! Module procedures for our algorithm implementations.
+
+
+  interface
+     !> Save the current state of the simulation in a linear fashion
+     module subroutine checkpoint_save_linear(this, neko_case)
+       class(simulation_checkpoint_t), intent(inout) :: this
+       class(case_t), intent(inout) :: neko_case
+     end subroutine checkpoint_save_linear
+
+     !> Restore the forward simulation state in a linear fashion
+     module subroutine checkpoint_restore_linear(this, neko_case, tstep)
+       class(simulation_checkpoint_t), intent(inout) :: this
+       class(case_t), target, intent(inout) :: neko_case
+       integer, intent(in) :: tstep
+     end subroutine checkpoint_restore_linear
+  end interface
+
 contains
 
   ! ========================================================================== !
+  ! Initialization and deallocation
 
   !> Initialization
-  subroutine checkpoint_init(this, parameters, neko_case)
-    class(simulation_checkpoint_t), intent(inout), target :: this
-    type(json_file), intent(inout) :: parameters
+  subroutine checkpoint_init_from_json(this, neko_case, parameters)
+    class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
+    type(json_file), target, intent(inout) :: parameters
+    integer :: n_saves_memory
+    character(len=:), allocatable :: filename, algorithm
+
+    call json_get_or_default(parameters, "algorithm", algorithm, "linear")
+    call json_get_or_default(parameters, "n_memory", n_saves_memory, 10)
+    call json_get_or_default(parameters, "filename", filename, "checkpoint_")
+
+    call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+         filename)
+  end subroutine checkpoint_init_from_json
+
+  !> Initialization from components
+  subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
+       n_saves_memory, chkp_file_name)
+    class(simulation_checkpoint_t), intent(inout), target :: this
+    class(case_t), target, intent(inout) :: neko_case
+    character(len=*), intent(in) :: algorithm
+    integer, intent(in) :: n_saves_memory
+    character(len=*), intent(in) :: chkp_file_name
     class(scalar_scheme_t), pointer :: scalar_i
     integer :: i, j, n_scalars
     character(len=10) :: str
-    character(len=:), allocatable :: chkp_file_name
 
-    ! Read options related to check pointing
-    call json_get_or_default(parameters, "checkpoints.n_memory", &
-         this%n_saves_memory, 10)
-    call json_get_or_default(parameters, "checkpoint.filename", &
-         chkp_file_name, "forward_chkp_")
+    call this%free()
 
-    call this%chkp_output%init(neko_case%chkp, chkp_file_name)
+    ! Set internal parameters
+    this%algorithm = algorithm
+    this%filename = chkp_file_name
+    this%n_saves_memory = n_saves_memory
     this%have_scalar = allocated(neko_case%scalars)
+
+    ! Initialize the Neko checkpoint output
+    call this%chkp_output%init(neko_case%chkp, this%filename)
 
     ! Allocate the RAM Checkpoints
     allocate(this%p_list(this%n_saves_memory))
@@ -129,7 +175,7 @@ contains
        end if
     end do
 
-  end subroutine checkpoint_init
+  end subroutine checkpoint_init_from_components
 
   !> Free
   subroutine checkpoint_free(this)
@@ -138,16 +184,18 @@ contains
 
     ! Free the RAM Checkpoints
     do i = 1, this%n_saves_memory
-       call this%p_list(i)%free()
-       call this%u_list(i)%free()
-       call this%v_list(i)%free()
-       call this%w_list(i)%free()
+       if (allocated(this%p_list)) call this%p_list(i)%free()
+       if (allocated(this%u_list)) call this%u_list(i)%free()
+       if (allocated(this%v_list)) call this%v_list(i)%free()
+       if (allocated(this%w_list)) call this%w_list(i)%free()
     end do
 
-    n_scalars = size(this%s_list)
-    do i = 1, n_scalars
-       call this%s_list(i)%free()
-    end do
+    if (allocated(this%s_list)) then
+       n_scalars = size(this%s_list)
+       do i = 1, n_scalars
+          call this%s_list(i)%free()
+       end do
+    end if
 
     if (allocated(this%p_list)) deallocate(this%p_list)
     if (allocated(this%u_list)) deallocate(this%u_list)
@@ -155,12 +203,10 @@ contains
     if (allocated(this%w_list)) deallocate(this%w_list)
     if (allocated(this%s_list)) deallocate(this%s_list)
 
-    this%checkpoint_enable = .false.
-    this%n_saves_memory = 0
-    this%n_saves_disc = 0
-    this%n_timesteps = 0
-    this%loaded_checkpoint = -1
   end subroutine checkpoint_free
+
+  ! ========================================================================== !
+  ! Meta handling
 
   !> Reset the checkpoint data
   subroutine checkpoint_reset(this)
@@ -168,8 +214,8 @@ contains
     integer :: i
 
     ! Reset our checkpoints
-    this%n_saves_disc = 0
     this%loaded_checkpoint = -1
+    this%n_saves_disc = 0
     this%n_timesteps = 0
 
     do i = 1, this%n_saves_memory
@@ -185,27 +231,52 @@ contains
   end subroutine checkpoint_reset
 
   !> Save the current state of the simulation to disk
-  subroutine checkpoint_save(this, neko_case, time)
+  subroutine checkpoint_save(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
 
     ! Update the number of recorded timesteps
     this%n_timesteps = this%n_timesteps + 1
 
-    ! Sample the checkpoint if needed
-    if (modulo(time%tstep, this%n_saves_memory) .eq. 0 .or. &
-         time%tstep .le. this%first_valid_timestep) then
+    select case (this%algorithm)
+    case ("linear")
+       call checkpoint_save_linear(this, neko_case)
+    case default
+       call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
+    end select
+  end subroutine checkpoint_save
 
-       call this%chkp_output%set_counter(time%tstep)
-       call this%chkp_output%sample(time%t)
+  !> Save the current state of the simulation in a linear fashion
+  module subroutine checkpoint_save_linear(this, neko_case)
+    class(simulation_checkpoint_t), intent(inout) :: this
+    class(case_t), intent(inout) :: neko_case
+
+    ! Sample the checkpoint if needed
+    if (modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0 .or. &
+         neko_case%time%tstep .le. this%first_valid_timestep) then
+
+       call this%chkp_output%set_counter(neko_case%time%tstep)
+       call this%chkp_output%sample(neko_case%time%t)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
-
-  end subroutine checkpoint_save
+  end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state
   subroutine checkpoint_restore(this, neko_case, tstep)
+    class(simulation_checkpoint_t), intent(inout) :: this
+    class(case_t), target, intent(inout) :: neko_case
+    integer, intent(in) :: tstep
+
+    select case (this%algorithm)
+    case ("linear")
+       call checkpoint_restore_linear(this, neko_case, tstep)
+    case default
+       call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
+    end select
+  end subroutine checkpoint_restore
+
+  !> Restore the forward simulation state in a linear fashion
+  module subroutine checkpoint_restore_linear(this, neko_case, tstep)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: tstep
@@ -238,7 +309,7 @@ contains
     end if
 
     if (this%loaded_checkpoint .ne. previous_save) then
-       write(chkp_file_name, '(A,I5.5,A)') 'forward_chkp_', &
+       write(chkp_file_name, '(A,I5.5,A)') trim(this%filename), &
             previous_save, '.chkp'
 
        call chkp_file%init(chkp_file_name)
@@ -286,6 +357,6 @@ contains
        end do
     end if
 
-  end subroutine checkpoint_restore
+  end subroutine checkpoint_restore_linear
 
 end module simulation_checkpoint

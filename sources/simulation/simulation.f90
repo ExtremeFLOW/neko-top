@@ -195,7 +195,7 @@ contains
     call json_get_or_default(parameters, "checkpoints.enable", &
          this%checkpoint_enable, .false.)
     if (this%checkpoint_enable) then
-       call this%checkpoint%init(parameters, this%neko_case)
+       call this%checkpoint%init(this%neko_case, parameters)
     end if
 
   end subroutine simulation_initialize
@@ -230,7 +230,7 @@ contains
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
        if (this%checkpoint_enable) then
-          call this%checkpoint%save(this%neko_case, this%neko_case%time)
+          call this%checkpoint%save(this%neko_case)
        end if
     end do
     call profiler_stop
