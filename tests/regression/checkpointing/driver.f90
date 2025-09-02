@@ -85,7 +85,7 @@ program checkpointing_test
   call prob%init(parameters, des, sim)
   call optimizer_factory(opt, parameters, prob, des, sim)
 
-  call chkp%init(parameters, sim%neko_case)
+  call chkp%init(sim%neko_case, parameters)
 
   ! Save some pointers and allocate the fields required for the testing
   p => sim%neko_case%fluid%p
@@ -125,7 +125,6 @@ program checkpointing_test
 
   loop_start = MPI_WTIME()
 
-  chkp%n_saves_disc = 0
   do i = 1, n_timesteps
      call simulation_step(sim%neko_case, dt_controller, loop_start)
 
@@ -134,7 +133,7 @@ program checkpointing_test
      call field_copy(v_fields(i), v)
      call field_copy(w_fields(i), w)
 
-     call chkp%save(sim%neko_case, sim%neko_case%time)
+     call chkp%save(sim%neko_case)
   end do
 
   call simulation_finalize(sim%neko_case)
