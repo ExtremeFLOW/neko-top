@@ -131,16 +131,37 @@ contains
 
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
+    
+    if (.not. has_scalar) then
+       call neko_error("wtf??")
+    end if
 
     if (has_scalar) then
+           ! reset the forward scalar
+           call json_get(neko_case%params, &
+               'case.scalar.initial_condition.type', string_val)
+          call json_extract_object(neko_case%params, &
+               'case.scalar.initial_condition', json_subdict)
+           if (trim(string_val) .ne. 'user') then
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict)
+          else
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
+                  neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%scalars%scalar_fields(1)%c_Xh, &
+                  neko_case%scalars%scalar_fields(1)%gs_Xh, &
+                  neko_case%user%initial_conditions)
+          end if
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
+          ! We need to write an "adjoint reset" instead of this
           ! we shouldn't fallback to the primal here.
           call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition.type', string_val)
           call json_extract_object(neko_case%params, &
                'case.adjoint_scalar.initial_condition', json_subdict)
 
-          !call neko_log%section("Adjoint scalar initial condition ")
+          ! call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
              call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
@@ -155,28 +176,6 @@ contains
           end if
 
           ! call neko_log%end_section()
-       else
-
-          ! Handle multiple scalars
-          call neko_case%params%info('case.scalars', n_children = n_scalars)
-
-          do i = 1, n_scalars
-             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
-                  i, scalar_params)
-             call json_get(scalar_params, 'initial_condition.type', string_val)
-             call json_extract_object(scalar_params, 'initial_condition', &
-                  json_subdict)
-
-             if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(neko_case%scalars%scalar_fields(i)%s, &
-                     neko_case%scalars%scalar_fields(i)%c_Xh, &
-                     neko_case%scalars%scalar_fields(i)%gs_Xh, string_val, &
-                     json_subdict)
-             else
-                call neko_error("user defined ICs not implemented for " // &
-                     "adjoint scalar")
-             end if
-          end do
        end if
     end if
 
