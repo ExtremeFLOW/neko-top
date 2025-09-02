@@ -39,7 +39,9 @@ for arg in "$@"; do
         esac
     fi
 done
-Nx=$N && Ny=$N && Nz=1
+Nx=$((N * 2))
+Ny=$N
+Nz=1
 
 # ============================================================================ #
 # Ensure Neko can be found and set default mesh size
@@ -63,7 +65,7 @@ fi
 z=$(python3 -c "print(1.0 / $N)")
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 1.5 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
+genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #

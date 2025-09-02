@@ -40,9 +40,15 @@ module adjoint_scalar_convection_source_term
   use json_module, only: json_file
   use time_state, only: time_state_t
   use source_term, only: source_term_t
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use coefs, only: coef_t
   use field_math, only: field_subcol3
   use operators, only: grad
+  use utils, only: neko_error
+  use field_registry, only: neko_field_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: col2, invcol2, add2, col3, sub2
   implicit none
   private
 
@@ -178,7 +184,7 @@ contains
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(4)
-    type(field_t), pointer :: dsdx, dsdy, dsdz
+    type(field_t), pointer :: dsdx, dsdy, dsdz, work
     real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
        accumulate, fld_GL, s_adj_GL
     integer :: n_GL, nel
@@ -243,6 +249,8 @@ contains
     ! preempt the GLL mass matrix
     call invcol2(work%x, this%coef%B, work%size())
     call sub2(fw%x, work%x, work%size())
+
+    end if
 
     else
     call field_subcol3(fu, this%s_adj, dsdx)

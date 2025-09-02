@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 1.0,
-            "timestep": 2e-4
+            "end_time": 6.0,
+            "timestep": 1e-3
         },
         "numerics": {
             "time_order": 3,
@@ -26,7 +26,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 50
             },
             "pressure_solver": {
@@ -34,7 +34,7 @@
                 "preconditioner": {
                     "type": "hsmg"
                 },
-                "absolute_tolerance": 1e-4,
+                "absolute_tolerance": 1e-6,
                 "max_iterations": 50
             },
             "boundary_conditions": [
@@ -51,13 +51,13 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 100.0,
+            "Pe": 1000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 50
             },
             "initial_condition": {
@@ -115,7 +115,8 @@
                 "type": "steady",
                 "tol": 1e-7,
                 "compute_control": "tsteps",
-                "compute_value": 1
+                "compute_value": 1,
+                "scalar_coupled": true
             }
         ],
         "point_zones": [
@@ -165,7 +166,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 1000
+                    "f_max": 100
                 }
             ],
             "initial_distribution": {
