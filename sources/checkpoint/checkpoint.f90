@@ -40,7 +40,7 @@ module simulation_checkpoint
   use time_state, only: time_state_t
   use chkp_output, only: chkp_output_t
   use field, only: field_t
-  use file, only: file_t
+  use file, only: file_t, file_free
   use mpi_f08, only: MPI_WTIME
   use simulation, only: simulation_step, simulation_restart
   use field_math, only: field_copy, field_rzero
@@ -51,7 +51,7 @@ module simulation_checkpoint
   type, public :: simulation_checkpoint_t
 
      character(len=256) :: algorithm = "linear"
-     character(len=256) :: filename = "checkpoint_"
+     character(len=256) :: filename = "checkpoint"
      integer :: n_saves_memory = 10
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
@@ -118,7 +118,7 @@ contains
 
     call json_get_or_default(parameters, "algorithm", algorithm, "linear")
     call json_get_or_default(parameters, "n_memory", n_saves_memory, 10)
-    call json_get_or_default(parameters, "filename", filename, "checkpoint_")
+    call json_get_or_default(parameters, "filename", filename, "checkpoint")
 
     call this%init_from_components(neko_case, algorithm, n_saves_memory, &
          filename)
@@ -314,6 +314,7 @@ contains
 
        call chkp_file%init(chkp_file_name)
        call chkp_file%read(neko_case%chkp)
+       call file_free(chkp_file)
 
        call dt_controller%init(neko_case%params)
        call simulation_restart(neko_case, neko_case%chkp)
