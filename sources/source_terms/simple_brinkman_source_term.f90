@@ -71,6 +71,8 @@ module simple_brinkman_source_term
      type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
+     !> if dealiasing should be applied
+     logical :: dealias
 
    contains
      !> The common constructor using a JSON object.
@@ -115,14 +117,16 @@ contains
   !! @param coef The SEM coeffs.
   !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
   !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias if dealiasing should be applied.
   subroutine simple_brinkman_source_term_init_from_components(this, &
-       f_x, f_y, f_z, chi, u, v, w, coef, c_Xh_GL, GLL_to_GL)
+       f_x, f_y, f_z, chi, u, v, w, coef, c_Xh_GL, GLL_to_GL, dealias)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
     type(coef_t), intent(in) :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
@@ -151,6 +155,7 @@ contains
     ! and get chi out of the design
     this%chi => chi
     ! for over integration
+    this%dealias = dealias
     this%c_Xh_GL => c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
     this%Xh_GLL => this%coef%Xh
@@ -184,46 +189,56 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! nel = this%coef%msh%nelv
-    ! n_GL = nel * this%Xh_GL%lxyz
-    ! call this%GLL_to_GL%map(chi_GL, this%chi%x, nel, this%Xh_GL)
+    if (this%dealias) then
+    nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
 
-    ! ! u
-    ! call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call sub2(fu%x, work%x, work%size())
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased brinkman term not implemented on device")
+    else
 
-    ! ! v
-    ! call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call sub2(fv%x, work%x, work%size())
+    call this%GLL_to_GL%map(chi_GL, this%chi%x, nel, this%Xh_GL)
 
-    ! ! w
-    ! call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-    ! call col3(accumulate, chi_GL, fld_GL, n_GL)
-    ! ! multiply by GL mass matrix
-    ! call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! ! map back to GLL
-    ! call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! ! preempt the GLL mass matrix
-    ! call invcol2(work%x, this%coef%B, work%size())
-    ! call sub2(fv%x, work%x, work%size())
+    ! u
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fu%x, work%x, work%size())
+
+    ! v
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fv%x, work%x, work%size())
+
+    ! w
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fv%x, work%x, work%size())
+    end if
+    else
 
     call field_subcol3(fu, this%u, this%chi)
     call field_subcol3(fv, this%v, this%chi)
     call field_subcol3(fw, this%w, this%chi)
+
+    end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
