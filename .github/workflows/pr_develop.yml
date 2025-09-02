@@ -27,7 +27,9 @@
 name: Check PR for Develop Branch
 on:
   pull_request:
-    branches: [develop]
+    branches:
+      - develop
+      - sensitivity
     types:
       - opened
       - synchronize
