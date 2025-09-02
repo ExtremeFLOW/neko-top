@@ -72,6 +72,35 @@ module simulation_m
   implicit none
   private
 
+  type :: checkpoint_t
+     private
+     ! ----------------------------------------------------------------------- !
+     ! Unsteady simulation parameters
+
+     ! This is used to save the state of the simulation at certain time steps
+     ! to be able to restart the simulation from there. This is used for the
+     ! adjoint simulation.
+     logical :: checkpoint_enable = .false.
+     integer :: n_saves_memory = 10
+     integer :: n_saves_disc = 0
+     integer :: n_timesteps = 0
+     integer :: first_valid_timestep = 2
+     integer :: loaded_checkpoint = -1
+     type(chkp_output_t) :: chkp_output
+     type(field_t), dimension(:), allocatable :: p_list
+     type(field_t), dimension(:), allocatable :: u_list
+     type(field_t), dimension(:), allocatable :: v_list
+     type(field_t), dimension(:), allocatable :: w_list
+     type(field_t), dimension(:), allocatable :: s_list
+
+   contains
+     !> Save the current state of the simulation to disk
+     procedure, pass(this) :: save_state => checkpoint_save_state
+     !> Restore the forward simulation state
+     procedure, pass(this) :: restore_state => checkpoint_restore_state
+
+  end type checkpoint_t
+
   type :: simulation_t
 
      !> and primal case
@@ -94,25 +123,10 @@ module simulation_m
      type(fld_file_output_t), public :: output_adjoint
 
      logical :: have_scalar = .false.
-
      ! ----------------------------------------------------------------------- !
-     ! Unsteady simulation parameters
+     !> The checkpointing data
+     type(checkpoint_t) :: chkp
 
-     ! This is used to save the state of the simulation at certain time steps
-     ! to be able to restart the simulation from there. This is used for the
-     ! adjoint simulation.
-     logical :: checkpoint_enable = .false.
-     integer :: n_saves_memory = 10
-     integer :: n_saves_disc = 0
-     integer :: n_timesteps = 0
-     integer :: first_valid_timestep = 2
-     integer :: loaded_checkpoint = -1
-     type(chkp_output_t) :: chkp_output
-     type(field_t), dimension(:), allocatable :: p_list
-     type(field_t), dimension(:), allocatable :: u_list
-     type(field_t), dimension(:), allocatable :: v_list
-     type(field_t), dimension(:), allocatable :: w_list
-     type(field_t), dimension(:), allocatable :: s_list
 
    contains
      !> Initialize the simulation
@@ -128,12 +142,7 @@ module simulation_m
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
 
-     !> Save the current state of the simulation to disk
-     procedure, pass(this) :: save_state => simulation_save_state
-     !> Restore the forward simulation state
-     procedure, pass(this) :: restore_state => simulation_restore_state
   end type simulation_t
-
   public :: simulation_t
 contains
 
@@ -392,8 +401,9 @@ contains
   end subroutine simulation_reset
 
   !> Save the current state of the simulation to disk
-  subroutine simulation_save_state(this, time)
-    class(simulation_t), intent(inout) :: this
+  subroutine checkpoint_save_state(this, time)
+    type(checkpoint_t), intent(inout) :: this
+    class(simulation_t), intent(inout) :: sim
     type(time_state_t), intent(in) :: time
 
     ! Update the number of recorded timesteps
@@ -408,10 +418,10 @@ contains
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
-  end subroutine simulation_save_state
+  end subroutine checkpoint_save_state
 
   !> Restore the forward simulation state
-  subroutine simulation_restore_state(this, tstep)
+  subroutine checkpoint_restore_state(this, tstep)
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
@@ -492,7 +502,7 @@ contains
     end if
 
 
-  end subroutine simulation_restore_state
+  end subroutine checkpoint_restore_state
 
 
   !> Write current state of the simulation to disk
