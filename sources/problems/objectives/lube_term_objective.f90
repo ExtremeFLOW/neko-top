@@ -87,9 +87,8 @@ module lube_term_objective
   implicit none
   private
 
-  !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !> An objective function corresponding to out of plane stresses
+  !! \f$ F =  \int_Omega \frac{1}{2} \chi |\mathbf{u}|^2 d \Omega \f$
   type, public, extends(objective_t) :: lube_term_objective_t
      private
 
