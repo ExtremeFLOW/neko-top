@@ -1,5 +1,6 @@
 program checkpointing_test
-  use simulation_m, only: simulation_t, simulation_checkpoint_t
+  use simulation_m, only: simulation_t
+  use simulation_checkpoint, only: simulation_checkpoint_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
