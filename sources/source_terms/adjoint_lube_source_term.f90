@@ -83,6 +83,8 @@ module adjoint_lube_source_term
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
+     !> should dealiasing be used?
+     logical :: dealias
      !> The original space used in the simulation
      type(space_t), pointer :: Xh_GLL
      !> The additional higher-order space used in dealiasing
@@ -143,7 +145,7 @@ contains
        f_x, f_y, f_z, design, K, &
        u, v, w, &
        mask, if_mask, &
-       coef, c_Xh_GL, GLL_to_GL)
+       coef, c_Xh_GL, GLL_to_GL, dealias)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
@@ -154,6 +156,7 @@ contains
     type(coef_t), intent(in) :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
@@ -177,6 +180,7 @@ contains
     this%Xh_GL => this%c_Xh_GL%Xh
     this%Xh_GLL => this%coef%Xh
     this%GLL_to_GL => GLL_to_GL
+    this%dealias = dealias
 
     ! point everything in the correct places
     ! NOTE!!!
@@ -239,52 +243,57 @@ contains
        call mask_exterior_const(work, this%mask, 0.0_rp)
     end if
 
+    if (this%dealias) then
+        nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased lube source term not implemented on device")
+    else
+
+    call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
+
+    ! u
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fu%x, work%x, work%size())
+
+    ! v
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fv%x, work%x, work%size())
+
+    ! w
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fw%x, work%x, work%size())
+
+    end if
+    else
     ! multiple and add the RHS
     call field_addcol3(fu, this%u, work)
     call field_addcol3(fv, this%v, work)
     call field_addcol3(fw, this%w, work)
-    
-   !  ! do it on the dealiased mesh!
-   !  if (NEKO_BCKND_DEVICE .eq. 1) then
-   !       call neko_error("dealiased lube source term not implemented on device")
-   !  end if
 
-   !  nel = this%coef%msh%nelv
-   !  n_GL = nel * this%Xh_GL%lxyz
-   !  call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
-
-   !  ! u
-   !  call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-   !  call col3(accumulate, chi_GL, fld_GL, n_GL)
-   !  ! multiply by GL mass matrix
-   !  call col2(accumulate, this%c_Xh_GL%B, n_GL)
-   !  ! map back to GLL
-   !  call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-   !  ! preempt the GLL mass matrix
-   !  call invcol2(work%x, this%coef%B, work%size())
-   !  call add2(fu%x, work%x, work%size())
-
-   !  ! v
-   !  call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-   !  call col3(accumulate, chi_GL, fld_GL, n_GL)
-   !  ! multiply by GL mass matrix
-   !  call col2(accumulate, this%c_Xh_GL%B, n_GL)
-   !  ! map back to GLL
-   !  call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-   !  ! preempt the GLL mass matrix
-   !  call invcol2(work%x, this%coef%B, work%size())
-   !  call add2(fv%x, work%x, work%size())
-
-   !  ! w
-   !  call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-   !  call col3(accumulate, chi_GL, fld_GL, n_GL)
-   !  ! multiply by GL mass matrix
-   !  call col2(accumulate, this%c_Xh_GL%B, n_GL)
-   !  ! map back to GLL
-   !  call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-   !  ! preempt the GLL mass matrix
-   !  call invcol2(work%x, this%coef%B, work%size())
-   !  call add2(fw%x, work%x, work%size())
+    end if
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

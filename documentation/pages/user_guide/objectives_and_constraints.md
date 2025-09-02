@@ -110,6 +110,8 @@ based on lubrication theory written by Gersborg-Hansen et al.
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
+| `dealias_forcing`| If dealiasing should be applied to adjoint forcing term | logical | `.true.`|
+| `dealias_sensitivity`| If dealiasing should be applied to sensitivity contribution | logical | `.true.`|
 
 ### Scalar mixing {#objective_scalar_mixing}
 

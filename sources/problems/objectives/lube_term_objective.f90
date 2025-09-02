@@ -100,6 +100,10 @@ module lube_term_objective
      type(field_t), pointer :: w => null()
      !> Pointer to the brinkman amplitude field.
      type(field_t), pointer :: brinkman_amplitude => null()
+     !> dealias sensitivity
+     logical :: dealias_sensitivity
+     !> dealias forcing
+     logical :: dealias_forcing
 
      ! ---- everything GLL ----
      !> The coefs
@@ -149,13 +153,18 @@ contains
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
+    logical :: dealias_sensitivity, dealias_forcing
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Out of plane stresses")
+    call json_get_or_default(json, "dealias_sensitivity", &
+         dealias_sensitivity, .true.)
+    call json_get_or_default(json, "dealias_forcing", &
+         dealias_forcing, .true.)
 
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name)
+         mask_name, dealias_sensitivity, dealias_forcing)
   end subroutine lube_term_init_json_sim
 
   !> The actual constructor.
@@ -165,18 +174,25 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
+  !! @param dealias_sensitivity use dealiasing on the sensitivity.
+  !! @param dealias_sensitivity use dealiasing on the adjoint forcing.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       name, mask_name)
+       name, mask_name, dealias_sensitivity, dealias_forcing)
     class(lube_term_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
+    logical, intent(in) :: dealias_sensitivity
+    logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
+
+    this%dealias_forcing = dealias_forcing
+    this%dealias_sensitivity = dealias_sensitivity
 
     ! Grab the brinkman amplitude for the lube term
     select type (design)
@@ -212,7 +228,8 @@ contains
 
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
-           this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL)
+           this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
+           this%dealias_forcing)
 
     end associate
 
@@ -292,20 +309,15 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! call field_col3(work, this%u, this%u)
-    ! call field_addcol3(work, this%v, this%v)
-    ! call field_addcol3(work, this%w, this%w)
-    ! call field_cmult(work, this%weight * 0.5_rp)
-    ! ! scale
-    ! call field_cmult(work, this%weight * 0.5_rp)
+    if(this%dealias_sensitivity) then
+
+    nel = this%c_Xh_GLL%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
          call neko_error("dealiased sensitivity not implemented on device")
-    end if
+    else
 
-    ! do it on the dealiased mesh!
-    nel = this%c_Xh_GLL%msh%nelv
-    n_GL = nel * this%Xh_GL%lxyz
     call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
     call col3(accumulate, fld_GL, fld_GL, n_GL)
     call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
@@ -322,6 +334,16 @@ contains
     ! preempt the GLL mass matrix
     call invcol2(work%x, this%c_Xh_GLL%B, work%size())
 
+    end if
+
+    else
+    call field_col3(work, this%u, this%u)
+    call field_addcol3(work, this%v, this%v)
+    call field_addcol3(work, this%w, this%w)
+    call field_cmult(work, this%weight * 0.5_rp)
+    ! scale
+    call field_cmult(work, this%weight * 0.5_rp)
+    end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
