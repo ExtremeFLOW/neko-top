@@ -32,6 +32,7 @@ module user
   real(kind=rp), parameter :: L = 1.0_rp
   real(kind=rp), parameter :: k = 20.0_rp
   real(kind=rp), parameter :: y_0 = 0.5_rp
+  real(kind=rp), parameter :: pi = acos(-1.0_rp)
 
 contains
 
@@ -78,7 +79,7 @@ contains
           idx = bc%msk(i)
           y = s%dof%y(idx, 1, 1, 1)
           ! Inflow scalar profile is a bump
-          s%x(idx, 1, 1, 1) = 4.0_rp * y * (1.0_rp - y)
+          s%x(idx, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
        end do
     end if
   end subroutine user_bc
@@ -91,14 +92,13 @@ contains
     integer :: i
     real(kind=rp) :: y
 
-    if (scheme_name .ne. 'scalar') return
+    if (scheme_name .eq. 'fluid') return
 
     ! Initial scalar profile is a bump
     s => fields%get("s")
     do i = 1, s%dof%size()
        y = s%dof%y(i, 1, 1, 1)
-       s%x(i, 1, 1, 1) = 4.0_rp * y * (1.0_rp - y)
-       s%x(i, 1, 1, 1) = 0.0_rp
+       s%x(i, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
     end do
 
   end subroutine scalar_ic
