@@ -30,6 +30,15 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 !
+
+!> Implementation for the Linear Checkpointing algorithm.
+!! In this case, we save the state of the simulation every `n_saves_memory`
+!! time steps. When restoring to a given time step, we load the nearest
+!! checkpoint and then we fill our cache with the following `n_saves_memory` time
+!! steps. Finally, we copy the required time step from our cache.
+!!
+!! This algorithm is the simplest one and do a minimum of re-computation. But
+!! requires large amounts of memory and disk space.
 submodule (simulation_checkpoint) checkpoint_linear
   use simulation, only: simulation_step, simulation_restart
   use file, only: file_t, file_free
@@ -37,7 +46,9 @@ submodule (simulation_checkpoint) checkpoint_linear
 
 contains
 
-  !> Save the current state of the simulation in a linear fashion
+  !> Save the current state of the simulation in a linear fashion.
+  !! We save every `n_saves_memory` time steps to disc and we always save
+  !! any timestep leading up to the `first_valid_timestep` time steps to disc.
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -55,7 +66,10 @@ contains
     end if
   end subroutine checkpoint_save_linear
 
-  !> Restore the forward simulation state in a linear fashion
+  !> Restore the forward simulation state in a linear fashion.
+  !! If the requested time step is not in memory, we load the nearest
+  !! checkpoint from disc and then we step forward in time to fill our cache.
+  !! Finally, we copy the requested time step from our cache.
   module subroutine checkpoint_restore_linear(this, neko_case, tstep)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case

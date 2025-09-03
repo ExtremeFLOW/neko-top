@@ -142,6 +142,7 @@ contains
     character(len=*), optional, intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
     character(len=*), optional, intent(in) :: filename
+
     class(scalar_scheme_t), pointer :: scalar_i
     integer :: i, j
     character(len=80) :: str
