@@ -48,6 +48,8 @@ module adjoint_lube_source_term
   use json_module, only: json_file
   use source_term, only: source_term_t
   use coefs, only: coef_t
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use field, only: field_t
   use time_state, only: time_state_t
   use design, only: design_t
@@ -58,6 +60,8 @@ module adjoint_lube_source_term
   use point_zone, only: point_zone_t
   use utils, only: neko_error
   use field_registry, only: neko_field_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: col2, invcol2, add2, col3
   implicit none
   private
 
@@ -79,6 +83,16 @@ module adjoint_lube_source_term
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
+     !> should dealiasing be used?
+     logical :: dealias
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -125,22 +139,27 @@ contains
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
        u, v, w, &
        mask, if_mask, &
-       coef)
+       coef, c_Xh_GL, GLL_to_GL, dealias)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
+    real(kind=rp), intent(in) :: K
+    type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), target :: mask
+    logical :: if_mask
     type(coef_t), intent(in) :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
-    logical :: if_mask
-    real(kind=rp) :: K
-    type(field_t), intent(in), target :: u, v, w
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -157,6 +176,11 @@ contains
     call fields%assign(3, f_z)
 
     call this%init_base(fields, coef, start_time, end_time)
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
+    this%dealias = dealias
 
     ! point everything in the correct places
     ! NOTE!!!
@@ -196,6 +220,9 @@ contains
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
+       accumulate, fld_GL, chi_GL
+    integer :: n_GL, nel
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -216,10 +243,58 @@ contains
        call mask_exterior_const(work, this%mask, 0.0_rp)
     end if
 
+    if (this%dealias) then
+        nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased lube source term not implemented on device")
+    else
+
+    call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
+
+    ! u
+    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fu%x, work%x, work%size())
+
+    ! v
+    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fv%x, work%x, work%size())
+
+    ! w
+    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+    call col3(accumulate, chi_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call add2(fw%x, work%x, work%size())
+
+    end if
+    else
     ! multiple and add the RHS
     call field_addcol3(fu, this%u, work)
     call field_addcol3(fv, this%v, work)
     call field_addcol3(fw, this%w, work)
+
+    end if
+
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine adjoint_lube_source_term_compute
