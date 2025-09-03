@@ -41,10 +41,13 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
+    logical :: save_disc
+
+    ! We save to disc only every n_saves_memory time steps
+    save_disc = modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0
 
     ! Sample the checkpoint if needed
-    if (modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0 .or. &
-         neko_case%time%tstep .le. this%first_valid_timestep) then
+    if (save_disc .or. neko_case%time%tstep .le. this%first_valid_timestep) then
 
        call this%chkp_output%set_counter(neko_case%time%tstep)
        call this%chkp_output%sample(neko_case%time%t)
@@ -58,11 +61,9 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
-    type(file_t) :: chkp_file
-    character(len=256) :: chkp_file_name
     real(kind=dp) :: loop_start
     integer :: j, k, previous_save, next_save
-    integer :: i_scalars, n_scalars
+    integer :: i_scalars
     type(field_t), pointer :: u, v, w, p, s
 
     loop_start = MPI_WTIME()
@@ -73,67 +74,66 @@ contains
     p => neko_case%fluid%p
     s => null()
 
-    ! Determine the nearest save states
+    ! Determine the nearest save states on both sides
     previous_save = tstep - modulo(tstep, this%n_saves_memory)
     next_save = previous_save + this%n_saves_memory
 
-    if (previous_save .le. this%first_valid_timestep) then
-       previous_save = min(tstep, this%first_valid_timestep)
-    end if
-
-    if (previous_save .lt. this%first_valid_timestep) then
+    ! Before the first valid state we always load from disc and we do not step
+    ! forward in time.
+    if (tstep .lt. this%first_valid_timestep) then
+       previous_save = tstep
        next_save = previous_save + 1
+    else if (previous_save .lt. this%first_valid_timestep) then
+       previous_save = this%first_valid_timestep
     end if
 
+    ! Load a new batch of checkpoints if needed
     if (this%loaded_checkpoint .ne. previous_save) then
-       write(chkp_file_name, '(A,I5.5,A)') trim(this%filename), &
-            previous_save, '.chkp'
 
-       call chkp_file%init(chkp_file_name)
-       call chkp_file%read(neko_case%chkp)
-       call file_free(chkp_file)
-
-       call dt_controller%init(neko_case%params)
+       ! Restart the simulation form the checkpoint file
+       call this%chkp_output%set_counter(previous_save)
+       call this%chkp_output%file_%read(neko_case%chkp)
        call simulation_restart(neko_case, neko_case%chkp)
+
+       ! Initialize the time step controller and set the time step
+       call dt_controller%init(neko_case%params)
        neko_case%time%tstep = previous_save
        this%loaded_checkpoint = neko_case%time%tstep
 
+       ! Step through the simulation and store field states in memory
        do k = previous_save, min(next_save - 1, this%n_timesteps)
 
+          ! Do not run simulation step on the first iteration
           if (k .ne. previous_save) then
              if (neko_case%time%t .ge. neko_case%time%end_time) exit
              call simulation_step(neko_case, dt_controller, loop_start)
           end if
 
-          j = modulo(k, this%n_saves_memory) + 1
-          call field_copy(this%p_list(j), p)
-          call field_copy(this%u_list(j), u)
-          call field_copy(this%v_list(j), v)
-          call field_copy(this%w_list(j), w)
-          if (this%have_scalar) then
-             n_scalars = size(neko_case%scalars%scalar_fields)
-             do i_scalars = 1, n_scalars
-                s => neko_case%scalars%scalar_fields(i_scalars)%s
-                call field_copy(this%s_list((j - 1) * n_scalars + i_scalars), s)
-             end do
-          end if
-       end do
+          local_idx = modulo(k, this%n_saves_memory) + 1
+          call field_copy(this%p_list(local_idx), p)
+          call field_copy(this%u_list(local_idx), u)
+          call field_copy(this%v_list(local_idx), v)
+          call field_copy(this%w_list(local_idx), w)
+          do i_scalars = 1, this%n_scalars
+             j = (local_idx - 1) * this%n_scalars + i_scalars
+             s => neko_case%scalars%scalar_fields(i_scalars)%s
+             call field_copy(this%s_list(j), s)
+          end do
 
-    end if
-
-    j = modulo(tstep, this%n_saves_memory) + 1
-
-    call field_copy(p, this%p_list(j))
-    call field_copy(u, this%u_list(j))
-    call field_copy(v, this%v_list(j))
-    call field_copy(w, this%w_list(j))
-    if (this%have_scalar) then
-       n_scalars = size(neko_case%scalars%scalar_fields)
-       do i_scalars = 1, n_scalars
-          s => neko_case%scalars%scalar_fields(i_scalars)%s
-          call field_copy(s, this%s_list((j - 1) * n_scalars + i_scalars))
        end do
     end if
+
+    local_idx = modulo(tstep, this%n_saves_memory) + 1
+    call field_copy(p, this%p_list(local_idx))
+    call field_copy(u, this%u_list(local_idx))
+    call field_copy(v, this%v_list(local_idx))
+    call field_copy(w, this%w_list(local_idx))
+    do i_scalars = 1, this%n_scalars
+       j = (local_idx - 1) * this%n_scalars + i_scalars
+       s => neko_case%scalars%scalar_fields(i_scalars)%s
+       call field_copy(s, this%s_list(j))
+    end do
+
 
   end subroutine checkpoint_restore_linear
 

@@ -48,7 +48,7 @@ module simulation_checkpoint
   type, public :: simulation_checkpoint_t
 
      character(len=256) :: algorithm = "linear"
-     character(len=256) :: filename = "checkpoint"
+     character(len=256) :: filename = "checkpoint.chkp"
      integer :: n_saves_memory = 10
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
@@ -61,7 +61,7 @@ module simulation_checkpoint
      type(field_t), dimension(:), allocatable :: v_list
      type(field_t), dimension(:), allocatable :: w_list
 
-     logical :: have_scalar = .false.
+     integer :: n_scalars = 0
      type(field_t), dimension(:), allocatable :: s_list
 
    contains
@@ -106,16 +106,16 @@ contains
   ! Initialization and deallocation
 
   !> Initialization
-  subroutine checkpoint_init_from_json(this, neko_case, parameters)
+  subroutine checkpoint_init_from_json(this, neko_case, params)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(json_file), target, intent(inout) :: parameters
+    type(json_file), target, intent(inout) :: params
     integer :: n_saves_memory
     character(len=:), allocatable :: filename, algorithm
 
-    call json_get_or_default(parameters, "algorithm", algorithm, "linear")
-    call json_get_or_default(parameters, "n_memory", n_saves_memory, 10)
-    call json_get_or_default(parameters, "filename", filename, "checkpoint")
+    call json_get_or_default(params, "algorithm", algorithm, "linear")
+    call json_get_or_default(params, "n_memory", n_saves_memory, 10)
+    call json_get_or_default(params, "filename", filename, "checkpoint.chkp")
 
     call this%init_from_components(neko_case, algorithm, n_saves_memory, &
          filename)
@@ -123,23 +123,25 @@ contains
 
   !> Initialization from components
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
-       n_saves_memory, chkp_file_name)
+       n_saves_memory, filename)
     class(simulation_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
-    character(len=*), intent(in) :: algorithm
-    integer, intent(in) :: n_saves_memory
-    character(len=*), intent(in) :: chkp_file_name
+    character(len=*), optional, intent(in) :: algorithm
+    integer, optional, intent(in) :: n_saves_memory
+    character(len=*), optional, intent(in) :: filename
     class(scalar_scheme_t), pointer :: scalar_i
-    integer :: i, j, n_scalars
+    integer :: i, j
     character(len=10) :: str
 
     call this%free()
 
     ! Set internal parameters
-    this%algorithm = algorithm
-    this%filename = chkp_file_name
-    this%n_saves_memory = n_saves_memory
-    this%have_scalar = allocated(neko_case%scalars)
+    if (present(algorithm)) this%algorithm = algorithm
+    if (present(filename)) this%filename = filename
+    if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
+    if (allocated(neko_case%scalars)) then
+       this%n_scalars = size(neko_case%scalars%scalar_fields)
+    end if
 
     ! Initialize the Neko checkpoint output
     call this%chkp_output%init(neko_case%chkp, this%filename)
@@ -149,9 +151,9 @@ contains
     allocate(this%u_list(this%n_saves_memory))
     allocate(this%v_list(this%n_saves_memory))
     allocate(this%w_list(this%n_saves_memory))
-    if (this%have_scalar) then
-       n_scalars = size(neko_case%scalars%scalar_fields)
-       allocate(this%s_list(this%n_saves_memory * n_scalars))
+    if (this%n_scalars .gt. 0) then
+       this%n_scalars = size(neko_case%scalars%scalar_fields)
+       allocate(this%s_list(this%n_saves_memory * this%n_scalars))
     end if
 
     do i = 1, this%n_saves_memory
@@ -163,11 +165,11 @@ contains
        call this%v_list(i)%init(neko_case%fluid%v%dof, str)
        write(str, '(A,I0)') "w_chkp_", i
        call this%w_list(i)%init(neko_case%fluid%w%dof, str)
-       if (this%have_scalar) then
-          do j = 1, n_scalars
+       if (this%n_scalars .gt. 0) then
+          do j = 1, this%n_scalars
              write(str, '(A,I0,A,I0)') "s_chkp_", i, "_", j
              scalar_i => neko_case%scalars%scalar_fields(j)
-             call this%s_list((i - 1) * n_scalars + j)%init(scalar_i%s%dof, str)
+             call this%s_list((i - 1) * this%n_scalars + j)%init(scalar_i%s%dof, str)
           end do
        end if
     end do
@@ -177,7 +179,7 @@ contains
   !> Free
   subroutine checkpoint_free(this)
     class(simulation_checkpoint_t), intent(inout) :: this
-    integer :: i, n_scalars
+    integer :: i
 
     ! Free the RAM Checkpoints
     do i = 1, this%n_saves_memory
@@ -188,8 +190,7 @@ contains
     end do
 
     if (allocated(this%s_list)) then
-       n_scalars = size(this%s_list)
-       do i = 1, n_scalars
+       do i = 1, size(this%s_list)
           call this%s_list(i)%free()
        end do
     end if
