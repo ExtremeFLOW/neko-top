@@ -195,6 +195,8 @@ module brinkman_design
 
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => brinkman_design_get_design
+     !> Retrieve the sensitivity
+     procedure, pass(this) :: get_sensitivity => brinkman_design_get_sensitivity
 
      !> Retrieve the x location of the design variables
      procedure, pass(this) :: design_get_x => brinkman_design_get_x
@@ -247,9 +249,11 @@ contains
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
+    logical :: dealias
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
+    call json_get_or_default(parameters, 'dealias', dealias, .true.)
 
     select case (trim(domain_type))
     case ('full')
@@ -267,14 +271,13 @@ contains
     end select
 
     ! Initialize and inject into the simulation
-    call this%init_from_components(name, simulation)
+    call this%init_from_components(name, simulation, dealias)
 
     ! Initialize the mapper
     associate(coef => simulation%neko_case%fluid%c_Xh, &
          gs => simulation%neko_case%fluid%gs_Xh)
 
       if ('mapping' .in. parameters) then
-         call json_extract_object(parameters, 'mapping', json_subdict)
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
       end if
@@ -304,10 +307,12 @@ contains
 
   end subroutine brinkman_design_free
 
-  subroutine brinkman_design_init_from_components(this, name, simulation)
+  subroutine brinkman_design_init_from_components(this, name, simulation, &
+       dealias)
     class(brinkman_design_t), intent(inout) :: this
     character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
+    logical, intent(in) :: dealias
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
@@ -405,7 +410,10 @@ contains
          simulation%fluid%u, &
          simulation%fluid%v, &
          simulation%fluid%w, &
-         simulation%fluid%c_Xh)
+         simulation%fluid%c_Xh, &
+         simulation%adjoint_fluid%c_Xh_GL, &
+         simulation%adjoint_fluid%GLL_to_GL, &
+         dealias)
     ! append brinkman source term to the forward problem
     call simulation%fluid%source_term%add(forward_brinkman)
 
@@ -418,7 +426,10 @@ contains
          simulation%adjoint_fluid%u_adj, &
          simulation%adjoint_fluid%v_adj, &
          simulation%adjoint_fluid%w_adj, &
-         simulation%adjoint_fluid%c_Xh)
+         simulation%adjoint_fluid%c_Xh, &
+         simulation%adjoint_fluid%c_Xh_GL, &
+         simulation%adjoint_fluid%GLL_to_GL, &
+         dealias)
     ! append brinkman source term based on design
 
     select type (f => simulation%adjoint_fluid)
@@ -444,9 +455,9 @@ contains
 
   end subroutine brinkman_design_map_forward
 
-  subroutine brinkman_design_get_design(this, values)
+  function brinkman_design_get_design(this) result(values)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: values
+    type(vector_t) :: values
     integer :: n
 
     n = this%size()
@@ -456,11 +467,25 @@ contains
        call device_copy(values%x_d, this%design_indicator%x_d, n)
     end if
 
-  end subroutine brinkman_design_get_design
+  end function brinkman_design_get_design
 
-  subroutine brinkman_design_get_x(this, x)
+  function brinkman_design_get_sensitivity(this) result(values)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: x
+    type(vector_t) :: values
+    integer :: n
+
+    n = this%size()
+    call values%init(n)
+    call copy(values%x, this%sensitivity%x, n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(values%x_d, this%sensitivity%x_d, n)
+    end if
+
+  end function brinkman_design_get_sensitivity
+
+  function brinkman_design_get_x(this) result(x)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t) :: x
     integer :: n
 
     n = this%size()
@@ -470,7 +495,7 @@ contains
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
     end if
 
-  end subroutine brinkman_design_get_x
+  end function brinkman_design_get_x
 
   function brinkman_design_get_x_i(this, i) result(x_i)
     class(brinkman_design_t), intent(in) :: this
@@ -487,9 +512,9 @@ contains
 
   end function brinkman_design_get_x_i
 
-  subroutine brinkman_design_get_y(this, y)
+  function brinkman_design_get_y(this) result(y)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: y
+    type(vector_t) :: y
     integer :: n
 
     n = this%size()
@@ -499,7 +524,7 @@ contains
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
     end if
 
-  end subroutine brinkman_design_get_y
+  end function brinkman_design_get_y
 
   function brinkman_design_get_y_i(this, i) result(y_i)
     class(brinkman_design_t), intent(in) :: this
@@ -516,9 +541,9 @@ contains
 
   end function brinkman_design_get_y_i
 
-  subroutine brinkman_design_get_z(this, z)
+  function brinkman_design_get_z(this) result(z)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: z
+    type(vector_t) :: z
     integer :: n
 
     n = this%size()
@@ -528,7 +553,7 @@ contains
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
     end if
 
-  end subroutine brinkman_design_get_z
+  end function brinkman_design_get_z
 
   function brinkman_design_get_z_i(this, i) result(z_i)
     class(brinkman_design_t), intent(in) :: this
@@ -577,16 +602,6 @@ contains
 
     call this%mapping%apply_backward(this%sensitivity, tmp_fld)
 
-    ! TODO
-    ! DELETE THIS LATER
-    !
-    ! When Abbas writes the interface for the optimization
-    ! module this may be a moot point, because we would only really collect
-    ! the sensitivity of the design variables inside the mask.
-    !
-    ! Note for Abbas,
-    ! I'm NOT doing this because I'm too lazy and I just need masks so I can
-    ! test something in the passive scalar.
     if (this%has_mask) then
        call mask_exterior_const(this%sensitivity, this%optimization_domain, &
             0.0_rp)
