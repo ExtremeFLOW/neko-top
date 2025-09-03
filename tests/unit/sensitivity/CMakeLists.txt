@@ -32,6 +32,9 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_CURRENT_SOURCE_DIR}/plotter_FD_check.py
             ${CMAKE_CURRENT_BINARY_DIR}/plotter_FD_check.py
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/steady_state_plotter.py
+            ${CMAKE_CURRENT_BINARY_DIR}/steady_state_plotter.py
 )
 
 # Sensitivity utils library
