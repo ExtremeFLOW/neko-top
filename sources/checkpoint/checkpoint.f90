@@ -46,15 +46,25 @@ module simulation_checkpoint
   private
 
   type, public :: simulation_checkpoint_t
+     private
 
+     ! ----------------------------------------------------------------------- !
+     ! User parameters
+
+     !> The checkpointing algorithm to use
      character(len=256) :: algorithm = "linear"
+     !> The name of the checkpoint file
      character(len=256) :: filename = "checkpoint.chkp"
+     !> Number of checkpoints to keep in memory
      integer :: n_saves_memory = 10
+
+     ! Internal parameters
      integer :: n_saves_disc = 0
      integer :: n_timesteps = 0
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
 
+     ! Structures to hold the checkpoint data
      type(chkp_output_t) :: chkp_output
      type(field_t), dimension(:), allocatable :: p_list
      type(field_t), dimension(:), allocatable :: u_list
@@ -66,18 +76,21 @@ module simulation_checkpoint
 
    contains
      !> Initialization
-     generic :: init => init_from_json, init_from_components
-     procedure, pass(this) :: init_from_json => checkpoint_init_from_json
-     procedure, pass(this) :: init_from_components => &
+     generic, public :: init => init_from_json, init_from_components
+     !> Initialization from a JSON file
+     procedure, public, pass(this) :: init_from_json => &
+          checkpoint_init_from_json
+     !> Initialization from components
+     procedure, public, pass(this) :: init_from_components => &
           checkpoint_init_from_components
      !> Free
-     procedure, pass(this) :: free => checkpoint_free
+     procedure, public, pass(this) :: free => checkpoint_free
      !> Reset the checkpoint data
-     procedure, pass(this) :: reset => checkpoint_reset
+     procedure, public, pass(this) :: reset => checkpoint_reset
      !> Save the current state of the simulation to disk
-     procedure, pass(this) :: save => checkpoint_save
+     procedure, public, pass(this) :: save => checkpoint_save
      !> Restore the forward simulation state
-     procedure, pass(this) :: restore => checkpoint_restore
+     procedure, public, pass(this) :: restore => checkpoint_restore
 
   end type simulation_checkpoint_t
 
@@ -131,7 +144,7 @@ contains
     character(len=*), optional, intent(in) :: filename
     class(scalar_scheme_t), pointer :: scalar_i
     integer :: i, j
-    character(len=10) :: str
+    character(len=80) :: str
 
     call this%free()
 
