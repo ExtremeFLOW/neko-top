@@ -186,7 +186,7 @@ contains
     integer :: temp_indices(4)
     type(field_t), pointer :: dsdx, dsdy, dsdz, work
     real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
-       accumulate, fld_GL, s_adj_GL
+         accumulate, fld_GL, s_adj_GL
     integer :: n_GL, nel
 
 
@@ -210,52 +210,52 @@ contains
     ! But I want to leave this todo as a reminder.
 
     if (this%dealias) then
-    nel = this%coef%msh%nelv
-    n_GL = nel * this%Xh_GL%lxyz
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("dealiased adjoint scalar not implemented on device")
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_error("dealiased adjoint scalar not implemented on device")
+       else
+          call this%GLL_to_GL%map(s_adj_GL, this%s_adj%x, nel, this%Xh_GL)
+
+          ! u
+          call this%GLL_to_GL%map(fld_GL, dsdx%x, nel, this%Xh_GL)
+          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+          ! multiply by GL mass matrix
+          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x, this%coef%B, work%size())
+          call sub2(fu%x, work%x, work%size())
+
+          ! v
+          call this%GLL_to_GL%map(fld_GL, dsdy%x, nel, this%Xh_GL)
+          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+          ! multiply by GL mass matrix
+          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x, this%coef%B, work%size())
+          call sub2(fv%x, work%x, work%size())
+
+          ! w
+          call this%GLL_to_GL%map(fld_GL, dsdz%x, nel, this%Xh_GL)
+          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+          ! multiply by GL mass matrix
+          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x, this%coef%B, work%size())
+          call sub2(fw%x, work%x, work%size())
+
+       end if
+
     else
-    call this%GLL_to_GL%map(s_adj_GL, this%s_adj%x, nel, this%Xh_GL)
-
-    ! u
-    call this%GLL_to_GL%map(fld_GL, dsdx%x, nel, this%Xh_GL)
-    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-    ! multiply by GL mass matrix
-    call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! map back to GLL
-    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! preempt the GLL mass matrix
-    call invcol2(work%x, this%coef%B, work%size())
-    call sub2(fu%x, work%x, work%size())
-
-    ! v
-    call this%GLL_to_GL%map(fld_GL, dsdy%x, nel, this%Xh_GL)
-    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-    ! multiply by GL mass matrix
-    call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! map back to GLL
-    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! preempt the GLL mass matrix
-    call invcol2(work%x, this%coef%B, work%size())
-    call sub2(fv%x, work%x, work%size())
-
-    ! w
-    call this%GLL_to_GL%map(fld_GL, dsdz%x, nel, this%Xh_GL)
-    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-    ! multiply by GL mass matrix
-    call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! map back to GLL
-    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! preempt the GLL mass matrix
-    call invcol2(work%x, this%coef%B, work%size())
-    call sub2(fw%x, work%x, work%size())
-
-    end if
-
-    else
-    call field_subcol3(fu, this%s_adj, dsdx)
-    call field_subcol3(fv, this%s_adj, dsdy)
-    call field_subcol3(fw, this%s_adj, dsdz)
+       call field_subcol3(fu, this%s_adj, dsdx)
+       call field_subcol3(fv, this%s_adj, dsdy)
+       call field_subcol3(fw, this%s_adj, dsdz)
     end if
 
     ! free the scratch
