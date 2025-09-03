@@ -39,11 +39,14 @@ module augmented_lagrangian_objective
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: copy
+  use math, only: copy, col3, addcol3, col2, invcol2
   use device_math, only: device_copy
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
+  use coefs, only: coef_t
   implicit none
   private
 
@@ -65,6 +68,23 @@ module augmented_lagrangian_objective
      type(field_t), pointer :: adjoint_v => null()
      !> Pointer to adjoint w field.
      type(field_t), pointer :: adjoint_w => null()
+
+     ! ---- everything GLL ----
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> cfs of the original space in the simulation
+     type(coef_t), pointer :: c_Xh_GLL
+
+     ! ---- everything for GL ----
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> If dealiasing should be applied
+     logical :: dealias
+
 
    contains
      !> The common constructor using a JSON object.
@@ -100,12 +120,15 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
+    logical :: dealias
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Augmented Lagrangian")
+    call json_get_or_default(json, "dealias", dealias, .true.)
 
-    call this%init_from_attributes(design, simulation, weight, name, mask_name)
+    call this%init_from_attributes(design, simulation, weight, name, &
+         mask_name, dealias)
   end subroutine augmented_lagrangian_init_json_sim
 
   !> The actual constructor.
@@ -115,14 +138,16 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
+  !! @param dealias should dealiasing be applied.
   subroutine augmented_lagrangian_init_attributes(this, design, simulation, &
-       weight, name, mask_name)
+       weight, name, mask_name, dealias)
     class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
+    logical, intent(in) :: dealias
 
     call this%init_base(name, design%size(), weight, mask_name)
 
@@ -133,6 +158,18 @@ contains
     this%adjoint_u => simulation%adjoint_case%fluid_adj%u_adj
     this%adjoint_v => simulation%adjoint_case%fluid_adj%v_adj
     this%adjoint_w => simulation%adjoint_case%fluid_adj%w_adj
+
+    this%dealias = dealias
+    ! GLL
+    this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
+    this%Xh_GLL => this%c_Xh_GLL%Xh
+
+    ! GL
+    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+
+    ! GLL to GL
+    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
 
   end subroutine augmented_lagrangian_init_attributes
 
@@ -168,15 +205,48 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
+         accumulate, fld_GL, adjoint_fld_GL
+    integer :: n_GL, nel
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%u, this%adjoint_u)
-    call field_addcol3(work, this%v, this%adjoint_v)
-    call field_addcol3(work, this%w, this%adjoint_w)
-    ! but negative
-    call field_cmult(work, -1.0_rp)
+    if (this%dealias) then
+
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_error("dealiased sensitivity not implemented on device")
+       else
+
+          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
+          call col3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+
+          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
+          call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+
+          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
+          call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+
+          ! multiply by GL mass matrix
+          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x, this%c_Xh_GLL%B, work%size())
+
+          ! but negative
+          call field_cmult(work, -1.0_rp)
+
+       end if
+    else
+       call field_col3(work, this%u, this%adjoint_u)
+       call field_addcol3(work, this%v, this%adjoint_v)
+       call field_addcol3(work, this%w, this%adjoint_w)
+    end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())

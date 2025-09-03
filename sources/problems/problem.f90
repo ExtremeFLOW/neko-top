@@ -44,11 +44,11 @@ module problem
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
-  use json_utils, only: json_extract_item, json_get
+  use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-  use vector_math, only: vector_add2
+  use vector, only: vector_t
 
   implicit none
   private
@@ -228,6 +228,7 @@ contains
     character(len=:), allocatable :: path, type
     type(json_file) :: objective_json
     integer :: n_objectives, i
+    logical :: dealias
 
     call neko_log%section("Reading objectives")
 
@@ -252,8 +253,11 @@ contains
        allocate(augmented_lagrangian_objective_t::objective)
        select type(ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          call ALO%init_from_attributes(design, simulation, &
-               weight = 1.0_rp, name = "Augmented Lagrangian", mask_name = "")
+          call json_get_or_default(parameters, &
+               "adjoint_fluid.dealias_sensitivity", dealias, .true.)
+          call ALO%init_from_attributes(design, simulation, weight = 1.0_rp, &
+               name = "Augmented Lagrangian", mask_name = "", &
+               dealias = dealias)
        end select
        call this%add_objective(objective)
     end if
@@ -474,8 +478,8 @@ contains
     objective_value = 0.0_rp
     do i = 1, this%n_objectives
        objective_value = objective_value + &
-            this%objective_list(i)%objective%get_weight() * &
-            this%objective_list(i)%objective%get_value()
+            this%objective_list(i)%objective%weight * &
+            this%objective_list(i)%objective%value
     end do
 
   end subroutine problem_get_objective_value
@@ -539,8 +543,7 @@ contains
 
     call sensitivity%init(this%n_design)
     do i = 1, this%n_objectives
-       call vector_add2(sensitivity, &
-            this%objective_list(i)%objective%sensitivity)
+       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
     end do
 
   end subroutine problem_get_objective_sensitivities
