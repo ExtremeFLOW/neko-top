@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 6.0,
-            "timestep": 1e-3
+            "timestep": 1.0e-3
         },
         "numerics": {
             "time_order": 3,
@@ -26,7 +26,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-8,
+                "absolute_tolerance": 1e-18,
                 "max_iterations": 50
             },
             "pressure_solver": {
@@ -34,7 +34,7 @@
                 "preconditioner": {
                     "type": "hsmg"
                 },
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-12,
                 "max_iterations": 50
             },
             "boundary_conditions": [
@@ -57,7 +57,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-8,
+                "absolute_tolerance": 1e-18,
                 "max_iterations": 50
             },
             "initial_condition": {
@@ -113,7 +113,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-7,
+                "tol": 1e-9,
                 "compute_control": "tsteps",
                 "compute_value": 1,
                 "scalar_coupled": true
@@ -162,7 +162,9 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.05
+                    "r": 0.05,
+                    "tol": 1.0e-20,
+                    "max_iter": 600
                 },
                 {
                     "type": "RAMP",

@@ -27,6 +27,7 @@ module neko_ext
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
+  use field_math, only: field_rzero
 
   implicit none
 
@@ -106,6 +107,9 @@ contains
     ! Restart the simulation components
     call neko_simcomps%restart(neko_case%time)
 
+    ! Reset all lag terms and RHS
+
+
     ! ------------------------------------------------------------------------ !
     ! Reset the fluid field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -125,6 +129,17 @@ contains
             neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
+    ! zero out all lags etc
+    ! (not sure what to do with the abx's)
+    call field_rzero(neko_case%fluid%f_x)
+    call field_rzero(neko_case%fluid%f_y)
+    call field_rzero(neko_case%fluid%f_z)
+    call neko_case%fluid%ulag%set(neko_case%fluid%f_x)
+    call neko_case%fluid%vlag%set(neko_case%fluid%f_x)
+    call neko_case%fluid%wlag%set(neko_case%fluid%f_x)
+
+
+
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -132,11 +147,11 @@ contains
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
     
-    if (.not. has_scalar) then
-       call neko_error("wtf??")
-    end if
 
     if (has_scalar) then
+           ! zero out lag terms and RHS
+           call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
+           call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
            ! reset the forward scalar
            call json_get(neko_case%params, &
                'case.scalar.initial_condition.type', string_val)
