@@ -208,7 +208,7 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    
+
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
     this%Xh_GLL => simulation%neko_case%fluid%c_Xh%Xh
@@ -293,7 +293,7 @@ contains
 
   end subroutine lube_term_update_value
 
-  !> update_value the sensitivity of the objective function with respect to $\chi$
+  !> update_value the sensitivity of the objective function with respect to chi
   !! @param this The objective.
   !! @param design the design.
   subroutine lube_term_update_sensitivity(this, design)
@@ -302,7 +302,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
-       accumulate, fld_GL
+         accumulate, fld_GL
     integer :: n_GL, nel
 
     ! if we have the lube term we also get an extra term in the sensitivity
@@ -311,38 +311,38 @@ contains
 
     if(this%dealias_sensitivity) then
 
-    nel = this%c_Xh_GLL%msh%nelv
-    n_GL = nel * this%Xh_GL%lxyz
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("dealiased sensitivity not implemented on device")
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_error("dealiased sensitivity not implemented on device")
+       else
+
+          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
+          call col3(accumulate, fld_GL, fld_GL, n_GL)
+          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
+          call addcol3(accumulate, fld_GL, fld_GL, n_GL)
+          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
+          call addcol3(accumulate, fld_GL, fld_GL, n_GL)
+          ! scale
+          call cmult(accumulate, this%weight * 0.5_rp, n_GL)
+
+          ! multiply by GL mass matrix
+          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x, this%c_Xh_GLL%B, work%size())
+
+       end if
+
     else
-
-    call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-    call col3(accumulate, fld_GL, fld_GL, n_GL)
-    call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-    call addcol3(accumulate, fld_GL, fld_GL, n_GL)
-    call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-    call addcol3(accumulate, fld_GL, fld_GL, n_GL)
-    ! scale
-    call cmult(accumulate, this%weight * 0.5_rp, n_GL)
-
-    ! multiply by GL mass matrix
-    call col2(accumulate, this%c_Xh_GL%B, n_GL)
-    ! map back to GLL
-    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-    ! preempt the GLL mass matrix
-    call invcol2(work%x, this%c_Xh_GLL%B, work%size())
-
-    end if
-
-    else
-    call field_col3(work, this%u, this%u)
-    call field_addcol3(work, this%v, this%v)
-    call field_addcol3(work, this%w, this%w)
-    call field_cmult(work, this%weight * 0.5_rp)
-    ! scale
-    call field_cmult(work, this%weight * 0.5_rp)
+       call field_col3(work, this%u, this%u)
+       call field_addcol3(work, this%v, this%v)
+       call field_addcol3(work, this%w, this%w)
+       call field_cmult(work, this%weight * 0.5_rp)
+       ! scale
+       call field_cmult(work, this%weight * 0.5_rp)
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
