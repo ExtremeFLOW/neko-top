@@ -40,9 +40,15 @@ module adjoint_scalar_convection_source_term
   use json_module, only: json_file
   use time_state, only: time_state_t
   use source_term, only: source_term_t
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
   use coefs, only: coef_t
   use field_math, only: field_subcol3
   use operators, only: grad
+  use utils, only: neko_error
+  use field_registry, only: neko_field_registry
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: col2, invcol2, add2, col3, sub2
   implicit none
   private
 
@@ -61,6 +67,18 @@ module adjoint_scalar_convection_source_term
      type(field_t), pointer :: s_adj => null()
      !> forward passive scalar
      type(field_t), pointer :: s => null()
+     ! --- for over-integration
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> if dealiasing should be applied
+     logical :: dealias
+
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -100,13 +118,24 @@ contains
 
   end subroutine adjoint_scalar_convection_source_term_init_from_json
 
-
+  !> The constructor from type components.
+  !! @param this The source term.
+  !! @param f_x, f_y, f_z the RHS of the equation (either primal or adjoint).
+  !! @param s the primal scalar
+  !! @param s_adj the primal scalar
+  !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias if dealiasing should be applied.
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, s, s_adj, coef)
+       f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
     type(coef_t) :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: s, s_adj
@@ -131,6 +160,13 @@ contains
     this%s_adj => s_adj
     this%s => s
 
+    ! for over integration
+    this%dealias = dealias
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
+
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
   !> Destructor.
@@ -147,13 +183,17 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
-    integer :: temp_indices(3)
-    type(field_t), pointer :: dsdx, dsdy, dsdz
+    integer :: temp_indices(4)
+    type(field_t), pointer :: dsdx, dsdy, dsdz, work
+    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
+       accumulate, fld_GL, s_adj_GL
+    integer :: n_GL, nel
 
 
     call neko_scratch_registry%request_field(dsdx, temp_indices(1))
     call neko_scratch_registry%request_field(dsdy, temp_indices(2))
     call neko_scratch_registry%request_field(dsdz, temp_indices(3))
+    call neko_scratch_registry%request_field(work, temp_indices(3))
 
     fu => this%fields%get(1)
     fv => this%fields%get(2)
@@ -161,11 +201,6 @@ contains
 
     ! we basically just need the term
     ! \f$\nabla s s_adj\f$
-    ! TODO
-    ! In principle, this should have to option to be evaluated on the dealiased
-    ! mesh!
-
-    ! So should the Brinkman term actually....
 
     call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
 
@@ -174,9 +209,54 @@ contains
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
     ! But I want to leave this todo as a reminder.
 
+    if (this%dealias) then
+    nel = this%coef%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("dealiased adjoint scalar not implemented on device")
+    else
+    call this%GLL_to_GL%map(s_adj_GL, this%s_adj%x, nel, this%Xh_GL)
+
+    ! u
+    call this%GLL_to_GL%map(fld_GL, dsdx%x, nel, this%Xh_GL)
+    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fu%x, work%x, work%size())
+
+    ! v
+    call this%GLL_to_GL%map(fld_GL, dsdy%x, nel, this%Xh_GL)
+    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fv%x, work%x, work%size())
+
+    ! w
+    call this%GLL_to_GL%map(fld_GL, dsdz%x, nel, this%Xh_GL)
+    call col3(accumulate, s_adj_GL, fld_GL, n_GL)
+    ! multiply by GL mass matrix
+    call col2(accumulate, this%c_Xh_GL%B, n_GL)
+    ! map back to GLL
+    call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+    ! preempt the GLL mass matrix
+    call invcol2(work%x, this%coef%B, work%size())
+    call sub2(fw%x, work%x, work%size())
+
+    end if
+
+    else
     call field_subcol3(fu, this%s_adj, dsdx)
     call field_subcol3(fv, this%s_adj, dsdy)
     call field_subcol3(fw, this%s_adj, dsdz)
+    end if
 
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)
