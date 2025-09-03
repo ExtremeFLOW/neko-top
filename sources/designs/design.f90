@@ -92,14 +92,14 @@ module design
      !> Retrieve the design variables.
      procedure(design_get_values), public, pass(this), deferred :: get_values
      !> Retrieve the x location of the design variables.
-     procedure, pass(this) :: get_x => design_get_x
-     procedure, pass(this) :: x => design_get_x_i
+     generic :: get_x => design_get_x
+     generic :: x => design_get_x_i
      !> Retrieve the y location of the design variables.
-     procedure, pass(this) :: get_y => design_get_y
-     procedure, pass(this) :: y => design_get_y_i
+     generic :: get_y => design_get_y
+     generic :: y => design_get_y_i
      !> Retrieve the z location of the design variables.
-     procedure, pass(this) :: get_z => design_get_z
-     procedure, pass(this) :: z => design_get_z_i
+     generic :: get_z => design_get_z
+     generic :: z => design_get_z_i
 
      !> Update the design variables.
      procedure(design_update_design), public, pass(this), deferred :: &
