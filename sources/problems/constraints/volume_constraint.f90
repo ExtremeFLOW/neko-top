@@ -323,7 +323,7 @@ contains
 
     volume = 0.0_rp
     if (this%if_mapping) then
-       unmapped_values = design%get_values()
+       call design%get_values(unmapped_values)
        call values%init(unmapped_values%size())
        call this%mapping%apply_forward(values, unmapped_values)
        call unmapped_values%free()
