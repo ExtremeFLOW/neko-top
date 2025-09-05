@@ -58,7 +58,6 @@ module adjoint_minimum_dissipation_source_term
   use math, only: rzero, copy, chsign, cfill, invcol2
   use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: opgrad, cdtp
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
