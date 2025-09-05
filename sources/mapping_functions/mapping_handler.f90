@@ -74,13 +74,13 @@ module mapping_handler
      procedure, pass(this) :: free => mapping_handler_free
      !> Cycle through all the mapping_cascade and return the final field
      generic :: apply_forward => mapping_handler_apply_forward_field, &
-        mapping_handler_apply_forward_vector
-     procedure, pass(this) ::  mapping_handler_apply_forward_field
-     procedure, pass(this) ::  mapping_handler_apply_forward_vector
+          mapping_handler_apply_forward_vector
+     procedure, pass(this) :: mapping_handler_apply_forward_field
+     procedure, pass(this) :: mapping_handler_apply_forward_vector
      !> Cycle backwards through all the mapping_cascade and return the
      !! sensitivity
      generic :: apply_backward => mapping_handler_apply_backward_field, &
-     mapping_handler_apply_backward_vector
+          mapping_handler_apply_backward_vector
      procedure, pass(this) :: mapping_handler_apply_backward_field
      procedure, pass(this) :: mapping_handler_apply_backward_vector
      !> Generic interface to add a mapping to the list.
@@ -169,7 +169,6 @@ contains
     class(mapping_handler_t), intent(inout) :: this
     type(vector_t), intent(in) :: X_in
     type(vector_t), intent(inout) :: X_out
-    integer :: i
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
@@ -248,7 +247,6 @@ contains
     class(mapping_handler_t), intent(inout) :: this
     type(vector_t), intent(in) :: X_in
     type(vector_t), intent(inout) :: X_out
-    integer :: i
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
