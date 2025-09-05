@@ -208,8 +208,8 @@ contains
     v => this%v
     w => this%w
 
-    call neko_scratch_registry%request_field(work , temp_indices(1))
-    call neko_scratch_registry%request_field(result , temp_indices(2))
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(result, temp_indices(2))
 
     associate(coef => this%coef)
 
