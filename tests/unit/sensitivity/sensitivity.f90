@@ -14,7 +14,7 @@ module sensitivity
 
   interface compute_sensitivity
      module procedure compute_sensitivity_i, compute_sensitivity_list, &
-        compute_problem_sensitivity_i, compute_problem_sensitivity_list
+          compute_problem_sensitivity_i, compute_problem_sensitivity_list
   end interface compute_sensitivity
 
 contains
@@ -150,7 +150,7 @@ contains
        call problem%get_constraint_values(constraint_vec)
        constraint = constraint_vec%x(1)
     end if
-    
+
     call design_perturbed%init(design_vector%size())
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -192,12 +192,12 @@ contains
        ! Compute the objective value of the perturbed design
        call problem%compute(des, sim)
        call problem%get_objective_value(perturbed_constraint)
-           if (is_objective) then
-               call problem%get_objective_value(perturbed_constraint)
-            else
-               call problem%get_constraint_values(constraint_vec)
-               perturbed_constraint = constraint_vec%x(1)
-            end if
+       if (is_objective) then
+          call problem%get_objective_value(perturbed_constraint)
+       else
+          call problem%get_constraint_values(constraint_vec)
+          perturbed_constraint = constraint_vec%x(1)
+       end if
        call sim%write(ip)
        call sim%reset()
 
