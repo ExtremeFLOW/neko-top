@@ -195,7 +195,6 @@ contains
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work, result
-    type(field_t), pointer :: t1 , t2
     integer :: temp_indices(2)
     integer n
 
