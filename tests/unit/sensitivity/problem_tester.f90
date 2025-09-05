@@ -81,7 +81,8 @@ program minimum_dissipation_sensitivity
 
   ! -------------------------------------------------------------------------- !
   ! Determine if objective or constraint
-  if ((prob%get_n_objectives() .gt. 0) .and. (prob%get_n_constraints() .eq. 0)) then
+  if ((prob%get_n_objectives() .gt. 0) .and. &
+       (prob%get_n_constraints() .eq. 0)) then
      is_objective = .true.
   else if (prob%get_n_constraints() .eq. 1) then
      ! note we always have a dummy objective
@@ -90,8 +91,8 @@ program minimum_dissipation_sensitivity
      write(nobj_str, '(I0)') prob%get_n_objectives()
      write(ncon_str, '(I0)') prob%get_n_constraints()
      call neko_error("Specify a) a single constraint b) multiple " // &
-        "objectives. You have" // nobj_str // &
-        "objectives and " // ncon_str // " constraints.")
+          "objectives. You have" // nobj_str // &
+          "objectives and " // ncon_str // " constraints.")
   end if
 
   ! -------------------------------------------------------------------------- !
@@ -105,7 +106,7 @@ program minimum_dissipation_sensitivity
      call prob%get_constraint_sensitivities(constraint_sensitivity)
      call sensitivities%init(constraint_sensitivity%size())
      call copy(sensitivities%x, constraint_sensitivity%x, &
-        constraint_sensitivity%size())
+          constraint_sensitivity%size())
   end if
 
   call des%write(1)
