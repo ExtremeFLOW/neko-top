@@ -100,7 +100,7 @@ program minimum_dissipation_sensitivity
   call prob%compute(des, sim)
   call prob%compute_sensitivity(des, sim)
   if (is_objective) then
-     sensitivities = des%get_sensitivity()
+     call des%get_sensitivity(sensitivities)
   else
      call prob%get_constraint_sensitivities(constraint_sensitivity)
      call sensitivities%init(constraint_sensitivity%size())

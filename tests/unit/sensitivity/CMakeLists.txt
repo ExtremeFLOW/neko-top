@@ -3,13 +3,13 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
 # Provide a list of case files instead of .f90 files
 set(test_list
-    #"volume.case"
+    "volume.case"
     #"volume_filtered.case"
     #"lube_term.case"
     #"minimum_dissipation.case"
     #"min_dis_and_lube.case"
     #"min_dis_and_lube_weights.case"
-    passive_scalar.case
+    #"passive_scalar.case"
 )
 
 # Path to the common driver source

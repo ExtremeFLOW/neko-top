@@ -40,7 +40,7 @@ contains
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
-    design_vector = des%get_values()
+    call des%get_values(design_vector)
     constraint = object%get_value()
     call design_perturbed%init(design_vector%size())
 
@@ -54,7 +54,7 @@ contains
 
     write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
          i, 'Design variable ', design_vector%x(i), &
-         'Location [', des%get_x(i), des%get_y(i), des%get_z(i), ']'
+         'Location [', des%x(i), des%y(i), des%z(i), ']'
     write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
     write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
 
@@ -142,7 +142,7 @@ contains
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
-    design_vector = des%get_values()
+    call des%get_values(design_vector)
 
     if (is_objective) then
        call problem%get_objective_value(constraint)
@@ -163,7 +163,7 @@ contains
 
     write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
          i, 'Design variable ', design_vector%x(i), &
-         'Location [', des%get_x(i), des%get_y(i), des%get_z(i), ']'
+         'Location [', des%x(i), des%y(i), des%z(i), ']'
     write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
     write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
 
