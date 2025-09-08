@@ -193,10 +193,9 @@ contains
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
-    type(field_t), pointer :: work, result
-    integer :: temp_indices(2)
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
     integer n
-
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -209,12 +208,10 @@ contains
     w => this%w
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
-    call neko_scratch_registry%request_field(result, temp_indices(2))
 
     associate(coef => this%coef)
 
-
-      ! note that axhelm computes h1 * lap u + h2 * u
+      ! Note that axhelm computes h1 * lap u + h2 * u
       ! we set h1 = 1 and h2 = 0 to compute the weak laplacian.
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_cfill(coef%h1_d, 1.0_rp, n)
@@ -225,62 +222,65 @@ contains
       end if
       coef%ifh2 = .false.
 
+      ! ------------------------------------------------------------------------
       ! u
-      ! ------------------------------------------------------------------------
-      call this%Ax%compute(result%x, u%x, coef, coef%msh, coef%xh)
+
+      call this%Ax%compute(work%x, u%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_invcol2(result%x_d, coef%B_d, result%size())
+         call device_invcol2(work%x_d, coef%B_d, work%size())
       else
-         call invcol2(result%x, coef%B, result%size())
+         call invcol2(work%x, coef%B, work%size())
       end if
 
       ! mask
       if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
+         call mask_exterior_const(work, this%mask, 0.0_rp)
       end if
 
       ! add to RHS
-      call field_add2s2(fu, result, this%obj_scale)
+      call field_add2s2(fu, work, this%obj_scale)
 
+      ! ------------------------------------------------------------------------
       ! v
-      ! ------------------------------------------------------------------------
-      call this%Ax%compute(result%x, v%x, coef, coef%msh, coef%xh)
+
+      call this%Ax%compute(work%x, v%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_invcol2(result%x_d, coef%B_d, result%size())
+         call device_invcol2(work%x_d, coef%B_d, work%size())
       else
-         call invcol2(result%x, coef%B, result%size())
+         call invcol2(work%x, coef%B, work%size())
       end if
 
       ! mask
       if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
+         call mask_exterior_const(work, this%mask, 0.0_rp)
       end if
 
       ! add to RHS
-      call field_add2s2(fv, result, this%obj_scale)
+      call field_add2s2(fv, work, this%obj_scale)
 
+      ! ------------------------------------------------------------------------
       ! w
-      ! ------------------------------------------------------------------------
-      call this%Ax%compute(result%x, w%x, coef, coef%msh, coef%xh)
+
+      call this%Ax%compute(work%x, w%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_invcol2(result%x_d, coef%B_d, result%size())
+         call device_invcol2(work%x_d, coef%B_d, work%size())
       else
-         call invcol2(result%x, coef%B, result%size())
+         call invcol2(work%x, coef%B, work%size())
       end if
 
       ! mask
       if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
+         call mask_exterior_const(work, this%mask, 0.0_rp)
       end if
 
       ! add to RHS
-      call field_add2s2(fw, result, this%obj_scale)
+      call field_add2s2(fw, work, this%obj_scale)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
