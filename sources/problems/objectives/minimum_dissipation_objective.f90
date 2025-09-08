@@ -90,8 +90,7 @@ module minimum_dissipation_objective
   private
 
   !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega \f$
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
@@ -260,15 +259,15 @@ contains
           call mask_exterior_const(work, this%mask, 0.0_rp)
           this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
                n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n)
+               this%c_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
        end if
     end if
 
