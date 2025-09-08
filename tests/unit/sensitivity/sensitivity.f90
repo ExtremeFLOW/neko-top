@@ -4,7 +4,7 @@ module sensitivity
   use base_functional, only: base_functional_t
   use utils, only: neko_error
   use num_types, only: rp
-  use math, only: abscmp
+  use math, only: abscmp, NEKO_EPS
   use vector, only: vector_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use problem, only : problem_t
@@ -244,16 +244,14 @@ contains
     end do
   end subroutine compute_problem_sensitivity_list
 
-
+  !> Computes the relative difference between two numbers
+  !! \f$ \frac{a - b}{|b|} \f$
   function relative_error(a, b) result(err)
     real(kind=rp), intent(in) :: a, b
     real(kind=rp) :: err
 
-    if (abscmp(a, b)) then
-       err = 0.0_rp
-    else
-       err = a - b / max(abs(a), 1e-6_rp)
-    end if
+    err = (a - b) / max(abs(b), NEKO_EPS)
+
   end function relative_error
 
 end module sensitivity
