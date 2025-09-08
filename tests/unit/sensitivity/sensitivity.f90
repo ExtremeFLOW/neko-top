@@ -86,14 +86,13 @@ contains
           fd_estimate = fd_estimate / perturb
        end if
 
-       fd_error = (fd_estimate - target_sensitivities%x(i)) / &
-            target_sensitivities%x(i)
+       fd_error = relative_error(fd_estimate, target_sensitivities%x(i))
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
        if (abs(fd_error) .gt. tol) then
-          !call neko_error('Finite difference estimate does not match ' // &
-          !     'sensitivity')
+          call neko_error('Finite difference estimate does not match ' // &
+               'sensitivity')
        end if
     end do
 
@@ -206,8 +205,7 @@ contains
           fd_estimate = fd_estimate / perturb
        end if
 
-       fd_error = (fd_estimate - target_sensitivities%x(i)) / &
-            target_sensitivities%x(i)
+       fd_error = relative_error(fd_estimate, target_sensitivities%x(i))
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
@@ -218,8 +216,8 @@ contains
        call logger%write(log_data)
 
        if (abs(fd_error) .gt. tol) then
-          !call neko_error('Finite difference estimate does not match ' // &
-          !     'sensitivity')
+          call neko_error('Finite difference estimate does not match ' // &
+               'sensitivity')
        end if
     end do
 
@@ -245,5 +243,17 @@ contains
             list(i), perturbations, tolerance, file_name, is_objective)
     end do
   end subroutine compute_problem_sensitivity_list
+
+
+  function relative_error(a, b) result(err)
+    real(kind=rp), intent(in) :: a, b
+    real(kind=rp) :: err
+
+    if (abscmp(a, b)) then
+       err = 0.0_rp
+    else
+       err = a - b / max(abs(a), 1e-6_rp)
+    end if
+  end function relative_error
 
 end module sensitivity

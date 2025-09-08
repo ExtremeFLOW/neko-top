@@ -46,7 +46,7 @@ program minimum_dissipation_sensitivity
   real(kind=rp), parameter :: perturbations(8) = [ &
        5e-1_rp, 1e-1_rp, 5e-2_rp, 1e-2_rp, 5e-3_rp, 1e-3_rp, 5e-4_rp, 1e-4_rp]
 
-  type(vector_t) :: sensitivities, tmp, log_data
+  type(vector_t) :: sensitivities
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
@@ -74,7 +74,7 @@ program minimum_dissipation_sensitivity
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
-  call user_setup(sim%neko_case%user)
+
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
