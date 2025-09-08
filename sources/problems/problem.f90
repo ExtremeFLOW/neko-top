@@ -462,8 +462,8 @@ contains
     objective_value = 0.0_rp
     do i = 1, this%n_objectives
        objective_value = objective_value + &
-            this%objective_list(i)%objective%weight * &
-            this%objective_list(i)%objective%value
+            this%objective_list(i)%objective%get_weight() * &
+            this%objective_list(i)%objective%get_value()
     end do
 
   end subroutine problem_get_objective_value
