@@ -460,19 +460,18 @@ contains
 
   end subroutine brinkman_design_get_design
 
-  function brinkman_design_get_sensitivity(this) result(values)
+  subroutine brinkman_design_get_sensitivity(this, values)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
-    call values%init(n)
     call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
     end if
 
-  end function brinkman_design_get_sensitivity
+  end subroutine brinkman_design_get_sensitivity
 
   subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this
