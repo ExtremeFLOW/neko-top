@@ -42,7 +42,7 @@ module adjoint_fluid_scheme_incompressible
   use comm, only: NEKO_COMM
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
-  use space, only: space_t, GLL
+  use space, only: space_t, GLL, GL
   use dofmap, only: dofmap_t
   use zero_dirichlet, only: zero_dirichlet_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
@@ -178,6 +178,7 @@ contains
     character(len=:), allocatable :: string_val1, string_val2
     character(len=:), allocatable :: json_key
     type(json_file) :: json_subdict
+    integer :: lxd
 
     !
     ! SEM simulation fundamentals
@@ -185,17 +186,28 @@ contains
 
     this%msh => msh
 
+    ! over intergration order (hard coded now, should be optional)
+    lxd = (3 * (lx + 1)) / 2
     if (msh%gdim .eq. 2) then
        call this%Xh%init(GLL, lx, lx)
     else
        call this%Xh%init(GLL, lx, lx, lx)
     end if
+    call this%Xh_GL%init(GL, lxd, lxd, lxd)
 
+    ! NOTE. This shouldn't require remaking all this stuff. What should be
+    ! changed on the neko side is a way of initializing a coef FULLY (ie, Bs)
+    ! with just a space.
     call this%dm_Xh%init(msh, this%Xh)
+    call this%dm_Xh_GL%init(msh, this%Xh_GL)
 
     call this%gs_Xh%init(this%dm_Xh)
+    call this%gs_Xh_GL%init(this%dm_Xh_GL)
 
     call this%c_Xh%init(this%gs_Xh)
+    call this%c_Xh_GL%init(this%gs_Xh_GL)
+
+    call this%GLL_to_GL%init(this%Xh_GL, this%Xh)
 
     ! Local scratch registry
     call this%scratch%init(this%dm_Xh, 10, 2)

@@ -37,6 +37,7 @@ module problem
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -244,6 +245,17 @@ contains
           call objective_factory(objective, objective_json, design, simulation)
           call this%add_objective(objective)
        end do
+    end if
+
+    if (present(simulation)) then
+       if (allocated(objective)) deallocate(objective)
+       allocate(augmented_lagrangian_objective_t::objective)
+       select type(ALO => objective)
+       class is (augmented_lagrangian_objective_t)
+          call ALO%init_from_attributes(design, simulation, &
+               weight = 1.0_rp, name = "Augmented Lagrangian", mask_name = "")
+       end select
+       call this%add_objective(objective)
     end if
 
     call neko_log%end_section()

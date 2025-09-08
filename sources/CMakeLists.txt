@@ -46,6 +46,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/augmented_lagrangian_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
