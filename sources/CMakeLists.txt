@@ -15,6 +15,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 
 # ============================================================================ #
 # Define the library sources and targets
