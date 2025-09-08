@@ -167,7 +167,7 @@ contains
     call problem%get_constraint_values(constraint_value)
     select type (des => design)
     type is (brinkman_design_t)
-       objective_sensitivities = des%get_sensitivity()
+       call des%get_sensitivity(objective_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
@@ -218,7 +218,7 @@ contains
        call problem%get_constraint_values(constraint_value)
        select type (des => design)
        type is (brinkman_design_t)
-          objective_sensitivities = des%get_sensitivity()
+          call des%get_sensitivity(objective_sensitivities)
        class default
           call problem%get_objective_sensitivities(objective_sensitivities)
        end select
