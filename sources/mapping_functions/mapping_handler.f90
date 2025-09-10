@@ -239,9 +239,9 @@ contains
 
   !> apply the cascade of mapping_cascade.
   !! @param this The handler object
-  !! @param sens_out The sensitivity after applying the chain rule
+  !! @param X_out The sensitivity after applying the chain rule
   !! (\f$\frac{\partial F}{\partial \rho}\f$)
-  !! @param sens_in The sensitivity before applying the chain rule
+  !! @param X_in The sensitivity before applying the chain rule
   !! (\f$\frac{\partial F}{\partial \tilde{\rho}}\f$)
   subroutine mapping_handler_apply_backward_vector(this, X_out, X_in)
     class(mapping_handler_t), intent(inout) :: this
