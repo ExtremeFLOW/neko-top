@@ -8,30 +8,45 @@ description: |
 # back to the caller.
 
 inputs:
-  install-dir:
-    description: "The directory to install the ParMETIS library."
-    required: false
-    default: "/home/runner/pkg/ParMETIS"
+    install-dir:
+      description: "The directory to install the ParMetis library."
+      required: false
+      default: "/home/runner/pkg/parmetis"
 
-  working-dir:
-    description: "The directory to work in."
-    required: false
-    default: "/home/runner/tmp/ParMETIS"
+    working-dir:
+      description: "The directory to work in."
+      required: false
+      default: "/home/runner/tmp/parmetis"
 
-  os:
-    description: "The operating system to use."
-    required: false
-    default: "${{ runner.os }}"
+    os:
+      description: "The operating system to use."
+      required: false
+      default: "${{ runner.os }}"
 
-  build-options:
-    description: "The build option to use."
-    required: false
-    default: "--parallel $(nproc)"
+    compiler:
+      description: "The compiler to use."
+      required: false
+      default: "gfortran"
 
-  version:
-    description: "The version of the ParMETIS library to use."
-    required: false
-    default: "v1.0.8"
+    compiler-flags:
+      description: "The compiler flag to use."
+      required: false
+      default: "-O3"
+
+    build-options:
+      description: "The build option to use."
+      required: false
+      default: "--parallel"
+
+    install-options:
+      description: "The install option to use."
+      required: false
+      default: ""
+
+    version:
+      description: "The version of the ParMetis library to use."
+      required: false
+      default: "4.0.3"
 
 outputs:
   install-dir:
@@ -55,10 +70,8 @@ runs:
         OS: ${{ inputs.os }}
         COMPILER: ${{ inputs.compiler }}
         COMPILER_FLAGS: ${{ inputs.compiler-flags }}
-        REPO: https://github.com/Nek5000/ParMETIS.git
       run: |
-        # Get the GIT sha for the current commit
-        key="ParMETIS-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        key="parmetis-$VERSION-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
     - name: Cache
@@ -85,12 +98,13 @@ runs:
       env:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         WORKING_DIR: ${{ inputs.working-dir }}
+        VERSION: ${{ inputs.version }}
       run: |
         mkdir -p $WORKING_DIR
         cd $WORKING_DIR
-        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
-        tar xzf parmetis-4.0.3.tar.gz
-        cd parmetis-4.0.3
+        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-$VERSION.tar.gz
+        tar xzf parmetis-$VERSION.tar.gz
+        cd parmetis-$VERSION
 
     - name: Build METIS
       if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
@@ -99,8 +113,9 @@ runs:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
         WORKING_DIR: ${{ inputs.working-dir }}
+        VERSION: ${{ inputs.version }}
       run: |
-        cd $WORKING_DIR/parmetis-4.0.3/metis
+        cd $WORKING_DIR/parmetis-$VERSION/metis
         make config prefix=${PARMETIS_DIR}
         make -j && make install
 
@@ -111,8 +126,9 @@ runs:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
         WORKING_DIR: ${{ inputs.working-dir }}
+        VERSION: ${{ inputs.version }}
       run: |
-        cd $WORKING_DIR/parmetis-4.0.3
+        cd $WORKING_DIR/parmetis-$VERSION
         make config prefix=${PARMETIS_DIR}
         make -j && make install
 
@@ -121,9 +137,10 @@ runs:
       shell: bash
       env:
         WORKING_DIR: ${{ inputs.working-dir }}
+        VERSION: ${{ inputs.version }}
       run: |
         cd $WORKING_DIR
-        rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
+        rm -rf parmetis-$VERSION parmetis-$VERSION.tar.gz
 
     # ------------------------------------------------------------------------ #
     # Cleanup the working directory if necessary and set the output.
