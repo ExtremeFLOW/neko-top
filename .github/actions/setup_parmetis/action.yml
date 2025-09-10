@@ -89,7 +89,7 @@ runs:
         mkdir -p $WORKING_DIR
         cd $WORKING_DIR
         wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
-        tar xzf parmetis-4.0.3.tar.gz && rm -fr parmetis-4.0.3.tar.gz
+        tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
     - name: Build METIS
@@ -98,12 +98,11 @@ runs:
       env:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
+        WORKING_DIR: ${{ inputs.working-dir }}
       run: |
-        # Compile the bundled metis library
-        cd metis
+        cd $WORKING_DIR/parmetis-4.0.3/metis
         make config prefix=${PARMETIS_DIR}
         make -j && make install
-        cd ../
 
     - name: Build ParMETIS
       if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
@@ -112,6 +111,7 @@ runs:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
       run: |
+        cd $WORKING_DIR/parmetis-4.0.3
         make config prefix=${PARMETIS_DIR}
         make -j && make install
 
