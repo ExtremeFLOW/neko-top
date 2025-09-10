@@ -110,6 +110,7 @@ runs:
       env:
         PARMETIS_DIR: ${{ inputs.install-dir }}
         CMAKE_GENERATOR: "Unix Makefiles"
+        WORKING_DIR: ${{ inputs.working-dir }}
       run: |
         cd $WORKING_DIR/parmetis-4.0.3
         make config prefix=${PARMETIS_DIR}
