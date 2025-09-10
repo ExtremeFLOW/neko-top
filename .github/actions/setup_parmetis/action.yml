@@ -1,0 +1,134 @@
+name: Setup the ParMETIS library
+description: |
+  This action sets up the ParMETIS library for use in the main workflow.
+
+# ---------------------------------------------------------------------------- #
+# Define the inputs and outputs for this action. The inputs are used to
+# configure the action, while the outputs are used to pass information
+# back to the caller.
+
+inputs:
+  install-dir:
+    description: "The directory to install the ParMETIS library."
+    required: false
+    default: "/home/runner/pkg/ParMETIS"
+
+  working-dir:
+    description: "The directory to work in."
+    required: false
+    default: "/home/runner/tmp/ParMETIS"
+
+  os:
+    description: "The operating system to use."
+    required: false
+    default: "${{ runner.os }}"
+
+  build-options:
+    description: "The build option to use."
+    required: false
+    default: "--parallel $(nproc)"
+
+  version:
+    description: "The version of the ParMETIS library to use."
+    required: false
+    default: "v1.0.8"
+
+outputs:
+  install-dir:
+    description: "The directory where the ParMETIS library was installed."
+    value: ${{ steps.set-output.outputs.install-dir }}
+
+# ---------------------------------------------------------------------------- #
+# Define the steps that will be run in this action.
+
+runs:
+  using: composite
+  steps:
+    # ------------------------------------------------------------------------ #
+    # Setup the cache for the ParMETIS library and clone the repository.
+
+    - name: Create cache key based on version, OS, and compiler
+      id: create-key
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        OS: ${{ inputs.os }}
+        COMPILER: ${{ inputs.compiler }}
+        COMPILER_FLAGS: ${{ inputs.compiler-flags }}
+        REPO: https://github.com/Nek5000/ParMETIS.git
+      run: |
+        # Get the GIT sha for the current commit
+        key="ParMETIS-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
+        printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
+
+    - name: Cache
+      id: cache-ParMETIS
+      uses: actions/cache@v4
+      with:
+        path: ${{ inputs.install-dir }}
+        key: ${{ steps.create-key.outputs.key }}
+
+    # ------------------------------------------------------------------------ #
+    # Setup the system for building the ParMETIS library
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt install openmpi-bin libopenmpi-dev
+
+    # ------------------------------------------------------------------------ #
+    # Configure, build, and install the ParMETIS library.
+
+    - name: Download and extract ParMETIS
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        PARMETIS_DIR: ${{ inputs.install-dir }}
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: |
+        mkdir -p $WORKING_DIR
+        cd $WORKING_DIR
+        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
+        tar xzf parmetis-4.0.3.tar.gz && rm -fr parmetis-4.0.3.tar.gz
+        cd parmetis-4.0.3
+
+    - name: Build METIS
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        PARMETIS_DIR: ${{ inputs.install-dir }}
+        CMAKE_GENERATOR: "Unix Makefiles"
+      run: |
+        # Compile the bundled metis library
+        cd metis
+        make config prefix=${PARMETIS_DIR}
+        make -j && make install
+        cd ../
+
+    - name: Build ParMETIS
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        PARMETIS_DIR: ${{ inputs.install-dir }}
+        CMAKE_GENERATOR: "Unix Makefiles"
+      run: |
+        make config prefix=${PARMETIS_DIR}
+        make -j && make install
+
+    - name: Cleanup
+      if: ${{ steps.cache-ParMETIS.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        WORKING_DIR: ${{ inputs.working-dir }}
+      run: |
+        cd $WORKING_DIR
+        rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
+
+    # ------------------------------------------------------------------------ #
+    # Cleanup the working directory if necessary and set the output.
+
+    - name: Set output
+      shell: bash
+      id: set-output
+      run: |
+        echo "install-dir=$(echo ${{ inputs.install-dir }})" >> $GITHUB_OUTPUT

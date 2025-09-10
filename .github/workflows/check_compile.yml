@@ -105,11 +105,18 @@ jobs:
           version: ${{ inputs.json-fortran-version }}
           compiler: ${{ matrix.compiler }}
 
+      - name: Get ParMETIS
+        id: get-parmetis
+        uses: ./.github/actions/setup_parmetis
+        with:
+          compiler: ${{ matrix.compiler }}
+
       - name: Get neko
         id: get-neko
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
           compiler: ${{ matrix.compiler }}
