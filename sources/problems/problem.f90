@@ -48,7 +48,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-    use vector_math, only: vector_add2
+  use vector_math, only: vector_add2
 
   implicit none
   private
