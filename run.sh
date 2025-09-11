@@ -390,9 +390,10 @@ for case in ${example_list[@]}; do
         old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
         old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
         mkdir -p $log/$old_run
-        find $log -maxdepth 1 -type f \
-            \( -name "*.log" -or -name "error.log" \) -and -not -empty \
+
+        find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
+
     fi
 
     touch $log/output.log $log/error.log
