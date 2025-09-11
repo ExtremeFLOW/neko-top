@@ -115,12 +115,18 @@ jobs:
         with:
           version: ${{ inputs.json-fortran-version }}
 
+      - name: Get parmetis
+        id: get-parmetis
+        uses: ./.github/actions/setup_parmetis
+
       - name: Get neko
         id: get-neko
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
+
 
       # ---------------------------------------------------------------------- #
       # Build and test the code
@@ -140,6 +146,7 @@ jobs:
         env:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
         run: |
           # Adjust the end time and max iterations for the rugby ball case
           sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
