@@ -31,61 +31,28 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 module adjoint_fluid_scheme
-  use bc, only: bc_t
   use gather_scatter, only: gs_t
-  use mean_sqr_flow, only: mean_sqr_flow_t
-  use neko_config, only: NEKO_BCKND_DEVICE
   use checkpoint, only: chkp_t
-  use mean_flow, only: mean_flow_t
-  use num_types, only: rp, i8
-  use comm, only: NEKO_COMM
-  use adjoint_source_term, only: adjoint_source_term_t
+  use num_types, only: rp
   use field, only: field_t
-  use space, only: space_t, GLL
+  use space, only: space_t
   use dofmap, only: dofmap_t
-  use zero_dirichlet, only: zero_dirichlet_t
-  use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
   use dirichlet, only: dirichlet_t
-  use field_dirichlet, only: field_dirichlet_t
-  use field_dirichlet_vector, only: field_dirichlet_vector_t
-  use jacobi, only: jacobi_t
-  use sx_jacobi, only: sx_jacobi_t
-  use device_jacobi, only: device_jacobi_t
-  use hsmg, only: hsmg_t
-  use phmg, only: phmg_t
   use precon, only: pc_t, precon_factory, precon_destroy
   use fluid_stats, only: fluid_stats_t
   use bc_list, only: bc_list_t
-  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use math, only: cfill, add2s2, glsum
-  use device_math, only: device_cfill, device_add2s2
+  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBL_LEN
   use time_state, only: time_state_t
   use time_scheme_controller, only: time_scheme_controller_t
-  use operators, only: cfl
-  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
-  use field_registry, only: neko_field_registry
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
-  use json_module, only: json_file, json_core, json_value
-  use scratch_registry, only: scratch_registry_t
-  use user_intf, only: user_t, dummy_user_material_properties, &
-       user_material_properties_intf
-  use utils, only: neko_error, neko_warning
+  use logger, only: LOG_SIZE
+  use json_module, only: json_file
+  use user_intf, only: user_t, user_material_properties_intf
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
-  use field_math, only: field_cfill, field_add2s2
-  use wall_model_bc, only: wall_model_bc_t
-  use shear_stress, only: shear_stress_t
   use field_list, only : field_list_t
-  use time_state, only: time_state_t
-  use field_math, only: field_addcol3
   use interpolation, only: interpolator_t
 
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
-  use json_utils_ext, only: json_key_fallback
-  use device, only : device_event_sync, glb_cmd_event, DEVICE_TO_HOST, &
-       device_memcpy
   implicit none
   private
   public :: adjoint_fluid_scheme_t, adjoint_fluid_scheme_factory
@@ -193,22 +160,14 @@ module adjoint_fluid_scheme
        import mesh_t
        import json_file
        import user_t
-       import rp
-       import LOG_SIZE
        class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        type(mesh_t), target, intent(inout) :: msh
        integer, intent(inout) :: lx
        type(json_file), target, intent(inout) :: params
+       logical, intent(inout) :: kspv_init
+       logical, intent(inout) :: kspp_init
        type(user_t), target, intent(in) :: user
-       logical :: kspv_init
-       logical :: kspp_init
        character(len=*), intent(in) :: scheme
-       real(kind=rp) :: abs_tol
-       integer :: integer_val, ierr
-       logical :: logical_val
-       character(len=:), allocatable :: solver_type, precon_type
-       character(len=LOG_SIZE) :: log_buf
-       real(kind=rp) :: GJP_param_a, GJP_param_b
      end subroutine adjoint_fluid_init_all_intrf
   end interface
 
@@ -220,9 +179,6 @@ module adjoint_fluid_scheme
        import mesh_t
        import json_file
        import user_t
-       import dirichlet_t
-       import LOG_SIZE
-       import rp
        class(adjoint_fluid_scheme_t), target, intent(inout) :: this
        type(mesh_t), target, intent(inout) :: msh
        integer, intent(inout) :: lx
@@ -230,14 +186,6 @@ module adjoint_fluid_scheme
        type(json_file), target, intent(inout) :: params
        type(user_t), target, intent(in) :: user
        logical, intent(in) :: kspv_init
-       type(dirichlet_t) :: bdry_mask
-       character(len=LOG_SIZE) :: log_buf
-       real(kind=rp), allocatable :: real_vec(:)
-       real(kind=rp) :: real_val, kappa, B, z0
-       logical :: logical_val
-       integer :: integer_val, ierr
-       type(json_file) :: wm_json
-       character(len=:), allocatable :: string_val1, string_val2
      end subroutine adjoint_fluid_init_common_intrf
   end interface
 
