@@ -40,6 +40,7 @@ module augmented_lagrangian_objective
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: copy, col3, addcol3, col2, invcol2
+  use device, only: device_map, device_free
   use device_math, only: device_copy, device_col3, device_addcol3, &
        device_col2, device_invcol2
   use design, only: design_t
@@ -48,7 +49,7 @@ module augmented_lagrangian_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   implicit none
   private
 
@@ -212,6 +213,25 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
+    if (allocated(this%accumulate)) then
+       deallocate(this%accumulate)
+    end if
+    if (allocated(this%fld_GL)) then
+       deallocate(this%fld_GL)
+    end if
+    if (allocated(this%adjoint_fld_GL)) then
+       deallocate(this%adjoint_fld_GL)
+    end if
+    if (c_associated(this%accumulate_d)) then
+       call device_free(this%accumulate_d)
+    end if
+    if (c_associated(this%fld_GL_d)) then
+       call device_free(this%fld_GL_d)
+    end if
+    if (c_associated(this%adjoint_fld_GL_d)) then
+       call device_free(this%adjoint_fld_GL_d)
+    end if
+
     ! We need to clean up the work arrays, both here and in neko
   end subroutine augmented_lagrangian_free
 
@@ -285,7 +305,7 @@ contains
 
           call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
           call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
-          this%Xh_GL)
+               this%Xh_GL)
           call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
 
           ! multiply by GL mass matrix
