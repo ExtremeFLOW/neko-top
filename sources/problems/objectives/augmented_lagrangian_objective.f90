@@ -224,11 +224,10 @@ contains
     class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work, B_GLL
-    integer :: temp_indices(2)
+    integer :: temp_indices(1)
     integer :: n_GL, nel
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
-    call neko_scratch_registry%request_field(B_GLL, temp_indices(1))
 
     if (this%dealias) then
 
