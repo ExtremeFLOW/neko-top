@@ -41,7 +41,7 @@ module augmented_lagrangian_objective
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: copy, col3, addcol3, col2, invcol2
   use device_math, only: device_copy, device_col3, device_addcol3, &
-      device_col2, device_invcol2
+       device_col2, device_invcol2
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -184,17 +184,17 @@ contains
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
 
     if (this%dealias) then
-    ! allocate work arrays for dealiasing
-    nel = this%c_Xh_GLL%msh%nelv
-    n_GL = nel * this%Xh_GL%lxyz
-    allocate(this%accumulate(n_GL))
-    allocate(this%fld_GL(n_GL))
-    allocate(this%adjoint_fld_GL(n_GL))
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-    call device_map(this%accumulate, this%accumulate_d, n_GL)
-    call device_map(this%fld_GL, this%fld_GL_d, n_GL)
-    call device_map(this%adjoint_fld_GL, this%adjoint_fld_GL_d, n_GL)
-    end if
+       ! allocate work arrays for dealiasing
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       allocate(this%accumulate(n_GL))
+       allocate(this%fld_GL(n_GL))
+       allocate(this%adjoint_fld_GL(n_GL))
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_map(this%accumulate, this%accumulate_d, n_GL)
+          call device_map(this%fld_GL, this%fld_GL_d, n_GL)
+          call device_map(this%adjoint_fld_GL, this%adjoint_fld_GL_d, n_GL)
+       end if
     end if
 
   end subroutine augmented_lagrangian_init_attributes
@@ -223,7 +223,8 @@ contains
 
   end subroutine augmented_lagrangian_update_value
 
-  !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
+  !> update_value the sensitivity of the objective function with respect to
+  !! \f\f$\chi\f\f$
   !! @param this the objective.
   !! @param design the design.
   subroutine augmented_lagrangian_update_sensitivity(this, design)
@@ -231,8 +232,6 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
-         accumulate, fld_GL, adjoint_fld_GL
     integer :: n_GL, nel
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
@@ -244,16 +243,22 @@ contains
        if (NEKO_BCKND_DEVICE .eq. 1) then
 
           call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
-          call device_col3(this%accumulate_d, this%fld_G_dL, this%adjoint_fld_GL_d, n_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, &
+               this%Xh_GL)
+          call device_col3(this%accumulate_d, this%fld_G_dL, &
+               this%adjoint_fld_GL_d, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
-          call device_addcol3(this%accumulate_d, this%fld_GL_d, this%adjoint_fld_GL_d, n_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, &
+               this%Xh_GL)
+          call device_addcol3(this%accumulate_d, this%fld_GL_d, &
+               this%adjoint_fld_GL_d, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
-          call device_addcol3(this%accumulate_d, this%fld_GL_d, adjoint_fld_GL_d, n_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
+               this%Xh_GL)
+          call device_addcol3(this%accumulate_d, this%fld_GL_d, &
+               adjoint_fld_GL_d, n_GL)
 
           ! multiply by GL mass matrix
           call device_col2(this%accumulate_d, this%c_Xh_GL%B_d, n_GL)
@@ -268,15 +273,18 @@ contains
        else
 
           call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, &
+               this%Xh_GL)
           call col3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, &
+               this%Xh_GL)
           call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, %
+          this%Xh_GL)
           call addcol3(this%accumulate, this%fld_GL, adjoint_fld_GL, n_GL)
 
           ! multiply by GL mass matrix
