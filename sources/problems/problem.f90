@@ -543,7 +543,8 @@ contains
 
     call sensitivity%init(this%n_design)
     do i = 1, this%n_objectives
-       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
+       call vector_add2(sensitivity, &
+            this%objective_list(i)%objective%sensitivity)
     end do
 
   end subroutine problem_get_objective_sensitivities
