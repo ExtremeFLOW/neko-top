@@ -54,7 +54,7 @@ module simulation_checkpoint
      !> The checkpointing algorithm to use
      character(len=256) :: algorithm = "linear"
      !> The name of the checkpoint file
-     character(len=256) :: filename = "checkpoint.chkp"
+     character(len=256) :: filename = "checkpoint"
      !> Number of checkpoints to keep in memory
      integer :: n_saves_memory = 10
 
