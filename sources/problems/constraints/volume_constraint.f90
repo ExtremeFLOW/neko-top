@@ -79,7 +79,7 @@ module volume_constraint
      !> Mapping cascade
      type(mapping_handler_t) :: mapping
      !> if mapping is needed
-     logical :: if_mapping =  .false.
+     logical :: if_mapping = .false.
 
    contains
 
