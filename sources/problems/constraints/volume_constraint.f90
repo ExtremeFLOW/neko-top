@@ -170,9 +170,6 @@ contains
     this%limit = limit
     this%c_Xh => simulation%neko_case%fluid%c_Xh
 
-    ! Assume no mapping, unless appended later
-    this%if_mapping = .false.
-
     ! Now we can extract the mask/has_mask from the design
     if (this%has_mask) then
 
