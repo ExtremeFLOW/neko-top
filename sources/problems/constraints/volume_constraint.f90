@@ -325,7 +325,7 @@ contains
        call this%mapping%apply_forward(values, unmapped_values)
        call unmapped_values%free()
     else
-       values = design%get_values()
+       call design%get_values(values)
     end if
 
     if (this%has_mask) then
