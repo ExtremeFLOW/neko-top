@@ -91,7 +91,6 @@ module augmented_lagrangian_objective
      !> work arrays
      type(vector_t) :: accumulate, fld_GL, adjoint_fld_GL
 
-
    contains
      !> The common constructor using a JSON object.
      procedure, public, pass(this) :: init_json_sim => &
