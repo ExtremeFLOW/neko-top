@@ -39,10 +39,11 @@ module augmented_lagrangian_objective
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: copy, col3, addcol3, col2, invcol2
-  use device, only: device_map, device_free
-  use device_math, only: device_copy, device_col3, device_addcol3, &
-       device_col2, device_invcol2
+  use math, only: copy, col2, invcol2
+  use device, only: device_map
+  use device_math, only: device_copy, device_col2, device_invcol2
+  use vector, only: vector_t
+  use vector_math, only: vector_col3, vector_addcol3
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -87,15 +88,8 @@ module augmented_lagrangian_objective
      type(interpolator_t), pointer :: GLL_to_GL
      !> If dealiasing should be applied
      logical :: dealias
-
      !> work arrays
-     real(kind=rp), allocatable :: accumulate(:), fld_GL(:), adjoint_fld_GL(:)
-     !> Device pointer for `accumulate`
-     type(c_ptr) :: accumulate_d = C_NULL_PTR
-     !> Device pointer for `fld_GL`
-     type(c_ptr) :: fld_GL_d = C_NULL_PTR
-     !> Device pointer for `adjoint_fld_GL`
-     type(c_ptr) :: adjoint_fld_GL_d = C_NULL_PTR
+     type(vector_t) :: accumulate, fld_GL, adjoint_fld_GL
 
 
    contains
@@ -188,14 +182,9 @@ contains
        ! allocate work arrays for dealiasing
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       allocate(this%accumulate(n_GL))
-       allocate(this%fld_GL(n_GL))
-       allocate(this%adjoint_fld_GL(n_GL))
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_map(this%accumulate, this%accumulate_d, n_GL)
-          call device_map(this%fld_GL, this%fld_GL_d, n_GL)
-          call device_map(this%adjoint_fld_GL, this%adjoint_fld_GL_d, n_GL)
-       end if
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+       call this%adjoint_fld_GL%init(n_GL)
     end if
 
   end subroutine augmented_lagrangian_init_attributes
@@ -213,26 +202,10 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
-    if (allocated(this%accumulate)) then
-       deallocate(this%accumulate)
-    end if
-    if (allocated(this%fld_GL)) then
-       deallocate(this%fld_GL)
-    end if
-    if (allocated(this%adjoint_fld_GL)) then
-       deallocate(this%adjoint_fld_GL)
-    end if
-    if (c_associated(this%accumulate_d)) then
-       call device_free(this%accumulate_d)
-    end if
-    if (c_associated(this%fld_GL_d)) then
-       call device_free(this%fld_GL_d)
-    end if
-    if (c_associated(this%adjoint_fld_GL_d)) then
-       call device_free(this%adjoint_fld_GL_d)
-    end if
+    call this%accumulate%free()
+    call this%fld_GL%free()
+    call this%adjoint_fld_GL%free()
 
-    ! We need to clean up the work arrays, both here and in neko
   end subroutine augmented_lagrangian_free
 
   !> Compute the objective function.
@@ -251,73 +224,43 @@ contains
   subroutine augmented_lagrangian_update_sensitivity(this, design)
     class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
+    type(field_t), pointer :: work, B_GLL
+    integer :: temp_indices(2)
     integer :: n_GL, nel
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(B_GLL, temp_indices(1))
 
     if (this%dealias) then
 
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
+
+       call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(this%adjoint_fld_GL%x, this%adjoint_u%x, nel, &
+            this%Xh_GL)
+       call vector_col3(this%accumulate, this%fld_GL, this%adjoint_fld_GL)
+
+       call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(this%adjoint_fld_GL%x, this%adjoint_v%x, nel, &
+            this%Xh_GL)
+       call vector_addcol3(this%accumulate, this%fld_GL, &
+            this%adjoint_fld_GL)
+
+       call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(this%adjoint_fld_GL%x, this%adjoint_w%x, nel, &
+            this%Xh_GL)
+       call vector_addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL)
+
+       ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-
-          call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, &
-               this%Xh_GL)
-          call device_col3(this%accumulate_d, this%fld_GL_d, &
-               this%adjoint_fld_GL_d, n_GL)
-
-          call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, &
-               this%Xh_GL)
-          call device_addcol3(this%accumulate_d, this%fld_GL_d, &
-               this%adjoint_fld_GL_d, n_GL)
-
-          call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
-               this%Xh_GL)
-          call device_addcol3(this%accumulate_d, this%fld_GL_d, &
-               this%adjoint_fld_GL_d, n_GL)
-
-          ! multiply by GL mass matrix
-          call device_col2(this%accumulate_d, this%c_Xh_GL%B_d, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, this%accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
-
-          ! but negative
-          call field_cmult(work, -1.0_rp)
-
        else
-
-          call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, &
-               this%Xh_GL)
-          call col3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
-
-          call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, &
-               this%Xh_GL)
-          call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
-
-          call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
-               this%Xh_GL)
-          call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
-
-          ! multiply by GL mass matrix
-          call col2(this%accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, this%accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%c_Xh_GLL%B, work%size())
-
-          ! but negative
-          call field_cmult(work, -1.0_rp)
-
        end if
     else
        call field_col3(work, this%u, this%adjoint_u)
