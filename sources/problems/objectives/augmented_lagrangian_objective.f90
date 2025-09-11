@@ -212,6 +212,7 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
+    ! We need to clean up the work arrays, both here and in neko
   end subroutine augmented_lagrangian_free
 
   !> Compute the objective function.
@@ -245,7 +246,7 @@ contains
           call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
           call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, &
                this%Xh_GL)
-          call device_col3(this%accumulate_d, this%fld_G_dL, &
+          call device_col3(this%accumulate_d, this%fld_GL_d, &
                this%adjoint_fld_GL_d, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
@@ -258,14 +259,14 @@ contains
           call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
                this%Xh_GL)
           call device_addcol3(this%accumulate_d, this%fld_GL_d, &
-               adjoint_fld_GL_d, n_GL)
+               this%adjoint_fld_GL_d, n_GL)
 
           ! multiply by GL mass matrix
           call device_col2(this%accumulate_d, this%c_Xh_GL%B_d, n_GL)
           ! map back to GLL
           call this%GLL_to_GL%map(work%x, this%accumulate, nel, this%Xh_GLL)
           ! preempt the GLL mass matrix
-          call invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
+          call device_invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
 
           ! but negative
           call field_cmult(work, -1.0_rp)
@@ -283,9 +284,9 @@ contains
           call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
 
           call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, %
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, &
           this%Xh_GL)
-          call addcol3(this%accumulate, this%fld_GL, adjoint_fld_GL, n_GL)
+          call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
 
           ! multiply by GL mass matrix
           call col2(this%accumulate, this%c_Xh_GL%B, n_GL)
