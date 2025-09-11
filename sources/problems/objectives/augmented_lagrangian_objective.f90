@@ -40,13 +40,15 @@ module augmented_lagrangian_objective
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: copy, col3, addcol3, col2, invcol2
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_col3, device_addcol3, &
+      device_col2, device_invcol2
   use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
+  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 
@@ -84,6 +86,15 @@ module augmented_lagrangian_objective
      type(interpolator_t), pointer :: GLL_to_GL
      !> If dealiasing should be applied
      logical :: dealias
+
+     !> work arrays
+     real(kind=rp), allocatable :: accumulate(:), fld_GL(:), adjoint_fld_GL(:)
+     !> Device pointer for `accumulate`
+     type(c_ptr) :: accumulate_d = C_NULL_PTR
+     !> Device pointer for `fld_GL`
+     type(c_ptr) :: fld_GL_d = C_NULL_PTR
+     !> Device pointer for `adjoint_fld_GL`
+     type(c_ptr) :: adjoint_fld_GL_d = C_NULL_PTR
 
 
    contains
@@ -148,6 +159,7 @@ contains
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias
+    integer :: nel, n_GL
 
     call this%init_base(name, design%size(), weight, mask_name)
 
@@ -170,6 +182,20 @@ contains
 
     ! GLL to GL
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+
+    if (this%dealias) then
+    ! allocate work arrays for dealiasing
+    nel = this%c_Xh_GLL%msh%nelv
+    n_GL = nel * this%Xh_GL%lxyz
+    allocate(this%accumulate(n_GL))
+    allocate(this%fld_GL(n_GL))
+    allocate(this%adjoint_fld_GL(n_GL))
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+    call device_map(this%accumulate, this%accumulate_d, n_GL)
+    call device_map(this%fld_GL, this%fld_GL_d, n_GL)
+    call device_map(this%adjoint_fld_GL, this%adjoint_fld_GL_d, n_GL)
+    end if
+    end if
 
   end subroutine augmented_lagrangian_init_attributes
 
@@ -216,25 +242,47 @@ contains
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error("dealiased sensitivity not implemented on device")
-       else
 
-          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
-          call col3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+          call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
+          call device_col3(this%accumulate_d, this%fld_G_dL, this%adjoint_fld_GL_d, n_GL)
 
-          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
-          call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+          call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
+          call device_addcol3(this%accumulate_d, this%fld_GL_d, this%adjoint_fld_GL_d, n_GL)
 
-          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-          call this%GLL_to_GL%map(adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
-          call addcol3(accumulate, fld_GL, adjoint_fld_GL, n_GL)
+          call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
+          call device_addcol3(this%accumulate_d, this%fld_GL_d, adjoint_fld_GL_d, n_GL)
 
           ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
+          call device_col2(this%accumulate_d, this%c_Xh_GL%B_d, n_GL)
           ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map(work%x, this%accumulate, nel, this%Xh_GLL)
+          ! preempt the GLL mass matrix
+          call invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
+
+          ! but negative
+          call field_cmult(work, -1.0_rp)
+
+       else
+
+          call this%GLL_to_GL%map(this%fld_GL, this%u%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_u%x, nel, this%Xh_GL)
+          call col3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
+
+          call this%GLL_to_GL%map(this%fld_GL, this%v%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_v%x, nel, this%Xh_GL)
+          call addcol3(this%accumulate, this%fld_GL, this%adjoint_fld_GL, n_GL)
+
+          call this%GLL_to_GL%map(this%fld_GL, this%w%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%adjoint_fld_GL, this%adjoint_w%x, nel, this%Xh_GL)
+          call addcol3(this%accumulate, this%fld_GL, adjoint_fld_GL, n_GL)
+
+          ! multiply by GL mass matrix
+          call col2(this%accumulate, this%c_Xh_GL%B, n_GL)
+          ! map back to GLL
+          call this%GLL_to_GL%map(work%x, this%accumulate, nel, this%Xh_GLL)
           ! preempt the GLL mass matrix
           call invcol2(work%x, this%c_Xh_GLL%B, work%size())
 
