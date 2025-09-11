@@ -53,8 +53,9 @@ module volume_constraint
   use mask_ops, only: mask_exterior_const
   use math, only: glsc2, copy, cmult
   use device_math, only: device_glsc2, device_copy, device_cmult
+  use vector_math, only: vector_cmult
   use math_ext, only: glsc2_mask
-  use field_math, only: field_rone, field_copy, field_cmult
+  use field_math, only: field_rone, field_copy, field_cmult, field_cfill
   use utils, only: neko_error
   use vector, only: vector_t
   use neko_ext, only: field_to_vector
@@ -78,7 +79,7 @@ module volume_constraint
      !> Mapping cascade
      type(mapping_handler_t) :: mapping
      !> if mapping is needed
-     logical :: if_mapping
+     logical :: if_mapping =  .false.
 
    contains
 
@@ -215,7 +216,7 @@ contains
             design%size())
 
        if (this%is_max) then
-          call cmult(this%sensitivity%x, -1.0_rp, design%size())
+          call vector_cmult(this%sensitivity, -1.0_rp)
        end if
     end if
 
@@ -265,8 +266,7 @@ contains
        call neko_scratch_registry%request_field(unmapped, temp_indices(1))
        call neko_scratch_registry%request_field(mapped, temp_indices(2))
        ! The mapping will handle the mass matrix
-       call field_rone(unmapped)
-       call field_cmult(unmapped, -1.0_rp / this%volume_domain)
+       call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
           call field_cmult(unmapped, -1.0_rp)
        end if
