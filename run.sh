@@ -384,13 +384,17 @@ for case in ${example_list[@]}; do
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
-    elif [ -f "$log/output.log" ]; then
-        printf '\t%-12s %-s\n' "Skipping:" "$example"
-        continue
+
+    elif [[ -s "$log/output.log" ]]; then
+        # Move old log files to folder with counter padded to 2 digits
+        old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p $log/$old_run
+        find $log -maxdepth 1 -type f \
+            \( -name "*.log" -or -name "error.log" \) -and -not -empty \
+            -exec mv -ft $log/$old_run {} \;
     fi
 
-    # Remove old output and error files
-    find $log -type f -name "*.log" -or -name "error.log" -delete
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
