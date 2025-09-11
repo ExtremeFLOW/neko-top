@@ -120,7 +120,6 @@ program minimum_dissipation_sensitivity
           DEVICE_TO_HOST, .true.)
   end if
 
-  ! BE SO CAREFUL THIS DOESN*T WORK IN PARALLEL !
   i_max = maxloc(abs(sensitivities%x), dim=1)
 
   ! -------------------------------------------------------------------------- !
