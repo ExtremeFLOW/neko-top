@@ -221,7 +221,7 @@ contains
   subroutine augmented_lagrangian_update_sensitivity(this, design)
     class(augmented_lagrangian_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work, B_GLL
+    type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer :: n_GL, nel
 
