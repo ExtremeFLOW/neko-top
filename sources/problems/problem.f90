@@ -48,7 +48,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-  use vector, only: vector_t
+    use vector_math, only: vector_add2
 
   implicit none
   private
@@ -478,8 +478,8 @@ contains
     objective_value = 0.0_rp
     do i = 1, this%n_objectives
        objective_value = objective_value + &
-            this%objective_list(i)%objective%weight * &
-            this%objective_list(i)%objective%value
+            this%objective_list(i)%objective%get_weight() * &
+            this%objective_list(i)%objective%get_value()
     end do
 
   end subroutine problem_get_objective_value
