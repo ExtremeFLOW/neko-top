@@ -40,7 +40,6 @@ module augmented_lagrangian_objective
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: copy, col2, invcol2
-  use device, only: device_map
   use device_math, only: device_copy, device_col2, device_invcol2
   use vector, only: vector_t
   use vector_math, only: vector_col3, vector_addcol3
@@ -50,7 +49,6 @@ module augmented_lagrangian_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   implicit none
   private
 
