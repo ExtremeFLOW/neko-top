@@ -1,7 +1,7 @@
 # Define the CTest for sensitivity
 set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
-# Provide a list of case files instead of .f90 files
+# Provide a list of .case files
 set(test_list
     "volume.case"
     #"volume_filtered.case"
