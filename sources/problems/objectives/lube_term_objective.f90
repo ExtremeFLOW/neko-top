@@ -178,7 +178,7 @@ contains
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
   !! @param dealias_sensitivity use dealiasing on the sensitivity.
-  !! @param dealias_sensitivity use dealiasing on the adjoint forcing.
+  !! @param dealias_forcing use dealiasing on the adjoint forcing.
   subroutine lube_term_init_attributes(this, design, simulation, weight, &
        name, mask_name, dealias_sensitivity, dealias_forcing)
     class(lube_term_objective_t), intent(inout) :: this
