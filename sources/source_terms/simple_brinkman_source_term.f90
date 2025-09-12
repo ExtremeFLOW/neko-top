@@ -208,11 +208,11 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-          call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
 
-          ! u
-          call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
-          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! u
+       call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
@@ -223,12 +223,12 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-          call sub2(fu%x, work%x, work%size())
+       call sub2(fu%x, work%x, work%size())
 
-          ! v
-          call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
-          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
-          ! Evaluate term on GL and preempt the GLL premultiplication
+       ! v
+       call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
@@ -238,12 +238,12 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-          call sub2(fv%x, work%x, work%size())
+       call sub2(fv%x, work%x, work%size())
 
-          ! w
-          call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
-          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
-          ! Evaluate term on GL and preempt the GLL premultiplication
+       ! w
+       call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
@@ -253,7 +253,7 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-          call sub2(fv%x, work%x, work%size())
+       call sub2(fv%x, work%x, work%size())
     else
 
        call field_subcol3(fu, this%u, this%chi)
