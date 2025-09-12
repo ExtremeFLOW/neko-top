@@ -79,11 +79,12 @@ module lube_term_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use math, only: glsc2, copy, col3, addcol3, col2, invcol2, cmult
-  use device_math, only: device_copy, device_glsc2
+  use math, only: glsc2, copy, col2, invcol2
+  use vector, only: vector_t
+  use vector_math, only: vector_cmult, vector_col3, vector_addcol3
+  use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
-  use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR
   implicit none
   private
 
@@ -118,6 +119,8 @@ module lube_term_objective
      type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
+     !> work arrays
+     type(vector_t) :: accumulate, fld_GL
 
    contains
 
@@ -187,6 +190,7 @@ contains
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
+    integer :: n_GL, nel
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
@@ -219,6 +223,14 @@ contains
 
     ! GLL to GL
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+
+    if (this%dealias_sensitivity) then
+       ! allocate work arrays for dealiasing
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+    end if
 
     ! if we have the lube term we need to initialize and append that too
 
@@ -293,7 +305,8 @@ contains
 
   end subroutine lube_term_update_value
 
-  !> update_value the sensitivity of the objective function with respect to chi
+  !> update_value the sensitivity of the objective function with respect to
+  !! \f$chi\f$
   !! @param this The objective.
   !! @param design the design.
   subroutine lube_term_update_sensitivity(this, design)
@@ -301,8 +314,6 @@ contains
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%c_Xh_GLL%msh%nelv) :: &
-         accumulate, fld_GL
     integer :: n_GL, nel
 
     ! if we have the lube term we also get an extra term in the sensitivity
@@ -310,30 +321,27 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     if(this%dealias_sensitivity) then
-
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
 
+       call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call vector_addcol3(this%accumulate, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call vector_addcol3(this%accumulate, this%fld_GL, this%fld_GL)
+       ! scale
+       call vector_cmult(this%accumulate, this%weight * 0.5_rp)
+
+       ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error("dealiased sensitivity not implemented on device")
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
        else
-
-          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-          call col3(accumulate, fld_GL, fld_GL, n_GL)
-          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-          call addcol3(accumulate, fld_GL, fld_GL, n_GL)
-          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-          call addcol3(accumulate, fld_GL, fld_GL, n_GL)
-          ! scale
-          call cmult(accumulate, this%weight * 0.5_rp, n_GL)
-
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%c_Xh_GLL%B, work%size())
-
        end if
 
     else
