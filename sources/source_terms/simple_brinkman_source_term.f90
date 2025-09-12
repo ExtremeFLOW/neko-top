@@ -43,10 +43,10 @@ module simple_brinkman_source_term
   use time_state, only: time_state_t
   use utils, only: neko_error
   use field, only: field_t
-  use field_math, only: field_subcol3
+  use field_math, only: field_subcol3, field_sub2
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
-  use math, only: col2, invcol2, sub2
+  use math, only: col2, invcol2
   use vector_math, only: vector_col3
   use scratch_registry, only: neko_scratch_registry
   use vector, only: vector_t
@@ -223,7 +223,7 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-       call sub2(fu%x, work%x, work%size())
+       call field_sub2(fu, work)
 
        ! v
        call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
@@ -238,7 +238,7 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-       call sub2(fv%x, work%x, work%size())
+       call field_sub2(fv, work)
 
        ! w
        call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
@@ -253,7 +253,7 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-       call sub2(fv%x, work%x, work%size())
+       call field_sub2(fw, work)
     else
 
        call field_subcol3(fu, this%u, this%chi)
