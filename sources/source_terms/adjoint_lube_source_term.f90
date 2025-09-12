@@ -63,7 +63,7 @@ module adjoint_lube_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
-  use vector_math, only: vector_add3
+  use vector_math, only: vector_add3, vector_col3
   use vector, only: vector_t
   implicit none
   private
@@ -146,6 +146,7 @@ contains
   !! @param coef The SEM coeffs.
   !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
   !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias weather this term should be overintegrated.
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
        u, v, w, &
