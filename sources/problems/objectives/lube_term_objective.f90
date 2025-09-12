@@ -263,6 +263,8 @@ contains
     this%w => null()
     this%c_Xh_GLL => null()
     this%brinkman_amplitude => null()
+    call this%accumulate%free()
+    call this%fld_GL%free()
 
   end subroutine lube_term_free
 
