@@ -47,6 +47,7 @@ module simple_brinkman_source_term
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use math, only: col2, invcol2
+  use device_math, only: device_col2, device_invcol2
   use vector_math, only: vector_col3
   use scratch_registry, only: neko_scratch_registry
   use vector, only: vector_t
