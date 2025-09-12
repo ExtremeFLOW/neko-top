@@ -54,14 +54,17 @@ module adjoint_lube_source_term
   use time_state, only: time_state_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use field_math, only: field_addcol3, field_copy, field_cmult
+  use field_math, only: field_addcol3, field_copy, field_cmult, field_add2
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use utils, only: neko_error
   use field_registry, only: neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: col2, invcol2, add2, col3
+  use math, only: col2, invcol2
+  use device_math, only: device_col2, device_invcol2
+  use vector_math, only: vector_add3
+  use vector, only: vector_t
   implicit none
   private
 
@@ -93,6 +96,8 @@ module adjoint_lube_source_term
      type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
+     !> work arrays
+     type(vector_t) :: accumulate, fld_GL, chi_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -160,6 +165,7 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
+    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -183,8 +189,6 @@ contains
     this%dealias = dealias
 
     ! point everything in the correct places
-    ! NOTE!!!
-    ! this is the primal!
     this%u => u
     this%v => v
     this%w => w
@@ -202,6 +206,15 @@ contains
        this%mask => mask
     end if
 
+    if (this%dealias) then
+       ! allocate work arrays for dealiasing
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+       call this%chi_GL%init(n_GL)
+    end if
+
   end subroutine adjoint_lube_source_term_init_from_components
 
   !> Destructor.
@@ -209,6 +222,9 @@ contains
     class(adjoint_lube_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    call this%accumulate%free()
+    call this%fld_GL%free()
+    call this%chi_GL%free()
   end subroutine adjoint_lube_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -220,8 +236,6 @@ contains
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
-         accumulate, fld_GL, chi_GL
     integer :: n_GL, nel
 
     fu => this%fields%get_by_index(1)
@@ -247,46 +261,50 @@ contains
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
 
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error("dealias lube source term not implemented on device")
-       else
-
-          call this%GLL_to_GL%map(chi_GL, work%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%chi_GL%x, work%x, nel, this%Xh_GL)
 
           ! u
-          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call add2(fu%x, work%x, work%size())
+       end if
+          call field_add2(fu, work)
 
           ! v
-          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call add2(fv%x, work%x, work%size())
+       end if
+          call field_add2(fv, work)
 
           ! w
-          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call add2(fw%x, work%x, work%size())
-
        end if
+          call field_add2(fw, work)
+
     else
        ! multiple and add the RHS
        call field_addcol3(fu, this%u, work)
