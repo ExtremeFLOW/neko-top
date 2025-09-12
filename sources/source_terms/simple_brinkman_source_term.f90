@@ -46,8 +46,10 @@ module simple_brinkman_source_term
   use field_math, only: field_subcol3
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
-  use math, only: col2, invcol2, sub2, col3
+  use math, only: col2, invcol2, sub2
+  use vector_math, only: vector_col3
   use scratch_registry, only: neko_scratch_registry
+  use vector, only: vector_t
   implicit none
   private
 
@@ -73,6 +75,8 @@ module simple_brinkman_source_term
      type(interpolator_t), pointer :: GLL_to_GL
      !> if dealiasing should be applied
      logical :: dealias
+     !> work arrays
+     type(vector_t) :: accumulate, fld_GL, chi_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -131,6 +135,7 @@ contains
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
+    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -161,6 +166,15 @@ contains
     this%Xh_GLL => this%coef%Xh
     this%GLL_to_GL => GLL_to_GL
 
+    if (this%dealias) then
+       ! allocate work arrays for dealiasing
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+       call this%chi_GL%init(n_GL)
+    end if
+
   end subroutine simple_brinkman_source_term_init_from_components
 
   !> Destructor.
@@ -168,6 +182,10 @@ contains
     class(simple_brinkman_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    call this%accumulate%free()
+    call this%fld_GL%free()
+    call this%chi_GL%free()
+
   end subroutine simple_brinkman_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -179,8 +197,6 @@ contains
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
     integer :: temp_indices(1)
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
-         accumulate, fld_GL, chi_GL
     integer :: n_GL, nel
 
     fu => this%fields%get_by_index(1)
@@ -192,46 +208,52 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error("dealiased brinkman term not implemented on device")
-       else
-
-          call this%GLL_to_GL%map(chi_GL, this%chi%x, nel, this%Xh_GL)
+          call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
 
           ! u
-          call this%GLL_to_GL%map(fld_GL, this%u%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
+       end if
           call sub2(fu%x, work%x, work%size())
 
           ! v
-          call this%GLL_to_GL%map(fld_GL, this%v%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+          ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
+       end if
           call sub2(fv%x, work%x, work%size())
 
           ! w
-          call this%GLL_to_GL%map(fld_GL, this%w%x, nel, this%Xh_GL)
-          call col3(accumulate, chi_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+          ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call sub2(fv%x, work%x, work%size())
        end if
+          call sub2(fv%x, work%x, work%size())
     else
 
        call field_subcol3(fu, this%u, this%chi)
