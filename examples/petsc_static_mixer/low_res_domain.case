@@ -1,12 +1,12 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/petsc_static_mixer/domain_256.nmsh", //
+        "mesh_file": "data_local/petsc_static_mixer/box.nmsh", //
         "output_directory": "fields",
-        "output_at_end": true,
-        "output_boundary": true,
-        "end_time": 2.0,
-        "timestep": 5e-4,
+        "time": {
+            "end_time": 1.0,
+            "timestep": 5e-4
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -23,33 +23,36 @@
                     0.0
                 ]
             },
-            "inflow_condition": {
-                "type": "uniform",
-                "value": [
-                    1.0
-                ]
-            },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": { "type": "jacobi" },
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
+                "preconditioner": { "type": "hsmg" },
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
             "output_control": "nsamples",
             "output_value": 250,
-            "boundary_types": [
-                "v",
-                "v",
-                "o",
-                "w"
+            "boundary_conditions ": [
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 2 ]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 3, 4, 5, 6 ]
+                }
             ],
             "source_terms": [
                 {
@@ -61,6 +64,12 @@
                             "distance_transform": {
                                 "type": "smooth_step",
                                 "value": 0.1
+                            },
+                            "mesh_transform": {
+                                "type": "bounding_box",
+                                "box_min": [ 1.00, 0.00, 0.00 ],
+                                "box_max": [ 3.00, 1.00, 1.00 ],
+                                "keep_aspect_ratio": true
                             }
                         }
                     ],
