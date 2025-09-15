@@ -110,6 +110,8 @@ based on lubrication theory written by Gersborg-Hansen et al.
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
+| `dealias_forcing`| If dealiasing should be applied to adjoint forcing term | logical | `.true.`|
+| `dealias_sensitivity`| If dealiasing should be applied to sensitivity contribution | logical | `.true.`|
 
 ### Scalar mixing {#objective_scalar_mixing}
 
@@ -170,3 +172,4 @@ and has the following input parameters:
 | `is_max` | Indicate whether a minimum or maximum volume constraint should be applied. | `.true.` or `.false.` | `.false.` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Volume constraint`|
+| `mapping`| A potential to, for instance, compute the volume based on a filtered design. For more information please refer to @ref mixer_mapping| Json | `""`|

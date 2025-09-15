@@ -43,7 +43,14 @@ module simple_brinkman_source_term
   use time_state, only: time_state_t
   use utils, only: neko_error
   use field, only: field_t
-  use field_math, only: field_subcol3
+  use field_math, only: field_subcol3, field_sub2
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
+  use math, only: col2, invcol2
+  use device_math, only: device_col2, device_invcol2
+  use vector_math, only: vector_col3
+  use scratch_registry, only: neko_scratch_registry
+  use vector, only: vector_t
   implicit none
   private
 
@@ -58,6 +65,19 @@ module simple_brinkman_source_term
      type(field_t), pointer :: v => null()
      !> the fields corresponding to w
      type(field_t), pointer :: w => null()
+     ! --- for over-integration
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> if dealiasing should be applied
+     logical :: dealias
+     !> work arrays
+     type(vector_t) :: accumulate, fld_GL, chi_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -100,16 +120,23 @@ contains
   !! @param chi the brinkman amplitude field.
   !! @param u, v, w the velocity field (either primal or adjoint).
   !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias if dealiasing should be applied.
   subroutine simple_brinkman_source_term_init_from_components(this, &
-       f_x, f_y, f_z, chi, u, v, w, coef)
+       f_x, f_y, f_z, chi, u, v, w, coef, c_Xh_GL, GLL_to_GL, dealias)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
-    type(coef_t) :: coef
+    type(coef_t), intent(in) :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
+    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -133,6 +160,21 @@ contains
     this%w => w
     ! and get chi out of the design
     this%chi => chi
+    ! for over integration
+    this%dealias = dealias
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
+
+    if (this%dealias) then
+       ! allocate work arrays for dealiasing
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+       call this%chi_GL%init(n_GL)
+    end if
 
   end subroutine simple_brinkman_source_term_init_from_components
 
@@ -141,6 +183,10 @@ contains
     class(simple_brinkman_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    call this%accumulate%free()
+    call this%fld_GL%free()
+    call this%chi_GL%free()
+
   end subroutine simple_brinkman_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -150,14 +196,74 @@ contains
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    integer :: n_GL, nel
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
 
-    call field_subcol3(fu, this%u, this%chi)
-    call field_subcol3(fv, this%v, this%chi)
-    call field_subcol3(fw, this%w, this%chi)
+    call neko_scratch_registry%request_field(work, temp_indices(1))
+
+    if (this%dealias) then
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
+
+       ! u
+       call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fu, work)
+
+       ! v
+       call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fv, work)
+
+       ! w
+       call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
+       ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call invcol2(work%x, this%coef%B, work%size())
+       end if
+       call field_sub2(fw, work)
+    else
+
+       call field_subcol3(fu, this%u, this%chi)
+       call field_subcol3(fv, this%v, this%chi)
+       call field_subcol3(fw, this%w, this%chi)
+
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine simple_brinkman_source_term_compute
 
