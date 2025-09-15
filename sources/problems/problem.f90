@@ -44,7 +44,7 @@ module problem
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
-  use json_utils, only: json_extract_item, json_get
+  use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
@@ -228,6 +228,7 @@ contains
     character(len=:), allocatable :: path, type
     type(json_file) :: objective_json
     integer :: n_objectives, i
+    logical :: dealias
 
     call neko_log%section("Reading objectives")
 
@@ -252,8 +253,11 @@ contains
        allocate(augmented_lagrangian_objective_t::objective)
        select type(ALO => objective)
        class is (augmented_lagrangian_objective_t)
-          call ALO%init_from_attributes(design, simulation, &
-               weight = 1.0_rp, name = "Augmented Lagrangian", mask_name = "")
+          call json_get_or_default(parameters, &
+               "adjoint_fluid.dealias_sensitivity", dealias, .true.)
+          call ALO%init_from_attributes(design, simulation, weight = 1.0_rp, &
+               name = "Augmented Lagrangian", mask_name = "", &
+               dealias = dealias)
        end select
        call this%add_objective(objective)
     end if
