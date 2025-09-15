@@ -170,7 +170,7 @@ module brinkman_design
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain
-     logical :: if_mask
+     logical :: has_mask
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -197,11 +197,17 @@ module brinkman_design
      procedure, pass(this) :: get_values => brinkman_design_get_design
 
      !> Retrieve the x location of the design variables
-     procedure, pass(this) :: get_x => brinkman_design_get_x
+     procedure, pass(this) :: design_get_x => brinkman_design_get_x
+     !> Retrieve the x location of the i'th design variable
+     procedure, pass(this) :: design_get_x_i => brinkman_design_get_x_i
      !> Retrieve the y location of the design variables
-     procedure, pass(this) :: get_y => brinkman_design_get_y
+     procedure, pass(this) :: design_get_y => brinkman_design_get_y
+     !> Retrieve the y location of the i'th design variable
+     procedure, pass(this) :: design_get_y_i => brinkman_design_get_y_i
      !> Retrieve the z location of the design variables
-     procedure, pass(this) :: get_z => brinkman_design_get_z
+     procedure, pass(this) :: design_get_z => brinkman_design_get_z
+     !> Retrieve the z location of the i'th design variable
+     procedure, pass(this) :: design_get_z_i => brinkman_design_get_z_i
 
      !> Update the design
      procedure, pass(this) :: update_design => brinkman_design_update_design
@@ -240,41 +246,41 @@ contains
     type(json_file), intent(inout) :: parameters
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
-    character(len=:), allocatable :: domain_name, domain_type
+    character(len=:), allocatable :: domain_name, domain_type, name
 
-    ! Initialize the optimization domain
-    if (parameters%valid_path('optimization.domain')) then
-       call json_get(parameters, 'optimization.domain.type', domain_type)
-       select case (trim(domain_type))
-       case ('point_zone')
-          this%if_mask = .true.
-          call json_get(parameters, 'optimization.domain.zone_name', &
-               domain_name)
-          this%optimization_domain => &
-               neko_point_zone_registry%get_point_zone(domain_name)
+    call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
+    call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
 
-       case default
-          call neko_error('brinkman design only supports point_zones for&
-          & optimization domain types')
+    select case (trim(domain_type))
+    case ('full')
+       this%has_mask = .false.
+    case ('point_zone')
+       this%has_mask = .true.
+       call json_get(parameters, 'domain.zone_name', domain_name)
+       this%optimization_domain => &
+            neko_point_zone_registry%get_point_zone(domain_name)
 
-       end select
-    else
-       this%if_mask = .false.
-    end if
+    case default
+       call neko_error('brinkman design only supports point_zones for ' // &
+            'optimization domain types')
+
+    end select
 
     ! Initialize and inject into the simulation
-    call this%init_from_components(simulation)
+    call this%init_from_components(name, simulation)
 
     ! Initialize the mapper
     associate(coef => simulation%neko_case%fluid%c_Xh, &
          gs => simulation%neko_case%fluid%gs_Xh)
-      call this%mapping%init_base(coef)
-      call this%mapping%add(parameters, 'optimization.design.mapping')
 
-      if (parameters%valid_path(&
-           'optimization.design.initial_distribution')) then
-         call json_extract_object(parameters, &
-              'optimization.design.initial_distribution', json_subdict)
+      if ('mapping' .in. parameters) then
+         call json_extract_object(parameters, 'mapping', json_subdict)
+         call this%mapping%init_base(coef)
+         call this%mapping%add(parameters, 'mapping')
+      end if
+
+      if ('initial_distribution' .in. parameters) then
+         call json_extract_object(parameters, 'initial_distribution', json_subdict)
          call set_optimization_ic(this%design_indicator, coef, gs, &
               json_subdict)
       else
@@ -298,8 +304,9 @@ contains
 
   end subroutine brinkman_design_free
 
-  subroutine brinkman_design_init_from_components(this, simulation)
+  subroutine brinkman_design_init_from_components(this, name, simulation)
     class(brinkman_design_t), intent(inout) :: this
+    character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
     integer :: n, i
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
@@ -368,7 +375,7 @@ contains
     ! interfaces, if we filter first then mask there's a chance we have a sharp
     ! interface on the boundary of the optimization domain.
     ! if we mask first then filter, at least all the boundaries will be smooth.
-    if (this%if_mask) then
+    if (this%has_mask) then
        call mask_exterior_const(this%design_indicator, &
             this%optimization_domain, 0.0_rp)
     end if
@@ -387,7 +394,7 @@ contains
     call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
-    call this%init_base(n)
+    call this%init_base(name, n)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -427,7 +434,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
 
     ! TODO, see previous todo about mask first, then mapping
-    if (this%if_mask) then
+    if (this%has_mask) then
        call mask_exterior_const(this%design_indicator, &
             this%optimization_domain, 0.0_rp)
     end if
@@ -437,9 +444,9 @@ contains
 
   end subroutine brinkman_design_map_forward
 
-  function brinkman_design_get_design(this) result(values)
+  subroutine brinkman_design_get_design(this, values)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
     integer :: n
 
     n = this%size()
@@ -449,11 +456,11 @@ contains
        call device_copy(values%x_d, this%design_indicator%x_d, n)
     end if
 
-  end function brinkman_design_get_design
+  end subroutine brinkman_design_get_design
 
-  function brinkman_design_get_x(this) result(x)
+  subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: x
+    type(vector_t), intent(inout) :: x
     integer :: n
 
     n = this%size()
@@ -463,11 +470,26 @@ contains
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
     end if
 
-  end function brinkman_design_get_x
+  end subroutine brinkman_design_get_x
 
-  function brinkman_design_get_y(this) result(y)
+  function brinkman_design_get_x_i(this, i) result(x_i)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: y
+    integer, intent(in) :: i
+    real(kind=rp) :: x_i
+    integer :: n
+
+    n = this%size()
+    if (i .lt. 1 .or. i .gt. n) then
+       call neko_error('brinkman_design_get_x_i: index out of bounds')
+    end if
+
+    x_i = this%design_indicator%dof%x(i,1,1,1)
+
+  end function brinkman_design_get_x_i
+
+  subroutine brinkman_design_get_y(this, y)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: y
     integer :: n
 
     n = this%size()
@@ -477,11 +499,26 @@ contains
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
     end if
 
-  end function brinkman_design_get_y
+  end subroutine brinkman_design_get_y
 
-  function brinkman_design_get_z(this) result(z)
+  function brinkman_design_get_y_i(this, i) result(y_i)
     class(brinkman_design_t), intent(in) :: this
-    type(vector_t) :: z
+    integer, intent(in) :: i
+    real(kind=rp) :: y_i
+    integer :: n
+
+    n = this%size()
+    if (i .lt. 1 .or. i .gt. n) then
+       call neko_error('brinkman_design_get_y_i: index out of bounds')
+    end if
+
+    y_i = this%design_indicator%dof%y(i,1,1,1)
+
+  end function brinkman_design_get_y_i
+
+  subroutine brinkman_design_get_z(this, z)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: z
     integer :: n
 
     n = this%size()
@@ -491,7 +528,22 @@ contains
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
     end if
 
-  end function brinkman_design_get_z
+  end subroutine brinkman_design_get_z
+
+  function brinkman_design_get_z_i(this, i) result(z_i)
+    class(brinkman_design_t), intent(in) :: this
+    integer, intent(in) :: i
+    real(kind=rp) :: z_i
+    integer :: n
+
+    n = this%size()
+    if (i .lt. 1 .or. i .gt. n) then
+       call neko_error('brinkman_design_get_z_i: index out of bounds')
+    end if
+
+    z_i = this%design_indicator%dof%z(i,1,1,1)
+
+  end function brinkman_design_get_z_i
 
   subroutine brinkman_design_update_design(this, values)
     class(brinkman_design_t), intent(inout) :: this
@@ -535,7 +587,7 @@ contains
     ! Note for Abbas,
     ! I'm NOT doing this because I'm too lazy and I just need masks so I can
     ! test something in the passive scalar.
-    if (this%if_mask) then
+    if (this%has_mask) then
        call mask_exterior_const(this%sensitivity, this%optimization_domain, &
             0.0_rp)
     end if

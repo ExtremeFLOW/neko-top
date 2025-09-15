@@ -43,25 +43,38 @@ module simulation_m
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
   use adjoint_scalars, only: adjoint_scalars_t
   use scalars, only: scalars_t
+  use scalar_scheme, only: scalar_scheme_t
   use fluid_pnpn, only: fluid_pnpn_t
   use time_step_controller, only: time_step_controller_t
+  use time_state, only: time_state_t
   use fld_file_output, only: fld_file_output_t
+  use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset
-  use field_math, only: field_rzero
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use field_math, only: field_rzero, field_copy
+  use checkpoint, only: chkp_t
+  use file, only: file_t
+  use utils, only: neko_warning, neko_error
+  use comm, only: pe_rank
   use json_file_module, only: json_file
-  use json_utils, only: json_extract_item
+  use json_utils, only: json_extract_item, json_get_or_default
   use num_types, only: rp, sp, dp
-  use logger, only: LOG_SIZE
+  use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
   use jobctrl, only: jobctrl_time_limit
   use profiler, only: profiler_start, profiler_stop
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
+  use simulation, only: simulation_init, simulation_step, simulation_finalize, &
+       simulation_restart
+  use simulation_checkpoint, only: simulation_checkpoint_t
   implicit none
   private
 
   type :: simulation_t
+
      !> and primal case
      type(case_t), public :: neko_case
      !> and adjoint case
@@ -81,9 +94,20 @@ module simulation_m
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_adjoint
 
+     logical :: have_scalar = .false.
+     integer :: n_timesteps = 0
+
+     ! ----------------------------------------------------------------------- !
+     ! Checkpoint system
+
+     !> Enable checkpoint system
+     logical :: checkpoint_enable = .false.
+     !> The checkpoint system data
+     type(simulation_checkpoint_t) :: checkpoint
+
    contains
      !> Initialize the simulation
-     procedure, pass(this) :: init => simulation_init
+     procedure, pass(this) :: init => simulation_initialize
      !> Free the simulation
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
@@ -94,13 +118,13 @@ module simulation_m
      procedure, pass(this) :: reset => simulation_reset
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
-  end type simulation_t
 
+  end type simulation_t
   public :: simulation_t
 contains
 
   !> Initialize the simulation
-  subroutine simulation_init(this, parameters)
+  subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     integer :: i, n_scalars
@@ -113,13 +137,11 @@ contains
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
        this%fluid => fluid
-
     end select
 
     select type (adjoint_fluid => this%adjoint_case%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        this%adjoint_fluid => adjoint_fluid
-
     end select
 
     if (allocated(this%neko_case%scalars)) then
@@ -170,12 +192,21 @@ contains
        end do
     end if
 
-  end subroutine simulation_init
+    call json_get_or_default(parameters, "checkpoints.enable", &
+         this%checkpoint_enable, .false.)
+    if (this%checkpoint_enable) then
+       call this%checkpoint%init(this%neko_case, parameters)
+    end if
+
+  end subroutine simulation_initialize
 
   !> Free the simulation
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
+    if (this%checkpoint_enable) then
+       call this%checkpoint%free()
+    end if
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -184,13 +215,27 @@ contains
   !> Run the simulation
   subroutine simulation_run_forward(this)
     class(simulation_t), intent(inout) :: this
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
 
-    ! set forward time to zero
-    this%neko_case%time%t = 0.0_rp
-    this%neko_case%time%tstep = 0
+    call dt_controller%init(this%neko_case%params)
 
-    ! run the primal
-    call neko_solve(this%neko_case)
+    call simulation_init(this%neko_case, dt_controller)
+
+    call profiler_start
+    loop_start = MPI_WTIME()
+    do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
+       this%n_timesteps = this%n_timesteps + 1
+
+       call simulation_step(this%neko_case, dt_controller, loop_start)
+
+       if (this%checkpoint_enable) then
+          call this%checkpoint%save(this%neko_case)
+       end if
+    end do
+    call profiler_stop
+
+    call simulation_finalize(this%neko_case)
 
   end subroutine simulation_run_forward
 
@@ -198,8 +243,9 @@ contains
   subroutine simulation_run_backward(this)
     class(simulation_t), intent(inout) :: this
     type(time_step_controller_t) :: dt_controller
-    real(kind=dp) :: tstep_loop_start_time
+    real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
+    integer :: i
 
     call dt_controller%init(this%neko_case%params)
 
@@ -207,12 +253,15 @@ contains
 
     call profiler_start
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
-    tstep_loop_start_time = MPI_WTIME()
+    loop_start = MPI_WTIME()
 
-    do while (this%adjoint_case%time%t .lt. this%adjoint_case%time%end_time &
-         .and. (.not. jobctrl_time_limit()))
+    do i = this%n_timesteps, 1, -1
+       if (this%checkpoint_enable) then
+          call this%checkpoint%restore(this%neko_case, i)
+       end if
+
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
-            tstep_loop_start_time)
+            loop_start)
     end do
     call profiler_stop
 
@@ -230,12 +279,14 @@ contains
     ! TODO
     ! reset for the adjoint
     ! call reset(this%adjoint_case)
-    this%adjoint_case%time%t = 0.0_dp
+    this%adjoint_case%time%t = 0.0_rp
     this%adjoint_case%time%tstep = 0
+    this%n_timesteps = 0
 
     call field_rzero(this%adjoint_case%fluid_adj%u_adj)
     call field_rzero(this%adjoint_case%fluid_adj%v_adj)
     call field_rzero(this%adjoint_case%fluid_adj%w_adj)
+    n_scalars = 0
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
        do i = 1, n_scalars
@@ -244,6 +295,9 @@ contains
        end do
     end if
 
+    if (this%checkpoint_enable) then
+       call this%checkpoint%reset()
+    end if
   end subroutine simulation_reset
 
   !> Write current state of the simulation to disk

@@ -59,11 +59,11 @@ contains
 
   !> @brief Force everything outside the mask to be a constant value
   !! @param[in,out] vec The field being masked
-  !! @param[in,out] mask The mask being applied.
+  !! @param[in,out] zone The zone being applied.
   !! @param[in] const The value to be filled
-  subroutine mask_exterior_const_vec(vec, mask, const)
+  subroutine mask_exterior_const_vec(vec, zone, const)
     type(vector_t), intent(inout) :: vec
-    class(point_zone_t), intent(inout) :: mask
+    class(point_zone_t), intent(inout) :: zone
     real(kind=rp), intent(in) :: const
     type(field_t), pointer :: work
     integer :: temp_indices(1), i
@@ -83,7 +83,7 @@ contains
     ! sizes are different
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    if (vec%n .ne. work%size()) then
+    if (vec%size() .ne. work%size()) then
        call neko_error('vector and field are of incompatible dimension')
     end if
 
@@ -92,11 +92,11 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy_mask(work%x_d, vec%x_d, work%size(), mask%mask_d, &
-            mask%size)
+       call device_copy_mask(work%x_d, vec%x_d, work%size(), zone%mask%get_d(), &
+            zone%size)
     else
-       do i = 1, mask%size
-          work%x(mask%mask(i), 1, 1, 1) = vec%x(mask%mask(i))
+       do i = 1, zone%size
+          work%x(zone%mask%get(i), 1, 1, 1) = vec%x(zone%mask%get(i))
        end do
     end if
 
@@ -113,11 +113,11 @@ contains
 
   !> @brief Force everything outside the mask to be a constant value
   !! @param[in,out] fld The field being masked
-  !! @param[in,out] mask The mask being applied.
+  !! @param[in,out] zone The zone being applied.
   !! @param[in] const The value to be filled
-  subroutine mask_exterior_const_fld(fld, mask, const)
+  subroutine mask_exterior_const_fld(fld, zone, const)
     type(field_t), intent(inout) :: fld
-    class(point_zone_t), intent(inout) :: mask
+    class(point_zone_t), intent(inout) :: zone
     real(kind=rp), intent(in) :: const
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -129,10 +129,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
-            mask%size)
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), zone%mask%get_d(), &
+            zone%size)
     else
-       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
+       call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
     end if
 
     ! copy over
@@ -144,11 +144,11 @@ contains
 
   !> @brief Force everything outside the mask to be a background field
   !! @param[in,out] fld The field being masked
-  !! @param[in,out] mask The mask being applied.
+  !! @param[in,out] zone The zone being applied.
   !! @param[in] background The background field
-  subroutine mask_exterior_fld(fld, mask, background)
+  subroutine mask_exterior_fld(fld, zone, background)
     type(field_t), intent(inout) :: fld
-    class(point_zone_t), intent(inout) :: mask
+    class(point_zone_t), intent(inout) :: zone
     type(field_t), intent(inout) :: background
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -160,10 +160,10 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy_mask(work%x_d, fld%x_d, fld%size(), mask%mask_d, &
-            mask%size)
+       call device_copy_mask(work%x_d, fld%x_d, fld%size(), zone%mask%get_d(), &
+            zone%size)
     else
-       call copy_mask(work%x, fld%x, fld%size(), mask%mask, mask%size)
+       call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
     end if
 
     ! copy over

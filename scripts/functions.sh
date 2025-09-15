@@ -68,7 +68,11 @@ function run {
             ncores=1
         fi
 
-        mpirun -n $ncores $neko $casefile 2>error.log
+        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+
+        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
+        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
+        sed -i 's/\[1,0\]<stderr>://g' error.log
 
     else
         $neko $casefile 2>error.log
@@ -237,7 +241,7 @@ function cleanup {
         pattern=$directory/${base%.*}
 
         mkdir -p $pattern
-        mv -t $pattern $nek ${nek%.*}.f*
+        mv -t $pattern $nek ${nek%[0-9]*.*}[0-9]*.f*
     done
     printf "\n"
 

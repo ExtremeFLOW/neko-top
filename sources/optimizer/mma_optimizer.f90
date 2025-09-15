@@ -24,13 +24,13 @@ module mma_optimizer
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
   use math, only: copy, cmult
-  use device_math, only: device_copy
+  use device_math, only: device_copy, device_cmult
   use field_math, only: field_rzero
+  use vector_math, only: vector_cmult
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
-  use device_math, only: device_copy
   implicit none
   private
   public :: mma_optimizer_t
@@ -57,8 +57,9 @@ module mma_optimizer
      procedure, pass(this) :: init_from_components => &
           mma_optimizer_init_from_components
 
-     procedure :: run => mma_optimizer_run
-     procedure :: free => mma_optimizer_free
+     procedure, pass(this) :: run => mma_optimizer_run
+     procedure, pass(this) :: validate => mma_optimizer_validate
+     procedure, pass(this) :: free => mma_optimizer_free
 
   end type mma_optimizer_t
 
@@ -90,7 +91,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
     call this%logger%set_header(trim(optimization_header))
 
-    x = design%get_values()
+    call design%get_values(x)
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
@@ -144,6 +145,13 @@ contains
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
+    ! Initialize the vectors
+    call x%init(n)
+    call all_objectives%init(problem%get_n_objectives())
+    call constraint_value%init(problem%get_n_constraints())
+    call objective_sensitivities%init(n)
+    call constraint_sensitivities%init(problem%get_n_constraints(), n)
+
     !>initializing the scaling factor
     scaling_factor = 1.0_rp
     if (pe_rank .eq. 0) then
@@ -151,12 +159,8 @@ contains
             this%max_iterations
     end if
 
-    if (present(simulation)) call simulation%run_forward()
-
-    call problem%compute(design)
-
-    if (present(simulation)) call simulation%run_backward()
-    call problem%compute_sensitivity(design)
+    call problem%compute(design, simulation)
+    call problem%compute_sensitivity(design, simulation)
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -171,7 +175,6 @@ contains
     call this%logger%write(log_data)
 
     if (present(simulation)) call simulation%write(0)
-
     call design%write(0)
 
     do iter = 1, this%max_iterations
@@ -184,10 +187,17 @@ contains
           scaling_factor = abs(this%scale)
        end if
 
-       x = design%get_values()
+       call design%get_values(x)
 
-       constraint_value = scaling_factor * constraint_value
-       constraint_sensitivities = scaling_factor * constraint_sensitivities
+       call vector_cmult(constraint_value, scaling_factor)
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_cmult(constraint_sensitivities%x_d, scaling_factor, &
+               constraint_sensitivities%size())
+       else
+          call cmult(constraint_sensitivities%x, scaling_factor, &
+               constraint_sensitivities%size())
+       end if
 
        ! Use scaled sensitivities to update the design variable
        call this%mma%update(iter, x, objective_sensitivities, &
@@ -195,11 +205,8 @@ contains
 
        call design%update_design(x)
 
-       if (present(simulation)) call simulation%run_forward()
-       call problem%compute(design)
-
-       if (present(simulation)) call simulation%run_backward()
-       call problem%compute_sensitivity(design)
+       call problem%compute(design, simulation)
+       call problem%compute_sensitivity(design, simulation)
 
        call problem%get_objective_value(objective_value)
        call problem%get_constraint_values(constraint_value)
@@ -219,19 +226,49 @@ contains
 
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
-       if (present(simulation)) call simulation%reset()
     end do
+
+    call this%validate(problem, design)
 
     ! Final state after optimization
     if (pe_rank .eq. 0) then
        print *, "MMA Optimization completed after", iter-1, "iterations."
     end if
 
+    ! Free local resources
+    call x%free()
+    call log_data%free()
+    call all_objectives%free()
     call constraint_value%free()
     call objective_sensitivities%free()
     call constraint_sensitivities%free()
 
   end subroutine mma_optimizer_run
+
+  !> Validate the solution for the MMA optimizer
+  subroutine mma_optimizer_validate(this, problem, design)
+    class(mma_optimizer_t), intent(inout) :: this
+    class(problem_t), intent(in) :: problem
+    class(design_t), intent(in) :: design
+
+    type(vector_t) :: constraint_values
+
+    call constraint_values%init(problem%get_n_constraints())
+    call problem%get_constraint_values(constraint_values)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(constraint_values%x, constraint_values%x_d, &
+            constraint_values%size(), HOST_TO_DEVICE, .true.)
+    end if
+
+    if (any(constraint_values%x .gt. 0.0_rp)) then
+       call neko_error("MMA optimizer validation failed: " // &
+            "Constraints are not satisfied.")
+    end if
+
+    ! Free local resources
+    call constraint_values%free()
+
+  end subroutine mma_optimizer_validate
 
   ! Free resources associated with the MMA optimizer
   subroutine mma_optimizer_free(this)

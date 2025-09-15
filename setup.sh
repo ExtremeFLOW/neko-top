@@ -40,7 +40,7 @@ export EXTERNAL_DIR="$MAIN_DIR/external"
 # Parse the options
 
 # Assign default values to the options
-DEVICE_TYPE="NONE"
+DEVICE_TYPE="CPU"
 CLEAN=false
 CLEAN_NEKO=false
 QUIET=false
@@ -76,15 +76,6 @@ while true; do
 done
 
 [ "$CLEAN_NEKO" == true ] && CLEAN=true
-
-# Check if the device type has changed
-if [[ -f "$MAIN_DIR/build/CMakeCache.txt" && $CLEAN != true ]]; then
-    CURRENT_DEVICE_TYPE="$(grep -oP '(?<=DEVICE_TYPE:STRING=).*' $MAIN_DIR/build/CMakeCache.txt)"
-    if [ "$DEVICE_TYPE" != "$CURRENT_DEVICE_TYPE" ]; then
-        echo >&2 "Device type has changed. Please do a clean setup."
-        exit 1
-    fi
-fi
 
 export TEST CLEAN CLEAN_NEKO QUIET DEVICE_TYPE
 
@@ -124,7 +115,6 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-find_nek5000 $NEK5000_DIR                      # Re-defines the NEK5000_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
@@ -135,6 +125,9 @@ find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variabl
 printf "=%.0s" {1..80} && printf "\n"
 printf "Compiling the example codes and Neko-TOP\n"
 
+# Clean the build directory if the clean flag is set
+[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+
 # Set CMAKE_VARIABLES to pass to the cmake command
 if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
 
@@ -143,18 +136,13 @@ if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
 fi
 
-# Set the variables for the compilation
-[ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
+# Enable desired features
+[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
-[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-[ "$DEVICE_TYPE" != "OFF" ] && CMAKE_VARIABLES+=("-DDEVICE_TYPE=$DEVICE_TYPE")
+[ "$EXAMPLES" == true ] && CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=ON")
 
-# Set the documentation flag
-if [ "$DOCS" == true ]; then
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
-else
-    CMAKE_VARIABLES+=("-DBUILD_DOCS=OFF")
-fi
+# Set the variables for the compilation
+[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 
 if [ ! -d $MAIN_DIR/build ]; then
     cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
@@ -162,10 +150,6 @@ fi
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
-
-# Build additional components
-[ "$DOCS" == true ] && cmake --build $MAIN_DIR/build --target Documentation --parallel
-[ "$EXAMPLES" == true ] && cmake --build $MAIN_DIR/build --target Examples --parallel
 
 # ============================================================================ #
 # Print the status of the build
@@ -180,5 +164,5 @@ printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDevice: $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
 if [ "$TEST" == true ]; then
-    ctest -C Debug --output-on-failure --test-dir $MAIN_DIR/build --parallel
+    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
 fi

@@ -34,23 +34,14 @@
 module adjoint_fluid_scheme_incompressible
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use gather_scatter, only: gs_t, GS_OP_MIN, GS_OP_MAX
-  use mean_sqr_flow, only: mean_sqr_flow_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use checkpoint, only: chkp_t
-  use mean_flow, only: mean_flow_t
   use num_types, only: rp, i8
-  use comm, only: NEKO_COMM
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
   use space, only: space_t, GLL
   use dofmap, only: dofmap_t
-  use zero_dirichlet, only: zero_dirichlet_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
-  use usr_inflow, only: usr_inflow_t, usr_inflow_eval
-  use dirichlet, only: dirichlet_t
-  use field_dirichlet, only: field_dirichlet_t
-  use field_dirichlet_vector, only: field_dirichlet_vector_t
   use jacobi, only: jacobi_t
   use sx_jacobi, only: sx_jacobi_t
   use device_jacobi, only: device_jacobi_t
@@ -61,29 +52,21 @@ module adjoint_fluid_scheme_incompressible
   use bc, only: bc_t
   use bc_list, only: bc_list_t
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use math, only: cfill, add2s2, glsum
-  use device_math, only: device_cfill, device_add2s2
-  use time_scheme_controller, only: time_scheme_controller_t
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only: neko_field_registry
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
-  use json_module, only: json_file, json_core, json_value
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_module, only: json_file
   use scratch_registry, only: scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
-       user_material_properties
-  use utils, only: neko_error, neko_warning
-  use field_series, only: field_series_t
-  use time_step_controller, only: time_step_controller_t
-  use field_math, only: field_cfill, field_add2s2
-  use wall_model_bc, only: wall_model_bc_t
-  use shear_stress, only: shear_stress_t
-  use field_list, only : field_list_t
-  use gradient_jump_penalty, only: gradient_jump_penalty_t
-  use field_math, only: field_addcol3
+       user_material_properties_intf
+  use utils, only: neko_error
+  use time_state, only: time_state_t
 
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
+  use math, only: glsum
+  use device_math, only: device_cfill, device_add2s2
+  use field_math, only: field_cfill, field_add2s2, field_addcol3
+
   use json_utils_ext, only: json_key_fallback
   use device, only : device_event_sync, glb_cmd_event, DEVICE_TO_HOST, &
        device_memcpy
@@ -110,9 +93,7 @@ module adjoint_fluid_scheme_incompressible
      type(field_t), pointer :: v_adj_e => null() !< Extrapolated y-Velocity
      type(field_t), pointer :: w_adj_e => null() !< Extrapolated z-Velocity
 
-     type(mean_flow_t) :: mean !< Mean flow field
      type(fluid_stats_t) :: stats !< Fluid statistics
-     type(mean_sqr_flow_t) :: mean_sqr !< Mean squared flow field
      logical :: forced_flow_rate = .false. !< Is the flow rate forced?
 
      !> The turbulent kinematic viscosity field name
@@ -385,7 +366,7 @@ contains
 
     ! Initialize the source term
     call this%source_term%init(this%f_adj_x, this%f_adj_y, this%f_adj_z, &
-         this%c_Xh, user)
+         this%c_Xh, user, this%name)
     call this%source_term%add(params, 'case.adjoint_fluid.source_term')
 
     call neko_log%end_section()
@@ -500,10 +481,9 @@ contains
   !! Here we perform additional gs operations to take care of
   !! shared points between elements that have different BCs, as done in Nek5000.
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_fluid_scheme_bc_apply_vel(this, t, tstep, strong)
+  subroutine adjoint_fluid_scheme_bc_apply_vel(this, time, strong)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     logical, intent(in) :: strong
 
     integer :: i
@@ -511,7 +491,7 @@ contains
 
     call this%bcs_vel%apply_vector(&
          this%u_adj%x, this%v_adj%x, this%w_adj%x, this%dm_Xh%size(), &
-         t, tstep, strong)
+         time, strong)
     call this%gs_Xh%op(this%u_adj, GS_OP_MIN, glb_cmd_event)
     call this%gs_Xh%op(this%v_adj, GS_OP_MIN, glb_cmd_event)
     call this%gs_Xh%op(this%w_adj, GS_OP_MIN, glb_cmd_event)
@@ -519,7 +499,7 @@ contains
 
     call this%bcs_vel%apply_vector(&
          this%u_adj%x, this%v_adj%x, this%w_adj%x, this%dm_Xh%size(), &
-         t, tstep, strong)
+         time, strong)
     call this%gs_Xh%op(this%u_adj, GS_OP_MAX, glb_cmd_event)
     call this%gs_Xh%op(this%v_adj, GS_OP_MAX, glb_cmd_event)
     call this%gs_Xh%op(this%w_adj, GS_OP_MAX, glb_cmd_event)
@@ -536,19 +516,18 @@ contains
 
   !> Apply all boundary conditions defined for pressure
   !! @todo Why can't we call the interface here?
-  subroutine adjoint_fluid_scheme_bc_apply_prs(this, t, tstep)
+  subroutine adjoint_fluid_scheme_bc_apply_prs(this, time)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
 
     integer :: i
     class(bc_t), pointer :: b => null()
 
-    call this%bcs_prs%apply(this%p_adj, t, tstep)
+    call this%bcs_prs%apply(this%p_adj, time)
     call this%gs_Xh%op(this%p_adj, GS_OP_MIN, glb_cmd_event)
     call device_event_sync(glb_cmd_event)
 
-    call this%bcs_prs%apply(this%p_adj, t, tstep)
+    call this%bcs_prs%apply(this%p_adj, time)
     call this%gs_Xh%op(this%p_adj, GS_OP_MAX, glb_cmd_event)
     call device_event_sync(glb_cmd_event)
 
@@ -638,16 +617,14 @@ contains
   !> Call user material properties routine and update the values of `mu`
   !! if necessary.
   !! @param this The fluid scheme.
-  !! @param t Time value.
-  !! @param tstep Current time step.
-  subroutine adjoint_fluid_scheme_update_material_properties(this, t, tstep)
+  !! @param time The time state.
+  subroutine adjoint_fluid_scheme_update_material_properties(this, time)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
-    real(kind=rp),intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: nut
 
-    call this%user_material_properties(t, tstep, this%name, &
-         this%material_properties)
+    call this%user_material_properties(this%name, &
+         this%material_properties, time)
 
     if (len(trim(this%nut_field_name)) > 0) then
        nut => neko_field_registry%get_field(this%nut_field_name)
@@ -676,8 +653,9 @@ contains
     type(user_t), target, intent(in) :: user
     character(len=LOG_SIZE) :: log_buf
     ! A local pointer that is needed to make Intel happy
-    procedure(user_material_properties), pointer :: dummy_mp_ptr
+    procedure(user_material_properties_intf), pointer :: dummy_mp_ptr
     real(kind=rp) :: const_mu, const_rho
+    type(time_state_t) :: time
 
 
     dummy_mp_ptr => dummy_user_material_properties
@@ -695,8 +673,8 @@ contains
        call neko_log%message(log_buf)
        this%user_material_properties => user%material_properties
 
-       call user%material_properties(0.0_rp, 0, this%name, &
-            this%material_properties)
+       call user%material_properties(this%name, &
+            this%material_properties, time)
 
     else
        this%user_material_properties => dummy_user_material_properties

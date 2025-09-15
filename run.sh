@@ -338,13 +338,15 @@ trap 'handler' SIGINT
 # ============================================================================ #
 # Compile the example executables
 
-printf "\n\e[4mCompiling the examples.\e[0m\n"
-cmake --build $MAIN_DIR/build --target Examples --parallel
+if [[ "$NEKO" != true && -d $MAIN_DIR/build ]]; then
+    printf "\n\e[4mCompiling the examples.\e[0m\n"
+    cmake --build $MAIN_DIR/build --target Examples --parallel
 
-# Check if the compilation was successful
-if [ $? -ne 0 ]; then
-    printf >&2 "\e[1;31mCompilation failed.\e[m\n"
-    exit 1
+    # Check if the compilation was successful
+    if [ $? -ne 0 ]; then
+        printf >&2 "\e[1;31mCompilation failed.\e[m\n"
+        exit 1
+    fi
 fi
 
 # ============================================================================ #
@@ -382,13 +384,18 @@ for case in ${example_list[@]}; do
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
-    elif [ -f "$log/output.log" ]; then
-        printf '\t%-12s %-s\n' "Skipping:" "$example"
-        continue
+
+    elif [[ -s "$log/output.log" ]]; then
+        # Move old log files to folder with counter padded to 2 digits
+        old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p $log/$old_run
+
+        find $log -maxdepth 1 -not -empty -type f -name "*.log" \
+            -exec mv -ft $log/$old_run {} \;
+
     fi
 
-    # Remove old output and error files
-    find $log -type f -name "*.log" -or -name "error.log" -delete
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
@@ -454,7 +461,7 @@ done
 # If we are just doing a dry-run, we exit here
 if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
-    exit 0
+    exit $?
 fi
 
 for example in $QUEUE; do
@@ -471,6 +478,7 @@ done
 
 if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
+    exit $?
 fi
 
 printf "\n"

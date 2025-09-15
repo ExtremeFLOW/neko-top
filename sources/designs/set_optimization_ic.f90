@@ -42,7 +42,6 @@ module optimization_ic
        neko_warning, NEKO_FNAME_LEN, extract_fld_file_index
   use coefs, only : coef_t
   use math, only : col2, cfill, cfill_mask
-  use user_intf, only : useric_scalar
   use json_module, only : json_file
   use json_utils, only: json_get, json_get_or_default
   use point_zone, only: point_zone_t
@@ -207,7 +206,7 @@ contains
     zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
 
     call set_optimization_ic_uniform(fld, base_value)
-    call cfill_mask(fld%x, zone_value, size, zone%mask, zone%size)
+    call cfill_mask(fld%x, zone_value, size, zone%mask%get(), zone%size)
 
   end subroutine set_optimization_ic_point_zone
 
@@ -338,7 +337,7 @@ contains
        end select
 
        ! Generates an interpolator object and performs the point search
-       global_interp = fld_data%generate_interpolator(fld%dof, fld%msh, &
+       call fld_data%generate_interpolator(global_interp, fld%dof, fld%msh, &
             tolerance)
 
        ! Evaluate design

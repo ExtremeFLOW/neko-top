@@ -5,12 +5,8 @@ name: Documentation
 # documentation is only built and deployed when a pull request is merged.
 on:
   workflow_call:
-  pull_request:
-    branches:
-      - "develop"
   push:
-    branches:
-      - "develop"
+    branches: [develop]
 
 # Set workflow concurrency to prevent multiple runs from being triggered
 # simultaneously for the same branch.
@@ -24,35 +20,40 @@ jobs:
   # Build Documentation job
 
   build-docs:
-    name: Build documentation
+    name: Build
     runs-on: ubuntu-latest
     steps:
-      - name: Setup system
-        shell: bash
-        run: |
-          sudo apt install git cmake doxygen graphviz
-
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure documentation
-        env:
-          BRANCH_NAME: ${{ github.ref_name }}
+      - name: Create cache key based on commit SHA
+        id: create-key
+        shell: bash
         run: |
-          BUILD_TYPE=Develop
-          if [ "$BRANCH_NAME" == "develop" ]; then
-            echo "Building documentation for the develop branch"
-            BUILD_TYPE=Release
-          else
-            echo "Skipping documentation build for the $BRANCH_NAME branch"
-          fi
-          cmake -DONLY_DOCS=ON -B build -S . -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+          # Get the GIT sha for the current commit
+          key="documentation-$(git rev-parse HEAD)"
+          printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
-      - name: Build documentation
-        run: |
-          cmake --build build --target Documentation
+      - name: Create cache the documentation
+        id: cache-documentation
+        uses: actions/cache@v4
+        with:
+          path: documentation/html/
+          key: ${{ steps.create-key.outputs.key }}
 
-      - name: Upload static files as artifact
+      - name: Setup system
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: sudo apt install git cmake doxygen graphviz
+
+      - name: Configure
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: cmake -DONLY_DOCS=ON -B build -S .
+
+      - name: Build
+        if: steps.cache-documentation.outputs.cache-hit != 'true'
+        run: cmake --build build --target Documentation
+
+      - name: Upload artifact
         id: deployment
         uses: actions/upload-pages-artifact@v3
         with:
@@ -62,10 +63,10 @@ jobs:
   # Deploy documentation job
 
   deploy-docs:
-    name: Deploy documentation
-    # If the job is triggered by a pull request, it will not run.
-    # If the job is triggered by a push to the develop branch, it will run.
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+    name: Deploy
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'push'
     needs: build-docs
 
     # Define the deployment environment
@@ -80,7 +81,6 @@ jobs:
       id-token: write
 
     # Define the deployment strategy
-    runs-on: ubuntu-latest
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
