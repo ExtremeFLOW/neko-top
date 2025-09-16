@@ -39,7 +39,7 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user_velocity_pointwise",
+                    "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -69,7 +69,7 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user_pointwise",
+                    "type": "user",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -183,8 +183,8 @@
             "type": "mma",
             "max_iterations": 100,
             "tolerance": 1.0e-3,
+            "subsolve": "dip",
             "mma": {
-                "m": 0,
                 "scale": 1000.0,
                 "xmin": 0.0,
                 "xmax": 1.0
