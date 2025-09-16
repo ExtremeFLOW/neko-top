@@ -1,4 +1,4 @@
-module initial_conditions
+module user_initial_conditions
   use field, only: field_t
   use json_file_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -15,17 +15,13 @@ contains
   !! 'case.scalar.initial_condition.value' or set to 0.0 if not found.
   !!
   !! @param[inout] s Scalar field
-  !! @param[inout] params JSON file
-  subroutine scalar_z_split_ic(s, params)
+  !! @param[inout] split_value
+  subroutine scalar_z_split_ic(s, split_value)
     type(field_t), intent(inout) :: s
-    type(json_file), intent(inout) :: params
+    real(kind=rp), intent(in) :: split_value
 
-    real(kind=rp) :: z_value, split_value
+    real(kind=rp) :: z_value
     integer :: i
-
-    call json_get_or_default(params, &
-         'case.scalar.initial_condition.value', &
-         split_value, 0.0_rp)
 
     do i = 1, s%dof%size()
        z_value = s%dof%z(i, 1, 1, 1)
@@ -40,4 +36,4 @@ contains
 
   end subroutine scalar_z_split_ic
 
-end module initial_conditions
+end module user_initial_conditions

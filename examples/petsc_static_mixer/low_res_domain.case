@@ -1,10 +1,14 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/petsc_static_mixer/box.nmsh", //
+        "mesh_file": "data_local/petsc_static_mixer/domain_256.nmsh", //
         "output_directory": "fields",
+        "output_boundary": true,
+        "output_checkpoints": false,
+        "output_control": "simulationtime",
+        "output_value": 0.04,
         "time": {
-            "end_time": 1.0,
+            "end_time": 8.0,
             "timestep": 5e-4
         },
         "numerics": {
@@ -37,21 +41,19 @@
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
-            "output_control": "nsamples",
-            "output_value": 250,
             "boundary_conditions ": [
                 {
                     "type": "velocity_value",
                     "value": [ 1.0, 0.0, 0.0 ],
-                    "zone_indices": [ 1 ]
+                    "zone_indices": [ 1, 2 ]
                 },
                 {
                     "type": "outflow",
-                    "zone_indices": [ 2 ]
+                    "zone_indices": [ 3 ]
                 },
                 {
                     "type": "no_slip",
-                    "zone_indices": [ 3, 4, 5, 6 ]
+                    "zone_indices": [ 4 ]
                 }
             ],
             "source_terms": [
@@ -60,17 +62,17 @@
                     "objects": [
                         {
                             "type": "boundary_mesh",
-                            "name": "data_local/petsc_static_mixer/surface_low_95.stl",
+                            "name": "data_local/petsc_static_mixer/Test_mixer_095.stl",
                             "distance_transform": {
                                 "type": "smooth_step",
                                 "value": 0.1
                             },
-                            "mesh_transform": {
-                                "type": "bounding_box",
-                                "box_min": [ 1.00, 0.00, 0.00 ],
-                                "box_max": [ 3.00, 1.00, 1.00 ],
-                                "keep_aspect_ratio": true
-                            }
+                            // "mesh_transform": {
+                            //     "type": "bounding_box",
+                            //     "box_min": [ 1.00, 0.00, 0.00 ],
+                            //     "box_max": [ 3.00, 1.00, 1.00 ],
+                            //     "keep_aspect_ratio": true
+                            // }
                         }
                     ],
                     "brinkman": {
@@ -79,6 +81,46 @@
                     }
                 }
             ]
+        },
+        "scalar": {
+            "name": "temperature",
+            "enabled": true,
+            "Pe": 1000.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "projection_space_size": 4,
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 1,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [ 2 ]
+                },
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [ 3 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [ 4 ]
+                },
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            }
         }
     }
 }
