@@ -5,11 +5,9 @@
         "output_directory": "fields",
         "output_boundary": true,
         "output_checkpoints": false,
-        "output_control": "simulationtime",
-        "output_value": 0.04,
         "time": {
-            "end_time": 8.0,
-            "timestep": 5e-4
+            "variable_timestep": true,
+            "end_time": 0.1
         },
         "numerics": {
             "time_order": 3,
@@ -19,6 +17,8 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 1000.0,
+            "output_control": "simulationtime",
+            "output_value": 0.04,
             "initial_condition": {
                 "type": "uniform",
                 "value": [
@@ -63,16 +63,12 @@
                         {
                             "type": "boundary_mesh",
                             "name": "data_local/petsc_static_mixer/Test_mixer_095.stl",
+                            "cache": true,
+                            "cache_file": "data_local/petsc_static_mixer/cache_256_",
                             "distance_transform": {
                                 "type": "smooth_step",
                                 "value": 0.1
-                            },
-                            // "mesh_transform": {
-                            //     "type": "bounding_box",
-                            //     "box_min": [ 1.00, 0.00, 0.00 ],
-                            //     "box_max": [ 3.00, 1.00, 1.00 ],
-                            //     "keep_aspect_ratio": true
-                            // }
+                            }
                         }
                     ],
                     "brinkman": {
@@ -107,8 +103,8 @@
                     "zone_indices": [ 2 ]
                 },
                 {
-                    "type": "dirichlet",
-                    "value": 0,
+                    "type": "neumann",
+                    "flux": 0,
                     "zone_indices": [ 3 ]
                 },
                 {
