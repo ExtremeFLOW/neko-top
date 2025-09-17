@@ -66,9 +66,9 @@ module simplefield_design
      private
 
      type(vector_t) :: values
-     type(vector_t) :: x
-     type(vector_t) :: y
-     type(vector_t) :: z
+     type(vector_t) :: x_coord
+     type(vector_t) :: y_coord
+     type(vector_t) :: z_coord
 
      ! needed to write the design
      type(fld_file_output_t), private :: output
@@ -91,12 +91,11 @@ module simplefield_design
 
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => design_simple_get_values
-    !  !> Retrieve the x location of the design variables
-    !  procedure, pass(this) :: get_x => design_simple_get_x
-    !  !> Retrieve the y location of the design variables
-    !  procedure, pass(this) :: get_y => design_simple_get_y
-    !  !> Retrieve the z location of the design variables
-    !  procedure, pass(this) :: get_z => design_simple_get_z
+     
+     ! Overrides of base class deferred procedures
+     procedure, pass(this) :: design_get_x => design_simple_get_x
+     procedure, pass(this) :: design_get_y => design_simple_get_y
+     procedure, pass(this) :: design_get_z => design_simple_get_z
 
      !> Update the design
      procedure, pass(this) :: update_design => design_simple_update_design
@@ -127,9 +126,9 @@ contains
     call this%init_base('simplefield_design', n)
 
     call this%values%init(n)
-    this%x = x
-    this%y = y
-    this%z = z
+    this%x_coord = x
+    this%y_coord = y
+    this%z_coord = z
     this%designfield = neko_field
     call this%output%init(sp, 'design', 1)
     call this%output%fields%assign_to_field(1, this%designfield)
@@ -141,9 +140,9 @@ contains
 
     call this%free_base()
     call this%values%free()
-    call this%x%free()
-    call this%y%free()
-    call this%z%free()
+    call this%x_coord%free()
+    call this%y_coord%free()
+    call this%z_coord%free()
 
     call this%designfield%free()
   end subroutine design_simple_free
@@ -163,37 +162,36 @@ contains
 
   end subroutine design_simple_map_forward
 
-  function design_simple_get_values(this) result(values)
+  subroutine design_simple_get_values(this, values)
     class(simplefield_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
 
     values = this%values
 
-  end function design_simple_get_values
+  end subroutine design_simple_get_values
 
-  ! function design_simple_get_x(this) result(x)
-  !   class(simplefield_design_t), intent(in) :: this
-  !   type(vector_t) :: x
+  subroutine design_simple_get_x(this, x)
+    class(simplefield_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: x
 
-  !   x = this%x
+    x = this%x_coord
+  end subroutine design_simple_get_x
 
-  ! end function design_simple_get_x
+  subroutine design_simple_get_y(this, y)
+    class(simplefield_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: y
 
-  ! function design_simple_get_y(this) result(y)
-  !   class(simplefield_design_t), intent(in) :: this
-  !   type(vector_t) :: y
+    y = this%y_coord
+  end subroutine design_simple_get_y
 
-  !   y = this%y
+  subroutine design_simple_get_z(this, z)
+    class(simplefield_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: z
 
-  ! end function design_simple_get_y
+    z = this%z_coord
+  end subroutine design_simple_get_z
 
-  ! function design_simple_get_z(this) result(z)
-  !   class(simplefield_design_t), intent(in) :: this
-  !   type(vector_t) :: z
-
-  !   z = this%z
-
-  ! end function design_simple_get_z
+  
 
   subroutine design_simple_update_design(this, values)
     class(simplefield_design_t), intent(inout) :: this

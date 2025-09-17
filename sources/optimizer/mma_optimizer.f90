@@ -24,14 +24,14 @@ module mma_optimizer
   ! Inclusions from external dependencies and standard libraries
   use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
-  use math, only: copy, cmult, cmult2
-  use device_math, only: device_copy, device_cmult2
+  use math, only: copy, cmult
+  use device_math, only: device_copy, device_cmult
   use field_math, only: field_rzero
+  use vector_math, only: vector_cmult
   use neko_ext, only: reset
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
-  use device_math, only: device_copy
   implicit none
   private
   public :: mma_optimizer_t
@@ -97,7 +97,7 @@ contains
          ', KKTmax, KKTnorm2, scaling factor'
    !  call this%logger%set_header(trim(optimization_header))
 
-    x = design%get_values()
+    call design%get_values(x)
 
     if (pe_rank .eq. 0) then
        print *, "Initializing mma_optimizer with steady_state_problem_t."
@@ -180,7 +180,6 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
-
     if (.not. this%performance) then
        ! Stamp the initial condition
        call mma_logger_assemble_data(log_data, 0, objective_value, &
@@ -197,7 +196,6 @@ contains
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
-
        ! Scaling
        if (this%auto_scale .eqv. .true.) then
           scaling_factor = abs(this%scale/constraint_value%x(1))
@@ -205,18 +203,16 @@ contains
           scaling_factor = abs(this%scale)
        end if
 
-       x = design%get_values()
+       call design%get_values(x)
 
        call vector_cmult(constraint_value, scaling_factor)
-       !call matrix_cmult(constraint_sensitivities, scaling_factor)
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
-            call device_cmult2(constraint_sensitivities%x_d, &
-                 constraint_sensitivities%x_d, scaling_factor, &
-                 constraint_sensitivities%size())
-         else
-            call cmult2(constraint_sensitivities%x, &
-                 constraint_sensitivities%x, scaling_factor, &
-                 constraint_sensitivities%size())
+          call device_cmult(constraint_sensitivities%x_d, scaling_factor, &
+               constraint_sensitivities%size())
+       else
+          call cmult(constraint_sensitivities%x, scaling_factor, &
+               constraint_sensitivities%size())
        end if
 
        ! Use scaled sensitivities to update the design variable

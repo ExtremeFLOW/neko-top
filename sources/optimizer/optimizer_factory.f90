@@ -3,7 +3,7 @@
 submodule(optimizer) optimizer_factory_mod
   use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_type_error
-
+  use dummy_constraint, only: dummy_constraint_t
   use mma_optimizer, only: mma_optimizer_t
 
   implicit none
@@ -30,7 +30,7 @@ contains
        simulation)
     class(optimizer_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: parameters
-    class(problem_t), intent(in) :: problem
+    class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
     class(simulation_t), optional, intent(in) :: simulation
 
@@ -38,6 +38,7 @@ contains
     integer :: max_iterations
     real(kind=rp) :: tolerance
     logical :: performance
+    class(dummy_constraint_t), allocatable :: dummy_con
 
     if (allocated(object)) then
        call object%free()
@@ -62,6 +63,14 @@ contains
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
 
+    !Check if we are solving an unconstrained problem and add a dummy contraint
+    if (problem%get_n_constraints() .eq. 0) then
+       allocate(dummy_con)
+       call dummy_con%init(parameters, design)
+       call problem%add_constraint(dummy_con)
+    end if
+
+
     if (present(simulation)) then
        call object%init_from_json(parameters, problem, design, &
             max_iterations, tolerance, performance, simulation)
@@ -69,8 +78,6 @@ contains
        call object%init_from_json(parameters, problem, design, &
             max_iterations, tolerance, performance)
     end if
-
-
 
   end subroutine optimizer_factory
 

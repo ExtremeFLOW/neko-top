@@ -64,9 +64,9 @@ module simple_design
      private
 
      type(vector_t) :: values
-     type(vector_t) :: x
-     type(vector_t) :: y
-     type(vector_t) :: z
+     type(vector_t) :: x_coord
+     type(vector_t) :: y_coord
+     type(vector_t) :: z_coord
 
      ! needed to write the design into a vtk file with connectivity
      integer :: nx, ny, nz
@@ -191,13 +191,9 @@ contains
     call this%init_base(name, n)
 
     call this%values%init(n)
-    call this%x%init(n)
-    call this%y%init(n)
-    call this%z%init(n)
-
-    this%x = x
-    this%y = y
-    this%z = z
+    this%x_coord = x
+    this%y_coord = y
+    this%z_coord = z
 
   end subroutine design_simple_init_from_components
 
@@ -207,9 +203,9 @@ contains
 
     call this%free_base()
     call this%values%free()
-    call this%x%free()
-    call this%y%free()
-    call this%z%free()
+    call this%x_coord%free()
+    call this%y_coord%free()
+    call this%z_coord%free()
 
   end subroutine design_simple_free
 
@@ -228,37 +224,37 @@ contains
 
   end subroutine design_simple_map_forward
 
-  function design_simple_get_values(this) result(values)
+  subroutine design_simple_get_values(this, values)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
 
     values = this%values
 
-  end function design_simple_get_values
+  end subroutine design_simple_get_values
 
-  function design_simple_get_x(this) result(x)
+  subroutine design_simple_get_x(this, x)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: x
+    type(vector_t), intent(inout) :: x
 
-    x = this%x
+    x = this%x_coord
 
-  end function design_simple_get_x
+  end subroutine design_simple_get_x
 
-  function design_simple_get_y(this) result(y)
+  subroutine design_simple_get_y(this, y)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: y
+    type(vector_t), intent(inout) :: y
 
-    y = this%y
+    y = this%y_coord
 
-  end function design_simple_get_y
+  end subroutine design_simple_get_y
 
-  function design_simple_get_z(this) result(z)
+  subroutine design_simple_get_z(this, z)
     class(simple_design_t), intent(in) :: this
-    type(vector_t) :: z
+    type(vector_t), intent(inout) :: z
 
-    z = this%z
+    z = this%z_coord
 
-  end function design_simple_get_z
+  end subroutine design_simple_get_z
 
   subroutine design_simple_update_design(this, values)
     class(simple_design_t), intent(inout) :: this
@@ -290,11 +286,11 @@ contains
 
     ! Synchronize the device memory if using a GPU backend is enabled
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%x%x, this%x%x_d, npts, &
+       call device_memcpy(this%x_coord%x, this%x_coord%x_d, npts, &
             DEVICE_TO_HOST, sync = .false.)
-       call device_memcpy(this%y%x, this%y%x_d, npts, &
+       call device_memcpy(this%y_coord%x, this%y_coord%x_d, npts, &
             DEVICE_TO_HOST, sync = .false.)
-       call device_memcpy(this%z%x, this%z%x_d, npts, &
+       call device_memcpy(this%z_coord%x, this%z_coord%x_d, npts, &
             DEVICE_TO_HOST, sync = .false.)
        call device_memcpy(this%values%x, this%values%x_d, npts, &
             DEVICE_TO_HOST, sync = .true.)
@@ -318,7 +314,8 @@ contains
     ! Points
     write(10,'(A,1X,I0,1X,A)') 'POINTS', npts, 'float'
     do i = 1, npts
-       write(10,'(3(F20.12,1X))') this%x%x(i), this%y%x(i), this%z%x(i)
+       write(10,'(3(F20.12,1X))') this%x_coord%x(i), this%y_coord%x(i), &
+            this%z_coord%x(i)
     end do
 
     ! Scalars

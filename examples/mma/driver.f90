@@ -10,7 +10,7 @@ program usrneko
   use mpi_f08, only: MPI_Init,  MPI_Wtime, MPI_COMM_WORLD
 
 
-  use example_problem, only: mma_obj, mma_con
+  use example_problem, only: mma_obj
 
   use simplefield_design, only: simplefield_design_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -44,7 +44,6 @@ program usrneko
   !> The problem type
   type(problem_t) :: prob
   type(mma_obj), allocatable :: obj
-  type(mma_con), allocatable :: con_1 !, con_2
 
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
@@ -107,34 +106,26 @@ program usrneko
   ! Construct the problem
   !
   ! This subroutine calculates function values and gradients
-  ! for "toy problem 3":
-  !
-  !   minimize \f$\sum_(j = 1,..,n) x_j/n \f$
-  ! subject to \f$\sum_(j = 1,..,n) (x_j - X_{j,GLL})^2 = 0 \f$
+  ! for the unconstrained problem:
+  !   minimize \f$\sum_(j = 1,..,n) (x_j - X_{j,GLL})^2/nglobal \f$
+
 
   allocate(obj)
-  allocate(con_1)
-
 
   call obj%init_from_components("Objective", des)
-  call con_1%init_from_components("Constraint", des, 1)
+
   
-  ! update obj and cons and sensitivities for the init design
+  ! update obj and sensitivities for the init design
   call obj%update_value(des)
   call obj%update_sensitivity(des)
-  call con_1%update_value(des)
-  call con_1%update_sensitivity(des)
    
   if (pe_rank == 0) then
-     print *, "objective value for the initial design=", obj%value, &
-        "Positive=", con_1%value
+     print *, "objective value for the initial design=", obj%value
   end if
 
   ! initialize the problem
   call prob%init(parameters, des)
-  
   call prob%add_objective(obj)
-  call prob%add_constraint(con_1)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
@@ -142,11 +133,12 @@ program usrneko
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_start = MPI_Wtime()
-  
+
   call opt%run(prob, des)
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_end = MPI_Wtime()
+
 
 
 

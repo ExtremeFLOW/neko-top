@@ -37,12 +37,12 @@ module example_problem
   use constraint, only: constraint_t
 
   use design, only: design_t
-  use math, only: glsum
   use json_module, only: json_file
   use vector, only: vector_t
 
   use device, only: device_memcpy, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
+  use vector_math, only: vector_sub2, vector_col2, vector_glsum, vector_cmult
 
   implicit none
   private
@@ -66,27 +66,6 @@ module example_problem
           mma_obj_update_sensitivity
 
   end type mma_obj
-
-  type, public, extends(constraint_t) :: mma_con
-
-     real(kind=rp) :: sign = 1.0_rp
-
-   contains
-     !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json => mma_con_init_from_json
-     !> The actual constructor.
-     procedure, public, pass(this) :: init_from_components => &
-          mma_con_init_from_components
-     !> Destructor.
-     procedure, public, pass(this) :: free => mma_con_free
-
-     !> Computes the value of the constraint function.
-     procedure, public, pass(this) :: update_value => mma_con_update_value
-
-     !> Computes the sensitivity with respect to the coefficient $\chi$.
-     procedure, public, pass(this) :: update_sensitivity => &
-          mma_con_update_sensitivity
-  end type mma_con
 
 contains
 
@@ -120,90 +99,33 @@ contains
   subroutine mma_obj_update_value(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: design_values
+    type(vector_t) :: difference
+    type(vector_t) :: x_coordinate
 
-    design_values = design%get_values()
+    call design%get_x(x_coordinate)
+    call design%get_values(difference)
+    call vector_sub2(difference, x_coordinate, design%size())
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-        call device_memcpy(design_values%x, &
-             design_values%x_d, design%size(), &
-             DEVICE_TO_HOST, sync = .false.)
-    end if
-    this%value = glsum(design_values%x, design%size()) &
-         / real(design%size_global(), kind=rp)
+    call vector_col2(difference, difference, design%size())
 
+    this%value = vector_glsum(difference, design%size()) / &
+         real(design%size_global(), kind=rp)
   end subroutine mma_obj_update_value
 
   subroutine mma_obj_update_sensitivity(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
+    type(vector_t) :: difference
+    type(vector_t) :: x_coordinate
 
-    this%sensitivity = 1.0_rp / real(design%size_global(), kind=rp)
+    call design%get_x(x_coordinate)
+    call design%get_values(difference)
+    call vector_sub2(difference, x_coordinate, design%size())
+
+	  call vector_cmult(difference , 2.0_rp / &
+         real(design%size_global(), kind=rp), design%size())
+    this%sensitivity = difference
 
   end subroutine mma_obj_update_sensitivity
 
-  ! ========================================================================== !
-  ! Methods for the Constraint Function
-
-  subroutine mma_con_init_from_json(this, json, design)
-    class(mma_con), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    class(design_t), intent(in) :: design
-    character(len=256), parameter :: name = 'mma_con'
-    integer :: sign
-
-    call this%init_from_components(name, design, sign)
-
-  end subroutine mma_con_init_from_json
-
-  subroutine mma_con_init_from_components(this, name, design, sign)
-    class(mma_con), intent(inout) :: this
-    character(len=*), intent(in) :: name
-    class(design_t), intent(in) :: design
-    integer, intent(in), optional :: sign
-    integer :: sign_ = 1
-
-    call this%init_base(name, design%size())
-
-    if (present(sign)) sign_ = sign
-    if (sign_ .lt. 0) this%sign = -1.0_rp
-    if (sign_ .ge. 0) this%sign = 1.0_rp
-
-  end subroutine mma_con_init_from_components
-
-  subroutine mma_con_free(this)
-    class(mma_con), intent(inout) :: this
-    call this%free_base()
-  end subroutine mma_con_free
-
-  subroutine mma_con_update_value(this, design)
-    class(mma_con), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(vector_t) :: difference
-
-    difference = design%get_values() - design%get_x()
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(difference%x, &
-            difference%x_d, design%size(), &
-            DEVICE_TO_HOST, sync = .false.)
-    end if
-
-    difference%x = difference%x * difference%x
-
-    this%value = this%sign * glsum(difference%x, design%size()) / &
-         real(design%size_global(), kind=rp)
-
-  end subroutine mma_con_update_value
-
-  subroutine mma_con_update_sensitivity(this, design)
-    class(mma_con), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(vector_t) :: difference
-
-    difference = design%get_values() - design%get_x()
-
-    this%sensitivity = this%sign * 2.0_rp * difference / &
-         real(design%size_global(), kind=rp)
-
-  end subroutine mma_con_update_sensitivity
 end module example_problem

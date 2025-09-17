@@ -34,22 +34,14 @@
 module adjoint_fluid_scheme_incompressible
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use gather_scatter, only: gs_t, GS_OP_MIN, GS_OP_MAX
-  use mean_sqr_flow, only: mean_sqr_flow_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use checkpoint, only: chkp_t
-  use mean_flow, only: mean_flow_t
   use num_types, only: rp, i8
-  use comm, only: NEKO_COMM
   use adjoint_source_term, only: adjoint_source_term_t
   use field, only: field_t
   use space, only: space_t, GLL
   use dofmap, only: dofmap_t
-  use zero_dirichlet, only: zero_dirichlet_t
   use krylov, only: ksp_t, krylov_solver_factory, KSP_MAX_ITER
   use coefs, only: coef_t
-  use dirichlet, only: dirichlet_t
-  use field_dirichlet, only: field_dirichlet_t
-  use field_dirichlet_vector, only: field_dirichlet_vector_t
   use jacobi, only: jacobi_t
   use sx_jacobi, only: sx_jacobi_t
   use device_jacobi, only: device_jacobi_t
@@ -60,30 +52,21 @@ module adjoint_fluid_scheme_incompressible
   use bc, only: bc_t
   use bc_list, only: bc_list_t
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use math, only: cfill, add2s2, glsum
-  use device_math, only: device_cfill, device_add2s2
-  use time_scheme_controller, only: time_scheme_controller_t
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only: neko_field_registry
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
-  use json_module, only: json_file, json_core, json_value
+  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_module, only: json_file
   use scratch_registry, only: scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
        user_material_properties_intf
-  use utils, only: neko_error, neko_warning
-  use field_series, only: field_series_t
-  use time_step_controller, only: time_step_controller_t
+  use utils, only: neko_error
   use time_state, only: time_state_t
-  use field_math, only: field_cfill, field_add2s2
-  use wall_model_bc, only: wall_model_bc_t
-  use shear_stress, only: shear_stress_t
-  use field_list, only : field_list_t
-  use gradient_jump_penalty, only: gradient_jump_penalty_t
-  use field_math, only: field_addcol3
 
-  use mpi_f08, only: MPI_INTEGER, MPI_SUM, MPI_Allreduce
+  use math, only: glsum
+  use device_math, only: device_cfill, device_add2s2
+  use field_math, only: field_cfill, field_add2s2, field_addcol3
+
   use json_utils_ext, only: json_key_fallback
   use device, only : device_event_sync, glb_cmd_event, DEVICE_TO_HOST, &
        device_memcpy
@@ -110,9 +93,7 @@ module adjoint_fluid_scheme_incompressible
      type(field_t), pointer :: v_adj_e => null() !< Extrapolated y-Velocity
      type(field_t), pointer :: w_adj_e => null() !< Extrapolated z-Velocity
 
-     type(mean_flow_t) :: mean !< Mean flow field
      type(fluid_stats_t) :: stats !< Fluid statistics
-     type(mean_sqr_flow_t) :: mean_sqr !< Mean squared flow field
      logical :: forced_flow_rate = .false. !< Is the flow rate forced?
 
      !> The turbulent kinematic viscosity field name

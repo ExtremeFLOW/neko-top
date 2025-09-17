@@ -155,7 +155,7 @@ contains
     real(rp), allocatable :: Delta(:)
 
     ! Local design values
-    h = design%get_values()
+    call design%get_values(h)
     n = design%size()
 
     ! Project design variables to physical height h = (h_max - h_min)*x + h_min
@@ -221,7 +221,7 @@ contains
     real(rp), allocatable :: Delta(:)
 
     ! Local design values
-    h = design%get_values()
+    call design%get_values(h)
     n = design%size()
     call sensitivity%init(n)
     
@@ -298,7 +298,7 @@ contains
     real(rp) :: Le, local_mass, global_mass
 
     ! Get local design values
-    design_values = design%get_values()
+    call design%get_values(design_values)
     n = design%size()
 
     ! Project design variables to physical height
@@ -384,7 +384,7 @@ contains
     if (this%is_local) then
        ! This element is  on our rank
        ! Local design values
-       h = design%get_values()
+       call design%get_values(h)
        n = design%size()
 
        ! Project design variables to physical height
@@ -436,7 +436,7 @@ contains
     if (this%is_local) then
       ! This element is on our rank
       ! Local design values
-      h = design%get_values()
+      call design%get_values(h)
       n = design%size()
       
       ! Project design variables to physical height

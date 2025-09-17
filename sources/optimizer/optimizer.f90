@@ -99,7 +99,7 @@ module optimizer
           simulation)
        class(optimizer_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: parameters
-       class(problem_t), intent(in) :: problem
+       class(problem_t), intent(inout) :: problem
        class(design_t), intent(in) :: design
        class(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_factory

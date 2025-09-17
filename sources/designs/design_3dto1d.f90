@@ -131,13 +131,13 @@ contains
   end subroutine design_3dto1d_map_backward
 
 
-  function design_3dto1d_get_values(this) result(values)
+  subroutine design_3dto1d_get_values(this, values)
     class(design_3dto1d_t), intent(in) :: this
-    type(vector_t) :: values
+    type(vector_t), intent(inout) :: values
 
     values = this%values
 
-  end function design_3dto1d_get_values
+  end subroutine design_3dto1d_get_values
 
   subroutine design_3dto1d_update_design(this, values)
     class(design_3dto1d_t), intent(inout) :: this
@@ -171,55 +171,72 @@ contains
     real(rp) :: Le, x_pos
     real(rp), allocatable :: global_values(:)
     real(rp), allocatable :: global_x(:)
-    integer :: global_size
+    integer :: global_size, local_size
     real(rp) :: L_total
+    integer, allocatable :: recvcounts(:), displs(:)
+    integer :: root_rank = 0
 
     L_total = 2.0_rp
 
-    ! Only rank 0 will write the file
-    if (pe_rank == 0) then
-      ! Get global size
-      global_size = this%size_global()
-      allocate(global_values(global_size))
-      allocate(global_x(global_size))
-      
-      ! Calculate element length and x positions
-      Le = L_total / real(global_size, kind=rp)
-      do i = 1, global_size
-        global_x(i) = Le * (i - 0.5_rp)  ! Center of each element
-      end do
+    ! Get local size on all ranks
+    local_size = this%size()
+    
+    ! Only rank 0 handles global arrays
+    if (pe_rank == root_rank) then
+       ! Get global size
+       global_size = this%size_global()
+       allocate(global_values(global_size))
+       allocate(global_x(global_size))
+       allocate(recvcounts(pe_size), displs(pe_size)) 
+       ! Calculate element length and x positions
+       Le = L_total / real(global_size, kind=rp)
+       do i = 1, global_size
+          global_x(i) = Le * (i - 0.5_rp)  ! Center of each element
+       end do
+    else
+       ! Non-root ranks: minimal dummy allocations
+       allocate(global_values(1), recvcounts(1), displs(1))
     endif
     
-    ! Gather design values from all ranks to rank 0
-    call MPI_Gather(this%values%x, this%size(), mpi_real_precision, &
-                  global_values, this%size(), mpi_real_precision, &
-                  0, neko_comm, ierr)
+    ! First, gather all the local sizes to rank 0
+    call MPI_Gather(local_size, 1, MPI_INTEGER, &
+         recvcounts, 1, MPI_INTEGER, &
+         root_rank, neko_comm, ierr)
     
-    if (pe_rank == 0) then
-      ! Create filename with iteration index
-      write(filename, '(A,I0.6,A)') 'design_iter_', idx, '.txt'
-      
-      ! Open file for writing
-      open(newunit=iunit, file=trim(filename), status='replace', action='write')
-      
-      ! Write header
-      write(iunit, '(A,I0)') '# Iteration: ', idx
-      write(iunit, '(A)') '# x_position height'
-      
-      ! Write data
-      do i = 1, global_size
-        write(iunit, '(2E16.8)') global_x(i), global_values(i)
-      end do
-      
-      close(iunit)
-      
-      deallocate(global_values)
-      deallocate(global_x)
-      
-      print *, "Design written to ", trim(filename)
+    ! Calculate displacements on rank 0
+    if (pe_rank == root_rank) then
+       displs(1) = 0
+       do i = 2, pe_size
+          displs(i) = displs(i-1) + recvcounts(i-1)
+       end do
     endif
     
-  end subroutine design_3dto1d_write
+    ! Now gather the actual data with proper displacement handling
+    call MPI_Gatherv(this%values%x, local_size, mpi_real_precision, &
+         global_values, recvcounts, displs, mpi_real_precision, &
+         root_rank, neko_comm, ierr)
+    
+    if (pe_rank == root_rank) then
+       ! Create filename with iteration index
+       write(filename, '(A,I0.6,A)') 'design_iter_', idx, '.txt'
+       ! Open file for writing
+       open(newunit=iunit, file=trim(filename), status='replace', action='write')
+       ! Write header
+       write(iunit, '(A,I0)') '# Iteration: ', idx
+       write(iunit, '(A)') '# x_position height'
 
+       ! Write data
+       do i = 1, global_size
+          write(iunit, '(2E16.8)') global_x(i), global_values(i)
+       end do
+
+       close(iunit)
+
+       deallocate(global_values, global_x, recvcounts, displs)
+       print *, "Design written to ", trim(filename)
+    else
+        deallocate(global_values, recvcounts, displs)
+    endif
+  end subroutine design_3dto1d_write
 
 end module design_3dto1d

@@ -107,7 +107,7 @@ program usrneko
   allocate(beamweight)
 
   ! Set up distributed stress constraints
-  num_constraints = 100
+  num_constraints = 10
   num_constraint_partitions=10
   allocate(stress_global_indices(num_constraints))
   allocate(stress_sigma_max(num_constraints))
@@ -176,13 +176,11 @@ program usrneko
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_start = MPI_Wtime()
-  
+
   call opt%run(prob, des)
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_end = MPI_Wtime()
-
-
 
   if (pe_rank == 0) then
      print *, "opt%run execution time:", t_end - t_start, "seconds"
@@ -240,7 +238,7 @@ subroutine finite_difference_validation(des, k_test, delta)
   ! Create perturbed design
   call pert_design%init_from_components(n)
   call designvec%init(n)
-  designvec = des%get_values()
+  call des%get_values(designvec)
   if (k_test >= 1 .and. k_test <= n) then
     designvec%x(k_test) = designvec%x(k_test) + delta
   endif

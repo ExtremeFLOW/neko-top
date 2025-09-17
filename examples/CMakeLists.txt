@@ -42,7 +42,7 @@ endif()
 # Add the example directories.
 
 add_subdirectory(${EXAMPLES_DIR}/easy-E)
-# add_subdirectory(${EXAMPLES_DIR}/mma)
+add_subdirectory(${EXAMPLES_DIR}/mma)
 add_subdirectory(${EXAMPLES_DIR}/passive_scalar)
 add_subdirectory(${EXAMPLES_DIR}/rugby_ball)
 add_subdirectory(${EXAMPLES_DIR}/rugby_verification)
