@@ -228,7 +228,7 @@ contains
 
     ! compute the scaling to go in front of the forcing term
     scale_forcing = (this%current_dissipation / &
-    (this%initial_dissipation * this%target_fraction) - 1.0_rp)
+         (this%initial_dissipation * this%target_fraction) - 1.0_rp)
 
     associate(coef => this%coef)
 
