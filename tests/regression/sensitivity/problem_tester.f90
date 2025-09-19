@@ -21,6 +21,7 @@ program minimum_dissipation_sensitivity
   use matrix, only: matrix_t
   use math, only: abscmp, copy
   use sensitivity, only: compute_sensitivity
+  use user, only: user_setup
   implicit none
 
   ! JSON related arguments

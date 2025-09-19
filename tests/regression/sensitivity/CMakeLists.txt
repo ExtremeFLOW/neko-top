@@ -3,8 +3,11 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
 # Provide a list of .case files
 set(test_list
-    "volume.case"
-    "volume_filtered.case"
+    "lube_term.case"
+    "minimum_dissipation.case"
+    "min_dis_and_lube.case"
+    "min_dis_and_lube_weights.case"
+    #"passive_scalar.case"
 )
 
 # Path to the common driver source
@@ -20,9 +23,22 @@ add_custom_target(sensitivity_test_prepare
     COMMENT "Preparing sensitivity test files"
 )
 
+# Copy the plotter script to the binary directory
+add_custom_command(
+    TARGET sensitivity_test_prepare
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/plotter_FD_check.py
+            ${CMAKE_CURRENT_BINARY_DIR}/plotter_FD_check.py
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/steady_state_plotter.py
+            ${CMAKE_CURRENT_BINARY_DIR}/steady_state_plotter.py
+)
+
 # Sensitivity utils library
 add_library(sensitivity_utils EXCLUDE_FROM_ALL
     ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
+    ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
 )
 target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
 target_link_libraries(sensitivity_utils
