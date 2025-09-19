@@ -168,30 +168,6 @@ contains
                   neko_case%scalars%scalar_fields(1)%gs_Xh, &
                   neko_case%user%initial_conditions)
           end if
-       if (neko_case%params%valid_path('case.adjoint_scalar')) then
-          ! We need to write an "adjoint reset" instead of this
-          ! we shouldn't fallback to the primal here.
-          call json_get(neko_case%params, &
-               'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_extract_object(neko_case%params, &
-               'case.adjoint_scalar.initial_condition', json_subdict)
-
-          ! call neko_log%section("Adjoint scalar initial condition ")
-
-          if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
-                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-                  json_subdict)
-          else
-             call neko_error("user defined ICs not implemented for " // &
-                  "adjoint scalar")
-             ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
-             !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
-             !      this%usr%scalar_user_ic, neko_case%params)
-          end if
-
-          ! call neko_log%end_section()
-       end if
     end if
 
     ! ------------------------------------------------------------------------ !
