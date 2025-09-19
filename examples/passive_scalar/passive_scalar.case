@@ -52,7 +52,6 @@
                 }
             ],
             "output_control": "never"
-
         },
         "scalar": {
             "enabled": true,

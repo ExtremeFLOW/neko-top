@@ -203,9 +203,7 @@ contains
     write (file_name, '(a,a,i5.5,a)') &
          trim(adjustl(dirname)), '/topopt_', iter, '_.fld'
 
-    neko_case%f_out%output_t%file_%file_type%fname = trim(file_name)
-    neko_case%f_out%output_t%file_%file_type%counter = 0
-    neko_case%f_out%output_t%file_%file_type%start_counter = 0
+    call neko_case%f_out%output_t%file_%init(trim(file_name))
     call neko_case%output_controller%execute(neko_case%time, .true.)
 
   end subroutine setup_iteration
