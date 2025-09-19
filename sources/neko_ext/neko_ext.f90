@@ -107,9 +107,6 @@ contains
     ! Restart the simulation components
     call neko_simcomps%restart(neko_case%time)
 
-    ! Reset all lag terms and RHS
-
-
     ! ------------------------------------------------------------------------ !
     ! Reset the fluid field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -146,28 +143,28 @@ contains
 
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
-    
+
 
     if (has_scalar) then
-           ! zero out lag terms and RHS
-           call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
-           call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
-           ! reset the forward scalar
-           call json_get(neko_case%params, &
-               'case.scalar.initial_condition.type', string_val)
-          call json_extract_object(neko_case%params, &
-               'case.scalar.initial_condition', json_subdict)
-           if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
-                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-                  json_subdict)
-          else
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
-                  neko_case%scalars%scalar_fields(1)%s, &
-                  neko_case%scalars%scalar_fields(1)%c_Xh, &
-                  neko_case%scalars%scalar_fields(1)%gs_Xh, &
-                  neko_case%user%initial_conditions)
-          end if
+       ! zero out lag terms and RHS
+       call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
+       call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
+       ! reset the forward scalar
+       call json_get(neko_case%params, &
+            'case.scalar.initial_condition.type', string_val)
+       call json_extract_object(neko_case%params, &
+            'case.scalar.initial_condition', json_subdict)
+       if (trim(string_val) .ne. 'user') then
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+               json_subdict)
+       else
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
+               neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%scalars%scalar_fields(1)%c_Xh, &
+               neko_case%scalars%scalar_fields(1)%gs_Xh, &
+               neko_case%user%initial_conditions)
+       end if
     end if
 
     ! ------------------------------------------------------------------------ !
