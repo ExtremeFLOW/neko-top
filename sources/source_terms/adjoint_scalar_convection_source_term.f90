@@ -168,7 +168,7 @@ contains
 
     ! for over integration
     this%dealias = dealias
-    ! this%dealias = .false.
+    this%dealias = .false.
     this%c_Xh_GL => c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
     this%Xh_GLL => this%coef%Xh
@@ -204,15 +204,13 @@ contains
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(4)
     type(field_t), pointer :: dsdx, dsdy, dsdz, work
-    real(kind=rp), dimension(this%Xh_GL%lxyz * this%coef%msh%nelv) :: &
-         accumulate, fld_GL, s_adj_GL
     integer :: n_GL, nel
 
 
     call neko_scratch_registry%request_field(dsdx, temp_indices(1))
     call neko_scratch_registry%request_field(dsdy, temp_indices(2))
     call neko_scratch_registry%request_field(dsdz, temp_indices(3))
-    call neko_scratch_registry%request_field(work, temp_indices(3))
+    call neko_scratch_registry%request_field(work, temp_indices(4))
 
     fu => this%fields%get(1)
     fv => this%fields%get(2)
