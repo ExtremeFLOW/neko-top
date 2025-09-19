@@ -32,34 +32,6 @@
 !
 !> Implements the `target_dissipation_objective_t` type.
 !
-! I promise I'll write this document properly in the future...
-!
-! But the Borval Peterson (I think) paper had an objective function
-! that had 2 terms, dissipation and this term they claimed represented
-! out of plane stresses.
-! I never really understood that extra term, I also don't think it
-! applies to 3D cases, but everyone includes it anyway.
-!
-! It appears to me to be basically a heuristic penality that targets
-! non-binary designs
-!
-! so let's call
-!
-! F = \int |\nabla u|^2  + K \int \chi \u^2
-!
-!      | dissipation |     |"lube term"|
-!
-! I say "lube term" because they said it came from lubrication theory...
-! Anyway, we can change all this later (especially the names!)
-
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
-!
-! for the lube term, the adjoint forcing is \chi u
-!
-! This has always annoyed me...
-! because now I see one objective and one constraint
-!
 module target_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
@@ -89,9 +61,7 @@ module target_dissipation_objective
   implicit none
   private
 
-  !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !> An objective function corresponding to target dissipation
   type, public, extends(objective_t) :: target_dissipation_objective_t
      private
 
@@ -160,7 +130,7 @@ contains
     call json_get(json, "target", target_fraction)
 
     call this%init_from_attributes(design, simulation, weight, name, &
-      mask_name, target_fraction)
+         mask_name, target_fraction)
   end subroutine target_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -195,8 +165,7 @@ contains
     this%adjoint_w => neko_field_registry%get_field('w_adj')
     this%target_fraction = target_fraction
 
-    ! you will need to init this!
-    ! append a source term based on the minimum dissipation
+    ! append a source term based on the target dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
          simulation%adjoint_fluid%f_adj_x, &
@@ -292,13 +261,13 @@ contains
 
     ! Check if it's the first time, and if so, set the initial dissipation
     if (this%is_first_time) then
-    this%initial_dissipation = this%current_dissipation
-    this%is_first_time = .false.
+       this%initial_dissipation = this%current_dissipation
+       this%is_first_time = .false.
     end if
 
     ! Now compute the objective
     this%value = 0.5_rp * (this%current_dissipation / &
-    (this%initial_dissipation * this%target_fraction) - 1.0_rp) ** 2
+         (this%initial_dissipation * this%target_fraction) - 1.0_rp) ** 2
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
