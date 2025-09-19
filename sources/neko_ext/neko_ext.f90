@@ -143,7 +143,7 @@ contains
 
     ! check for multiple scalars
     if (neko_case%params%valid_path('case.scalars')) then
-         call neko_error('Multiple scalars not supported')
+       call neko_error('Multiple scalars not supported')
     end if
 
     ! check for a single scalar
