@@ -55,11 +55,11 @@ contains
   subroutine reset(neko_case)
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
-    integer :: i, n_scalars
+    integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
-    type(json_file) :: json_subdict, scalar_params
+    type(json_file) :: json_subdict
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
