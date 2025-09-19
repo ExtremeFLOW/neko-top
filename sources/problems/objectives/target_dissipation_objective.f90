@@ -210,7 +210,6 @@ contains
     type(field_t), pointer :: objective_field
     integer :: temp_indices(5)
     integer n
-    real(kind=rp) :: current_dissipation
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
