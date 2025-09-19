@@ -1,31 +1,30 @@
-# Define the CTest for sensitivity
+# Define the CTest for sensitivity (regression suite)
 set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 
-# Provide a list of .case files
+# --------------------------------------------------------------------------- #
+# .case files to run in the regression suite (long-running)
 set(test_list
     "lube_term.case"
-    "minimum_dissipation.case"
-    "min_dis_and_lube.case"
-    "min_dis_and_lube_weights.case"
-    #"passive_scalar.case"
+    #"minimum_dissipation.case"
+    #"min_dis_and_lube.case"
+    #"min_dis_and_lube_weights.case"
+    # "passive_scalar.case"  # enable when ready
 )
 
-# Path to the common driver source
+# Common driver source (same as unit)
 set(SENSITIVITY_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90)
 
-# ============================================================================ #
-# Ensure the neko library is found correctly
+# Ensure the neko library module dir is found (from the main target)
 get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
 
-# ============================================================================ #
-# Preparation target
-add_custom_target(sensitivity_test_prepare ALL
-    COMMENT "Preparing sensitivity test files"
+# --------------------------------------------------------------------------- #
+# Preparation target: copies helper scripts into the binary dir
+add_custom_target(reg_sensitivity_test_prepare ALL
+    COMMENT "Preparing regression sensitivity test files"
 )
 
-# Copy the plotter script to the binary directory
 add_custom_command(
-    TARGET sensitivity_test_prepare
+    TARGET reg_sensitivity_test_prepare
     POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
             ${CMAKE_CURRENT_SOURCE_DIR}/plotter_FD_check.py
@@ -35,13 +34,26 @@ add_custom_command(
             ${CMAKE_CURRENT_BINARY_DIR}/steady_state_plotter.py
 )
 
-# Sensitivity utils library
-add_library(sensitivity_utils
+# --------------------------------------------------------------------------- #
+# Regression sensitivity utilities (Fortran modules)
+add_library(reg_sensitivity_utils
     ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
     ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
 )
-target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
-target_link_libraries(sensitivity_utils
+
+# Use a private .mod folder to avoid clashes with unit targets
+set(reg_sens_moddir ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set_target_properties(reg_sensitivity_utils
+    PROPERTIES Fortran_MODULE_DIRECTORY ${reg_sens_moddir})
+
+# Make both NEKO and this target's .mod directory visible to dependents
+target_include_directories(reg_sensitivity_utils
+    PUBLIC
+        ${NEKO_TOP_MODDIR}
+        ${reg_sens_moddir}
+)
+
+target_link_libraries(reg_sensitivity_utils
     PUBLIC
         Neko-TOP::neko-top
         PkgConfig::neko
@@ -50,75 +62,87 @@ target_link_libraries(sensitivity_utils
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
 )
-add_dependencies(sensitivity_test_prepare sensitivity_utils)
 
-# ============================================================================ #
-# Neko environment
+add_dependencies(reg_sensitivity_test_prepare reg_sensitivity_utils)
+
+# --------------------------------------------------------------------------- #
+# Neko runtime environment for prepare.sh (mirrors unit)
 set(neko_PATH "${neko_PREFIX}/bin:$ENV{PATH}")
 string(REPLACE ";" ":"
     neko_LD_LIBRARY_PATH "${neko_LIBRARY_DIRS}:$ENV{LD_LIBRARY_PATH}"
 )
 
-# Prepare script (if exists)
+# Copy and execute the prepare script in the binary dir
 add_custom_target(
-    sensitivity_prepare_script ALL
-    COMMENT "Copying and execute prepare script"
+    reg_sensitivity_prepare_script ALL
+    COMMENT "Copying and executing regression sensitivity prepare.sh"
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/prepare.sh
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
-    COMMAND
-        ${CMAKE_COMMAND} -E copy_if_different
-        ${CMAKE_CURRENT_SOURCE_DIR}/prepare.sh
-        ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${CMAKE_CURRENT_SOURCE_DIR}/prepare.sh
+            ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     COMMAND ${CMAKE_COMMAND} -E env
-        LD_LIBRARY_PATH="${neko_LD_LIBRARY_PATH}" PATH="${neko_PATH}"
-        ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
+            LD_LIBRARY_PATH="${neko_LD_LIBRARY_PATH}" PATH="${neko_PATH}"
+            ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
-add_dependencies(problem_tester_sensitivity_bin sensitivity_utils)
+add_dependencies(reg_sensitivity_test_prepare reg_sensitivity_prepare_script)
 
-# ============================================================================ #
-# Build the single driver executable
-add_executable(problem_tester_sensitivity_bin
+# --------------------------------------------------------------------------- #
+# Build the single driver executable for regression
+add_executable(reg_problem_tester_sensitivity_bin
     ${SENSITIVITY_DRIVER}
 )
-target_link_libraries(problem_tester_sensitivity_bin
-    sensitivity_utils
+target_link_libraries(reg_problem_tester_sensitivity_bin
+    reg_sensitivity_utils
 )
-add_dependencies(Unit problem_tester_sensitivity_bin)
 
-# ============================================================================ #
-# Loop over all case files and create tests
+# Ensure driver builds after the utils (target exists now)
+add_dependencies(reg_problem_tester_sensitivity_bin reg_sensitivity_utils)
+
+# The driver must also see the regression .mod directory
+target_include_directories(reg_problem_tester_sensitivity_bin
+    PRIVATE ${reg_sens_moddir})
+
+# Let the umbrella target trigger both build+prepare steps (if present)
+if (TARGET Unit)
+  add_dependencies(Unit reg_problem_tester_sensitivity_bin)
+  add_dependencies(Unit reg_sensitivity_test_prepare)
+endif()
+
+# --------------------------------------------------------------------------- #
+# Per-case setup and CTest entries
 foreach(case_file ${test_list})
-    # Get the case name without extension
+    # name without extension
     get_filename_component(case_name ${case_file} NAME_WE)
 
-    # Copy case file
+    # Copy each .case file into the binary dir (namespaced target to avoid clashes)
     add_custom_target(
-        ${case_name}_case_file ALL
-        COMMENT "Copying case file ${case_file} to the test directory"
+        ${case_name}_case_file_reg ALL
+        COMMENT "Copying case file ${case_file} to the regression sensitivity directory"
         SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
         BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
-        COMMAND
-            ${CMAKE_COMMAND} -E copy_if_different
-            ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
-            ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
+                ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    add_dependencies(sensitivity_test_prepare ${case_name}_case_file)
+    add_dependencies(reg_sensitivity_test_prepare ${case_name}_case_file_reg)
 
-    # Add test for this case
-    add_test(NAME ${case_name}_sensitivity
-        COMMAND $<TARGET_FILE:problem_tester_sensitivity_bin> ${case_file}
+    # Test (namespaced to avoid colliding with unit tests)
+    add_test(NAME ${case_name}_sensitivity_reg
+        COMMAND $<TARGET_FILE:reg_problem_tester_sensitivity_bin> ${case_file}
         WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
     )
-    set_tests_properties(${case_name}_sensitivity
+
+    # Make sure the test waits for driver+prepare, label as regression
+    set_tests_properties(${case_name}_sensitivity_reg
         PROPERTIES
-            DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
+            DEPENDS "reg_problem_tester_sensitivity_bin;reg_sensitivity_test_prepare"
             LABELS "sensitivity;regression"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
             TIMEOUT 300000
     )
 endforeach()
 
-# ============================================================================ #
+# --------------------------------------------------------------------------- #
