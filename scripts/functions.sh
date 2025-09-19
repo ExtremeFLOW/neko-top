@@ -241,7 +241,7 @@ function cleanup {
         pattern=$directory/${base%.*}
 
         mkdir -p $pattern
-        mv -t $pattern $nek ${nek%[0-9]*.*}[0-9]*.f*
+        mv -t $pattern $nek ${nek%.*}.f*
     done
     printf "\n"
 
