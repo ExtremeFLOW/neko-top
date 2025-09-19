@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 0.1,
+            "end_time": 5.0,
             "timestep": 1e-3
         },
         "numerics": {
@@ -51,8 +51,7 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 10
+            "output_control": "never"
 
         },
         "scalar": {
