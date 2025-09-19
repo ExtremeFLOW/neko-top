@@ -91,12 +91,15 @@ contains
     type(field_t), pointer :: s
     integer :: i
 
-    if (scheme_name .ne. 'scalar') return
+    if (scheme_name .eq. 'fluid') return
 
     ! Initial scalar profile is a sigmoid separating the two species
+    print *, "OUT HERE"
     s => fields%get("s")
     do i = 1, s%dof%size()
+       print *, "IN HERE"
        s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
+       s%x(i,1,1,1) = 1.0_rp
     end do
 
   end subroutine scalar_ic

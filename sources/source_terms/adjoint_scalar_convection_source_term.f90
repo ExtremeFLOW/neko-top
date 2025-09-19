@@ -43,12 +43,15 @@ module adjoint_scalar_convection_source_term
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use field_math, only: field_subcol3
+  use field_math, only: field_subcol3, field_sub2
   use operators, only: grad
   use utils, only: neko_error
   use field_registry, only: neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
-  use math, only: col2, invcol2, add2, col3, sub2
+  use math, only: col2, invcol2
+  use device_math, only: device_col2, device_invcol2
+  use vector, only: vector_t
+  use vector_math, only: vector_col3
   implicit none
   private
 
@@ -78,6 +81,8 @@ module adjoint_scalar_convection_source_term
      type(interpolator_t), pointer :: GLL_to_GL
      !> if dealiasing should be applied
      logical :: dealias
+     !> work arrays
+     type(vector_t) :: accumulate, fld_GL, s_adj_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -139,6 +144,7 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: s, s_adj
+    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -162,10 +168,20 @@ contains
 
     ! for over integration
     this%dealias = dealias
+    ! this%dealias = .false.
     this%c_Xh_GL => c_Xh_GL
     this%Xh_GL => this%c_Xh_GL%Xh
     this%Xh_GLL => this%coef%Xh
     this%GLL_to_GL => GLL_to_GL
+
+    if (this%dealias) then
+       ! allocate work arrays for dealiasing
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%accumulate%init(n_GL)
+       call this%fld_GL%init(n_GL)
+       call this%s_adj_GL%init(n_GL)
+    end if
 
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
@@ -174,6 +190,9 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    call this%accumulate%free()
+    call this%fld_GL%free()
+    call this%s_adj_GL%free()
   end subroutine adjoint_scalar_convection_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -212,45 +231,53 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_error("dealiased adjoint scalar not implemented on device")
-       else
-          call this%GLL_to_GL%map(s_adj_GL, this%s_adj%x, nel, this%Xh_GL)
+
+          call this%GLL_to_GL%map(this%s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
 
           ! u
-          call this%GLL_to_GL%map(fld_GL, dsdx%x, nel, this%Xh_GL)
-          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, dsdx%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+            ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call sub2(fu%x, work%x, work%size())
+       end if
+          call field_sub2(fu, work)
 
           ! v
-          call this%GLL_to_GL%map(fld_GL, dsdy%x, nel, this%Xh_GL)
-          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, dsdy%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+            ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call sub2(fv%x, work%x, work%size())
+       end if
+          call field_sub2(fv, work)
 
           ! w
-          call this%GLL_to_GL%map(fld_GL, dsdz%x, nel, this%Xh_GL)
-          call col3(accumulate, s_adj_GL, fld_GL, n_GL)
-          ! multiply by GL mass matrix
-          call col2(accumulate, this%c_Xh_GL%B, n_GL)
-          ! map back to GLL
-          call this%GLL_to_GL%map(work%x, accumulate, nel, this%Xh_GLL)
-          ! preempt the GLL mass matrix
+          call this%GLL_to_GL%map(this%fld_GL%x, dsdz%x, nel, this%Xh_GL)
+          call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+            ! Evaluate term on GL and preempt the GLL premultiplication
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_invcol2(work%x_d, this%coef%B_d, work%size())
+       else
+          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
-          call sub2(fw%x, work%x, work%size())
-
        end if
+          call field_sub2(fw, work)
 
     else
        call field_subcol3(fu, this%s_adj, dsdx)
