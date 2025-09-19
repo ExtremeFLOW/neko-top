@@ -74,6 +74,7 @@ add_custom_target(
         ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
+add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 add_dependencies(problem_tester_sensitivity_bin sensitivity_utils)
 
 # ============================================================================ #
