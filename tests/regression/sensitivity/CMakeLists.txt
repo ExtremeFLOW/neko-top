@@ -1,5 +1,5 @@
 # Define the CTest for sensitivity
-set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
+set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 
 # Provide a list of .case files
 set(test_list
@@ -19,7 +19,7 @@ get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
 
 # ============================================================================ #
 # Preparation target
-add_custom_target(sensitivity_test_prepare
+add_custom_target(sensitivity_test_prepare ALL
     COMMENT "Preparing sensitivity test files"
 )
 
@@ -36,7 +36,7 @@ add_custom_command(
 )
 
 # Sensitivity utils library
-add_library(sensitivity_utils EXCLUDE_FROM_ALL
+add_library(sensitivity_utils
     ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
     ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
 )
@@ -61,7 +61,7 @@ string(REPLACE ";" ":"
 
 # Prepare script (if exists)
 add_custom_target(
-    sensitivity_prepare_script
+    sensitivity_prepare_script ALL
     COMMENT "Copying and execute prepare script"
     SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/prepare.sh
     BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
@@ -74,11 +74,11 @@ add_custom_target(
         ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
+add_dependencies(problem_tester_sensitivity_bin sensitivity_utils)
 
 # ============================================================================ #
 # Build the single driver executable
-add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
+add_executable(problem_tester_sensitivity_bin
     ${SENSITIVITY_DRIVER}
 )
 target_link_libraries(problem_tester_sensitivity_bin
@@ -94,7 +94,7 @@ foreach(case_file ${test_list})
 
     # Copy case file
     add_custom_target(
-        ${case_name}_case_file
+        ${case_name}_case_file ALL
         COMMENT "Copying case file ${case_file} to the test directory"
         SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/${case_file}
         BYPRODUCTS ${CMAKE_CURRENT_BINARY_DIR}/${case_file}
@@ -114,12 +114,10 @@ foreach(case_file ${test_list})
     set_tests_properties(${case_name}_sensitivity
         PROPERTIES
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
-            LABELS "sensitivity;unit"
+            LABELS "sensitivity;regression"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
             TIMEOUT 300000
     )
 endforeach()
 
 # ============================================================================ #
-# Final dependencies
-add_dependencies(Unit sensitivity_test_prepare)
