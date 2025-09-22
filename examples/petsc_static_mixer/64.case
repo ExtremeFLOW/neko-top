@@ -62,7 +62,7 @@
                     "objects": [
                         {
                             "type": "boundary_mesh",
-                            "name": "data_local/petsc_static_mixer/Test_mixer_095.stl",
+                            "name": "data_local/petsc_static_mixer/Test_mixer_095_smooth.stl",
                             "cache": true,
                             "cache_file": "data_local/petsc_static_mixer/cache_64_",
                             "distance_transform": {
