@@ -1,10 +1,10 @@
 # A Simple 1D Beam Optimization Test Case for MMA
 
-This example demonstrates a simple test case for the Method of Moving Asymptotes (MMA), applied to a **1D cantilever beam** discretized into elements. The design variable is the **beam height** `h` at each element, and the objective is to **maximize stiffness (minimize tip deflection)** while satisfying **stress constraints**.
+This example demonstrates a simple test case for the Method of Moving Asymptotes (MMA) as implemented in **NEKO-TOP**.
+The problem is a **1D cantilever beam**, discretized into multiple elements, where the design variable is the **beam height** `h` at each element. The objective is to **maximize stiffness (minimize tip deflection)** while **minimizing beam weight** and enforcing **stress constraints**.
+The number of design variables (1D beam elements) matches the number of Gauss–Lobatto–Legendre (GLL) points in the 3D spectral element mesh provided in the `box.nmsh` file from the examples repository. This creates a one-to-one mapping between the GLL points in the spectral element mesh and the 1D beam elements.
+This setup allows to use the **Neko’s mesh partitioning** for parallel execution: when running on multiple MPI nodes, Neko distributes the GLL points across nodes, which directly translates to distributing the 1D beam elements in the parallel system.
 
-The goal is to test the MMA implementation on a small, analytically tractable structural optimization problem, without requiring a full 3D FEM solver.
-
----
 
 ## Problem Description
 
@@ -14,15 +14,18 @@ In the `driver.f90` file, the beam is divided into `n` elements, each of length 
 
 ### Beam Properties
 
-- Width $b$ (constant)
-- Young’s modulus $E$ (constant)
-- Element height $h(k)$ (design variable)
-- Moment of inertia:  
-  $$
-  I(k) = \frac{b \cdot h(k)^3}{12}
-  $$
-- Maximum allowable stress: $\sigma_\text{max}(k)$
-- **Bounds** on height: $h_{min} \leq h(k) \leq h_{max}$
+- **Structure**: Cantilever beam of length `L = 2.0 m` and width `b = 0.02 m`.
+- **Material**: Density `ρ = 7800 kg/m³`, Young’s modulus `E = 210 GPa`.
+- **Loading**: Tip load `P = 1000 N`.
+- **Design Variables**: Element-wise beam height `h` ∈ [`h_min = 0.005 m`, `h_max = 0.05 m`]. Moment of inertia (the beam is assumed to be rectangular with depth b and hight h):  
+ $I(k) = \frac{b \cdot h(k)^3}{12}$
+- **Objectives**:
+  1. Minimize **tip deflection** (normalized by maximum allowed `u_tip_max = 0.25 m`).
+  2. Minimize **beam weight**.
+- **Constraints**:
+  - Element-wise stress must satisfy `σ ≤ σ_max = 250 MPa`.
+  - Stress constraints are distributed across MPI processes.
+
 
 ### Design Variable Mapping
 
@@ -104,11 +107,44 @@ $$
 $$
 
 
+## Problem Formulation
 
+**Minimize:**
+
+$$
+f(\mathbf{x}) = w_1 \cdot \frac{u_{tip}(\mathbf{x})}{u_{tip}^{max}} + w_2 \cdot \frac{m(\mathbf{x})}{m_{max}}
+$$
+
+**Subject to:**
+
+$$
+g_j(\mathbf{x}) = \frac{\sigma_j(\mathbf{x})}{\sigma_{max}} - 1 \le 0, \quad j = 1, \dots, N_\text{ constraints}
+$$
+
+$$
+0 \le x_i \le 1, \quad i = 1, \dots, N_\text{ elements}
+$$
+
+**Where:**
+
+- $\mathbf{x}$ are the normalized design variables.
+- $u_{tip}$ is the tip deflection.
+- $m$ is the total beam mass.
+- $\sigma_j$ is the bending stress at the $j$-th constraint location.
+- $N_\text{ constraints} can be set in the driver.f90 in lines:
+```
+  ! Set up distributed stress constraints
+  num_constraints = 10
+```
+- the weights $$w_1, w_2$$ for the objective function can be set in the driver.f90 in lines:
+```
+  call deflection%init_from_components("tip_deflection", des, 1.0_rp)
+  call beamweight%init_from_components("beamweight", des, 1.0_rp)
+```
+where 1.0_rp is the weight for each objective.
 
 
 ## Notes
 
 - This example is **1D** and uses **analytical formulas** for both the objective and constraints.
 - It is intended as a **minimal, testable example** for verifying your MMA implementation performance.
-- All variables and sensitivities are scaled to work with the MMA optimizer directly.
