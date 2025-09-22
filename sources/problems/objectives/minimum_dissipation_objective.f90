@@ -278,7 +278,7 @@ contains
        end if
     end if
 
-    this%value = this%value * 0.5_rp
+    this%value = this%value * 0.5_rp / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
