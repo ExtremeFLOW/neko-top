@@ -102,24 +102,10 @@ module example_problem
           stress_con_update_sensitivity
   end type stress_con
 
-  ! ========================================================================== !
-  ! stress constraints
-  ! type, public, extends(constraint_t) :: mma_con
-  !    real(kind=rp) :: sign = 1.0_rp
-  !  contains
-  !    procedure, public, pass(this) :: init_json => mma_con_init_from_json
-  !    procedure, public, pass(this) :: init_from_components => &
-  !         mma_con_init_from_components
-  !    procedure, public, pass(this) :: free => mma_con_free
-  !    procedure, public, pass(this) :: update_value => mma_con_update_value
-  !    procedure, public, pass(this) :: update_sensitivity => &
-  !         mma_con_update_sensitivity
-  ! end type mma_con
-
 contains
 
   ! ========================================================================== !
-  ! Methods for the Objective Function
+  ! Methods for the Objective Function (tip deflection for the beam)
 
   subroutine mma_obj_init_from_json(this, json, design)
     class(mma_obj), intent(inout) :: this
@@ -198,14 +184,10 @@ contains
     ! Global sum
     u_global = vector_glsum(contrib, n)
 
-    ! if (pe_rank == 0) print *, "Global tip deflection =", u_global
-
     ! Normalizing with u_tip_max
     u_global = u_global/u_tip_max - 1
 
     this%value = u_global
-
-    ! if (pe_rank == 0) print *, "Normalized Global tip deflection =", this%value
 
     deallocate(Delta)
   end subroutine mma_obj_update_value
@@ -224,7 +206,7 @@ contains
     call design%get_values(h)
     n = design%size()
     call sensitivity%init(n)
-    
+
     ! Project design variables to physical height
     call vector_cmult(h, (h_max - h_min), n)
     call vector_cadd(h, h_min, n)
@@ -242,6 +224,10 @@ contains
       Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
                   (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
     end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+    end if
 
     ! Compute sensitivity: 
     ! dg/dx = P * Δ * (-36.0 / (E * b * h^4)) * (h_max - h_min)
@@ -373,48 +359,50 @@ contains
   subroutine stress_con_update_value(this, design)
     class(stress_con), intent(inout) :: this
     class(design_t), intent(in) :: design
-    
+
     type(vector_t) :: h
     integer :: ierr, n, offset
     real(rp) :: Le, x_e, I_e, c_e, M_e, sigma_e
     real(rp) :: global_value
-    
+
     ! Initialize to safe value
     this%value = 0.0_rp
     if (this%is_local) then
-       ! This element is  on our rank
-       ! Local design values
+       ! This element is on our rank
+       ! Fetch the local design values
        call design%get_values(h)
        n = design%size()
 
        ! Project design variables to physical height
        call vector_cmult(h, (h_max - h_min), n)
        call vector_cadd(h, h_min, n)
-       
+
        ! Global element length
        Le = L_total / real(design%size_global(), kind=rp)
-       
+
        ! Start coordinate of this element
        x_e = Le * real(this%global_element_index - 1, rp)
-       
+
        ! Section properties
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       end if
        I_e = b * h%x(this%local_index)**3 / 12.0_rp
        c_e = h%x(this%local_index) / 2.0_rp
-       
+
        ! Bending moment at this element
        M_e = P * (L_total - x_e)
-       
+
        ! Stress in this element
        sigma_e = M_e * c_e / I_e
-       
+
        ! Constraint value: stress <= sigma_max
        this%value = sigma_e / this%sigma_max - 1.0_rp
     endif
 
     ! Sum across all MPI ranks (only one rank will have non-zero value)
     call MPI_Allreduce(this%value, global_value, 1, mpi_real_precision, &
-                      MPI_SUM, neko_comm, ierr)
-    ! print *, "pe_rank=", pe_rank, this%name, "value=", this%value, "global_value=", global_value
+         MPI_SUM, neko_comm, ierr)
     
     this%value = global_value
   end subroutine stress_con_update_value
@@ -434,93 +422,50 @@ contains
     local_sensitivity = 0.0_rp
     
     if (this%is_local) then
-      ! This element is on our rank
-      ! Local design values
-      call design%get_values(h)
-      n = design%size()
+       ! This element is on our rank
+       ! Local design values
+       call design%get_values(h)
+       n = design%size()
       
-      ! Project design variables to physical height
-      call vector_cmult(h, (h_max - h_min), n)
-      call vector_cadd(h, h_min, n)
+       ! Project design variables to physical height
+       call vector_cmult(h, (h_max - h_min), n)
+       call vector_cadd(h, h_min, n)
       
-      ! Global element length
-      Le = L_total / real(design%size_global(), kind=rp)
+       ! Global element length
+       Le = L_total / real(design%size_global(), kind=rp)
       
-      ! Start coordinate of this element
-      x_e = Le * real(this%global_element_index - 1, rp)
+       ! Start coordinate of this element
+       x_e = Le * real(this%global_element_index - 1, rp)
       
-      ! Section properties
-      I_e = b * h%x(this%local_index)**3 / 12.0_rp
-      c_e = h%x(this%local_index) / 2.0_rp
-      
-      ! Bending moment at this element
-      M_e = P * (L_total - x_e)
+       ! Section properties
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       end if
+       I_e = b * h%x(this%local_index)**3 / 12.0_rp
+       c_e = h%x(this%local_index) / 2.0_rp
+
+       ! Bending moment at this element
+       M_e = P * (L_total - x_e)
       
       ! Sensitivity wrt h
-      dsigma_dh = M_e * ( (1.0_rp / (2.0_rp * I_e)) - &
-          (c_e * 3.0_rp * b * h%x(this%local_index)**2 / 12.0_rp) / (I_e**2) )
+       dsigma_dh = M_e * ( (1.0_rp / (2.0_rp * I_e)) - &
+            (c_e * 3.0_rp * b * h%x(this%local_index)**2 / 12.0_rp) / (I_e**2) )
       
-      ! Chain rule for normalized variable
-      local_sensitivity(this%local_index) = dsigma_dh * (h_max - h_min) / this%sigma_max
+       ! Chain rule for normalized variable
+       local_sensitivity(this%local_index) = dsigma_dh * &
+            (h_max - h_min) / this%sigma_max
     endif
     
-    ! If the constraint is not local we dont need its sensitivity on the current node
-    ! call MPI_Allreduce(local_sensitivity, this%sensitivity%x, design%size_global(), &
-    !                   mpi_real_precision, MPI_SUM, neko_comm, ierr)
+    ! If the constraint is not local we dont need its sensitivity on the 
+    ! current node
     this%sensitivity%x = local_sensitivity
 
     ! Update device memory if needed
     if (neko_bcknd_device .eq. 1) then
-      call device_memcpy(this%sensitivity%x, this%sensitivity%x_d, design%size_global(), &
-                        HOST_TO_DEVICE, sync = .false.)
+       call device_memcpy(this%sensitivity%x, this%sensitivity%x_d, &
+            design%size_global(), HOST_TO_DEVICE, sync = .false.)
     end if
-    ! print *, "pe_rank=", pe_rank, this%name, "maxval(this%sensitivity%x)=", maxval(this%sensitivity%x),&
-    !      "sum(this%sensitivity%x)=", sum(this%sensitivity%x), "minval(this%sensitivity%x)=", minval(this%sensitivity%x)
 
     deallocate(local_sensitivity)
   end subroutine stress_con_update_sensitivity
-
-  ! subroutine mma_con_init_from_json(this, json, design)
-  !   class(mma_con), intent(inout) :: this
-  !   type(json_file), intent(inout) :: json
-  !   class(design_t), intent(in) :: design
-  !   character(len=256), parameter :: name = 'mma_con'
-  !   integer :: sign
-
-  !   call this%init_from_components(name, design, sign)
-
-  ! end subroutine mma_con_init_from_json
-
-  ! subroutine mma_con_init_from_components(this, name, design, sign)
-  !   class(mma_con), intent(inout) :: this
-  !   character(len=*), intent(in) :: name
-  !   class(design_t), intent(in) :: design
-  !   integer, intent(in), optional :: sign
-  !   integer :: sign_ = 1
-
-  !   call this%init_base(name, design%size())
-
-  !   if (present(sign)) sign_ = sign
-  !   if (sign_ .lt. 0) this%sign = -1.0_rp
-  !   if (sign_ .ge. 0) this%sign = 1.0_rp
-
-  ! end subroutine mma_con_init_from_components
-
-  ! subroutine mma_con_free(this)
-  !   class(mma_con), intent(inout) :: this
-  !   call this%free_base()
-  ! end subroutine mma_con_free
-
-  ! subroutine mma_con_update_value(this, design)
-  !   class(mma_con), intent(inout) :: this
-  !   class(design_t), intent(in) :: design
-
-
-  ! end subroutine mma_con_update_value
-
-  ! subroutine mma_con_update_sensitivity(this, design)
-  !   class(mma_con), intent(inout) :: this
-  !   class(design_t), intent(in) :: design
-
-  ! end subroutine mma_con_update_sensitivity
 end module example_problem

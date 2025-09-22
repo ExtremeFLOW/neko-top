@@ -62,12 +62,12 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 15,
+            "max_iterations": 6,
             "tolerance": 1.0e-4,
             "performance": false,
             "mma": {
                 "max_iter": 100,
-                "backend": "cpu",
+                "backend": "device",
                 "subsolver": "dip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,

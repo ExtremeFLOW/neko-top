@@ -22,7 +22,7 @@ program usrneko
   use matrix, only: matrix_t
 
   use comm, only: pe_rank, neko_comm
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
 
   implicit none
@@ -113,8 +113,7 @@ program usrneko
   allocate(stress_sigma_max(num_constraints))
   ! Add constraints on global indices
   call fill_constraint_indices(stress_global_indices, num_constraints, &
-       num_constraint_partitions, des%size_global())
-  ! print *, "stress_global_indices=" ,stress_global_indices                                   
+       num_constraint_partitions, des%size_global())                                
 
   stress_sigma_max = 250e6_rp  ! Same max stress for all
   
@@ -125,12 +124,10 @@ program usrneko
   
   ! Add each constraint to the problem
   do i = 1, size(stress_constraints)
-     write(index_str, '(I0)') stress_global_indices(i)  ! I0 format for minimal length
-     !   write(index_str, '(I0)') i  ! I0 format for minimal length
+     write(index_str, '(I0)') stress_global_indices(i) 
      call stress_constraints(i)%init_stress_con( &
           "stress_con_"//trim(index_str), &
           des, stress_global_indices(i), stress_sigma_max(i))
-
      call prob%add_constraint(stress_constraints(i))
   end do
 
@@ -141,15 +138,17 @@ program usrneko
 
   call MPI_Barrier(neko_comm, ierr)
   if (pe_rank == 0) print *, "Constraints distribution complete!"
-  if (pe_rank == 0) print *, "number of problem objectives=", prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
+  if (pe_rank == 0) print *, "number of problem objectives=", &
+       prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
   
+
+  ! -------------------------------------------------------------------------- !
+  ! Perform finite difference validation
   ! update obj and cons and sensitivities for the init design
   !   call deflection%update_value(des)
   !   call beamweight%update_value(des)
   !   call deflection%update_sensitivity(des)
   !   call beamweight%update_sensitivity(des)
-  ! -------------------------------------------------------------------------- !
-  ! Perform finite difference validation
   !   if (pe_rank == 0) then
   !      print *, "Performing finite difference validation..."
   !   endif
@@ -165,9 +164,10 @@ program usrneko
   call prob%get_constraint_values(constraint_value)
   call prob%get_objective_value(objective_value)
   if (pe_rank == 0) then
-     print *, "nobject=", prob%get_n_objectives(), "nconstraint=", prob%get_n_constraints(), &
-        "total objective=", objective_value, &
-        "all_objectives%x=", all_objectives%x, "constraint_value", constraint_value%x
+     print *, "nobject=", prob%get_n_objectives(), "nconstraint=", &
+          prob%get_n_constraints(), "total objective=", objective_value, &
+          "all_objectives%x=", all_objectives%x, "constraint_value", &
+          constraint_value%x
   end if
 
   ! -------------------------------------------------------------------------- !
@@ -196,7 +196,6 @@ program usrneko
   if (allocated(opt)) deallocate(opt)
 
 end program usrneko
-
 
 
 ! ========================================================================== !
@@ -323,9 +322,6 @@ subroutine fill_constraint_indices(stress_global_indices, num_constraints, &
 
     partition_start = cum_start
     partition_end   = partition_start + partition_size - 1
-
-    ! print *, "chunk num=", i, "starts from", partition_start, &
-    !          "ends at", partition_end, "ncloc=", partition_end - partition_start + 1
 
     ! pick consecutive indices in this partition
     do j = 1, partition_constraints

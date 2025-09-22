@@ -43,7 +43,7 @@ module design_3dto1d
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use device_math, only: device_copy
   use design, only: design_t
   use math, only: rzero
@@ -210,7 +210,11 @@ contains
           displs(i) = displs(i-1) + recvcounts(i-1)
        end do
     endif
-    
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%values%x, this%values%x_d, local_size, &
+            DEVICE_TO_HOST, sync = .false.)
+    end if
     ! Now gather the actual data with proper displacement handling
     call MPI_Gatherv(this%values%x, local_size, mpi_real_precision, &
          global_values, recvcounts, displs, mpi_real_precision, &
