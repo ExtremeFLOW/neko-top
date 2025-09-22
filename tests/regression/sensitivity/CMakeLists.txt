@@ -4,8 +4,8 @@ set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 # --------------------------------------------------------------------------- #
 # .case files to run in the regression suite (long-running)
 set(test_list
-    "lube_term.case"
-    #"minimum_dissipation.case"
+    #"lube_term.case"
+    "minimum_dissipation.case"
     #"min_dis_and_lube.case"
     #"min_dis_and_lube_weights.case"
     # "passive_scalar.case"  # enable when ready

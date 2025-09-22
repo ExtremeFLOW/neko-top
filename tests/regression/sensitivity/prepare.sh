@@ -39,7 +39,7 @@ for arg in "$@"; do
         esac
     fi
 done
-Nx=$((N * 2))
+Nx=$((N * 1))
 Ny=$N
 Nz=1
 
@@ -65,7 +65,7 @@ fi
 z=$(python3 -c "print(1.0 / $N)")
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
+genmeshbox 0 1 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #
