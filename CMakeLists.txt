@@ -137,6 +137,7 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
+pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
 # Setup PFUnit
