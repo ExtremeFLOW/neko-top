@@ -475,6 +475,7 @@ contains
     integer :: n
 
     n = this%size()
+    call values%init(n)
     call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
