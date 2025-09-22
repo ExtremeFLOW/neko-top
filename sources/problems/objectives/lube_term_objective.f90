@@ -71,7 +71,7 @@ module lube_term_objective
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
-  use mask_ops, only: mask_exterior_const
+  use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
@@ -105,6 +105,8 @@ module lube_term_objective
      logical :: dealias_sensitivity
      !> dealias forcing
      logical :: dealias_forcing
+     !> volume of objective domain
+     real(kind=rp) :: volume
 
      ! ---- everything GLL ----
      !> The coefs
@@ -191,6 +193,8 @@ contains
     logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
     integer :: n_GL, nel
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
@@ -232,6 +236,13 @@ contains
        call this%fld_GL%init(n_GL)
     end if
 
+    ! compute the volume of the objective domain
+    if (this%has_mask) then
+       this%volume = compute_masked_volume(this%mask, this%c_Xh_GLL)
+    else
+       this%volume = this%c_Xh_GLL%volume
+    end if
+
     ! if we have the lube term we need to initialize and append that too
 
     associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
@@ -241,7 +252,7 @@ contains
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing)
+           this%dealias_forcing, this%volume)
 
     end associate
 
@@ -301,7 +312,7 @@ contains
           this%value = glsc2(work%x, this%c_Xh_GLL%B, design%size())
        end if
     end if
-    this%value = 0.5_rp * this%value
+    this%value = 0.5_rp * this%value / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -333,7 +344,7 @@ contains
        call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
        call vector_addcol3(this%accumulate, this%fld_GL, this%fld_GL)
        ! scale
-       call vector_cmult(this%accumulate, this%weight * 0.5_rp)
+       call vector_cmult(this%accumulate, this%weight * 0.5_rp / this%volume)
 
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -350,9 +361,8 @@ contains
        call field_col3(work, this%u, this%u)
        call field_addcol3(work, this%v, this%v)
        call field_addcol3(work, this%w, this%w)
-       call field_cmult(work, this%weight * 0.5_rp)
        ! scale
-       call field_cmult(work, this%weight * 0.5_rp)
+       call field_cmult(work, this%weight * 0.5_rp / this%volume)
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then

@@ -71,7 +71,7 @@ and has the following input parameters:
 In the works of [A. Gersborg-Hansen et al. (2005)](https://link.springer.com/article/10.1007/s00158-004-0508-7)
 an objective function of the form
 \f[
-\mathcal{F} = \frac{1}{2}\int \frac{1}{2} 
+\mathcal{F} = \frac{1}{|\Omega_\text{obj}|}\int \frac{1}{2} 
 \left[
 \underset{I}{\nabla \mathbf{u} \cdot \left(\nabla \mathbf{u} + (\nabla \mathbf{u})^T \right)}
 + \underset{II}{\chi \mathbf{u} \cdot \mathbf{u} }

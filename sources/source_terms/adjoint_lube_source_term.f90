@@ -98,6 +98,8 @@ module adjoint_lube_source_term
      type(interpolator_t), pointer :: GLL_to_GL
      !> work arrays
      type(vector_t) :: accumulate, fld_GL, chi_GL
+     !> Volume of the objective domain
+     real(kind=rp) :: volume
 
    contains
      !> The common constructor using a JSON object.
@@ -147,11 +149,12 @@ contains
   !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
   !! @param GLL_to_GL Interpolator between GLL and GL.
   !! @param dealias weather this term should be overintegrated.
+  !! @param volume volume of the objective domain.
   subroutine adjoint_lube_source_term_init_from_components(this, &
        f_x, f_y, f_z, design, K, &
        u, v, w, &
        mask, if_mask, &
-       coef, c_Xh_GL, GLL_to_GL, dealias)
+       coef, c_Xh_GL, GLL_to_GL, dealias, volume)
     class(adjoint_lube_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
@@ -163,6 +166,7 @@ contains
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
+    real(kind=rp), intent(in) :: volume
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
@@ -193,6 +197,8 @@ contains
     this%u => u
     this%v => v
     this%w => w
+
+    this%volume = volume
 
     select type (design)
     type is (brinkman_design_t)
@@ -250,8 +256,8 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
     call field_copy(work, this%chi)
 
-    ! scale by K
-    call field_cmult(work, this%K)
+    ! scale by K and volume
+    call field_cmult(work, this%K / this%volume)
 
     ! mask
     if (this%if_mask) then
