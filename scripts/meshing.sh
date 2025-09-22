@@ -20,6 +20,7 @@ function jou2nbin() {
     input_name=$(basename ${1%.*})
 
     # Construct the mesh using Cubit
+    echo "$cubit -nojournal -nographics -batch -noecho $1"
     $cubit -nojournal -nographics -batch -noecho $1
 
     if [[ $(find ./ -name "*.exo" | wc -l) -lt 1 ]]; then
