@@ -162,8 +162,8 @@ function prepare {
         printf "Running user provided preparation script.\n"
         printf "=%.0s" {1..80} && printf "\n"
 
-        if [[ -n "$SLURM_JOB_NAME" && -f "select_gpu" && -n "$CPU_BIND" ]]; then
-            srun --ntasks=1 --cpu-bind=${CPU_BIND} ./select_gpu ./prepare.sh
+        if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+            srun --ntasks=1 --cpu-bind=${CPU_BIND} ./prepare.sh
             sleep 1 # Make sure SLURM have time to clean up.
         else
             ./prepare.sh
