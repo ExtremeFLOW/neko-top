@@ -54,7 +54,7 @@ The full optimization problem can be stated as:
 
 $$
 \begin{aligned}
-\min_{\frac{1}{n} \sum_{j=1}^n (d_j - x_j)^2, \\
+&\min \frac{1}{n} \sum_{j=1}^n (d_j - x_j)^2, \\
 & d_j \in [\texttt{xmin}, \texttt{xmax}], \quad j=1,\ldots,n,
 \end{aligned}
 $$
