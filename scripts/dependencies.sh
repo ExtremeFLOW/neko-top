@@ -567,10 +567,10 @@ function find_gmsh2nek() {
     elif [ -x "$NEKO_DIR/bin/gmsh2nek" ]; then
         export gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
     elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
-        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        tmp_dir=$(pwd)
         cd $NEKO_DIR/contrib/gmsh2nek
         ./compile.sh
-        cd $CURRENT_DIR
+        cd $tmp_dir
         export gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
     else
         error "gmsh2nek not found."
