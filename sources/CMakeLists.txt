@@ -9,6 +9,26 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
 
 add_library(neko-top)
 
+# ............................................................................ #
+# Enable devices
+
+pkg_get_variable(DEVICE_TYPE neko backend)
+if (DEVICE_TYPE STREQUAL "CUDA")
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
+
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+elseif(NOT DEVICE_TYPE STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
+endif()
+
+# ============================================================================ #
+# Define the library sources and targets
+
 # Add our partial libraries to the build.
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
@@ -17,8 +37,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 
-# ============================================================================ #
-# Define the library sources and targets
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90

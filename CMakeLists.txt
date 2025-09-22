@@ -155,23 +155,6 @@ if (NOT compiler_flags_found)
         "${CMAKE_Fortran_COMPILER_ID}.")
 endif()
 
-# ............................................................................ #
-# Enable devices
-
-pkg_get_variable(DEVICE_TYPE neko backend)
-if (DEVICE_TYPE STREQUAL "CUDA")
-    enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA=1)
-elseif(DEVICE_TYPE STREQUAL "HIP")
-    enable_language(HIP)
-    add_compile_definitions(HAVE_HIP=1)
-
-    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
-
-elseif(NOT DEVICE_TYPE STREQUAL "CPU")
-    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
-endif()
-
 # ============================================================================ #
 # Setup the Neko-TOP library
 # ============================================================================ #
