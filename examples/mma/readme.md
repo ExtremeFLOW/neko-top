@@ -30,7 +30,7 @@ For simplicity, in this file, we use `des%values` instead of `des%values%x`. (Pl
 Minimize the mean squared difference between the design variable at each mesh node and the node’s physical coordinate:
 
 $$
-f(\mathbf{x}) = \frac{1}{n} \sum_{j=1}^{n} (\texttt{des.values}(j) -\texttt{des.x_coord}(j))^2
+f(\mathbf{x}) = \frac{1}{n} \sum_{j=1}^{n} (\texttt{des.values}(j) -\texttt{des.x}(j))^2
 $$
 
 where:
