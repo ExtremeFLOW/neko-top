@@ -193,8 +193,6 @@ contains
     logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
     integer :: n_GL, nel
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
