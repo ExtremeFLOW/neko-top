@@ -149,7 +149,7 @@ if [ ! -d $MAIN_DIR/build ]; then
 fi
 
 # Clean the build directory if the clean flag is set
-cmake --build $MAIN_DIR/build --parallel
+cmake --build $MAIN_DIR/build
 
 # ============================================================================ #
 # Print the status of the build

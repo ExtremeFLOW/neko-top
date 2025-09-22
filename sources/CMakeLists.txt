@@ -66,7 +66,6 @@ target_sources(neko-top
 # ============================================================================ #
 # Specify compile options
 
-add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 target_include_directories(neko-top PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -87,6 +86,8 @@ target_link_libraries(neko-top
 
 # ============================================================================ #
 # Specify installation instructions
+
+add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 
 # Install the neko-top library and its modules.
 # These should adhere to the CMake installation conventions.

@@ -128,8 +128,7 @@ function find_gslib() {
             GSLIB_DIR="$(realpath $1)"
         fi
     else
-        export GSLIB_DIR=""
-        return
+        GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -425,7 +424,17 @@ function find_neko() {
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
-            ./configure --prefix="$(realpath ./)" $FEATURES
+            ./configure --prefix="$(realpath ./)" $FEATURES \
+                FC=$FC \
+                MPIFC=$MPIFC \
+                FCFLAGS="$NEKO_FCFLAGS" \
+                CC=$CC \
+                MPICC=$MPICC \
+                MPICXX=$MPICXX \
+                CFLAGS="$NEKO_CFLAGS" \
+                HIPCC=$HIPCC \
+                HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
+                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
 
         # Update compile dependencies if makedepf90 is installed
