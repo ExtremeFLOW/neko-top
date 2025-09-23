@@ -155,20 +155,13 @@ contains
 
   end subroutine design_3dto1d_update_design
 
-
-  ! subroutine design_3dto1d_write(this, idx)
-  !   class(design_3dto1d_t), intent(inout) :: this
-  !   integer, intent(in) :: idx
-  !   if (pe_rank == 0) print *, "write is not supported yet for design_3dto1d_t"
-  ! end subroutine design_3dto1d_write
-
   subroutine design_3dto1d_write(this, idx)
     class(design_3dto1d_t), intent(inout) :: this
     integer, intent(in) :: idx
     
     character(len=100) :: filename
     integer :: i, iunit, ierr
-    real(rp) :: Le, x_pos
+    real(rp) :: Le
     real(rp), allocatable :: global_values(:)
     real(rp), allocatable :: global_x(:)
     integer :: global_size, local_size
