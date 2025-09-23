@@ -86,6 +86,11 @@ module minimum_dissipation_objective
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use interpolation, only: interpolator_t
+  use space, only: space_t, GL
+  use coefs, only: coef_t
+  use vector, only: vector_t
+  use vector_math, only: vector_col3, vector_addcol3
   implicit none
   private
 
@@ -101,7 +106,9 @@ module minimum_dissipation_objective
      !> Pointer to the w field.
      type(field_t), pointer :: w => null()
      !> Pointer to the coefficient field.
-     type(coef_t), pointer :: c_Xh => null()
+     type(coef_t), pointer :: c_Xh_GLL => null()
+     !> The original space used in the simulation
+     type(space_t), pointer :: Xh_GLL => null()
      !> Pointer to adjoint u field.
      type(field_t), pointer :: adjoint_u => null()
      !> Pointer to adjoint v field.
@@ -110,6 +117,18 @@ module minimum_dissipation_objective
      type(field_t), pointer :: adjoint_w => null()
      !> Volume of the objective domain.
      real(kind=rp) :: volume
+
+     ! ---- everything for GL ----
+     !> The additional higher-order space used in dealiasing
+     type(space_t), pointer :: Xh_GL
+     !> cfs of the higher-order space
+     type(coef_t), pointer :: c_Xh_GL
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t), pointer :: GLL_to_GL
+     !> If dealiasing should be applied
+     logical :: dealias
+     !> work arrays
+     type(vector_t) :: objective_field_GL, fld_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -145,12 +164,15 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
+    logical :: dealias
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
+    call json_get_or_default(json, "dealias", dealias, .true.)
 
-    call this%init_from_attributes(design, simulation, weight, name, mask_name)
+    call this%init_from_attributes(design, simulation, weight, name, &
+    mask_name, dealias)
   end subroutine minimum_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -160,15 +182,18 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
+  !! @param dealias if over-integration should be applied to the objective.
   subroutine minimum_dissipation_init_attributes(this, design, simulation, &
-       weight, name, mask_name)
+       weight, name, mask_name, dealias)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
+    logical, intent(in) ::dealias
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
+    integer :: n_GL, nel
 
     call this%init_base(name, design%size(), weight, mask_name)
 
@@ -176,16 +201,16 @@ contains
     this%u => neko_field_registry%get_field('u')
     this%v => neko_field_registry%get_field('v')
     this%w => neko_field_registry%get_field('w')
-    this%c_Xh => simulation%fluid%c_Xh
+    this%c_Xh_GLL => simulation%fluid%c_Xh
     this%adjoint_u => neko_field_registry%get_field('u_adj')
     this%adjoint_v => neko_field_registry%get_field('v_adj')
     this%adjoint_w => neko_field_registry%get_field('w_adj')
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
-       this%volume = compute_masked_volume(this%mask, this%c_Xh)
+       this%volume = compute_masked_volume(this%mask, this%c_Xh_GLL)
     else
-       this%volume = this%c_Xh%volume
+       this%volume = this%c_Xh_GLL%volume
     end if
 
     ! you will need to init this!
@@ -197,13 +222,33 @@ contains
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%volume)
+         this%c_Xh_GLL, this%volume)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
     type is (adjoint_fluid_pnpn_t)
        call f%source_term%add_source_term(adjoint_forcing)
     end select
+
+    this%dealias = dealias
+    ! GLL
+    this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
+    this%Xh_GLL => this%c_Xh_GLL%Xh
+
+    ! GL
+    this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+
+    ! GLL to GL
+    this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
+
+    if (this%dealias) then
+       ! allocate work arrays for dealiasing
+       nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+       call this%objective_field_GL%init(n_GL)
+       call this%fld_GL%init(n_GL)
+    end if
 
   end subroutine minimum_dissipation_init_attributes
 
@@ -215,7 +260,7 @@ contains
     if (associated(this%u)) nullify(this%u)
     if (associated(this%v)) nullify(this%v)
     if (associated(this%w)) nullify(this%w)
-    if (associated(this%c_Xh)) nullify(this%c_Xh)
+    if (associated(this%c_Xh_GLL)) nullify(this%c_Xh_GLL)
 
     if (associated(this%adjoint_u)) nullify(this%adjoint_u)
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
@@ -232,7 +277,7 @@ contains
     type(field_t), pointer :: wo1, wo2, wo3, work
     type(field_t), pointer :: objective_field
     integer :: temp_indices(5)
-    integer n
+    integer n, n_GL, nel
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1))
     call neko_scratch_registry%request_field(wo2, temp_indices(2))
@@ -240,18 +285,58 @@ contains
     call neko_scratch_registry%request_field(objective_field, temp_indices(4))
     call neko_scratch_registry%request_field(work, temp_indices(5))
 
+    if (this%dealias) then
+        nel = this%c_Xh_GLL%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
+    call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh_GLL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo1%x, nel, this%Xh_GL)
+       call vector_col3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo2%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo3%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+
+       call grad(wo1%x, wo2%x, wo3%x, this%v%x, this%c_Xh_GLL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo1%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo2%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo3%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+
+       call grad(wo1%x, wo2%x, wo3%x, this%w%x, this%c_Xh_GLL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo1%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo2%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(this%fld_GL%x, wo3%x, nel, this%Xh_GL)
+       call vector_addcol3(this%objective_field_GL, this%fld_GL, this%fld_GL)
+
+       ! integrate the field (on GL)
+    if (this%has_mask) then
+       call neko_error("dealiasing not implemented for masked objectives")
+    else
+       if (neko_bcknd_device .eq. 1) then
+          this%value = device_glsc2(this%objective_field_GL%x_d, &
+               this%c_Xh_GL%b_d, n_GL)
+       else
+          this%value = glsc2(this%objective_field_GL%x, this%c_Xh_GL%b, n_GL)
+       end if
+    end if
+    else
     ! update_value the objective function.
-    call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh_GLL)
+    
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%v%x, this%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%v%x, this%c_Xh_GLL)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    call grad(wo1%x, wo2%x, wo3%x, this%w%x, this%c_Xh)
+    call grad(wo1%x, wo2%x, wo3%x, this%w%x, this%c_Xh_GLL)
     call field_addcol3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
@@ -264,18 +349,19 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
+          this%value = device_glsc2(work%x_d, this%c_xh_GLL%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%c_Xh_GLL%b, &
                n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%c_Xh%b_d, n)
+               this%c_Xh_GLL%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%c_Xh_GLL%b, n)
        end if
+    end if
     end if
 
     this%value = this%value * 0.5_rp / this%volume
