@@ -425,15 +425,9 @@ function find_neko() {
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES \
-                FC=$FC \
-                MPIFC=$MPIFC \
-                FCFLAGS="$NEKO_FCFLAGS" \
-                CC=$CC \
-                MPICC=$MPICC \
-                MPICXX=$MPICXX \
-                CFLAGS="$NEKO_CFLAGS" \
-                HIPCC=$HIPCC \
-                HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
+                FC="$FC" MPIFC="$MPIFC" FCFLAGS="$NEKO_FCFLAGS" \
+                CC="$CC" MPICC="$MPICC" MPICXX="$MPICXX" CFLAGS="$NEKO_CFLAGS" \
+                HIPCC="$HIPCC" HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
 
