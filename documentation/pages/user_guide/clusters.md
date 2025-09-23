@@ -28,18 +28,28 @@ The `prepare.env` file should contain the following lines:
 ```bash
 #!/bin/bash
 
-# Load the required modules
-module load LUMI/24.03 partition/C # Load the LUMI module and the partition
-module load PrgEnv-gnu             # Load desired programming environment
-module load cray-libsci buildtools # Note: Support for BLAS, LAPACK and cmake
+# Load modules
+ml CrayEnv PrgEnv-cray buildtools cray-mpich 2> /dev/null
 
-# Assign the compiler environment variables
-export MPIFC=$(which ftn)
-export MPICXX=$(which CC)
-export MPICC=$(which cc)
-export FC=$(which ftn)
-export CXX=$(which CC)
-export CC=$(which cc)
+export MPIFC=ftn
+export MPICC=cc
+export MPICXX=CC
+export FC=ftn
+export CC=cc
+
+export NEKO_CFLAGS="-O3"
+export NEKO_FCFLAGS="-O2 -m4"
+
+if [ "$DEVICE_TYPE" == "HIP" ]; then
+    # Load GPU Specific modules
+    ml craype-x86-trento craype-accel-amd-gfx90a rocm 2> /dev/null
+
+    HIP_DIR=${ROCM_PATH}
+    export HIPCC=hipcc
+    export NEKO_HIPCC_FLAGS="-O3 --offload-arch=gfx90a"
+    export NEKO_CONFIG_FLAGS=(--enable-device-mpi)
+    export MPICH_GPU_SUPPORT_ENABLED=1
+fi
 ```
 
 ### Execution of examples

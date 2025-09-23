@@ -137,6 +137,7 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
+pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
 # Setup PFUnit
@@ -153,23 +154,6 @@ include(${CMAKE_Fortran_COMPILER_ID} OPTIONAL RESULT_VARIABLE compiler_flags_fou
 if (NOT compiler_flags_found)
     message(WARNING "No specific compiler flags found for "
         "${CMAKE_Fortran_COMPILER_ID}.")
-endif()
-
-# ............................................................................ #
-# Enable devices
-
-pkg_get_variable(DEVICE_TYPE neko backend)
-if (DEVICE_TYPE STREQUAL "CUDA")
-    enable_language(CUDA)
-    add_compile_definitions(HAVE_CUDA=1)
-elseif(DEVICE_TYPE STREQUAL "HIP")
-    enable_language(HIP)
-    add_compile_definitions(HAVE_HIP=1)
-
-    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
-
-elseif(NOT DEVICE_TYPE STREQUAL "CPU")
-    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
 endif()
 
 # ============================================================================ #

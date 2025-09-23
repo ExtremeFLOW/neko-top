@@ -7,6 +7,25 @@
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
     CACHE PATH "Fortran module directory")
 
+# ............................................................................ #
+# Enable devices
+
+if (${DEVICE_TYPE} STREQUAL "CUDA")
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
+elseif(${DEVICE_TYPE} STREQUAL "HIP")
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
+
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+elseif(NOT ${DEVICE_TYPE} STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
+endif()
+
+# ============================================================================ #
+# Define the library sources and targets
+
 add_library(neko-top)
 
 # Add our partial libraries to the build.
@@ -17,8 +36,6 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 
-# ============================================================================ #
-# Define the library sources and targets
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
@@ -66,7 +83,6 @@ target_sources(neko-top
 # ============================================================================ #
 # Specify compile options
 
-add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 target_include_directories(neko-top PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
@@ -87,6 +103,8 @@ target_link_libraries(neko-top
 
 # ============================================================================ #
 # Specify installation instructions
+
+add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
 
 # Install the neko-top library and its modules.
 # These should adhere to the CMake installation conventions.
