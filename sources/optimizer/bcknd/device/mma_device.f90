@@ -34,8 +34,8 @@ submodule (mma) mma_device
 
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
-       device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax, &
-       device_glsum, device_cmult2, device_pwmax
+       device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax2, &
+       device_glsum, device_cmult2, device_pwmax2
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
@@ -853,7 +853,7 @@ contains
     ! initialize lambda with an array of ones (change to this%c%x/2 if needed!)
     call device_cfill(lambda%x_d, 1.0_rp, this%m)
     call device_cmult2(dummy_m%x_d, this%c%x_d, 0.5_rp, this%m)
-    call device_pwmax(lambda%x_d, dummy_m%x_d, this%m)
+    call device_pwmax2(lambda%x_d, dummy_m%x_d, this%m)
 
     call device_cfill(mu%x_d, 1.0_rp, this%m)
     z = 0.0_rp
@@ -890,7 +890,7 @@ contains
          call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
          ! division by dd to avoid devision by 0 (in case this%d%x_d)
          call device_invcol2(y%x_d, dd%x_d, this%m)
-         call device_pwmax(y%x_d, zerom%x_d, this%m)
+         call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
          ! Comput the value of z that minimizes L_z for the current λ
          ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
@@ -1075,7 +1075,7 @@ contains
             call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
             ! division by dd to avoid devision by 0 (in case this%d%x_d)
             call device_invcol2(y%x_d, dd%x_d, this%m)
-            call device_pwmax(y%x_d, zerom%x_d, this%m)
+            call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
             ! Comput the value of z that minimizes L_z for the current λ
             ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
