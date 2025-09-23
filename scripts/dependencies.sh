@@ -129,6 +129,7 @@ function find_gslib() {
         fi
     else
         export GSLIB_DIR=""
+        return
     fi
 
     # Ensure GSLIB is installed, if not install it.
