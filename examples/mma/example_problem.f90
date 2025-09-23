@@ -122,7 +122,7 @@ contains
     call design%get_values(difference)
     call vector_sub2(difference, x_coordinate, design%size())
 
-	  call vector_cmult(difference , 2.0_rp / &
+    call vector_cmult(difference , 2.0_rp / &
          real(design%size_global(), kind=rp), design%size())
     this%sensitivity = difference
 

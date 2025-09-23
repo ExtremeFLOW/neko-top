@@ -42,14 +42,14 @@ module mma_optimizer
      type(mma_t) :: mma
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
-     !! (if auto_scale then constraint_value%x=scale else 
+     !! (if auto_scale then constraint_value%x=scale else
      !! constraint_value%x=scale*constraint_value%x)
      !! When auto_scale is true, we use an adaptable scale for
-     !! constraint_value%x and constraint_sensitivities%x 
+     !! constraint_value%x and constraint_sensitivities%x
      !! in every iteration (variable scale factors)
      real(kind=rp) :: scale
      logical :: auto_scale
-     
+
      ! when true, then we remove IO loggings for optimal performance
      logical :: performance
 
@@ -95,7 +95,7 @@ contains
     problem_header = problem%get_log_header()
     optimization_header = 'iter, ' // trim(problem_header) // &
          ', KKTmax, KKTnorm2, scaling factor'
-   !  call this%logger%set_header(trim(optimization_header))
+    !  call this%logger%set_header(trim(optimization_header))
 
     call design%get_values(x)
 
@@ -233,7 +233,7 @@ contains
        call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
 
-       
+
        if (.not. this%performance) then
           ! Stamp the i^th iteration
           call mma_logger_assemble_data(log_data, iter, objective_value, &

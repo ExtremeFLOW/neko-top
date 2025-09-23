@@ -46,7 +46,7 @@ module example_problem
 
   use mpi_f08, only: mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
   use comm, only: pe_rank, pe_size, neko_comm, mpi_real_precision
-  use vector_math, only:  vector_glsum, vector_cmult, vector_cadd, &
+  use vector_math, only: vector_glsum, vector_cmult, vector_cadd, &
        vector_col2, vector_invcol2, vector_copy
 
   implicit none
@@ -54,14 +54,14 @@ module example_problem
 
   ! ========================================================================== !
   ! Global beam parameters
-  real(rp), public :: L_total   = 2.0_rp      ! total length (m)
-  real(rp), public :: b         = 0.02_rp     ! width (m)
-  real(rp), public :: rho       = 7800.0_rp   ! density (kg/m3)
-  real(rp), public :: E         = 210.0e9_rp  ! Young's modulus (Pa)
-  real(rp), public :: P         = 1000.0_rp   ! tip load (N)
-  real(rp), public :: h_min     = 0.005_rp    ! min height (m)
-  real(rp), public :: h_max     = 0.05_rp     ! max height (m)
-  real(rp), public :: u_tip_max = 0.25_rp     ! max tip deflection (m)
+  real(rp), public :: L_total = 2.0_rp ! total length (m)
+  real(rp), public :: b = 0.02_rp ! width (m)
+  real(rp), public :: rho = 7800.0_rp ! density (kg/m3)
+  real(rp), public :: E = 210.0e9_rp ! Young's modulus (Pa)
+  real(rp), public :: P = 1000.0_rp ! tip load (N)
+  real(rp), public :: h_min = 0.005_rp ! min height (m)
+  real(rp), public :: h_max = 0.05_rp ! max height (m)
+  real(rp), public :: u_tip_max = 0.25_rp ! max tip deflection (m)
   ! ========================================================================== !
   ! Objective: tip deflection
   type, public, extends(objective_t) :: mma_obj
@@ -90,10 +90,10 @@ module example_problem
   ! ========================================================================== !
   ! Stress constraint for specific global elements
   type, public, extends(constraint_t) :: stress_con
-    integer :: global_element_index ! Global element index this constraint 
-    real(rp) :: sigma_max           ! Max stress for this element
-    logical :: is_local             ! If this element is on current MPI-rank
-    integer :: local_index          ! Local index if is_local
+     integer :: global_element_index ! Global element index this constraint
+     real(rp) :: sigma_max ! Max stress for this element
+     logical :: is_local ! If this element is on current MPI-rank
+     integer :: local_index ! Local index if is_local
    contains
      procedure, public, pass(this) :: init_stress_con
      procedure, public, pass(this) :: free => stress_con_free
@@ -158,28 +158,28 @@ contains
     ! Build elementwise Δ_k on host (geometry-related, not design-related)
     allocate(Delta(n))
     do k = 1, n
-      Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
-                  (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
+       Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+            (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
     end do
 
     call I%init(n)
 
     ! Now compute I_k = b * h^3 / 12
-    call vector_copy(I, h, n)             ! I = h
-    call vector_col2(I, h, n)             ! I = h^2
-    call vector_col2(I, h, n)             ! I = h^3
-    call vector_cmult(I, b/12.0_rp, n)    ! I = b * h^3 / 12
+    call vector_copy(I, h, n) ! I = h
+    call vector_col2(I, h, n) ! I = h^2
+    call vector_col2(I, h, n) ! I = h^3
+    call vector_cmult(I, b/12.0_rp, n) ! I = b * h^3 / 12
 
     ! contrib = Δ / (E * I)
     call contrib%init(n)
-    
-    contrib%x = Delta                    ! copy Δ into contrib
+
+    contrib%x = Delta ! copy Δ into contrib
     if (neko_bcknd_device .eq. 1) then
        call device_memcpy(contrib%x,contrib%x_d, n, &
             HOST_TO_DEVICE, sync = .true.)
     end if
-    call vector_invcol2(contrib, I, n)   ! contrib = contrib / I
-    call vector_cmult(contrib, P/E, n)   ! contrib = contrib * P / E
+    call vector_invcol2(contrib, I, n) ! contrib = contrib / I
+    call vector_cmult(contrib, P/E, n) ! contrib = contrib * P / E
 
     ! Global sum
     u_global = vector_glsum(contrib, n)
@@ -191,7 +191,7 @@ contains
 
     deallocate(Delta)
   end subroutine mma_obj_update_value
- 
+
 
   subroutine mma_obj_update_sensitivity(this, design)
     class(mma_obj), intent(inout) :: this
@@ -221,19 +221,19 @@ contains
     ! Build elementwise Δ_k
     allocate(Delta(n))
     do k = 1, n
-      Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
-                  (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
+       Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+            (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
     end do
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
     end if
 
-    ! Compute sensitivity: 
+    ! Compute sensitivity:
     ! dg/dx = P * Δ * (-36.0 / (E * b * h^4)) * (h_max - h_min)
     do k = 1, n
-      sensitivity%x(k) = P * Delta(k) * (-36.0_rp) / &
-           (E * b * h%x(k)**4) * (h_max - h_min)
+       sensitivity%x(k) = P * Delta(k) * (-36.0_rp) / &
+            (E * b * h%x(k)**4) * (h_max - h_min)
     end do
     if (neko_bcknd_device .eq. 1) then
        call device_memcpy(sensitivity%x,sensitivity%x_d, n, &
@@ -242,7 +242,7 @@ contains
 
     ! Normalize by u_tip_max
     call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
-    
+
     call vector_copy(this%sensitivity, sensitivity, n)
 
     deallocate(Delta)
@@ -279,22 +279,22 @@ contains
   subroutine beamweight_update_value(this, design)
     class(beamweight_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: design_values     !h = (h_max-h_min) x + h_min
-    integer :: ierr, n, k, offset
-    real(rp) :: Le, local_mass, global_mass
+    type(vector_t) :: design_values
+    integer :: n
+    real(rp) :: Le, global_mass
 
     ! Get local design values
     call design%get_values(design_values)
     n = design%size()
 
-    ! Project design variables to physical height
+    ! Project design variables to physical height !h = (h_max-h_min) x + h_min
     call vector_cmult(design_values, (h_max - h_min) )
     call vector_cadd(design_values, h_min)
 
     ! Global element length
     Le = L_total / real(design%size_global(), kind=rp)
 
-    global_mass =  rho * b * Le * vector_glsum(design_values, n)
+    global_mass = rho * b * Le * vector_glsum(design_values, n)
 
     this%value = global_mass
 
@@ -327,28 +327,26 @@ contains
     class(design_t), intent(in) :: design
     integer, intent(in) :: global_index
     real(rp), intent(in) :: sigma_max_value
-    
-    integer :: ierr, n, offset, local_offset
-    
-    call this%init_base(name, design%size())  ! 1 constraint per object
-    
+
+    integer :: ierr, n, offset
+
+    call this%init_base(name, design%size()) ! 1 constraint per object
+
     this%global_element_index = global_index
     this%sigma_max = sigma_max_value
-    
+
     ! Get MPI distribution info
     n = design%size()
     call MPI_Exscan(n, offset, 1, MPI_INTEGER, MPI_SUM, neko_comm, ierr)
     if (pe_rank == 0) offset = 0
-    
+
     ! Check if this global element is on our rank
     this%is_local = (global_index > offset .and. global_index <= offset + n)
     if (this%is_local) then
-      this%local_index = global_index - offset
+       this%local_index = global_index - offset
     else
-      this%local_index = -1
+       this%local_index = -1
     endif
-    ! print *, "rank=", pe_rank, "global_index=", global_index, "this%is_local=", this%is_local, &
-    !      "this%local_index =", this%local_index 
   end subroutine init_stress_con
 
   subroutine stress_con_free(this)
@@ -361,7 +359,7 @@ contains
     class(design_t), intent(in) :: design
 
     type(vector_t) :: h
-    integer :: ierr, n, offset
+    integer :: ierr, n
     real(rp) :: Le, x_e, I_e, c_e, M_e, sigma_e
     real(rp) :: global_value
 
@@ -403,40 +401,40 @@ contains
     ! Sum across all MPI ranks (only one rank will have non-zero value)
     call MPI_Allreduce(this%value, global_value, 1, mpi_real_precision, &
          MPI_SUM, neko_comm, ierr)
-    
+
     this%value = global_value
   end subroutine stress_con_update_value
 
   subroutine stress_con_update_sensitivity(this, design)
     class(stress_con), intent(inout) :: this
     class(design_t), intent(in) :: design
-    
+
     type(vector_t) :: h
-    integer :: ierr, n
+    integer :: n
     real(rp) :: Le, x_e, I_e, c_e, M_e, dsigma_dh
     real(rp), allocatable :: local_sensitivity(:)
-    
+
     ! Initialize local sensitivity to zero
     if (allocated(local_sensitivity)) deallocate(local_sensitivity)
     allocate(local_sensitivity(design%size_global()))
     local_sensitivity = 0.0_rp
-    
+
     if (this%is_local) then
        ! This element is on our rank
        ! Local design values
        call design%get_values(h)
        n = design%size()
-      
+
        ! Project design variables to physical height
        call vector_cmult(h, (h_max - h_min), n)
        call vector_cadd(h, h_min, n)
-      
+
        ! Global element length
        Le = L_total / real(design%size_global(), kind=rp)
-      
+
        ! Start coordinate of this element
        x_e = Le * real(this%global_element_index - 1, rp)
-      
+
        ! Section properties
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
@@ -446,17 +444,17 @@ contains
 
        ! Bending moment at this element
        M_e = P * (L_total - x_e)
-      
-      ! Sensitivity wrt h
+
+       ! Sensitivity wrt h
        dsigma_dh = M_e * ( (1.0_rp / (2.0_rp * I_e)) - &
             (c_e * 3.0_rp * b * h%x(this%local_index)**2 / 12.0_rp) / (I_e**2) )
-      
+
        ! Chain rule for normalized variable
        local_sensitivity(this%local_index) = dsigma_dh * &
             (h_max - h_min) / this%sigma_max
     endif
-    
-    ! If the constraint is not local we dont need its sensitivity on the 
+
+    ! If the constraint is not local we dont need its sensitivity on the
     ! current node
     this%sensitivity%x = local_sensitivity
 

@@ -7,7 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init,  MPI_Wtime, MPI_COMM_WORLD
+  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
 
 
   use example_problem, only: mma_obj
@@ -114,11 +114,11 @@ program usrneko
 
   call obj%init_from_components("Objective", des)
 
-  
+
   ! update obj and sensitivities for the init design
   call obj%update_value(des)
   call obj%update_sensitivity(des)
-   
+
   if (pe_rank == 0) then
      print *, "objective value for the initial design=", obj%value
   end if

@@ -7,7 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init,  MPI_Wtime, MPI_COMM_WORLD, mpi_in_place, &
+  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD, mpi_in_place, &
        mpi_allreduce, mpi_exscan
 
 
@@ -91,7 +91,7 @@ program usrneko
   if (pe_rank == 0) then
      print *, "Global number of design variables=", des%size_global()
   end if
-   
+
   ! initialize the design
   call initdesign%init(des%size())
   initdesign = 0.5_rp
@@ -113,18 +113,18 @@ program usrneko
   allocate(stress_sigma_max(num_constraints))
   ! Add constraints on global indices
   call fill_constraint_indices(stress_global_indices, num_constraints, &
-       num_constraint_partitions, des%size_global())                                
+       num_constraint_partitions, des%size_global())
 
-  stress_sigma_max = 250e6_rp  ! Same max stress for all
-  
+  stress_sigma_max = 250e6_rp ! Same max stress for all
+
   allocate(stress_constraints(size(stress_global_indices)))
 
   call deflection%init_from_components("tip_deflection", des, 1.0_rp)
   call beamweight%init_from_components("beamweight", des, 1.0_rp)
-  
+
   ! Add each constraint to the problem
   do i = 1, size(stress_constraints)
-     write(index_str, '(I0)') stress_global_indices(i) 
+     write(index_str, '(I0)') stress_global_indices(i)
      call stress_constraints(i)%init_stress_con( &
           "stress_con_"//trim(index_str), &
           des, stress_global_indices(i), stress_sigma_max(i))
@@ -140,7 +140,7 @@ program usrneko
   if (pe_rank == 0) print *, "Constraints distribution complete!"
   if (pe_rank == 0) print *, "number of problem objectives=", &
        prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
-  
+
 
   ! -------------------------------------------------------------------------- !
   ! Perform finite difference validation
@@ -209,11 +209,11 @@ subroutine finite_difference_validation(des, k_test, delta)
   use design_3dto1d, only: design_3dto1d_t
   use num_types, only: rp
   use vector, only: vector_t
-  
+
   type(design_3dto1d_t), intent(in) :: des
   integer, intent(in) :: k_test
   real(rp), intent(in) :: delta
-  
+
   type(vector_t) :: designvec
   type(design_3dto1d_t) :: pert_design
   type(mma_obj) :: obj
@@ -221,25 +221,25 @@ subroutine finite_difference_validation(des, k_test, delta)
   real(rp) :: error, rel_error
   integer :: n, i, ierr
   real(rp), allocatable :: sensitivities(:)
-  
+
   ! Initialize objective
   call obj%init_from_components("test_obj", des, 1.0_rp)
-  
+
   ! Get original value and sensitivities
   call obj%update_value(des)
   call obj%update_sensitivity(des)
   f_original = obj%value
-  
+
   n = des%size()
   allocate(sensitivities(n))
   sensitivities = obj%sensitivity%x
-  
+
   ! Create perturbed design
   call pert_design%init_from_components(n)
   call designvec%init(n)
   call des%get_values(designvec)
   if (k_test >= 1 .and. k_test <= n) then
-    designvec%x(k_test) = designvec%x(k_test) + delta
+     designvec%x(k_test) = designvec%x(k_test) + delta
   endif
   call pert_design%update_design(designvec)
 
@@ -247,41 +247,41 @@ subroutine finite_difference_validation(des, k_test, delta)
   ! Compute perturbed value
   call obj%update_value(pert_design)
   f_perturbed = obj%value
-  
+
   ! Finite difference derivative
   fd_derivative = (f_perturbed - f_original) / delta
   analytical_derivative = sensitivities(k_test)
-  
+
   ! Calculate error
   error = abs(fd_derivative - analytical_derivative)
   if (abs(analytical_derivative) > 1e-12) then
-    rel_error = error / abs(analytical_derivative)
+     rel_error = error / abs(analytical_derivative)
   else
-    rel_error = error
+     rel_error = error
   endif
-  
+
   ! Output results
   if (pe_rank == 0) then
-    print *, "=============================================="
-    print *, "FINITE DIFFERENCE VALIDATION"
-    print *, "=============================================="
-    print *, "Test variable index:      ", k_test
-    print *, "Perturbation size (delta):", delta
-    print *, "Original function value:  ", f_original
-    print *, "Perturbed function value: ", f_perturbed
-    print *, "Finite difference deriv:  ", fd_derivative
-    print *, "Analytical derivative:    ", analytical_derivative
-    print *, "Absolute error:           ", error
-    print *, "Relative error:           ", rel_error
-    print *, "=============================================="
+     print *, "=============================================="
+     print *, "FINITE DIFFERENCE VALIDATION"
+     print *, "=============================================="
+     print *, "Test variable index:      ", k_test
+     print *, "Perturbation size (delta):", delta
+     print *, "Original function value:  ", f_original
+     print *, "Perturbed function value: ", f_perturbed
+     print *, "Finite difference deriv:  ", fd_derivative
+     print *, "Analytical derivative:    ", analytical_derivative
+     print *, "Absolute error:           ", error
+     print *, "Relative error:           ", rel_error
+     print *, "=============================================="
   endif
-  
+
   deallocate(sensitivities)
   call obj%free()
 end subroutine finite_difference_validation
 
 subroutine fill_constraint_indices(stress_global_indices, num_constraints, &
-                                   num_constraint_partitions, design_size)
+     num_constraint_partitions, design_size)
   use num_types, only: rp
   implicit none
 
@@ -296,41 +296,41 @@ subroutine fill_constraint_indices(stress_global_indices, num_constraints, &
 
   ! --- partitioning of constraints ---
   constraints_per_partition = num_constraints / num_constraint_partitions
-  remainder_constraints     = mod(num_constraints, num_constraint_partitions)
+  remainder_constraints = mod(num_constraints, num_constraint_partitions)
 
   ! --- partitioning of design variables ---
-  base_size     = design_size / num_constraint_partitions
+  base_size = design_size / num_constraint_partitions
   remainder_size = mod(design_size, num_constraint_partitions)
 
   idx = 1
   cum_start = 1
 
   do i = 1, num_constraint_partitions
-    ! how many constraints in this partition
-    if (i <= remainder_constraints) then
-      partition_constraints = constraints_per_partition + 1
-    else
-      partition_constraints = constraints_per_partition
-    endif
+     ! how many constraints in this partition
+     if (i <= remainder_constraints) then
+        partition_constraints = constraints_per_partition + 1
+     else
+        partition_constraints = constraints_per_partition
+     endif
 
-    ! how many design variables in this partition
-    if (i <= remainder_size) then
-      partition_size = base_size + 1
-    else
-      partition_size = base_size
-    endif
+     ! how many design variables in this partition
+     if (i <= remainder_size) then
+        partition_size = base_size + 1
+     else
+        partition_size = base_size
+     endif
 
-    partition_start = cum_start
-    partition_end   = partition_start + partition_size - 1
+     partition_start = cum_start
+     partition_end = partition_start + partition_size - 1
 
-    ! pick consecutive indices in this partition
-    do j = 1, partition_constraints
-      if (idx > num_constraints) exit
-      stress_global_indices(idx) = min(partition_start + (j-1), partition_end)
-      idx = idx + 1
-    end do
+     ! pick consecutive indices in this partition
+     do j = 1, partition_constraints
+        if (idx > num_constraints) exit
+        stress_global_indices(idx) = min(partition_start + (j-1), partition_end)
+        idx = idx + 1
+     end do
 
-    cum_start = partition_end + 1
+     cum_start = partition_end + 1
   end do
 
 end subroutine fill_constraint_indices

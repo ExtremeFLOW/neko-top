@@ -91,7 +91,7 @@ module simplefield_design
 
      !> Retrieve the design variables
      procedure, pass(this) :: get_values => design_simple_get_values
-     
+
      ! Overrides of base class deferred procedures
      procedure, pass(this) :: design_get_x => design_simple_get_x
      procedure, pass(this) :: design_get_y => design_simple_get_y
@@ -191,7 +191,7 @@ contains
     z = this%z_coord
   end subroutine design_simple_get_z
 
-  
+
 
   subroutine design_simple_update_design(this, values)
     class(simplefield_design_t), intent(inout) :: this
