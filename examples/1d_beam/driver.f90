@@ -7,8 +7,7 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD, mpi_in_place, &
-       mpi_allreduce, mpi_exscan
+  use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
 
 
   use example_problem, only: mma_obj, beamweight_obj, stress_con
@@ -22,8 +21,7 @@ program usrneko
   use matrix, only: matrix_t
 
   use comm, only: pe_rank, neko_comm
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy
 
   implicit none
 
@@ -203,8 +201,7 @@ end program usrneko
 ! ========================================================================== !
 
 subroutine finite_difference_validation(des, k_test, delta)
-  use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_DOUBLE_PRECISION
-  use comm, only: pe_rank, pe_size, neko_comm
+  use comm, only: pe_rank
   use example_problem, only: mma_obj
   use design_3dto1d, only: design_3dto1d_t
   use num_types, only: rp
@@ -219,7 +216,7 @@ subroutine finite_difference_validation(des, k_test, delta)
   type(mma_obj) :: obj
   real(rp) :: f_original, f_perturbed, fd_derivative, analytical_derivative
   real(rp) :: error, rel_error
-  integer :: n, i, ierr
+  integer :: n
   real(rp), allocatable :: sensitivities(:)
 
   ! Initialize objective
@@ -282,7 +279,6 @@ end subroutine finite_difference_validation
 
 subroutine fill_constraint_indices(stress_global_indices, num_constraints, &
      num_constraint_partitions, design_size)
-  use num_types, only: rp
   implicit none
 
   integer, intent(in) :: num_constraints, num_constraint_partitions, design_size
