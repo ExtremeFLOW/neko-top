@@ -425,7 +425,11 @@ function find_neko() {
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
-            ./configure --prefix="$(realpath ./)" $FEATURES
+            ./configure --prefix="$(realpath ./)" $FEATURES \
+                FC="$FC" MPIFC="$MPIFC" FCFLAGS="$NEKO_FCFLAGS" \
+                CC="$CC" MPICC="$MPICC" MPICXX="$MPICXX" CFLAGS="$NEKO_CFLAGS" \
+                HIPCC="$HIPCC" HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
+                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
 
         # Update compile dependencies if makedepf90 is installed
@@ -483,9 +487,9 @@ function find_cubit() {
     if command -v cubit 2>&1 1>/dev/null; then
         return
     elif command -v coreform_cubit 2>&1 1>/dev/null; then
-        alias cubit=$(command -v coreform_cubit)
+        export cubit=$(command -v coreform_cubit)
     elif command -v trelis 2>&1 1>/dev/null; then
-        alias cubit=$(command -v trelis)
+        export cubit=$(command -v trelis)
     else
         error "Cubit not found."
         error "Please ensure it is installed and available in the PATH."
@@ -502,7 +506,7 @@ function find_exo2nek() {
     if command -v exo2nek 2>&1 1>/dev/null; then
         return
     elif [ -x "$NEK5000_DIR/bin/exo2nek" ]; then
-        alias exo2nek="$NEK5000_DIR/bin/exo2nek"
+        export exo2nek="$NEK5000_DIR/bin/exo2nek"
     elif [ -x "$NEK5000_DIR/tools/maketools" ]; then
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
@@ -510,7 +514,7 @@ function find_exo2nek() {
 
         ./maketools exo2nek
         cd $CURRENT_DIR
-        alias exo2nek="$NEK5000_DIR/bin/exo2nek"
+        export exo2nek="$NEK5000_DIR/bin/exo2nek"
     else
         error "exo2nek not found."
         error "Please ensure it is installed and available in the PATH."
@@ -523,12 +527,13 @@ function find_exo2nek() {
 # Ensure Rea2Nbin is installed.
 function find_rea2nbin() {
     find_json_fortran $JSON_FORTRAN_DIR
+    find_hdf5 $HDF5_DIR
 
     # Check if rea2nbin is available
     if command -v rea2nbin 2>&1 1>/dev/null; then
         return
     elif [ -x "$NEKO_DIR/bin/rea2nbin" ]; then
-        alias rea2nbin="$NEKO_DIR/bin/rea2nbin"
+        export rea2nbin="$NEKO_DIR/bin/rea2nbin"
     else
         error "rea2nbin not found."
         error "Please ensure it is installed and available in the PATH."
@@ -555,13 +560,13 @@ function find_gmsh2nek() {
     if command -v gmsh2nek 2>&1 1>/dev/null; then
         return
     elif [ -x "$NEKO_DIR/bin/gmsh2nek" ]; then
-        alias gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
+        export gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
     elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR/contrib/gmsh2nek
         ./compile.sh
         cd $CURRENT_DIR
-        alias gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
+        export gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
     else
         error "gmsh2nek not found."
         error "Please ensure it is installed and available in the PATH."
