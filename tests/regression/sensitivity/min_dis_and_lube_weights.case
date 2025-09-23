@@ -63,7 +63,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-8,
+                "tol": 1e-10,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }

@@ -4,10 +4,10 @@ set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 # --------------------------------------------------------------------------- #
 # .case files to run in the regression suite (long-running)
 set(test_list
-    #"lube_term.case"
     "minimum_dissipation.case"
-    #"min_dis_and_lube.case"
-    #"min_dis_and_lube_weights.case"
+    "lube_term.case"
+    "min_dis_and_lube.case"
+    "min_dis_and_lube_weights.case"
     # "passive_scalar.case"  # enable when ready
 )
 
@@ -83,7 +83,7 @@ add_custom_target(
             ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     COMMAND ${CMAKE_COMMAND} -E env
             LD_LIBRARY_PATH="${neko_LD_LIBRARY_PATH}" PATH="${neko_PATH}"
-            ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
+            ./prepare.sh -N14 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 add_dependencies(reg_sensitivity_test_prepare reg_sensitivity_prepare_script)
@@ -113,6 +113,25 @@ endif()
 # --------------------------------------------------------------------------- #
 # Per-case setup and CTest entries
 foreach(case_file ${test_list})
+    # Copy matching reference CSV if it exists:
+    set(ref_src "${CMAKE_CURRENT_SOURCE_DIR}/ref_FD_check_${case_file}.csv")
+    set(ref_dst "${CMAKE_CURRENT_BINARY_DIR}/ref_FD_check_${case_file}.csv")
+
+    if(EXISTS "${ref_src}")
+        add_custom_target(
+            ${case_name}_ref_fd_reg ALL
+            COMMENT "Copying reference CSV for ${case_file}"
+            BYPRODUCTS "${ref_dst}"
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${ref_src}" "${ref_dst}"
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        )
+        # Ensure the prepare step brings these in before plotting/tests
+        add_dependencies(reg_sensitivity_test_prepare ${case_name}_ref_fd_reg)
+    else()
+        message(STATUS "No reference CSV found for ${case_file} (${ref_src})")
+    endif()
+
     # name without extension
     get_filename_component(case_name ${case_file} NAME_WE)
 
