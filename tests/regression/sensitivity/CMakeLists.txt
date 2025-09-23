@@ -3,12 +3,20 @@ set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 
 # --------------------------------------------------------------------------- #
 # .case files to run in the regression suite (long-running)
+# NOTE: 
+# These have all been commented out such that they don't run along side
+# the unit tests.
+# In order to test these one can uncomment the tests, run:
+# ./setup.sh -t
+# And then within the build directory run:
+# python plotter_FD_check.py
+# To compare against the reference values
 set(test_list
-    "minimum_dissipation.case"
-    "lube_term.case"
-    "min_dis_and_lube.case"
-    "min_dis_and_lube_weights.case"
-    # "passive_scalar.case"  # enable when ready
+    #"minimum_dissipation.case"
+    #"lube_term.case"
+    #"min_dis_and_lube.case"
+    #"min_dis_and_lube_weights.case"
+    # "passive_scalar.case"
 )
 
 # Common driver source (same as unit)
