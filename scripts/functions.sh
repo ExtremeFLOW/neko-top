@@ -27,6 +27,7 @@ function run {
     # Set up the environment and find neko
     prepare 2>error.log || return 1
     rm -fr error.log && touch error.log
+
     if [ -s ./error.log ]; then
         printf "ERROR: An error occured during preparation.\n"
         printf "See error.log for details.\n"
