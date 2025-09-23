@@ -134,9 +134,6 @@ contains
     call neko_case%fluid%ulag%set(neko_case%fluid%f_x)
     call neko_case%fluid%vlag%set(neko_case%fluid%f_x)
     call neko_case%fluid%wlag%set(neko_case%fluid%f_x)
-
-
-
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
