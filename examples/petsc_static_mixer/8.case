@@ -7,7 +7,7 @@
         "output_checkpoints": false,
         "time": {
             "variable_timestep": true,
-            "end_time": 30.0
+            "end_time": 0.01
         },
         "numerics": {
             "time_order": 3,
@@ -67,7 +67,7 @@
                             "cache_file": "data_local/petsc_static_mixer/cache_8_",
                             "distance_transform": {
                                 "type": "smooth_step",
-                                "value": 0.1
+                                "value": 0.5
                             }
                         }
                     ],

@@ -7,7 +7,7 @@
         "output_checkpoints": false,
         "time": {
             "variable_timestep": true,
-            "end_time": 30.0
+            "end_time": 0.01
         },
         "numerics": {
             "time_order": 3,
@@ -64,10 +64,10 @@
                             "type": "boundary_mesh",
                             "name": "data_local/petsc_static_mixer/Test_mixer_095_smooth.stl",
                             "cache": true,
-                            "cache_file": "data_local/petsc_static_mixer/cache_16_",
+                            "cache_file": "data_local/petsc_static_mixer/cache_16_05_",
                             "distance_transform": {
                                 "type": "smooth_step",
-                                "value": 0.1
+                                "value": 0.25
                             }
                         }
                     ],
