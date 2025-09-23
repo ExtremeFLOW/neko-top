@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/petsc_static_mixer/domain_32.nmsh", //
+        "mesh_file": "data_local/petsc_static_mixer/domain_4096.nmsh", //
         "output_directory": "fields",
         "output_boundary": true,
         "output_checkpoints": false,
@@ -21,11 +21,7 @@
             "output_value": 0.04,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    1.0,
-                    0.0,
-                    0.0
-                ]
+                "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -64,10 +60,10 @@
                             "type": "boundary_mesh",
                             "name": "data_local/petsc_static_mixer/Test_mixer_095_smooth.stl",
                             "cache": true,
-                            "cache_file": "data_local/petsc_static_mixer/cache_32_",
+                            "cache_file": "data_local/petsc_static_mixer/cache_4096_",
                             "distance_transform": {
                                 "type": "smooth_step",
-                                "value": 0.125
+                                "value": 0.0009765625
                             }
                         }
                     ],
