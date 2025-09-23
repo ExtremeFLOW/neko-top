@@ -263,6 +263,8 @@ contains
        call field_addcol3(work, this%v, this%adjoint_v)
        call field_addcol3(work, this%w, this%adjoint_w)
     end if
+    ! but negative
+    call field_cmult(work, -1.0_rp)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
