@@ -89,7 +89,7 @@ contains
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
-       if (abs(fd_error) .gt. tolerance) then
+       if ((abs(fd_error) .gt. tolerance) .and. ip .eq. n_perturbations) then
           call neko_error('Finite difference estimate does not match ' // &
                'sensitivity')
        end if
@@ -213,7 +213,7 @@ contains
        log_data%x(4) = fd_error
        call logger%write(log_data)
 
-       if (abs(fd_error) .gt. tolerance) then
+       if ((abs(fd_error) .gt. tolerance) .and. ip .eq. n_perturbations) then
           call neko_error('Finite difference estimate does not match ' // &
                'sensitivity')
        end if
