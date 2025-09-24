@@ -8,8 +8,7 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -112,7 +111,7 @@ contains
 
     call json_get(neko_case%params, &
          'case.fluid.initial_condition.type', string_val)
-    call json_extract_object(neko_case%params, 'case.fluid.initial_condition', &
+    call json_get(neko_case%params, 'case.fluid.initial_condition', &
          json_subdict)
 
     if (trim(string_val) .ne. 'user') then
@@ -137,7 +136,7 @@ contains
           ! we shouldn't fallback to the primal here.
           call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_extract_object(neko_case%params, &
+          call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition', json_subdict)
 
           !call neko_log%section("Adjoint scalar initial condition ")
@@ -164,7 +163,7 @@ contains
              call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
                   i, scalar_params)
              call json_get(scalar_params, 'initial_condition.type', string_val)
-             call json_extract_object(scalar_params, 'initial_condition', &
+             call json_get(scalar_params, 'initial_condition', &
                   json_subdict)
 
              if (trim(string_val) .ne. 'user') then

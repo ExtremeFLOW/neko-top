@@ -55,7 +55,7 @@ module adjoint_fluid_scheme_incompressible
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only: neko_field_registry
-  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default
   use json_module, only: json_file
   use scratch_registry, only: scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
@@ -323,7 +323,7 @@ contains
        json_key = json_key_fallback(params, &
             'case.adjoint_fluid.velocity_solver.preconditioner', &
             'case.fluid.velocity_solver.preconditioner')
-       call json_extract_object(params, json_key, json_subdict)
+       call json_get(params, json_key, json_subdict)
 
        json_key = json_key_fallback(params, &
             'case.adjoint_fluid.velocity_solver.absolute_tolerance', &
