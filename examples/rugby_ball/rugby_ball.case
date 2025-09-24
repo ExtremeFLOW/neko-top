@@ -7,10 +7,10 @@
         "output_boundary": true,
         "time": {
             "end_time": 0.1,
-            "timestep": 1e-4
+            "timestep": 1e-3
         },
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": false
         },
@@ -35,7 +35,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 1,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -109,11 +109,12 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.01
+                    "r": 0.05
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100,
+                    "q": 3
                 }
             ],
             "initial_distribution": {
@@ -125,20 +126,20 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
-            "tolerance": 1.0e-3,
+            "max_iterations": 50,
+            "tolerance": 1.0e-8,
             "mma": {
                 "max_iter": 100,
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 10.0,
+                "scale": 0.1,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 1000.0,
+                "c": 10000.0,
                 "d": 1.0
             }
         },
@@ -149,8 +150,7 @@
             },
             {
                 "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
+                "weight": 50.0,
             }
         ],
         "constraints": [
