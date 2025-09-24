@@ -7,6 +7,7 @@ set(test_list
     "volume_filtered.case"
     "ramp_down.case"
     "ramp_up.case"
+    "ramp_down_filtered.case"
 )
 
 # Path to the common driver source
