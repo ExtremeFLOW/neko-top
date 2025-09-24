@@ -57,8 +57,7 @@ module adjoint_scalar_scheme
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
   use field_registry, only : neko_field_registry
-  use json_utils, only : json_get, json_get_or_default, json_extract_item, &
-       json_extract_object
+  use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
        user_material_properties_intf
@@ -291,7 +290,7 @@ contains
 
     params_selected => json_key_fallback(params_adjoint, params_primal, &
          'solver.preconditioner')
-    call json_extract_object(params_selected, 'solver.preconditioner', &
+    call json_get(params_selected, 'solver.preconditioner', &
          precon_params)
 
     params_selected => json_key_fallback(params_adjoint, params_primal, &
