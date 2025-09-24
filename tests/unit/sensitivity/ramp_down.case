@@ -135,11 +135,6 @@
                 "is_max": false,
                 "mapping": [
                     {
-                        "type": "PDE_filter",
-                        "r": 0.2,
-                        "tol": 1.0e-25
-                    },
-                    {
                         "type": "RAMP",
                         "q": 3,
                         "f_max": 1.0,
