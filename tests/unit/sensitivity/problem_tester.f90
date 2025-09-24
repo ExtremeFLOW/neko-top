@@ -41,7 +41,7 @@ program minimum_dissipation_sensitivity
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
   real(kind=rp), parameter :: perturbations(8) = [ &
-       5e-1_rp, 1e-1_rp, 5e-2_rp, 1e-2_rp, 5e-3_rp, 1e-3_rp, 5e-4_rp, 1e-4_rp]
+       5e-3_rp, 1e-3_rp, 5e-4_rp, 1e-4_rp, 5e-5_rp, 1e-5_rp, 5e-6_rp, 1e-6_rp]
 
   type(vector_t) :: sensitivities
   type(matrix_t) :: constraint_sensitivity
