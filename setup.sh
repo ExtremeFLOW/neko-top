@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e # Exit with nonzero exit code if anything fails
+set -e # Exit with non-zero exit code if anything fails
 # ============================================================================ #
 # Print the help message
 function help() {
@@ -118,7 +118,7 @@ find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
-# Done settng up external dependencies
+# Done setting up external dependencies
 # ============================================================================ #
 # Compile the Neko-TOP and example codes.
 
