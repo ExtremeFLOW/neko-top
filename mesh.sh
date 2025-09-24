@@ -240,7 +240,7 @@ for input_file in $file_list; do
     "msh") msh2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     esac
 
-    cp *.nmsh -ft $OUTPUT_PATH/$input_dir
+    find -name "*.nmsh" -exec cp -t $OUTPUT_PATH/$input_dir {} \;
 
     cd $CURRENT_DIR
 
