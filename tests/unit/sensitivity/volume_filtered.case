@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 2.0,
-            "timestep": 1e-4
+            "end_time": 1.0e-4,
+            "timestep": 1.0e-4
         },
         "numerics": {
             "time_order": 3,
@@ -63,7 +63,7 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "tol": 1e-2,
+                "tol": 1e-6,
                 "compute_control": "tsteps",
                 "compute_value": 1
             }
@@ -92,16 +92,12 @@
         },
         "design": {
             "type": "brinkman",
-            // "mapping": [
-            // {
-            //     "type": "PDE_filter",
-            //     "r": 0.01
-            // },
-            // {
-            //     "type": "RAMP",
-            //     "f_max": 1000
-            // }
-            // ],
+             "mapping": [
+             {
+                 "type": "RAMP",
+                 "f_max": 1000
+             }
+             ],
             "initial_distribution": {
                 "type": "point_zone",
                 "base_value": 0.0,
@@ -129,22 +125,21 @@
             }
         },
         "objectives": [
-            {
-                "type": "minimum_dissipation",
-                "weight": 1.0
-            },
-            {
-                "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
-            }
+            // empty so we don't double up
         ],
         "constraints": [
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
                 "limit": 0.2,
-                "is_max": false
+                "is_max": false,
+                "mapping": [
+                    {
+                        "type": "PDE_filter",
+                        "r": 0.2,
+                        "tol": 1.0e-25
+                    }
+                ]
             }
         ]
     }

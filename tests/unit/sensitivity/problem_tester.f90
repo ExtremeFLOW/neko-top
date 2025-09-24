@@ -1,8 +1,8 @@
-program volume_sensitivity
+program minimum_dissipation_sensitivity
 
   use simulation_m, only: simulation_t
   use brinkman_design, only: brinkman_design_t
-  use volume_constraint, only: volume_constraint_t
+  use problem, only : problem_t
 
   ! Standard modules shared by most of our tests
   use json_module, only: json_file
@@ -19,7 +19,7 @@ program volume_sensitivity
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp
+  use math, only: abscmp, copy
   use sensitivity, only: compute_sensitivity
   implicit none
 
@@ -35,8 +35,8 @@ program volume_sensitivity
   type(simulation_t) :: sim
   !> The design type
   type(brinkman_design_t) :: des
-  !> The object to be tested
-  type(volume_constraint_t) :: object
+  !> The problem type
+  type(problem_t) :: prob
 
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
@@ -44,8 +44,13 @@ program volume_sensitivity
        5e-3_rp, 1e-3_rp, 5e-4_rp, 1e-4_rp, 5e-5_rp, 1e-5_rp, 5e-6_rp, 1e-6_rp]
 
   type(vector_t) :: sensitivities
+  type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
+
+  ! True => testing an objective, F => testing a constraint
+  logical :: is_objective
+  character(len=12) :: nobj_str, ncon_str
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
@@ -69,23 +74,47 @@ program volume_sensitivity
 
   call sim%init(parameters)
   call des%init(design_parameters, sim)
+  call prob%init(parameters, des, sim)
 
-  ! Initialize our constraint object
-  call object%init_from_components(des, sim, &
-       "Volume", "optimization_domain", is_max = .true., limit = 0.2_rp)
+  ! -------------------------------------------------------------------------- !
+  ! Determine if objective or constraint
+  if ((prob%get_n_objectives() .gt. 0) .and. &
+       (prob%get_n_constraints() .eq. 0)) then
+     is_objective = .true.
+  else if (prob%get_n_constraints() .eq. 1) then
+     ! note we always have a dummy objective
+     is_objective = .false.
+  else
+     write(nobj_str, '(I0)') prob%get_n_objectives()
+     write(ncon_str, '(I0)') prob%get_n_constraints()
+     call neko_error("Specify a) a single constraint b) multiple " // &
+          "objectives. You have" // nobj_str // &
+          "objectives and " // ncon_str // " constraints.")
+  end if
 
   ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
 
-  call sim%run_forward()
-  call object%update_value(des)
-  call sim%run_backward()
-  call object%update_sensitivity(des)
+  call prob%compute(des, sim)
+  call prob%compute_sensitivity(des, sim)
+  if (is_objective) then
+     call des%get_sensitivity(sensitivities)
+  else
+     call prob%get_constraint_sensitivities(constraint_sensitivity)
+     call sensitivities%init(constraint_sensitivity%size())
+     call copy(sensitivities%x, constraint_sensitivity%x, &
+          constraint_sensitivity%size())
+  end if
+
+  call des%write(1)
+  ! --------------------------------------
+  ! Reset the simulation
   call sim%reset()
-  call object%get_sensitivity(sensitivities)
+
   if (NEKO_BCKND_DEVICE .eq. 1) then
-     call device_memcpy(sensitivities%x, sensitivities%x_d, &
-          sensitivities%size(), DEVICE_TO_HOST, .true.)
+     call device_memcpy(sensitivities%x, &
+          sensitivities%x_d, sensitivities%size(), &
+          DEVICE_TO_HOST, .true.)
   end if
 
   i_max = maxloc(abs(sensitivities%x), dim=1)
@@ -94,14 +123,14 @@ program volume_sensitivity
   ! Loop over the perturbations and compare the finite difference estimate with
   ! the sensitivity computed by our method.
 
-  call compute_sensitivity(object, sim, des, &
-       sensitivities, i_max, perturbations, tolerance)
+  call compute_sensitivity(prob, sim, des, sensitivities, &
+       i_max, perturbations, tolerance, trim(parameter_file), is_objective)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call object%free()
+  call prob%free()
   call des%free()
   call sim%free()
 
-end program volume_sensitivity
+end program minimum_dissipation_sensitivity
