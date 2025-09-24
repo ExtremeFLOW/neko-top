@@ -24,6 +24,6 @@ More information regarding objectives and constraints can be found in
 
 The following depicts the optimization history for various volume constraints
 
-![Design field.](rugby_ball.gif)
+![Design field.](/documentation/images/rugby_ball.gif)
 
-![Convergence history.](rugby_ball_convergence_history.png)
+![Convergence history.](/documentation/images/rugby_ball_convergence_history.png)
