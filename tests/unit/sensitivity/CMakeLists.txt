@@ -6,7 +6,10 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 # Define the list of sensitivity tests
 # each of these should be a custom driver.
 set(test_list
-    "volume.f90"
+    "volume.case"
+    "volume_filtered.case"
+    "ramp_down.case"
+    "ramp_up.case"
 )
 
 # ============================================================================ #
