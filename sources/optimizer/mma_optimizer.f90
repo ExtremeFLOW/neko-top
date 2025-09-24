@@ -6,7 +6,7 @@ module mma_optimizer
   use num_types, only: rp
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
@@ -98,7 +98,7 @@ contains
        print *, "Initializing mma_optimizer with steady_state_problem_t."
     end if
 
-    call json_extract_object(parameters, "optimization.solver", &
+    call json_get(parameters, "optimization.solver", &
          solver_parameters)
     call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)

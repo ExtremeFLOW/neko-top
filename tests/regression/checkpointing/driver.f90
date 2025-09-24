@@ -16,7 +16,7 @@ program checkpointing_test
   use math, only: abscmp, NEKO_EPS
   use comm, only: pe_rank
   use mpi_f08, only: MPI_Init, MPI_Wtime
-  use json_utils, only: json_extract_object
+  use json_utils, only: json_get
   implicit none
 
   ! JSON related arguments
@@ -74,7 +74,7 @@ program checkpointing_test
 
   ! Read the parameters file
   parameters = json_read_file(trim(parameter_file))
-  call json_extract_object(parameters, 'optimization.design', design_parameters)
+  call json_get(parameters, 'optimization.design', design_parameters)
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
