@@ -17,9 +17,10 @@ contains
   !!
   !! @param[inout] s Scalar field
   !! @param[inout] split_value
-  subroutine scalar_z_split_ic(s, split_value)
+  subroutine scalar_z_split_ic(s, split_value, value_below, value_above)
     type(field_t), intent(inout) :: s
     real(kind=rp), intent(in) :: split_value
+    real(kind=rp), intent(in) :: value_below, value_above
 
     real(kind=rp) :: z_value
     integer :: i
@@ -27,10 +28,10 @@ contains
     do i = 1, s%dof%size()
        z_value = s%dof%z(i, 1, 1, 1)
 
-       if (z_value .gt. 0.0_rp) then
-          s%x(i, 1, 1, 1) = 0.0_rp
+       if (z_value .gt. split_value) then
+          s%x(i, 1, 1, 1) = value_above
        else
-          s%x(i, 1, 1, 1) = 1.0_rp
+          s%x(i, 1, 1, 1) = value_below
        end if
 
     end do
