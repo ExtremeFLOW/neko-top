@@ -3,9 +3,8 @@
     "case": {
         "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
         "output_directory": "fields",
-        "output_boundary": true,
+        "output_boundary": false,
         "output_checkpoints": false,
-        "strict_convergence": true,
         "time": {
             "end_time": 30.0,
             "variable_timestep": true
@@ -20,6 +19,7 @@
             "Re": 1000.0,
             "output_control": "simulationtime",
             "output_value": 0.04,
+            "strict_convergence": true,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 1.0, 0.0, 0.0 ]
