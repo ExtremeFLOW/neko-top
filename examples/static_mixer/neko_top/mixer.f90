@@ -18,13 +18,15 @@ contains
 
     type(field_t), pointer :: s
 
+    if (scheme_name .ne. 'temperature') return
+
     ! See scalar.name in the case file, makes sure that we only
     ! run this for the scalar field.
     if (scheme_name .ne. 'temperature') return
 
     s => fields%items(1)%ptr
+    call scalar_z_split_ic(s, 0.5_rp, 0.0_rp, 1.0_rp)
 
-    call scalar_z_split_ic(s, 0.5_rp)
   end subroutine initial_conditions
 
   subroutine dirichlet_update(fields, bc, time)

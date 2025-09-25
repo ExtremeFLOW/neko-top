@@ -5,9 +5,10 @@
         "output_directory": "fields",
         "output_boundary": true,
         "output_checkpoints": false,
+        "strict_convergence": true,
         "time": {
-            "variable_timestep": true,
-            "end_time": 0.01
+            "end_time": 30.0,
+            "variable_timestep": true
         },
         "numerics": {
             "time_order": 3,
@@ -41,15 +42,15 @@
                 {
                     "type": "velocity_value",
                     "value": [ 1.0, 0.0, 0.0 ],
-                    "zone_indices": [ 1, 2 ]
+                    "zone_indices": [ 1 ]
                 },
                 {
                     "type": "outflow",
-                    "zone_indices": [ 3 ]
+                    "zone_indices": [ 2 ]
                 },
                 {
                     "type": "no_slip",
-                    "zone_indices": [ 4 ]
+                    "zone_indices": [ 3, 4, 5, 6 ]
                 }
             ],
             "source_terms": [
@@ -63,7 +64,7 @@
                             "cache_file": "data_local/static_mixer/petsc/cache_8_",
                             "distance_transform": {
                                 "type": "smooth_step",
-                                "value": 0.5
+                                "value": 0.01
                             }
                         }
                     ],
@@ -100,8 +101,7 @@
                 }
             ],
             "initial_condition": {
-                "type": "uniform",
-                "value": 0.0
+                "type": "user"
             }
         }
     }

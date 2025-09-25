@@ -5,8 +5,9 @@
         "output_directory": "fields",
         "output_boundary": false,
         "output_checkpoints": false,
+        "strict_convergence": true,
         "time": {
-            "end_time": 0.01,
+            "end_time": 30.0,
             "timestep": 1e-4
         },
         "numerics": {
