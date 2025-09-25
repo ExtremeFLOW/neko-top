@@ -2,6 +2,7 @@ module user_initial_conditions
   use field, only: field_t
   use json_file_module, only: json_file
   use json_utils, only: json_get_or_default
+  use device, only: HOST_TO_DEVICE
   use num_types, only: rp
   implicit none
 
@@ -33,6 +34,8 @@ contains
        end if
 
     end do
+
+    call s%copy_from(HOST_TO_DEVICE, .true.)
 
   end subroutine scalar_z_split_ic
 

@@ -126,23 +126,26 @@ source $MAIN_DIR/scripts/meshing.sh
 if [ "$BOX" == "true" ]; then
     # Create the box mesh using Neko genmeshbox
     printf "\n\e[4mCreating box mesh.\e[0m\n"
-    mkdir -p $OUTPUT_PATH/box_mesh.tmp
-    cd $OUTPUT_PATH/box_mesh.tmp
 
-    [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="$OUTPUT_PATH/box.nmsh"
+    [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="box.nmsh"
 
     if [[ -f "$OUTPUT_FILE" && $REMESH == "false" ]]; then
         printf '  %-11s %-67s\n' "Box Mesh:" "Already exists, skipping."
         exit 0
     fi
 
+    mkdir -p $OUTPUT_PATH/box_mesh.tmp
+    cd $OUTPUT_PATH/box_mesh.tmp
+
+    echo "Finding Neko in $NEKO_DIR"
     find_neko $NEKO_DIR
+
     if ! command -v genmeshbox &>/dev/null; then
         echo "Error: genmeshbox command not found."
         echo "Please ensure Neko is installed and the path is set correctly."
         exit 1
     fi
-
+    echo "genmeshbox $@"
     genmeshbox $@ 1>box_mesh.log 2>error.log
 
     if [ $? -ne 0 ]; then
@@ -150,7 +153,7 @@ if [ "$BOX" == "true" ]; then
         exit 1
     fi
 
-    cp box.nmsh $OUTPUT_FILE
+    cp box.nmsh $OUTPUT_PATH/$OUTPUT_FILE
     printf '  %-11s %-67s\n' "Box Mesh:" "Created in $OUTPUT_FILE"
 
     cd $CURRENT_DIR
