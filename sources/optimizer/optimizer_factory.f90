@@ -5,6 +5,7 @@ submodule(optimizer) optimizer_factory_mod
   use utils, only: neko_type_error
   use dummy_constraint, only: dummy_constraint_t
   use mma_optimizer, only: mma_optimizer_t
+  use constraint, only: constraint_t
 
   implicit none
 
@@ -38,7 +39,7 @@ contains
     integer :: max_iterations
     real(kind=rp) :: tolerance
     logical :: performance
-    class(dummy_constraint_t), allocatable :: dummy_con
+    class(constraint_t), allocatable :: dummy_con
 
     if (allocated(object)) then
        call object%free()
@@ -65,7 +66,8 @@ contains
 
     !Check if we are solving an unconstrained problem and add a dummy contraint
     if (problem%get_n_constraints() .eq. 0) then
-       allocate(dummy_con)
+      !  allocate(dummy_con)
+       allocate(dummy_constraint_t::dummy_con)
        call dummy_con%init(parameters, design)
        call problem%add_constraint(dummy_con)
     end if

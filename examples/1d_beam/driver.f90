@@ -8,6 +8,8 @@ program usrneko
   use json_utils_ext, only: json_read_file
 
   use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
+  use constraint, only: constraint_t
+  use objective, only: objective_t
 
 
   use example_problem, only: mma_obj, beamweight_obj, stress_con
@@ -24,7 +26,17 @@ program usrneko
   use device, only: device_memcpy
 
   implicit none
+  
+  ! ========================================================================== !
+  ! Set up distributed stress constraints
 
+  ! number of elements with stress constraints
+  integer :: num_constraints = 10
+
+  ! number of beam sections to distribute the constraint
+  integer :: num_constraint_partitions=10
+  ! ========================================================================== !
+    
   ! JSON related arguments
   integer :: argc
   type(json_file) :: parameters
@@ -42,9 +54,9 @@ program usrneko
 
   !> The problem type
   type(problem_t) :: prob
-  type(mma_obj), allocatable :: deflection
-  type(beamweight_obj), allocatable :: beamweight
-  type(stress_con), allocatable :: stress_constraints(:)
+  class(objective_t), allocatable :: deflection
+  class(objective_t), allocatable :: beamweight
+  class(constraint_t), allocatable :: tmp_constraint
 
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
@@ -57,12 +69,10 @@ program usrneko
   character(len=20) :: index_str
   integer, allocatable :: stress_global_indices(:)
   real(rp), allocatable :: stress_sigma_max(:)
-  integer :: num_constraints, num_constraint_partitions
 
   !> For getting objectives and constraints values though getters in problem_t
   type(vector_t) :: all_objectives, constraint_value
   real(rp) :: objective_value
-
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
 
@@ -101,12 +111,9 @@ program usrneko
   ! initialize the problem
   call prob%init(parameters, des)
 
-  allocate(deflection)
-  allocate(beamweight)
+  allocate(beamweight_obj :: deflection)
+  allocate(mma_obj :: beamweight)
 
-  ! Set up distributed stress constraints
-  num_constraints = 10
-  num_constraint_partitions=10
   allocate(stress_global_indices(num_constraints))
   allocate(stress_sigma_max(num_constraints))
   ! Add constraints on global indices
@@ -115,31 +122,35 @@ program usrneko
 
   stress_sigma_max = 250e6_rp ! Same max stress for all
 
-  allocate(stress_constraints(size(stress_global_indices)))
-
-  call deflection%init_from_components("tip_deflection", des, 1.0_rp)
-  call beamweight%init_from_components("beamweight", des, 1.0_rp)
+  call deflection%init_json(parameters, des)
+  call beamweight%init_json(parameters, des)
 
   ! Add each constraint to the problem
-  do i = 1, size(stress_constraints)
-     write(index_str, '(I0)') stress_global_indices(i)
-     call stress_constraints(i)%init_stress_con( &
-          "stress_con_"//trim(index_str), &
-          des, stress_global_indices(i), stress_sigma_max(i))
-     call prob%add_constraint(stress_constraints(i))
+  do i = 1, size(stress_global_indices)
+      allocate(stress_con ::tmp_constraint)
+
+      write(index_str, '(I0)') i
+
+      select type(c => tmp_constraint)
+      type is (stress_con)
+        call c%init_stress_con("stress_con_"//trim(index_str), des, &
+             stress_global_indices(i), stress_sigma_max(i))
+      class default
+        call neko_error("tmp_constraint is not stress_con!")
+      end select
+
+      call prob%add_constraint(tmp_constraint)
+
+      if (allocated(tmp_constraint)) then
+         deallocate(tmp_constraint)
+      end if
   end do
 
   ! Add objectives to the problem
   call prob%add_objective(deflection)
   call prob%add_objective(beamweight)
 
-
   call MPI_Barrier(neko_comm, ierr)
-  if (pe_rank == 0) print *, "Constraints distribution complete!"
-  if (pe_rank == 0) print *, "number of problem objectives=", &
-       prob%get_n_objectives(), "constraints=", prob%get_n_constraints()
-
-
   ! -------------------------------------------------------------------------- !
   ! Perform finite difference validation
   ! update obj and cons and sensitivities for the init design
@@ -161,6 +172,7 @@ program usrneko
   call prob%get_all_objective_values(all_objectives)
   call prob%get_constraint_values(constraint_value)
   call prob%get_objective_value(objective_value)
+  
   if (pe_rank == 0) then
      print *, "nobject=", prob%get_n_objectives(), "nconstraint=", &
           prob%get_n_constraints(), "total objective=", objective_value, &

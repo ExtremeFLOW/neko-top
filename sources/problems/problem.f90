@@ -40,7 +40,6 @@ module problem
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use vector_math, only: vector_add2
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
@@ -290,7 +289,7 @@ contains
   !> Add an objective to the list.
   subroutine problem_add_objective(this, objective)
     class(problem_t), intent(inout) :: this
-    class(objective_t), intent(inout) :: objective
+    class(objective_t), allocatable, intent(inout) :: objective
     class(objective_wrapper_t), allocatable, dimension(:) :: temp_list
     integer :: i, n
 
@@ -309,14 +308,14 @@ contains
        allocate(this%objective_list(1))
     end if
 
-    this%objective_list(n + 1)%objective = objective
+    call move_alloc(objective, this%objective_list(n + 1)%objective)
     this%n_objectives = n + 1
   end subroutine problem_add_objective
 
   !> Add an objective to the list.
   subroutine problem_add_constraint(this, constraint)
     class(problem_t), intent(inout) :: this
-    class(constraint_t), intent(inout) :: constraint
+    class(constraint_t), allocatable, intent(inout) :: constraint
     class(constraint_wrapper_t), allocatable, dimension(:) :: temp_list
     integer :: i, n
 
@@ -335,7 +334,7 @@ contains
        allocate(this%constraint_list(1))
     end if
 
-    this%constraint_list(n + 1)%constraint = constraint
+    call move_alloc(constraint, this%constraint_list(n + 1)%constraint)
     this%n_constraints = n + 1
   end subroutine problem_add_constraint
 

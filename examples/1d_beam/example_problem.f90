@@ -111,8 +111,9 @@ contains
     class(mma_obj), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
-    character(len=256), parameter :: name = 'mma_obj'
-    real(kind=rp) :: weight
+    character(len=256), parameter :: name = 'tip_deflection'
+    real(kind=rp) :: weight = 1.0_rp
+
 
     call this%init_from_components(name, design, weight)
 
@@ -256,8 +257,8 @@ contains
     class(beamweight_obj), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
-    character(len=256), parameter :: name = 'beamweight_obj'
-    real(kind=rp) :: weight
+    character(len=256), parameter :: name = 'beam_weight'
+    real(kind=rp) :: weight = 1.0_rp
 
     call this%init_from_components(name, design, weight)
   end subroutine beamweight_init_from_json

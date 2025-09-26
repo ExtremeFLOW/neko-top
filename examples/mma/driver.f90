@@ -11,6 +11,7 @@ program usrneko
 
 
   use example_problem, only: mma_obj
+  use objective, only: objective_t
 
   use simplefield_design, only: simplefield_design_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -43,8 +44,9 @@ program usrneko
 
   !> The problem type
   type(problem_t) :: prob
-  type(mma_obj), allocatable :: obj
-
+  !   type(mma_obj), allocatable :: obj
+  class(objective_t), allocatable :: obj
+  
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
@@ -110,10 +112,9 @@ program usrneko
   !   minimize \f$\sum_(j = 1,..,n) (x_j - X_{j,GLL})^2/nglobal \f$
 
 
-  allocate(obj)
-
-  call obj%init_from_components("Objective", des)
-
+  !   allocate(obj)
+  allocate(mma_obj :: obj)   ! allocate as subtype mma_obj
+  call obj%init_json(parameters, des)
 
   ! update obj and sensitivities for the init design
   call obj%update_value(des)
