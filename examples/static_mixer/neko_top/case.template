@@ -6,7 +6,7 @@
         "output_boundary": false,
         "output_checkpoints": false,
         "time": {
-            "end_time": 30.0,
+            "end_time": 0.1,
             "timestep": 1e-4
         },
         "numerics": {
@@ -62,11 +62,11 @@
             "boundary_conditions": [
                 {
                     "type": "no_slip",
-                    "zone_indices": [ 1, 2, 4 ]
+                    "zone_indices": [ 1, 3, 4, 5, 6 ]
                 },
                 {
                     "type": "outflow",
-                    "zone_indices": [ 3 ]
+                    "zone_indices": [ 2 ]
                 }
             ]
         },
@@ -79,7 +79,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "projection_space_size": 4,
+                "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 100
             },
@@ -95,8 +95,7 @@
                 },
             ],
             "initial_condition": {
-                "type": "uniform",
-                "value": 0.0
+                "type": "user"
             }
         },
         "point_zones": [
