@@ -33,8 +33,7 @@ module neko_ext
   ! Module interface
   ! ========================================================================= !
   private
-  public :: setup_iteration, reset, field_to_vector, vector_to_field, &
-       get_scalar_indicies
+  public :: reset, field_to_vector, vector_to_field, get_scalar_indicies
 
 contains
 
@@ -189,36 +188,6 @@ contains
     neko_case%fluid%freeze = freezeflow
 
   end subroutine reset
-
-  !> @brief Setup the iteration
-  !!
-  !! @details This subroutine sets up the iteration. It is called at the
-  !! beginning of each iteration. It is used to save the initial configuration
-  !! and to set the output file name.
-  !!
-  !! @param[inout] neko_case Case data structure.
-  !! @param[in] iter Iteration number.
-  subroutine setup_iteration(neko_case, iter)
-    type(case_t), intent(inout) :: neko_case
-    integer, intent(in) :: iter
-
-    character(len=:), allocatable :: dirname
-    character(len=80) :: file_name
-
-    if (iter .ne. 1) then
-       call reset(neko_case)
-    end if
-
-    call json_get_or_default(neko_case%params, &
-         'case.output_directory', dirname, './')
-
-    write (file_name, '(a,a,i5.5,a)') &
-         trim(adjustl(dirname)), '/topopt_', iter, '_.fld'
-
-    call neko_case%f_out%output_t%file_%init(trim(file_name))
-    call neko_case%output_controller%execute(neko_case%time, .true.)
-
-  end subroutine setup_iteration
 
   !> @brief Vector to field
   !!
