@@ -30,7 +30,7 @@ for i, csv_file in enumerate(csv_files):
         label="Current"
     )
 
-    # Matching reference: FD_check_foo.case.csv -> ref_FD_check_foo.case.csv
+    # Matching reference: FD_check_foo.csv -> ref_FD_check_foo.csv
     ref_file = csv_file.replace("FD_check", "ref_FD_check", 1)
     if os.path.exists(ref_file):
         df_ref = pd.read_csv(ref_file)
@@ -42,7 +42,7 @@ for i, csv_file in enumerate(csv_files):
         )
 
     # Title from filename
-    name = csv_file.split("FD_check_")[-1].replace(".case.csv", "")
+    name = csv_file.split("FD_check_")[-1].replace(".csv", "")
     axes[i].set_title(name)
     axes[i].set_ylabel("Error")
     axes[i].grid(True, which="both", linestyle="--", linewidth=0.5)

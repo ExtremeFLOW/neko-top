@@ -122,13 +122,14 @@ endif()
 # Per-case setup and CTest entries
 foreach(case_file ${test_list})
     # Copy matching reference CSV if it exists:
-    set(ref_src "${CMAKE_CURRENT_SOURCE_DIR}/ref_FD_check_${case_file}.csv")
-    set(ref_dst "${CMAKE_CURRENT_BINARY_DIR}/ref_FD_check_${case_file}.csv")
+    get_filename_component(case_base "${case_file}" NAME_WE)
+    set(ref_src "${CMAKE_CURRENT_SOURCE_DIR}/ref_FD_check_${case_base}.csv")
+    set(ref_dst "${CMAKE_CURRENT_BINARY_DIR}/ref_FD_check_${case_base}.csv")
 
     if(EXISTS "${ref_src}")
         add_custom_target(
             ${case_name}_ref_fd_reg ALL
-            COMMENT "Copying reference CSV for ${case_file}"
+            COMMENT "Copying reference CSV for ${case_base}"
             BYPRODUCTS "${ref_dst}"
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                     "${ref_src}" "${ref_dst}"

@@ -133,6 +133,7 @@ contains
     real(kind=rp) :: constraint, perturbed_constraint
     real(kind=rp) :: fd_estimate, fd_error
     type(csv_file_t) :: logger
+    integer :: n
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
@@ -162,7 +163,8 @@ contains
     write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
 
     ! Init the csv writer
-    call logger%init('FD_check_'//trim(file_name)//'.csv')
+    n = len_trim(file_name)
+    call logger%init('FD_check_'//trim(file_name(:n-5))//'.csv')
     call logger%set_header('perturbation,F,dFdx,error')
     call log_data%init(4)
 
