@@ -1,3 +1,5 @@
+#!/bin/bash
+
 mkdir -p data_local/static_mixer
 
 mesh_pattern=mixer
