@@ -1,5 +1,5 @@
 # Define the CTest for checkpointing
-set(CMAKE_FOLDER "Tests/Regression/Checkpointing")
+set(CMAKE_FOLDER "Tests/Unit/Checkpointing")
 
 # ============================================================================ #
 # Define the executable used for the checkpointing test
@@ -10,7 +10,7 @@ set(BASE_EXAMPLE_DIR "${CMAKE_SOURCE_DIR}/examples/${BASE_EXAMPLE}")
 add_executable(checkpointing_exe EXCLUDE_FROM_ALL
     ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90
 )
-add_dependencies(Regression checkpointing_exe)
+add_dependencies(Unit checkpointing_exe)
 target_link_libraries(checkpointing_exe
     PRIVATE
         PkgConfig::neko
@@ -82,4 +82,5 @@ add_test(NAME checkpointing_test
 # Set the environment variables for the test
 set_tests_properties(checkpointing_test PROPERTIES
     ENVIRONMENT "NEKO_LOG_FILE=neko.log"
+    LABELS "unit;checkpointing"
 )

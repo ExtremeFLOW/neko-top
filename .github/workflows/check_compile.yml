@@ -160,7 +160,7 @@ jobs:
       - name: Running Unit Tests
         if: ${{ matrix.backend == 'cpu' }}
         run: |
-          ctest --test-dir build --output-on-failure --parallel
+          ctest -L unit --test-dir build --output-on-failure --parallel
 
       - name: Building Examples
         run: |

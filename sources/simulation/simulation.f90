@@ -59,7 +59,7 @@ module simulation_m
   use utils, only: neko_warning, neko_error
   use comm, only: pe_rank
   use json_file_module, only: json_file
-  use json_utils, only: json_extract_item, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
   use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
@@ -100,8 +100,6 @@ module simulation_m
      ! ----------------------------------------------------------------------- !
      ! Checkpoint system
 
-     !> Enable checkpoint system
-     logical :: checkpoint_enable = .false.
      !> The checkpoint system data
      type(simulation_checkpoint_t) :: checkpoint
 
@@ -127,6 +125,7 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
+    type(json_file) :: checkpoint_params
     integer :: i, n_scalars
 
     ! initialize the primal
@@ -192,10 +191,9 @@ contains
        end do
     end if
 
-    call json_get_or_default(parameters, "checkpoints.enable", &
-         this%checkpoint_enable, .false.)
-    if (this%checkpoint_enable) then
-       call this%checkpoint%init(this%neko_case, parameters)
+    if ("checkpoints" .in. parameters) then
+       call json_get(parameters, 'checkpoints', checkpoint_params)
+       call this%checkpoint%init(this%neko_case, checkpoint_params)
     end if
 
   end subroutine simulation_initialize
@@ -204,9 +202,7 @@ contains
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
-    if (this%checkpoint_enable) then
-       call this%checkpoint%free()
-    end if
+    call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -229,9 +225,7 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (this%checkpoint_enable) then
-          call this%checkpoint%save(this%neko_case)
-       end if
+       call this%checkpoint%save(this%neko_case)
     end do
     call profiler_stop
 
@@ -256,9 +250,8 @@ contains
     loop_start = MPI_WTIME()
 
     do i = this%n_timesteps, 1, -1
-       if (this%checkpoint_enable) then
-          call this%checkpoint%restore(this%neko_case, i)
-       end if
+       call this%checkpoint%restore(this%neko_case, i)
+
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -295,9 +288,7 @@ contains
        end do
     end if
 
-    if (this%checkpoint_enable) then
-       call this%checkpoint%reset()
-    end if
+    call this%checkpoint%reset()
   end subroutine simulation_reset
 
   !> Write current state of the simulation to disk
