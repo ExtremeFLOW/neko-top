@@ -2,11 +2,11 @@
     "version": 1.0,
     "case": {
         "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
-        "output_directory": "fields",
         "output_boundary": false,
         "output_checkpoints": false,
+        "output_at_end": false,
         "time": {
-            "end_time": 0.1,
+            "end_time": 1e-2,
             "timestep": 1e-4
         },
         "numerics": {
@@ -17,9 +17,8 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 1000.0,
-            "output_control": "simulationtime",
-            "output_value": 0.04,
             "strict_convergence": true,
+            "output_control": "never",
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 1.0, 0.0, 0.0 ]
@@ -72,7 +71,7 @@
         },
         "scalar": {
             "name": "temperature",
-            "enabled": true,
+            "enabled": false,
             "Pe": 1000.0,
             "solver": {
                 "type": "cg",
@@ -107,6 +106,9 @@
                 "z_bounds": [ 0.0, 1.0 ]
             }
         ]
+    },
+    "checkpoints": {
+        "enable": true
     },
     "optimization": {
         "domain": {

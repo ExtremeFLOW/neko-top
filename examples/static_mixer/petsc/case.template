@@ -4,6 +4,7 @@
         "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
         "output_directory": "fields",
         "output_boundary": false,
+        "output_at_end": false,
         "output_checkpoints": false,
         "time": {
             "end_time": 30.0,
@@ -40,8 +41,7 @@
             },
             "boundary_conditions ": [
                 {
-                    "type": "velocity_value",
-                    "value": [ 1.0, 0.0, 0.0 ],
+                    "type": "user",
                     "zone_indices": [ 1 ]
                 },
                 {
