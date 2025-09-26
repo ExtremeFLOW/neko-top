@@ -28,6 +28,7 @@ program checkpointing_test
   use num_types, only: dp, rp
   use json_module, only: json_file
   use utils, only: neko_error, neko_warning
+  use json_utils, only: json_get
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
   use time_step_controller, only: time_step_controller_t
