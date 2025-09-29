@@ -66,7 +66,7 @@ module device_mma_math
 
 contains
 
-   subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
+  subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
     !--------------------------------------------------------------------------!
     ! A device support to do the following calculation for 1D beam elements:   !
     !   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &                         !

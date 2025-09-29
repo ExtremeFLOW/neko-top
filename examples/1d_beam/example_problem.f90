@@ -248,7 +248,7 @@ contains
     ! Calculate 1 / h^4
     call vector_invcol1(h, n) ! h4 = 1 / h^4
     call vector_col2(sensitivity, h, n)
-  
+
     ! Normalize by u_tip_max
     call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
 
