@@ -66,12 +66,10 @@ contains
 
     !Check if we are solving an unconstrained problem and add a dummy contraint
     if (problem%get_n_constraints() .eq. 0) then
-      !  allocate(dummy_con)
        allocate(dummy_constraint_t::dummy_con)
        call dummy_con%init(parameters, design)
        call problem%add_constraint(dummy_con)
     end if
-
 
     if (present(simulation)) then
        call object%init_from_json(parameters, problem, design, &

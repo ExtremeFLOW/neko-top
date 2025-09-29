@@ -26,7 +26,7 @@ program usrneko
   use device, only: device_memcpy
 
   implicit none
-  
+
   ! ========================================================================== !
   ! Set up distributed stress constraints
 
@@ -36,7 +36,7 @@ program usrneko
   ! number of beam sections to distribute the constraint
   integer :: num_constraint_partitions=10
   ! ========================================================================== !
-    
+
   ! JSON related arguments
   integer :: argc
   type(json_file) :: parameters
@@ -127,23 +127,22 @@ program usrneko
 
   ! Add each constraint to the problem
   do i = 1, size(stress_global_indices)
-      allocate(stress_con ::tmp_constraint)
+     allocate(stress_con ::tmp_constraint)
+     write(index_str, '(I0)') i
 
-      write(index_str, '(I0)') i
+     select type(c => tmp_constraint)
+     type is (stress_con)
+       call c%init_stress_con("stress_con_"//trim(index_str), des, &
+            stress_global_indices(i), stress_sigma_max(i))
+     class default
+       call neko_error("tmp_constraint is not stress_con!")
+     end select
 
-      select type(c => tmp_constraint)
-      type is (stress_con)
-        call c%init_stress_con("stress_con_"//trim(index_str), des, &
-             stress_global_indices(i), stress_sigma_max(i))
-      class default
-        call neko_error("tmp_constraint is not stress_con!")
-      end select
+     call prob%add_constraint(tmp_constraint)
 
-      call prob%add_constraint(tmp_constraint)
-
-      if (allocated(tmp_constraint)) then
-         deallocate(tmp_constraint)
-      end if
+     if (allocated(tmp_constraint)) then
+        deallocate(tmp_constraint)
+     end if
   end do
 
   ! Add objectives to the problem
@@ -172,7 +171,7 @@ program usrneko
   call prob%get_all_objective_values(all_objectives)
   call prob%get_constraint_values(constraint_value)
   call prob%get_objective_value(objective_value)
-  
+
   if (pe_rank == 0) then
      print *, "nobject=", prob%get_n_objectives(), "nconstraint=", &
           prob%get_n_constraints(), "total objective=", objective_value, &

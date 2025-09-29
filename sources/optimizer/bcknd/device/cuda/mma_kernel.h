@@ -201,8 +201,8 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
 
   // Clamp helpers
   const T half_xgap = 0.5 * xgap;
-  const T tenth_low_diff = 0.1 * (xt - low_t);
-  const T tenth_upp_diff = 0.1 * (upp_t - xt);
+  const T tenth_low_diff = T(0.1) * (xt - low_t);
+  const T tenth_upp_diff = T(0.1) * (upp_t - xt);
 
   // Compute alpha and beta with fused max/min and fewer calls
   T alpha_val = max(max(xmin_t, low_t + tenth_low_diff), xt - half_xgap);
@@ -218,17 +218,17 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
   const T x_minus_low_sq = x_minus_low * x_minus_low;
 
   // Small epsilon for numerical stability
-  const T eps = 1e-5;
-  const T inv_xgap = 1.0 / max(eps, xgap);
+  const T eps = T(1e-5);
+  const T inv_xgap = T(1.0) / max(eps, xgap);
 
   // Compute terms reused multiple times
   const T max_df0_pos = max(df0, T(0));
   const T max_df0_neg = max(-df0, T(0));
 
-  p0j[tj] = upp_minus_x_sq * (1.001 * max_df0_pos + 
-       0.001 * max_df0_neg + eps * inv_xgap);
-  q0j[tj] = x_minus_low_sq * (0.001 * max_df0_pos + 
-       1.001 * max_df0_neg + eps * inv_xgap);
+  p0j[tj] = upp_minus_x_sq * (T(1.001) * max_df0_pos + 
+       T(0.001) * max_df0_neg + eps * inv_xgap);
+  q0j[tj] = x_minus_low_sq * (T(0.001) * max_df0_pos + 
+       T(1.001) * max_df0_neg + eps * inv_xgap);
 
   // Loop over m for pij and qij
   for (int i = 0; i < m; ++i) {
@@ -238,10 +238,10 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
     T max_pos = max(dfdx_val, T(0));
     T max_neg = max(-dfdx_val, T(0));
 
-    pij[idx] = upp_minus_x_sq * (1.001 * max_pos + 
-         0.001 * max_neg + eps * inv_xgap);
-    qij[idx] = x_minus_low_sq * (0.001 * max_pos + 
-         1.001 * max_neg + eps * inv_xgap);
+    pij[idx] = upp_minus_x_sq * (T(1.001) * max_pos + 
+         T(0.001) * max_neg + eps * inv_xgap);
+    qij[idx] = x_minus_low_sq * (T(0.001) * max_pos + 
+         T(1.001) * max_neg + eps * inv_xgap);
   }
 }
 

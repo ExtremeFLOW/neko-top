@@ -111,9 +111,8 @@ program usrneko
   ! for the unconstrained problem:
   !   minimize \f$\sum_(j = 1,..,n) (x_j - X_{j,GLL})^2/nglobal \f$
 
-
-  !   allocate(obj)
-  allocate(mma_obj :: obj)   ! allocate as subtype mma_obj
+  ! allocate as subtype mma_obj
+  allocate(mma_obj :: obj)
   call obj%init_json(parameters, des)
 
   ! update obj and sensitivities for the init design
@@ -140,16 +139,12 @@ program usrneko
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_end = MPI_Wtime()
 
-
-
-
   if (pe_rank == 0) then
      print *, "opt%run execution time:", t_end - t_start, "seconds"
   end if
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
-
 
   call neko_finalize(neko_case)
   call opt%free()
