@@ -5,6 +5,10 @@
         "output_boundary": false,
         "output_checkpoints": false,
         "output_at_end": false,
+        "runtime_statistics": {
+            "enabled": true,
+            "output_profile": true
+        },
         "time": {
             "end_time": 1e-2,
             "timestep": 1e-4
@@ -134,7 +138,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
+            "max_iterations": 2,
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
@@ -166,7 +170,7 @@
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
-                "limit": 0.2,
+                "limit": 0.0,
                 "is_max": false
             }
         ]
