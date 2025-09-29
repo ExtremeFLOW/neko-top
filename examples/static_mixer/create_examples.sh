@@ -16,7 +16,8 @@ for n in ${N[@]}; do
 
     if [ ! -f ${output_file} ]; then
         ./mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz
-        mv data_local/box.nmsh ${output_file}
+         \
+            -o ${data_path} -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
     fi
 
     # Create the cases from the templates
