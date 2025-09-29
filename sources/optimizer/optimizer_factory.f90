@@ -64,7 +64,7 @@ contains
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
 
-    !Check if we are solving an unconstrained problem and add a dummy contraint
+    !Check if we are solving an unconstrained problem and add a dummy constraint
     if (problem%get_n_constraints() .eq. 0) then
        allocate(dummy_constraint_t::dummy_con)
        call dummy_con%init(parameters, design)

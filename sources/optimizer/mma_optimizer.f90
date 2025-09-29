@@ -14,7 +14,6 @@ module mma_optimizer
 
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use vector_math, only: vector_add2, vector_cmult
 
   !only to print nglobal when running in parallel
   use comm, only: neko_comm, pe_rank
