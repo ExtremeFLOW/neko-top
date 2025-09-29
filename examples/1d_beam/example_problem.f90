@@ -47,7 +47,10 @@ module example_problem
   use mpi_f08, only: mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
   use comm, only: pe_rank, pe_size, neko_comm, mpi_real_precision
   use vector_math, only: vector_glsum, vector_cmult, vector_cadd, &
-       vector_col2, vector_invcol2, vector_copy
+       vector_col2, vector_invcol2, vector_copy, vector_cmult2, &
+       vector_invcol1
+  
+  use device_mma_math, only: device_delta_1dbeam
 
   implicit none
   private
@@ -136,10 +139,9 @@ contains
   subroutine mma_obj_update_value(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: h, I, contrib
+    type(vector_t) :: h, I, contrib, Delta
     integer :: ierr, n, offset, k
     real(rp) :: Le, u_global
-    real(rp), allocatable :: Delta(:)
 
     ! Local design values
     call design%get_values(h)
@@ -157,14 +159,20 @@ contains
     if (pe_rank == 0) offset = 0
 
     ! Build elementwise Δ_k on host (geometry-related, not design-related)
-    allocate(Delta(n))
-    do k = 1, n
-       Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
-            (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
-    end do
+    call Delta%init(n)
+    if (neko_bcknd_device .eq. 1) then
+       ! Device version
+       call device_delta_1dbeam(Delta%x_d, L_total, Le, offset, n)
+    else
+      ! Host version
+       do k = 1, n
+          Delta%x(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+               (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
+       end do
+    end if
+
 
     call I%init(n)
-
     ! Now compute I_k = b * h^3 / 12
     call vector_copy(I, h, n) ! I = h
     call vector_col2(I, h, n) ! I = h^2
@@ -174,11 +182,7 @@ contains
     ! contrib = Δ / (E * I)
     call contrib%init(n)
 
-    contrib%x = Delta ! copy Δ into contrib
-    if (neko_bcknd_device .eq. 1) then
-       call device_memcpy(contrib%x,contrib%x_d, n, &
-            HOST_TO_DEVICE, sync = .true.)
-    end if
+    contrib = Delta ! copy Δ into contrib
     call vector_invcol2(contrib, I, n) ! contrib = contrib / I
     call vector_cmult(contrib, P/E, n) ! contrib = contrib * P / E
 
@@ -190,7 +194,10 @@ contains
 
     this%value = u_global
 
-    deallocate(Delta)
+    call Delta%free()
+    call h%free()
+    call I%free()
+    call contrib%free()
   end subroutine mma_obj_update_value
 
 
@@ -199,9 +206,8 @@ contains
     class(design_t), intent(in) :: design
 
     real(rp) :: Le
-    type(vector_t) :: h, sensitivity
+    type(vector_t) :: h, sensitivity, Delta
     integer :: ierr, n, offset, k
-    real(rp), allocatable :: Delta(:)
 
     ! Local design values
     call design%get_values(h)
@@ -220,34 +226,37 @@ contains
     if (pe_rank == 0) offset = 0
 
     ! Build elementwise Δ_k
-    allocate(Delta(n))
-    do k = 1, n
-       Delta(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
-            (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
-    end do
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+    call Delta%init(n)
+    if (neko_bcknd_device .eq. 1) then
+       ! Device version
+       call device_delta_1dbeam(Delta%x_d, L_total, Le, offset, n)
+    else
+      ! Host version
+       do k = 1, n
+          Delta%x(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
+               (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
+       end do
     end if
+
 
     ! Compute sensitivity:
     ! dg/dx = P * Δ * (-36.0 / (E * b * h^4)) * (h_max - h_min)
-    do k = 1, n
-       sensitivity%x(k) = P * Delta(k) * (-36.0_rp) / &
-            (E * b * h%x(k)**4) * (h_max - h_min)
-    end do
-    if (neko_bcknd_device .eq. 1) then
-       call device_memcpy(sensitivity%x,sensitivity%x_d, n, &
-            HOST_TO_DEVICE, sync = .true.)
-    end if
-
+    call vector_cmult2(sensitivity, Delta, &
+         P * (-36.0_rp) * (h_max - h_min) / (E * b), n) 
+    call vector_col2(h, h, n) ! h = h^2  
+    call vector_col2(h, h, n) ! h = h^4
+    ! Calculate 1 / h^4
+    call vector_invcol1(h, n) ! h4 = 1 / h^4
+    call vector_col2(sensitivity, h, n)  
+    
     ! Normalize by u_tip_max
     call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
 
     call vector_copy(this%sensitivity, sensitivity, n)
 
-    deallocate(Delta)
     call sensitivity%free()
+    call h%free()
+    call Delta%free()
   end subroutine mma_obj_update_sensitivity
 
   ! ========================================================================== !

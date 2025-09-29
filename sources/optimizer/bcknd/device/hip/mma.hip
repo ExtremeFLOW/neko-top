@@ -53,6 +53,16 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 
+void delta_1dbeam_hip(void* Delta, double L_total, double Le, 
+                      int* offset, int* n) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((n + 1024 - 1) / 1024, 1, 1);
+    hipLaunchKernelGGL(delta_1dbeam_kernel<real>, 
+                      nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+                      (real*)Delta, L_total, Le, *offset, *n);
+    HIP_CHECK(hipGetLastError());
+}
+
 void hip_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

@@ -38,6 +38,14 @@ module hip_mma_math
   public
 
   interface
+     subroutine delta_1dbeam_hip(Delta_d, L_total, Le, offset, n) &
+          bind(c, name = 'delta_1dbeam_hip')
+       import c_int, c_ptr, rp
+       type(c_ptr), value :: Delta_d
+       real(rp), value :: L_total, Le
+       integer(c_int) :: offset, n
+     end subroutine delta_1dbeam_hip
+
      subroutine hip_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) bind(c, name = 'hip_Hess')
        import c_int, c_ptr
        type(c_ptr), value :: Hess_d, hijx_d, Ljjxinv_d

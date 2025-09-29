@@ -36,6 +36,27 @@
 #define MMA_CUDA_KERNEL_H
 
 template <typename T>
+__global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
+     const T L_total, const T Le, const int offset, const int n) {
+  int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n) return;
+
+  // Convert to 1-based indexing for the calculation
+  int idx = k + 1;
+
+  // Calculate first term: (L_total - Le*(offset+idx-1))^3
+  T x1 = L_total - Le * (T)(offset + idx - 1);
+  T term1 = x1 * x1 * x1;
+
+  // Calculate second term: (L_total - Le*(offset+idx))^3  
+  T x2 = L_total - Le * (T)(offset + idx);
+  T term2 = x2 * x2 * x2;
+
+  // Final result
+  Delta[k] = (term1 - term2) / (T)3.0;
+}
+
+template <typename T>
 __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
      const T* __restrict__ pjlambda, const T* __restrict__ qjlambda,
      const T* __restrict__ x, const T* __restrict__ low, const T* __restrict__ upp,

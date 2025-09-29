@@ -42,14 +42,14 @@ module device_mma_math
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
-       mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess
+       mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
        hip_updateAA, hip_dx, hip_dy, hip_deta, hip_dxsi, hip_maxval2, &
        hip_maxval3, hip_kkt_rex, mma_gensub1_hip, mma_gensub2_hip, &
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
-       mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess
+       mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip
 
   implicit none
   private
@@ -62,9 +62,30 @@ module device_mma_math
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess
+       device_mma_Ljjxinv, device_Hess, device_delta_1dbeam
 
 contains
+    subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
+    !--------------------------------------------------------------------------!
+    ! A device support to do the following calculation for 1D beam elements:   !
+    !   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &                         !
+    !              (L_total - Le*(offset+k))**3) / 3.0_rp                      !
+    !                                                                          !
+    ! Where k ranges from 1 to n                                               !
+    !--------------------------------------------------------------------------!
+      type(c_ptr) :: Delta_d
+      real(rp), value :: L_total, Le
+      integer(c_int), value :: offset, n
+#if HAVE_HIP
+    call delta_1dbeam_hip(Delta_d, L_total, Le, offset, n)
+#elif HAVE_CUDA
+    call delta_1dbeam_cuda(Delta_d, L_total, Le, offset, n)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_delta_1dbeam
 
   subroutine device_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m)
     type(c_ptr):: Hess_d, hijx_d, Ljjxinv_d
