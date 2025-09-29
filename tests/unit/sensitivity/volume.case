@@ -60,14 +60,6 @@
             ],
             "output_control": "never"
         },
-        "simulation_components": [
-            {
-                "type": "steady",
-                "tol": 1e-6,
-                "compute_control": "tsteps",
-                "compute_value": 1
-            }
-        ],
         "point_zones": [
             {
                 "name": "optimization_domain",
@@ -125,14 +117,13 @@
             }
         },
         "objectives": [
-            // empty so we don't double up
         ],
         "constraints": [
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
                 "limit": 0.2,
-                "is_max": false,
+                "is_max": false
             }
         ]
     }
