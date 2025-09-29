@@ -23,7 +23,4 @@ for n in ${N[@]}; do
     cp ${example_path}/petsc/case.template ${example_path}/petsc/${n}.case
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${output_file}\",|g" ${example_path}/petsc/${n}.case
     sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/petsc/cache_${n}_\",|g" ${example_path}/petsc/${n}.case
-
-    cp ${example_path}/neko_top/case.template ${example_path}/neko_top/${n}.case
-    sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${output_file}\",|g" ${example_path}/neko_top/${n}.case
 done
