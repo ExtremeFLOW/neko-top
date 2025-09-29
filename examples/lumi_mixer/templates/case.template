@@ -6,8 +6,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "runtime_statistics": {
-            "enabled": true,
-            "output_profile": true
+            "enabled": true
         },
         "time": {
             "end_time": 1e-2,

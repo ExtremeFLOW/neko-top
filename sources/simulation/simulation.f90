@@ -133,6 +133,9 @@ contains
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
+    ! Start the profiler
+    call profiler_start
+
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
        this%fluid => fluid
@@ -202,6 +205,9 @@ contains
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
+    ! Stop the profiler
+    call profiler_stop
+
     call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
@@ -218,7 +224,6 @@ contains
 
     call simulation_init(this%neko_case, dt_controller)
 
-    call profiler_start
     loop_start = MPI_WTIME()
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
@@ -227,7 +232,6 @@ contains
 
        call this%checkpoint%save(this%neko_case)
     end do
-    call profiler_stop
 
     call simulation_finalize(this%neko_case)
 
@@ -245,18 +249,15 @@ contains
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
-    call profiler_start
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
     do i = this%n_timesteps, 1, -1
        call this%checkpoint%restore(this%neko_case, i)
 
-
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
     end do
-    call profiler_stop
 
     call simulation_adjoint_finalize(this%adjoint_case)
 
