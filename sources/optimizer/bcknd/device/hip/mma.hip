@@ -56,7 +56,7 @@ real * mma_bufred_d = NULL;
 void delta_1dbeam_hip(void* Delta, real* L_total, real* Le, 
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks((n + 1024 - 1) / 1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
     hipLaunchKernelGGL(delta_1dbeam_kernel<real>, 
                       nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
                       (real*)Delta, *L_total, *Le, *offset, *n);
