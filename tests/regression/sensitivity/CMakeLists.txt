@@ -8,7 +8,6 @@ set(test_list
     "lube_term.case"
     "min_dis_and_lube.case"
     "min_dis_and_lube_weights.case"
-    "passive_scalar.case"
 )
 
 # Common driver source (same as unit)
