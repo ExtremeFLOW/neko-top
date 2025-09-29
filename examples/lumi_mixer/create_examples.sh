@@ -8,13 +8,15 @@ export mesh_pattern="mixer"
 export data_path=$(realpath "${MAIN_DIR}/data_local/static_mixer")
 export example_path=$(realpath "${MAIN_DIR}/examples/lumi_mixer/cases")
 export template_path=$(realpath "${MAIN_DIR}/examples/lumi_mixer/templates")
+export hpc_path=$(realpath "${MAIN_DIR}/scripts/jobscripts")
 
 [ ! -d ${data_path} ] && mkdir -p ${data_path}
 [ ! -d ${example_path} ] && mkdir -p ${example_path}
 
 function create_case() {
-    local case_template=$1  # Template file
-    local n=$2              # Number of cells in x direction
+    local n=$1              # Number of cells in x direction
+    local cluster=$2        # Name of the cluster
+    local nodes=$3          # Number of nodes
 
     # Compute mesh dimensions
     local Nx=$((n / 4 * 4))
@@ -28,22 +30,33 @@ function create_case() {
     fi
 
     # Set file names
+    local case_name="nodes_${nodes}_mesh_${n}"
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
-    local case_file="${example_path}/${n}.case"
+    local case_file="${example_path}/${case_name}.case"
+    local job_path="${hpc_path}/${cluster}/lumi_mixer/cases"
 
     # Create the mesh if it does not exist
     if [ ! -f ${mesh_file} ]; then
         ./mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz \
-            -o ${data_path} -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
+           -o ${data_path} -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
     fi
 
     # Create the cases from the templates
     cp ${template_path}/case.template ${case_file}
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${mesh_file}\",|g" ${case_file}
+
+    [ ! -d ${job_path} ] && mkdir -p ${job_path}
+    [ ! -f ${job_path}/.gitignore ] && echo "*.sh" > ${job_path}/.gitignore
+
+    # Create the jobscript
+    cp ${template_path}/${cluster}.sh ${job_path}/${case_name}.sh
+    sed -i "s|--nodes=.*|--nodes=${nodes}|g" ${job_path}/${case_name}.sh
+
 }
 
 N=(4 8 16)
-
+cluster="LUMI-G"
+nodes=2
 for n in ${N[@]}; do
-    create_case neko_top ${n}
+    create_case ${n} ${cluster} ${nodes}
 done
