@@ -42,6 +42,7 @@ set(PFUNIT_TEST_SOURCES
 
 # Add the more complex tests that require additional setup or dependencies.
 add_subdirectory(sensitivity)
+add_subdirectory(checkpointing)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.

@@ -10,3 +10,4 @@ set_target_properties(Regression PROPERTIES
 )
 add_dependencies(Tests Regression)
 
+# Add each regression test subdirectory
