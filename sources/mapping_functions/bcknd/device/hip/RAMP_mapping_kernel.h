@@ -98,7 +98,7 @@ __global__ void convex_up_RAMP_mapping_apply_backward_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < n; i += str) {
-        sens_out_d[i] = (f_max - f_min) 
+        sens_out_d[i] = (f_max - f_min) * q
             * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * sens_in_d[i];
     }
 }
