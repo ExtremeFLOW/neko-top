@@ -24,7 +24,7 @@ function jou2nbin() {
     if [[ $(find ./ -name "*.exo" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "Cubit:" "Exodus not created: $input_file"
-        return
+        return 1
     fi
 
     # Convert the mesh from Exodus format to Nek5000 format
@@ -39,7 +39,7 @@ function jou2nbin() {
     if [[ $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "exo2nek:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 
     # Convert the mesh to Neko mesh format
@@ -48,7 +48,7 @@ function jou2nbin() {
     if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 }
 
@@ -76,7 +76,7 @@ function exo2nbin() {
     if [[ $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "exo2nek:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 
     # Convert the mesh to Neko mesh format
@@ -85,7 +85,7 @@ function exo2nbin() {
     if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 }
 
@@ -106,7 +106,7 @@ function re2nbin() {
     if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 }
 
@@ -138,7 +138,7 @@ function geo2nbin() {
     if [[ $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "gmsh2nek:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 
     # Convert the mesh to Neko mesh format
@@ -147,7 +147,7 @@ function geo2nbin() {
     if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 }
 
@@ -173,7 +173,7 @@ function msh2nbin() {
     if [[ $(find ./ -name "*.re2" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "gmsh2nek:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 
     # Convert the mesh to Neko mesh format
@@ -182,6 +182,6 @@ function msh2nbin() {
     if [[ $(find ./ -name "*.nmsh" | wc -l) -lt 1 ]]; then
         printf >&2 "\n\e[4mError:\e[0m\n"
         printf >&2 "  %-10s %-67s\n" "rea2nbin:" "re2 not created: $input_file"
-        return
+        return 1
     fi
 }

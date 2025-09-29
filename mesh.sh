@@ -62,8 +62,8 @@ OUTPUT_PATH="" # Path to the output meshes
 INPUT_PATH=""  # Path to the input files
 
 # List possible options
-OPTIONS=help,all,keep,remesh,file,dimension:,box,input:,output:
-OPT=h,a,k,r,f,d:,b,i:,o:
+OPTIONS=help,all,keep,remesh,file:,dimension:,box,input:,output:
+OPT=h,a,k,r,f:,d:,b,i:,o:
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -171,6 +171,17 @@ SUPPORTED_TYPES=(".jou" ".e" ".exo" ".rea" ".re2" ".geo")
 file_list=""
 for input in $@; do
     [[ $ALL == "true" ]] && break
+
+    if [ -f "$input" ]; then
+        input="$(realpath $input)"
+        if [ -z "${input#"$INPUT_PATH"/}" ]; then
+            printf '  %-10s %-67s\n' "Not found in INPUT_PATH:" "$input"
+            continue
+        fi
+        file_list+="$input"
+        continue
+    fi
+
     input_name="$(basename $input)"
     input_dir=$(realpath $INPUT_PATH/$(dirname $input))
 
@@ -243,8 +254,18 @@ for input_file in $file_list; do
     "msh") msh2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     esac
 
-    find -name "*.nmsh" -exec cp -t $OUTPUT_PATH/$input_dir {} \;
+    if [ $? -ne 0 ]; then
+        printf '  %-10s %-67s\n' "Error:" "Mesh not created: $input_file"
+        cd $CURRENT_DIR
+        continue
+    fi
 
+    if [ -n "$OUTPUT_FILE" ]; then
+        mkdir -p $(dirname $OUTPUT_PATH/$OUTPUT_FILE)
+        cp -f $input_name.nmsh $OUTPUT_PATH/$OUTPUT_FILE
+    else
+        find -name "*.nmsh" -exec cp -t $OUTPUT_PATH/$input_dir {} \;
+    fi
     cd $CURRENT_DIR
 
     # Clean up the temporary files
