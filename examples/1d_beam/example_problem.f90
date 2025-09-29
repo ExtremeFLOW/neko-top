@@ -49,7 +49,7 @@ module example_problem
   use vector_math, only: vector_glsum, vector_cmult, vector_cadd, &
        vector_col2, vector_invcol2, vector_copy, vector_cmult2, &
        vector_invcol1
-  
+
   use device_mma_math, only: device_delta_1dbeam
 
   implicit none
@@ -164,7 +164,7 @@ contains
        ! Device version
        call device_delta_1dbeam(Delta%x_d, L_total, Le, offset, n)
     else
-      ! Host version
+       ! Host version
        do k = 1, n
           Delta%x(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
                (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
@@ -231,7 +231,7 @@ contains
        ! Device version
        call device_delta_1dbeam(Delta%x_d, L_total, Le, offset, n)
     else
-      ! Host version
+       ! Host version
        do k = 1, n
           Delta%x(k) = ((L_total - Le*real(offset+k-1,rp))**3 - &
                (L_total - Le*real(offset+k,rp))**3) / 3.0_rp
@@ -242,13 +242,13 @@ contains
     ! Compute sensitivity:
     ! dg/dx = P * Δ * (-36.0 / (E * b * h^4)) * (h_max - h_min)
     call vector_cmult2(sensitivity, Delta, &
-         P * (-36.0_rp) * (h_max - h_min) / (E * b), n) 
-    call vector_col2(h, h, n) ! h = h^2  
+         P * (-36.0_rp) * (h_max - h_min) / (E * b), n)
+    call vector_col2(h, h, n) ! h = h^2
     call vector_col2(h, h, n) ! h = h^4
     ! Calculate 1 / h^4
     call vector_invcol1(h, n) ! h4 = 1 / h^4
-    call vector_col2(sensitivity, h, n)  
-    
+    call vector_col2(sensitivity, h, n)
+  
     ! Normalize by u_tip_max
     call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
 

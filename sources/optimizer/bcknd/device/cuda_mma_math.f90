@@ -40,9 +40,9 @@ module cuda_mma_math
   interface
      subroutine delta_1dbeam_cuda(Delta_d, L_total, Le, offset, n) &
           bind(c, name = 'delta_1dbeam_cuda')
-       import c_int, c_ptr, rp
+       import c_rp, c_int, c_ptr
        type(c_ptr), value :: Delta_d
-       real(rp), value :: L_total, Le
+       real(c_rp) :: L_total, Le
        integer(c_int) :: offset, n
      end subroutine delta_1dbeam_cuda
 

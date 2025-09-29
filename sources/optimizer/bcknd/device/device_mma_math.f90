@@ -65,7 +65,8 @@ module device_mma_math
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam
 
 contains
-    subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
+
+   subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
     !--------------------------------------------------------------------------!
     ! A device support to do the following calculation for 1D beam elements:   !
     !   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &                         !
@@ -73,9 +74,9 @@ contains
     !                                                                          !
     ! Where k ranges from 1 to n                                               !
     !--------------------------------------------------------------------------!
-      type(c_ptr) :: Delta_d
-      real(rp), value :: L_total, Le
-      integer(c_int), value :: offset, n
+    type(c_ptr) :: Delta_d
+    real(c_rp) :: L_total, Le
+    integer(c_int), value :: offset, n
 #if HAVE_HIP
     call delta_1dbeam_hip(Delta_d, L_total, Le, offset, n)
 #elif HAVE_CUDA

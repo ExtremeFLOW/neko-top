@@ -132,10 +132,10 @@ program usrneko
 
      select type(c => tmp_constraint)
      type is (stress_con)
-       call c%init_stress_con("stress_con_"//trim(index_str), des, &
-            stress_global_indices(i), stress_sigma_max(i))
+        call c%init_stress_con("stress_con_"//trim(index_str), des, &
+             stress_global_indices(i), stress_sigma_max(i))
      class default
-       call neko_error("tmp_constraint is not stress_con!")
+        call neko_error("tmp_constraint is not stress_con!")
      end select
 
      call prob%add_constraint(tmp_constraint)

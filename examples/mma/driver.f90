@@ -44,9 +44,8 @@ program usrneko
 
   !> The problem type
   type(problem_t) :: prob
-  !   type(mma_obj), allocatable :: obj
   class(objective_t), allocatable :: obj
-  
+
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
