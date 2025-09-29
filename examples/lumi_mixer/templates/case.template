@@ -112,7 +112,9 @@
         ]
     },
     "checkpoints": {
-        "enable": true
+        "enabled": true,
+        "n_saves_memory": 10,
+        "keep_checkpoints": true
     },
     "optimization": {
         "domain": {
