@@ -45,8 +45,7 @@ module adjoint_case
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
@@ -166,13 +165,13 @@ contains
 
     if (this%have_scalar) then
        allocate(this%adjoint_scalars)
-       call json_extract_object(neko_case%params, 'case.numerics', &
+       call json_get(neko_case%params, 'case.numerics', &
             numerics_params)
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
-          call json_extract_object(neko_case%params, 'case.adjoint_scalar', &
+          call json_get(neko_case%params, 'case.adjoint_scalar', &
                scalar_params_adjoint)
-          call json_extract_object(neko_case%params, 'case.scalar', &
+          call json_get(neko_case%params, 'case.scalar', &
                scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
@@ -202,9 +201,9 @@ contains
        else
           ! Multiple scalars
 
-          call json_extract_object(this%case%params, &
+          call json_get(this%case%params, &
                'case.adjoint_scalars', scalar_params_adjoint)
-          call json_extract_object(this%case%params, &
+          call json_get(this%case%params, &
                'case.scalars', scalar_params_primal)
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
@@ -220,7 +219,7 @@ contains
     !
     ! Time control
     !
-    call json_extract_object(this%case%params, 'case.time', json_subdict)
+    call json_get(this%case%params, 'case.time', json_subdict)
     call this%time%init(json_subdict)
 
     !
@@ -248,7 +247,7 @@ contains
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
-    call json_extract_object(neko_case%params, json_key, ic_json)
+    call json_get(neko_case%params, json_key, ic_json)
     call json_get(ic_json, 'type', string_val)
 
     if (trim(string_val) .ne. 'user') then
@@ -271,7 +270,7 @@ contains
           ! we shouldn't fallback to the primal here.
           call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_extract_object(neko_case%params, &
+          call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition', ic_json)
 
           !call neko_log%section("Adjoint scalar initial condition ")
@@ -298,7 +297,7 @@ contains
                   i, scalar_params_adjoint)
              call json_get(scalar_params_adjoint, &
                   'initial_condition.type', string_val)
-             call json_extract_object(scalar_params_adjoint, &
+             call json_get(scalar_params_adjoint, &
                   'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then

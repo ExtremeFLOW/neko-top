@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 5.0,
-            "timestep": 1e-3
+            "timestep": 2.5e-3
         },
         "numerics": {
             "time_order": 1,
@@ -197,6 +197,13 @@
                 "weight": 1.0
             }
         ],
-        "constraints": [ ]
+        "constraints": [
+            {
+                "type": "volume",
+                "mask_name": "optimization_domain",
+                "limit": 0.5,
+                "is_max": false
+            }
+        ],
     }
 }

@@ -57,7 +57,7 @@ module brinkman_design
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default, json_get
   use utils, only: neko_error
   implicit none
   private
@@ -283,7 +283,7 @@ contains
       end if
 
       if ('initial_distribution' .in. parameters) then
-         call json_extract_object(parameters, 'initial_distribution', json_subdict)
+         call json_get(parameters, 'initial_distribution', json_subdict)
          call set_optimization_ic(this%design_indicator, coef, gs, &
               json_subdict)
       else
@@ -475,6 +475,7 @@ contains
     integer :: n
 
     n = this%size()
+    call values%init(n)
     call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)

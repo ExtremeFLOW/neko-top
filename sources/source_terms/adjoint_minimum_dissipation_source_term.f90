@@ -84,6 +84,8 @@ module adjoint_minimum_dissipation_source_term
      logical :: if_mask
      !> an ax_helm type to compute weak laplacian
      class(ax_t), allocatable :: Ax
+     !> volume of the objective domain.
+     real(kind=rp) :: volume
 
    contains
      !> The common constructor using a JSON object.
@@ -129,11 +131,12 @@ contains
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
+  !! @param volume volume of the objective domain.
   subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
        u, v, w, obj_scale, &
        mask, if_mask, &
-       coef)
+       coef, volume)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -143,6 +146,7 @@ contains
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), target :: mask
+    real(kind=rp), intent(in) :: volume
     logical :: if_mask
 
     ! I wish you didn't need a start time and end time...
@@ -167,6 +171,7 @@ contains
     this%w => w
 
     this%obj_scale = obj_scale
+    this%volume = volume
 
     this%if_mask = if_mask
     if (this%if_mask) then
@@ -240,7 +245,7 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fu, work, this%obj_scale)
+      call field_add2s2(fu, work, this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! v
@@ -260,7 +265,7 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fv, work, this%obj_scale)
+      call field_add2s2(fv, work, this%obj_scale / this%volume)
 
       ! ------------------------------------------------------------------------
       ! w
@@ -280,7 +285,7 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fw, work, this%obj_scale)
+      call field_add2s2(fw, work, this%obj_scale / this%volume)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
