@@ -85,7 +85,9 @@ __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
   T val = -1.0 / denom;
 
   // Mask out active primal constraints
-  bool active = (xt == alpha[tj]) || (xt == beta[tj]);
+  bool active = (fabs(xt - alpha[tj]) <= T(1e-16)) ||
+              (fabs(xt - beta[tj])  <= T(1e-16));
+
   Ljjxinv[tj] = active ? T(0.0) : val;
 }
 
