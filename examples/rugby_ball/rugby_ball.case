@@ -100,10 +100,6 @@
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
@@ -121,7 +117,11 @@
                 "base_value": 0.0,
                 "zone_value": 1.0,
                 "zone_name": "initial_ball"
-            }
+            },
+            "domain": {
+            "type": "point_zone",
+            "zone_name": "optimization_domain"
+            },
         },
         "solver": {
             "type": "mma",
