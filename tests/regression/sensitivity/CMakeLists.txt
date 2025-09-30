@@ -4,8 +4,8 @@ set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 # --------------------------------------------------------------------------- #
 # .case files to run in the regression suite (long-running)
 set(test_list
-    #"minimum_dissipation.case"
-    #"lube_term.case"
+    "minimum_dissipation.case"
+    "lube_term.case"
     #"min_dis_and_lube.case"
     #"min_dis_and_lube_weights.case"
     "passive_scalar.case"
@@ -83,7 +83,7 @@ add_custom_target(
             ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     COMMAND ${CMAKE_COMMAND} -E env
             LD_LIBRARY_PATH="${neko_LD_LIBRARY_PATH}" PATH="${neko_PATH}"
-            ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
+            ./prepare.sh -N16 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 add_dependencies(reg_sensitivity_test_prepare reg_sensitivity_prepare_script)
