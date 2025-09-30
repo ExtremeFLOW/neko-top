@@ -19,7 +19,7 @@ program minimum_dissipation_sensitivity
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, copy
+  use math, only: abscmp, copy, glmax, NEKO_EPS
   use sensitivity, only: compute_sensitivity
   use user, only: user_setup
   implicit none
@@ -48,6 +48,8 @@ program minimum_dissipation_sensitivity
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
+  real(kind=rp) :: sens_max_l, sens_max_g
+  logical :: contains_max
 
   ! True => testing an objective, F => testing a constraint
   logical :: is_objective
@@ -73,6 +75,7 @@ program minimum_dissipation_sensitivity
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  call user_setup(sim%neko_case%user)
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
