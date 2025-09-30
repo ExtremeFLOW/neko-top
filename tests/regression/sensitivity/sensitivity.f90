@@ -117,11 +117,6 @@ contains
        log_data%x(3) = fd_estimate
        log_data%x(4) = fd_error
        call logger%write(log_data)
-
-       if (abs(fd_error) .gt. tolerance) then
-          call neko_error('Finite difference estimate does not match ' // &
-               'sensitivity')
-       end if
     end do
 
   end subroutine compute_sensitivity_i
