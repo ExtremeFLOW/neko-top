@@ -50,6 +50,7 @@ contains
           if (time%t .lt. T_fin) then
           print *, "1"
                u%x(idx, 1, 1, 1) = U_max * time%t / T_fin
+               u%x(idx, 1, 1, 1) = U_max
           else
           print *, "2"
                u%x(idx, 1, 1, 1) = U_max
