@@ -85,6 +85,7 @@ module lube_term_objective
   use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
+  use device
   implicit none
   private
 
@@ -328,6 +329,12 @@ contains
     integer :: n_GL, nel
 
     ! if we have the lube term we also get an extra term in the sensitivity
+      if (.not. device_associated(this%accumulate%x)) then
+         call device_associate(this%accumulate%x, this%accumulate%x_d)
+      end if
+      if (.not. device_associated(this%fld_GL%x)) then
+         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
+      end if
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
