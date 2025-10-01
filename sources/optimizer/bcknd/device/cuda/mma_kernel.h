@@ -45,15 +45,15 @@ __global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
   int idx = k + 1;
 
   // Calculate first term: (L_total - Le*(offset+idx-1))^3
-  T x1 = L_total - Le * (T)(offset + idx - 1);
+  T x1 = L_total - Le * static_cast<T>(offset + idx - 1);
   T term1 = x1 * x1 * x1;
 
   // Calculate second term: (L_total - Le*(offset+idx))^3  
-  T x2 = L_total - Le * (T)(offset + idx);
+  T x2 = L_total - Le * static_cast<T>(offset + idx);
   T term2 = x2 * x2 * x2;
 
   // Final result
-  Delta[k] = (term1 - term2) / (T)3.0;
+  Delta[k] = (term1 - term2) / static_cast<T>(3.0);
 }
 
 template <typename T>
@@ -67,14 +67,14 @@ __global__ void mma_Ljjxinv_kernel(T* __restrict__ Ljjxinv,
 
   // Load inputs into registers
   const T xt    = x[tj];
-  const T low_t = low[tj];
-  const T upp_t = upp[tj];
+  const T low_j = low[tj];
+  const T upp_j = upp[tj];
   const T pj    = pjlambda[tj];
   const T qj    = qjlambda[tj];
 
   // Precompute reused differences
-  const T diff_u = upp_t - xt;
-  const T diff_l = xt - low_t;
+  const T diff_u = upp_j - xt;
+  const T diff_l = xt - low_j;
 
   // Cube once (avoiding pow for speed)
   const T diff_u3 = diff_u * diff_u * diff_u;
@@ -106,16 +106,16 @@ __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
   const T qj_sqrt = sqrt(qjlambda[tj]);
   const T denom   = pj_sqrt + qj_sqrt;
 
-  const T low_t   = low[tj];
-  const T upp_t   = upp[tj];
-  const T alpha_t = alpha[tj];
-  const T beta_t  = beta[tj];
+  const T low_j   = low[tj];
+  const T upp_j   = upp[tj];
+  const T alpha_j = alpha[tj];
+  const T beta_j  = beta[tj];
 
   // Weighted average
-  const T val = (pj_sqrt * low_t + qj_sqrt * upp_t) / denom;
+  const T val = (pj_sqrt * low_j + qj_sqrt * upp_j) / denom;
 
   // Clamp x between alpha and beta using branchless min/max
-  x[tj] = fmin(fmax(val, alpha_t), beta_t);
+  x[tj] = fmin(fmax(val, alpha_j), beta_j);
 }
 
 template <typename T>
@@ -150,11 +150,11 @@ __global__ void mma_sub1_kernel(
 
   // Load values once into registers (global memory is slow)
   const T xt    = x[tj];
-  const T xmin_t = xmin[tj];
-  const T xmax_t = xmax[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
 
   // Reuse xgap calculation
-  const T xgap = xmax_t - xmin_t;
+  const T xgap = xmax_j - xmin_j;
   const T offset = asyinit * xgap;
 
   xlow[tj] = xt - offset;
@@ -215,28 +215,28 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
 
   // Load into registers once
   const T xt    = x[tj];
-  const T xmin_t = xmin[tj];
-  const T xmax_t = xmax[tj];
-  const T low_t = low[tj];
-  const T upp_t = upp[tj];
+  const T xmin_j = xmin[tj];
+  const T xmax_j = xmax[tj];
+  const T low_j = low[tj];
+  const T upp_j = upp[tj];
   const T df0 = df0dx[tj];
-  const T xgap = xmax_t - xmin_t;
+  const T xgap = xmax_j - xmin_j;
 
   // Clamp helpers
   const T half_xgap = 0.5 * xgap;
-  const T tenth_low_diff = T(0.1) * (xt - low_t);
-  const T tenth_upp_diff = T(0.1) * (upp_t - xt);
+  const T tenth_low_diff = T(0.1) * (xt - low_j);
+  const T tenth_upp_diff = T(0.1) * (upp_j - xt);
 
   // Compute alpha and beta with fused max/min and fewer calls
-  T alpha_val = max(max(xmin_t, low_t + tenth_low_diff), xt - half_xgap);
-  T beta_val = min(min(xmax_t, upp_t - tenth_upp_diff), xt + half_xgap);
+  T alpha_val = max(max(xmin_j, low_j + tenth_low_diff), xt - half_xgap);
+  T beta_val = min(min(xmax_j, upp_j - tenth_upp_diff), xt + half_xgap);
 
   alpha[tj] = alpha_val;
   beta[tj] = beta_val;
 
   // Avoid multiple pow calls, compute once
-  const T upp_minus_x = upp_t - xt;
-  const T x_minus_low = xt - low_t;
+  const T upp_minus_x = upp_j - xt;
+  const T x_minus_low = xt - low_j;
   const T upp_minus_x_sq = upp_minus_x * upp_minus_x;
   const T x_minus_low_sq = x_minus_low * x_minus_low;
 
@@ -284,11 +284,11 @@ __global__ void mma_sub4_kernel(
 
   // Register caching
   const T xt     = x[tj];
-  const T low_t  = low[tj];
-  const T upp_t  = upp[tj];
+  const T low_j  = low[tj];
+  const T upp_j  = upp[tj];
 
-  const T denom_upp = upp_t - xt;
-  const T denom_low = xt - low_t;
+  const T denom_upp = upp_j - xt;
+  const T denom_low = xt - low_j;
 
   const T eps = T(1e-12);  // Precision-dependent epsilon
   const T inv_denom_upp = T(1) / max(denom_upp, eps);
@@ -479,16 +479,16 @@ __global__ void delx_kernel(
     int tj = blockIdx.x * blockDim.x + threadIdx.x;
     if (tj < n) {
         T xt = x[tj];
-        T xlow_t = xlow[tj];
-        T xupp_t = xupp[tj];
-        T alpha_t = alpha[tj];
-        T beta_t = beta[tj];
+        T xlow_j = xlow[tj];
+        T xupp_j = xupp[tj];
+        T alpha_j = alpha[tj];
+        T beta_j = beta[tj];
         
         // Precompute denominators squared for better performance
-        T denom_low = xt - xlow_t;
-        T denom_upp = xupp_t - xt;
-        T denom_alpha = xt - alpha_t;
-        T denom_beta = beta_t - xt;
+        T denom_low = xt - xlow_j;
+        T denom_upp = xupp_j - xt;
+        T denom_alpha = xt - alpha_j;
+        T denom_beta = beta_j - xt;
 
         const T small_eps = T(1e-12);
         denom_low = (abs(denom_low) < small_eps) ? small_eps : denom_low;
@@ -525,12 +525,12 @@ __global__ void GG_kernel(
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj < n) {
     T xt = x[tj];
-    T xlow_t = xlow[tj];
-    T xupp_t = xupp[tj];
+    T xlow_j = xlow[tj];
+    T xupp_j = xupp[tj];
 
     // Distances from bounds
-    T diff_upper = xupp_t - xt;
-    T diff_lower = xt - xlow_t;
+    T diff_upper = xupp_j - xt;
+    T diff_lower = xt - xlow_j;
 
     // Squared distances
     T diff_upper2 = diff_upper * diff_upper;
@@ -687,8 +687,7 @@ __global__ void mmasumHess_kernel(
     const unsigned int lane = threadIdx.x % warpSize;
     const unsigned int wid = threadIdx.x / warpSize;
 
-    // Shared memory sized by number of warps per block
-    extern __shared__ T shared[]; 
+    __shared__ T shared[32];
 
     T sum = T(0);
 
