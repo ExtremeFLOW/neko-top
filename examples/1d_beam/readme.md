@@ -1,4 +1,4 @@
-# A Simple 1D Beam Optimization Test Case for MMA
+# A Simple 1D Beam Optimization Test Case for MMA {#beam}
 
 This example demonstrates a simple test case for the Method of Moving Asymptotes (MMA) as implemented in **NEKO-TOP**.
 The problem is a **1D cantilever beam**, discretized into multiple elements, where the design variable is the **beam height** `h` at each element. The objective is to **maximize stiffness (minimize tip deflection)** while **minimizing beam weight** and enforcing **stress constraints**.
