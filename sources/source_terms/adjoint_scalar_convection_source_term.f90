@@ -44,7 +44,7 @@ module adjoint_scalar_convection_source_term
   use space, only: space_t, GL
   use coefs, only: coef_t
   use field_math, only: field_subcol3, field_sub2
-  use operators, only: grad
+  use operators, only: grad, dudxyz
   use utils, only: neko_error
   use field_registry, only: neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -82,7 +82,7 @@ module adjoint_scalar_convection_source_term
      !> if dealiasing should be applied
      logical :: dealias
      !> work arrays
-     type(vector_t) :: accumulate, fld_GL, s_adj_GL
+     type(vector_t) :: accumulate, fld_GL, s_GL, s_adj_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -179,6 +179,7 @@ contains
        n_GL = nel * this%Xh_GL%lxyz
        call this%accumulate%init(n_GL)
        call this%fld_GL%init(n_GL)
+       call this%s_GL%init(n_GL)
        call this%s_adj_GL%init(n_GL)
     end if
 
@@ -191,6 +192,7 @@ contains
     call this%free_base()
     call this%accumulate%free()
     call this%fld_GL%free()
+    call this%s_GL%free()
     call this%s_adj_GL%free()
   end subroutine adjoint_scalar_convection_source_term_free
 
@@ -215,24 +217,17 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
-    ! we basically just need the term
-    ! \f$\nabla s s_adj\f$
-
-    call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
-
-    ! TODO
-    ! So in principal, the derivatives could have kinks now.
-    ! I don't think a gsop will remedy this (or even whether it's a good idea)
-    ! But I want to leave this todo as a reminder.
-
+    ! we need the term \f$\nabla s s_adj\f$
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
 
+       call this%GLL_to_GL%map(this%s_GL%x, this%s%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(this%s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
 
        ! u
-       call this%GLL_to_GL%map(this%fld_GL%x, dsdx%x, nel, this%Xh_GL)
+       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdx, &
+       this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -247,7 +242,8 @@ contains
        call field_sub2(fu, work)
 
        ! v
-       call this%GLL_to_GL%map(this%fld_GL%x, dsdy%x, nel, this%Xh_GL)
+       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdy, &
+       this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -262,7 +258,8 @@ contains
        call field_sub2(fv, work)
 
        ! w
-       call this%GLL_to_GL%map(this%fld_GL%x, dsdz%x, nel, this%Xh_GL)
+       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdz, &
+       this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -277,6 +274,7 @@ contains
        call field_sub2(fw, work)
 
     else
+       call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
        call field_subcol3(fu, this%s_adj, dsdx)
        call field_subcol3(fv, this%s_adj, dsdy)
        call field_subcol3(fw, this%s_adj, dsdz)
