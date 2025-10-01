@@ -64,7 +64,6 @@
             "type": "mma",
             "max_iterations": 100,
             "tolerance": 1.0e-4,
-            "performance": false,
             "mma": {
                 "max_iter": 100,
                 "backend": "cpu",

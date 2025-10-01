@@ -49,8 +49,8 @@ module mma_optimizer
      real(kind=rp) :: scale
      logical :: auto_scale
 
-     ! when true, then we remove IO loggings for optimal performance
-     logical :: performance
+     ! Set to flase to remove logging for optimal performance
+     logical :: enable_output
 
    contains
 
@@ -76,7 +76,7 @@ contains
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
     type(simulation_t), optional, intent(in) :: simulation
-    logical :: performance
+    logical :: enable_output
     integer :: max_iterations
     real(kind=rp) :: tolerance
 
@@ -111,11 +111,11 @@ contains
          max_iterations, 100)
     call json_get_or_default(parameters, "optimization.solver.tolerance", &
          tolerance, 1.0e-3_rp)
-    call json_get_or_default(parameters, "optimization.solver.performance", &
-         performance, .false.)
+    call json_get_or_default(parameters, "optimization.solver.enable_output", &
+         enable_output, .true.)
 
     call this%init_from_components(problem, design, &
-         max_iterations, tolerance, performance, simulation)
+         max_iterations, tolerance, enable_output, simulation)
 
     call this%logger%set_header(trim(optimization_header) // &
          this%mma%get_backend_and_subsolver())
@@ -124,17 +124,17 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       max_iterations, tolerance, performance, simulation)
+       max_iterations, tolerance, enable_output, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     type(simulation_t), intent(in), optional :: simulation
-    logical, intent(in) :: performance
+    logical, intent(in) :: enable_output
 
-    !set the performance flag
-    this%performance = performance
+    !set the enable_output flag
+    this%enable_output = enable_output
 
     call this%init_base(max_iterations, tolerance)
 
@@ -186,7 +186,7 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
-    if (.not. this%performance) then
+    if (this%enable_output) then
        ! Stamp the initial condition
        call mma_logger_assemble_data(log_data, 0, objective_value, &
             all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
@@ -196,9 +196,9 @@ contains
        if (present(simulation)) then
           call simulation%write(0)
        end if
-    end if
 
-    if (.not. this%performance) call design%write(0)
+       call design%write(0)
+    end if
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -240,7 +240,7 @@ contains
             constraint_value, constraint_sensitivities)
 
 
-       if (.not. this%performance) then
+       if (this%enable_output) then
           ! Stamp the i^th iteration
           call mma_logger_assemble_data(log_data, iter, objective_value, &
                all_objectives, constraint_value, this%mma%get_residumax(), &
@@ -251,9 +251,9 @@ contains
           if (present(simulation)) then
              call simulation%write(iter)
           end if
+          call design%write(iter)
        end if
 
-       if (.not. this%performance) call design%write(iter)
        if (present(simulation)) call simulation%reset()
     end do
 

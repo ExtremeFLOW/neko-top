@@ -36,9 +36,6 @@ contains
     type(simulation_t), optional, intent(in) :: simulation
 
     character(len=:), allocatable :: type
-    integer :: max_iterations
-    real(kind=rp) :: tolerance
-    logical :: performance
     class(constraint_t), allocatable :: dummy_con
 
     if (allocated(object)) then
