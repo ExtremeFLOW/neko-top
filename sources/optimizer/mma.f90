@@ -228,8 +228,7 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
-    ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-    !      max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
+
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
@@ -327,7 +326,7 @@ contains
     call this%qij%init(m, n)
     call this%bi%init(m)
 
-    !---nesessary for KKT check after updating df0dx, fval, dfdx --------
+    ! Necessary for KKT check after updating df0dx, fval, dfdx
     call this%y%init(m)
     call this%lambda%init(m)
     call this%s%init(m)
@@ -340,14 +339,14 @@ contains
     this%c%x = c
     this%d%x = d
 
-    !setting the bounds for the design variable based on the problem
+    ! Set the bounds for the design variable based on the problem
     this%xmax%x = xmax
     this%xmin%x = xmin
 
     this%low%x(:) = minval(x)
     this%upp%x(:) = maxval(x)
 
-    !setting KKT norms to a large number for the initial design
+    ! Set KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
@@ -358,7 +357,7 @@ contains
           print *, "MMA initialized with CPU backend!"
        end if
     case ("device")
-       ! upload all init values to device pointers
+       ! Upload all init values to device pointers
        call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, &
             HOST_TO_DEVICE, sync = .false.)
        call device_memcpy(this%xold2%x, this%xold2%x_d, this%n, &
@@ -391,11 +390,11 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
-    ! based on the Cpp Code by Niels
+    ! Based on the Cpp Code by Niels
     if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
     if (.not. present(max_iter)) this%max_iter = 100
 
-    ! Following parameters are set based on eq.3.8:--------
+    ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
@@ -422,7 +421,7 @@ contains
        print *, "MMA is initialized with a0 = ", a0, ", a = ", a, ", c = ", c, &
             ", d = ", d, "epsimin = ", this%epsimin
     end if
-    !the object is correctly initialized
+    ! The object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_from_components
 
@@ -456,7 +455,6 @@ contains
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
-       !  call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     end select
 
   end subroutine mma_update_vector

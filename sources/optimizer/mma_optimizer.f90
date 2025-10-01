@@ -94,7 +94,6 @@ contains
     problem_header = problem%get_log_header()
     optimization_header = 'iter, ' // trim(problem_header) // &
          ', KKTmax, KKTnorm2, scaling factor'
-    !  call this%logger%set_header(trim(optimization_header))
 
     call design%get_values(x)
 
