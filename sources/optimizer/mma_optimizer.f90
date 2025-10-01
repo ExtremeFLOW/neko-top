@@ -70,15 +70,15 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
-       max_iterations, tolerance, performance, simulation)
+       simulation)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
-    integer, intent(in) :: max_iterations
-    real(kind=rp), intent(in) :: tolerance
     type(simulation_t), optional, intent(in) :: simulation
-    logical, intent(in) :: performance
+    logical :: performance
+    integer :: max_iterations
+    real(kind=rp) :: tolerance
 
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
@@ -106,6 +106,13 @@ contains
          solver_parameters)
     call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
+
+    call json_get_or_default(parameters, "optimization.solver.max_iterations", &
+         max_iterations, 100)
+    call json_get_or_default(parameters, "optimization.solver.tolerance", &
+         tolerance, 1.0e-3_rp)
+    call json_get_or_default(parameters, "optimization.solver.performance", &
+         performance, .false.)
 
     call this%init_from_components(problem, design, &
          max_iterations, tolerance, performance, simulation)

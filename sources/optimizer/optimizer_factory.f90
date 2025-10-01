@@ -33,7 +33,7 @@ contains
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
-    class(simulation_t), optional, intent(in) :: simulation
+    type(simulation_t), optional, intent(in) :: simulation
 
     character(len=:), allocatable :: type
     integer :: max_iterations
@@ -48,18 +48,12 @@ contains
 
     ! Get the type of the optimizer
     call json_get(parameters, "optimization.solver.type", type)
-    call json_get_or_default(parameters, "optimization.solver.max_iterations", &
-         max_iterations, 100)
-    call json_get_or_default(parameters, "optimization.solver.tolerance", &
-         tolerance, 1.0e-3_rp)
-    call json_get_or_default(parameters, "optimization.solver.performance", &
-         performance, .false.)
 
     ! Select the optimizer type
     select case (trim(type))
     case ("mma")
        allocate(mma_optimizer_t::object)
-
+       print *, "MMA optimizer allocated successfully"
     case default
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
@@ -71,13 +65,7 @@ contains
        call problem%add_constraint(dummy_con)
     end if
 
-    if (present(simulation)) then
-       call object%init_from_json(parameters, problem, design, &
-            max_iterations, tolerance, performance, simulation)
-    else
-       call object%init_from_json(parameters, problem, design, &
-            max_iterations, tolerance, performance)
-    end if
+    call object%init_from_json(parameters, problem, design, simulation)
 
   end subroutine optimizer_factory
 
