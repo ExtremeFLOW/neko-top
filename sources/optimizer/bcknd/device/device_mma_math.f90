@@ -68,11 +68,11 @@ contains
 
   subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
     !--------------------------------------------------------------------------!
-    !> A device support to do the following calculation for 1D beam elements:  
-    !! 
-    !!   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &  
-    !!              (L_total - Le*(offset+k))**3) / 3.0_rp  
-    !!  
+    !> A device support to do the following calculation for 1D beam elements:
+    !!
+    !!   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &
+    !!              (L_total - Le*(offset+k))**3) / 3.0_rp
+    !!
     !! Where k ranges from 1 to n
     !--------------------------------------------------------------------------!
     type(c_ptr) :: Delta_d
