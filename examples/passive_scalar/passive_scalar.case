@@ -158,10 +158,6 @@
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
@@ -177,6 +173,10 @@
             "initial_distribution": {
                 "type": "uniform",
                 "value": 0.0
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {
