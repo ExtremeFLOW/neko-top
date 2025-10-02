@@ -64,7 +64,8 @@ module simulation_m
   use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
   use jobctrl, only: jobctrl_time_limit
-  use profiler, only: profiler_start, profiler_stop
+  use profiler, only: profiler_start, profiler_stop, &
+       profiler_start_region, profiler_end_region
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
@@ -225,6 +226,7 @@ contains
     call simulation_init(this%neko_case, dt_controller)
 
     loop_start = MPI_WTIME()
+    call profiler_start_region("Forward simulation")
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
 
@@ -232,6 +234,7 @@ contains
 
        call this%checkpoint%save(this%neko_case)
     end do
+    call profiler_end_region("Forward simulation")
 
     call simulation_finalize(this%neko_case)
 
@@ -252,12 +255,14 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
+    call profiler_start_region("Adjoint simulation")
     do i = this%n_timesteps, 1, -1
        call this%checkpoint%restore(this%neko_case, i)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
     end do
+    call profiler_end_region("Adjoint simulation")
 
     call simulation_adjoint_finalize(this%adjoint_case)
 
