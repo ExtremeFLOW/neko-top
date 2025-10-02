@@ -68,11 +68,12 @@ contains
 
   subroutine device_delta_1dbeam(Delta_d, L_total, Le, offset, n)
     !--------------------------------------------------------------------------!
-    ! A device support to do the following calculation for 1D beam elements:   !
-    !   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &                         !
-    !              (L_total - Le*(offset+k))**3) / 3.0_rp                      !
-    !                                                                          !
-    ! Where k ranges from 1 to n                                               !
+    !> A device support to do the following calculation for 1D beam elements:  
+    !! 
+    !!   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &  
+    !!              (L_total - Le*(offset+k))**3) / 3.0_rp  
+    !!  
+    !! Where k ranges from 1 to n
     !--------------------------------------------------------------------------!
     type(c_ptr) :: Delta_d
     real(c_rp) :: L_total, Le
@@ -105,14 +106,14 @@ contains
   subroutine device_mma_Ljjxinv(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
        low_d, upp_d, alpha_d, beta_d, n)
     !--------------------------------------------------------------------------!
-    ! A device support to do the following calculation needed for the          !
-    ! dualsubsolve for MMA:                                                    !
-    !   Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &                         !
-    !                                  (2*qjlambda/(x - low)**3))              !                                                     !
-    !                                                                          !
-    ! And then remove the sensitivity for the active primal constraints        !
-    ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)                           !
-    ! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)                            !
+    !> A device support to do the following calculation needed for the         !
+    !! dualsubsolve for MMA:                                                   !
+    !!   Ljjxinv= - 1 / ( (2*pjlambda/(upp - x)**3) + &                        !
+    !!                                  (2*qjlambda/(x - low)**3))             !
+    !!                                                                         !
+    !! And then remove the sensitivity for the active primal constraints       !
+    !! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. alpha)                          !
+    !! Ljjxinv = merge(0.0_rp, Ljjxinv, x .eq. beta)                           !
     !--------------------------------------------------------------------------!
     type(c_ptr) :: Ljjxinv_d, pjlambda_d, qjlambda_d, x_d, &
          low_d, upp_d, alpha_d, beta_d
@@ -134,10 +135,10 @@ contains
   subroutine device_mma_dipsolvesub1(x_d, pjlambda_d, qjlambda_d, &
        low_d, upp_d, alpha_d, beta_d, n)
     !--------------------------------------------------------------------------!
-    ! A device support to do the following calculation needed for the          !
-    ! dualsubsolve for MMA:                                                    !
-    !   x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) /  &                 !
-    !                                  (sqrt(pjlambda) + sqrt(qjlambda))       !                                                     !
+    !> A device support to do the following calculation needed for the         !
+    !! dualsubsolve for MMA:                                                   !
+    !!   x = (sqrt(pjlambda) * low + sqrt(qjlambda) * upp) /  &                !
+    !!                                  (sqrt(pjlambda) + sqrt(qjlambda))      !
     !--------------------------------------------------------------------------!
     type(c_ptr) :: x_d, pjlambda_d, qjlambda_d, &
          low_d, upp_d, alpha_d, beta_d
@@ -158,10 +159,10 @@ contains
 
   subroutine device_mattrans_v_mul(output_d, pij_d, lambda_d, m, n)
     !--------------------------------------------------------------------------!
-    ! A device support to do the following matrix multiplication               !
-    !               output = matmul(transpose(pij), lambda)                    !
-    ! where matrix pij is mxn, vector lambda is of size m and the output       !
-    ! vector is of size n                                                      !
+    !> A device support to do the following matrix multiplication              !
+    !!               output = matmul(transpose(pij), lambda)                   !
+    !! where matrix pij is mxn, vector lambda is of size m and the output      !
+    !! vector is of size n                                                     !
     !--------------------------------------------------------------------------!
     type(c_ptr) :: output_d, pij_d, lambda_d
     integer :: m, n

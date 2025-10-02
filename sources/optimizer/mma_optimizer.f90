@@ -92,7 +92,6 @@ contains
     ! Initialize the logger
     call this%logger%init('optimization_data.csv')
 
-
     ! Write the header
     problem_header = problem%get_log_header()
     optimization_header = 'iter, ' // trim(problem_header) // &
