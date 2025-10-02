@@ -1,11 +1,10 @@
 
 
 submodule(optimizer) optimizer_factory_mod
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get
   use utils, only: neko_type_error
-  use dummy_constraint, only: dummy_constraint_t
   use mma_optimizer, only: mma_optimizer_t
-  use constraint, only: constraint_t
+
 
   implicit none
 
@@ -36,7 +35,6 @@ contains
     type(simulation_t), optional, intent(in) :: simulation
 
     character(len=:), allocatable :: type
-    class(constraint_t), allocatable :: dummy_con
 
     if (allocated(object)) then
        call object%free()
@@ -50,17 +48,9 @@ contains
     select case (trim(type))
     case ("mma")
        allocate(mma_optimizer_t::object)
-       print *, "MMA optimizer allocated successfully"
     case default
        call neko_type_error("Optimizer", type, KNOWN_TYPES)
     end select
-
-    !Check if we are solving an unconstrained problem and add a dummy constraint
-    if (problem%get_n_constraints() .eq. 0) then
-       allocate(dummy_constraint_t::dummy_con)
-       call dummy_con%init(parameters, design)
-       call problem%add_constraint(dummy_con)
-    end if
 
     call object%init_from_json(parameters, problem, design, simulation)
 
