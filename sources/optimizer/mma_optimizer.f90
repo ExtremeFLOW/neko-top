@@ -6,7 +6,7 @@ module mma_optimizer
   use num_types, only: rp
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default, json_extract_object
+  use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use design, only: design_t
   use field, only: field_t
@@ -103,7 +103,7 @@ contains
        print *, "Initializing mma_optimizer with steady_state_problem_t."
     end if
 
-    call json_extract_object(parameters, "optimization.solver", &
+    call json_get(parameters, "optimization.solver", &
          solver_parameters)
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained

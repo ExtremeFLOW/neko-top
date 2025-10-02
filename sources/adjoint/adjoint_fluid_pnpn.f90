@@ -58,8 +58,7 @@ module adjoint_fluid_pnpn
   use advection_adjoint, only: advection_adjoint_t, advection_adjoint_factory
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
-  use json_utils, only: json_get, json_get_or_default, json_extract_item, &
-       json_extract_object
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use json_module, only: json_file
   use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
@@ -420,7 +419,7 @@ contains
     call json_get(params, 'case.fluid.pressure_solver.type', solver_type)
     call json_get(params, 'case.fluid.pressure_solver.preconditioner.type', &
          precon_type)
-    call json_extract_object(params, &
+    call json_get(params, &
          'case.fluid.pressure_solver.preconditioner', precon_params)
     call json_get(params, 'case.fluid.pressure_solver.absolute_tolerance', &
          abs_tol)
@@ -441,7 +440,7 @@ contains
     ! Initialize the advection factory
     call neko_log%section("Advection factory")
     call json_get_or_default(params, 'case.fluid.advection', advection, .true.)
-    call json_extract_object(params, 'case.numerics', numerics_params)
+    call json_get(params, 'case.numerics', numerics_params)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          this%ulag, this%vlag, this%wlag, &
          chkp%dtlag, chkp%tlag, this%ext_bdf, &
@@ -687,7 +686,7 @@ contains
 
     n = this%dm_Xh%size()
 
-    call profiler_start_region('Adjoint', 13)
+    call profiler_start_region('Adjoint')
     associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
          p => this%p_adj, &
          u_e => this%u_adj_e, v_e => this%v_adj_e, w_e => this%w_adj_e, &
@@ -756,7 +755,7 @@ contains
       call this%update_material_properties(time)
 
       ! Compute pressure residual.
-      call profiler_start_region('Pressure_residual', 18)
+      call profiler_start_region('Adjoint_pressure_residual')
 
       call prs_res%compute(p, p_res, &
            u, v, w, &
@@ -777,7 +776,7 @@ contains
       call this%bclst_dp%apply_scalar(p_res%x, p%dof%size(), time)
 
 
-      call profiler_end_region('Pressure_residual', 18)
+      call profiler_end_region('Adjoint_pressure_residual')
 
 
       call this%proj_prs%pre_solving(p_res%x, tstep, c_Xh, n, dt_controller, &
@@ -785,7 +784,7 @@ contains
 
       call this%pc_prs%update()
 
-      call profiler_start_region('Pressure_solve', 3)
+      call profiler_start_region('Adjoint_pressure_solve')
 
       ! Solve for the pressure increment.
       ksp_results(1) = &
@@ -793,7 +792,7 @@ contains
            this%bclst_dp, gs_Xh)
 
 
-      call profiler_end_region('Pressure_solve', 3)
+      call profiler_end_region('Adjoint_pressure_solve')
 
       call this%proj_prs%post_solving(dp%x, Ax_prs, c_Xh, &
            this%bclst_dp, gs_Xh, n, tstep, dt_controller)
@@ -803,7 +802,7 @@ contains
       if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
 
       ! Compute velocity residual.
-      call profiler_start_region('Velocity_residual', 19)
+      call profiler_start_region('Adjoint_velocity_residual')
       call vel_res%compute(Ax_vel, u, v, w, &
            u_res, v_res, w_res, &
            p, &
@@ -823,19 +822,19 @@ contains
       call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
 
 
-      call profiler_end_region('Velocity_residual', 19)
+      call profiler_end_region('Adjoint_velocity_residual')
 
       call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, &
            tstep, c_Xh, n, dt_controller, 'Velocity')
 
       call this%pc_vel%update()
 
-      call profiler_start_region("Velocity_solve", 4)
+      call profiler_start_region("Adjoint_velocity_solve")
       ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
            u_res%x, v_res%x, w_res%x, n, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
            this%ksp_vel%max_iter)
-      call profiler_end_region("Velocity_solve", 4)
+      call profiler_end_region("Adjoint_velocity_solve")
 
       ksp_results(1)%name = 'Adjoint Pressure'
       ksp_results(2)%name = 'Adjoint Velocity U'
@@ -862,7 +861,7 @@ contains
            this%full_stress_formulation, this%strict_convergence)
 
     end associate
-    call profiler_end_region('Adjoint', 13)
+    call profiler_end_region('Adjoint')
 
   end subroutine adjoint_fluid_pnpn_step
 
