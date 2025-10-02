@@ -31,19 +31,18 @@
                 "preconditioner": { "type": "jacobi" },
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-8,
-                "max_iterations": 100
+                "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": { "type": "hsmg" },
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-7,
-                "max_iterations": 100
+                "max_iterations": 800
             },
             "boundary_conditions ": [
                 {
-                    "type": "velocity_value",
-                    "value": [ 1.0, 0.0, 0.0 ],
+                    "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -83,7 +82,7 @@
                 },
                 "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 100
+                "max_iterations": 800
             },
             "boundary_conditions": [
                 {
@@ -107,6 +106,12 @@
                 "x_bounds": [ 1.0, 3.5 ],
                 "y_bounds": [ 0.0, 1.0 ],
                 "z_bounds": [ 0.0, 1.0 ]
+            },
+            {
+                "name": "initial_ball",
+                "geometry": "sphere",
+                "center": [ 2.25, 0.5, 0.5 ],
+                "radius": 0.25
             }
         ]
     },
@@ -129,17 +134,19 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 1000
                 }
             ],
             "initial_distribution": {
-                "type": "uniform",
-                "value": 0.05
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_ball"
             }
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 2,
+            "max_iterations": 0,
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,

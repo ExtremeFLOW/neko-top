@@ -34,7 +34,7 @@ contains
 
     type(field_t), pointer :: u, v, w, s
     integer :: i
-    real(kind=rp), parameter :: band_size = 0.05_rp
+    real(kind=rp), parameter :: band_size = 0.01_rp
     real(kind=rp) :: y, z, val_y0, val_z0, val_y1, val_z1
     logical :: is_velocity_bc, is_scalar_bc
 
