@@ -112,7 +112,7 @@
     },
     "checkpoints": {
         "enabled": true,
-        "n_saves_memory": 100,
+        "n_saves_memory": 5,
         "keep_checkpoints": true
     },
     "optimization": {
@@ -134,7 +134,7 @@
             ],
             "initial_distribution": {
                 "type": "uniform",
-                "value": 0.1
+                "value": 0.05
             }
         },
         "solver": {
