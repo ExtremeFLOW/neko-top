@@ -32,7 +32,7 @@ function create_case() {
 
     # Set file names
     local case_name="${cluster,,}_nodes_${nodes}_mesh_${Nx}x${Ny}x${Nz}"
-    local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}_${Np}.nmsh"
+    local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
     local case_file="${case_path}/${case_name}.case"
     local job_path="${hpc_path}/${cluster}/lumi_mixer/cases"
 
@@ -64,6 +64,8 @@ function create_case() {
     fi
 }
 
+find ${case_path} -type f -name "*.case" -delete
+
 experiment="preliminary"
 cluster="LUMI-G"
 create_case $experiment   8   2   2 ${cluster} 1
@@ -71,4 +73,6 @@ create_case $experiment  16   4   4 ${cluster} 1
 create_case $experiment  32   8   8 ${cluster} 1
 create_case $experiment  64  16  16 ${cluster} 1
 create_case $experiment 128  32  32 ${cluster} 1
-create_case $experiment 256  64  64 ${cluster} 1
+
+# Too big even with just 5 saves to memory
+# create_case $experiment 256  64  64 ${cluster} 1
