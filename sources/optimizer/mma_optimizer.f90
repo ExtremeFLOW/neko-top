@@ -107,7 +107,7 @@ contains
     call json_extract_object(parameters, "optimization.solver", &
          solver_parameters)
 
-    ! Initialize mma_t, handling the dummy_constraint added for unconstrained 
+    ! Initialize mma_t, handling the dummy_constraint added for unconstrained
     ! problems in mma_optimizer_run()
     unconstrained_problem = (problem%get_n_constraints() == 0)
     if (unconstrained_problem) then
