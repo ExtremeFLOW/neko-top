@@ -5,38 +5,35 @@ export ROOT_DIR=$(realpath $(dirname $0))
 export MAIN_DIR=$(realpath $ROOT_DIR/../..)
 
 export mesh_pattern="mixer"
-export data_path="${MAIN_DIR}/data_local/static_mixer"
-export example_path="${MAIN_DIR}/examples/lumi_mixer/cases"
-export template_path="${MAIN_DIR}/examples/lumi_mixer/templates"
+
 export hpc_path="${MAIN_DIR}/scripts/jobscripts"
+export data_path="${MAIN_DIR}/data_local/static_mixer"
+export example_path="${MAIN_DIR}/examples/lumi_mixer"
+
+export case_path="${example_path}/cases"
+export template_path="${example_path}/templates"
+export experiment_path="${example_path}/experiments"
 
 [ ! -d ${data_path} ] && mkdir -p ${data_path}
-[ ! -d ${example_path} ] && mkdir -p ${example_path}
+[ ! -d ${case_path} ] && mkdir -p ${case_path}
+[ ! -d ${experiment_path} ] && mkdir -p ${experiment_path}
 
 function create_case() {
-    local n=$1              # Number of cells in x direction
-    local cluster=$2        # Name of the cluster
-    local nodes=$3          # Number of nodes
-
-    # Compute mesh dimensions
-    local Nx=$((n / 4 * 4))
-    local Ny=$((n / 4))
-    local Nz=$((n / 4))
+    local experiment=$1     # Experiment type (weak_scaling)
+    local Nx=$2             # Mesh dimension in x
+    local Ny=$3             # Mesh dimension in y
+    local Nz=$4             # Mesh dimension in z
+    local cluster=$5        # HPC cluster (LUMI-G)
+    local nodes=$6          # Number of nodes
 
     if [ ${cluster} == "LUMI-G" ]; then
         Np=$((nodes * 8))
     fi
 
-    if [[ Nx -ne n || Ny -lt 1 || Nz -lt 1 ]]; then
-        echo "Error: Invalid mesh dimensions: ${n}."
-        echo "       Must be a multiple of 4 and at least 4."
-        exit 1
-    fi
-
     # Set file names
-    local case_name="nodes_${nodes}_mesh_${n}"
+    local case_name="${cluster,,}_nodes_${nodes}_mesh_${Nx}x${Ny}x${Nz}"
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}_${Np}.nmsh"
-    local case_file="${example_path}/${case_name}.case"
+    local case_file="${case_path}/${case_name}.case"
     local job_path="${hpc_path}/${cluster}/lumi_mixer/cases"
 
     # Create the mesh if it does not exist
@@ -56,13 +53,22 @@ function create_case() {
     cp ${template_path}/${cluster}.sh ${job_path}/${case_name}.sh
     sed -i "s|--nodes=.*|--nodes=${nodes}|g" ${job_path}/${case_name}.sh
 
+    # Create the experiment entry
+    if [ ! -f ${experiment_path}/${experiment}.txt ]; then
+        echo "# Experiment: ${experiment}" > ${experiment_path}/${experiment}.txt
+        echo "# Format: case_name cluster Nx Ny Nz Np" >> ${experiment_path}/${experiment}.txt
+    fi
+
+    if ! grep -q "^${case_name} " ${experiment_path}/${experiment}.txt; then
+        echo "${case_name} ${cluster} ${Nx} ${Ny} ${Nz} ${Np}" >> ${experiment_path}/${experiment}.txt
+    fi
 }
 
-N=(8)
+experiment="preliminary"
 cluster="LUMI-G"
-nodes=(2 1)
-for n in ${N[@]}; do
-    for nodes_ in ${nodes[@]}; do
-        create_case ${n} ${cluster} ${nodes_}
-    done
-done
+create_case $experiment 8 2 2     ${cluster} 1
+create_case $experiment 16 4 4    ${cluster} 1
+create_case $experiment 32 8 8    ${cluster} 1
+create_case $experiment 64 16 16  ${cluster} 1
+create_case $experiment 128 32 32 ${cluster} 1
+create_case $experiment 256 64 64 ${cluster} 1

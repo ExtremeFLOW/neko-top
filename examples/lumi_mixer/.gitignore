@@ -1,1 +1,2 @@
-**/*.case
+cases/*.case
+experiments/*.txt
