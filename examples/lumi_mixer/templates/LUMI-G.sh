@@ -18,12 +18,11 @@
 
 # Ask for n cores placed on R host.
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
 #SBATCH --tasks-per-node=8
 #SBATCH --gpus-per-node=8
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 00-00:01:00
+#SBATCH --time 00-01:00:00
 
 # -- Notification options
 
