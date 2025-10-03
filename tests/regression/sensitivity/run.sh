@@ -65,7 +65,7 @@ fi
 # Generate mesh and run case
 
 # Compute the depth to retain the aspect ratio of the elements
-# The aspect ratio each element is  1:1:1
+# The aspect ratio each element is 1:1:1
 z=$(python3 -c "print(1.0 / $N)")
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
@@ -74,6 +74,7 @@ genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 cases=$(find . -maxdepth 1 -type f -name "*.case")
 for case in $cases; do
     mpirun -n 4 ./sensitivity_regression_driver ${case#./} || exit 1
+    mv steady_state_data.csv steady_state_data_${case#./%.*}.csv
 done
 
 python plotter_FD_check.py || exit 1
