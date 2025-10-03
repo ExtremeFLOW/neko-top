@@ -76,6 +76,9 @@ for case in $cases; do
     mpirun -n 4 ./sensitivity_regression_driver ${case#./} || exit 1
 done
 
+python plotter_FD_check.py || exit 1
+python steady_state_plotter.py || exit 1
+
 cd "$CURRENT_DIR" || exit 1
 
 # ============================================================================ #
