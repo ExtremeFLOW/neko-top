@@ -1,0 +1,7 @@
+**/*
+!**/.gitignore
+!**/*.f90
+!**/*.py
+!**/*.sh
+!**/*.case
+!**/CMakeLists.txt
