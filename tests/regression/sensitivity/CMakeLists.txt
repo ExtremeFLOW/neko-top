@@ -10,11 +10,8 @@ set(test_list
     "min_dis_and_lube_weights.case"
 )
 
-# Common driver source (same as unit)
-set(SENSITIVITY_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90)
-
 # Ensure the neko library module dir is found (from the main target)
-get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
+get_target_property(NEKO_TOP_MOD_DIR neko-top Fortran_MODULE_DIRECTORY)
 
 # --------------------------------------------------------------------------- #
 # Preparation target: copies helper scripts into the binary dir
@@ -30,15 +27,15 @@ add_library(reg_sensitivity_utils
 )
 
 # Use a private .mod folder to avoid clashes with unit targets
-set(reg_sens_moddir ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set(LOCAL_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR}/modules)
 set_target_properties(reg_sensitivity_utils
-    PROPERTIES Fortran_MODULE_DIRECTORY ${reg_sens_moddir})
+    PROPERTIES Fortran_MODULE_DIRECTORY ${LOCAL_MOD_DIR})
 
 # Make both NEKO and this target's .mod directory visible to dependents
 target_include_directories(reg_sensitivity_utils
     PUBLIC
-        ${NEKO_TOP_MODDIR}
-        ${reg_sens_moddir}
+        ${NEKO_TOP_MOD_DIR}
+        ${LOCAL_MOD_DIR}
 )
 
 target_link_libraries(reg_sensitivity_utils
@@ -54,7 +51,7 @@ target_link_libraries(reg_sensitivity_utils
 # --------------------------------------------------------------------------- #
 # Build the single driver executable for regression
 add_executable(reg_problem_tester_sensitivity_bin
-    ${SENSITIVITY_DRIVER}
+    ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90
 )
 target_link_libraries(reg_problem_tester_sensitivity_bin
     reg_sensitivity_utils
@@ -62,7 +59,7 @@ target_link_libraries(reg_problem_tester_sensitivity_bin
 
 # The driver must also see the regression .mod directory
 target_include_directories(reg_problem_tester_sensitivity_bin
-    PRIVATE ${reg_sens_moddir})
+    PRIVATE ${LOCAL_MOD_DIR})
 
 set_target_properties(reg_problem_tester_sensitivity_bin
     PROPERTIES
