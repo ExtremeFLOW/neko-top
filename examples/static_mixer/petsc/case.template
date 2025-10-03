@@ -7,9 +7,11 @@
         "output_at_end": false,
         "output_checkpoints": false,
         "time": {
-            "end_time": 30.0,
+            "end_time": 5.0,
             "variable_timestep": true,
-            "max_timestep": 0.004,
+            "target_cfl": 0.3,
+            "max_timestep": 0.004, // One tenth of the sample time
+            "min_timestep": 1e-8,
         },
         "numerics": {
             "time_order": 3,
@@ -18,7 +20,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1000.0,
+            "Re": 500.0,
             "output_control": "simulationtime",
             "output_value": 0.04,
             "strict_convergence": true,
@@ -29,15 +31,15 @@
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": { "type": "jacobi" },
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-8,
+                "projection_space_size": 4,
+                "absolute_tolerance": 1e-9,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": { "type": "hsmg" },
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-7,
+                "projection_space_size": 6,
+                "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "boundary_conditions ": [
@@ -85,7 +87,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "projection_space_size": 4,
+                "projection_space_size": 0,
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
