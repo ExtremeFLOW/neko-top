@@ -6,7 +6,9 @@ mesh_pattern=mixer
 data_path=data_local/static_mixer
 example_path=examples/static_mixer
 
-N=(8 16 32)
+find $example_path/petsc -name "*.case" -type f -delete
+
+N=(8 16 32 64 128 256 512 1024 2048 4096)
 
 for n in ${N[@]}; do
     Nx=$n
