@@ -7,8 +7,9 @@
         "output_at_end": false,
         "output_checkpoints": false,
         "time": {
-            "end_time": 30.0,
-            "variable_timestep": true
+            "end_time": 0.08,
+            "variable_timestep": true,
+            "max_timestep": 0.02,
         },
         "numerics": {
             "time_order": 3,
@@ -41,7 +42,7 @@
             },
             "boundary_conditions ": [
                 {
-                    "type": "user",
+                    "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
