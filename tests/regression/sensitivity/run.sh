@@ -23,6 +23,10 @@ function help() {
     exit 0
 }
 
+CURRENT_DIR=$(pwd)
+WORKING_DIR=$(dirname "$0")
+cd "$WORKING_DIR" || exit 1
+
 # Handle options
 N=10
 for arg in "$@"; do
@@ -67,5 +71,13 @@ z=$(python3 -c "print(1.0 / $N)")
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
 genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
+cases=$(find . -maxdepth 1 -type f -name "*.case")
+for case in $cases; do
+    mpirun -n 4 ./sensitivity_regression_driver ${case#./} || exit 1
+done
+
+cd "$CURRENT_DIR" || exit 1
+
+# ============================================================================ #
 # End of file
 # ============================================================================ #
