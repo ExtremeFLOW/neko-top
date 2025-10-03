@@ -7,9 +7,9 @@
         "output_at_end": false,
         "output_checkpoints": false,
         "time": {
-            "end_time": 0.08,
+            "end_time": 30.0,
             "variable_timestep": true,
-            "max_timestep": 0.02,
+            "max_timestep": 0.004,
         },
         "numerics": {
             "time_order": 3,
