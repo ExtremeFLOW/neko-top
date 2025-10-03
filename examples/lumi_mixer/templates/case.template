@@ -9,7 +9,7 @@
             "enabled": true
         },
         "time": {
-            "end_time": 1.0,
+            "end_time": 1e-2,
             "timestep": 1e-4
         },
         "numerics": {
