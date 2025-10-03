@@ -65,14 +65,13 @@ module simplefield_design
   type, extends(design_t), public :: simplefield_design_t
      private
 
-     type(vector_t) :: values
+     type(field_t), private :: designfield
      type(vector_t) :: x_coord
      type(vector_t) :: y_coord
      type(vector_t) :: z_coord
 
      ! needed to write the design
      type(fld_file_output_t), private :: output
-     type(field_t), private :: designfield
 
 
    contains
@@ -125,7 +124,6 @@ contains
 
     call this%init_base('simplefield_design', n)
 
-    call this%values%init(n)
     this%x_coord = x
     this%y_coord = y
     this%z_coord = z
@@ -139,7 +137,6 @@ contains
     class(simplefield_design_t), intent(inout) :: this
 
     call this%free_base()
-    call this%values%free()
     call this%x_coord%free()
     call this%y_coord%free()
     call this%z_coord%free()
@@ -165,9 +162,15 @@ contains
   subroutine design_simple_get_values(this, values)
     class(simplefield_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: values
+    integer :: n
 
-    values = this%values
-
+    n = this%size()
+    call values%init(n)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(values%x_d, this%designfield%x_d, n)
+    else
+       values%x = reshape(this%designfield%x, shape(values%x))
+    end if
   end subroutine design_simple_get_values
 
   subroutine design_simple_get_x(this, x)
@@ -201,14 +204,10 @@ contains
     n = this%size()
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%values%x_d, values%x_d, n)
        call device_copy(this%designfield%x_d, values%x_d, n)
     else
-       this%values = values
        this%designfield%x = reshape(values%x, shape(this%designfield%x))
     end if
-
-
   end subroutine design_simple_update_design
 
   subroutine design_simple_map_backward(this, sensitivity)
