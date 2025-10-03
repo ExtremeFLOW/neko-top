@@ -73,8 +73,9 @@ genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 cases=$(find . -maxdepth 1 -type f -name "*.case")
 for case in $cases; do
+    case=${case#./}
     mpirun -n 4 ./sensitivity_regression_driver ${case#./} || exit 1
-    mv steady_state_data.csv steady_state_data_${case#./%.*}.csv
+    mv steady_state_data.csv steady_state_data_${case%.*}.csv
 done
 
 python plotter_FD_check.py || exit 1
