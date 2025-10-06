@@ -4,7 +4,7 @@ module sensitivity
   use base_functional, only: base_functional_t
   use utils, only: neko_error
   use num_types, only: rp
-  use math, only: abscmp, NEKO_EPS
+  use math, only: abscmp, NEKO_EPS, glsum
   use vector, only: vector_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use problem, only : problem_t
@@ -35,7 +35,8 @@ contains
     character(len=*), parameter :: fmt_data = '(4X,4E15.6E3)'
 
     integer :: n_perturbations, ip
-    real(kind=rp) :: perturb
+    real(kind=rp) :: perturb, work_arr(1)
+    real(kind=rp) :: target_sensitivity_i
     type(vector_t) :: design_vector, design_perturbed, log_data, constraint_vec
     real(kind=rp) :: constraint, perturbed_constraint
     real(kind=rp) :: fd_estimate, fd_error
@@ -63,11 +64,21 @@ contains
             DEVICE_TO_HOST, .true.)
     end if
 
+   ! Get global target sensitivity
+   if (i.ge.0) then
+      work_arr(1) = target_sensitivities%x(i)
+   else
+      work_arr(1) = 0.0_rp
+   end if
+   target_sensitivity_i = glsum(work_arr, 1)
+
+   if (i.ge.0) then
     write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
          i, 'Design variable ', design_vector%x(i), &
          'Location [', des%x(i), des%y(i), des%z(i), ']'
     write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
-    write(*, fmt_data) 0.0_rp, constraint, target_sensitivities%x(i), 0.0_rp
+    write(*, fmt_data) 0.0_rp, constraint, target_sensitivity_i, 0.0_rp
+    end if
 
     ! Init the csv writer
     n = len_trim(file_name)
@@ -79,12 +90,20 @@ contains
     do ip = 1, n_perturbations
        perturb = perturbations(ip)
 
-       ! Ensure the perturbation stays within the bounds of the design variable
-       if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
-
-       ! Reset and Perturb the design field by a small amount
+       ! Reset the design field
        design_perturbed%x = design_vector%x
-       design_perturbed%x(i) = design_vector%x(i) + perturb
+       ! only one rank perturbs, we assume i < 0 implies this rank doesn't
+       if (i.ge.0) then
+          ! Ensure the perturbation stays within the bounds
+          if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
+          design_perturbed%x(i) = design_vector%x(i) + perturb
+          work_arr(1) = perturb
+       else
+          work_arr(1) = 0.0_rp
+       end if
+       ! ensure all ranks have the same perturb
+       perturb = glsum(work_arr, 1)
+
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_memcpy(design_perturbed%x, design_perturbed%x_d, &
                design_perturbed%size(), HOST_TO_DEVICE, .true.)
@@ -108,7 +127,7 @@ contains
           fd_estimate = fd_estimate / perturb
        end if
 
-       fd_error = relative_error(fd_estimate, target_sensitivities%x(i))
+       fd_error = relative_error(fd_estimate, target_sensitivity_i)
 
        write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
 
