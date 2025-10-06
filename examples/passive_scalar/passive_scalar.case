@@ -176,8 +176,8 @@
                 "value": 0.0
             },
             "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {

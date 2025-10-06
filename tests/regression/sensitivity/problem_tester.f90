@@ -19,7 +19,8 @@ program minimum_dissipation_sensitivity
   use num_types, only: rp
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, copy, glmax, NEKO_EPS
+  use math, only: abscmp, copy, glmax
+  use comm, only: pe_rank
   use sensitivity, only: compute_sensitivity
   use user, only: user_setup
   implicit none
@@ -48,8 +49,9 @@ program minimum_dissipation_sensitivity
   type(matrix_t) :: constraint_sensitivity
 
   integer :: i_max
-  real(kind=rp) :: sens_max_l, sens_max_g
-  logical :: contains_max
+  integer :: i_local
+  real(kind=rp) :: local_abs_max, global_abs_max
+  real(kind=rp) :: key_local, key_global, key_arr(1)
 
   ! True => testing an objective, F => testing a constraint
   logical :: is_objective
@@ -121,7 +123,25 @@ program minimum_dissipation_sensitivity
           DEVICE_TO_HOST, .true.)
   end if
 
-  i_max = maxloc(abs(sensitivities%x), dim=1)
+  i_local = maxloc(abs(sensitivities%x), dim=1)
+  local_abs_max = abs(sensitivities%x(i_local))
+  global_abs_max = glmax(abs(sensitivities%x), sensitivities%size()) ! DEVICE?
+
+  ! rank-based tie-breaker: only those within eps of the global max get key=1
+  if (abscmp(local_abs_max, global_abs_max)) then
+     key_local = 1.0_rp + 1.0e-12_rp*real(pe_rank, rp)
+  else
+     key_local = 0.0_rp
+  end if
+
+  ! reduce the key to pick a single owner
+  key_arr(1) = key_local
+  key_global = glmax(key_arr, 1)
+  if (abscmp(key_local, key_global)) then
+     i_max = i_local
+  else
+     i_max = -1 ! to indicate that this proc doesn't participate
+  end if
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
