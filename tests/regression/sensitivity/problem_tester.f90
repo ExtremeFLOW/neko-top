@@ -141,7 +141,6 @@ program minimum_dissipation_sensitivity
   else
      i_max = -1 ! to indicate that this proc doesn't participate
   end if
-  print *, pe_rank, i_max, "yofam"
 
   ! -------------------------------------------------------------------------- !
   ! Loop over the perturbations and compare the finite difference estimate with
