@@ -178,12 +178,6 @@ contains
        call this%accumulate%init(n_GL)
        call this%fld_GL%init(n_GL)
        call this%chi_GL%init(n_GL)
-
-              print *, "BLAME"
-       u_d = device_get_ptr(this%chi%x)
-       print *, "chi"
-       v_d = device_get_ptr(this%chi_GL%x)
-       print *, "chi GL"
     end if
 
   end subroutine simple_brinkman_source_term_init_from_components
@@ -192,7 +186,6 @@ contains
   subroutine simple_brinkman_source_term_free(this)
     class(simple_brinkman_source_term_t), intent(inout) :: this
 
-    print *, "free for some reason"
     call this%free_base()
     call this%accumulate%free()
     call this%fld_GL%free()
@@ -218,7 +211,6 @@ contains
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    print *, "REALLY Brink", NEKO_BCKND_DEVICE
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
@@ -243,13 +235,11 @@ contains
       end if
 
        call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
-       print *, "this"
 
        ! u
        call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
        call vector_col3(this%accumulate, this%chi_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
-       print *, "about to do Brink"
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
@@ -259,7 +249,6 @@ contains
           call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
-       print *, "did Brink"
        call field_sub2(fu, work)
 
        ! v
