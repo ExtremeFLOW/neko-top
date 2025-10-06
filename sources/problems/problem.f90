@@ -33,7 +33,7 @@
 
 !> Module for handling the optimization problem.
 module problem
-  use num_types, only: rp
+  use num_types, only: rp, dp
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
@@ -49,6 +49,11 @@ module problem
   use logger, only: neko_log
   use device_math, only: device_copy
   use vector_math, only: vector_add2
+  ! not so clean, hopefully a refactor is possible.
+  use time_step_controller, only: time_step_controller_t
+  use simulation_adjoint, only: simulation_adjoint_init, &
+       simulation_adjoint_step, simulation_adjoint_finalize
+  use mpi_f08, only: MPI_WTIME
 
   implicit none
   private
@@ -94,7 +99,11 @@ module problem
      !! design. It should be implemented in the derived classes.
      procedure, pass(this), public :: compute_sensitivity => &
           problem_compute_sensitivity
-
+     !> Evaluate the sensitivity of the optimization problem.
+     !! This is the main function that evaluates the problem sensitivity to the
+     !! design. It should be implemented in the derived classes.
+     procedure, pass(this), public :: run_backward_unsteady => &
+          problem_run_backward_unsteady
      ! ----------------------------------------------------------------------- !
      ! Base class methods
 
@@ -121,7 +130,7 @@ module problem
      !> Update the objective function.
      procedure, pass(this) :: update_objectives => &
           problem_update_objectives
-     !> Update the volume constraint.
+     !> Update the constraints.
      procedure, pass(this) :: update_constraints => &
           problem_update_constraints
      !> Update the objective sensitivities.
@@ -130,6 +139,32 @@ module problem
      !> Update the constraint sensitivities.
      procedure, pass(this) :: update_constraint_sensitivities => &
           problem_update_constraint_sensitivities
+
+     !> Reset the objective function.
+     procedure, pass(this) :: reset_objectives => &
+          problem_reset_objectives
+     !> Reset the constraints.
+     procedure, pass(this) :: reset_constraints => &
+          problem_reset_constraints
+     !> Reset the objective sensitivities.
+     procedure, pass(this) :: reset_objective_sensitivities => &
+          problem_reset_objective_sensitivities
+     !> Reset the constraint sensitivities.
+     procedure, pass(this) :: reset_constraint_sensitivities => &
+          problem_reset_constraint_sensitivities
+
+     !> Accumulate the objective function.
+     procedure, pass(this) :: accumulate_objectives => &
+          problem_accumulate_objectives
+     !> Accumulate the constraints.
+     procedure, pass(this) :: accumulate_constraints => &
+          problem_accumulate_constraints
+     !> Accumulate the objective sensitivities.
+     procedure, pass(this) :: accumulate_objective_sensitivities => &
+          problem_accumulate_objective_sensitivities
+     !> Accumulate the constraint sensitivities.
+     procedure, pass(this) :: accumulate_constraint_sensitivities => &
+          problem_accumulate_constraint_sensitivities
 
      ! ----------------------------------------------------------------------- !
      ! Public Getters
@@ -378,13 +413,25 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     class(simulation_t), optional, intent(inout) :: simulation
+    logical :: unsteady
 
     type(vector_t) :: objective_sensitivity
 
-    if (present(simulation)) call simulation%run_backward()
+    if (present(simulation)) then
+        call simulation%checkpoint%get_enabled(unsteady)
+        if (unsteady) then
+            ! The update to objective sensitivities is performed within the
+            ! backwards run
+            call this%run_backward_unsteady(simulation, design)
+        else
+            call simulation%run_backward()
+            call this%update_objective_sensitivities(design)
+        end if
+    else
+        call this%update_objective_sensitivities(design)
+    end if
 
-    call this%update_objective_sensitivities(design)
-    call this%update_constraint_sensitivities(design)
+   call this%update_constraint_sensitivities(design)
 
     call objective_sensitivity%init(this%n_design)
     call this%get_objective_sensitivities(objective_sensitivity)
@@ -393,6 +440,48 @@ contains
 
     call objective_sensitivity%free()
   end subroutine problem_compute_sensitivity
+
+  !> Run the adjoint backwards
+  subroutine problem_run_backward_unsteady(this, simulation, design)
+    class(problem_t), intent(inout) :: this
+    class(simulation_t), intent(inout) :: simulation
+    class(design_t), intent(inout) :: design
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
+    real(kind=rp) :: cfl
+    integer :: i
+
+    call dt_controller%init(simulation%neko_case%params)
+
+    call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
+
+    ! Reset the sensitivity and objective value to zero
+    ! (note: It's convenient to compute the objective value and sensitivity
+    ! on the backwards pass as opposed to the forward so it isn't computed on
+    ! recomputations of the forward.
+    call this%reset_objectives()
+    call this%reset_objective_sensitivities()
+
+    call profiler_start
+    cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
+    loop_start = MPI_WTIME()
+
+    do i = simulation%n_timesteps, 1, -1
+       ! restore primal field
+       call simulation%checkpoint%restore(simulation%neko_case, i)
+       ! accumulate objective value
+       call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
+       ! step the adjoint backwards
+       call simulation_adjoint_step(simulation%adjoint_case, dt_controller, cfl, &
+            loop_start)
+       ! accumulate objective sensitivity
+       call this%accumulate_objective_sensitivities(design, simulation%adjoint_case%time%dt)
+    end do
+    call profiler_stop
+
+    call simulation_adjoint_finalize(simulation%adjoint_case)
+
+  end subroutine problem_run_backward_unsteady
 
   ! ========================================================================== !
   ! Update the objectives and constraints
@@ -460,6 +549,132 @@ contains
        call this%constraint_list(i)%constraint%update_sensitivity(design)
     end do
   end subroutine problem_update_constraint_sensitivities
+
+  ! ========================================================================== !
+  ! Reset the objectives and constraints
+
+  !> Reset the objectives.
+  !!
+  !! This function will reset all objectives to zero.
+  !! @param[inout] this The problem to reset the objectives with.
+  subroutine problem_reset_objectives(this)
+    class(problem_t), intent(inout) :: this
+    integer :: i
+
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%reset_value()
+    end do
+  end subroutine problem_reset_objectives
+
+  !> Reset the constraints.
+  !!
+  !! This function will reset all the constraints to zero.
+  !! @param[inout] this The problem to reset the objectives with.
+  subroutine problem_reset_constraints(this)
+    class(problem_t), intent(inout) :: this
+    integer :: i
+
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%reset_value()
+    end do
+  end subroutine problem_reset_constraints
+
+  !> Reset the sensitivity of the objectives.
+  !!
+  !! This function will reset all the objective sensitivity to zero.
+  !! @param[inout] this The problem to reset the objectives with.
+  subroutine problem_reset_objective_sensitivities(this)
+    class(problem_t), intent(inout) :: this
+    integer :: i
+
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%reset_sensitivity()
+    end do
+  end subroutine problem_reset_objective_sensitivities
+
+  !> Reset the sensitivity of the constraints.
+  !!
+  !! This function will reset all the constraint sensitivity to zero.
+  !! @param[inout] this The problem to reset the objectives with.
+  subroutine problem_reset_constraint_sensitivities(this)
+    class(problem_t), intent(inout) :: this
+    integer :: i
+
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%reset_sensitivity()
+    end do
+  end subroutine problem_reset_constraint_sensitivities
+
+  ! ========================================================================== !
+  ! Accumulate the objectives and constraints
+
+  !> Accumulate the objectives.
+  !!
+  !! This function will accumulate all objectives.
+  !! @param[inout] this The problem to accumulate the objectives with.
+  !! @param[in] design The design to accumulate the objectives with.
+  !! @param[in] dt The timestep.
+  subroutine problem_accumulate_objectives(this, design, dt)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+    integer :: i
+
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%accumulate_value(design, dt)
+    end do
+  end subroutine problem_accumulate_objectives
+
+  !> Accumulate the constraints.
+  !!
+  !! This function will accumulate all the constraints.
+  !! @param[inout] this The problem to accumulate the objectives with.
+  !! @param[in] design The design to accumulate the constraints with.
+  !! @param[in] dt The timestep.
+  subroutine problem_accumulate_constraints(this, design, dt)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+    integer :: i
+
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%accumulate_value(design, dt)
+    end do
+  end subroutine problem_accumulate_constraints
+
+  !> Accumulate the sensitivity of the objectives.
+  !!
+  !! This function will accumulate all the objective sensitivity.
+  !! @param[inout] this The problem to accumulate the objectives with.
+  !! @param[in] design The design to accumulate the objectives with.
+  !! @param[in] dt The timestep.
+  subroutine problem_accumulate_objective_sensitivities(this, design, dt)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+    integer :: i
+
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%accumulate_sensitivity(design, dt)
+    end do
+  end subroutine problem_accumulate_objective_sensitivities
+
+  !> Accumulate the sensitivity of the constraints.
+  !!
+  !! This function will accumulate all the constraint sensitivity.
+  !! @param[inout] this The problem to accumulate the objectives with.
+  !! @param[in] design The design to accumulate the constraints with.
+  !! @param[in] dt The timestep.
+  subroutine problem_accumulate_constraint_sensitivities(this, design, dt)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+    integer :: i
+
+    do i = 1, this%n_constraints
+       call this%constraint_list(i)%constraint%accumulate_sensitivity(design, dt)
+    end do
+  end subroutine problem_accumulate_constraint_sensitivities
 
   ! ========================================================================== !
   ! Problem part getters

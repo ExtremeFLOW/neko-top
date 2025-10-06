@@ -111,7 +111,7 @@ module simulation_m
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
      procedure, pass(this) :: run_forward => simulation_run_forward
-     !> Run the simulation
+     !> Run the adjoint simulation
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
