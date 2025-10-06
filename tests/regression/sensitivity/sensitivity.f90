@@ -64,20 +64,20 @@ contains
             DEVICE_TO_HOST, .true.)
     end if
 
-   ! Get global target sensitivity
-   if (i.ge.0) then
-      work_arr(1) = target_sensitivities%x(i)
-   else
-      work_arr(1) = 0.0_rp
-   end if
-   target_sensitivity_i = glsum(work_arr, 1)
+    ! Get global target sensitivity
+    if (i.ge.0) then
+       work_arr(1) = target_sensitivities%x(i)
+    else
+       work_arr(1) = 0.0_rp
+    end if
+    target_sensitivity_i = glsum(work_arr, 1)
 
-   if (i.ge.0) then
-    write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
-         i, 'Design variable ', design_vector%x(i), &
-         'Location [', des%x(i), des%y(i), des%z(i), ']'
-    write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
-    write(*, fmt_data) 0.0_rp, constraint, target_sensitivity_i, 0.0_rp
+    if (i.ge.0) then
+       write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
+            i, 'Design variable ', design_vector%x(i), &
+            'Location [', des%x(i), des%y(i), des%z(i), ']'
+       write(*, fmt_head) "Perturbation", "Constraint", "FD Estimate", "Error"
+       write(*, fmt_data) 0.0_rp, constraint, target_sensitivity_i, 0.0_rp
     end if
 
     ! Init the csv writer

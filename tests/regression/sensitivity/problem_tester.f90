@@ -122,7 +122,6 @@ program minimum_dissipation_sensitivity
           DEVICE_TO_HOST, .true.)
   end if
 
-  ! i_max = maxloc(abs(sensitivities%x), dim=1)
   i_local = maxloc(abs(sensitivities%x), dim=1)
   local_abs_max = abs(sensitivities%x(i_local))
   global_abs_max = glmax(abs(sensitivities%x), sensitivities%size()) ! DEVICE?
