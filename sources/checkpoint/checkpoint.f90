@@ -269,6 +269,8 @@ contains
 
     if (.not. this%enabled) return
 
+    call profiler_start_region("Checkpoint save")
+
     ! Update the number of recorded timesteps
     this%n_timesteps = this%n_timesteps + 1
 
@@ -278,6 +280,8 @@ contains
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
+
+    call profiler_end_region("Checkpoint save")
   end subroutine checkpoint_save
 
   !> Restore the forward simulation state
@@ -288,6 +292,8 @@ contains
     character(len=256) :: msg
 
     if (.not. this%enabled) return
+
+    call profiler_start_region("Checkpoint restore")
 
     if (tstep .lt. 1 .or. tstep .gt. this%n_timesteps) then
        write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
@@ -301,6 +307,8 @@ contains
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
+
+    call profiler_end_region("Checkpoint restore")
   end subroutine checkpoint_restore
 
   ! ========================================================================== !
