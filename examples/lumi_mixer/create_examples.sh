@@ -1,8 +1,16 @@
 #!/bin/bash
 
 # Global parameters
-export ROOT_DIR=$(realpath $(dirname $0))
-export MAIN_DIR=$(realpath $ROOT_DIR/../..)
+if [ -z $SLURM_JOB_NAME ]; then
+    export MAIN_DIR=$(realpath $(dirname $0)/../..)
+else
+    export MAIN_DIR=$(realpath $(dirname ./))
+fi
+
+if [ "$(basename $MAIN_DIR)" == "neko-top" ]; then
+    echo "Invalid MAIN_DIR: $MAIN_DIR" >&2
+    exit 1
+fi
 
 export mesh_pattern="mixer"
 
@@ -71,8 +79,34 @@ cluster="LUMI-G"
 create_case $experiment   8   2   2 ${cluster} 1
 create_case $experiment  16   4   4 ${cluster} 1
 create_case $experiment  32   8   8 ${cluster} 1
-create_case $experiment  64  16  16 ${cluster} 1
-create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment  64   8   8 ${cluster} 1
+create_case $experiment  32  16   8 ${cluster} 1
+create_case $experiment  32   8  16 ${cluster} 1
 
-# Too big even with just 5 saves to memory
-# create_case $experiment 256  64  64 ${cluster} 1
+experiment="weak_scaling"
+cluster="LUMI-G"
+create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment 256  32  32 ${cluster} 2
+create_case $experiment 256  64  32 ${cluster} 4
+create_case $experiment 256  64  64 ${cluster} 8
+create_case $experiment 512  64  64 ${cluster} 16
+create_case $experiment 512 128  64 ${cluster} 32
+create_case $experiment 512 128 128 ${cluster} 64
+
+experiment="strong_scaling_small"
+cluster="LUMI-G"
+create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment 128  32  32 ${cluster} 2
+create_case $experiment 128  32  32 ${cluster} 4
+create_case $experiment 128  32  32 ${cluster} 8
+create_case $experiment 128  32  32 ${cluster} 16
+create_case $experiment 128  32  32 ${cluster} 32
+create_case $experiment 128  32  32 ${cluster} 64
+
+experiment="strong_scaling_large"
+cluster="LUMI-G"
+create_case $experiment 1024 256 256 ${cluster} 16
+create_case $experiment 1024 256 256 ${cluster} 32
+create_case $experiment 1024 256 256 ${cluster} 64
+create_case $experiment 1024 256 256 ${cluster} 128
+create_case $experiment 1024 256 256 ${cluster} 256
