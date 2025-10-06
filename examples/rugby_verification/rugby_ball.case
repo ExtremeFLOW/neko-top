@@ -115,15 +115,9 @@
                 "zone_name": "initial_ball"
             },
             "domain": {
-<<<<<<< HEAD
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-             }
-=======
                 "type": "point_zone",
                 "zone_name": "optimization_domain"
             }
->>>>>>> origin/sens/driver
         },
         "solver": {
             "type": "mma",
