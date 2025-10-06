@@ -89,44 +89,53 @@ function create_case() {
 
 find ${case_path} -type f -name "*.case" -delete
 
-experiment="preliminary"
 cluster="LUMI-G"
+
+# Check max capacity of a single node
+experiment="single_node_capacity"
 create_case $experiment   8   2   2 ${cluster} 1
 create_case $experiment  16   4   4 ${cluster} 1
 create_case $experiment  32   8   8 ${cluster} 1
+create_case $experiment  64  16  16 ${cluster} 1
+create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment 256  32  32 ${cluster} 1
+create_case $experiment 256  64  32 ${cluster} 1
+create_case $experiment 256  64  64 ${cluster} 1
+
+# Check that time is not affected by which dimension is scaled
+experiment="dimension_scaling"
 create_case $experiment  64   8   8 ${cluster} 1
 create_case $experiment  32  16   8 ${cluster} 1
 create_case $experiment  32   8  16 ${cluster} 1
-create_case $experiment  32   8   8 ${cluster} 1 10
-create_case $experiment  32   8   8 ${cluster} 1 100
-create_case $experiment  32   8   8 ${cluster} 1 1000
-create_case $experiment  32   8   8 ${cluster} 1 10000
-create_case $experiment  32   8   8 ${cluster} 1 100000
+create_case $experiment 128  16  16 ${cluster} 1
+create_case $experiment  64  32  16 ${cluster} 1
+create_case $experiment  64  16  32 ${cluster} 1
 
-# experiment="weak_scaling"
-# cluster="LUMI-G"
-# create_case $experiment 128  32  32 ${cluster} 1
-# create_case $experiment 256  32  32 ${cluster} 2
-# create_case $experiment 256  64  32 ${cluster} 4
-# create_case $experiment 256  64  64 ${cluster} 8
-# create_case $experiment 512  64  64 ${cluster} 16
-# create_case $experiment 512 128  64 ${cluster} 32
-# create_case $experiment 512 128 128 ${cluster} 64
+experiment="weak_scaling"
+create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment 256  32  32 ${cluster} 2
+create_case $experiment 256  64  32 ${cluster} 4
+create_case $experiment 256  64  64 ${cluster} 8
+create_case $experiment 512  64  64 ${cluster} 16
+create_case $experiment 512 128  64 ${cluster} 32
+create_case $experiment 512 128 128 ${cluster} 64
+create_case $experiment 1024 128 128 ${cluster} 128
+create_case $experiment 1024 256 128 ${cluster} 256
+create_case $experiment 1024 256 256 ${cluster} 512
 
-# experiment="strong_scaling_small"
-# cluster="LUMI-G"
-# create_case $experiment 128  32  32 ${cluster} 1
-# create_case $experiment 128  32  32 ${cluster} 2
-# create_case $experiment 128  32  32 ${cluster} 4
-# create_case $experiment 128  32  32 ${cluster} 8
-# create_case $experiment 128  32  32 ${cluster} 16
-# create_case $experiment 128  32  32 ${cluster} 32
-# create_case $experiment 128  32  32 ${cluster} 64
+experiment="strong_scaling_small"
+create_case $experiment 128  32  32 ${cluster} 1
+create_case $experiment 128  32  32 ${cluster} 2
+create_case $experiment 128  32  32 ${cluster} 4
+create_case $experiment 128  32  32 ${cluster} 8
+create_case $experiment 128  32  32 ${cluster} 16
+create_case $experiment 128  32  32 ${cluster} 32
+create_case $experiment 128  32  32 ${cluster} 64
 
-# experiment="strong_scaling_large"
-# cluster="LUMI-G"
-# create_case $experiment 1024 256 256 ${cluster} 16
-# create_case $experiment 1024 256 256 ${cluster} 32
-# create_case $experiment 1024 256 256 ${cluster} 64
-# create_case $experiment 1024 256 256 ${cluster} 128
-# create_case $experiment 1024 256 256 ${cluster} 256
+experiment="strong_scaling_large"
+create_case $experiment 1024 256 256 ${cluster} 16
+create_case $experiment 1024 256 256 ${cluster} 32
+create_case $experiment 1024 256 256 ${cluster} 64
+create_case $experiment 1024 256 256 ${cluster} 128
+create_case $experiment 1024 256 256 ${cluster} 256
+create_case $experiment 1024 256 256 ${cluster} 512
