@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1,
+            "Re": 20,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -96,7 +96,7 @@
     },
     "checkpoints": {
         "enabled": true,
-        "n_memory": 50
+        "n_memory": 100
     },
     "optimization": {
         "design": {
