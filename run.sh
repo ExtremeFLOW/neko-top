@@ -120,7 +120,6 @@ if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
-    export HPATH="$HPATH/neko"
 fi
 
 # End of user inputs
@@ -421,8 +420,13 @@ for case in ${example_list[@]}; do
             exit 1
         fi
 
+        if [ "$NEKO" == true ]; then
+            setting=$HPATH/neko/${case%.*}.sh
+        else
+            setting=$HPATH/${case%.*}.sh
+        fi
+
         # Find the setting file for the case recursively
-        setting=$HPATH/${case%.*}.sh
         while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
