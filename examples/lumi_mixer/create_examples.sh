@@ -87,9 +87,12 @@ function create_case() {
     fi
 }
 
-find ${case_path} -type f -name "*.case" -delete
-
+# Global settings
 cluster="LUMI-G"
+
+# Clean up old cases
+find ${case_path} -type f -name "*.case" -delete
+find ${hpc_path}/${cluster}/lumi_mixer/cases -type f -name "*.sh" -delete
 
 # Check max capacity of a single node
 experiment="single_node_capacity"
