@@ -17,7 +17,8 @@ Details:
     - Walls (y=0, y=1, z=0, z=1): No-slip, Neumann for thermal.
     - Outlet (x=4): Pressure outflow.
     - Initial condition: Fluid at constant velocity u = 1, v = w = 0
-- Re = 1000
+- Re = 0
+- Pe = 2000
 - Brinkman IBM for solid obstacles.
     - Max restriction = 100
     - Min restriction = 0
