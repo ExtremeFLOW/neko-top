@@ -32,6 +32,12 @@ for pe in ${Pe[@]}; do
             sed -i "s|\"Pe\": .*|\"Pe\": ${pe},|g" ${case_file}
             sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${output_file}\",|g" ${case_file}
             sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/petsc/cache_${n}_\",|g" ${case_file}
+
+            if [ ! -f "${data_path}/petsc/cache_${n}_0.nek5000" ]; then
+                sed -i "s|\"end_time\": .*|\"end_time\": 1e-3,|g" ${case_file}
+                ./run.sh -c static_mixer/petsc/${n}_re_${re}_pe_${pe}.case
+                sed -i "s|\"end_time\": .*|\"end_time\": 30.0,|g" ${case_file}
+            fi
         done
     done
 done
