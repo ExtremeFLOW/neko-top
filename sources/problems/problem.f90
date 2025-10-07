@@ -100,9 +100,8 @@ module problem
      !! design. It should be implemented in the derived classes.
      procedure, pass(this), public :: compute_sensitivity => &
           problem_compute_sensitivity
-     !> Evaluate the sensitivity of the optimization problem.
-     !! This is the main function that evaluates the problem sensitivity to the
-     !! design. It should be implemented in the derived classes.
+     !> Run the unsteady adjoint backwards in time will time integrating the
+     !! sensitivity and objective function.
      procedure, pass(this), public :: run_backward_unsteady => &
           problem_run_backward_unsteady
      ! ----------------------------------------------------------------------- !
@@ -460,7 +459,11 @@ contains
     ! Reset the sensitivity and objective value to zero
     ! (note: It's convenient to compute the objective value and sensitivity
     ! on the backwards pass as opposed to the forward so it isn't computed on
-    ! recomputations of the forward.
+    ! recomputations of the forward.)
+    !
+    ! The alternative (likely a better option) is to time integrate the
+    ! objective function on the forward run, but this will require some
+    ! refactoring.
     call this%reset_objectives()
     call this%reset_objective_sensitivities()
 
