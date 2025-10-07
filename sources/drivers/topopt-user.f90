@@ -57,7 +57,7 @@ program topopt_user
   call sim%init(parameters)
 
   ! initialize the design
-  call design_factory(des, parameters, sim)
+  call design_factory(des, design_parameters, sim)
 
   ! initialize the problem
   call prob%init(parameters, des, sim)
