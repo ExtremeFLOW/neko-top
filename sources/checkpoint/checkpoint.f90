@@ -42,6 +42,7 @@ module simulation_checkpoint
   use mpi_f08, only: MPI_WTIME
   use utils, only: neko_error
   use field_math, only: field_copy, field_rzero
+  use profiler, only: profiler_start_region, profiler_end_region
   implicit none
   private
 
