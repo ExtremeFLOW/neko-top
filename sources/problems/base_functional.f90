@@ -99,7 +99,7 @@ module base_functional
      procedure, pass(this) :: accumulate_value => functional_accumulate_value
      !> Accumulate the sensitivity
      procedure, pass(this) :: accumulate_sensitivity => &
-     functional_accumulate_sensitivity
+          functional_accumulate_sensitivity
 
   end type base_functional_t
 
@@ -215,6 +215,6 @@ contains
     call this%update_sensitivity(design)
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    call	vector_add2s1(this%sensitivity, temp, dt)
+    call vector_add2s1(this%sensitivity, temp, dt)
   end subroutine functional_accumulate_sensitivity
 end module base_functional
