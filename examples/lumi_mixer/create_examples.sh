@@ -101,9 +101,6 @@ create_case $experiment  16   4   4 ${cluster} 1
 create_case $experiment  32   8   8 ${cluster} 1
 create_case $experiment  64  16  16 ${cluster} 1
 create_case $experiment 128  32  32 ${cluster} 1
-create_case $experiment 256  32  32 ${cluster} 1
-create_case $experiment 256  64  32 ${cluster} 1
-create_case $experiment 256  64  64 ${cluster} 1
 
 # Check that time is not affected by which dimension is scaled
 experiment="dimension_scaling"
