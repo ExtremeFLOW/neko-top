@@ -53,6 +53,7 @@ module problem
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use mpi_f08, only: MPI_WTIME
+  use profiler, only: profiler_start, profiler_stop
 
   implicit none
   private
@@ -433,6 +434,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
+    real(kind=rp) :: total_time
     integer :: i
 
     call dt_controller%init(simulation%neko_case%params)
@@ -450,6 +452,8 @@ contains
     cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
+    total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
+
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%checkpoint%restore(simulation%neko_case, i)
@@ -457,7 +461,7 @@ contains
        call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
        ! step the adjoint backwards
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, cfl, &
-            loop_start)
+            loop_start, total_time)
        ! accumulate objective sensitivity
        call this%accumulate_objective_sensitivities(design, simulation%adjoint_case%time%dt)
     end do
