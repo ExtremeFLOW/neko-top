@@ -18,7 +18,7 @@ module topology_optimization_user_module
   use json_file_module, only: json_file
   use json_utils, only: json_get
   use num_types, only: rp
-  use initial_conditions, only: scalar_z_split_ic
+  use user_initial_conditions, only: scalar_z_split_ic
 
   implicit none
 
