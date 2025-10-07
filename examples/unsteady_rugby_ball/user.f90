@@ -10,7 +10,7 @@ module user
   use neko_config, only: NEKO_BCKND_DEVICE
   implicit none
   !> Case parameters
-  real(kind=rp), parameter :: T_fin = 1.0_rp
+  real(kind=rp), parameter :: T_fin = 0.05_rp
   real(kind=rp), parameter :: U_max = 1.0_rp
 
 contains

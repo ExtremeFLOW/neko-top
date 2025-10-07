@@ -47,8 +47,7 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 50
+            "output_control": "never",
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -94,17 +93,17 @@
             },
         ]
     },
+    "checkpoints": {
+        "enabled": true,
+        "n_memory": 100
+    },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.01
+                    "r": 0.05
                 },
                 {
                     "type": "RAMP",
@@ -116,12 +115,16 @@
                 "base_value": 0.0,
                 "zone_value": 1.0,
                 "zone_name": "initial_ball"
-            }
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
+            },
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 5,
-            "tolerance": 1.0e-3,
+            "max_iterations": 50,
+            "tolerance": 1.0e-12,
             "mma": {
                 "xmin": 0.0,
                 "xmax": 1.0
