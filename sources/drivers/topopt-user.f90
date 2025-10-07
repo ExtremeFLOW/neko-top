@@ -12,7 +12,6 @@ program topopt_user
   use user, only: user_setup
 
   use mpi_f08, only: MPI_Init
-  use user, only: user_setup
 
   implicit none
 
