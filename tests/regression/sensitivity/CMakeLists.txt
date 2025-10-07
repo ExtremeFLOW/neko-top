@@ -6,8 +6,6 @@ set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 set(test_list
     "minimum_dissipation.case"
     "lube_term.case"
-    #"min_dis_and_lube.case"
-    #"min_dis_and_lube_weights.case"
     "passive_scalar.case"
 )
 
