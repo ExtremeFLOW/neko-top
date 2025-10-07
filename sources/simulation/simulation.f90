@@ -64,7 +64,8 @@ module simulation_m
   use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
   use jobctrl, only: jobctrl_time_limit
-  use profiler, only: profiler_start, profiler_stop
+  use profiler, only: profiler_start, profiler_stop, &
+       profiler_start_region, profiler_end_region
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
@@ -132,6 +133,9 @@ contains
     call neko_init(this%neko_case)
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
+
+    ! Start the profiler
+    call profiler_start
 
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
@@ -202,6 +206,9 @@ contains
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
+    ! Stop the profiler
+    call profiler_stop
+
     call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
@@ -218,8 +225,8 @@ contains
 
     call simulation_init(this%neko_case, dt_controller)
 
-    call profiler_start
     loop_start = MPI_WTIME()
+    call profiler_start_region("Forward simulation")
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
 
@@ -227,7 +234,7 @@ contains
 
        call this%checkpoint%save(this%neko_case)
     end do
-    call profiler_stop
+    call profiler_end_region("Forward simulation")
 
     call simulation_finalize(this%neko_case)
 
@@ -245,18 +252,17 @@ contains
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
-    call profiler_start
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
+    call profiler_start_region("Adjoint simulation")
     do i = this%n_timesteps, 1, -1
        call this%checkpoint%restore(this%neko_case, i)
-
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
     end do
-    call profiler_stop
+    call profiler_end_region("Adjoint simulation")
 
     call simulation_adjoint_finalize(this%adjoint_case)
 
