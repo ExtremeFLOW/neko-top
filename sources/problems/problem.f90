@@ -402,20 +402,20 @@ contains
     type(vector_t) :: objective_sensitivity
 
     if (present(simulation)) then
-        call simulation%checkpoint%get_enabled(unsteady)
-        if (unsteady) then
-            ! The update to objective sensitivities is performed within the
-            ! backwards run
-            call this%run_backward_unsteady(simulation, design)
-        else
-            call simulation%run_backward()
-            call this%update_objective_sensitivities(design)
-        end if
+       call simulation%checkpoint%get_enabled(unsteady)
+       if (unsteady) then
+          ! The update to objective sensitivities is performed within the
+          ! backwards run
+          call this%run_backward_unsteady(simulation, design)
+       else
+          call simulation%run_backward()
+          call this%update_objective_sensitivities(design)
+       end if
     else
-        call this%update_objective_sensitivities(design)
+       call this%update_objective_sensitivities(design)
     end if
 
-   call this%update_constraint_sensitivities(design)
+    call this%update_constraint_sensitivities(design)
 
     call objective_sensitivity%init(this%n_design)
     call this%get_objective_sensitivities(objective_sensitivity)

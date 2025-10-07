@@ -33,17 +33,17 @@ contains
     is_fluid = (fields%items(1)%ptr%name .eq. 'u')
 
     if (is_fluid) then
-    u => fields%get("u")
-    v => fields%get("v")
-    w => fields%get("w")
+       u => fields%get("u")
+       v => fields%get("v")
+       w => fields%get("w")
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
           ! Inflow velocity profile is a ramp up
           if (time%t .lt. T_fin) then
-               u%x(idx, 1, 1, 1) = U_max * time%t / T_fin
+             u%x(idx, 1, 1, 1) = U_max * time%t / T_fin
           else
-               u%x(idx, 1, 1, 1) = U_max
+             u%x(idx, 1, 1, 1) = U_max
           end if
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
