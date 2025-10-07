@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 0.1,
-            "timestep": 1e-4
+            "end_time": 1.0,
+            "timestep": 1e-3
         },
         "numerics": {
             "time_order": 3,
@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 1,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -95,7 +95,7 @@
     },
     "checkpoints": {
         "enabled": true,
-        "n_memory": 100
+        "n_memory": 50
     },
     "optimization": {
         "design": {
@@ -107,7 +107,9 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100,
+                    "q": 3,
+                    "convex_up": true
                 }
             ],
             "initial_distribution": {
@@ -127,7 +129,9 @@
             "tolerance": 1.0e-12,
             "mma": {
                 "xmin": 0.0,
-                "xmax": 1.0
+                "xmax": 1.0,
+                "c": 1000.0,
+                "d": 10.0
             }
         },
         "objectives": [
@@ -137,8 +141,7 @@
             },
             {
                 "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
+                "weight": 1.0
             }
         ],
         "constraints": [
