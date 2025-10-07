@@ -22,7 +22,7 @@
 #SBATCH --gpus-per-node=8
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 00-24:00:00
+#SBATCH --time 00-01:00:00
 
 # -- Notification options
 
