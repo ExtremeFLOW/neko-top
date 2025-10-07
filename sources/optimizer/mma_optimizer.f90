@@ -201,7 +201,9 @@ contains
     call profiler_start_region("Optimizer iteration")
 
     call problem%compute(design, simulation)
+    if (present(simulation)) call simulation%write_forward(0)
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation)) call simulation%write_adjoint(0)
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -266,7 +268,9 @@ contains
        call design%update_design(x)
 
        call problem%compute(design, simulation)
+       if (present(simulation)) call simulation%write_forward(iter)
        call problem%compute_sensitivity(design, simulation)
+       if (present(simulation)) call simulation%write_adjoint(iter)
 
        call problem%get_objective_value(objective_value)
        call problem%get_constraint_values(constraint_value)

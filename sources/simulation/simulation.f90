@@ -117,6 +117,10 @@ module simulation_m
      procedure, pass(this) :: reset => simulation_reset
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
+     !> Write current state of the forward simulation to disk
+     procedure, pass(this) :: write_forward => simulation_write_forward
+     !> Write current state of the adjoint simulation to disk
+     procedure, pass(this) :: write_adjoint => simulation_write_adjoint
 
   end type simulation_t
   public :: simulation_t
@@ -287,5 +291,23 @@ contains
     call this%output_adjoint%sample(real(idx, kind=rp))
 
   end subroutine simulation_write
+
+  !> Write current state of the forward simulation to disk
+  subroutine simulation_write_forward(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_forward%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_forward
+
+  !> Write current state of the adjoint simulation to disk
+  subroutine simulation_write_adjoint(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_adjoint%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_adjoint
 
 end module simulation_m
