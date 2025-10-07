@@ -9,7 +9,7 @@
             "enabled": true
         },
         "time": {
-            "end_time": 1.0,
+            "end_time": 1e-2,
             "timestep": 1e-4
         },
         "numerics": {
@@ -20,40 +20,87 @@
         "fluid": {
             "scheme": "pnpn",
             "Re": 1000.0,
-            "strict_convergence": true,
             "output_control": "never",
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 1.0, 0.0, 0.0 ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": { "type": "jacobi" },
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-8,
-                "max_iterations": 800
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 50
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": { "type": "hsmg" },
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-7,
-                "max_iterations": 800
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 50
             },
-            "boundary_conditions ": [
+            "boundary_conditions": [
                 {
                     "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
-                    "type": "outflow",
-                    "zone_indices": [ 2 ]
-                },
-                {
                     "type": "no_slip",
                     "zone_indices": [ 3, 4, 5, 6 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 2 ]
                 }
             ]
+        },
+        "scalar": {
+            // "name": "temperature",
+            "enabled": true,
+            "Pe": 1000.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 50
+            },
+            "initial_condition": {
+                "type": "user"
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user",
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [ 2, 3, 4, 5, 6 ]
+                }
+            ]
+        },
+        "adjoint_scalar": {
+            "enabled": true,
+            "boundary_conditions": [
+                {
+                    "type": "dirichlet",
+                    "value": 0,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [ 2, 3, 4, 5, 6 ]
+                }
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            }
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -71,34 +118,6 @@
                 }
             ]
         },
-        "scalar": {
-            "name": "temperature",
-            "enabled": false,
-            "Pe": 1000.0,
-            "solver": {
-                "type": "cg",
-                "preconditioner": {
-                    "type": "jacobi"
-                },
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-6,
-                "max_iterations": 800
-            },
-            "boundary_conditions": [
-                {
-                    "type": "user",
-                    "zone_indices": [ 1 ]
-                },
-                {
-                    "type": "neumann",
-                    "flux": 0,
-                    "zone_indices": [ 2, 3, 4, 5, 6 ]
-                },
-            ],
-            "initial_condition": {
-                "type": "user"
-            }
-        },
         "point_zones": [
             {
                 "name": "optimization_domain",
@@ -112,6 +131,13 @@
                 "geometry": "sphere",
                 "center": [ 2.25, 0.5, 0.5 ],
                 "radius": 0.25
+            },
+            {
+                "name": "objective_domain",
+                "geometry": "box",
+                "x_bounds": [ 3.5, 4.0 ],
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             }
         ]
     },
@@ -146,39 +172,27 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 0,
+            "max_iterations": 1,
             "tolerance": 1.0e-3,
             "mma": {
-                "max_iter": 100,
-                "asyinit": 0.5,
-                "asyincr": 1.2,
-                "asydecr": 0.7,
-                "scale": 10.0,
-                "auto_scale": false,
+                "scale": 1000.0,
                 "xmin": 0.0,
-                "xmax": 1.0,
-                "a0": 1.0,
-                "a": 0.0,
-                "c": 1000.0,
-                "d": 1.0
+                "xmax": 1.0
             }
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "scalar_mixing",
+                "mask_name": "objective_domain",
+                "phi_ref": 0.5,
                 "weight": 1.0
-            },
-            {
-                "type": "lube_term",
-                "weight": 1.0,
-                "K": 1.0
             }
         ],
         "constraints": [
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
-                "limit": 0.0,
+                "limit": 0.05,
                 "is_max": false
             }
         ]
