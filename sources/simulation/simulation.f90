@@ -227,7 +227,6 @@ contains
 
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
-    call profiler_start_region("Forward simulation")
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
 
@@ -256,8 +255,6 @@ contains
     call profiler_start_region("Adjoint simulation")
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
-
-    call profiler_start_region("Adjoint simulation")
     do i = this%n_timesteps, 1, -1
        call this%checkpoint%restore(this%neko_case, i)
 
