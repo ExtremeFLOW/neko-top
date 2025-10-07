@@ -102,6 +102,18 @@ create_case $experiment  32   8   8 ${cluster} 1
 create_case $experiment  64  16  16 ${cluster} 1
 create_case $experiment 128  32  32 ${cluster} 1
 
+# Investigation of the effect of memory checkpoints
+experiment="memory_checkpoints"
+create_case $experiment  32   8   8 ${cluster} 1 10
+create_case $experiment  32   8   8 ${cluster} 1 50
+create_case $experiment  32   8   8 ${cluster} 1 100
+create_case $experiment  32   8   8 ${cluster} 1 150
+create_case $experiment  32   8   8 ${cluster} 1 200
+create_case $experiment  32   8   8 ${cluster} 1 250
+create_case $experiment  32   8   8 ${cluster} 1 500
+create_case $experiment  32   8   8 ${cluster} 1 750
+create_case $experiment  32   8   8 ${cluster} 1 1000
+
 # Check that time is not affected by which dimension is scaled
 experiment="dimension_scaling"
 create_case $experiment  64   8   8 ${cluster} 1
