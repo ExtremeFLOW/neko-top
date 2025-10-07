@@ -51,9 +51,16 @@ program topopt
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  ! initialize the simulation
   call sim%init(parameters)
+
+  ! initialize the design
   call design_factory(des, design_parameters, sim)
+
+  ! initialize the problem
   call prob%init(parameters, des, sim)
+
+  ! initialize the optimizer
   call optimizer_factory(opt, parameters, prob, des, sim)
 
   ! -------------------------------------------------------------------------- !
