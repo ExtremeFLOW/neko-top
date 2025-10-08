@@ -136,17 +136,15 @@ contains
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
 
-    ! check for multiple scalars
-    if (size(neko_case%scalars%scalar_fields) .gt. 1) then
-       call neko_error('Multiple scalars not supported')
-    end if
-
     ! check for a single scalar
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
 
-
     if (has_scalar) then
+       ! check for multiple scalars
+       if (size(neko_case%scalars%scalar_fields) .gt. 1) then
+          call neko_error('Multiple scalars not supported')
+       end if
        ! zero out lag terms and RHS
        call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
        call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
