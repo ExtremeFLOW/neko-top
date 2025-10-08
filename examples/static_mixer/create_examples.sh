@@ -21,7 +21,7 @@ for pe in ${Pe[@]}; do
             output_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
             case_file="${example_path}/petsc/${n}_re_${re}_pe_${pe}.case"
 
-            if [ ! -f ${output_file} ]; then
+            if [[ "$1" == "mesh" && ! -f ${output_file} ]]; then
                 ./mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz \
                     -o ${data_path} -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
             fi
@@ -33,7 +33,7 @@ for pe in ${Pe[@]}; do
             sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${output_file}\",|g" ${case_file}
             sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/petsc/cache_${n}_\",|g" ${case_file}
 
-            if [ ! -f "${data_path}/petsc/cache_${n}_0.nek5000" ]; then
+            if [[ "$1" == "mesh" && ! -f "${data_path}/petsc/cache_${n}_0.nek5000" ]]; then
                 sed -i "s|\"end_time\": .*|\"end_time\": 1e-3,|g" ${case_file}
                 ./run.sh -c static_mixer/petsc/${n}_re_${re}_pe_${pe}.case
                 sed -i "s|\"end_time\": .*|\"end_time\": 30.0,|g" ${case_file}
