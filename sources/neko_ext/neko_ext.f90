@@ -204,7 +204,6 @@ contains
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
     type(json_file) :: json_subdict
-    logical :: temperature_found = .false.
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
