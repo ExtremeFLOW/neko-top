@@ -366,13 +366,11 @@ __global__ void sub2cons2_kernel(
     a[idx] = bt * (ct - dt) - e;
 }
 
-template< typename T>
+template <typename T>
 __inline__ __device__ T max_reduce_warp(T val) {
-  val = max(val, __shfl_down(val, 16, 32));
-  val = max(val, __shfl_down(val, 8, 32));
-  val = max(val, __shfl_down(val, 4, 32));
-  val = max(val, __shfl_down(val, 2, 32));
-  val = max(val, __shfl_down(val, 1, 32));
+  int w = warpSize;
+  for (int offset = w / 2; offset > 0; offset /= 2)
+     val = max(val, __shfl_down(val, offset, w));
   return val;
 }
 
@@ -385,7 +383,7 @@ __global__ void maxval_kernel(const T*  __restrict__ a, T *temp, const int n) {
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T maxval = 0.0;
   for (int i = idx; i < n; i += str) {
      maxval = max(maxval, abs(a[i]));
@@ -418,7 +416,7 @@ __global__ void max_reduce_kernel(T* __restrict__ bufred, const int n) {
         maxval = max(maxval, bufred[i]);
     }
 
-    __shared__ T shared[32];  // One slot per warp (max 1024 threads/block)
+    __shared__ T shared[(1024 + warpSize - 1) / warpSize];  // One slot per warp (max 1024 threads/block)
 
     unsigned int lane = threadIdx.x % warpSize;
     unsigned int wid = threadIdx.x / warpSize;
@@ -552,13 +550,11 @@ __global__ void diagx_kernel(T* __restrict__ diagx, const T* __restrict__ x,
 }
 
 
-template< typename T>
+template <typename T>
 __inline__ __device__ T reduce_warp(T val) {
-  val += __shfl_down(val, 16, 32);
-  val += __shfl_down(val, 8, 32);
-  val += __shfl_down(val, 4, 32);
-  val += __shfl_down(val, 2, 32);
-  val += __shfl_down(val, 1, 32);
+  int w = warpSize;
+  for (int offset = w / 2; offset > 0; offset /= 2)
+     val += __shfl_down(val, offset, w);
   return val;
 }
 
@@ -573,7 +569,7 @@ __global__ void mmareduce_kernel(T* __restrict__ bufred, const int n) {
     sum += bufred[i];
   }
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   unsigned int lane = threadIdx.x % warpSize;
   unsigned int wid = threadIdx.x / warpSize;
 
@@ -601,7 +597,7 @@ __global__ void mmasum_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T sum = 0;
   for (int i = idx; i < n; i += str)
   {
@@ -632,7 +628,7 @@ __global__ void mmasumbb_kernel(const T*  __restrict__ GG,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T sum = 0;
   for (int i = idx; i < n; i += str)
   {
@@ -670,7 +666,7 @@ __global__ void mmasumHess_kernel(
     const unsigned int lane = threadIdx.x % warpSize;
     const unsigned int wid = threadIdx.x / warpSize;
 
-    __shared__ T shared[32];
+    __shared__ T shared[(1024 + warpSize - 1) / warpSize];
 
     T sum = T(0);
 
@@ -714,7 +710,7 @@ __global__ void mmasumAA_kernel(const T*  __restrict__ GG,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T sum = 0;
   for (int i = idx; i < n; i += str)
   {
@@ -854,7 +850,7 @@ __global__ void norm_kernel(const T*  __restrict__ a, T*  __restrict__ buf_h,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T sum = 0;
   for (int i = idx; i < n; i += str)
   {
@@ -910,7 +906,7 @@ __global__ void maxval2_kernel(const T* __restrict__ a, const T* __restrict__ b,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T maxval = cons * a[0] / b[0];
   for (int i = idx; i < n; i += str)
   {
@@ -942,7 +938,7 @@ __global__ void maxval3_kernel(const T* __restrict__ a, const T* __restrict__ b,
   const unsigned int lane = threadIdx.x % warpSize;
   const unsigned int wid = threadIdx.x / warpSize;
 
-  __shared__ T shared[32];
+  __shared__ T shared[(1024 + warpSize - 1) / warpSize];
   T maxval = cons * a[0] / b[0];
   for (int i = idx; i < n; i += str)
   {
@@ -999,7 +995,7 @@ __global__ void maxcons_kernel(T* __restrict__ a, const T b,
    const unsigned int lane = threadIdx.x % warpSize;
    const unsigned int wid = threadIdx.x / warpSize;
 
-   __shared__ T shared[32];
+   __shared__ T shared[(1024 + warpSize - 1) / warpSize];
    T sum = 0;
    for (int i = idx; i<n ; i += str)
    {
@@ -1031,7 +1027,7 @@ __global__ void glsc2_kernel(const T * a,
    const unsigned int lane = threadIdx.x % warpSize;
    const unsigned int wid = threadIdx.x / warpSize;
 
-   __shared__ T shared[32];
+   __shared__ T shared[(1024 + warpSize - 1) / warpSize];
    T sum = 0.0;
    for (int i = idx; i < n; i+= str) {
      sum += a[i] * b[i];
