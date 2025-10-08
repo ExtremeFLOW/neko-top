@@ -65,7 +65,6 @@ module adjoint_lube_source_term
   use device_math, only: device_col2, device_invcol2
   use vector_math, only: vector_add3, vector_col3
   use vector, only: vector_t
-  use device
   implicit none
   private
 
@@ -249,17 +248,6 @@ contains
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
     fw => this%fields%get_by_index(3)
-
-      ! if we have the lube term we also get an extra term in the sensitivity
-      if (.not. device_associated(this%chi_GL%x)) then
-         call device_associate(this%chi_GL%x, this%chi_GL%x_d)
-      end if      
-      if (.not. device_associated(this%accumulate%x)) then
-         call device_associate(this%accumulate%x, this%accumulate%x_d)
-      end if
-      if (.not. device_associated(this%fld_GL%x)) then
-         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
-      end if
 
     ! BE SO CAREFUL HERE
     ! It make look the same as the Brinkman term, but it's assumed that

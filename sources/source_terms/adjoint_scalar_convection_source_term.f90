@@ -52,7 +52,6 @@ module adjoint_scalar_convection_source_term
   use device_math, only: device_col2, device_invcol2
   use vector, only: vector_t
   use vector_math, only: vector_col3
-  use device
   implicit none
   private
 
@@ -217,20 +216,6 @@ contains
     fu => this%fields%get(1)
     fv => this%fields%get(2)
     fw => this%fields%get(3)
-
-      ! if we have the lube term we also get an extra term in the sensitivity
-      if (.not. device_associated(this%s_adj_GL%x)) then
-         call device_associate(this%s_adj_GL%x, this%s_adj_GL%x_d)
-      end if      
-      if (.not. device_associated(this%accumulate%x)) then
-         call device_associate(this%accumulate%x, this%accumulate%x_d)
-      end if
-      if (.not. device_associated(this%fld_GL%x)) then
-         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
-      end if
-      if (.not. device_associated(this%s_GL%x)) then
-         call device_associate(this%s_GL%x, this%s_GL%x_d)
-      end if
 
     ! we need the term \f$\nabla s s_adj\f$
     if (this%dealias) then

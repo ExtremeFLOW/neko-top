@@ -51,9 +51,6 @@ module simple_brinkman_source_term
   use vector_math, only: vector_col3
   use scratch_registry, only: neko_scratch_registry
   use vector, only: vector_t
-  ! delete
-  use, intrinsic :: iso_c_binding, only : c_ptr, c_associated
-  use device
   implicit none
   private
 
@@ -203,7 +200,6 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer :: n_GL, nel
-    type(c_ptr) :: v_d, u_d, a_d, bt_d, ct_d
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -214,25 +210,6 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-      !  print *, "blame"
-      !  print *, "chi    dev_assoc:", c_associated(this%chi%x_d)
-      !  print *, "chi_GL dev_assoc:", c_associated(this%chi_GL%x_d)
-      !  print *, "device asociated?", device_associated(this%chi_GL%x)
-      !  u_d = device_get_ptr(this%chi%x)
-      !  print *, "chi"
-      !  v_d = device_get_ptr(this%chi_GL%x)
-      !  print *, "chi GL"
-
-      ! no idea why this didn't work...
-      if (.not. device_associated(this%chi_GL%x)) then
-         call device_associate(this%chi_GL%x, this%chi_GL%x_d)
-      end if
-      if (.not. device_associated(this%accumulate%x)) then
-         call device_associate(this%accumulate%x, this%accumulate%x_d)
-      end if
-      if (.not. device_associated(this%fld_GL%x)) then
-         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
-      end if
 
        call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
 

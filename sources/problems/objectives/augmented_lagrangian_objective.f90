@@ -49,7 +49,6 @@ module augmented_lagrangian_objective
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use device
   implicit none
   private
 
@@ -229,16 +228,6 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     if (this%dealias) then
-
-      if (.not. device_associated(this%adjoint_fld_GL%x)) then
-         call device_associate(this%adjoint_fld_GL%x, this%adjoint_fld_GL%x_d)
-      end if
-      if (.not. device_associated(this%accumulate%x)) then
-         call device_associate(this%accumulate%x, this%accumulate%x_d)
-      end if
-      if (.not. device_associated(this%fld_GL%x)) then
-         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
-      end if
 
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz

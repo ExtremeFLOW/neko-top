@@ -58,7 +58,7 @@ module brinkman_design
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
   use json_utils, only: json_get, json_get_or_default, json_get
-  use utils, only: neko_error, neko_warning
+  use utils, only: neko_error
   implicit none
   private
 
