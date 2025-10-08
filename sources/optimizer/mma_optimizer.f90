@@ -110,10 +110,10 @@ contains
     ! problems in mma_optimizer_run()
     unconstrained_problem = (problem%get_n_constraints() == 0)
     if (unconstrained_problem) then
-       call this%mma%init(x%x, design%size(), 1, &
+       call this%mma%init(x, design%size(), 1, &
             solver_parameters, this%scale, this%auto_scale)
     else
-       call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
+       call this%mma%init(x, design%size(), problem%get_n_constraints(), &
             solver_parameters, this%scale, this%auto_scale)
     end if
 

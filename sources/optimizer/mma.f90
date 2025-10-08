@@ -156,7 +156,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
 
     type(json_file), intent(inout) :: json
 
@@ -283,7 +283,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -305,8 +305,8 @@ contains
 
     call this%xold1%init(n)
     call this%xold2%init(n)
-    this%xold1%x = x
-    this%xold2%x = x
+    this%xold1 = x
+    this%xold2 = x
 
     call this%alpha%init(n)
     call this%beta%init(n)
@@ -343,8 +343,19 @@ contains
     this%xmax%x = xmax
     this%xmin%x = xmin
 
-    this%low%x(:) = minval(x)
-    this%upp%x(:) = maxval(x)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%a%x, this%a%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%c%x, this%c%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%d%x, this%d%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%xmax%x, this%xmax%x_d, n, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%xmin%x, this%xmin%x_d, n, HOST_TO_DEVICE, &
+            sync = .false.)
+    end if
+
 
     ! Set KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
@@ -357,21 +368,6 @@ contains
           print *, "MMA initialized with CPU backend!"
        end if
     case ("device")
-       ! Upload all init values to device pointers
-       call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, &
-            HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%xold2%x, this%xold2%x_d, this%n, &
-            HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, &
-            sync = .false.)
        if (pe_rank == 0) then
           if (NEKO_BCKND_CUDA .eq. 1) then
              print *, "MMA initialized with CUDA backend!"
@@ -380,11 +376,11 @@ contains
           else if (NEKO_BCKND_OPENCL .eq. 1) then
              print *, "MMA initialized with OPENCL backend!"
           else
-             call neko_error('The backend device is unknown mma_init_attribute')
+             call neko_error('Unknown backend device in mma_init_components')
           end if
        end if
     case default
-       call neko_error('Unknown backend in mma_init_attributes')
+       call neko_error('Unknown backend in mma_init_components')
     end select
 
     ! ------------------------------------------------------------------------ !
