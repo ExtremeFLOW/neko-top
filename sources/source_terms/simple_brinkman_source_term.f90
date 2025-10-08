@@ -137,7 +137,6 @@ contains
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
     integer :: nel, n_GL
-    type(c_ptr) :: v_d, u_d, a_d, bt_d, ct_d
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -210,7 +209,6 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-
        call this%GLL_to_GL%map(this%chi_GL%x, this%chi%x, nel, this%Xh_GL)
 
        ! u

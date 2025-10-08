@@ -328,6 +328,7 @@ contains
     integer :: n_GL, nel
 
     ! if we have the lube term we also get an extra term in the sensitivity
+    
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     if(this%dealias_sensitivity) then
