@@ -51,6 +51,7 @@ module simple_brinkman_source_term
   use vector_math, only: vector_col3
   use scratch_registry, only: neko_scratch_registry
   use vector, only: vector_t
+  use device
   implicit none
   private
 
@@ -205,6 +206,16 @@ contains
     fw => this%fields%get_by_index(3)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
+
+      if (.not. device_associated(this%chi_GL%x)) then
+         call device_associate(this%chi_GL%x, this%chi_GL%x_d)
+      end if
+      if (.not. device_associated(this%accumulate%x)) then
+         call device_associate(this%accumulate%x, this%accumulate%x_d)
+      end if
+      if (.not. device_associated(this%fld_GL%x)) then
+         call device_associate(this%fld_GL%x, this%fld_GL%x_d)
+      end if
 
     if (this%dealias) then
        nel = this%coef%msh%nelv
