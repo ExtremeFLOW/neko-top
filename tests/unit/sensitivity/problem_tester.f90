@@ -1,4 +1,4 @@
-program minimum_dissipation_sensitivity
+program problem_tester
 
   use simulation_m, only: simulation_t
   use brinkman_design, only: brinkman_design_t
@@ -20,6 +20,7 @@ program minimum_dissipation_sensitivity
   use vector, only: vector_t
   use matrix, only: matrix_t
   use math, only: abscmp, copy
+  use device_math, only: device_copy
   use sensitivity, only: compute_sensitivity
   implicit none
 
@@ -102,8 +103,13 @@ program minimum_dissipation_sensitivity
   else
      call prob%get_constraint_sensitivities(constraint_sensitivity)
      call sensitivities%init(constraint_sensitivity%size())
-     call copy(sensitivities%x, constraint_sensitivity%x, &
-          constraint_sensitivity%size())
+     if (NEKO_BCKND_DEVICE .eq. 1) then
+        call device_copy(sensitivities%x_d, constraint_sensitivity%x_d, &
+             constraint_sensitivity%size())
+     else
+        call copy(sensitivities%x, constraint_sensitivity%x, &
+             constraint_sensitivity%size())
+     end if
   end if
 
   call des%write(1)
@@ -133,4 +139,4 @@ program minimum_dissipation_sensitivity
   call des%free()
   call sim%free()
 
-end program minimum_dissipation_sensitivity
+end program problem_tester
