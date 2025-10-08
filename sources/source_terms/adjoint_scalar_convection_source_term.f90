@@ -141,7 +141,7 @@ contains
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
-    
+
     type(field_list_t) :: fields
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
@@ -195,6 +195,13 @@ contains
     call this%fld_GL%free()
     call this%s_GL%free()
     call this%s_adj_GL%free()
+
+    nullify(this%s_adj)
+    nullify(this%s)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
   end subroutine adjoint_scalar_convection_source_term_free
 
   !> Computes the source term and adds the result to `fields`.

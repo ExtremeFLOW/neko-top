@@ -272,6 +272,10 @@ contains
     this%w => null()
     this%c_Xh_GLL => null()
     this%brinkman_amplitude => null()
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
     call this%accumulate%free()
     call this%fld_GL%free()
 
