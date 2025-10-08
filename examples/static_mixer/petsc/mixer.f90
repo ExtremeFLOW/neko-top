@@ -4,26 +4,51 @@ module user
   use field_math, only: field_rzero
   implicit none
 
+  real(kind=rp) :: Re
+
 contains
+
   ! Register user defined functions (see user_intf.f90)
   subroutine user_setup(user)
     type(user_t), intent(inout) :: user
     user%initial_conditions => initial_conditions
     user%dirichlet_conditions => dirichlet_update
+    user%startup => startup
   end subroutine user_setup
+
+  subroutine startup(params)
+    type(json_file), intent(inout) :: params
+    call json_get(params, "case.fluid.Re", Re)
+  end subroutine startup
 
   !> User initial condition
   subroutine initial_conditions(scheme_name, fields)
     character(len=*), intent(in) :: scheme_name
     type(field_list_t), intent(inout) :: fields
 
-    type(field_t), pointer :: s
+    type(field_t), pointer :: u, v, w, s, brinkman_indicator
+
+    brinkman_indicator => neko_field_registry%get_field("brinkman_indicator")
 
     ! See scalar.name in the case file, makes sure that we only
     ! run this for the scalar field.
     if (scheme_name .eq. 'temperature') then
        s => fields%items(1)%ptr
        call scalar_z_split_ic(s, 0.5_rp, 0.0_rp, 1.0_rp)
+    end if
+
+    if (scheme_name .eq. 'fluid') then
+       u => fields%get("u")
+       v => fields%get("v")
+       w => fields%get("w")
+       call field_cfill(u, 1.0_rp)
+       call field_subcol3(u, u, brinkman_indicator)
+       call field_rzero(v)
+       call field_rzero(w)
+
+       call u%copy_from(DEVICE_TO_HOST, .false.)
+       call v%copy_from(DEVICE_TO_HOST, .false.)
+       call w%copy_from(DEVICE_TO_HOST, .true.)
     end if
   end subroutine initial_conditions
 
@@ -34,7 +59,7 @@ contains
 
     type(field_t), pointer :: u, v, w, s
     integer :: i
-    real(kind=rp), parameter :: band_size = 0.01_rp
+    real(kind=rp) :: band_size
     real(kind=rp) :: y, z, val_y0, val_z0, val_y1, val_z1
     logical :: is_velocity_bc, is_scalar_bc
 
@@ -53,6 +78,8 @@ contains
 
        call field_rzero(v)
        call field_rzero(w)
+
+       band_size = 0.2_rp / sqrt(Re)
 
        do i = 1, bc%msk(0)
           y = bc%dof%y(bc%msk(i), 1, 1, 1)
