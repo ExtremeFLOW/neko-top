@@ -157,14 +157,15 @@ contains
        call json_get(neko_case%params, &
             'case.scalar.initial_condition', json_subdict)
        if (trim(string_val) .ne. 'user') then
-       if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. 'temperature') then
-          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
-               neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-               json_subdict, 0)
+          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+               'temperature') then
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict, 0)
           else
-          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
-               neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-               json_subdict, 1)
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict, 1)
           end if
        else
           call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
