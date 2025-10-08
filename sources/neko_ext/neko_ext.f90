@@ -189,7 +189,7 @@ contains
 !> @brief Reset the adjoint case data structure
   !>
   !> @details This subroutine resets the adjoint case data structure. It is
-  !> called at the beginning of each iteration. It is used to reset the time 
+  !> called at the beginning of each iteration. It is used to reset the time
   !> step counter, the lagged time step parameters, the external BDF
   !> coefficients, the adjoint fluid_adj and adjoint scalar fields.
   !>
@@ -278,10 +278,10 @@ contains
          has_scalar, .false.)
 
     if (has_scalar) then
-    ! check for multiple adjoint_scalars
-    if (size(adjoint_case%adjoint_scalars%adjoint_scalar_fields) .gt. 1) then
-       call neko_error('Multiple adjoint scalars not supported')
-    end if
+       ! check for multiple adjoint_scalars
+       if (size(adjoint_case%adjoint_scalars%adjoint_scalar_fields) .gt. 1) then
+          call neko_error('Multiple adjoint scalars not supported')
+       end if
        ! zero out lag terms and RHS
        call adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj_lag% &
             set(adjoint_case%fluid_adj%f_adj_x)
