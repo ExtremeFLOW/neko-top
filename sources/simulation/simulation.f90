@@ -50,7 +50,7 @@ module simulation_m
   use fld_file_output, only: fld_file_output_t
   use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
-  use neko_ext, only: reset
+  use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use field_math, only: field_rzero, field_copy
@@ -268,27 +268,9 @@ contains
     integer :: i, n_scalars
 
     call reset(this%neko_case)
-
-    ! TODO
-    ! reset for the adjoint
-    ! call reset(this%adjoint_case)
-    this%adjoint_case%time%t = 0.0_rp
-    this%adjoint_case%time%tstep = 0
-    this%n_timesteps = 0
-
-    call field_rzero(this%adjoint_case%fluid_adj%u_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%v_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    n_scalars = 0
-    if (allocated(this%adjoint_case%adjoint_scalars)) then
-       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
-       do i = 1, n_scalars
-          call field_rzero(&
-               this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
-       end do
-    end if
-
+    call reset_adjoint(this%adjoint_case, this%neko_case)
     call this%checkpoint%reset()
+
   end subroutine simulation_reset
 
   !> Write current state of the simulation to disk
