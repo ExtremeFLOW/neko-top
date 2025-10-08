@@ -8,7 +8,7 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -26,6 +26,7 @@ module neko_ext
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
+  use field_math, only: field_rzero
 
   implicit none
 
@@ -52,11 +53,12 @@ contains
   subroutine reset(neko_case)
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
-    integer :: i, n_scalars
+    integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
-    type(json_file) :: json_subdict, scalar_params
+    type(json_file) :: json_subdict
+    logical :: temperature_found = .false.
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
@@ -123,58 +125,53 @@ contains
             neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
+    ! zero out all lags etc
+    ! (not sure what to do with the abx's)
+    call field_rzero(neko_case%fluid%f_x)
+    call field_rzero(neko_case%fluid%f_y)
+    call field_rzero(neko_case%fluid%f_z)
+    call neko_case%fluid%ulag%set(neko_case%fluid%f_x)
+    call neko_case%fluid%vlag%set(neko_case%fluid%f_x)
+    call neko_case%fluid%wlag%set(neko_case%fluid%f_x)
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
 
+    ! check for multiple scalars
+    if (size(neko_case%scalars%scalar_fields) .gt. 1) then
+       call neko_error('Multiple scalars not supported')
+    end if
+
+    ! check for a single scalar
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
 
+
     if (has_scalar) then
-       if (neko_case%params%valid_path('case.adjoint_scalar')) then
-          ! we shouldn't fallback to the primal here.
-          call json_get(neko_case%params, &
-               'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_get(neko_case%params, &
-               'case.adjoint_scalar.initial_condition', json_subdict)
-
-          !call neko_log%section("Adjoint scalar initial condition ")
-
-          if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
-                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-                  json_subdict)
+       ! zero out lag terms and RHS
+       call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
+       call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
+       ! reset the forward scalar
+       call json_get(neko_case%params, &
+            'case.scalar.initial_condition.type', string_val)
+       call json_get(neko_case%params, &
+            'case.scalar.initial_condition', json_subdict)
+       if (trim(string_val) .ne. 'user') then
+       if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. 'temperature') then
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+               json_subdict, 0)
           else
-             call neko_error("user defined ICs not implemented for " // &
-                  "adjoint scalar")
-             ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
-             !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
-             !      this%usr%scalar_user_ic, neko_case%params)
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+               json_subdict, 1)
           end if
-
-          ! call neko_log%end_section()
        else
-
-          ! Handle multiple scalars
-          call neko_case%params%info('case.scalars', n_children = n_scalars)
-
-          do i = 1, n_scalars
-             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
-                  i, scalar_params)
-             call json_get(scalar_params, 'initial_condition.type', string_val)
-             call json_get(scalar_params, 'initial_condition', &
-                  json_subdict)
-
-             if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(neko_case%scalars%scalar_fields(i)%s, &
-                     neko_case%scalars%scalar_fields(i)%c_Xh, &
-                     neko_case%scalars%scalar_fields(i)%gs_Xh, string_val, &
-                     json_subdict)
-             else
-                call neko_error("user defined ICs not implemented for " // &
-                     "adjoint scalar")
-             end if
-          end do
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
+               neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%scalars%scalar_fields(1)%c_Xh, &
+               neko_case%scalars%scalar_fields(1)%gs_Xh, &
+               neko_case%user%initial_conditions)
        end if
     end if
 
