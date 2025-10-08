@@ -217,23 +217,6 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
-    <<<<<<< HEAD
-    =======
-    ! if we have the lube term we also get an extra term in the sensitivity
-    if (.not. device_associated(this%s_adj_GL%x)) then
-       call device_associate(this%s_adj_GL%x, this%s_adj_GL%x_d)
-    end if
-    if (.not. device_associated(this%accumulate%x)) then
-       call device_associate(this%accumulate%x, this%accumulate%x_d)
-    end if
-    if (.not. device_associated(this%fld_GL%x)) then
-       call device_associate(this%fld_GL%x, this%fld_GL%x_d)
-    end if
-    if (.not. device_associated(this%s_GL%x)) then
-       call device_associate(this%s_GL%x, this%s_GL%x_d)
-    end if
-
-    >>>>>>> 12bcd8c2 (formatting)
     ! we need the term \f$\nabla s s_adj\f$
     if (this%dealias) then
        nel = this%coef%msh%nelv
