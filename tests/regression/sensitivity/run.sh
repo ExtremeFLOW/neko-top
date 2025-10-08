@@ -5,21 +5,21 @@
 
 function help() {
     echo -e "run.sh case"
-    echo -e "  Generate a mesh."
-    echo -e "  The input arguments are the number of cells in the x, y, and z"
-    echo -e "  directions, respectively."
+    echo -e "  Generate a mesh of size [0,2]x[0,1]."
+    echo -e "  The input arguments are the number of cells in y direction and"
+    echo -e "  the number of processors to run with"
     echo -e ""
-    echo -e "  If no input arguments are provided, the default mesh size is"
-    echo -e "  32x8x8."
+    echo -e "  If no input arguments are provided, the default mesh size is 10"
+    echo -e "  and run with 4 processors"
     echo -e ""
     echo -e "  Example usage:"
-    echo -e "    run.sh -x32 -y8 -z8"
+    echo -e "    run.sh -N32 -np=4"
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help  Show this help message and exit."
-    echo -e "  -N#         Number of cells in the x and y direction."
+    echo -e "  -N#         Number of cells in the x and y direction (e.g. -N8)."
+    echo -e "  -np=#       MPI ranks for mpirun -n (e.g. -np=4)."
     echo -e ""
-    echo -e "  See Readme for additional details."
     exit 0
 }
 
@@ -29,6 +29,7 @@ cd "$WORKING_DIR" || exit 1
 
 # Handle options
 N=10
+NP=4
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -38,11 +39,19 @@ for arg in "$@"; do
     elif [ "${arg:0:1}" == "-" ]; then
         case ${arg:1:1} in
         h) help ;;
-        N) N=${arg:2} ;;
+        N) N=${arg:2} ;;                # e.g. -N8
+        n)                             # handle -np=4
+           if [ "${arg:0:4}" == "-np=" ]; then
+              NP=${arg:4}
+           else
+              echo -e "Invalid option: $arg" >&2 && help
+           fi
+           ;;
         *) echo -e "Invalid option: ${arg:1}" >&2 && help ;;
         esac
     fi
 done
+
 Nx=$((N * 2))
 Ny=$N
 Nz=1
@@ -81,7 +90,8 @@ genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 cases=$(find . -maxdepth 1 -type f -name "*.case")
 for case in $cases; do
     case=${case#./}
-    mpirun -n 4 ./sensitivity_regression_driver ${case} || exit 1
+    echo "Running ${case} with mpirun -n $NP"
+    mpirun -n "$NP" ./sensitivity_regression_driver "${case}" || exit 1
     mv steady_state_data.csv steady_state_data_${case%.*}.csv
 done
 
