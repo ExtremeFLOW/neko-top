@@ -217,6 +217,23 @@ contains
     fv => this%fields%get(2)
     fw => this%fields%get(3)
 
+    <<<<<<< HEAD
+    =======
+    ! if we have the lube term we also get an extra term in the sensitivity
+    if (.not. device_associated(this%s_adj_GL%x)) then
+       call device_associate(this%s_adj_GL%x, this%s_adj_GL%x_d)
+    end if
+    if (.not. device_associated(this%accumulate%x)) then
+       call device_associate(this%accumulate%x, this%accumulate%x_d)
+    end if
+    if (.not. device_associated(this%fld_GL%x)) then
+       call device_associate(this%fld_GL%x, this%fld_GL%x_d)
+    end if
+    if (.not. device_associated(this%s_GL%x)) then
+       call device_associate(this%s_GL%x, this%s_GL%x_d)
+    end if
+
+    >>>>>>> 12bcd8c2 (formatting)
     ! we need the term \f$\nabla s s_adj\f$
     if (this%dealias) then
        nel = this%coef%msh%nelv
@@ -227,7 +244,7 @@ contains
 
        ! u
        call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdx, &
-       this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
+            this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -243,7 +260,7 @@ contains
 
        ! v
        call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdy, &
-       this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
+            this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -259,7 +276,7 @@ contains
 
        ! w
        call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdz, &
-       this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
+            this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
        call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
