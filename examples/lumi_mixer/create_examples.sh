@@ -12,6 +12,8 @@ if [ "$(basename $MAIN_DIR)" != "neko-top" ]; then
     exit 1
 fi
 
+[ "$1" == "mesh" ] && MESH="true" || MESH="false"
+
 export mesh_pattern="mixer"
 
 export hpc_path="${MAIN_DIR}/scripts/jobscripts"
@@ -43,7 +45,7 @@ function create_case() {
     [ $# -ge 7 ] && local N_memory=$7 || local N_memory=""
 
     if [ "${cluster}" == "LUMI-G" ]; then
-        Np="$((nodes * 8))"
+        Np="8"
     fi
 
     # Define a unique case name
@@ -56,7 +58,7 @@ function create_case() {
     local job_path="${hpc_path}/${cluster}/lumi_mixer/cases"
 
     # Create the mesh if it does not exist
-    if [ ! -f "${mesh_file}" ]; then
+    if [[ ! -f "${mesh_file}" && "$MESH" == "true" ]]; then
         ./mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz \
            -o "${data_path}" -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
     fi
@@ -79,7 +81,7 @@ function create_case() {
     # Create the experiment entry
     experiment_file="${experiment_path}/${experiment}.csv"
     if [ ! -f ${experiment_file} ]; then
-        header="case_name, cluster, Nx, Ny, Nz, Np"
+        header="case_name, cluster, Nx, Ny, Nz, nodes, Np"
         [ -n "${N_memory}" ] && header+=", N_memory"
 
         echo "$header" >> ${experiment_file}
@@ -87,7 +89,7 @@ function create_case() {
 
     if ! grep -q "^${case_name}\," "${experiment_file}"; then
         # Determine the data line
-        data_line="${case_name}, ${cluster}, ${Nx}, ${Ny}, ${Nz}, ${Np}"
+        data_line="${case_name}, ${cluster}, ${Nx}, ${Ny}, ${Nz}, ${nodes}, ${Np}"
         [ -n "${N_memory}" ] && data_line+=", ${N_memory}"
         printf "${data_line}\n" >> "${experiment_file}"
     fi
