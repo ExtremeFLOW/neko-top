@@ -11,6 +11,7 @@ module mma_optimizer
   use design, only: design_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
+  use profiler, only: profiler_start_region, profiler_end_region
 
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -142,6 +143,8 @@ contains
 
     type(vector_t) :: log_data
 
+    call profiler_start_region("Optimizer iteration 0")
+
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
@@ -176,9 +179,12 @@ contains
 
     if (present(simulation)) call simulation%write(0)
     call design%write(0)
+    call profiler_end_region("Optimizer iteration 0")
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
+
+       call profiler_start_region("Optimizer iteration")
 
        ! Scaling
        if (this%auto_scale .eqv. .true.) then
@@ -200,8 +206,10 @@ contains
        end if
 
        ! Use scaled sensitivities to update the design variable
+       call profiler_start_region("MMA update")
        call this%mma%update(iter, x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
+       call profiler_end_region("MMA update")
 
        call design%update_design(x)
 
@@ -214,8 +222,10 @@ contains
        call problem%get_constraint_sensitivities(constraint_sensitivities)
        call problem%get_all_objective_values(all_objectives)
 
+       call profiler_start_region("MMA KKT computation")
        call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
+       call profiler_end_region("MMA KKT computation")
 
        ! Stamp the i^th iteration
        call mma_logger_assemble_data(log_data, iter, objective_value, &
@@ -226,6 +236,8 @@ contains
 
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
+
+       call profiler_end_region("Optimizer iteration")
     end do
 
     call this%validate(problem, design)
