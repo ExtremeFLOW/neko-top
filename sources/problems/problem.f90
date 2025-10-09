@@ -53,8 +53,10 @@ module problem
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
+  use simulation, only: simulation_init, &
+       simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
-  use profiler, only: profiler_start, profiler_stop
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
   private
@@ -100,8 +102,12 @@ module problem
      !! design. It should be implemented in the derived classes.
      procedure, pass(this), public :: compute_sensitivity => &
           problem_compute_sensitivity
-     !> Run the unsteady adjoint backwards in time will time integrating the
-     !! sensitivity and objective function.
+     !> Run the unsteady problem forward in time while time integrating the
+     !! objective function.
+     procedure, pass(this), public :: run_forward_unsteady => &
+          problem_run_forward_unsteady
+     !> Run the unsteady adjoint backwards in time while time integrating the
+     !! sensitivity.
      procedure, pass(this), public :: run_backward_unsteady => &
           problem_run_backward_unsteady
      ! ----------------------------------------------------------------------- !
@@ -397,13 +403,23 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     class(simulation_t), optional, intent(inout) :: simulation
+    logical :: unsteady
 
     if (present(simulation)) then
        call simulation%reset()
-       call simulation%run_forward()
+       call simulation%checkpoint%get_enabled(unsteady)
+       if (unsteady) then
+          ! Objective value accumulated
+          call this%run_forward_unsteady(simulation, design)
+       else
+          call simulation%run_forward()
+          ! Compute objective value on steady field
+          call this%update_objectives(design)
+       end if
+    else
+       call this%update_objectives(design)
     end if
 
-    call this%update_objectives(design)
     call this%update_constraints(design)
 
   end subroutine problem_compute
@@ -420,11 +436,11 @@ contains
     if (present(simulation)) then
        call simulation%checkpoint%get_enabled(unsteady)
        if (unsteady) then
-          ! The update to objective sensitivities is performed within the
-          ! backwards run
+          ! Objective sensitivity accumulated
           call this%run_backward_unsteady(simulation, design)
        else
           call simulation%run_backward()
+          ! Compute sensitivity on steady field
           call this%update_objective_sensitivities(design)
        end if
     else
@@ -441,6 +457,39 @@ contains
     call objective_sensitivity%free()
   end subroutine problem_compute_sensitivity
 
+  !> Run the forward backwards
+  subroutine problem_run_forward_unsteady(this, simulation, design)
+    class(problem_t), intent(inout) :: this
+    class(simulation_t), intent(inout) :: simulation
+    class(design_t), intent(inout) :: design
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
+
+
+    call dt_controller%init(simulation%neko_case%params)
+
+    call simulation_init(simulation%neko_case, dt_controller)
+
+    ! Reset the objective value to zero
+    call this%reset_objectives()
+
+    call profiler_start_region("Forward simulation")
+    loop_start = MPI_WTIME()
+    do while (simulation%neko_case%time%t .lt. simulation%neko_case%time%end_time)
+       simulation%n_timesteps = simulation%n_timesteps + 1
+       ! step forward
+       call simulation_step(simulation%neko_case, dt_controller, loop_start)
+       ! accumulate objective value
+       call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
+       ! save a checkpoint
+       call simulation%checkpoint%save(simulation%neko_case)
+    end do
+    call profiler_end_region("Forward simulation")
+
+    call simulation_finalize(simulation%neko_case)
+
+  end subroutine problem_run_forward_unsteady
+
   !> Run the adjoint backwards
   subroutine problem_run_backward_unsteady(this, simulation, design)
     class(problem_t), intent(inout) :: this
@@ -456,35 +505,51 @@ contains
 
     call simulation_adjoint_init(simulation%adjoint_case, dt_controller)
 
-    ! Reset the sensitivity and objective value to zero
-    ! (note: It's convenient to compute the objective value and sensitivity
-    ! on the backwards pass as opposed to the forward so it isn't computed on
-    ! recomputations of the forward.)
-    !
-    ! The alternative (likely a better option) is to time integrate the
-    ! objective function on the forward run, but this will require some
-    ! refactoring.
-    call this%reset_objectives()
+    ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
 
-    call profiler_start
     cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
     total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
 
+    call profiler_start_region("Adjoint simulation")
+
+    ! TODO. IC's need to be handled rather carefully, we should take a
+    ! checkpoint at i = 0. However, 99% of the time we use an initial condition
+    ! for the fluid of u=0, so this doesn't matter. Then we use u_adj = 0 on
+    ! the other end.
+    !
+    ! we have: 
+    !  - n    time steps to compute
+    !  - n+1  fields to consider
+    !  - n-1  non-zero contributions to u * u_adj
+    !
+    !              non-zero
+    !             |--------|
+    !  primal  o--x--x--x--x--x
+    !          x--x--x--x--x--o  adjoint
+    !          ^              ^
+    !         u=0          u_adj=0
+
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%checkpoint%restore(simulation%neko_case, i)
-       ! accumulate objective value
-       call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
-       ! step the adjoint backwards
-       call simulation_adjoint_step(simulation%adjoint_case, dt_controller, cfl, &
-            loop_start, total_time)
        ! accumulate objective sensitivity
-       call this%accumulate_objective_sensitivities(design, simulation%adjoint_case%time%dt)
+       call this%accumulate_objective_sensitivities(design, &
+            simulation%adjoint_case%time%dt)
+       ! step the adjoint backwards
+       call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
+            cfl, loop_start, total_time)
     end do
-    call profiler_stop
+    ! really there should be one final call to restore the IC of the primal
+    ! and then one more accumulate on that one, but the IC of the primal
+    ! should always be zero, if not, special treatment of the adjoint is
+    ! required.
+
+    call profiler_end_region("Forward simulation")
+
+
 
     call simulation_adjoint_finalize(simulation%adjoint_case)
 
