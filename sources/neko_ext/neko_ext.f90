@@ -181,15 +181,15 @@ contains
 
   end subroutine reset
 
-!> @brief Reset the adjoint case data structure
-  !>
-  !> @details This subroutine resets the adjoint case data structure. It is
-  !> called at the beginning of each iteration. It is used to reset the time
-  !> step counter, the lagged time step parameters, the external BDF
-  !> coefficients, the adjoint fluid_adj and adjoint scalar fields.
-  !>
-  !> @param[inout] adjoint_case Adjoint case data structure.
-  !> @param[in] neko_case Primal case.
+  !> @brief Reset the adjoint case data structure
+  !!
+  !! @details This subroutine resets the adjoint case data structure. It is
+  !! called at the beginning of each iteration. It is used to reset the time
+  !! step counter, the lagged time step parameters, the external BDF
+  !! coefficients, the adjoint fluid_adj and adjoint scalar fields.
+  !!
+  !! @param[inout] adjoint_case Adjoint case data structure.
+  !! @param[in] neko_case Primal case.
   subroutine reset_adjoint(adjoint_case, neko_case)
     type(adjoint_case_t), intent(inout) :: adjoint_case
     type(case_t), intent(inout) :: neko_case
