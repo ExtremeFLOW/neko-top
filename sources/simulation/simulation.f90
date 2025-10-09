@@ -265,7 +265,6 @@ contains
   !> Reset the simulation
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
-    integer :: i, n_scalars
 
     call reset(this%neko_case)
     call reset_adjoint(this%adjoint_case, this%neko_case)
