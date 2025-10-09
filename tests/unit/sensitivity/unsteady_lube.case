@@ -10,7 +10,7 @@
             "timestep": 1e-3
         },
         "numerics": {
-            "time_order": 1,
+            "time_order": 3,
             "polynomial_order": 5,
             "dealias": true
         },

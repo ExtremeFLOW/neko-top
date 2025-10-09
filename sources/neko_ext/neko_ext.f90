@@ -29,7 +29,6 @@ module neko_ext
   use adjoint_scalars, only: adjoint_scalars_t
   use field_math, only: field_rzero, field_copy
   use fluid_pnpn, only: fluid_pnpn_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
 
   implicit none
 
