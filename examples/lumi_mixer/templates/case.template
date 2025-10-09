@@ -128,9 +128,10 @@
             },
             {
                 "name": "initial_ball",
-                "geometry": "sphere",
-                "center": [ 2.25, 0.5, 0.5 ],
-                "radius": 0.25
+                "geometry": "box",
+                "x_bounds": [ 1.0, 3.5 ],
+                "y_bounds": [ 0.5, 0.75 ],
+                "z_bounds": [ 0.25, 0.75 ]
             },
             {
                 "name": "objective_domain",
