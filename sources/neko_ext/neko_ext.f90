@@ -223,13 +223,8 @@ contains
     ! Reset the timing parameters
     ! ------------------------------------------------------------------------ !
 
-    t = 0.0_rp
-    adjoint_case%time%t = t
-    adjoint_case%time%tstep = 0
-
-    ! Setup lagged time step parameters
-    adjoint_case%time%tlag = t
-    adjoint_case%time%dtlag = adjoint_case%time%dt
+    call adjoint_case%time%reset()
+    t = adjoint_case%time%start_time
     do i = 1, size(adjoint_case%time%tlag)
        adjoint_case%time%tlag(i) = t - i*adjoint_case%time%dtlag(i)
     end do
