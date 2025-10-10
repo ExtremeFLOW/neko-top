@@ -126,25 +126,11 @@
                 "z_bounds": [ 0.0, 1.0 ]
             },
             {
-                "name": "ball_1",
-                "geometry": "sphere",
-                "center": [ 2, 0.5, 0.5 ],
-                "radius": 0.25
-            },
-            {
-                "name": "ball_2",
-                "geometry": "sphere",
-                "center": [ 3, 0.5, 0.5 ],
-                "radius": 0.25
-            },
-            {
                 "name": "initial_design",
-                "geometry": "combine",
-                "operator": "OR",
-                "subsets": [
-                    { "name": "ball_1" },
-                    { "name": "ball_2" }
-                ]
+                "geometry": "box",
+                "x_bounds": [ 1.0, 3.5 ],
+                "y_bounds": [ 0.55, 0.75 ],
+                "z_bounds": [ 0.25, 0.75 ]
             },
             {
                 "name": "objective_domain",
@@ -157,8 +143,8 @@
     },
     "checkpoints": {
         "enabled": true,
-        "n_memory": 1000,
-        "keep_checkpoints": true
+        "n_memory": 100,
+        "keep_checkpoints": false
     },
     "optimization": {
         "domain": {
