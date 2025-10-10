@@ -65,13 +65,13 @@ module simplefield_design
   type, extends(design_t), public :: simplefield_design_t
      private
 
-     type(field_t), private :: designfield
+     type(field_t) :: designfield
      type(vector_t) :: x_coord
      type(vector_t) :: y_coord
      type(vector_t) :: z_coord
 
      ! needed to write the design
-     type(fld_file_output_t), private :: output
+     type(fld_file_output_t) :: output
 
 
    contains
