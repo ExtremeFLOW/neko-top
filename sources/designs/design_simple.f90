@@ -277,7 +277,7 @@ contains
     integer :: i
     integer :: npts, nx, ny, nz
     character(len=100) :: filename
-    integer :: ios
+    integer :: ios, funit
 
     nx = this%nx + 1
     ny = this%ny + 1
@@ -298,35 +298,35 @@ contains
 
     write(filename, '(A,I4.4,A)') 'design_', idx, '.vtk'
 
-    open(unit=10, file=filename, status='replace', action='write', iostat=ios)
-    if (ios /= 0) then
+    open(newunit=funit, file=filename, status='replace', action='write', iostat=ios)
+    if (ios .ne. 0) then
        print *, 'Error opening file ', filename
        stop
     end if
 
     ! Header
-    write(10,'(A)') '# vtk DataFile Version 3.0'
-    write(10,'(A)') 'Simple Scalar Field'
-    write(10,'(A)') 'ASCII'
-    write(10,'(A)') 'DATASET STRUCTURED_GRID'
-    write(10,'(A,3(1X,I0))') 'DIMENSIONS', nx, ny, nz
+    write(funit, '(A)') '# vtk DataFile Version 3.0'
+    write(funit, '(A)') 'Simple Scalar Field'
+    write(funit, '(A)') 'ASCII'
+    write(funit, '(A)') 'DATASET STRUCTURED_GRID'
+    write(funit, '(A,3(1X,I0))') 'DIMENSIONS', nx, ny, nz
 
     ! Points
-    write(10,'(A,1X,I0,1X,A)') 'POINTS', npts, 'float'
+    write(funit, '(A,1X,I0,1X,A)') 'POINTS', npts, 'float'
     do i = 1, npts
-       write(10,'(3(F20.12,1X))') this%x_coord%x(i), this%y_coord%x(i), &
+       write(funit, '(3(F20.12,1X))') this%x_coord%x(i), this%y_coord%x(i), &
             this%z_coord%x(i)
     end do
 
     ! Scalars
-    write(10,'(A,1X,I0)') 'POINT_DATA', npts
-    write(10,'(A)') 'SCALARS density float 1'
-    write(10,'(A)') 'LOOKUP_TABLE default'
+    write(funit, '(A,1X,I0)') 'POINT_DATA', npts
+    write(funit, '(A)') 'SCALARS density float 1'
+    write(funit, '(A)') 'LOOKUP_TABLE default'
     do i = 1, npts
-       write(10,'(F20.12)') this%values%x(i)
+       write(funit, '(F20.12)') this%values%x(i)
     end do
 
-    close(10)
+    close(funit)
   end subroutine design_simple_write
 
 end module simple_design
