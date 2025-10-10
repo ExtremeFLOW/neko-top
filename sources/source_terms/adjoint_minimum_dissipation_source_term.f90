@@ -188,7 +188,6 @@ contains
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
 
     call this%free_base()
-
     nullify(this%u)
     nullify(this%v)
     nullify(this%w)
