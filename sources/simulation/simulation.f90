@@ -227,6 +227,7 @@ contains
 
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
+    this%n_timesteps = 0
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
 
