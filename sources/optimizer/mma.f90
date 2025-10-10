@@ -184,7 +184,7 @@ contains
          MPI_SUM, MPI_COMM_WORLD, ierr)
 
     ! Assign default values for the backend based on the NEKO_BCKND_DEVICE
-    if (NEKO_BCKND_CUDA .eq. 1) then
+    if (NEKO_BCKND_DEVICE .eq. 1) then
        bcknd_default = "device"
     else
        bcknd_default = "cpu"
