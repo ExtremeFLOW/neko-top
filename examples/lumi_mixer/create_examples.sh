@@ -117,21 +117,17 @@ create_case ${experiment} 128  32  16 "${cluster}" 1
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
-create_case ${experiment} 128  32  16 "${cluster}" 1 100
-create_case ${experiment} 128  32  16 "${cluster}" 1 200
-create_case ${experiment} 128  32  16 "${cluster}" 1 400
-create_case ${experiment} 128  32  16 "${cluster}" 1 800
-create_case ${experiment} 128  32  16 "${cluster}" 1 1600
-create_case ${experiment} 128  32  16 "${cluster}" 1 3200
-create_case ${experiment} 128  32  16 "${cluster}" 1 6400
+create_case ${experiment}  64  16  16 "${cluster}" 1 100
+create_case ${experiment}  64  16  16 "${cluster}" 1 200
+create_case ${experiment}  64  16  16 "${cluster}" 1 400
+create_case ${experiment}  64  16  16 "${cluster}" 1 800
 
 create_case ${experiment} 128  16  16 "${cluster}" 1 100
 create_case ${experiment} 128  16  16 "${cluster}" 1 200
 create_case ${experiment} 128  16  16 "${cluster}" 1 400
-create_case ${experiment} 128  16  16 "${cluster}" 1 800
-create_case ${experiment} 128  16  16 "${cluster}" 1 1600
-create_case ${experiment} 128  16  16 "${cluster}" 1 3200
-create_case ${experiment} 128  16  16 "${cluster}" 1 6400
+
+create_case ${experiment} 128  32  16 "${cluster}" 1 100
+create_case ${experiment} 128  32  16 "${cluster}" 1 200
 
 # Check that time is not affected by which dimension is scaled
 experiment="dimension_scaling"
@@ -141,6 +137,22 @@ create_case ${experiment}  32   8  16 "${cluster}" 1
 create_case ${experiment} 128  16  16 "${cluster}" 1
 create_case ${experiment}  64  32  16 "${cluster}" 1
 create_case ${experiment}  64  16  32 "${cluster}" 1
+
+# Investigate the scaling on 2 nodes
+experiment="node_scaling_64x16x16"
+create_case ${experiment}  64  16  16 "${cluster}" 1 800
+create_case ${experiment} 128  16  16 "${cluster}" 2 800
+create_case ${experiment}  64  16  16 "${cluster}" 2 1600
+
+experiment="node_scaling_128x16x16"
+create_case ${experiment} 128  16  16 "${cluster}" 1 400
+create_case ${experiment} 128  32  16 "${cluster}" 2 400
+create_case ${experiment} 128  16  16 "${cluster}" 2 800
+
+experiment="node_scaling_256x64x32"
+create_case ${experiment} 128  32  16 "${cluster}" 1 200
+create_case ${experiment} 128  32  32 "${cluster}" 2 200
+create_case ${experiment} 128  32  16 "${cluster}" 2 400
 
 experiment="weak_scaling"
 create_case ${experiment} 128  32  32 "${cluster}" 1
