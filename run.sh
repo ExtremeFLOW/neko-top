@@ -314,6 +314,11 @@ function Submit() {
     if [ -n "$(which bsub 2>/dev/null)" ]; then
         bsub -J $1 -env "all" <job_script.sh
     elif [ -n "$(which sbatch 2>/dev/null)" ]; then
+        if [ "$(squeue -h --name=$1 | wc -l)" -gt 0 ]; then
+            printf '\t%-12s %-s\n' "In queue:" "$1"
+            cd $CURRENT_DIR
+            return
+        fi
         sbatch -J $1 $ACCOUNT job_script.sh 1>/dev/null 2>error.log
     else
         printf >&2 "Unknown submission system.\n"
