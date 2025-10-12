@@ -374,7 +374,6 @@ for case in ${example_list[@]}; do
 
     export log=$LPATH/$example
     if [[ "$CLEAN" == true && -d "$log" ]]; then
-        printf '\t%-12s %-s\n' "Removing:" "$log"
         rm -fr $log
     fi
 
@@ -395,7 +394,7 @@ for case in ${example_list[@]}; do
 
         find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
-    else
+    elif [[ -f "$log/output.log" ]]; then
         printf '\t%-12s %-s\n' "Skipped:" "$example"
         continue
     fi
