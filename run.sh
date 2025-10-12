@@ -372,8 +372,11 @@ for case in ${example_list[@]}; do
         continue
     fi
 
-    export log=$LPATH/$example && mkdir -p $log
-    [ "$CLEAN" == true ] && rm -fr $log/*
+    export log=$LPATH/$example
+    if [[ "$CLEAN" == true && -d "$log" ]]; then
+        printf '\t%-12s %-s\n' "Removing:" "$log"
+        rm -fr $log
+    fi
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
@@ -384,7 +387,7 @@ for case in ${example_list[@]}; do
         QUEUE="$QUEUE $example"
         continue
 
-    elif [[ -s "$log/output.log" ]]; then
+    elif [[ -s "$log/error.log" ]]; then
         # Move old log files to folder with counter padded to 2 digits
         old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
         old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
@@ -392,9 +395,12 @@ for case in ${example_list[@]}; do
 
         find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
-
+    else
+        printf '\t%-12s %-s\n' "Skipped:" "$example"
+        continue
     fi
 
+    mkdir -p $log
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
