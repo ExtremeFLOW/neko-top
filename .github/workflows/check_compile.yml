@@ -1,0 +1,209 @@
+# This workflow checks the compilation of the Neko-TOP library.
+
+name: Check Neko-TOP compilation
+
+# This workflow is only defined here. It is triggered from other workflows.
+on:
+  workflow_call:
+    inputs:
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
+      json-fortran-version:
+        description: "The version of json-fortran to use."
+        required: true
+        type: string
+      pfunit-version:
+        description: "The version of pFUnit to use."
+        required: true
+        type: string
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+
+jobs:
+
+  # -------------------------------------------------------------------------- #
+  # Define the compilation and testing job that will be run in this workflow.
+  # This job will build the Neko-TOP code in debug mode and run the unit tests.
+
+  neko-top-debug:
+
+    # ------------------------------------------------------------------------ #
+    # Define the Matrix for the job.
+    # ------------------------------------------------------------------------ #
+
+    strategy:
+      fail-fast: true
+      matrix:
+
+        # Default matrix
+        precision: [dp]
+        backend: [CPU, CUDA, HIP]
+        compiler: [gfortran-13, gfortran-14]
+
+        # Exclude specific combinations
+        exclude:
+          - backend: CUDA
+            compiler: gfortran-13
+          - backend: HIP
+            compiler: gfortran-13
+
+        # Define the setup jobs
+        include:
+          - backend: CUDA
+            setup-backend: |
+              sudo apt-get update
+              sudo apt-get install -y nvidia-cuda-toolkit
+              echo "backend-path=/usr" >> $GITHUB_OUTPUT
+
+          - backend: HIP
+            setup-backend: |
+              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+              sudo apt install ./amdgpu-install_*.deb
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              ROCM_DIR=$(ls -d /opt/rocm-*)
+              echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
+
+    # ------------------------------------------------------------------------ #
+    # Define the job itself.
+    # ------------------------------------------------------------------------ #
+    name: ${{ matrix.backend }} - ${{ matrix.compiler }} - ${{ matrix.precision }}
+    runs-on: ubuntu-latest
+    env:
+      JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}
+    steps:
+
+      # ---------------------------------------------------------------------- #
+      # Checkout the repository and setup the environment
+      # ---------------------------------------------------------------------- #
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
+            openmpi-bin pkg-config liblapack-dev ninja-build
+
+      - name: Setup backend
+        id: setup-backend
+        shell: bash
+        run: ${{ matrix.setup-backend }}
+
+      # ---------------------------------------------------------------------- #
+      # Setup the external dependencies
+      # ---------------------------------------------------------------------- #
+
+      - name: Get json-fortran
+        id: get-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
+          compiler: ${{ matrix.compiler }}
+
+      - name: Get ParMETIS
+        id: get-parmetis
+        uses: ./.github/actions/setup_parmetis
+        with:
+          compiler: ${{ matrix.compiler }}
+
+      - name: Get neko
+        id: get-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          version: ${{ inputs.neko-version }}
+          precision: ${{ matrix.precision }}
+          compiler: ${{ matrix.compiler }}
+          backend: ${{ matrix.backend }}
+          backend-path: ${{ steps.setup-backend.outputs.backend-path }}
+
+      - name: Get pfunit
+        id: get-pfunit
+        uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ inputs.pfunit-version }}
+
+      # ---------------------------------------------------------------------- #
+      # Build and test the code
+      # ---------------------------------------------------------------------- #
+
+      - name: Configuration
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+        run: |
+          if [ "${{ matrix.backend }}" == "CPU" ]; then
+            TEST=ON
+          else
+            TEST=OFF
+          fi
+          cmake -B build -S . -G Ninja --fresh \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=$TEST
+
+      - name: Building Library
+        run: |
+          cmake --build build --parallel
+
+      # ---------------------------------------------------------------------- #
+      # Run the tests, which is only done on the CPU backend as the github
+      # runner does not have a GPU available.
+      # ---------------------------------------------------------------------- #
+
+      - name: Running Unit Tests
+        if: ${{ matrix.backend == 'cpu' }}
+        run: |
+          ctest -L unit --test-dir build --output-on-failure --parallel
+
+      - name: Building Examples
+        run: |
+          cmake --build build --target Examples --parallel
+
+      - name: Run Rugby Ball
+        if: ${{ matrix.backend == 'cpu' }}
+        env:
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
+        run: |
+          # Adjust the end time and max iterations for the rugby ball case
+          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
+
+          ./run.sh -rc rugby_ball
+
+      # ---------------------------------------------------------------------- #
+      # Report errors if any step fails
+      # ---------------------------------------------------------------------- #
+      - name: Report errors
+        if: failure()
+        run: |
+          [ ! -d logs ] && exit
+          echo "Errors encountered during script execution."
+          echo "Please check the logs for details."
+          logs=($(find logs/ -name "error.log"))
+
+          for file in ${logs[@]}; do
+            if [[ -s $file ]]; then
+              printf "\nContents of $file:\n" >&2
+              cat $file >&2
+            elif [ -f $file ]; then
+              rm -fr $(dirname $file)
+            fi
+          done
+
+      - name: Save logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.JOB_NAME }}-logs
+          path: logs/**/*.log
+          overwrite: true
+          if-no-files-found: ignore

@@ -4,8 +4,10 @@
         "mesh_file": "data_local/thermal_mix_channel/square_pipe.nmsh",
         "output_checkpoints": false,
         "output_at_end": true,
-        "end_time": 5.0,
-        "timestep": 1e-5,
+        "time": {
+            "end_time": 5.0,
+            "timestep": 1e-5
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -25,14 +27,12 @@
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": "hsmg",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
@@ -66,7 +66,6 @@
             "solver": {
                 "type": "cg",
                 "preconditioner": "jacobi",
-                "projection_space_size": 0,
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },

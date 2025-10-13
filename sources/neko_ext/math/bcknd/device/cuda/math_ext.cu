@@ -32,16 +32,23 @@
  POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "math_ext_kernel.h"
-#include <device/cuda/check.h>
-#include <device/device_config.h>
+// System includes
 #include <stdio.h>
 #include <stdlib.h>
 
-extern "C" {
+// Device includes
+#include <cuda_runtime.h>
 
-#include <math/bcknd/device/device_mpi_op.h>
-#include <math/bcknd/device/device_mpi_reduce.h>
+// Neko includes
+#include <neko/device/device_config.h>
+#include <neko/device/cuda/check.h>
+#include <neko/math/bcknd/device/device_mpi_op.h>
+#include <neko/math/bcknd/device/device_mpi_reduce.h>
+
+// Local includes
+#include "math_ext_kernel.h"
+
+extern "C" {
 
 /** Fortran wrapper for copy_mask
  * Copy a vector \f$ a_i = b_i, for i \in mask \f$
@@ -51,10 +58,12 @@ void cuda_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     copy_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+
 /** Fortran wrapper for cadd_mask
  * Add a scalar to vector \f$ a_i = a_i + s, for i \in mask \f$
  */
@@ -63,10 +72,12 @@ void cuda_cadd_mask(void* a, real* c, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     cadd_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, *c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+
 /** Fortran wrapper for invcol1_mask
  * Invert elements of vector \f$ a_i = 1.0 / a_i, for i \in mask \f$
  */
@@ -75,11 +86,13 @@ void cuda_invcol1_mask(void* a, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     invcol1_mask_kernel<real>
         <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
             (real*)a, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+
 /** Fortran wrapper for col2_mask
  * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
  */
@@ -88,10 +101,12 @@ void cuda_col2_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     col2_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+
 /** Fortran wrapper for col3_mask
  * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
  */
@@ -101,10 +116,12 @@ void cuda_col3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     col3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());
 }
+
 /** Fortran wrapper for sub3_mask
  * Invert elements of vector \f$ a_i = b_i * c_i, for i \in mask \f$
  */
@@ -114,6 +131,7 @@ void cuda_sub3_mask(
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
 
+    if (*mask_size == 0) return;
     sub3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
     CUDA_CHECK(cudaGetLastError());

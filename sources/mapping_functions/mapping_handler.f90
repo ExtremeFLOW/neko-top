@@ -178,7 +178,7 @@ contains
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
-       do i = 1, size(this%mapping_cascade)
+       do i = size(this%mapping_cascade), 1, -1
           ! the output from one mapping becomes the input for the next.
           call field_copy(tmp_fld_in, tmp_fld_out)
           ! apply the mapping on temp_fld

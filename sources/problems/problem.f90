@@ -47,7 +47,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
-  use vector, only: vector_t
+  use vector_math, only: vector_add2
 
   implicit none
   private
@@ -169,17 +169,17 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    type(simulation_t), intent(inout) :: simulation
+    type(simulation_t), optional, intent(inout) :: simulation
 
     this%n_design = design%size()
     this%n_objectives = 0
     this%n_constraints = 0
 
     ! minimum dissipation objective function
-    call this%read_objectives(parameters, simulation, design)
+    call this%read_objectives(parameters, design, simulation)
 
     ! volume constraint
-    call this%read_constraints(parameters, simulation, design)
+    call this%read_constraints(parameters, design, simulation)
 
   end subroutine problem_init
 
@@ -216,12 +216,12 @@ contains
   ! Handling constraints and objectives
 
   !> Read the objective from a parameters file.
-  subroutine problem_read_objectives(this, parameters, simulation, design)
+  subroutine problem_read_objectives(this, parameters, design, simulation)
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(objective_t), allocatable :: objective
+    type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single objective term as its own json_file.
     character(len=:), allocatable :: path, type
@@ -232,30 +232,31 @@ contains
 
     ! Get the number of objectives.
     path = "optimization.objectives"
-    call parameters%info(path, n_children = n_objectives)
+    if (parameters%valid_path(path)) then
+       call parameters%info(path, n_children = n_objectives)
 
-    ! Grab a single parameters entry and create a constraint from it.
-    do i = 1, n_objectives
-       call json_extract_item(parameters, path, i, objective_json)
-       call json_get(objective_json, "type", type)
-       call neko_log%message(type)
+       ! Grab a single parameters entry and create a constraint from it.
+       do i = 1, n_objectives
+          call json_extract_item(parameters, path, i, objective_json)
+          call json_get(objective_json, "type", type)
+          call neko_log%message(type)
 
-       call objective_factory(objective, objective_json, design, simulation)
-       call this%add_objective(objective)
-
-    end do
+          call objective_factory(objective, objective_json, design, simulation)
+          call this%add_objective(objective)
+       end do
+    end if
 
     call neko_log%end_section()
 
   end subroutine problem_read_objectives
 
   !> Read the constraint from a parameters file.
-  subroutine problem_read_constraints(this, parameters, simulation, design)
+  subroutine problem_read_constraints(this, parameters, design, simulation)
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
-    type(simulation_t), intent(inout) :: simulation
     class(design_t), intent(in) :: design
     class(constraint_t), allocatable :: constraint
+    type(simulation_t), optional, intent(inout) :: simulation
 
     ! A single constraint term as its own json_file.
     character(len=:), allocatable :: path, type
@@ -266,18 +267,20 @@ contains
 
     ! Get the number of constraints.
     path = "optimization.constraints"
-    call parameters%info(path, n_children = n_constraints)
 
-    ! Grab a single parameters entry and create a constraint from it.
-    do i = 1, n_constraints
-       call json_extract_item(parameters, path, i, constraint_json)
-       call json_get(constraint_json, "type", type)
-       call neko_log%message(type)
+    if (parameters%valid_path(path)) then
+       call parameters%info(path, n_children = n_constraints)
 
-       call constraint_factory(constraint, constraint_json, design, simulation)
-       call this%add_constraint(constraint)
+       ! Grab a single parameters entry and create a constraint from it.
+       do i = 1, n_constraints
+          call json_extract_item(parameters, path, i, constraint_json)
+          call json_get(constraint_json, "type", type)
+          call neko_log%message(type)
 
-    end do
+          call constraint_factory(constraint, constraint_json, design, simulation)
+          call this%add_constraint(constraint)
+       end do
+    end if
 
     call neko_log%end_section()
 
@@ -339,9 +342,15 @@ contains
   ! Problem part computation
 
   !> The computation of the objective function and constraints.
-  subroutine problem_compute(this, design)
+  subroutine problem_compute(this, design, simulation)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
+    class(simulation_t), optional, intent(inout) :: simulation
+
+    if (present(simulation)) then
+       call simulation%reset()
+       call simulation%run_forward()
+    end if
 
     call this%update_objectives(design)
     call this%update_constraints(design)
@@ -349,19 +358,24 @@ contains
   end subroutine problem_compute
 
   !> The computation of the objective function and constraints.
-  subroutine problem_compute_sensitivity(this, design)
+  subroutine problem_compute_sensitivity(this, design, simulation)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
+    class(simulation_t), optional, intent(inout) :: simulation
 
     type(vector_t) :: objective_sensitivity
+
+    if (present(simulation)) call simulation%run_backward()
 
     call this%update_objective_sensitivities(design)
     call this%update_constraint_sensitivities(design)
 
+    call objective_sensitivity%init(this%n_design)
     call this%get_objective_sensitivities(objective_sensitivity)
 
     call design%map_backward(objective_sensitivity)
 
+    call objective_sensitivity%free()
   end subroutine problem_compute_sensitivity
 
   ! ========================================================================== !
@@ -438,18 +452,18 @@ contains
   !!
   !! This function constructs the objective value from the individual
   !! objectives and their weights.
-  !! @param[inout] this The problem to update the objectives with.
+  !! @param[in] this The problem to update the objectives with.
   !! @param[out] objective_value The weighted sum of all objective values.
   subroutine problem_get_objective_value(this, objective_value)
-    class(problem_t), intent(inout) :: this
+    class(problem_t), intent(in) :: this
     real(kind=rp), intent(out) :: objective_value
     integer :: i
 
     objective_value = 0.0_rp
     do i = 1, this%n_objectives
        objective_value = objective_value + &
-            this%objective_list(i)%objective%weight * &
-            this%objective_list(i)%objective%value
+            this%objective_list(i)%objective%get_weight() * &
+            this%objective_list(i)%objective%get_value()
     end do
 
   end subroutine problem_get_objective_value
@@ -458,15 +472,14 @@ contains
   !!
   !! This function returns all the indivual objectives comprising the
   !! objective function
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] all_objective_values A vector containing all objectives
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] all_objective_values A vector containing all objectives
   subroutine problem_get_all_objective_values(this, all_objective_values)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: all_objective_values
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: all_objective_values
     integer :: i
 
     call all_objective_values%init(this%n_objectives)
-
     do i = 1, this%n_objectives
        all_objective_values%x(i) = this%objective_list(i)%objective%value
     end do
@@ -482,15 +495,14 @@ contains
   !!
   !! This function constructs the constraint values from the individual
   !! constraints.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] constraint_value The vector of all constraint values.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] constraint_value The vector of all constraint values.
   subroutine problem_get_constraint_values(this, constraint_value)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: constraint_value
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: constraint_value
     integer :: i
 
     call constraint_value%init(this%n_constraints)
-
     do i = 1, this%n_constraints
        constraint_value%x(i) = this%constraint_list(i)%constraint%value
     end do
@@ -506,17 +518,17 @@ contains
   !!
   !! This function constructs the sensitivity of the objective value from the
   !! individual objectives and their weights.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] sensitivity The weighted sum of all objective sensitivities.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] sensitivity The weighted sum of all objective sensitivities.
   subroutine problem_get_objective_sensitivities(this, sensitivity)
-    class(problem_t), intent(inout) :: this
-    type(vector_t), intent(out) :: sensitivity
+    class(problem_t), intent(in) :: this
+    type(vector_t), intent(inout) :: sensitivity
     integer :: i
 
     call sensitivity%init(this%n_design)
-
     do i = 1, this%n_objectives
-       sensitivity = sensitivity + this%objective_list(i)%objective%sensitivity
+       call vector_add2(sensitivity, &
+            this%objective_list(i)%objective%sensitivity)
     end do
 
   end subroutine problem_get_objective_sensitivities
@@ -525,31 +537,44 @@ contains
   !!
   !! This function constructs the sensitivity of the constraint values from the
   !! individual constraints.
-  !! @param[inout] this The problem to update the objectives with.
-  !! @param[out] sensitivity The matrix of all constraint sensitivities.
+  !! @param[in] this The problem to update the objectives with.
+  !! @param[inout] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
-    class(problem_t), intent(inout) :: this
-    type(matrix_t), intent(out) :: sensitivity
-    integer :: i, j
+    class(problem_t), intent(in) :: this
+    type(matrix_t), intent(inout) :: sensitivity
+    type(vector_t) :: tmp
+    integer :: i, j, n
 
+    n = this%n_constraints * this%n_design
     call sensitivity%init(this%n_constraints, this%n_design)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call tmp%init(this%n_design)
+    end if
 
     do i = 1, this%n_constraints
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy( &
-               this%constraint_list(i)%constraint%sensitivity%x, &
-               this%constraint_list(i)%constraint%sensitivity%x_d, &
+          tmp = this%constraint_list(i)%constraint%sensitivity
+          call device_memcpy(tmp%x, tmp%x_d, &
                this%n_design, DEVICE_TO_HOST, sync = .true.)
+          do j = 1, this%n_design
+             sensitivity%x(i, j) = tmp%x(j)
+          end do
+       else
+          do j = 1, this%n_design
+             sensitivity%x(i, j) = &
+                  this%constraint_list(i)%constraint%sensitivity%x(j)
+          end do
        end if
-       do j = 1, this%n_design
-          sensitivity%x(i, j) = &
-               this%constraint_list(i)%constraint%sensitivity%x(j)
-       end do
     end do
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(sensitivity%x, sensitivity%x_d, &
-            this%n_design * this%n_constraints, HOST_TO_DEVICE, sync = .true.)
+       call device_memcpy(sensitivity%x, sensitivity%x_d, n, &
+            HOST_TO_DEVICE, sync = .true.)
+    end if
+
+    ! Free the temporary vector
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call tmp%free()
     end if
 
   end subroutine problem_get_constraint_sensitivities

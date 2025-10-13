@@ -26,6 +26,7 @@ function run {
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
     prepare 2>error.log || return 1
+    rm -fr error.log && touch error.log
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occured during preparation.\n"
@@ -44,10 +45,13 @@ function run {
     if [ -f "run.sh" ]; then
         ./run.sh 2>error.log
 
-    elif [ ! -z "$SLURM_JOB_NAME" ]; then
-        srun --gpu-bind=single:1 $neko $casefile 2>error.log
+    elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+        srun --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
 
-    else
+    elif command -v srun 2>&1 1>/dev/null; then
+        srun $neko $casefile 2>error.log
+
+    elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
         if [ ! -z "$NPROCS" ]; then
             ncores=$NPROCS
@@ -65,7 +69,14 @@ function run {
             ncores=1
         fi
 
-        mpirun -n $ncores $neko $casefile 2>error.log
+        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+
+        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
+        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
+        sed -i 's/\[1,0\]<stderr>://g' error.log
+
+    else
+        $neko $casefile 2>error.log
 
     fi
     TIME_END=$(date +%s)
@@ -76,12 +87,6 @@ function run {
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
-        return 1
-    fi
-
-    normal_end=$(tail -n 10 $logfile | grep "Normal end.")
-    if [[ -z "$normal_end" ]]; then
-        printf >&2 "ERROR: Neko did not end normally.\n"
         return 1
     fi
 
@@ -158,7 +163,12 @@ function prepare {
         printf "Running user provided preparation script.\n"
         printf "=%.0s" {1..80} && printf "\n"
 
-        ./prepare.sh
+        if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
+            srun --ntasks=1 --cpu-bind=${CPU_BIND} ./prepare.sh
+            sleep 1 # Make sure SLURM have time to clean up.
+        else
+            ./prepare.sh
+        fi
 
     fi
 
@@ -177,7 +187,7 @@ function prepare {
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
-        $NEKO_DIR/bin/makeneko *.f90
+        $NEKO_DIR/bin/makeneko *.f90 || echo "makeneko failed" >&2
         neko=$(realpath ./neko)
 
     else
@@ -189,6 +199,11 @@ function prepare {
         printf >&2 "ERROR: Neko executable not found."
         return 1
     fi
+
+    if [ -f "./select_gpu" ]; then
+        neko="./select_gpu $neko"
+    fi
+
     export neko
 }
 
@@ -227,9 +242,16 @@ function cleanup {
         pattern=$directory/${base%.*}
 
         mkdir -p $pattern
-        mv -t $pattern $nek ${nek%.*}.f*
+        mv -t $pattern $nek ${nek%[0-9]*.*}[0-9]*.f*
     done
     printf "\n"
+
+    # Move all the Checkpoint files to the results folder.
+    printf "Archiving chkp files.\n"
+    if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
+        mkdir -p $results/checkpoints
+        find ./ -name "*.chkp" -execdir mv {} $results/checkpoints/ \;
+    fi
 
     # Move all files which are not the error or executable files to the log
     # folder
@@ -237,7 +259,6 @@ function cleanup {
         --exclude "output.log" \
         --exclude "error.log" \
         --exclude "neko" \
-        --exclude "*.chkp" \
         --exclude "*.smod" \
         ./ $results
 

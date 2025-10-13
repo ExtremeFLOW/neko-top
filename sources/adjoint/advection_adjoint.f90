@@ -36,11 +36,14 @@ module advection_adjoint
   use space, only: space_t
   use field, only: field_t
   use coefs, only: coef_t
+  use json_module, only : json_file
+  use field_series, only: field_series_t
+  use time_scheme_controller, only: time_scheme_controller_t
   implicit none
   private
 
   !> Base abstract type for computing the advection operator
-  type, public, abstract :: advection_adjoint_t
+  type, abstract :: advection_adjoint_t
    contains
      procedure(compute_adv_lin2), pass(this), deferred :: compute
      procedure(compute_adv_lin), pass(this), deferred :: compute_linear
@@ -49,6 +52,34 @@ module advection_adjoint
           compute_adjoint_scalar
      procedure(advection_adjoint_free), pass(this), deferred :: free
   end type advection_adjoint_t
+
+  interface
+     !> A factory for \ref advection_adjoint_t descendants. Both creates and
+     !! initializes the object.
+     !! @param object The object allocated by the factory.
+     !! @param json The parameter file.
+     !! @param coef The coefficients of the (space, mesh) pair.
+     !! @param ulag, vlag, wlag The lagged velocity fields.
+     !! @param dtlag The lagged time steps.
+     !! @param tlag The lagged times.
+     !! @param time_scheme The bdf-ext time scheme used in the method.
+     !! @param use_dummy If true, a dummy zero-valued advection type is
+     !! @param slag The lagged scalar field.
+     !! allocated. This can be used to kill the advection term.
+     !! @note The factory both allocates and initializes `object`.
+     module subroutine advection_adjoint_factory(object, json, coef, &
+          ulag, vlag, wlag, dtlag, tlag, time_scheme, use_dummy, slag)
+       class(advection_adjoint_t), allocatable, intent(inout) :: object
+       type(json_file), intent(inout) :: json
+       type(coef_t), intent(inout), target :: coef
+       type(field_series_t), intent(in), target :: ulag, vlag, wlag
+       real(kind=rp), intent(in), target :: dtlag(10)
+       real(kind=rp), intent(in), target :: tlag(10)
+       type(time_scheme_controller_t), intent(in), target :: time_scheme
+       logical, optional, intent(in) :: use_dummy
+       type(field_series_t), target, optional, intent(in) :: slag
+     end subroutine advection_adjoint_factory
+  end interface
 
   ! ========================================================================== !
   ! Linearized advection operator interface
@@ -148,4 +179,5 @@ module advection_adjoint
      end subroutine advection_adjoint_free
   end interface
 
+  public :: advection_adjoint_t, advection_adjoint_factory
 end module advection_adjoint

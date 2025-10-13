@@ -6,40 +6,41 @@
 # Setup the global inclusion for fortran
 set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
     CACHE PATH "Fortran module directory")
-include_directories(${CMAKE_Fortran_MODULE_DIRECTORY})
 
-add_library(neko-top STATIC)
+# ............................................................................ #
+# Enable devices
 
-# Set the output directory of the library.
-set_target_properties(neko-top
-    PROPERTIES
-    OUTPUT_NAME "neko-top"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
-    INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}/include"
-)
+if (${DEVICE_TYPE} STREQUAL "CUDA")
+    enable_language(CUDA)
+    add_compile_definitions(HAVE_CUDA=1)
+elseif(${DEVICE_TYPE} STREQUAL "HIP")
+    enable_language(HIP)
+    add_compile_definitions(HAVE_HIP=1)
 
-# Add the local neko extension library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
+    add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
 
-# Add the mapping extension library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
-
-# Add the adjoint library
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+elseif(NOT ${DEVICE_TYPE} STREQUAL "CPU")
+    message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
+endif()
 
 # ============================================================================ #
 # Define the library sources and targets
+
+add_library(neko-top)
+
+# Add our partial libraries to the build.
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/neko_ext)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mapping_functions)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
+
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/simple_brinkman_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_lube_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_minimum_dissipation_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_mixing_scalar_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/adjoint_scalar_convection_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/source_terms/sponge_source_term.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
@@ -64,8 +65,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
 
-        ${CMAKE_CURRENT_SOURCE_DIR}/simulation_components/steady_simcomp.f90
-
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
@@ -77,17 +76,19 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/device_mma_math.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda_mma_math.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma.cu
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma_kernel.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip_mma_math.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip/mma.hip
 )
 
 # ============================================================================ #
 # Specify compile options
 
-target_include_directories(neko-top
-    PUBLIC
-        ${CMAKE_Fortran_MODULE_DIRECTORY}
+target_include_directories(neko-top PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>
+    $<BUILD_INTERFACE:${CMAKE_Fortran_MODULE_DIRECTORY}>
+    $<INSTALL_INTERFACE:include/neko-top>
 )
-
 
 # ............................................................................ #
 # Link to the required libraries.
@@ -103,9 +104,23 @@ target_link_libraries(neko-top
 # ============================================================================ #
 # Specify installation instructions
 
+add_library(${PROJECT_NAME}::neko-top ALIAS neko-top)
+
+# Install the neko-top library and its modules.
+# These should adhere to the CMake installation conventions.
+
 install(TARGETS neko-top
-    DESTINATION ${CMAKE_SOURCE_DIR}/lib/
+    EXPORT neko-top-targets
+    ARCHIVE DESTINATION lib/neko-top
+    LIBRARY DESTINATION lib/neko-top
+    RUNTIME DESTINATION bin/neko-top
+    INCLUDES DESTINATION include/neko-top
 )
-install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}
-    DESTINATION ${CMAKE_CURRENT_SOURCE_DIR}
+install(EXPORT neko-top-targets
+    NAMESPACE ${PROJECT_NAME}::
+    DESTINATION lib/cmake/${PROJECT_NAME}
+)
+install(DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY}/
+    DESTINATION include/neko-top
+    FILES_MATCHING PATTERN "*.mod"
 )
