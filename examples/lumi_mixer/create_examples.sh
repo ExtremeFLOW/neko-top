@@ -77,6 +77,11 @@ function create_case() {
     # Create the jobscript
     cp "${template_path}/${cluster}.sh" "${job_path}/${case_name}.sh"
     sed -i "s|--nodes=.*|--nodes=${nodes}|g" "${job_path}/${case_name}.sh"
+    if [ $((nodes*Np)) -gt 72 ]; then
+        sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c 72 ./|g" "${job_path}/${case_name}.sh"
+    else
+        sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c $((nodes*Np)) ./|g" "${job_path}/${case_name}.sh"
+    fi
 
     # Create the experiment entry
     experiment_file="${experiment_path}/${experiment}.csv"
@@ -172,20 +177,23 @@ create_case ${experiment} 128  32  32 "${cluster}" 8 800
 create_case ${experiment} 256  32  32 "${cluster}" 16 800
 create_case ${experiment} 128  64  64 "${cluster}" 32 800
 create_case ${experiment} 256  64  64 "${cluster}" 64 800
+create_case ${experiment} 512  64  64 "${cluster}" 128 800
+create_case ${experiment} 256 128 128 "${cluster}" 256 800
+create_case ${experiment} 512 128 128 "${cluster}" 512 800
 
-experiment="strong_scaling_small"
-create_case ${experiment} 128  32  32 "${cluster}" 1
-create_case ${experiment} 128  32  32 "${cluster}" 2
-create_case ${experiment} 128  32  32 "${cluster}" 4
-create_case ${experiment} 128  32  32 "${cluster}" 8
-create_case ${experiment} 128  32  32 "${cluster}" 16
-create_case ${experiment} 128  32  32 "${cluster}" 32
-create_case ${experiment} 128  32  32 "${cluster}" 64
+# experiment="strong_scaling_small"
+# create_case ${experiment} 128  32  32 "${cluster}" 1
+# create_case ${experiment} 128  32  32 "${cluster}" 2
+# create_case ${experiment} 128  32  32 "${cluster}" 4
+# create_case ${experiment} 128  32  32 "${cluster}" 8
+# create_case ${experiment} 128  32  32 "${cluster}" 16
+# create_case ${experiment} 128  32  32 "${cluster}" 32
+# create_case ${experiment} 128  32  32 "${cluster}" 64
 
-experiment="strong_scaling_large"
-create_case ${experiment} 1024 256 256 "${cluster}" 16
-create_case ${experiment} 1024 256 256 "${cluster}" 32
-create_case ${experiment} 1024 256 256 "${cluster}" 64
-create_case ${experiment} 1024 256 256 "${cluster}" 128
-create_case ${experiment} 1024 256 256 "${cluster}" 256
-create_case ${experiment} 1024 256 256 "${cluster}" 512
+# experiment="strong_scaling_large"
+# create_case ${experiment} 1024 256 256 "${cluster}" 16
+# create_case ${experiment} 1024 256 256 "${cluster}" 32
+# create_case ${experiment} 1024 256 256 "${cluster}" 64
+# create_case ${experiment} 1024 256 256 "${cluster}" 128
+# create_case ${experiment} 1024 256 256 "${cluster}" 256
+# create_case ${experiment} 1024 256 256 "${cluster}" 512

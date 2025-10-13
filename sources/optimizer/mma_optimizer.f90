@@ -168,11 +168,11 @@ contains
     call problem%get_constraint_values(constraint_value)
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-    call problem%get_all_objective_values(all_objectives)
 
     call profiler_end_region("Optimizer iteration")
 
     ! Stamp the initial condition
+    call problem%get_all_objective_values(all_objectives)
     call mma_logger_assemble_data(log_data, 0, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
          problem%get_n_objectives(), problem%get_n_constraints())
@@ -184,6 +184,8 @@ contains
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
 
+       call design%get_values(x)
+
        call profiler_start_region("Optimizer iteration")
 
        ! Scaling
@@ -192,8 +194,6 @@ contains
        else
           scaling_factor = abs(this%scale)
        end if
-
-       call design%get_values(x)
 
        call vector_cmult(constraint_value, scaling_factor)
 
@@ -220,16 +220,16 @@ contains
        call problem%get_constraint_values(constraint_value)
        call problem%get_objective_sensitivities(objective_sensitivities)
        call problem%get_constraint_sensitivities(constraint_sensitivities)
-       call problem%get_all_objective_values(all_objectives)
 
        call profiler_start_region("MMA KKT computation")
        call this%mma%KKT(x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
+       constraint_value, constraint_sensitivities)
        call profiler_end_region("MMA KKT computation")
 
        call profiler_end_region("Optimizer iteration")
 
        ! Stamp the i^th iteration
+       call problem%get_all_objective_values(all_objectives)
        call mma_logger_assemble_data(log_data, iter, objective_value, &
             all_objectives, constraint_value, this%mma%get_residumax(), &
             this%mma%get_residunorm(), scaling_factor, &

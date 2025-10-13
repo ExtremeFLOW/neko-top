@@ -64,6 +64,8 @@ chmod +x ./select_gpu
 export CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
 export MPICH_GPU_SUPPORT_ENABLED=1
 
+lfs setstripe -S 2m -c 72 ./
+
 run $example
 
 # ==============================   End of File   ==============================

@@ -230,6 +230,7 @@ function cleanup {
 
     # Remove the data link if it exists
     [ -L data ] && rm data
+    [ -L data_local ] && rm data_local
 
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
