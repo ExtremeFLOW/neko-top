@@ -239,6 +239,7 @@ contains
     nullify(this%Xh_GL)
     nullify(this%Xh_GLL)
     nullify(this%GLL_to_GL)
+    nullify(this%mask)
 
   end subroutine adjoint_lube_source_term_free
 

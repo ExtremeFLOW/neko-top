@@ -191,6 +191,10 @@ contains
     nullify(this%u)
     nullify(this%v)
     nullify(this%w)
+    nullify(this%mask)
+    if (allocated(this%Ax)) then
+       deallocate(this%Ax)
+    end if
 
   end subroutine adjoint_minimum_dissipation_source_term_free
 

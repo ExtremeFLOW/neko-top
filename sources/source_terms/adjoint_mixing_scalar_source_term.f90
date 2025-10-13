@@ -153,6 +153,7 @@ contains
 
     call this%free_base()
     nullify(this%s)
+    nullify(this%mask)
 
   end subroutine adjoint_mixing_scalar_source_term_free
 
