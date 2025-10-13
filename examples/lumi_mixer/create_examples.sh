@@ -150,12 +150,17 @@ create_case ${experiment} 128  16  32 "${cluster}" 4 800
 
 experiment="node_scaling_128x16x16"
 create_case ${experiment} 128  16  16 "${cluster}" 1 400
+create_case ${experiment}  64  32  16 "${cluster}" 1 400
+create_case ${experiment}  64  16  32 "${cluster}" 1 400
 create_case ${experiment} 128  32  16 "${cluster}" 2 400
 create_case ${experiment} 128  16  32 "${cluster}" 2 400
+create_case ${experiment}  64  32  32 "${cluster}" 2 400
 create_case ${experiment} 128  32  32 "${cluster}" 4 400
 
 experiment="node_scaling_128x32x16"
 create_case ${experiment} 128  32  16 "${cluster}" 1 200
+create_case ${experiment} 128  16  32 "${cluster}" 1 200
+create_case ${experiment}  64  32  32 "${cluster}" 1 200
 create_case ${experiment} 128  32  32 "${cluster}" 2 200
 create_case ${experiment} 256  32  32 "${cluster}" 4 200
 create_case ${experiment} 128  64  32 "${cluster}" 4 200
