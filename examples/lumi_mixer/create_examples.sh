@@ -139,7 +139,7 @@ create_case ${experiment}  64  32  16 "${cluster}" 1
 create_case ${experiment}  64  16  32 "${cluster}" 1
 
 # Investigate the scaling on a couple of nodes
-experiment="aspect_checpoint_scaling"
+experiment="aspect_checkpoint_scaling"
 create_case ${experiment}  64  16  16 "${cluster}" 1 800
 create_case ${experiment} 128  16  16 "${cluster}" 2 800
 create_case ${experiment}  64  32  16 "${cluster}" 2 800
