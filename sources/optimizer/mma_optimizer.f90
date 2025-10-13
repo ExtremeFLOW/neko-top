@@ -143,8 +143,6 @@ contains
 
     type(vector_t) :: log_data
 
-    call profiler_start_region("Optimizer iteration 0")
-
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
@@ -161,6 +159,7 @@ contains
        print *, "max_iterations for the optimization loop = ", &
             this%max_iterations
     end if
+    call profiler_start_region("Optimizer iteration")
 
     call problem%compute(design, simulation)
     call problem%compute_sensitivity(design, simulation)
@@ -171,6 +170,8 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
     call problem%get_all_objective_values(all_objectives)
 
+    call profiler_end_region("Optimizer iteration")
+
     ! Stamp the initial condition
     call mma_logger_assemble_data(log_data, 0, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
@@ -179,7 +180,6 @@ contains
 
     if (present(simulation)) call simulation%write(0)
     call design%write(0)
-    call profiler_end_region("Optimizer iteration 0")
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -227,6 +227,8 @@ contains
             constraint_value, constraint_sensitivities)
        call profiler_end_region("MMA KKT computation")
 
+       call profiler_end_region("Optimizer iteration")
+
        ! Stamp the i^th iteration
        call mma_logger_assemble_data(log_data, iter, objective_value, &
             all_objectives, constraint_value, this%mma%get_residumax(), &
@@ -237,7 +239,6 @@ contains
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
 
-       call profiler_end_region("Optimizer iteration")
     end do
 
     call this%validate(problem, design)
