@@ -18,7 +18,7 @@ module topology_optimization_user_module
   use json_file_module, only: json_file
   use json_utils, only: json_get
   use num_types, only: rp
-  use initial_conditions, only: scalar_z_split_ic
+  use user_initial_conditions, only: scalar_z_split_ic
 
   implicit none
 
@@ -40,29 +40,9 @@ contains
     type(case_t), intent(inout) :: neko_case
 
     ! Set the properties for the fluid
-    neko_case%usr%material_properties => set_material_properties
-    neko_case%usr%scalar_user_ic => scalar_z_split_ic
+    ! neko_case%user%initial_conditions => scalar_z_split_ic
 
   end subroutine neko_user_init
-
-  !> Initialize the material properties, unfortunately required from Neko.
-  subroutine set_material_properties(t, tstep, rho, mu, cp, lambda, params)
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-    real(kind=rp), intent(inout) :: rho, mu, cp, lambda
-    type(json_file), intent(inout) :: params
-
-    real(kind=rp) :: Re, Pe
-
-    call json_get(params, 'case.fluid.Re', Re)
-    call json_get(params, 'case.scalar.Pe', Pe)
-
-    mu = 1.0_rp / Re
-    lambda = 1.0_rp / Pe
-    rho = 1.0_rp
-    cp = 1.0_rp
-  end subroutine set_material_properties
-
 
 
 

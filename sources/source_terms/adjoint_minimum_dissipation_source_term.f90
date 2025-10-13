@@ -47,11 +47,11 @@ module adjoint_minimum_dissipation_source_term
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3, field_add2, field_add2s2
-  use user_intf, only: user_t, simulation_component_user_settings
   use json_module, only: json_file
+  use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
   use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
+  use user_source_term, only: user_source_term_t
   use num_types, only: rp
   use field, only: field_t
   use field_registry, only: neko_field_registry
@@ -69,12 +69,16 @@ module adjoint_minimum_dissipation_source_term
   ! $\int \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
        adjoint_minimum_dissipation_source_term_t
-     !> u,v,w of the primal
-     type(field_t), pointer :: u,v,w
+     !> u of the primal
+     type(field_t), pointer :: u => null()
+     !> v of the primal
+     type(field_t), pointer :: v => null()
+     !> w of the primal
+     type(field_t), pointer :: w => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
      !> A mask for where the source term is evaluated
-     class(point_zone_t), pointer :: mask
+     class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
 
@@ -99,12 +103,14 @@ contains
   !! @param this The source term.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, &
-       json, fields, coef)
+       json, fields, coef, variable_name)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
+    character(len=*), intent(in) :: variable_name
 
     ! we shouldn't be initializing this from JSON
     ! maybe throw an error?
@@ -175,12 +181,10 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
-  subroutine adjoint_minimum_dissipation_source_term_compute(this, t, tstep)
+  !! @param time The time state.
+  subroutine adjoint_minimum_dissipation_source_term_compute(this, time)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
     !type(field_t), pointer :: dudx, dudy, dudz

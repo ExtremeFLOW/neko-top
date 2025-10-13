@@ -66,7 +66,7 @@ module lube_term_objective
   use brinkman_design, only: brinkman_design_t
   use simulation_m, only: simulation_t
   use adjoint_lube_source_term, only: adjoint_lube_source_term_t
-
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
@@ -204,7 +204,10 @@ contains
     end associate
 
     ! append adjoint forcing term based on objective function
-    call simulation%adjoint_fluid%source_term%add_source_term(lube_term)
+    select type (f => simulation%adjoint_fluid)
+    type is (adjoint_fluid_pnpn_t)
+       call f%source_term%add_source_term(lube_term)
+    end select
 
   end subroutine lube_term_init_attributes
 
@@ -249,7 +252,7 @@ contains
           this%value = device_glsc2(work%x_d, this%c_Xh%B_d, design%size())
        else
           this%value = glsc2_mask(work%x, this%c_Xh%B, design%size(), &
-               this%mask%mask, this%mask%size)
+               this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
@@ -258,7 +261,7 @@ contains
           this%value = glsc2(work%x, this%c_Xh%B, design%size())
        end if
     end if
-    this%value = 0.5 * this%K * this%value
+    this%value = 0.5_rp * this%K * this%value
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

@@ -228,17 +228,17 @@ contains
          call adjoint_weak_no_dealias_device(fx_d, vx_d, &
               vxb%x, vyb%x, vzb%x, &
               coef, Xh, n, &
-              w1,w2,w3,w4,w5,w6)
+              w1, w2, w3, w4, w5, w6)
 
          call adjoint_weak_no_dealias_device(fy_d, vy_d, &
               vxb%x, vyb%x, vzb%x, &
               coef, Xh, n, &
-              w1,w2,w3,w4,w5,w6)
+              w1, w2, w3, w4, w5, w6)
 
          call adjoint_weak_no_dealias_device(fz_d, vz_d, &
               vxb%x, vyb%x, vzb%x, &
               coef, Xh, n, &
-              w1,w2,w3,w4,w5,w6)
+              w1, w2, w3, w4, w5, w6)
        end associate
 
        call neko_scratch_registry%relinquish_field(temp_indices)
@@ -279,19 +279,19 @@ contains
                  fx%x(:,:,:,e), vx%x(1,1,1,e), &
                  vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                  e, coef, Xh, Xh%lxyz, &
-                 w1,w2,w3,w4,w5,w6)
+                 w1, w2, w3, w4, w5, w6)
 
             call adjoint_weak_no_dealias_cpu( &
                  fy%x(:,:,:,e), vy%x(1,1,1,e), &
                  vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                  e, coef, Xh, Xh%lxyz, &
-                 w1,w2,w3,w4,w5,w6)
+                 w1, w2, w3, w4, w5, w6)
 
             call adjoint_weak_no_dealias_cpu( &
                  fz%x(:,:,:,e), vz%x(1,1,1,e), &
                  vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                  e, coef, Xh, Xh%lxyz, &
-                 w1,w2,w3,w4,w5,w6)
+                 w1, w2, w3, w4, w5, w6)
           end associate
        end do
 
@@ -496,7 +496,7 @@ contains
     type(coef_t), intent(inout) :: coef
     integer, intent(in) :: n
     real(kind=rp), intent(in), optional :: dt
-    real(kind=rp), dimension(Xh%lxyz) :: w1,w2,w3,w4,w5,w6
+    real(kind=rp), dimension(Xh%lxyz) :: w1, w2, w3, w4, w5, w6
     integer :: e
     type(field_t), pointer :: w1_d, w2_d, w3_d, w4_d, w5_d, w6_d
     integer :: temp_indices(6)
@@ -512,7 +512,7 @@ contains
        call adjoint_weak_no_dealias_device(fs%x_d, s%x_d, &
             vxb%x, vyb%x, vzb%x, &
             coef, Xh, n, &
-            w1_d,w2_d,w3_d,w4_d,w5_d,w6_d)
+            w1_d, w2_d, w3_d, w4_d, w5_d, w6_d)
 
        call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -525,7 +525,7 @@ contains
                vxb%x(1,1,1,e), vyb%x(1,1,1,e), vzb%x(1,1,1,e), &
                e, coef, Xh, Xh%lxyz, &
                w1, w2, w3, w4, w5, w6)
-       enddo
+       end do
     end if
 
   end subroutine compute_adjoint_scalar_advection_no_dealias

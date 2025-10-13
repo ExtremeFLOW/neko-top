@@ -1,10 +1,11 @@
 # Contains the Neko-TOP adjoint functionality
 #
 target_sources(neko-top
-    PUBLIC
+    PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_case.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_output.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_scheme_incompressible.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_pnpn.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_fluid_pnpn_bc_fctry.f90
@@ -17,4 +18,5 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_scheme.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn_bc_fctry.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalars.f90
 )

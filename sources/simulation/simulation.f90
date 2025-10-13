@@ -41,21 +41,41 @@ module simulation_m
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scalar_pnpn, only: scalar_pnpn_t
   use adjoint_scalar_pnpn, only: adjoint_scalar_pnpn_t
+  use adjoint_scalars, only: adjoint_scalars_t
+  use scalars, only: scalars_t
+  use scalar_scheme, only: scalar_scheme_t
   use fluid_pnpn, only: fluid_pnpn_t
-  use simulation_adjoint, only: solve_adjoint
+  use time_step_controller, only: time_step_controller_t
+  use time_state, only: time_state_t
   use fld_file_output, only: fld_file_output_t
-  use steady_simcomp, only: steady_simcomp_t
+  use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
-  use neko_ext, only: reset
-  use field_math, only: field_rzero
+  use neko_ext, only: reset, reset_adjoint
+  use field, only: field_t
+  use field_registry, only: neko_field_registry
+  use field_math, only: field_rzero, field_copy
+  use checkpoint, only: chkp_t
+  use file, only: file_t
+  use utils, only: neko_warning, neko_error
+  use comm, only: pe_rank
   use json_file_module, only: json_file
-  use json_utils, only: json_extract_item
-  use num_types, only: rp, sp
-  use user_intf, only: user_t, simulation_component_user_settings
+  use json_utils, only: json_get, json_get_or_default
+  use num_types, only: rp, sp, dp
+  use logger, only: LOG_SIZE, neko_log
+  use mpi_f08, only: MPI_WTIME
+  use jobctrl, only: jobctrl_time_limit
+  use profiler, only: profiler_start, profiler_stop, &
+       profiler_start_region, profiler_end_region
+  use simulation_adjoint, only: simulation_adjoint_init, &
+       simulation_adjoint_step, simulation_adjoint_finalize
+  use simulation, only: simulation_init, simulation_step, simulation_finalize, &
+       simulation_restart
+  use simulation_checkpoint, only: simulation_checkpoint_t
   implicit none
   private
 
   type :: simulation_t
+
      !> and primal case
      type(case_t), public :: neko_case
      !> and adjoint case
@@ -63,11 +83,11 @@ module simulation_m
      !> The fluid
      class(fluid_scheme_incompressible_t), public, pointer :: fluid => null()
      !> The scalar
-     type(scalar_pnpn_t), public, pointer :: scalar => null()
+     type(scalars_t), public, pointer :: scalars => null()
      !> The adjoint fluid
      class(adjoint_fluid_scheme_t), public, pointer :: adjoint_fluid => null()
      !> The adjoint scalar
-     type(adjoint_scalar_pnpn_t), public, pointer :: adjoint_scalar => null()
+     type(adjoint_scalars_t), public, pointer :: adjoint_scalars => null()
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_forward
@@ -75,9 +95,18 @@ module simulation_m
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_adjoint
 
+     logical :: have_scalar = .false.
+     integer :: n_timesteps = 0
+
+     ! ----------------------------------------------------------------------- !
+     ! Checkpoint system
+
+     !> The checkpoint system data
+     type(simulation_checkpoint_t) :: checkpoint
+
    contains
      !> Initialize the simulation
-     procedure, pass(this) :: init => simulation_init
+     procedure, pass(this) :: init => simulation_initialize
      !> Free the simulation
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
@@ -88,87 +117,99 @@ module simulation_m
      procedure, pass(this) :: reset => simulation_reset
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
-  end type simulation_t
 
+  end type simulation_t
   public :: simulation_t
 contains
 
-  subroutine user_simcomp(params)
-    type(json_file), intent(inout) :: params
-    type(steady_simcomp_t), allocatable :: steady_comp
-    type(json_file) :: simcomp_settings
-
-    ! Allocate a simulation component
-    allocate(steady_comp)
-    simcomp_settings = simulation_component_user_settings("steady", params)
-    call neko_simcomps%add_user_simcomp(steady_comp, simcomp_settings)
-
-  end subroutine user_simcomp
-
   !> Initialize the simulation
-  subroutine simulation_init(this, parameters)
+  subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-
-    this%neko_case%usr%init_user_simcomp => user_simcomp
+    type(json_file) :: checkpoint_params
+    integer :: i, n_scalars
 
     ! initialize the primal
     call neko_init(this%neko_case)
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
+    ! Start the profiler
+    call profiler_start
+
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
        this%fluid => fluid
-
     end select
 
     select type (adjoint_fluid => this%adjoint_case%fluid_adj)
     type is (adjoint_fluid_pnpn_t)
        this%adjoint_fluid => adjoint_fluid
-
     end select
 
-    if (allocated(this%neko_case%scalar)) then
-       this%scalar => this%neko_case%scalar
+    if (allocated(this%neko_case%scalars)) then
+       this%scalars => this%neko_case%scalars
     end if
 
-    if (allocated(this%adjoint_case%scalar_adj)) then
-       this%adjoint_scalar => this%adjoint_case%scalar_adj
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       this%adjoint_scalars => this%adjoint_case%adjoint_scalars
     end if
 
     ! init the sampler
     !---------------------------------------------------------
     ! Allocate the output type
-    if (allocated(this%neko_case%scalar)) then
-       call this%output_forward%init(sp, 'forward_fields', 5)
-       call this%output_forward%fields%assign(5, this%scalar%s)
-    else
-       call this%output_forward%init(sp, 'forward_fields', 4)
+    n_scalars = 0
+    if (allocated(this%neko_case%scalars)) then
+       n_scalars = size(this%neko_case%scalars%scalar_fields)
     end if
+    call this%output_forward%init(sp, 'forward_fields', 4 + n_scalars)
 
     call this%output_forward%fields%assign(1, this%fluid%p)
     call this%output_forward%fields%assign(2, this%fluid%u)
     call this%output_forward%fields%assign(3, this%fluid%v)
     call this%output_forward%fields%assign(4, this%fluid%w)
 
-    if (allocated(this%adjoint_case%scalar_adj)) then
-       call this%output_adjoint%init(sp, 'adjoint_fields', 5)
-       call this%output_adjoint%fields%assign(5, this%adjoint_scalar%s_adj)
-    else
-       call this%output_adjoint%init(sp, 'adjoint_fields', 4)
+    ! Assign all scalar fields
+    if (allocated(this%neko_case%scalars)) then
+       do i = 1, n_scalars
+          call this%output_forward%fields%assign(4 + i, &
+               this%scalars%scalar_fields(i)%s)
+       end do
     end if
+
+    n_scalars = 0
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
+    end if
+    call this%output_adjoint%init(sp, 'adjoint_fields', 4 + n_scalars)
     call this%output_adjoint%fields%assign(1, this%adjoint_fluid%p_adj)
     call this%output_adjoint%fields%assign(2, this%adjoint_fluid%u_adj)
     call this%output_adjoint%fields%assign(3, this%adjoint_fluid%v_adj)
     call this%output_adjoint%fields%assign(4, this%adjoint_fluid%w_adj)
 
-  end subroutine simulation_init
+    ! Assign all scalar fields
+    if (allocated(this%adjoint_case%adjoint_scalars)) then
+       do i = 1, n_scalars
+          call this%output_adjoint%fields%assign(4 + i, &
+               this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
+       end do
+    end if
+
+    if ("checkpoints" .in. parameters) then
+       call json_get(parameters, 'checkpoints', checkpoint_params)
+       call this%checkpoint%init(this%neko_case, checkpoint_params)
+    end if
+
+  end subroutine simulation_initialize
 
   !> Free the simulation
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
+    ! Stop the profiler
+    call profiler_stop
+
+    call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -177,18 +218,53 @@ contains
   !> Run the simulation
   subroutine simulation_run_forward(this)
     class(simulation_t), intent(inout) :: this
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
 
-    ! run the primal
-    call neko_solve(this%neko_case)
+    call dt_controller%init(this%neko_case%params)
+
+    call simulation_init(this%neko_case, dt_controller)
+
+    call profiler_start_region("Forward simulation")
+    loop_start = MPI_WTIME()
+    this%n_timesteps = 0
+    do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
+       this%n_timesteps = this%n_timesteps + 1
+
+       call simulation_step(this%neko_case, dt_controller, loop_start)
+
+       call this%checkpoint%save(this%neko_case)
+    end do
+    call profiler_end_region("Forward simulation")
+
+    call simulation_finalize(this%neko_case)
 
   end subroutine simulation_run_forward
 
   !> Run the simulation
   subroutine simulation_run_backward(this)
     class(simulation_t), intent(inout) :: this
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
+    real(kind=rp) :: cfl
+    integer :: i
 
-    ! run the adjoint
-    call solve_adjoint(this%adjoint_case)
+    call dt_controller%init(this%neko_case%params)
+
+    call simulation_adjoint_init(this%adjoint_case, dt_controller)
+
+    call profiler_start_region("Adjoint simulation")
+    cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
+    loop_start = MPI_WTIME()
+    do i = this%n_timesteps, 1, -1
+       call this%checkpoint%restore(this%neko_case, i)
+
+       call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
+            loop_start)
+    end do
+    call profiler_end_region("Adjoint simulation")
+
+    call simulation_adjoint_finalize(this%adjoint_case)
 
   end subroutine simulation_run_backward
 
@@ -197,16 +273,8 @@ contains
     class(simulation_t), intent(inout) :: this
 
     call reset(this%neko_case)
-
-    ! TODO
-    ! reset for the adjoint
-    ! call reset(this%adjoint_case)
-    call field_rzero(this%adjoint_case%fluid_adj%u_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%v_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    if (allocated(this%neko_case%scalar)) then
-       call field_rzero(this%adjoint_case%scalar_adj%s_adj)
-    end if
+    call reset_adjoint(this%adjoint_case, this%neko_case)
+    call this%checkpoint%reset()
 
   end subroutine simulation_reset
 

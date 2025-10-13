@@ -38,6 +38,7 @@ module adjoint_scalar_convection_source_term
   use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
   use json_module, only: json_file
+  use time_state, only: time_state_t
   use source_term, only: source_term_t
   use coefs, only: coef_t
   use field_math, only: field_subcol3
@@ -57,9 +58,9 @@ module adjoint_scalar_convection_source_term
   type, public, extends(source_term_t) :: &
        adjoint_scalar_convection_source_term_t
      !> adjoint passive scalar
-     type(field_t), pointer :: s_adj
+     type(field_t), pointer :: s_adj => null()
      !> forward passive scalar
-     type(field_t), pointer :: s
+     type(field_t), pointer :: s => null()
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
@@ -80,12 +81,14 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine adjoint_scalar_convection_source_term_init_from_json(this, &
-       json, fields, coef)
+       json, fields, coef, variable_name)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
+    character(len=*), intent(in) :: variable_name
 
     ! this is a bit weird... because I don't think this should come from the
     ! JSON.
@@ -139,12 +142,10 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The object.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
-  subroutine adjoint_scalar_convection_source_term_compute(this, t, tstep)
+  !! @param time The time state.
+  subroutine adjoint_scalar_convection_source_term_compute(this, time)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(3)
     type(field_t), pointer :: dsdx, dsdy, dsdz
@@ -166,16 +167,16 @@ contains
 
     ! So should the Brinkman term actually....
 
-    call grad(dsdx%x,dsdy%x,dsdz%x,this%s%x, this%coef)
+    call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)
 
     ! TODO
     ! So in principal, the derivatives could have kinks now.
     ! I don't think a gsop will remedy this (or even whether it's a good idea)
     ! But I want to leave this todo as a reminder.
 
-    call field_subcol3(fu,this%s_adj,dsdx)
-    call field_subcol3(fv,this%s_adj,dsdy)
-    call field_subcol3(fw,this%s_adj,dsdz)
+    call field_subcol3(fu, this%s_adj, dsdx)
+    call field_subcol3(fv, this%s_adj, dsdy)
+    call field_subcol3(fw, this%s_adj, dsdz)
 
     ! free the scratch
     call neko_scratch_registry%relinquish_field(temp_indices)

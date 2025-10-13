@@ -5,8 +5,10 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": true,
-        "end_time": 0.1,
-        "timestep": 1e-4,
+        "time": {
+            "end_time": 0.1,
+            "timestep": 1e-4
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
@@ -40,15 +42,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-4,
                 "max_iterations": 800
             },
@@ -64,7 +68,6 @@
         "simulation_components": [
             {
                 "type": "steady",
-                "is_user": true,
                 "tol": 1e-2,
                 "compute_control": "tsteps",
                 "compute_value": 1
@@ -90,17 +93,13 @@
             {
                 "name": "initial_ball",
                 "geometry": "cylinder",
-                "start": [0.5, 0.5, -0.5],
-                "end": [0.5, 0.5, 1.5],
+                "start": [ 0.5, 0.5, -0.5 ],
+                "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
             },
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
@@ -118,6 +117,10 @@
                 "base_value": 0.0,
                 "zone_value": 1.0,
                 "zone_name": "initial_ball"
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {
@@ -129,15 +132,14 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "m": 1,
-                "scale": 1.0,
+                "scale": 10.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 100.0,
-                "d": 0.0
+                "c": 1000.0,
+                "d": 1.0
             }
         },
         "objectives": [

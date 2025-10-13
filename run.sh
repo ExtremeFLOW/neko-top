@@ -64,7 +64,7 @@ RERUN=false
 
 # List possible options
 OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
-OPT="a,c,h,n,s:,d,r"
+OPT=a,c,h,n,s:,d,r
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -86,6 +86,9 @@ while true; do
     "--") shift && break ;;
     esac
 done
+
+# Fix case of the cluster name
+CLUSTER=$(echo $CLUSTER | awk '{print toupper($0)}')
 
 # ============================================================================ #
 # Define environment
@@ -117,7 +120,6 @@ if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
-    export HPATH="$HPATH/neko"
 fi
 
 # End of user inputs
@@ -133,10 +135,10 @@ for in in $@; do
     base=$(basename $in)
 
     # Extract the examples from the input
-    matches=($(find $EPATH/$dir -maxdepth 1 -type d -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.case"))
-    matches+=($(find $EPATH/$dir -maxdepth 1 -type f -name "$base.json"))
+    matches=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type d -name "$base"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.case"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.json"))
 
     for match in ${matches[@]}; do
         file_list=()
@@ -277,7 +279,7 @@ fi
 function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
-    source $SPATH/functions.sh
+    source functions.sh
     run $1 1>output.log 2>error.log
     cd $CURRENT_DIR
 }
@@ -287,26 +289,34 @@ function Submit() {
 
     # Run the submission based on which cluster we attempt to use.
     cd $LPATH/$example
-    if [ $CLUSTER == "DTU" ]; then
-        export BSUB_QUIET=Y
-        if [ ! -z "$(bjobs -J $1 2>/dev/null)" ]; then
-            bkill -J $1 1>/dev/null 2>/dev/null
-        fi
 
-        bsub -J $1 -env "all" <job_script.sh
-
-    elif [ $CLUSTER == "MN5" ]; then
+    if [ $CLUSTER == "MN5" ]; then
         if [ -z "$MN5_ACCOUNT" ]; then
             printf >&2 "No account specified for Marenostrum5.\n"
-            printf >&2 "Please set the MN5_ACCOUNT variable in the environment.\n"
-            exit 1
+            printf >&2 "Using SLURM environment variables if available\n"
+            printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
+            printf >&2 "this message."
+        else
+            ACCOUNT="-A $MN5_ACCOUNT"
         fi
-        sbatch -A $MN5_ACCOUNT -J $1 job_script.sh 1>/dev/null 2>error.log
 
+    elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
+        if [ -z "$LUMI_ACCOUNT" ]; then
+            printf >&2 "No account specified for LUMI.\n"
+            printf >&2 "Using SLURM environment variables if available\n"
+            printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
+            printf >&2 "this message."
+        else
+            ACCOUNT="-A $LUMI_ACCOUNT"
+        fi
+    fi
+
+    if [ -n "$(which bsub 2>/dev/null)" ]; then
+        bsub -J $1 -env "all" <job_script.sh
+    elif [ -n "$(which sbatch 2>/dev/null)" ]; then
+        sbatch -J $1 $ACCOUNT job_script.sh 1>/dev/null 2>error.log
     else
-        printf >&2 "No or invalid cluster specified for submission.\n"
-        printf >&2 "\t- DTU for the DTU cluster.\n"
-        printf >&2 "\t- MN5 for the Marenostrum5 cluster.\n"
+        printf >&2 "Unknown submission system.\n"
         exit 1
     fi
 
@@ -327,13 +337,15 @@ trap 'handler' SIGINT
 # ============================================================================ #
 # Compile the example executables
 
-printf "\n\e[4mCompiling the examples.\e[0m\n"
-cmake --build $MAIN_DIR/build --target Examples --parallel
+if [[ "$NEKO" != true && -d $MAIN_DIR/build ]]; then
+    printf "\n\e[4mCompiling the examples.\e[0m\n"
+    cmake --build $MAIN_DIR/build --target Examples --parallel
 
-# Check if the compilation was successful
-if [ $? -ne 0 ]; then
-    printf >&2 "\e[1;31mCompilation failed.\e[m\n"
-    exit 1
+    # Check if the compilation was successful
+    if [ $? -ne 0 ]; then
+        printf >&2 "\e[1;31mCompilation failed.\e[m\n"
+        exit 1
+    fi
 fi
 
 # ============================================================================ #
@@ -371,13 +383,18 @@ for case in ${example_list[@]}; do
         [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
-    elif [ -f "$log/output.log" ]; then
-        printf '\t%-12s %-s\n' "Skipping:" "$example"
-        continue
+
+    elif [[ -s "$log/output.log" ]]; then
+        # Move old log files to folder with counter padded to 2 digits
+        old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p $log/$old_run
+
+        find $log -maxdepth 1 -not -empty -type f -name "*.log" \
+            -exec mv -ft $log/$old_run {} \;
+
     fi
 
-    # Remove old output and error files
-    find $log -type f -name "*.log" -or -name "error.log" -delete
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
@@ -402,10 +419,20 @@ for case in ${example_list[@]}; do
     cp -f $SPATH/functions.sh $log/functions.sh
 
     # If we are submitting to a cluster, look for the associated jobscript
-    if [ ! -z $CLUSTER ]; then
+    if [ -n "$CLUSTER" ]; then
+        if [ ! -d "$HPATH" ]; then
+            printf >&2 "\e[1;31mInvalid Cluster:\e[m $HPATH/$CLUSTER\n"
+            exit 1
+        fi
+
+        if [ "$NEKO" == true ]; then
+            setting=$HPATH/neko/${case%.*}.sh
+        else
+            setting=$HPATH/${case%.*}.sh
+        fi
+
         # Find the setting file for the case recursively
-        setting=$HPATH/${case%.*}.sh
-        while [[ ! -f $setting && ! -z "$setting" ]]; do
+        while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
         setting=$(realpath $setting)
@@ -438,7 +465,7 @@ done
 # If we are just doing a dry-run, we exit here
 if [ "$DRY" == true ]; then
     $MAIN_DIR/status.sh
-    exit 0
+    exit $?
 fi
 
 for example in $QUEUE; do
@@ -455,6 +482,7 @@ done
 
 if [ -z "$CLUSTER" ]; then
     $MAIN_DIR/status.sh
+    exit $?
 fi
 
 printf "\n"

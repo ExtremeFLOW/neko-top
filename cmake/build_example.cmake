@@ -5,9 +5,11 @@
 # The function takes one argument, which is the type of driver to use. The
 # following driver types are supported:
 #
-#   - user:    The user provides a driver file in the examples directory.
-#   - custom:  The user provides a driver file in the current directory.
-#   - default: The driver file in the examples directory is used.
+#   - neko:        The default neko driver is used.
+#   - neko-user:   The user module is loaded and the neko driver is used.
+#   - topopt:      The default topopt driver is used.
+#   - topopt-user: The user module is loaded and the topopt driver is used.
+#   - custom:      The user provides a driver file in the current directory.
 #
 # The function also looks at the following variables:
 #
@@ -24,20 +26,25 @@ function(build_example)
     # ........................................................................ #
     # Define the executable.
     if (NOT DEFINED EXAMPLE_NAME)
-        file(RELATIVE_PATH EXAMPLE_NAME ${EXAMPLES_DIR}
-            ${CMAKE_CURRENT_SOURCE_DIR})
+        file(RELATIVE_PATH EXAMPLE_NAME
+            ${EXAMPLES_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
     endif()
 
     if (DEFINED DRIVER)
         set(DRIVER ${DRIVER})
         set(DRIVER_TYPE "custom")
 
-    elseif(NOT DEFINED DRIVER_TYPE)
-        set(DRIVER_TYPE "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
+    elseif(${DRIVER_TYPE} STREQUAL "neko")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/neko.f90)
 
-    elseif (${DRIVER_TYPE} STREQUAL "user")
-        set(DRIVER ${EXAMPLES_DIR}/usr_driver.f90)
+    elseif (${DRIVER_TYPE} STREQUAL "neko-user")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/neko-user.f90)
+
+    elseif(${DRIVER_TYPE} STREQUAL "topopt")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/topopt.f90)
+
+    elseif(${DRIVER_TYPE} STREQUAL "topopt-user")
+        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/topopt-user.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "custom")
         if (NOT DEFINED DRIVER)
@@ -48,12 +55,6 @@ function(build_example)
             message(FATAL_ERROR
                 "No custom driver file found. Please specify through DRIVER.")
         endif()
-
-    elseif(${DRIVER_TYPE} STREQUAL "topopt")
-        set(DRIVER ${CMAKE_SOURCE_DIR}/sources/topopt_driver.f90)
-
-    elseif(${DRIVER_TYPE} STREQUAL "default")
-        set(DRIVER ${EXAMPLES_DIR}/driver.f90)
 
     else()
         message(FATAL_ERROR "Unknown driver type: ${DRIVER_TYPE}")
@@ -82,8 +83,8 @@ function(build_example)
 
     # If the example contains extra sources, set the module directory.
     if (DEFINED EXTRA_SOURCES)
-        set(CMAKE_Fortran_MODULE_DIRECTORY
-            ${CMAKE_Fortran_MODULE_DIRECTORY}/${EXAMPLE_NAME})
+        set(OLD_MODULE_DIR ${CMAKE_Fortran_MODULE_DIRECTORY})
+        set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
         # Create the module directory.
         file(MAKE_DIRECTORY ${CMAKE_Fortran_MODULE_DIRECTORY})
     endif()
@@ -92,13 +93,13 @@ function(build_example)
     # Construct example name from the folder structure relative to EXAMPLES_DIR.
     set(TARGET_DIRECTORY ${EXAMPLES_DIR}/${EXAMPLE_NAME})
     string(REPLACE "/" "_" EXAMPLE_NAME ${EXAMPLE_NAME})
-    string(CONCAT EXAMPLE_NAME "Examples-" ${EXAMPLE_NAME})
+    string(CONCAT EXAMPLE_NAME ${EXAMPLE_NAME})
 
     add_executable(${EXAMPLE_NAME}
         EXCLUDE_FROM_ALL
         ${DRIVER}
         ${EXTRA_SOURCES}
-        )
+    )
     add_dependencies(Examples ${EXAMPLE_NAME})
 
     # Set the output directory of the executable.
@@ -106,6 +107,7 @@ function(build_example)
         PROPERTIES
         OUTPUT_NAME "neko"
         RUNTIME_OUTPUT_DIRECTORY "${TARGET_DIRECTORY}"
+        FOLDER "Examples/${EXAMPLE_NAME}"
     )
 
     # ........................................................................ #
@@ -114,25 +116,15 @@ function(build_example)
     target_link_libraries(${EXAMPLE_NAME}
         PkgConfig::neko
         PkgConfig::json-fortran
+        Neko-TOP::neko-top
         MPI::MPI_Fortran
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     )
 
-    # Import the neko-top static library
-    add_library(neko-top-a STATIC IMPORTED)
-    set_target_properties(neko-top-a PROPERTIES
-        IMPORTED_LOCATION "${CMAKE_BINARY_DIR}/libneko-top.a"
-    )
-
-    add_dependencies(${EXAMPLE_NAME} neko-top)
-
-    # Link our local Neko-TOP library to the driver
-    target_link_libraries(${EXAMPLE_NAME} neko-top-a)
-    target_include_directories(${EXAMPLE_NAME}
-        PRIVATE
-            ${CMAKE_BINARY_DIR}/modules
-            ${CMAKE_Fortran_MODULE_DIRECTORY}
-    )
+    # Reset the module directory if we set it earlier.
+    if (DEFINED EXTRA_SOURCES)
+        set(CMAKE_Fortran_MODULE_DIRECTORY ${OLD_MODULE_DIR})
+    endif()
 
 endfunction()

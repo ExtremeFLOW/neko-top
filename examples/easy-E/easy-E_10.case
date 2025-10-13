@@ -6,8 +6,10 @@
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 10.0,
-        "timestep": 1e-4,
+        "time": {
+            "end_time": 10.0,
+            "timestep": 1e-4
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 8,
@@ -26,15 +28,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
@@ -82,8 +86,9 @@
             "enabled": true,
             "solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },

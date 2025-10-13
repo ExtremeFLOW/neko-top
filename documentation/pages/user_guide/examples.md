@@ -1,4 +1,4 @@
-# Examples {#examples}
+# Running examples {#examples}
 \tableofcontents
 
 The execution of examples have been automated to allow for easy testing and
@@ -12,9 +12,6 @@ For inline help on the `run.sh` script, use the `-h` or `--help` switch.
 ```sh
 ./run.sh [-h] [--help]
 ```
-
-A full list of examples can be found in the 
-\subpage examples-list.
 
 ## Execution of examples {#examples-running}
 
@@ -68,10 +65,10 @@ source files should ideally be placed in that folder as well.
 Additionally the following constraints on the structure of the example folder
 are required:
 
-- The example is required to only contain a single `run.sh` script. This script
-  indicate the root of the example.
+- The example is required to contain at most a single `run.sh` script. This
+  script indicate the root of the example.
 - The example may contain any number of case files, but if there is no `run.sh`
-  script, all of them should be placed in the root of the example folder.
+  script, all of them should be placed in the same subfolder of the example.
   Otherwise, each folder containing a case file will be considered an example.
 
 ## Case files and meshes. {#examples-data}
@@ -97,11 +94,13 @@ the example folder must call the `build_example` function to setup the example.
 
 Current driver types:
 
-- "default": Pure neko with no user defined source files.
-- "user":    Equivalent to using makeneko to generate the executable.
-- "topopt":  Topology optimization driver defined in the Neko-TOP library.
-- "custom":  Use the driver.f90 provided in the current example folder or read
-             the cmake variable DRIVER.
+- "neko":        Pure neko with no user defined source files.
+- "neko-user":   Equivalent to using makeneko to generate the executable.
+- "topopt":      Topology optimization driver defined in the Neko-TOP library.
+- "topopt-user": Topology optimization driver with loading of a Neko user
+                 module.
+- "custom":      Use the driver.f90 provided in the current example folder or
+                 read the cmake variable DRIVER for a fully custom driver.
 
 Additional source files can be added to the example by setting the EXTRA_SOURCES
 variable in the CMakeLists.txt file. Preferably these files should be specified
@@ -114,7 +113,7 @@ rest of the setup.
 Example of a CMakeLists.txt file:
 
 ```cmake
-set(DRIVER_TYPE "default")
+set(DRIVER_TYPE "custom")
 
 # If example require a custom driver, define the source file here.
 # set(DRIVER PATH/TO/CUSTOM/DRIVER.f90)

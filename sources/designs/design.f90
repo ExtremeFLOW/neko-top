@@ -34,8 +34,12 @@
 module design
   use json_module, only: json_file
   use simulation_m, only: simulation_t
+  use num_types, only: rp
   use vector, only: vector_t
   use utils, only: neko_error
+  use point_zone, only: point_zone_t
+  use comm, only: neko_comm
+  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM
   implicit none
   private
 
@@ -47,9 +51,13 @@ module design
   !! alterations to the simulation based on the design variables.
   type, abstract :: design_t
      private
+     !> The name of the design
+     character(len=:), allocatable :: name
 
      !> The number of design variables
      integer :: n = 0
+     !> The global number of design variables
+     integer :: n_global = 0
 
    contains
 
@@ -82,7 +90,17 @@ module design
      procedure(design_free), public, pass(this), deferred :: free
 
      !> Retrieve the design variables.
-     procedure(design_get_design), public, pass(this), deferred :: get_design
+     procedure(design_get_values), public, pass(this), deferred :: get_values
+     !> Retrieve the x location of the design variables.
+     generic :: get_x => design_get_x
+     generic :: x => design_get_x_i
+     !> Retrieve the y location of the design variables.
+     generic :: get_y => design_get_y
+     generic :: y => design_get_y_i
+     !> Retrieve the z location of the design variables.
+     generic :: get_z => design_get_z
+     generic :: z => design_get_z_i
+
      !> Update the design variables.
      procedure(design_update_design), public, pass(this), deferred :: &
           update_design
@@ -105,7 +123,21 @@ module design
      procedure, pass(this) :: free_base => design_free_base
      !> Return the number of design variables
      procedure, public, pass(this) :: size => design_size
+     !> Return the number of global design variables
+     procedure, public, pass(this) :: size_global => design_size_global
 
+     !> Getter of x vector
+     procedure, pass(this) :: design_get_x
+     !> Getter of i'th element of x
+     procedure, pass(this) :: design_get_x_i
+     !> Getter of y vector
+     procedure, pass(this) :: design_get_y
+     !> Getter of i'th element of y
+     procedure, pass(this) :: design_get_y_i
+     !> Getter of z vector
+     procedure, pass(this) :: design_get_z
+     !> Getter of i'th element of z
+     procedure, pass(this) :: design_get_z_i
   end type design_t
 
   ! ========================================================================== !
@@ -138,16 +170,16 @@ module design
        class(design_t), intent(inout) :: this
      end subroutine design_free
 
-     function design_get_design(this) result(x)
+     subroutine design_get_values(this, values)
        import design_t, vector_t
        class(design_t), intent(in) :: this
-       type(vector_t) :: x
-     end function design_get_design
+       type(vector_t), intent(inout) :: values
+     end subroutine design_get_values
 
-     subroutine design_update_design(this, x)
+     subroutine design_update_design(this, values)
        import design_t, vector_t
        class(design_t), intent(inout) :: this
-       type(vector_t), intent(inout) :: x
+       type(vector_t), intent(inout) :: values
      end subroutine design_update_design
 
      subroutine design_map_forward(this)
@@ -197,18 +229,27 @@ contains
 
   !> Initialize the base design
   !! @param this The design object.
+  !! @param name The name of the design.
   !! @param n The number of design variables.
-  subroutine design_init_base(this, n)
+  subroutine design_init_base(this, name, n)
     class(design_t), intent(inout) :: this
+    character(len=*), intent(in) :: name
     integer, intent(in) :: n
+    integer :: ierr
+
+    this%name = name
     this%n = n
+    call MPI_Allreduce(n, this%n_global, 1, MPI_INTEGER, MPI_SUM, &
+         neko_comm, ierr)
   end subroutine design_init_base
 
   !> Free the base design
   !! @param this The design object.
   subroutine design_free_base(this)
     class(design_t), intent(inout) :: this
+    this%name = ""
     this%n = 0
+    this%n_global = 0
   end subroutine design_free_base
 
   !> Return the number of design variables
@@ -219,5 +260,54 @@ contains
     integer :: n
     n = this%n
   end function design_size
+
+  !> Return the number of global design variables
+  pure function design_size_global(this) result(n)
+    class(design_t), intent(in) :: this
+    integer :: n
+    n = this%n_global
+  end function design_size_global
+
+  subroutine design_get_x(this, x)
+    class(design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: x
+    call neko_error("Design type does not support x retrieval")
+  end subroutine design_get_x
+
+  function design_get_x_i(this, i) result(x_i)
+    class(design_t), intent(in) :: this
+    integer, intent(in) :: i
+    real(kind=rp) :: x_i
+    x_i = -huge(x_i)
+    call neko_error("Design type does not support x retrieval")
+  end function design_get_x_i
+
+  subroutine design_get_y(this, y)
+    class(design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: y
+    call neko_error("Design type does not support y retrieval")
+  end subroutine design_get_y
+
+  function design_get_y_i(this, i) result(y_i)
+    class(design_t), intent(in) :: this
+    integer, intent(in) :: i
+    real(kind=rp) :: y_i
+    y_i = -huge(y_i)
+    call neko_error("Design type does not support y retrieval")
+  end function design_get_y_i
+
+  subroutine design_get_z(this, z)
+    class(design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: z
+    call neko_error("Design type does not support z retrieval")
+  end subroutine design_get_z
+
+  function design_get_z_i(this, i) result(z_i)
+    class(design_t), intent(in) :: this
+    integer, intent(in) :: i
+    real(kind=rp) :: z_i
+    z_i = -huge(z_i)
+    call neko_error("Design type does not support z retrieval")
+  end function design_get_z_i
 
 end module design

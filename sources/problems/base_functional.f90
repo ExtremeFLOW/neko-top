@@ -85,6 +85,12 @@ module base_functional
      !> Update the sensitivity of the function
      procedure(functional_update_sensitivity), pass(this), deferred :: &
           update_sensitivity
+
+     !> Get the value of the function
+     procedure, pass(this) :: get_value => functional_get_value
+     !> Get the sensitivity of the function
+     procedure, pass(this) :: get_sensitivity => functional_get_sensitivity
+
   end type base_functional_t
 
   ! -------------------------------------------------------------------------- !
@@ -142,4 +148,20 @@ contains
          "' does not support initialization with simulation")
   end subroutine functional_init_json_sim
 
+
+  !> Get the value of the function
+  function functional_get_value(this) result(v)
+    class(base_functional_t), intent(in) :: this
+    real(kind=rp) :: v
+
+    v = this%value
+  end function functional_get_value
+
+  !> Get the sensitivity of the function
+  subroutine functional_get_sensitivity(this, sensitivity)
+    class(base_functional_t), intent(in) :: this
+    type(vector_t), intent(inout) :: sensitivity
+
+    sensitivity = this%sensitivity
+  end subroutine functional_get_sensitivity
 end module base_functional

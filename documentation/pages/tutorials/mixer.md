@@ -2,7 +2,9 @@
 
 \tableofcontents
 
-## Optimization problem
+\attention
+This tutorial is currently under construction. The figures do not reflect the
+parameters documented, as these parameters will be finalized soon.
 
 This tutorial aims to replicate the passive mixer problem by 
 [C. S. Andreasen et al. 2009](https://doi.org/10.1002/fld.1964).
@@ -148,6 +150,7 @@ The remained of this tutorial will guide you through the process of solving
 such an optimization problem with the topology optimization framework `neko-top`.
 
 ## prepare.sh and meshing {#mixer_meshing}
+
 `neko-top` provides users with the capability of executing custom scripts before
 an the simulation begins but including a `prepare.sh` script in the example 
 folder. This functionality is commonly used to generate
@@ -158,6 +161,7 @@ be found in @ref meshing.
 In this tutorial we will be utilizing the `neko` utility `genmeshbox` in the 
 `prepare.sh` script to generate \f$ \Omega \f$ from a cartesian mesh. The
 key excerpts in this script read
+
 ```bash
 # Handle options
 Nx=30 && Ny=10 && Nz=10
@@ -176,12 +180,13 @@ problem there are no periodic boundary conditions, hence the `.false.` arguments
 
 An important consideration when using `genmeshbox` is the boundary identifiers,
 which become relevant when prescribing boundary conditions. The convention is
-to label from 1-6 in the order \f$[x_\text{start}, x_\text{finish},y_\text{start}, y_\text{finish}, z_\text{start}, z_\text{finish}] \f$ 
+to label from 1-6 in the order \f$[x_\text{start}, x_\text{finish}, y_\text{start}, y_\text{finish}, z_\text{start}, z_\text{finish}] \f$ 
 or as indicated in the figure below.
 
 ![Indication of the face ordering used by `genmeshbox`](mixer_BC_order.png)
 
 ## The neko-top .case file {#mixer_case_file}
+
 The `*.case` file allows the user to set up the case.
 The high level case structure is described extensively in the `neko`
 documentation which can be found 
@@ -190,7 +195,8 @@ strongly encouraged to refer to this documentation in regards to setting up
 a forward simulation. In `neko-top`, the high level case structure is extended
 to allow for additional adjoint and optimization parameters. The `neko-top`
 high level case structure reads
-```
+
+```.json
 {
     "version": 1.0
     "case": {
@@ -211,27 +217,26 @@ high level case structure reads
         "constraints": []
     }
 }
-
 ```
+
 ### Case
 The top level of the case file allows the user to prescribe details on the
 numerics and case set up.
 
-```
-{
-    "version": 1.0,
-    "case": {
-        "mesh_file": "box.nmsh",
-        "output_checkpoints": false,
-        "output_at_end": false,
-        "output_boundary": false,
-        "end_time": 8.0,
-        "timestep": 2e-4,
-        "numerics": {
-            "time_order": 1,
-            "polynomial_order": 5,
-            "dealias": true
-        },
+```.json
+"case": {
+    "mesh_file": "box.nmsh",
+    "output_checkpoints": false,
+    "output_at_end": false,
+    "output_boundary": false,
+    "end_time": 8.0,
+    "timestep": 2e-4,
+    "numerics": {
+        "time_order": 1,
+        "polynomial_order": 5,
+        "dealias": true
+    }
+}
 ```
 \note The default name when using `genmeshbox` is `"box.nmsh"`.
 
@@ -253,16 +258,17 @@ streamlining this process.
 
 Instead, steady states are currently marched towards using the the steady
 state simulation component
-```
-        "simulation_components": [
-            {
-                "type": "steady",
-                "is_user": true,
-                "tol": 1e-7,
-                "compute_control": "tsteps",
-                "compute_value": 1
-            }
-        ],
+
+```.json
+"simulation_components": [
+    {
+        "type": "steady",
+        "is_user": true,
+        "tol": 1e-7,
+        "compute_control": "tsteps",
+        "compute_value": 1
+    }
+]
 ```
 
 \attention Currently certain features of `neko` are not supported by `neko-top`
@@ -272,164 +278,180 @@ that variable time-stepping is not supported.
 ### Fluid
 The fluid section of the case file allows the user to prescribe fluid properties,
 solvers, boundary conditions and initial conditions.
-```
-        "fluid": {
-            "scheme": "pnpn",
-            "Re": 2,
-            "initial_condition": {
-                "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
-            },
-            "velocity_solver": {
-                "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-4,
-                "max_iterations": 50
-            },
-            "pressure_solver": {
-                "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-4,
-                "max_iterations": 50
-            },
-            "boundary_conditions": [
-                {
-                    "type": "user_velocity_pointwise",
-                    "zone_indices": [1]
-                },
-                {
-                    "type": "no_slip",
-                    "zone_indices": [3, 4, 5, 6]
-                },
-                {
-                    "type": "outflow",
-                    "zone_indices": [2]
-                }
-            ],
-            "output_control": "never",
+
+```.json
+"fluid": {
+    "scheme": "pnpn",
+    "Re": 2,
+    "initial_condition": {
+        "type": "uniform",
+        "value": [ 0.0, 0.0, 0.0 ]
+    },
+    "velocity_solver": {
+        "type": "cg",
+        "preconditioner": "jacobi",
+        "projection_space_size": 0,
+        "absolute_tolerance": 1e-4,
+        "max_iterations": 50
+    },
+    "pressure_solver": {
+        "type": "gmres",
+        "preconditioner": "hsmg",
+        "projection_space_size": 0,
+        "absolute_tolerance": 1e-4,
+        "max_iterations": 50
+    },
+    "boundary_conditions": [
+        {
+            "type": "user_velocity_pointwise",
+            "zone_indices": [1]
         },
+        {
+            "type": "no_slip",
+            "zone_indices": [3, 4, 5, 6]
+        },
+        {
+            "type": "outflow",
+            "zone_indices": [2]
+        }
+    ],
+    "output_control": "never"
+}
 ```
 
 The key details which are prescribed are:
 - a significantly low Reynolds number (`"Re": 2`)
 - an initial \f$ \mathbf{u}|_{t=0} = \mathbf{0}\f$
-```
-            "initial_condition": {
-                "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
-            },
-```
-- no slip boundary conditions on \f$\Gamma_\text{wall}\f$
-```
-                    "type": "no_slip",
-                    "zone_indices": [3, 4, 5, 6]
-```
-- an outflow boundary condition on \f$\Gamma_\text{out}\f$
-```
-                    "type": "outflow",
-                    "zone_indices": [2]
 
+```.json
+"initial_condition": {
+    "type": "uniform",
+    "value": [ 0.0, 0.0, 0.0 ]
+}
 ```
+
+- no slip boundary conditions on \f$\Gamma_\text{wall}\f$
+
+```.json
+"type": "no_slip",
+"zone_indices": [3, 4, 5, 6]
+```
+
+- an outflow boundary condition on \f$\Gamma_\text{out}\f$
+
+```.json
+"type": "outflow",
+"zone_indices": [2]
+```
+
 - a user defined inflow condition on \f$\Gamma_\text{in}\f$
-```
-                    "type": "user_velocity_pointwise",
-                    "zone_indices": [1]
+
+```.json
+"type": "user_velocity_pointwise",
+"zone_indices": [1]
 ```
 
 \note The velocity and pressure solvers have been set relatively conventionally,
 however the interested reader can find more information 
-[here](https://neko.cfd/docs/release/dd/d33/case-file.html#autotoc_md39). 
+[here](https://neko.cfd/docs/release/dd/d33/case-file.html#autotoc_md39).
 
 \attention
 It should be noted that some features in `neko` are not supported in `neko-top`
 due to a lack of adjoint support. Relevant to this section, it should be noted
 that the use of projections or gradient jump penalty are not supported.
 
-To prescribe user defined conditions, such as the condition on \f$\Gamma_\text{in}\f$
-users can provide additional fortran code. In this tutorial we will provide an
-additional `user.f90`. Further details on the `neko` user interface can be
-found [here](https://neko.cfd/docs/release/d6/def/user-file.html).
+To prescribe user defined conditions, such as the condition on
+\f$\Gamma_\text{in}\f$ users can provide additional fortran code. In this
+tutorial we will provide an additional `user.f90`. Further details on the `neko`
+user interface can be found
+[here](https://neko.cfd/docs/release/d6/def/user-file.html).
 
 In this tutorial we wish to prescribe a paraboloid as an inflow condition, this
 is achieved by asserting `user%fluid_user_if => user_inflow_eval` and providing
 the following code excerpt:
 
 ```fortran
-  !> user-defined boundary condition
-  subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, &
-       ie, t, tstep)
-    real(kind=rp), intent(inout) :: u
-    real(kind=rp), intent(inout) :: v
-    real(kind=rp), intent(inout) :: w
-    real(kind=rp), intent(in) :: x
-    real(kind=rp), intent(in) :: y
-    real(kind=rp), intent(in) :: z
-    real(kind=rp), intent(in) :: nx
-    real(kind=rp), intent(in) :: ny
-    real(kind=rp), intent(in) :: nz
-    integer, intent(in) :: ix
-    integer, intent(in) :: iy
-    integer, intent(in) :: iz
-    integer, intent(in) :: ie
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+!> user-defined boundary condition
+subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, &
+     ie, t, tstep)
+  real(kind=rp), intent(inout) :: u
+  real(kind=rp), intent(inout) :: v
+  real(kind=rp), intent(inout) :: w
+  real(kind=rp), intent(in) :: x
+  real(kind=rp), intent(in) :: y
+  real(kind=rp), intent(in) :: z
+  real(kind=rp), intent(in) :: nx
+  real(kind=rp), intent(in) :: ny
+  real(kind=rp), intent(in) :: nz
+  integer, intent(in) :: ix
+  integer, intent(in) :: iy
+  integer, intent(in) :: iz
+  integer, intent(in) :: ie
+  real(kind=rp), intent(in) :: t
+  integer, intent(in) :: tstep
 
-    ! Inflow velocity profile is a paraboloid
-    u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
-    v = 0._rp
-    w = 0._rp
-  end subroutine user_inflow_eval
+  ! Inflow velocity profile is a paraboloid
+  u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
+  v = 0._rp
+  w = 0._rp
+end subroutine user_inflow_eval
 ```
+
 ### Scalar
 Similarly, the scalar section of the case file allows the user to prescribe 
 scalar properties, solvers, boundary conditions and initial conditions.
-```
-        "scalar": {
-            "enabled": true,
-            "Pe": 5000.0,
-            "solver": {
-                "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-6,
-                "max_iterations": 50
-            },
-            "initial_condition": {
-                "type": "user"
-            },
-            "boundary_conditions": [
-                {
-                    "type": "user_pointwise",
-                    "zone_indices": [1]
-                },
-                {
-                    "type": "neumann",
-                    "flux": 0,
-                    "zone_indices": [2, 3, 4, 5, 6]
-                },
-            ],
+
+```.json
+"scalar": {
+    "enabled": true,
+    "Pe": 5000.0,
+    "solver": {
+        "type": "cg",
+        "preconditioner": "jacobi",
+        "projection_space_size": 0,
+        "absolute_tolerance": 1e-6,
+        "max_iterations": 50
+    },
+    "initial_condition": {
+        "type": "user"
+    },
+    "boundary_conditions": [
+        {
+            "type": "user_pointwise",
+            "zone_indices": [1]
         },
+        {
+            "type": "neumann",
+            "flux": 0,
+            "zone_indices": [2, 3, 4, 5, 6]
+        }
+    ]
+}
 ```
+
 The key details which are prescribed are:
 - a significantly high Peclet number (`"Pe": 5000.0`)
 - a user defined initial condition
+
+```.json
+"initial_condition": {
+    "type": "user"
+}
 ```
-            "initial_condition": {
-                "type": "user"
-            },
+
+- Neumann conditions on \f$ \Gamma_\text{out} \cup \Gamma_\text{wall} \f$
+
+```.json
+"type": "neumann",
+"flux": 0,
+"zone_indices": [2, 3, 4, 5, 6]
 ```
-- Neuman conditions on \f$ \Gamma_\text{out} \cup \Gamma_\text{wall} \f$
-```
-                    "type": "neumann",
-                    "flux": 0,
-                    "zone_indices": [2, 3, 4, 5, 6]
-```
+
 - a user defined scalar inflow condition on \f$ \Gamma_\text{in}\f$
-```
-                    "type": "user_pointwise",
-                    "zone_indices": [1]
+
+```.json
+"type": "user_pointwise",
+"zone_indices": [1]
 ```
 
 The user defined scalar inflow condition and scalar initial condition are 
@@ -440,153 +462,50 @@ It is well understood that spectral methods struggle to represent discontinuitie
 hence, a sigmoid function is use to provide a sufficient amount of smoothing
 across the interface of the two species. The completed `user.f90` should now
 read:
-```fortran
-! User module for the user defined simulation component
-module user
-  use user_intf, only: user_t, simulation_component_user_settings
-  use json_module, only: json_file
-  use steady_simcomp, only: steady_simcomp_t
-  use simcomp_executor, only: neko_simcomps
-  use fluid_user_source_term, only: fluid_user_source_term_t
-  use num_types, only : rp
-  use field, only : field_t
-  use field_registry, only : neko_field_registry
-  use math, only : rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl
-  use scratch_registry, only : neko_scratch_registry
-  implicit none
-  !> Case parameters
-  ! To define the initial boundary conditions we don't wish to introduce a
-  ! discontinuity,
-  !
-  !    DONT                    DO (but smoother)
-  !        _______               ______
-  !       |                     /
-  !       |                    /
-  ! -------             -------
-  !
-  ! hence,
-  !> we use a logistic function defined by
-  !! $ \frac{L}{1 + exp{-k(z-z_0)}}$
-  real(kind=rp), parameter :: L = 1.0_rp
-  real(kind=rp), parameter :: k = 20.0_rp
-  real(kind=rp), parameter :: z_0 = 1.0_rp
 
-contains
+\include{} "examples/passive_scalar/user.f90"
 
-  ! Register user-defined functions (see user_intf.f90)
-  subroutine user_setup(user)
-    type(user_t), intent(inout) :: user
-    user%fluid_user_if => user_inflow_eval
-    user%scalar_user_bc => scalar_bc
-    user%scalar_user_ic => scalar_ic
-  end subroutine user_setup
-
-  !> user-defined boundary condition
-  subroutine user_inflow_eval(u, v, w, x, y, z, nx, ny, nz, ix, iy, iz, &
-       ie, t, tstep)
-    real(kind=rp), intent(inout) :: u
-    real(kind=rp), intent(inout) :: v
-    real(kind=rp), intent(inout) :: w
-    real(kind=rp), intent(in) :: x
-    real(kind=rp), intent(in) :: y
-    real(kind=rp), intent(in) :: z
-    real(kind=rp), intent(in) :: nx
-    real(kind=rp), intent(in) :: ny
-    real(kind=rp), intent(in) :: nz
-    integer, intent(in) :: ix
-    integer, intent(in) :: iy
-    integer, intent(in) :: iz
-    integer, intent(in) :: ie
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-
-    ! Inflow velocity profile is a paraboloid
-    u = -0.5_rp * (y - 1.0_rp)**2 - 0.5_rp * (z - 1.0_rp)**2 + 1.0_rp
-    v = 0._rp
-    w = 0._rp
-  end subroutine user_inflow_eval
-
-  !> user-defined boundary condition
-  subroutine scalar_bc(s, x, y, z, nx, ny, nz, ix, iy, iz, ie, t, tstep)
-    real(kind=rp), intent(inout) :: s
-    real(kind=rp), intent(in) :: x
-    real(kind=rp), intent(in) :: y
-    real(kind=rp), intent(in) :: z
-    real(kind=rp), intent(in) :: nx
-    real(kind=rp), intent(in) :: ny
-    real(kind=rp), intent(in) :: nz
-    integer, intent(in) :: ix
-    integer, intent(in) :: iy
-    integer, intent(in) :: iz
-    integer, intent(in) :: ie
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
-
-    ! Inflow scalar profile is a sigmoid separating the two species
-    s = L / (1.0_rp + exp(-k*(z - z_0)))
-
-  end subroutine scalar_bc
-
-  !> user-defined initial condition
-  subroutine scalar_ic(s, params)
-    type(field_t), intent(inout) :: s
-    type(json_file), intent(inout) :: params
-    integer :: i
-
-    ! Initial scalar profile is a sigmoid separating the two species
-    do i = 1, s%dof%size()
-       s%x(i,1,1,1) = L / (1.0_rp + exp(-k*(s%dof%z(i,1,1,1) - z_0)))
-    end do
-
-  end subroutine scalar_ic
-
-end module user
-```
-
-### Adjoint fluid and scalar
+### Adjoint fluid and scalar {#mixer_adjoint}
 This tutorial will focus on the practical aspects of setting up the adjoint 
 simulation however the theory regarding adjoint sensitivity analysis can be 
 found in [Adjoint sensitivity analysis](@ref adjoint).
 
-```
-        "adjoint_scalar": {
-            "enabled": true,
-            "boundary_conditions": [
-                {
-                    "type": "dirichlet",
-                    "value": 0,
-                    "zone_indices": [1]
-                },
-                {
-                    "type": "neumann",
-                    "flux": 0,
-                    "zone_indices": [2, 3, 4, 5, 6]
-                }
-            ],
-            "initial_condition": {
-                "type": "uniform",
-                "value": 0.0,
-            }
+```.json
+"adjoint_scalar": {
+    "enabled": true,
+    "boundary_conditions": [
+        {
+            "type": "dirichlet",
+            "value": 0,
+            "zone_indices": [1]
         },
-        "adjoint_fluid": {
-            "initial_condition": {
-                "type": "uniform",
-                "value": [0.0, 0.0, 0.0]
-            },
-            "boundary_conditions": [
-                {
-                    "type": "no_slip",
-                    "zone_indices": [1, 3, 4, 5, 6]
-                },
-                {
-                     "type": "outflow",
-                     "zone_indices": [2]
-                 }
-            ],
+        {
+            "type": "neumann",
+            "flux": 0,
+            "zone_indices": [2, 3, 4, 5, 6]
+        }
+    ],
+    "initial_condition": {
+        "type": "uniform",
+        "value": 0.0
+    }
+},
+"adjoint_fluid": {
+    "initial_condition": {
+        "type": "uniform",
+        "value": [0.0, 0.0, 0.0]
+    },
+    "boundary_conditions": [
+        {
+            "type": "no_slip",
+            "zone_indices": [1, 3, 4, 5, 6]
         },
+        {
+            "type": "outflow",
+            "zone_indices": [2]
+        }
+    ]
+}
 ```
 \note An important feature to be aware of in the `neko-top` adjoint system is that
 unless a parameter is specified, the adjoint will adopt the same parameters
@@ -596,87 +515,96 @@ fluid.
 
 The key details which are prescribed are:
 - \f$ \phi^\dagger = 0\f$ on \f$ \Gamma_\text{in} \f$
-```
-                    "type": "dirichlet",
-                    "value": 0,
-                    "zone_indices": [1]
-```
-- \f$ \nabla  \phi^\dagger \cdot \mathbf{n} = 0\f$ on 
-\f$ \Gamma_\text{out} \cup \Gamma_\text{wall} \f$
-```
-                    "type": "neumann",
-                    "flux": 0,
-                    "zone_indices": [2, 3, 4, 5, 6]
-```
-- \f$ \mathbf{u}^\dagger = \mathbf{0}\f$ on 
-\f$ \Gamma_\text{in} \cup \Gamma_\text{wall} \f$
-```
-                    "type": "no_slip",
-                    "zone_indices": [1, 3, 4, 5, 6]
-```
-- an outflow velocity boundary condition on \f$ \Gamma_\text{out} \f$
-```
-                     "type": "outflow",
-                     "zone_indices": [2]
+
+```.json
+"type": "dirichlet",
+"value": 0,
+"zone_indices": [1]
 ```
 
-## Domain specification {#mixer_domains}
+- \f$ \nabla  \phi^\dagger \cdot \mathbf{n} = 0\f$ on
+\f$ \Gamma_\text{out} \cup \Gamma_\text{wall} \f$
+
+```.json
+"type": "neumann",
+"flux": 0,
+"zone_indices": [2, 3, 4, 5, 6]
+```
+
+- \f$ \mathbf{u}^\dagger = \mathbf{0}\f$ on 
+\f$ \Gamma_\text{in} \cup \Gamma_\text{wall} \f$
+
+```.json
+"type": "no_slip",
+"zone_indices": [1, 3, 4, 5, 6]
+```
+
+- an outflow velocity boundary condition on \f$ \Gamma_\text{out} \f$
+
+```.json
+"type": "outflow",
+"zone_indices": [2]
+```
+
+### Domain specification {#mixer_domains}
 Domains can be specified through the `neko` functionality `point_zones`, the
 reader is referred [here](https://neko.cfd/docs/release/da/dd0/point-zones.html)
 for extensive documentation on point zones.
 
-In this tutorial we must define \f$\Omega_\text{opt}\f$ and 
-\f$\Omega_\text{mix}\f$ which we name `optimization_domain` and `objective_domain`
-respectively.
+In this tutorial we must define \f$\Omega_\text{opt}\f$ and
+\f$\Omega_\text{mix}\f$ which we name `optimization_domain` and
+`objective_domain` respectively.
 
-```
-        "point_zones": [
-            {
-                "name": "optimization_domain",
-                "geometry": "box",
-                "x_bounds": [
-                    1.5,
-                    4.5,
-                ],
-                "y_bounds": [
-                    -1.0,
-                     3.0,
-                ],
-                "z_bounds": [
-                   -1.0,
-                    3.0,
-                ],
-            },
-            {
-                "name": "objective_domain",
-                "geometry": "box",
-                "x_bounds": [
-                    5.0,
-                    6.0,
-                ],
-                "y_bounds": [
-                    -1.0,
-                     3.0,
-                ],
-                "z_bounds": [
-                   -1.0,
-                    3.0,
-                ],
-            },
+```.json
+"point_zones": [
+    {
+        "name": "optimization_domain",
+        "geometry": "box",
+        "x_bounds": [
+            1.5,
+            4.5,
+        ],
+        "y_bounds": [
+            -1.0,
+                3.0,
+        ],
+        "z_bounds": [
+            -1.0,
+            3.0,
         ]
     },
+    {
+        "name": "objective_domain",
+        "geometry": "box",
+        "x_bounds": [
+            5.0,
+            6.0,
+        ],
+        "y_bounds": [
+            -1.0,
+                3.0,
+        ],
+        "z_bounds": [
+            -1.0,
+            3.0,
+        ]
+    }
+]
 ```
 
 Assigning \f$\Omega_\text{opt}\f$ to the optimization domain is performed in
 the `optimization` section of the case file
+
+```.json
+"optimization": {
+    "domain": {
+        "type": "point_zone",
+        "zone_name": "optimization_domain"
+    }
+}
 ```
-    "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-            },
-```
-## Objectives and constraint {#mixer_objectives}
+
+### Objectives and constraint {#mixer_objectives}
 Various objectives and constraints can be provided as lists in the `objectives`
 and `constraints` subsection of `optimization`. A full list of the available
 objectives and constraints can be found in [Objectives and constraints](@ref objectives_and_constraints).
@@ -687,17 +615,16 @@ to come.
 
 In this tutorial we wish to assign a `"scalar_mixing"` objective and no
 constraints by prescribing
-```
-        "objectives": [
-            {
-                "type": "scalar_mixing",
-                "mask_name": "objective_domain",
-                "phi_ref": 0.5,
-                "weight": 1.0
-            },
-        ],
-        "constraints": [
-        ],
+```.json
+"objectives": [
+    {
+        "type": "scalar_mixing",
+        "mask_name": "objective_domain",
+        "phi_ref": 0.5,
+        "weight": 1.0
+    },
+],
+"constraints": [ ]
 ```
 
 In `neko-top` multiple objectives can be prescribed in a list, resulting in
@@ -716,7 +643,7 @@ concentration to \f$ \phi = 0.5\f$ (`"phi_ref": 0.5`) and assert the area of
 interest is in \f$ \Omega_{mix}\f$ (`"mask_name": "objective_domain"`).
 
 
-## Mapping cascade {#mixer_mapping}
+### Mapping cascade {#mixer_mapping}
 We saw in [Defining the optimization problem](@ref mixer_optimization_problem) that the design indicator field
 \f$\rho\f$ must be mapped to the Brinkman amplitude \f$\chi\f$. This is achieved
 through the use of the mapping cascade accessible in `optimization.design.mapping`.
@@ -729,19 +656,20 @@ In this tutorial we use the composite mapping
 -\f$\tilde{\rho} \mapsto \chi\f$ is a RAMP mapping
 
 which can be prescribed with
-```
-        "design": {
-            "type": "brinkman",
-            "mapping" : [
-                {
-                    "type": "PDE_filter",
-                    "r": 0.01
-                },
-                {
-                    "type": "RAMP",
-                    "f_max": 1000
-                }
-            ],
+```.json
+"design": {
+    "type": "brinkman",
+    "mapping" : [
+        {
+            "type": "PDE_filter",
+            "r": 0.01
+        },
+        {
+            "type": "RAMP",
+            "f_max": 1000
+        }
+    ]
+}
 ```
 
 \note It is important to note that the order in which the mappings occur in
@@ -758,25 +686,26 @@ the chain rule backward, i.e.
     \mapsto \frac{\partial F}{\partial \rho}
 \f]
 
-## Optimization parameters {#mixer_MMA}
+### Optimization parameters {#mixer_MMA}
 The optimization algorithm used to solve optimization problem is prescribed
 in the `"solver"` section of the case file.
 Currently on the MMA algorithm is implemented and more details can be found
 in [The Method of Moving Asymptotes (MMA)](@ref MMA).
 
 In this tutorial we we select the MMA algorithm by prescribing
-```
-        "solver": {
-            "type": "mma",
-            "max_iterations": 100,
-            "tolerance": 1.0e-3,
-            "mma": {
-                "m": 0,
-                "scale": 1000.0,
-                "xmin": 0.0,
-                "xmax": 1.0
-            }
-        },
+
+```.json
+"solver": {
+    "type": "mma",
+    "max_iterations": 100,
+    "tolerance": 1.0e-3,
+    "mma": {
+        "m": 0,
+        "scale": 1000.0,
+        "xmin": 0.0,
+        "xmax": 1.0
+    }
+}
 ```
 
 The key parameters selected are
@@ -785,16 +714,21 @@ The key parameters selected are
 - no constraints (`"m": 0`)
 - a scaling factor of 1000 for the objective function (`"scale": 1000.0`)
 - assert that \f$ \rho \in [0,1] \f$
-```
-                "xmin": 0.0,
-                "xmax": 1.0
-```
 
+```.json
+"xmin": 0.0,
+"xmax": 1.0
+```
 
 Scaling factors can be adjusted to influence convergence rates of the optimization
 problem.
 
+### The final case file
+The final case file should now read
+\include{} "examples/passive_scalar/passive_scalar.case"
+
 ## Neko-top drivers {#mixer_driver}
+
 `neko-top` exists as a library of tools to allow users to perform optimization
 in conjunction with the `neko` library. As such, the user has the freedom to
 create custom drivers to perform specific tasks. Further details regarding drivers
@@ -805,23 +739,16 @@ example folder along with a `CMakeLists.txt`.
 
 For this tutorial, we provide the following `CMakeLists.txt`
 
-```CMake
-# Simple setup to compile the current example.
-set(DRIVER_TYPE "custom")
-set(DRIVER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)
-set(EXTRA_SOURCES
-    ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
-)
-
-build_example(${DRIVER_TYPE})
-```
+\include{} "examples/passive_scalar/CMakeLists.txt"
 
 This script performs the following task:
 - allows `neko-top` to use a custom driver (`set(DRIVER_TYPE "custom")`)
-- indicates to `neko-top` to use the `driver.f90` driver (`set(DRIVER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)`)
-- includes the additional `user.f90` file used to prescribe user boundary conditions
-and initial conditions.
-```
+- indicates to `neko-top` to use the `driver.f90` driver 
+  (`set(DRIVER_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90)`)
+- includes the additional `user.f90` file used to prescribe user boundary
+  conditions and initial conditions.
+
+```CMake
 set(EXTRA_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
 )
@@ -842,126 +769,45 @@ The basic structure of `driver.f90` is to
 
 1) declare these objects
 ```fortran
-  type(simulation_t) :: simulation
-  type(problem_t) :: problem
-  class(design_t), allocatable :: design
-  class(optimizer_t), allocatable :: optimizer
+type(simulation_t) :: simulation
+type(problem_t) :: problem
+class(design_t), allocatable :: design
+class(optimizer_t), allocatable :: optimizer
 ```
 
 2) initialize these objects along with the user specified boundary and initial
 conditions
 ```fortran
-  call user_setup(simulation%neko_case%usr)
-  call simulation%init(parameters)
-  call design_factory(design, parameters, simulation)
-  call problem%init(parameters, design, simulation)
-  call optimizer_factory(optimizer, parameters, problem, design, simulation)
+call user_setup(simulation%neko_case%usr)
+call simulation%init(parameters)
+call design_factory(design, parameters, simulation)
+call problem%init(parameters, design, simulation)
+call optimizer_factory(optimizer, parameters, problem, design, simulation)
 ```
 
 3) run the optimization algorithm
 ```fortran
-  call optimizer%run(problem, design, simulation)
+call optimizer%run(problem, design, simulation)
 ```
 
 4) clean
 ```fortran
-  call optimizer%free()
-  if (allocated(optimizer)) deallocate(optimizer)
-  call problem%free()
-  call design%free()
-  call simulation%free()
+call optimizer%free()
+if (allocated(optimizer)) deallocate(optimizer)
+call problem%free()
+call design%free()
+call simulation%free()
 ```
 
-
+### The driver file
 The complete driver takes the following form
-
-```fortran
-program usrneko
-  use simulation_m, only: simulation_t
-  use problem, only: problem_t
-  use optimizer, only : optimizer_t, optimizer_factory
-  use json_module, only: json_file
-  use utils, only: neko_error
-  use json_utils_ext, only: json_read_file
-  use user, only: user_setup
-  use design, only: design_t, design_factory
-
-  use mpi_f08, only: MPI_Init
-
-  implicit none
-
-  ! JSON related arguments
-  integer :: argc
-  type(json_file) :: parameters
-  character(len=256) :: parameter_file
-
-  ! MPI parameters
-  integer :: ierr
-
-  !> The simulation we are working with
-  type(simulation_t) :: simulation
-  !> The problem type
-  type(problem_t) :: problem
-  !> The design type
-  class(design_t), allocatable :: design
-  !> The optimizer (in this case mma)
-  class(optimizer_t), allocatable :: optimizer
-
-  ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
-  call MPI_Init(ierr)
-
-  ! -------------------------------------------------------------------------- !
-  ! Read the parameters file as the first terminal argument
-
-  argc = command_argument_count()
-  if (argc .lt. 1) call neko_error('Missing parameter file')
-  call get_command_argument(1, parameter_file)
-
-  ! Read the parameters file
-  parameters = json_read_file(trim(parameter_file))
-
-  ! -------------------------------------------------------------------------- !
-  ! Initialization of the components
-
-  ! initialize the user additions for the forward (through the neko interface)
-  call user_setup(simulation%neko_case%usr)
-
-  ! initialize the simulation
-  call simulation%init(parameters)
-
-  ! initialize the design
-  call design_factory(design, parameters, simulation)
-
-  ! initialize the problem
-  call problem%init(parameters, design, simulation)
-
-  ! initialize the optimizer
-  call optimizer_factory(optimizer, parameters, problem, design, simulation)
-
-  ! -------------------------------------------------------------------------- !
-  ! Execute the optimization
-
-  call optimizer%run(problem, design, simulation)
-
-  ! -------------------------------------------------------------------------- !
-  ! Clean up the components
-
-  call optimizer%free()
-  if (allocated(optimizer)) deallocate(optimizer)
-
-  call problem%free()
-  call design%free()
-  call simulation%free()
-
-end program usrneko
-```
+\include{} "sources/drivers/topopt-user.f90"
 
 ## Solving the optimization problem {#mixer_solve}
 
 Once the example has been constructed it can be run by simply executing
 
-```
+```bash
 ./run.sh passive_scalar
 ```
 
@@ -974,13 +820,27 @@ The output from a `neko-top` topology optimization problem consists of three
 key components
 
 1) an optimization log, saved in the file `optimization_data.csv`.
-
-2) a log of the steady state residual, saved in the file `steady_state_data.csv`
-
+2) a log of the steady state residual, saved in the file
+   `steady_state_data.csv`.
 3) a series of field files
     - the steady state forward solution `forward_fields0.nek5000`
     - the steady state adjoint solution `adjoint_fields0.nek5000`
     - the design field `design0.nek5000`
 
-The remainder of this tutorial will help you understand how to process these
-files and provide some scripts to help you visualize the results.
+Within `design0.nek5000` there are 3 fields labeled `x_velocity`, `y_velocity`
+and `z_velocity`, these fields correspond to:
+    - `x_velocity`: The unmapped design field \f$\rho \in [0,1]\f$
+    - `y_velocity`: The mapped design field \f$\chi \in [0,\chi_{\text{max}}]\f$
+    - `z_velocity`: The sensitivity \f$\partial \mathcal{F}/\partial\f$
+
+Included in this example is a folder `passive_scalar/post_processing`
+containing:
+    - `plot_convergence.py`: A python script to plot the convergence history
+    - `post_processing.pvsm`: A Paraview state file to assist you with
+    visualizing the optimized designs.
+
+
+\attention
+The remainder of this tutorial is under construction, however it intends to help
+you understand how to process these files and provide some scripts to help you 
+visualize the results.

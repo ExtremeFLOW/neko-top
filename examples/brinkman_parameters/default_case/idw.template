@@ -5,8 +5,10 @@
         "output_at_end": false,
         "output_boundary": false,
         "output_checkpoints": false,
-        "end_time": 150.0,
-        "timestep": 2.5e-3,
+        "time": {
+            "end_time": 150.0,
+            "timestep": 2.5e-3
+        },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
@@ -20,15 +22,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },

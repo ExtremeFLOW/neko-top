@@ -38,6 +38,35 @@ module cuda_mma_math
   public
 
   interface
+     subroutine cuda_Hess(Hess_d, hijx_d, Ljjxinv_d, n, m) bind(c, name = 'cuda_Hess')
+       import c_int, c_ptr
+       type(c_ptr), value :: Hess_d, hijx_d, Ljjxinv_d
+       integer(c_int) :: n, m
+     end subroutine cuda_Hess
+
+     subroutine mma_Ljjxinv_cuda(Ljjxinv_d,pjlambda_d, qjlambda_d, x_d, &
+          low_d, upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_Ljjxinv_cuda')
+       import c_int, c_ptr
+       type(c_ptr), value :: Ljjxinv_d, x_d, pjlambda_d, qjlambda_d, low_d, &
+            upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_Ljjxinv_cuda
+
+     subroutine mma_dipsolvesub1_cuda(x_d, pjlambda_d, qjlambda_d, low_d, &
+          upp_d, alpha_d, beta_d, n) bind(c, name = 'mma_dipsolvesub1_cuda')
+       import c_int, c_ptr
+       type(c_ptr), value :: x_d, pjlambda_d, qjlambda_d, low_d, &
+            upp_d, alpha_d, beta_d
+       integer(c_int) :: n
+     end subroutine mma_dipsolvesub1_cuda
+
+     subroutine mattrans_v_mul_cuda(output_d, pij_d, lambda_d, m, n) &
+          bind(c, name = 'mattrans_v_mul_cuda')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: output_d, pij_d, lambda_d
+       integer(c_int) :: m, n
+     end subroutine mattrans_v_mul_cuda
+
      subroutine mma_gensub1_cuda(low_d, upp_d, x_d, xmin_d, xmax_d, asyinit, n)&
           bind(c, name = 'mma_gensub1_cuda')
        import c_rp, c_int, c_ptr
@@ -46,10 +75,10 @@ module cuda_mma_math
        integer(c_int) :: n
      end subroutine mma_gensub1_cuda
 
-     subroutine mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, &
-          xmax_d, asydecr, asyincr, n) bind(c, name = 'mma_gensub2_cuda')
+     subroutine mma_gensub2_cuda(low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d, &
+          asydecr, asyincr, n) bind(c, name = 'mma_gensub2_cuda')
        import c_rp, c_int, c_ptr
-       type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d, xmin_d, xmax_d
+       type(c_ptr), value :: low_d, upp_d, x_d, xold1_d, xold2_d, xdiff_d
        real(c_rp) :: asydecr, asyincr
        integer(c_int) :: n
      end subroutine mma_gensub2_cuda

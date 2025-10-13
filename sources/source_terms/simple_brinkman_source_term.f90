@@ -40,6 +40,7 @@ module simple_brinkman_source_term
   use source_term, only: source_term_t
   use coefs, only: coef_t
   use neko_config, only: NEKO_BCKND_DEVICE
+  use time_state, only: time_state_t
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3
@@ -49,8 +50,14 @@ module simple_brinkman_source_term
   !> A simple Brinkman source term.
   ! We have a source term of the form $\chi \mathbf{u}$
   type, public, extends(source_term_t) :: simple_brinkman_source_term_t
-     !> the fields corresponding to \f$\chi\f$, u, v and w
-     type(field_t), pointer :: chi, u, v, w
+     !> the fields corresponding to \f$\chi\f$
+     type(field_t), pointer :: chi => null()
+     !> the fields corresponding to u
+     type(field_t), pointer :: u => null()
+     !> the fields corresponding to v
+     type(field_t), pointer :: v => null()
+     !> the fields corresponding to w
+     type(field_t), pointer :: w => null()
 
    contains
      !> The common constructor using a JSON object.
@@ -71,12 +78,14 @@ contains
   !! @param json The JSON object for the source.
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
+  !! @param variable_name The name of the variable where the source term acts.
   subroutine simple_brinkman_source_term_init_from_json(this, json, fields, &
-       coef)
+       coef, variable_name)
     class(simple_brinkman_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
+    character(len=*), intent(in) :: variable_name
 
 
     ! we shouldn't be initializing this from JSON
@@ -136,12 +145,10 @@ contains
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
-  !! @param t The time value.
-  !! @param tstep The current time-step.
-  subroutine simple_brinkman_source_term_compute(this, t, tstep)
+  !! @param time The time state.
+  subroutine simple_brinkman_source_term_compute(this, time)
     class(simple_brinkman_source_term_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
 
     fu => this%fields%get_by_index(1)
