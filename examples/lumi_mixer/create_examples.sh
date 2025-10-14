@@ -118,17 +118,14 @@ create_case ${experiment}  32   8   8 "${cluster}" 1
 create_case ${experiment}  64   8   8 "${cluster}" 1
 create_case ${experiment}  64  16   8 "${cluster}" 1
 create_case ${experiment}  64  16  16 "${cluster}" 1
-create_case ${experiment} 128  16  16 "${cluster}" 1 400
-create_case ${experiment} 128  32  16 "${cluster}" 1 200
+create_case ${experiment} 128  16  16 "${cluster}" 1
+create_case ${experiment} 128  32  16 "${cluster}" 1
 create_case ${experiment} 128  32  32 "${cluster}" 1 100
 create_case ${experiment} 128  32  32 "${cluster}" 1 50
 create_case ${experiment} 128  32  32 "${cluster}" 1 25
-create_case ${experiment} 256  32  32 "${cluster}" 1 100
-create_case ${experiment} 256  32  32 "${cluster}" 1 50
-create_case ${experiment} 256  32  32 "${cluster}" 1 25
 create_case ${experiment} 256  64  32 "${cluster}" 1 50
 create_case ${experiment} 256  64  32 "${cluster}" 1 25
-create_case ${experiment} 256  64  64 "${cluster}" 1 25
+create_case ${experiment} 256  64  64 "${cluster}" 1 50
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
