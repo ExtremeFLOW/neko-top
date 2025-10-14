@@ -120,20 +120,14 @@ create_case ${experiment}  64  16   8 "${cluster}" 1
 create_case ${experiment}  64  16  16 "${cluster}" 1
 create_case ${experiment} 128  16  16 "${cluster}" 1
 create_case ${experiment} 128  32  16 "${cluster}" 1
-create_case ${experiment} 128  32  32 "${cluster}" 1 100
+create_case ${experiment} 128  32  32 "${cluster}" 1
 create_case ${experiment} 128  32  32 "${cluster}" 1 50
 create_case ${experiment} 128  32  32 "${cluster}" 1 25
 create_case ${experiment} 256  64  32 "${cluster}" 1 50
-create_case ${experiment} 256  64  32 "${cluster}" 1 25
 create_case ${experiment} 256  64  64 "${cluster}" 1 25
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
-create_case ${experiment}  64  16  16 "${cluster}" 1 100
-create_case ${experiment}  64  16  16 "${cluster}" 1 200
-create_case ${experiment}  64  16  16 "${cluster}" 1 400
-create_case ${experiment}  64  16  16 "${cluster}" 1 800
-
 create_case ${experiment} 128  16  16 "${cluster}" 1 100
 create_case ${experiment} 128  16  16 "${cluster}" 1 200
 create_case ${experiment} 128  16  16 "${cluster}" 1 400
@@ -141,14 +135,7 @@ create_case ${experiment} 128  16  16 "${cluster}" 1 400
 create_case ${experiment} 128  32  16 "${cluster}" 1 100
 create_case ${experiment} 128  32  16 "${cluster}" 1 200
 
-# Check that time is not affected by which dimension is scaled
-experiment="dimension_scaling"
-create_case ${experiment}  64   8   8 "${cluster}" 1
-create_case ${experiment}  32  16   8 "${cluster}" 1
-create_case ${experiment}  32   8  16 "${cluster}" 1
-create_case ${experiment} 128  16  16 "${cluster}" 1
-create_case ${experiment}  64  32  16 "${cluster}" 1
-create_case ${experiment}  64  16  32 "${cluster}" 1
+create_case ${experiment} 128  32  32 "${cluster}" 1 100
 
 # Investigate the scaling on a couple of nodes
 experiment="aspect_checkpoint_scaling"
