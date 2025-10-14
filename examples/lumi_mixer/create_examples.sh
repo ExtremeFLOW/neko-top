@@ -138,30 +138,21 @@ create_case ${experiment} 128  32  16 "${cluster}" 1 200
 create_case ${experiment} 128  32  32 "${cluster}" 1 100
 
 # Investigate the scaling on a couple of nodes
-experiment="aspect_checkpoint_scaling"
-create_case ${experiment}  64  16  16 "${cluster}" 1 800
-create_case ${experiment} 128  16  16 "${cluster}" 2 800
-create_case ${experiment}  64  32  16 "${cluster}" 2 800
-create_case ${experiment}  64  16  32 "${cluster}" 2 800
-create_case ${experiment}  64  32  32 "${cluster}" 4 800
-create_case ${experiment} 128  32  16 "${cluster}" 4 800
-create_case ${experiment} 128  16  32 "${cluster}" 4 800
-
+experiment="weak_scaling_mini"
 create_case ${experiment} 128  16  16 "${cluster}" 1 400
-create_case ${experiment}  64  32  16 "${cluster}" 1 400
-create_case ${experiment}  64  16  32 "${cluster}" 1 400
-create_case ${experiment} 128  32  16 "${cluster}" 2 400
-create_case ${experiment} 128  16  32 "${cluster}" 2 400
 create_case ${experiment}  64  32  32 "${cluster}" 2 400
 create_case ${experiment} 128  32  32 "${cluster}" 4 400
+create_case ${experiment} 256  32  32 "${cluster}" 8 400
 
-create_case ${experiment} 128  32  16 "${cluster}" 1 200
-create_case ${experiment} 128  16  32 "${cluster}" 1 200
 create_case ${experiment}  64  32  32 "${cluster}" 1 200
 create_case ${experiment} 128  32  32 "${cluster}" 2 200
 create_case ${experiment} 256  32  32 "${cluster}" 4 200
-create_case ${experiment} 128  64  32 "${cluster}" 4 200
-create_case ${experiment} 128  32  64 "${cluster}" 4 200
+create_case ${experiment} 128  64  64 "${cluster}" 8 200
+
+create_case ${experiment} 128  32  32 "${cluster}" 1 100
+create_case ${experiment} 256  32  32 "${cluster}" 2 100
+create_case ${experiment} 128  64  64 "${cluster}" 4 100
+create_case ${experiment} 266  64  64 "${cluster}" 8 100
 
 experiment="weak_scaling"
 create_case ${experiment}  64  16  16 "${cluster}" 1 800
