@@ -125,7 +125,7 @@ create_case ${experiment} 128  32  32 "${cluster}" 1 50
 create_case ${experiment} 128  32  32 "${cluster}" 1 25
 create_case ${experiment} 256  64  32 "${cluster}" 1 50
 create_case ${experiment} 256  64  32 "${cluster}" 1 25
-create_case ${experiment} 256  64  64 "${cluster}" 1 50
+create_case ${experiment} 256  64  64 "${cluster}" 1 25
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
