@@ -2,14 +2,6 @@
 set(CMAKE_FOLDER "Tests/Regression/Sensitivity")
 
 # --------------------------------------------------------------------------- #
-# .case files to run in the regression suite (long-running)
-set(test_list
-    "minimum_dissipation.case"
-    "lube_term.case"
-    "min_dis_and_lube.case"
-    "min_dis_and_lube_weights.case"
-)
-
 # Ensure the neko library module dir is found (from the main target)
 get_target_property(NEKO_TOP_MOD_DIR neko-top Fortran_MODULE_DIRECTORY)
 

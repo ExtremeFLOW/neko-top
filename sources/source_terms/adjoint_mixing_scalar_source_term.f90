@@ -152,6 +152,9 @@ contains
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%s)
+    nullify(this%mask)
+
   end subroutine adjoint_mixing_scalar_source_term_free
 
   !> Computes the source term and adds the result to `fields`.

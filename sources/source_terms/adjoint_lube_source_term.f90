@@ -232,6 +232,15 @@ contains
     call this%accumulate%free()
     call this%fld_GL%free()
     call this%chi_GL%free()
+    nullify(this%u)
+    nullify(this%v)
+    nullify(this%w)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
+    nullify(this%mask)
+
   end subroutine adjoint_lube_source_term_free
 
   !> Computes the source term and adds the result to `fields`.

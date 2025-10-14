@@ -77,6 +77,7 @@ program minimum_dissipation_sensitivity
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  call user_setup(sim%neko_case%user)
   call sim%init(parameters)
   call des%init(design_parameters, sim)
   call prob%init(parameters, des, sim)
