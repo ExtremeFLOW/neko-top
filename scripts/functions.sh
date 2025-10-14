@@ -249,8 +249,8 @@ function cleanup {
     # Move all the Checkpoint files to the results folder.
     printf "Archiving chkp files.\n"
     if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
-        mkdir -p $results/checkpoints
-        find ./ -name "*.chkp" -execdir mv {} $results/checkpoints/ \;
+        mkdir -p checkpoints
+        find ./ -name "*.chkp" -execdir mv {} checkpoints/ \;
     fi
 
     # Move all files which are not the error or executable files to the log
@@ -263,6 +263,7 @@ function cleanup {
         ./ $results
 
     # Remove all but the log files
+    find ./ -type d -empty -delete
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
 
     # ------------------------------------------------------------------------ #
