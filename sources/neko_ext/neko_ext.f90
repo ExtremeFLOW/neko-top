@@ -27,7 +27,9 @@ module neko_ext
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
-  use field_math, only: field_rzero
+  use field_math, only: field_rzero, field_copy
+  use fluid_pnpn, only: fluid_pnpn_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
 
   implicit none
 
@@ -121,14 +123,26 @@ contains
             neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
-    ! zero out all lags etc
-    ! (not sure what to do with the abx's)
+    ! set lags to IC
+    call neko_case%fluid%ulag%set(u)
+    call neko_case%fluid%vlag%set(v)
+    call neko_case%fluid%wlag%set(w)
+    ! zero out RHS etc
+    select type (f => neko_case%fluid)
+    type is (fluid_pnpn_t)
+       call field_rzero(f%abx1)
+       call field_rzero(f%aby1)
+       call field_rzero(f%abz1)
+       call field_rzero(f%abx2)
+       call field_rzero(f%aby2)
+       call field_rzero(f%abz2)
+       call field_copy(f%u_e, u)
+       call field_copy(f%v_e, v)
+       call field_copy(f%w_e, w)
+    end select
     call field_rzero(neko_case%fluid%f_x)
     call field_rzero(neko_case%fluid%f_y)
     call field_rzero(neko_case%fluid%f_z)
-    call neko_case%fluid%ulag%set(neko_case%fluid%f_x)
-    call neko_case%fluid%vlag%set(neko_case%fluid%f_x)
-    call neko_case%fluid%wlag%set(neko_case%fluid%f_x)
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -142,8 +156,7 @@ contains
        if (size(neko_case%scalars%scalar_fields) .gt. 1) then
           call neko_error('Multiple scalars not supported')
        end if
-       ! zero out lag terms and RHS
-       call neko_case%scalars%scalar_fields(1)%slag%set(neko_case%fluid%f_x)
+       ! zero out RHS
        call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
        ! reset the forward scalar
        call json_get(neko_case%params, &
@@ -168,6 +181,9 @@ contains
                neko_case%scalars%scalar_fields(1)%gs_Xh, &
                neko_case%user%initial_conditions)
        end if
+       ! set lags to IC
+       call neko_case%scalars%scalar_fields(1)%slag%set(&
+            neko_case%scalars%scalar_fields(1)%s)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -250,14 +266,25 @@ contains
        call neko_error("adjoint user initial conditions not supported")
     end if
 
+    ! set lags to IC
+    call adjoint_case%fluid_adj%ulag%set(u_adj)
+    call adjoint_case%fluid_adj%vlag%set(v_adj)
+    call adjoint_case%fluid_adj%wlag%set(w_adj)
+    ! zero out RHS etc
+    select type (f => adjoint_case%fluid_adj)
+    type is (adjoint_fluid_pnpn_t)
+       call field_rzero(f%abx1)
+       call field_rzero(f%aby1)
+       call field_rzero(f%abz1)
+       call field_rzero(f%abx2)
+       call field_rzero(f%aby2)
+       call field_rzero(f%abz2)
+    end select
     ! zero out all lags etc
     ! (not sure what to do with the abx's_adj)
     call field_rzero(adjoint_case%fluid_adj%f_adj_x)
     call field_rzero(adjoint_case%fluid_adj%f_adj_y)
     call field_rzero(adjoint_case%fluid_adj%f_adj_z)
-    call adjoint_case%fluid_adj%ulag%set(adjoint_case%fluid_adj%f_adj_x)
-    call adjoint_case%fluid_adj%vlag%set(adjoint_case%fluid_adj%f_adj_x)
-    call adjoint_case%fluid_adj%wlag%set(adjoint_case%fluid_adj%f_adj_x)
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
@@ -271,9 +298,7 @@ contains
        if (size(adjoint_case%adjoint_scalars%adjoint_scalar_fields) .gt. 1) then
           call neko_error('Multiple adjoint scalars not supported')
        end if
-       ! zero out lag terms and RHS
-       call adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj_lag% &
-            set(adjoint_case%fluid_adj%f_adj_x)
+       ! zero out lag terms
        call field_rzero( &
             adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%f_Xh)
        ! reset the forward scalar
@@ -297,6 +322,9 @@ contains
        else
           call neko_error("adjoint scalar user IC not supported")
        end if
+       ! set lags to IC
+       call adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj_lag% &
+            set(adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj)
     end if
 
     ! ------------------------------------------------------------------------ !
