@@ -69,6 +69,8 @@ function create_case() {
 
     if [ -n "${N_memory}" ]; then
         sed -i "s|\"n_memory\": .*|\"n_memory\": ${N_memory},|g" "${case_file}"
+    else
+        N_memory=$(grep -oP '(?<="n_memory": )[^,]*' "${case_file}")
     fi
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
