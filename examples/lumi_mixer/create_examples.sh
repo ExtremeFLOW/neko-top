@@ -77,11 +77,11 @@ function create_case() {
     # Create the jobscript
     cp "${template_path}/${cluster}.sh" "${job_path}/${case_name}.sh"
     sed -i "s|--nodes=.*|--nodes=${nodes}|g" "${job_path}/${case_name}.sh"
-    if [ $((nodes*Np)) -gt 72 ]; then
-        sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c 72 ./|g" "${job_path}/${case_name}.sh"
-    else
-        sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c $((nodes*Np)) ./|g" "${job_path}/${case_name}.sh"
-    fi
+    # if [ $((nodes*Np)) -gt 72 ]; then
+    #     sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c 72 ./|g" "${job_path}/${case_name}.sh"
+    # else
+    #     sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c $((nodes*Np)) ./|g" "${job_path}/${case_name}.sh"
+    # fi
 
     # Create the experiment entry
     experiment_file="${experiment_path}/${experiment}.csv"
@@ -119,6 +119,9 @@ create_case ${experiment}  64  16   8 "${cluster}" 1
 create_case ${experiment}  64  16  16 "${cluster}" 1
 create_case ${experiment} 128  16  16 "${cluster}" 1
 create_case ${experiment} 128  32  16 "${cluster}" 1
+create_case ${experiment} 128  32  32 "${cluster}" 1 25
+create_case ${experiment} 128  32  32 "${cluster}" 1 50
+create_case ${experiment} 128  32  32 "${cluster}" 1 100
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
