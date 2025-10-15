@@ -251,6 +251,9 @@ function cleanup {
     if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
         mkdir -p checkpoints
         find ./ -name "*.chkp" -execdir mv {} checkpoints/ \;
+    fi
+    if [ -n "$(find ./ -name "*.h5" -print)" ]; then
+        mkdir -p checkpoints
         find ./ -name "*.h5" -execdir mv {} checkpoints/ \;
     fi
 
