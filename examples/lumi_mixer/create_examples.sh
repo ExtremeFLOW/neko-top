@@ -81,11 +81,6 @@ function create_case() {
     # Create the jobscript
     cp "${template_path}/${cluster}.sh" "${job_path}/${case_name}.sh"
     sed -i "s|--nodes=.*|--nodes=${nodes}|g" "${job_path}/${case_name}.sh"
-    # if [ $((nodes*Np)) -gt 72 ]; then
-    #     sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c 72 ./|g" "${job_path}/${case_name}.sh"
-    # else
-    #     sed -i "s|lfs setstripe -S 2m -c .*|lfs setstripe -S 2m -c $((nodes*Np)) ./|g" "${job_path}/${case_name}.sh"
-    # fi
 
     # Create the experiment entry
     experiment_file="${experiment_path}/${experiment}.csv"
