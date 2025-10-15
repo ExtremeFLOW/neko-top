@@ -49,9 +49,14 @@ function create_case() {
         Np="8"
     fi
 
+    if [ -z "$N_memory" ]; then
+        N_memory=$(grep -oP '(?<="n_memory": )[^,]*' "${template_path}/case.template")
+    fi
+
     # Define a unique case name
-    local case_name="${cluster,,}_nodes_${nodes}_mesh_${Nx}x${Ny}x${Nz}"
-    [ -n "${N_memory}" ] && case_name="${case_name}_n_memory_${N_memory}"
+    case_name="${cluster,,}_nodes_${nodes}_mesh_${Nx}x${Ny}x${Nz}"
+    case_name="${case_name}_n_memory_${N_memory}"
+    [ "${keep_files}" == "true" ] && case_name="${case_name}_keep_files"
 
     # Set file names
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
@@ -67,12 +72,7 @@ function create_case() {
     # Create the cases from the templates
     cp "${template_path}/case.template" "${case_file}"
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${mesh_file}\",|g" "${case_file}"
-
-    if [ -n "${N_memory}" ]; then
         sed -i "s|\"n_memory\": .*|\"n_memory\": ${N_memory},|g" "${case_file}"
-    else
-        N_memory=$(grep -oP '(?<="n_memory": )[^,]*' "${case_file}")
-    fi
     sed -i "s|\"keep_checkpoints\": .*|\"keep_checkpoints\": ${keep_files},|g" "${case_file}"
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
