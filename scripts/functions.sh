@@ -251,6 +251,7 @@ function cleanup {
     if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
         mkdir -p checkpoints
         find ./ -name "*.chkp" -execdir mv {} checkpoints/ \;
+        find ./ -name "*.h5" -execdir mv {} checkpoints/ \;
     fi
 
     # Move all files which are not the error or executable files to the log
