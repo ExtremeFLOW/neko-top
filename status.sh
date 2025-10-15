@@ -54,7 +54,7 @@ if [ $(which bjobs 2>/dev/null) ]; then
     bjobs -ro -noheader "time_left:8 job_name"
 elif [ $(which squeue 2>/dev/null) ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
-    squeue -ro "%.8L %j" -u $USER
+    squeue -rho "%.10t %9L %j" --me
 fi
 
 printf "\n\e[4mTest status.\e[m\n"
