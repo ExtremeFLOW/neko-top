@@ -242,7 +242,9 @@ contains
     ! call this%chkp_output%free()
     if (.not. this%keep_checkpoints) then
        call system("rm -f $(ls | grep -E '" // &
-            trim(this%filename) // "[0-9]{5}\.(chkp|h5)$')")
+            trim(this%filename) // "[0-9]+\.chkp$')")
+       call system("rm -f $(ls | grep -E '" // &
+            trim(this%filename) // "[0-9]+\.h5$')")
     end if
 
     ! Reset to default values
