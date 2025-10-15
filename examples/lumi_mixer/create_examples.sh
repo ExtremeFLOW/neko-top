@@ -190,6 +190,11 @@ create_case ${experiment} 512 128 128 "${cluster}" 512 800
 
 experiment="storage_test"
 create_case ${experiment}  16   4   4 "${cluster}" 1 100 true
+create_case ${experiment}  16   8   4 "${cluster}" 1 100 true
+create_case ${experiment}  16   8   8 "${cluster}" 1 100 true
+create_case ${experiment}  32   8   8 "${cluster}" 1 100 true
+
+create_case ${experiment}  16   4   4 "${cluster}" 1 100 true
 create_case ${experiment}  16   8   4 "${cluster}" 2 100 true
 create_case ${experiment}  16   8   8 "${cluster}" 4 100 true
 create_case ${experiment}  32   8   8 "${cluster}" 8 100 true
