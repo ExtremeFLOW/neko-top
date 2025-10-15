@@ -43,6 +43,7 @@ function create_case() {
     local nodes="$6"          # Number of nodes
 
     [ $# -ge 7 ] && local N_memory=$7 || local N_memory=""
+    [ $# -ge 8 ] && local keep_files=$8 || local keep_files=false
 
     if [ "${cluster}" == "LUMI-G" ]; then
         Np="8"
@@ -72,6 +73,7 @@ function create_case() {
     else
         N_memory=$(grep -oP '(?<="n_memory": )[^,]*' "${case_file}")
     fi
+    sed -i "s|\"keep_checkpoints\": .*|\"keep_checkpoints\": ${keep_files},|g" "${case_file}"
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
     [ ! -f ${job_path}/.gitignore ] && echo "*.sh" > ${job_path}/.gitignore
@@ -185,3 +187,9 @@ create_case ${experiment} 512 128 128 "${cluster}" 512 800
 # create_case ${experiment} 1024 256 256 "${cluster}" 128
 # create_case ${experiment} 1024 256 256 "${cluster}" 256
 # create_case ${experiment} 1024 256 256 "${cluster}" 512
+
+experiment="storage_test"
+create_case ${experiment}  16   4   4 "${cluster}" 1 100 true
+create_case ${experiment}  16   8   4 "${cluster}" 2 100 true
+create_case ${experiment}  16   8   8 "${cluster}" 4 100 true
+create_case ${experiment}  32   8   8 "${cluster}" 8 100 true
