@@ -40,7 +40,7 @@ done
 # Print status
 
 # List all the tests, if there are none we return
-tests=($(find $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
+tests=($(find -L $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
 for ((i = 0; i < ${#tests[@]}; i++)); do tests[$i]="${tests[$i]#$LPATH/}"; done
 
 if [ ${#tests[@]} -eq 0 ]; then
