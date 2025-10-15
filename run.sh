@@ -1,5 +1,4 @@
 #!/bin/bash
-set +e # Do not exit on error
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -64,7 +63,7 @@ DRY=false
 RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential
 OPT=a,c,h,n,s:,d,r
 
 # Parse the inputs for options
@@ -132,6 +131,7 @@ fi
 # End of user inputs
 # ============================================================================ #
 # Find the examples to run
+set +e # Do not exit on error
 
 example_list=()
 for in in $@; do
