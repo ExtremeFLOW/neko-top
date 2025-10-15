@@ -59,6 +59,7 @@ CLEAN=false
 NEKO=false
 DELETE=false
 CLUSTER=""
+SEQUENTIAL=false
 DRY=false
 RERUN=false
 
@@ -79,8 +80,11 @@ while true; do
     "-n" | "--neko") NEKO=true && shift ;;        # Look for example in neko
     "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
     "-s" | "--submit") CLUSTER="${2^^}" && shift 2 ;; # Submit to the queue
-    "--dry-run") DRY=true && shift ;;             # Dry run
     "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
+
+    # Long option with no short option
+    "--dry-run") DRY=true && shift ;;             # Dry run
+    "--sequential") SEQUENTIAL=true && shift ;;   # Submit sequentially
 
     # End of options
     "--") shift && break ;;
@@ -300,7 +304,7 @@ function Submit() {
             printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="-A $MN5_ACCOUNT"
+            ACCOUNT="$MN5_ACCOUNT"
         fi
 
     elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
@@ -310,7 +314,7 @@ function Submit() {
             printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="-A $LUMI_ACCOUNT"
+            ACCOUNT="$LUMI_ACCOUNT"
         fi
     fi
 
@@ -322,7 +326,16 @@ function Submit() {
             cd $CURRENT_DIR
             return
         fi
-        sbatch -J $1 $ACCOUNT job_script.sh 1>/dev/null 2>error.log
+        DEPENDENCY=""
+        if [ "$SEQUENTIAL" == true ]; then
+            job_list=$(squeue -ho "%i" -S "i" --me | tail -n 1)
+            if [ -n "$job_list" ]; then
+                DEPENDENCY="--dependency=afterany:$job_list"
+            else
+                DEPENDENCY=""
+            fi
+        fi
+        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh 1>/dev/null 2>error.log
     else
         printf >&2 "Unknown submission system.\n"
         exit 1
