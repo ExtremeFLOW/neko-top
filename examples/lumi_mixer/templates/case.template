@@ -9,13 +9,13 @@
             "enabled": true
         },
         "time": {
-            "end_time": 1.0,
+            "end_time": 0.1,
             "timestep": 1e-4
         },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
-            "dealias": true
+            "dealias": false
         },
         "fluid": {
             "scheme": "pnpn",
@@ -143,6 +143,7 @@
     },
     "checkpoints": {
         "enabled": true,
+        "format": "hdf5",
         "n_memory": 100,
         "keep_checkpoints": false
     },
