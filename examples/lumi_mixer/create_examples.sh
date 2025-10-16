@@ -72,7 +72,7 @@ function create_case() {
     # Create the cases from the templates
     cp "${template_path}/case.template" "${case_file}"
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${mesh_file}\",|g" "${case_file}"
-        sed -i "s|\"n_memory\": .*|\"n_memory\": ${N_memory},|g" "${case_file}"
+    sed -i "s|\"n_memory\": .*|\"n_memory\": ${N_memory},|g" "${case_file}"
     sed -i "s|\"keep_checkpoints\": .*|\"keep_checkpoints\": ${keep_files},|g" "${case_file}"
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
@@ -118,7 +118,7 @@ create_case ${experiment}  64  16  16 "${cluster}" 1
 create_case ${experiment} 128  16  16 "${cluster}" 1
 create_case ${experiment} 128  32  16 "${cluster}" 1
 create_case ${experiment} 128  32  32 "${cluster}" 1
-create_case ${experiment} 256  32  32 "${cluster}" 1 10
+create_case ${experiment} 256  32  32 "${cluster}" 1 5
 
 # Investigation of the effect of memory checkpoints
 experiment="memory_checkpoints"
@@ -133,7 +133,6 @@ create_case ${experiment} 128  32  16 "${cluster}" 1 200
 
 create_case ${experiment} 128  32  32 "${cluster}" 1 50
 create_case ${experiment} 128  32  32 "${cluster}" 1 100
-create_case ${experiment} 128  32  32 "${cluster}" 1 150
 
 # Investigate the scaling on a couple of nodes
 experiment="weak_scaling_400"
@@ -155,16 +154,14 @@ create_case ${experiment} 128  64  64 "${cluster}" 4 100
 create_case ${experiment} 256  64  64 "${cluster}" 8 100
 
 experiment="weak_scaling"
-create_case ${experiment}  64  16  16 "${cluster}" 1 800
-create_case ${experiment} 128  16  16 "${cluster}" 2 800
-create_case ${experiment}  64  32  32 "${cluster}" 4 800
-create_case ${experiment} 128  32  32 "${cluster}" 8 800
-create_case ${experiment} 256  32  32 "${cluster}" 16 800
-create_case ${experiment} 128  64  64 "${cluster}" 32 800
-create_case ${experiment} 256  64  64 "${cluster}" 64 800
-create_case ${experiment} 512  64  64 "${cluster}" 128 800
-create_case ${experiment} 256 128 128 "${cluster}" 256 800
-create_case ${experiment} 512 128 128 "${cluster}" 512 800
+create_case ${experiment}  128   32   32 "${cluster}"   1 100
+create_case ${experiment}  256   32   32 "${cluster}"   2 100
+create_case ${experiment}  128   64   64 "${cluster}"   4 100
+create_case ${experiment}  256   64   64 "${cluster}"   8 100
+create_case ${experiment}  512   64   64 "${cluster}"  16 100
+create_case ${experiment}  256  128  128 "${cluster}"  32 100
+create_case ${experiment}  512  128  128 "${cluster}"  64 100
+create_case ${experiment} 1024  128  128 "${cluster}" 128 100
 
 # experiment="strong_scaling_small"
 # create_case ${experiment} 128  32  32 "${cluster}" 1
@@ -192,4 +189,3 @@ create_case ${experiment}  32   8   8 "${cluster}" 1 100 true
 create_case ${experiment}  16   4   4 "${cluster}" 1 100 true
 create_case ${experiment}  16   8   4 "${cluster}" 2 100 true
 create_case ${experiment}  16   8   8 "${cluster}" 4 100 true
-create_case ${experiment}  32   8   8 "${cluster}" 8 100 true
