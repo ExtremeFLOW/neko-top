@@ -136,22 +136,31 @@ create_case ${experiment} 128  32  32 "${cluster}" 1 100
 
 # Investigate the scaling on a couple of nodes
 experiment="weak_scaling_400"
-create_case ${experiment} 128  16  16 "${cluster}" 1 400
-create_case ${experiment}  64  32  32 "${cluster}" 2 400
-create_case ${experiment} 128  32  32 "${cluster}" 4 400
-create_case ${experiment} 256  32  32 "${cluster}" 8 400
+create_case ${experiment} 128  16  16 "${cluster}"   1 400
+create_case ${experiment}  64  32  32 "${cluster}"   2 400
+create_case ${experiment} 128  32  32 "${cluster}"   4 400
+create_case ${experiment} 256  32  32 "${cluster}"   8 400
+create_case ${experiment} 128  64  64 "${cluster}"  16 400
+create_case ${experiment} 256  64  64 "${cluster}"  32 400
+create_case ${experiment} 512  64  64 "${cluster}"  64 400
+create_case ${experiment} 256 128 128 "${cluster}" 128 400
+create_case ${experiment} 512 128 128 "${cluster}" 256 400
 
 experiment="weak_scaling_200"
-create_case ${experiment}  64  32  32 "${cluster}" 1 200
-create_case ${experiment} 128  32  32 "${cluster}" 2 200
-create_case ${experiment} 256  32  32 "${cluster}" 4 200
-create_case ${experiment} 128  64  64 "${cluster}" 8 200
+create_case ${experiment}  64  32  32 "${cluster}"  1 200
+create_case ${experiment} 128  32  32 "${cluster}"  2 200
+create_case ${experiment} 256  32  32 "${cluster}"  4 200
+create_case ${experiment} 128  64  64 "${cluster}"  8 200
+create_case ${experiment} 256  64  64 "${cluster}" 16 200
+create_case ${experiment} 512  64  64 "${cluster}" 32 200
+create_case ${experiment} 256 128 128 "${cluster}" 64 200
 
 experiment="weak_scaling_100"
-create_case ${experiment} 128  32  32 "${cluster}" 1 100
-create_case ${experiment} 256  32  32 "${cluster}" 2 100
-create_case ${experiment} 128  64  64 "${cluster}" 4 100
-create_case ${experiment} 256  64  64 "${cluster}" 8 100
+create_case ${experiment} 128  32  32 "${cluster}"  1 100
+create_case ${experiment} 256  32  32 "${cluster}"  2 100
+create_case ${experiment} 128  64  64 "${cluster}"  4 100
+create_case ${experiment} 256  64  64 "${cluster}"  8 100
+create_case ${experiment} 512  64  64 "${cluster}" 16 100
 
 experiment="weak_scaling"
 create_case ${experiment}  128   32   32 "${cluster}"   1 100
@@ -159,9 +168,6 @@ create_case ${experiment}  256   32   32 "${cluster}"   2 100
 create_case ${experiment}  128   64   64 "${cluster}"   4 100
 create_case ${experiment}  256   64   64 "${cluster}"   8 100
 create_case ${experiment}  512   64   64 "${cluster}"  16 100
-create_case ${experiment}  256  128  128 "${cluster}"  32 100
-create_case ${experiment}  512  128  128 "${cluster}"  64 100
-create_case ${experiment} 1024  128  128 "${cluster}" 128 100
 
 # experiment="strong_scaling_small"
 # create_case ${experiment} 128  32  32 "${cluster}" 1
