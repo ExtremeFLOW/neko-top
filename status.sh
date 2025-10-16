@@ -62,6 +62,7 @@ printf "\n\e[4mTest status.\e[m\n"
 for test in ${tests[@]}; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
+        rm -rf $LPATH/$test
     fi
 done
 
