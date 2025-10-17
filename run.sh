@@ -389,14 +389,14 @@ for case in ${example_list[@]}; do
     fi
 
     if [ "$RERUN" == false ] && [ -d "$RPATH/$example" ]; then
-        printf '\t%-12s %-s\n' "Skipped:" "$example"
+        printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$example"
         continue
     fi
 
     case "$CLUSTER" in
         "MN5" | "LUMI-C" | "LUMI-G")
             if [[ "$(squeue -h --name=$example | wc -l)" -gt 0 ]]; then
-                printf '\t%-12s %-s\n' "In queue:" "$example"
+                printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
                 continue
             fi
         ;;
@@ -426,7 +426,7 @@ for case in ${example_list[@]}; do
         find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
     elif [[ -f "$log/output.log" ]]; then
-        printf '\t%-12s %-s\n' "Skipped:" "$example"
+        printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Skipped:" "$example"
         continue
     fi
 
