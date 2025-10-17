@@ -11,6 +11,7 @@ module mma_optimizer
   use design, only: design_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
+  use profiler, only: profiler_start_region, profiler_end_region
 
   use vector, only: vector_t
   use matrix, only: matrix_t
@@ -173,6 +174,8 @@ contains
     class(constraint_t), allocatable :: dummy_con
     type(json_file) :: parameters
 
+    call profiler_start_region("Optimizer iteration 0")
+
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
@@ -243,8 +246,10 @@ contains
        end if
 
        ! Use scaled sensitivities to update the design variable
+       call profiler_start_region("MMA update")
        call this%mma%update(iter, x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
+       call profiler_end_region("MMA update")
 
        call design%update_design(x)
 
@@ -257,8 +262,10 @@ contains
        call problem%get_constraint_sensitivities(constraint_sensitivities)
        call problem%get_all_objective_values(all_objectives)
 
+       call profiler_start_region("MMA KKT computation")
        call this%mma%KKT(x, objective_sensitivities, &
             constraint_value, constraint_sensitivities)
+       call profiler_end_region("MMA KKT computation")
 
        if (this%enable_output) then
           ! Stamp the i^th iteration

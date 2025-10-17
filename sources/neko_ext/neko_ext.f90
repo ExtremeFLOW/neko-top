@@ -8,7 +8,8 @@
 !! optimization code.
 module neko_ext
   use case, only: case_t
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use adjoint_case, only: adjoint_case_t
+  use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp
   use simcomp_executor, only: neko_simcomps
   use flow_ic, only: set_flow_ic
@@ -26,6 +27,9 @@ module neko_ext
   use json_module, only : json_file
   use scalars, only: scalars_t
   use adjoint_scalars, only: adjoint_scalars_t
+  use field_math, only: field_rzero, field_copy
+  use fluid_pnpn, only: fluid_pnpn_t
+  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
 
   implicit none
 
@@ -33,7 +37,8 @@ module neko_ext
   ! Module interface
   ! ========================================================================= !
   private
-  public :: reset, field_to_vector, vector_to_field, get_scalar_indicies
+  public :: reset, reset_adjoint, field_to_vector, vector_to_field, &
+       get_scalar_indicies
 
 contains
 
@@ -52,11 +57,11 @@ contains
   subroutine reset(neko_case)
     type(case_t), intent(inout) :: neko_case
     real(kind=rp) :: t
-    integer :: i, n_scalars
+    integer :: i
     character(len=:), allocatable :: string_val
     logical :: has_scalar, freezeflow
     type(field_t), pointer :: u, v, w, p, s
-    type(json_file) :: json_subdict, scalar_params
+    type(json_file) :: json_subdict
 
     ! ------------------------------------------------------------------------ !
     ! Setup shorthand notation
@@ -76,13 +81,8 @@ contains
     ! Reset the timing parameters
     ! ------------------------------------------------------------------------ !
 
-    t = 0.0_rp
-    neko_case%time%t = t
-    neko_case%time%tstep = 0
-
-    ! Setup lagged time step parameters
-    neko_case%time%tlag = t
-    neko_case%time%dtlag = neko_case%time%dt
+    call neko_case%time%reset()
+    t = neko_case%time%start_time
     do i = 1, size(neko_case%time%tlag)
        neko_case%time%tlag(i) = t - i*neko_case%time%dtlag(i)
     end do
@@ -123,59 +123,67 @@ contains
             neko_case%user%initial_conditions, neko_case%fluid%name)
     end if
 
+    ! set lags to IC
+    call neko_case%fluid%ulag%set(u)
+    call neko_case%fluid%vlag%set(v)
+    call neko_case%fluid%wlag%set(w)
+    ! zero out RHS etc
+    select type (f => neko_case%fluid)
+    type is (fluid_pnpn_t)
+       call field_rzero(f%abx1)
+       call field_rzero(f%aby1)
+       call field_rzero(f%abz1)
+       call field_rzero(f%abx2)
+       call field_rzero(f%aby2)
+       call field_rzero(f%abz2)
+       call field_copy(f%u_e, u)
+       call field_copy(f%v_e, v)
+       call field_copy(f%w_e, w)
+    end select
+    call field_rzero(neko_case%fluid%f_x)
+    call field_rzero(neko_case%fluid%f_y)
+    call field_rzero(neko_case%fluid%f_z)
     ! ------------------------------------------------------------------------ !
     ! Reset the scalar field to the initial condition
     ! ------------------------------------------------------------------------ !
 
+    ! check for a single scalar
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
 
     if (has_scalar) then
-       if (neko_case%params%valid_path('case.adjoint_scalar')) then
-          ! we shouldn't fallback to the primal here.
-          call json_get(neko_case%params, &
-               'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_get(neko_case%params, &
-               'case.adjoint_scalar.initial_condition', json_subdict)
-
-          !call neko_log%section("Adjoint scalar initial condition ")
-
-          if (trim(string_val) .ne. 'user') then
+       ! check for multiple scalars
+       if (size(neko_case%scalars%scalar_fields) .gt. 1) then
+          call neko_error('Multiple scalars not supported')
+       end if
+       ! zero out RHS
+       call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
+       ! reset the forward scalar
+       call json_get(neko_case%params, &
+            'case.scalar.initial_condition.type', string_val)
+       call json_get(neko_case%params, &
+            'case.scalar.initial_condition', json_subdict)
+       if (trim(string_val) .ne. 'user') then
+          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+               'temperature') then
              call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
                   neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
-                  json_subdict)
+                  json_subdict, 0)
           else
-             call neko_error("user defined ICs not implemented for " // &
-                  "adjoint scalar")
-             ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
-             !      this%adjoint_scalars%c_Xh, this%adjoint_scalars%gs_Xh, &
-             !      this%usr%scalar_user_ic, neko_case%params)
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+                  neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
+                  json_subdict, 1)
           end if
-
-          ! call neko_log%end_section()
        else
-
-          ! Handle multiple scalars
-          call neko_case%params%info('case.scalars', n_children = n_scalars)
-
-          do i = 1, n_scalars
-             call json_extract_item(neko_case%params, 'case.adjoint_scalars', &
-                  i, scalar_params)
-             call json_get(scalar_params, 'initial_condition.type', string_val)
-             call json_get(scalar_params, 'initial_condition', &
-                  json_subdict)
-
-             if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(neko_case%scalars%scalar_fields(i)%s, &
-                     neko_case%scalars%scalar_fields(i)%c_Xh, &
-                     neko_case%scalars%scalar_fields(i)%gs_Xh, string_val, &
-                     json_subdict)
-             else
-                call neko_error("user defined ICs not implemented for " // &
-                     "adjoint scalar")
-             end if
-          end do
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
+               neko_case%scalars%scalar_fields(1)%s, &
+               neko_case%scalars%scalar_fields(1)%c_Xh, &
+               neko_case%scalars%scalar_fields(1)%gs_Xh, &
+               neko_case%user%initial_conditions)
        end if
+       ! set lags to IC
+       call neko_case%scalars%scalar_fields(1)%slag%set(&
+            neko_case%scalars%scalar_fields(1)%s)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -188,6 +196,147 @@ contains
     neko_case%fluid%freeze = freezeflow
 
   end subroutine reset
+
+  !> @brief Reset the adjoint case data structure
+  !!
+  !! @details This subroutine resets the adjoint case data structure. It is
+  !! called at the beginning of each iteration. It is used to reset the time
+  !! step counter, the lagged time step parameters, the external BDF
+  !! coefficients, the adjoint fluid_adj and adjoint scalar fields.
+  !!
+  !! @param[inout] adjoint_case Adjoint case data structure.
+  !! @param[in] neko_case Primal case.
+  subroutine reset_adjoint(adjoint_case, neko_case)
+    type(adjoint_case_t), intent(inout) :: adjoint_case
+    type(case_t), intent(inout) :: neko_case
+    real(kind=rp) :: t
+    integer :: i
+    character(len=:), allocatable :: string_val
+    logical :: has_scalar, freezeflow
+    type(field_t), pointer :: u_adj, v_adj, w_adj, p_adj, s_adj
+    type(json_file) :: json_subdict
+
+    ! ------------------------------------------------------------------------ !
+    ! Setup shorthand notation
+    ! ------------------------------------------------------------------------ !
+
+    u_adj => adjoint_case%fluid_adj%u_adj
+    v_adj => adjoint_case%fluid_adj%v_adj
+    w_adj => adjoint_case%fluid_adj%w_adj
+    p_adj => adjoint_case%fluid_adj%p_adj
+    if (allocated(adjoint_case%adjoint_scalars)) then
+       s_adj => adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj
+    else
+       nullify(s_adj)
+    end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Reset the timing parameters
+    ! ------------------------------------------------------------------------ !
+
+    call adjoint_case%time%reset()
+    t = adjoint_case%time%start_time
+    do i = 1, size(adjoint_case%time%tlag)
+       adjoint_case%time%tlag(i) = t - i*adjoint_case%time%dtlag(i)
+    end do
+
+    ! Reset the time step counter
+    call adjoint_case%output_controller%set_counter(adjoint_case%time)
+
+    ! Reset the external BDF coefficients
+    do i = 1, size(adjoint_case%time%dtlag)
+       call adjoint_case%fluid_adj%ext_bdf%set_coeffs(adjoint_case%time%dtlag)
+    end do
+
+    ! ------------------------------------------------------------------------ !
+    ! Reset the adjoint fluid to the initial (final) condition
+    ! ------------------------------------------------------------------------ !
+
+    ! don't fallback to the fluid here
+    call json_get(neko_case%params, &
+         'case.adjoint_fluid.initial_condition.type', string_val)
+    call json_get(neko_case%params, 'case.adjoint_fluid.initial_condition', &
+         json_subdict)
+
+    if (trim(string_val) .ne. 'user') then
+       call set_flow_ic(u_adj, v_adj, w_adj, p_adj, &
+            adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+            string_val, json_subdict)
+    else
+       call neko_error("adjoint user initial conditions not supported")
+    end if
+
+    ! set lags to IC
+    call adjoint_case%fluid_adj%ulag%set(u_adj)
+    call adjoint_case%fluid_adj%vlag%set(v_adj)
+    call adjoint_case%fluid_adj%wlag%set(w_adj)
+    ! zero out RHS etc
+    select type (f => adjoint_case%fluid_adj)
+    type is (adjoint_fluid_pnpn_t)
+       call field_rzero(f%abx1)
+       call field_rzero(f%aby1)
+       call field_rzero(f%abz1)
+       call field_rzero(f%abx2)
+       call field_rzero(f%aby2)
+       call field_rzero(f%abz2)
+    end select
+    ! zero out all lags etc
+    ! (not sure what to do with the abx's_adj)
+    call field_rzero(adjoint_case%fluid_adj%f_adj_x)
+    call field_rzero(adjoint_case%fluid_adj%f_adj_y)
+    call field_rzero(adjoint_case%fluid_adj%f_adj_z)
+    ! ------------------------------------------------------------------------ !
+    ! Reset the scalar field to the initial condition
+    ! ------------------------------------------------------------------------ !
+
+    ! check for a single scalar
+    call json_get_or_default(neko_case%params, 'case.scalar.enabled', &
+         has_scalar, .false.)
+
+    if (has_scalar) then
+       ! check for multiple adjoint_scalars
+       if (size(adjoint_case%adjoint_scalars%adjoint_scalar_fields) .gt. 1) then
+          call neko_error('Multiple adjoint scalars not supported')
+       end if
+       ! zero out lag terms
+       call field_rzero( &
+            adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%f_Xh)
+       ! reset the forward scalar
+       call json_get(neko_case%params, &
+            'case.adjoint_scalar.initial_condition.type', string_val)
+       call json_get(neko_case%params, &
+            'case.adjoint_scalar.initial_condition', json_subdict)
+       if (trim(string_val) .ne. 'user') then
+          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+               'temperature') then
+             call set_scalar_ic( &
+                  adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                  adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+                  string_val, json_subdict, 0)
+          else
+             call set_scalar_ic( &
+                  adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                  adjoint_case%fluid_adj%c_Xh, adjoint_case%fluid_adj%gs_Xh, &
+                  string_val, json_subdict, 1)
+          end if
+       else
+          call neko_error("adjoint scalar user IC not supported")
+       end if
+       ! set lags to IC
+       call adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj_lag% &
+            set(adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj)
+    end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Reset the "freeze" parameter of the flow
+    ! ------------------------------------------------------------------------ !
+
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.freeze_flow', freezeflow, .false.)
+
+    adjoint_case%fluid_adj%freeze = freezeflow
+
+  end subroutine reset_adjoint
 
   !> @brief Vector to field
   !!

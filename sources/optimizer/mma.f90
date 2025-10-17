@@ -43,7 +43,6 @@ module mma
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
-
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
 
@@ -527,4 +526,3 @@ contains
          this%subsolver
   end function mma_get_backend_and_subsolver
 end module mma
-
