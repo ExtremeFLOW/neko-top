@@ -393,7 +393,7 @@ contains
 
     ! Section properties
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
     end if
     I_e = b * h%x(this%local_index)**3 / 12.0_rp
     c_e = h%x(this%local_index) / 2.0_rp
@@ -405,8 +405,8 @@ contains
     sigma_e = M_e * c_e / I_e
 
     if (this%is_local) then
-      ! Constraint value: stress <= sigma_max
-      this%value = sigma_e / this%sigma_max - 1.0_rp
+       ! Constraint value: stress <= sigma_max
+       this%value = sigma_e / this%sigma_max - 1.0_rp
     end if
 
     ! Sum across all MPI ranks (only one rank will have non-zero value)
@@ -447,7 +447,7 @@ contains
 
     ! Section properties
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
     end if
     I_e = b * h%x(this%local_index)**3 / 12.0_rp
     c_e = h%x(this%local_index) / 2.0_rp
