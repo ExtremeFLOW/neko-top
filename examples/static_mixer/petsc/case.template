@@ -29,13 +29,13 @@
                 "type": "gmres",
                 "preconditioner": { "type": "hsmg" },
                 "absolute_tolerance": 1e-7,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "velocity_solver": {
                 "type": "cg",
                 "preconditioner": { "type": "jacobi" },
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 50
             },
             "boundary_conditions ": [
                 {
