@@ -22,7 +22,6 @@
             "Re": 500.0,
             "output_control": "simulationtime",
             "output_value": 4e-2,
-            "strict_convergence": true,
             "initial_condition": {
                 "type": "user"
             },
