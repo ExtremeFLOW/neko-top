@@ -153,7 +153,7 @@ create_case ${experiment} 128  32  32 "${cluster}"  1 100
 create_case ${experiment} 256  32  32 "${cluster}"  2 100
 create_case ${experiment} 128  64  64 "${cluster}"  4 100
 create_case ${experiment} 256  64  64 "${cluster}"  8 100
-create_case ${experiment} 512  64  64 "${cluster}" 16 100
+# create_case ${experiment} 512  64  64 "${cluster}" 16 100 # Dies on IO
 
 experiment="weak_scaling"
 create_case ${experiment}  128   32   32 "${cluster}"   1 100
