@@ -262,3 +262,8 @@ create_case ${experiment} 128  64  64 "${cluster}" 8 100
 create_case ${experiment} 128  64  64 "${cluster}" 8 200
 create_case ${experiment} 128  64  64 "${cluster}" 8 400
 create_case ${experiment} 128  64  64 "${cluster}" 8 800
+
+create_case ${experiment} 256  64  64 "${cluster}" 8 100
+create_case ${experiment} 256  64  64 "${cluster}" 8 200
+create_case ${experiment} 256  64  64 "${cluster}" 8 400
+create_case ${experiment} 256  64  64 "${cluster}" 8 800
