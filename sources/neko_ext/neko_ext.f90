@@ -137,7 +137,6 @@ contains
     call json_get_or_default(neko_case%params, &
          'case.scalar.enabled', has_scalar, .false.)
 
-
     if (has_scalar) then
        ! check for multiple scalars
        if (size(neko_case%scalars%scalar_fields) .gt. 1) then
