@@ -44,6 +44,7 @@ function create_case() {
 
     [ $# -ge 7 ] && local N_memory=$7 || local N_memory=""
     [ $# -ge 8 ] && local keep_files=$8 || local keep_files=false
+    [ $# -ge 9 ] && local end_time=$9 || local end_time=""
 
     if [ "${cluster}" == "LUMI-G" ]; then
         Np="8"
@@ -57,6 +58,7 @@ function create_case() {
     case_name="${cluster,,}_nodes_${nodes}_mesh_${Nx}x${Ny}x${Nz}"
     case_name="${case_name}_n_memory_${N_memory}"
     [ "${keep_files}" == "true" ] && case_name="${case_name}_keep_files"
+    [ -n "${end_time}" ] && case_name="${case_name}_end_time_${end_time}"
 
     # Set file names
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
@@ -74,6 +76,7 @@ function create_case() {
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${mesh_file}\",|g" "${case_file}"
     sed -i "s|\"n_memory\": .*|\"n_memory\": ${N_memory},|g" "${case_file}"
     sed -i "s|\"keep_checkpoints\": .*|\"keep_checkpoints\": ${keep_files},|g" "${case_file}"
+    [ -n "${end_time}" ] && sed -i "s|\"end_time\": .*|\"end_time\": ${end_time},|g" "${case_file}"
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
     [ ! -f ${job_path}/.gitignore ] && echo "*.sh" > ${job_path}/.gitignore
@@ -199,26 +202,18 @@ create_case ${experiment}  64  16  16 "${cluster}" 2 800
 # Large
 create_case ${experiment} 128  32  32 "${cluster}" 2 100
 create_case ${experiment} 128  32  32 "${cluster}" 2 200
-create_case ${experiment} 128  32  32 "${cluster}" 2 400
-create_case ${experiment} 128  32  32 "${cluster}" 2 800
 
 # Four node runs with different mesh sizes and memory settings
 # Large
 create_case ${experiment} 128  32  32 "${cluster}" 4 100
 create_case ${experiment} 128  32  32 "${cluster}" 4 200
 create_case ${experiment} 128  32  32 "${cluster}" 4 400
-create_case ${experiment} 128  32  32 "${cluster}" 4 800
 
 # Extra large
 create_case ${experiment} 256  32  32 "${cluster}" 4 100
 create_case ${experiment} 256  32  32 "${cluster}" 4 200
-create_case ${experiment} 256  32  32 "${cluster}" 4 400
-create_case ${experiment} 256  32  32 "${cluster}" 4 800
 
 create_case ${experiment} 128  64  64 "${cluster}" 4 100
-create_case ${experiment} 128  64  64 "${cluster}" 4 200
-create_case ${experiment} 128  64  64 "${cluster}" 4 400
-create_case ${experiment} 128  64  64 "${cluster}" 4 800
 
 # Eight node runs with different mesh sizes and memory settings
 # Large
@@ -231,14 +226,49 @@ create_case ${experiment} 128  32  32 "${cluster}" 8 800
 create_case ${experiment} 256  32  32 "${cluster}" 8 100
 create_case ${experiment} 256  32  32 "${cluster}" 8 200
 create_case ${experiment} 256  32  32 "${cluster}" 8 400
-create_case ${experiment} 256  32  32 "${cluster}" 8 800
 
 create_case ${experiment} 128  64  64 "${cluster}" 8 100
 create_case ${experiment} 128  64  64 "${cluster}" 8 200
-create_case ${experiment} 128  64  64 "${cluster}" 8 400
-create_case ${experiment} 128  64  64 "${cluster}" 8 800
 
 create_case ${experiment} 256  64  64 "${cluster}" 8 100
-create_case ${experiment} 256  64  64 "${cluster}" 8 200
-create_case ${experiment} 256  64  64 "${cluster}" 8 400
-create_case ${experiment} 256  64  64 "${cluster}" 8 800
+
+experiment="run_time_test_1s"
+# Two node runs with different mesh sizes and memory settings
+# Medium
+create_case ${experiment}  64  16  16 "${cluster}" 2 100 false 1.0
+create_case ${experiment}  64  16  16 "${cluster}" 2 200 false 1.0
+create_case ${experiment}  64  16  16 "${cluster}" 2 400 false 1.0
+create_case ${experiment}  64  16  16 "${cluster}" 2 800 false 1.0
+
+# Large
+create_case ${experiment} 128  32  32 "${cluster}" 2 100 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 2 200 false 1.0
+
+# Four node runs with different mesh sizes and memory settings
+# Large
+create_case ${experiment} 128  32  32 "${cluster}" 4 100 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 4 200 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 4 400 false 1.0
+
+# Extra large
+create_case ${experiment} 256  32  32 "${cluster}" 4 100 false 1.0
+create_case ${experiment} 256  32  32 "${cluster}" 4 200 false 1.0
+
+create_case ${experiment} 128  64  64 "${cluster}" 4 100 false 1.0
+
+# Eight node runs with different mesh sizes and memory settings
+# Large
+create_case ${experiment} 128  32  32 "${cluster}" 8 100 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 8 200 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 8 400 false 1.0
+create_case ${experiment} 128  32  32 "${cluster}" 8 800 false 1.0
+
+# Extra large
+create_case ${experiment} 256  32  32 "${cluster}" 8 100 false 1.0
+create_case ${experiment} 256  32  32 "${cluster}" 8 200 false 1.0
+create_case ${experiment} 256  32  32 "${cluster}" 8 400 false 1.0
+
+create_case ${experiment} 128  64  64 "${cluster}" 8 100 false 1.0
+create_case ${experiment} 128  64  64 "${cluster}" 8 200 false 1.0
+
+create_case ${experiment} 256  64  64 "${cluster}" 8 100 false 1.0
