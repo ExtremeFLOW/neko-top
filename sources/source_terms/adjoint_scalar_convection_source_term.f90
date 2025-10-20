@@ -136,14 +136,15 @@ contains
        f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
-    type(field_list_t) :: fields
-    type(coef_t) :: coef
+    type(field_t), intent(in), target :: s, s_adj
+    type(coef_t), intent(in), target :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
+
+    type(field_list_t) :: fields
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    type(field_t), intent(in), target :: s, s_adj
     integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
@@ -194,6 +195,13 @@ contains
     call this%fld_GL%free()
     call this%s_GL%free()
     call this%s_adj_GL%free()
+    nullify(this%s_adj)
+    nullify(this%s)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
+
   end subroutine adjoint_scalar_convection_source_term_free
 
   !> Computes the source term and adds the result to `fields`.

@@ -110,6 +110,7 @@ contains
     integer :: precision
     integer :: n_scalars_primal, n_scalars_adjoint, i
     logical :: scalar = .false.
+    logical :: temperature_found = .false.
 
     ! extra things for json
     type(json_file) :: ic_json, numerics_params
@@ -276,11 +277,20 @@ contains
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(&
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
-                  string_val, ic_json)
+             if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+                  'temperature') then
+                call set_scalar_ic(&
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
+                     string_val, ic_json, 0)
+             else
+                call set_scalar_ic(&
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
+                     string_val, ic_json, 1)
+             end if
           else
              call neko_error("user ICs not implemented for adjoint scalar")
              ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
@@ -301,11 +311,31 @@ contains
                   'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(&
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
-                     string_val, json_subdict)
+                if (trim(neko_case%scalars%scalar_fields(i)%name) .eq. &
+                     'temperature') then
+                   call set_scalar_ic(&
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                        string_val, json_subdict, 0)
+                   temperature_found = .true.
+                else
+                   if (temperature_found) then
+                      ! if temperature is found, scalars start from index 1
+                      call set_scalar_ic(&
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                           string_val, json_subdict, i - 1)
+                   else
+                      ! if temperature is not found, scalars start from index 0
+                      call set_scalar_ic(&
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                           string_val, json_subdict, i)
+                   end if
+                end if
              else
                 call neko_error("user ICs not implemented for adjoint scalar")
              end if
