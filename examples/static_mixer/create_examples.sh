@@ -35,15 +35,16 @@ for pe in ${Pe[@]}; do
             sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/petsc/cache_${n}_\",|g" ${case_file}
 
             if [ "$re" == 1 ]; then
-                sed -i "s|\"limits\": .*|\"limits\": [0.0, 5000.0],|g" ${case_file}
-            else
                 sed -i "s|\"limits\": .*|\"limits\": [0.0, 1000.0],|g" ${case_file}
+            else
+                sed -i "s|\"limits\": .*|\"limits\": [0.0, 500.0],|g" ${case_file}
             fi
 
             if [[ "$1" == "mesh" && ! -f "${cache_file}" ]]; then
+                end_time=$(grep -oP '"end_time": \K[0-9.eE+-]+' ${case_file})
                 sed -i "s|\"end_time\": .*|\"end_time\": 1e-3,|g" ${case_file}
                 ./run.sh -c static_mixer/petsc/${n}_re_${re}_pe_${pe}.case
-                sed -i "s|\"end_time\": .*|\"end_time\": 30.0,|g" ${case_file}
+                sed -i "s|\"end_time\": .*|\"end_time\": ${end_time},|g" ${case_file}
             fi
 
             if [ ! -f "${cache_file}" ]; then
