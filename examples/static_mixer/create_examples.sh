@@ -8,7 +8,7 @@ example_path=examples/static_mixer
 
 find $example_path/petsc -name "*.case" -type f -delete
 
-N=(8 16 32 64 128 256 512 1024 2048 4096)
+N=(64 128 256 512 1024 2048 4096)
 Pe=(500)
 Re=(1 500)
 
