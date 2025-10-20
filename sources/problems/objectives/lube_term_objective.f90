@@ -69,7 +69,7 @@ module lube_term_objective
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
-  use scratch_registry, only: neko_scratch_registry
+  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
@@ -80,8 +80,6 @@ module lube_term_objective
   use space, only: space_t, GL
   use coefs, only: coef_t
   use math, only: glsc2, copy, col2, invcol2
-  use vector, only: vector_t
-  use vector_math, only: vector_cmult, vector_col3, vector_addcol3
   use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
@@ -121,8 +119,8 @@ module lube_term_objective
      type(coef_t), pointer :: c_Xh_GL
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
-     !> work arrays
-     type(vector_t) :: accumulate, fld_GL
+     !> GL scratch registry
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
 
@@ -192,7 +190,6 @@ contains
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
     type(adjoint_lube_source_term_t) :: lube_term
-    integer :: n_GL, nel
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
@@ -226,13 +223,7 @@ contains
     ! GLL to GL
     this%GLL_to_GL => simulation%adjoint_case%fluid_adj%GLL_to_GL
 
-    if (this%dealias_sensitivity) then
-       ! allocate work arrays for dealiasing
-       nel = this%c_Xh_GLL%msh%nelv
-       n_GL = nel * this%Xh_GL%lxyz
-       call this%accumulate%init(n_GL)
-       call this%fld_GL%init(n_GL)
-    end if
+    this%scratch_GL => simulation%adjoint_case%fluid_adj%scratch_GL
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
@@ -250,7 +241,8 @@ contains
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing, this%volume)
+           this%dealias_forcing, this%volume, &
+           this%scratch_GL)
 
     end associate
 
@@ -276,8 +268,7 @@ contains
     nullify(this%Xh_GL)
     nullify(this%Xh_GLL)
     nullify(this%GLL_to_GL)
-    call this%accumulate%free()
-    call this%fld_GL%free()
+    nullify(this%scratch_GL)
 
   end subroutine lube_term_free
 
@@ -330,6 +321,8 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
     integer :: n_GL, nel
+    type(field_t), pointer :: accumulate, fld_GL
+    integer :: temp_indices_GL(2)
 
     ! if we have the lube term we also get an extra term in the sensitivity
 
@@ -338,26 +331,30 @@ contains
     if(this%dealias_sensitivity) then
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
 
-       call this%GLL_to_GL%map(this%fld_GL%x, this%u%x, nel, this%Xh_GL)
-       call vector_col3(this%accumulate, this%fld_GL, this%fld_GL)
-       call this%GLL_to_GL%map(this%fld_GL%x, this%v%x, nel, this%Xh_GL)
-       call vector_addcol3(this%accumulate, this%fld_GL, this%fld_GL)
-       call this%GLL_to_GL%map(this%fld_GL%x, this%w%x, nel, this%Xh_GL)
-       call vector_addcol3(this%accumulate, this%fld_GL, this%fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
+       call field_col3(accumulate, fld_GL, fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
+       call field_addcol3(accumulate, fld_GL, fld_GL)
+       call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+       call field_addcol3(accumulate, fld_GL, fld_GL)
        ! scale
-       call vector_cmult(this%accumulate, this%weight * 0.5_rp / this%volume)
+       call field_cmult(accumulate, this%weight * 0.5_rp / this%volume)
 
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%c_Xh_GLL%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%c_Xh_GLL%B, work%size())
        end if
+
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
 
     else
        call field_col3(work, this%u, this%u)

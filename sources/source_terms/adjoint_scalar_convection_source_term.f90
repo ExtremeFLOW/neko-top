@@ -50,7 +50,6 @@ module adjoint_scalar_convection_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
-  use vector, only: vector_t
   implicit none
   private
 

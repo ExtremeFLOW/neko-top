@@ -49,7 +49,6 @@ module simple_brinkman_source_term
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
   use scratch_registry, only: scratch_registry_t, neko_scratch_registry
-  use vector, only: vector_t
   use device
   implicit none
   private
@@ -134,11 +133,11 @@ contains
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
-    type(scratch_registry_t), intent(in), target :: scratch_GL
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
+    type(scratch_registry_t), intent(in), target :: scratch_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -209,11 +208,12 @@ contains
     call neko_scratch_registry%request_field(work, temp_indices(1))
 
     if (this%dealias) then
+       nel = this%coef%msh%nelv
+       n_GL = nel * this%Xh_GL%lxyz
        call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
        call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
        call this%scratch_GL%request_field(chi_GL, temp_indices_GL(3))
-       nel = this%coef%msh%nelv
-       n_GL = nel * this%Xh_GL%lxyz
+
        call this%GLL_to_GL%map(chi_GL%x, this%chi%x, nel, this%Xh_GL)
 
        ! u
