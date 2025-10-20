@@ -230,15 +230,15 @@ contains
        ! u
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdx, &
             this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
-       call field_col3(this%accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fu, work)
@@ -246,15 +246,15 @@ contains
        ! v
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdy, &
             this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
-       call field_col3(this%accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fv, work)
@@ -262,15 +262,15 @@ contains
        ! w
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdz, &
             this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
-       call field_col3(this%accumulate, s_adj_GL, fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fw, work)
