@@ -317,6 +317,8 @@ contains
        end if
        call field_add2(fw, work)
 
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
+
     else
        ! multiple and add the RHS
        call field_addcol3(fu, this%u, work)
