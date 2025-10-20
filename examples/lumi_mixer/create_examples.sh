@@ -240,11 +240,26 @@ create_case ${experiment}  64  16  16 "${cluster}" 2 200 false 1.0
 create_case ${experiment}  64  16  16 "${cluster}" 2 400 false 1.0
 create_case ${experiment}  64  16  16 "${cluster}" 2 800 false 1.0
 
+create_case ${experiment} 128  16  16 "${cluster}" 2 100 false 1.0
+create_case ${experiment} 128  16  16 "${cluster}" 2 200 false 1.0
+create_case ${experiment} 128  16  16 "${cluster}" 2 400 false 1.0
+create_case ${experiment} 128  16  16 "${cluster}" 2 800 false 1.0
+
+create_case ${experiment}  64  32  32 "${cluster}" 2 100 false 1.0
+create_case ${experiment}  64  32  32 "${cluster}" 2 200 false 1.0
+create_case ${experiment}  64  32  32 "${cluster}" 2 400 false 1.0
+
 # Large
 create_case ${experiment} 128  32  32 "${cluster}" 2 100 false 1.0
 create_case ${experiment} 128  32  32 "${cluster}" 2 200 false 1.0
 
 # Four node runs with different mesh sizes and memory settings
+# Medium
+create_case ${experiment} 64  32  32 "${cluster}" 4 100 false 1.0
+create_case ${experiment} 64  32  32 "${cluster}" 4 200 false 1.0
+create_case ${experiment} 64  32  32 "${cluster}" 4 400 false 1.0
+create_case ${experiment} 64  32  32 "${cluster}" 4 800 false 1.0
+
 # Large
 create_case ${experiment} 128  32  32 "${cluster}" 4 100 false 1.0
 create_case ${experiment} 128  32  32 "${cluster}" 4 200 false 1.0
