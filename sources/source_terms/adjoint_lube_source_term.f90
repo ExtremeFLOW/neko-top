@@ -171,7 +171,6 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields
-    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...

@@ -149,7 +149,6 @@ contains
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias
-    integer :: nel, n_GL
 
     call this%init_base(name, design%size(), weight, mask_name)
 
