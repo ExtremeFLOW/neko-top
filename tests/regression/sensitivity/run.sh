@@ -28,7 +28,7 @@ WORKING_DIR=$(dirname "$0")
 cd "$WORKING_DIR" || exit 1
 
 # Handle options
-N=10
+N=8
 NP=4
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
