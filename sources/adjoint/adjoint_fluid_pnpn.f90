@@ -88,12 +88,14 @@ module adjoint_fluid_pnpn
   use time_state, only: time_state_t
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult
+  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
+  use scratch_registry, only: neko_scratch_registry
+  use operators, only : opgrad, curl
 
   implicit none
   private
@@ -680,6 +682,9 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, chi
+    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
+    integer :: temp_indices(11)
 
     if (this%freeze) return
 
@@ -753,6 +758,103 @@ contains
       ! Update material properties if necessary
       call this%update_material_properties(time)
 
+      ! Compute velocity residual.
+
+      !------------------------------------------------------------------------!
+      ! Compute the additional RHS contributions due to the discrete adjoint
+      ! Karniadakis scheme
+      call neko_scratch_registry%request_field(ta1, temp_indices(1))
+      call neko_scratch_registry%request_field(ta2, temp_indices(2))
+      call neko_scratch_registry%request_field(ta3, temp_indices(3))
+      call neko_scratch_registry%request_field(wa1, temp_indices(4))
+      call neko_scratch_registry%request_field(wa2, temp_indices(5))
+      call neko_scratch_registry%request_field(wa3, temp_indices(6))
+      call neko_scratch_registry%request_field(work1, temp_indices(7))
+      call neko_scratch_registry%request_field(work2, temp_indices(8))
+      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(9))
+      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(10))
+      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
+
+      ! gradient of adjoint pressure (explicit)
+      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, p_adj%x, c_Xh)
+
+      ! adjoint advection operator
+      call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
+              f_x, f_y, f_z, &
+              Xh, c_Xh, dm_Xh%size())
+
+      ! 1/dt (NOTE, I'm not 100% sure about rho)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("not implemented")
+      else
+         call addcol3s2(f_x%x, dx_p_adj%x, c_Xh%B, 1.0_rp / dt, f_x%size())
+         call addcol3s2(f_y%x, dy_p_adj%x, c_Xh%B, 1.0_rp / dt, f_y%size())
+         call addcol3s2(f_z%x, dz_p_adj%x, c_Xh%B, 1.0_rp / dt, f_z%size())
+      end if
+
+      ! curl curl
+      ! (NOTE, not 100% sure about adjoint consistency with the gsop)
+      call curl(ta1, ta2, ta3, dx_p_adj, dy_p_adj, dz_p_adj, work1, work2, c_Xh)
+      call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("not implemented")
+      else
+         call subcol3(f_x%x, wa1%x, c_Xh%B, f_x%size())
+         call subcol3(f_y%x, wa2%x, c_Xh%B, f_y%size())
+         call subcol3(f_z%x, wa3%x, c_Xh%B, f_z%size())
+      end if
+
+      ! Brinkman
+      ! damn... this one is hidden in a source term, be we can get it from the
+      ! registry, not ideal, but ok until we find a better solution.
+      ! also... this one needs over integration :/
+      chi => neko_field_registry%get_field("brinkman_amplitude")
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("not implemented")
+      else
+         call subcol4(f_x%x, chi%x, dx_p_adj%x, c_Xh%B, f_x%size())
+         call subcol4(f_y%x, chi%x, dy_p_adj%x, c_Xh%B, f_y%size())
+         call subcol4(f_z%x, chi%x, dz_p_adj%x, c_Xh%B, f_z%size())
+      end if
+
+      call neko_scratch_registry%relinquish_field(temp_indices)
+      !------------------------------------------------------------------------!
+
+
+      call profiler_start_region('Adjoint_velocity_residual')
+      call vel_res%compute(Ax_vel, u, v, w, &
+           u_res, v_res, w_res, &
+           p, &
+           f_x, f_y, f_z, &
+           c_Xh, msh, Xh, &
+           mu, rho, ext_bdf%diffusion_coeffs(1), &
+           dt, dm_Xh%size())
+
+      call gs_Xh%op(u_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(v_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(w_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! Set residual to zero at strong velocity boundaries.
+      call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
+
+
+      call profiler_end_region('Adjoint_velocity_residual')
+
+      call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, &
+           tstep, c_Xh, n, dt_controller, 'Velocity')
+
+      call this%pc_vel%update()
+
+      call profiler_start_region("Adjoint_velocity_solve")
+      ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
+           u_res%x, v_res%x, w_res%x, n, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
+           this%ksp_vel%max_iter)
+      call profiler_end_region("Adjoint_velocity_solve")
+
       ! Compute pressure residual.
       call profiler_start_region('Adjoint_pressure_residual')
 
@@ -799,41 +901,6 @@ contains
       ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
       if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
-
-      ! Compute velocity residual.
-      call profiler_start_region('Adjoint_velocity_residual')
-      call vel_res%compute(Ax_vel, u, v, w, &
-           u_res, v_res, w_res, &
-           p, &
-           f_x, f_y, f_z, &
-           c_Xh, msh, Xh, &
-           mu, rho, ext_bdf%diffusion_coeffs(1), &
-           dt, dm_Xh%size())
-
-      call gs_Xh%op(u_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(v_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(w_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-
-      ! Set residual to zero at strong velocity boundaries.
-      call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
-
-
-      call profiler_end_region('Adjoint_velocity_residual')
-
-      call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, &
-           tstep, c_Xh, n, dt_controller, 'Velocity')
-
-      call this%pc_vel%update()
-
-      call profiler_start_region("Adjoint_velocity_solve")
-      ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
-           u_res%x, v_res%x, w_res%x, n, c_Xh, &
-           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
-           this%ksp_vel%max_iter)
-      call profiler_end_region("Adjoint_velocity_solve")
 
       ksp_results(1)%name = 'Adjoint Pressure'
       ksp_results(2)%name = 'Adjoint Velocity U'
