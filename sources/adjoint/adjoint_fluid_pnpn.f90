@@ -776,7 +776,7 @@ contains
       call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
 
       ! gradient of adjoint pressure (explicit)
-      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, p_adj%x, c_Xh)
+      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
 
       ! adjoint advection operator
       call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
