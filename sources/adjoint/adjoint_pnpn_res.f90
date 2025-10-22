@@ -51,10 +51,10 @@ module adjoint_pnpn_residual
   end type adjoint_pnpn_prs_res_t
 
   !> Abstract type to compute velocity residual
-  type, public, abstract :: adjoint_pnpn_prs_res_t
+  type, public, abstract :: adjoint_pnpn_vel_res_t
    contains
      procedure(adjoint_vel_res), nopass, deferred :: compute
-  end type adjoint_pnpn_prs_res_t
+  end type adjoint_pnpn_vel_res_t
 
   abstract interface
      subroutine adjoint_prs_res(p, p_res, u, v, w, u_e, v_e, w_e, f_x, f_y, f_z, c_xh,&
@@ -126,7 +126,7 @@ module adjoint_pnpn_residual
      !! @details Only selects the compute backend.
      !! @param object The object to be allocated by the factory.
      module subroutine adjoint_pnpn_vel_res_factory(object)
-       class(adjoint_pnpn_prs_res_t), allocatable, intent(inout) :: object
+       class(adjoint_pnpn_vel_res_t), allocatable, intent(inout) :: object
      end subroutine adjoint_pnpn_vel_res_factory
 
   end interface

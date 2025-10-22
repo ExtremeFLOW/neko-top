@@ -39,9 +39,8 @@ module adjoint_fluid_pnpn
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
-  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t, &
-       pnpn_prs_res_factory, pnpn_vel_res_factory, &
-       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
+  use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t, &
+       adjoint_pnpn_prs_res_factory, adjoint_pnpn_vel_res_factory
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
@@ -177,10 +176,10 @@ module adjoint_fluid_pnpn
      type(field_t) :: advx, advy, advz
 
      !> Pressure residual equation for computing `p_res`.
-     class(pnpn_prs_res_t), allocatable :: prs_res
+     class(adjoint_pnpn_prs_res_t), allocatable :: prs_res
 
      !> Velocity residual equation for computing `u_res`, `v_res`, `w_res`.
-     class(pnpn_vel_res_t), allocatable :: vel_res
+     class(adjoint_pnpn_vel_res_t), allocatable :: vel_res
 
      !> Summation of AB/BDF contributions
      class(rhs_maker_sumab_t), allocatable :: sumab
@@ -334,10 +333,10 @@ contains
        call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
 
        ! Setup backend dependent prs residual routines
-       call pnpn_prs_res_factory(this%prs_res)
+       call adjoint_pnpn_prs_res_factory(this%prs_res)
 
        ! Setup backend dependent vel residual routines
-       call pnpn_vel_res_factory(this%vel_res)
+       call adjoint_pnpn_vel_res_factory(this%vel_res)
     end if
 
     if (params%valid_path('case.fluid.nut_field')) then

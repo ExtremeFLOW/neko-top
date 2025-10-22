@@ -6,7 +6,7 @@ module adjoint_pnpn_res_cpu
   use ax_product, only : ax_t
   use coefs, only : coef_t
   use facet_normal, only : facet_normal_t
-  use pnpn_residual, only : pnpn_prs_res_t, pnpn_vel_res_t
+  use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t
   use scratch_registry, only: neko_scratch_registry
   use mesh, only : mesh_t
   use num_types, only : rp
@@ -16,12 +16,12 @@ module adjoint_pnpn_res_cpu
   implicit none
   private
 
-  type, public, extends(pnpn_prs_res_t) :: adjoint_pnpn_prs_res_cpu_t
+  type, public, extends(adjoint_pnpn_prs_res_t) :: adjoint_pnpn_prs_res_cpu_t
    contains
      procedure, nopass :: compute => adjoint_pnpn_prs_res_cpu_compute
   end type adjoint_pnpn_prs_res_cpu_t
 
-  type, public, extends(pnpn_vel_res_t) :: adjoint_pnpn_vel_res_cpu_t
+  type, public, extends(adjoint_pnpn_vel_res_t) :: adjoint_pnpn_vel_res_cpu_t
    contains
      procedure, nopass :: compute => adjoint_pnpn_vel_res_cpu_compute
   end type adjoint_pnpn_vel_res_cpu_t
