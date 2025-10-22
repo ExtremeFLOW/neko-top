@@ -19,4 +19,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_pnpn_bc_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalars.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res_fctry.f90
 )
