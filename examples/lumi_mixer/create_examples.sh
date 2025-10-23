@@ -143,6 +143,7 @@ create_case ${experiment}  64  32  32 "${cluster}"   2 400
 create_case ${experiment} 128  32  32 "${cluster}"   4 400
 create_case ${experiment} 256  32  32 "${cluster}"   8 400
 create_case ${experiment} 128  64  64 "${cluster}"  16 400
+create_case ${experiment} 256  64  64 "${cluster}"  32 400
 
 experiment="weak_scaling_200"
 create_case ${experiment}  64  32  32 "${cluster}"  1 200
@@ -150,33 +151,35 @@ create_case ${experiment} 128  32  32 "${cluster}"  2 200
 create_case ${experiment} 256  32  32 "${cluster}"  4 200
 create_case ${experiment} 128  64  64 "${cluster}"  8 200
 create_case ${experiment} 256  64  64 "${cluster}" 16 200
+create_case ${experiment} 512  64  64 "${cluster}" 32 200
 
 experiment="weak_scaling_100"
 create_case ${experiment} 128  32  32 "${cluster}"  1 100
 create_case ${experiment} 256  32  32 "${cluster}"  2 100
 create_case ${experiment} 128  64  64 "${cluster}"  4 100
 create_case ${experiment} 256  64  64 "${cluster}"  8 100
-# create_case ${experiment} 512  64  64 "${cluster}" 16 100 # Dies on IO
+create_case ${experiment} 512  64  64 "${cluster}" 16 100
+create_case ${experiment} 256 128 128 "${cluster}" 32 100
 
 experiment="weak_scaling"
-create_case ${experiment}  256   32   32 "${cluster}"   2 100 false 1.0
-create_case ${experiment}  256   32   32 "${cluster}"   4 200 false 1.0
-create_case ${experiment}  128   64   64 "${cluster}"   4 100 false 1.0
-create_case ${experiment}  128   64   64 "${cluster}"   8 200 false 1.0
-create_case ${experiment}  256   64   64 "${cluster}"   8 100 false 1.0
-create_case ${experiment}  256   64   64 "${cluster}"  16 200 false 1.0
-create_case ${experiment}  512   64   64 "${cluster}"  16 100 false 1.0
-create_case ${experiment}  512   64   64 "${cluster}"  32 200 false 1.0
-create_case ${experiment}  256  128  128 "${cluster}"  32 100 false 1.0
+create_case ${experiment}  256   32   32 "${cluster}"   2 100
+create_case ${experiment}  256   32   32 "${cluster}"   4 200
+create_case ${experiment}  128   64   64 "${cluster}"   4 100
+create_case ${experiment}  128   64   64 "${cluster}"   8 200
+create_case ${experiment}  256   64   64 "${cluster}"   8 100
+create_case ${experiment}  256   64   64 "${cluster}"  16 200
+create_case ${experiment}  512   64   64 "${cluster}"  16 100
+create_case ${experiment}  512   64   64 "${cluster}"  32 200
+create_case ${experiment}  256  128  128 "${cluster}"  32 100
 
-# experiment="strong_scaling_small"
-# create_case ${experiment} 128  32  32 "${cluster}" 1
-# create_case ${experiment} 128  32  32 "${cluster}" 2
-# create_case ${experiment} 128  32  32 "${cluster}" 4
-# create_case ${experiment} 128  32  32 "${cluster}" 8
-# create_case ${experiment} 128  32  32 "${cluster}" 16
-# create_case ${experiment} 128  32  32 "${cluster}" 32
-# create_case ${experiment} 128  32  32 "${cluster}" 64
+experiment="strong_scaling_small"
+create_case ${experiment} 128  32  32 "${cluster}" 1  100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 2  100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 4  100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 8  100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 16 100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 32 100 false 0.5
+create_case ${experiment} 128  32  32 "${cluster}" 64 100 false 0.5
 
 # experiment="strong_scaling_large"
 # create_case ${experiment} 1024 256 256 "${cluster}" 16
