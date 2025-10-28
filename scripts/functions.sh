@@ -228,10 +228,6 @@ function cleanup {
     [ -d $results ] && rm -fr $results/*
     mkdir -p $results
 
-    # Remove the data link if it exists
-    [ -L data ] && rm data
-    [ -L data_local ] && rm data_local
-
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
     for nek in $(find ./ -name "*.nek5000"); do
@@ -268,8 +264,9 @@ function cleanup {
         ./ $results
 
     # Remove all but the log files
-    find ./ -type d -empty -delete
+    find ./ -type l -delete
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
+    find ./ -type d -empty -delete
 
     # ------------------------------------------------------------------------ #
     # Last minute checks
