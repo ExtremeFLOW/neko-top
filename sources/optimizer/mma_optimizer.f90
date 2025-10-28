@@ -223,7 +223,7 @@ contains
 
        call profiler_start_region("MMA KKT computation")
        call this%mma%KKT(x, objective_sensitivities, &
-       constraint_value, constraint_sensitivities)
+            constraint_value, constraint_sensitivities)
        call profiler_end_region("MMA KKT computation")
 
        call profiler_end_region("Optimizer iteration")

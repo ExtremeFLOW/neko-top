@@ -246,10 +246,11 @@ contains
        do i = this%n_timesteps, 1, -1
           call this%chkp_output%set_counter(i)
           file_name = this%chkp_output%file_%get_fname()
-          inquire(file=trim(file_name), exist=exists)
+          inquire(file = trim(file_name), exist = exists)
           if (exists) then
-             open(newunit=unit, file=trim(file_name), iostat=stat, status='old')
-             if (stat == 0) close(unit, status='delete')
+             open(newunit = unit, file = trim(file_name), iostat = stat, &
+                  status='old')
+             if (stat .eq. 0) close(unit, status = 'delete')
           end if
        end do
     end if
