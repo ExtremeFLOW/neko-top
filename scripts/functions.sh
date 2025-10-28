@@ -27,6 +27,7 @@ function run {
     # Set up the environment and find neko
     prepare 2>error.log || return 1
     rm -fr error.log && touch error.log
+
     if [ -s ./error.log ]; then
         printf "ERROR: An error occured during preparation.\n"
         printf "See error.log for details.\n"
@@ -230,7 +231,6 @@ function cleanup {
 
     # Remove the data link if it exists
     [ -L data ] && rm data
-    [ -L data_local ] && rm data_local
 
     # Move all the nek5000 files to the results folder.
     printf "Archiving nek5000 files.\n"
@@ -249,17 +249,8 @@ function cleanup {
     # Move all the Checkpoint files to the results folder.
     printf "Archiving chkp files.\n"
     if [ -n "$(find ./ -name "*.chkp" -print)" ]; then
-        mkdir -p checkpoints
-        mv -t checkpoints *.chkp
-    fi
-    if [ -n "$(find ./ -name "*.h5" -print)" ]; then
-        mkdir -p checkpoints
-        mv -t checkpoints *.h5
-    fi
-
-    if [ -s ./error.log ]; then
-        printf >&2 "ERROR: An error occurred during archiving.\n"
-        return 1
+        mkdir -p $results/checkpoints
+        find ./ -name "*.chkp" -execdir mv {} $results/checkpoints/ \;
     fi
 
     # Move all files which are not the error or executable files to the log
@@ -272,7 +263,6 @@ function cleanup {
         ./ $results
 
     # Remove all but the log files
-    find ./ -type d -empty -delete
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete
 
     # ------------------------------------------------------------------------ #

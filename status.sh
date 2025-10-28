@@ -40,7 +40,7 @@ done
 # Print status
 
 # List all the tests, if there are none we return
-tests=($(find -L $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
+tests=($(find $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
 for ((i = 0; i < ${#tests[@]}; i++)); do tests[$i]="${tests[$i]#$LPATH/}"; done
 
 if [ ${#tests[@]} -eq 0 ]; then
@@ -54,7 +54,7 @@ if [ $(which bjobs 2>/dev/null) ]; then
     bjobs -ro -noheader "time_left:8 job_name"
 elif [ $(which squeue 2>/dev/null) ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
-    squeue -rho "%.10t %9L %j" --me
+    squeue -ro "%.8L %j" -u $USER
 fi
 
 printf "\n\e[4mTest status.\e[m\n"
@@ -62,7 +62,6 @@ printf "\n\e[4mTest status.\e[m\n"
 for test in ${tests[@]}; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
-        rm -rf $LPATH/$test
     fi
 done
 

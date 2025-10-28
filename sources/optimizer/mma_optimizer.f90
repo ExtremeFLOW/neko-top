@@ -143,6 +143,8 @@ contains
 
     type(vector_t) :: log_data
 
+    call profiler_start_region("Optimizer iteration 0")
+
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
@@ -159,7 +161,6 @@ contains
        print *, "max_iterations for the optimization loop = ", &
             this%max_iterations
     end if
-    call profiler_start_region("Optimizer iteration")
 
     call problem%compute(design, simulation)
     call problem%compute_sensitivity(design, simulation)
@@ -168,11 +169,9 @@ contains
     call problem%get_constraint_values(constraint_value)
     call problem%get_objective_sensitivities(objective_sensitivities)
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-
-    call profiler_end_region("Optimizer iteration")
+    call problem%get_all_objective_values(all_objectives)
 
     ! Stamp the initial condition
-    call problem%get_all_objective_values(all_objectives)
     call mma_logger_assemble_data(log_data, 0, objective_value, &
          all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
          problem%get_n_objectives(), problem%get_n_constraints())
@@ -180,11 +179,10 @@ contains
 
     if (present(simulation)) call simulation%write(0)
     call design%write(0)
+    call profiler_end_region("Optimizer iteration 0")
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
-
-       call design%get_values(x)
 
        call profiler_start_region("Optimizer iteration")
 
@@ -194,6 +192,8 @@ contains
        else
           scaling_factor = abs(this%scale)
        end if
+
+       call design%get_values(x)
 
        call vector_cmult(constraint_value, scaling_factor)
 
@@ -220,16 +220,14 @@ contains
        call problem%get_constraint_values(constraint_value)
        call problem%get_objective_sensitivities(objective_sensitivities)
        call problem%get_constraint_sensitivities(constraint_sensitivities)
+       call problem%get_all_objective_values(all_objectives)
 
        call profiler_start_region("MMA KKT computation")
        call this%mma%KKT(x, objective_sensitivities, &
-       constraint_value, constraint_sensitivities)
+            constraint_value, constraint_sensitivities)
        call profiler_end_region("MMA KKT computation")
 
-       call profiler_end_region("Optimizer iteration")
-
        ! Stamp the i^th iteration
-       call problem%get_all_objective_values(all_objectives)
        call mma_logger_assemble_data(log_data, iter, objective_value, &
             all_objectives, constraint_value, this%mma%get_residumax(), &
             this%mma%get_residunorm(), scaling_factor, &
@@ -239,6 +237,7 @@ contains
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
 
+       call profiler_end_region("Optimizer iteration")
     end do
 
     call this%validate(problem, design)

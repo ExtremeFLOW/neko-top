@@ -34,7 +34,7 @@ submodule (mma) mma_device
 
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
-       device_sub2, device_sub3, device_add2s2, device_cadd2, &
+       device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax2, &
        device_glsum, device_cmult2, device_pwmax2
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &

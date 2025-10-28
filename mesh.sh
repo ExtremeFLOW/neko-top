@@ -56,15 +56,14 @@ ALL=false      # Run all meshing
 KEEP=false     # Keep logs and temporaries
 REMESH=false   # Do complete remesh
 DIMENSION=2    # Dimension of GMSH file
-PREPART=0      # Pre-partition the mesh
 BOX=false      # Create a box mesh
 OUTPUT_FILE="" # Output file for the mesh
 OUTPUT_PATH="" # Path to the output meshes
 INPUT_PATH=""  # Path to the input files
 
 # List possible options
-OPTIONS=help,all,keep,remesh,file:,dimension:,box,input:,output:,prepart:
-OPT=h,a,k,r,f:,d:,b,i:,o:,p:
+OPTIONS=help,all,keep,remesh,file,dimension:,box,input:,output:
+OPT=h,a,k,r,f,d:,b,i:,o:
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -83,8 +82,6 @@ while true; do
     "-i" | "--input") INPUT_PATH="$2" && shift 2 ;;   # Input path for the mesh files
     "-o" | "--output") OUTPUT_PATH="$2" && shift 2 ;; # Output path for the meshes
     "-f" | "--file") OUTPUT_FILE="$2" && shift 2 ;;   # Output file for the mesh
-
-    "-p" | "--prepart") PREPART="$2" && shift 2 ;;     # Prepart the mesh
 
     # End of options
     "--") shift && break ;;
@@ -119,7 +116,7 @@ export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
 # ============================================================================ #
 # Ensure executables are available
 
-[ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
+source $MAIN_DIR/prepare.env
 source $MAIN_DIR/scripts/dependencies.sh
 source $MAIN_DIR/scripts/meshing.sh
 
@@ -129,39 +126,32 @@ source $MAIN_DIR/scripts/meshing.sh
 if [ "$BOX" == "true" ]; then
     # Create the box mesh using Neko genmeshbox
     printf "\n\e[4mCreating box mesh.\e[0m\n"
-    find_neko $NEKO_DIR
+    mkdir -p $OUTPUT_PATH/box_mesh.tmp
+    cd $OUTPUT_PATH/box_mesh.tmp
 
-    [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="box.nmsh"
+    [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="$OUTPUT_PATH/box.nmsh"
 
-    if [[ ! -f "$OUTPUT_PATH/$OUTPUT_FILE" || $REMESH == "true" ]]; then
-
-        mkdir -p $OUTPUT_PATH/box_mesh.tmp
-        cd $OUTPUT_PATH/box_mesh.tmp
-
-        echo "Finding Neko in $NEKO_DIR"
-
-        if ! command -v genmeshbox &>/dev/null; then
-            echo "Error: genmeshbox command not found."
-            echo "Please ensure Neko is installed and the path is set correctly."
-            exit 1
-        fi
-        echo "genmeshbox $@"
-        genmeshbox $@ 1>box_mesh.log 2>error.log
-
-        if [ $? -ne 0 ]; then
-            echo "Error: Failed to create box mesh."
-            exit 1
-        fi
-
-        cp box.nmsh $OUTPUT_PATH/$OUTPUT_FILE
-        printf '  %-11s %-67s\n' "Box Mesh:" "Created in $OUTPUT_FILE"
-    else
+    if [[ -f "$OUTPUT_FILE" && $REMESH == "false" ]]; then
         printf '  %-11s %-67s\n' "Box Mesh:" "Already exists, skipping."
+        exit 0
     fi
 
-    if [[ $PREPART -gt 0 && ! -f $OUTPUT_PATH/${OUTPUT_FILE%.*}_$PREPART.nmsh ]]; then
-        prepart $OUTPUT_PATH/$OUTPUT_FILE $PREPART
+    find_neko $NEKO_DIR
+    if ! command -v genmeshbox &>/dev/null; then
+        echo "Error: genmeshbox command not found."
+        echo "Please ensure Neko is installed and the path is set correctly."
+        exit 1
     fi
+
+    genmeshbox $@ 1>box_mesh.log 2>error.log
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to create box mesh."
+        exit 1
+    fi
+
+    cp box.nmsh $OUTPUT_FILE
+    printf '  %-11s %-67s\n' "Box Mesh:" "Created in $OUTPUT_FILE"
 
     cd $CURRENT_DIR
 
@@ -178,17 +168,6 @@ SUPPORTED_TYPES=(".jou" ".e" ".exo" ".rea" ".re2" ".geo")
 file_list=""
 for input in $@; do
     [[ $ALL == "true" ]] && break
-
-    if [ -f "$input" ]; then
-        input="$(realpath $input)"
-        if [ -z "${input#"$INPUT_PATH"/}" ]; then
-            printf '  %-10s %-67s\n' "Not found in INPUT_PATH:" "$input"
-            continue
-        fi
-        file_list+="$input"
-        continue
-    fi
-
     input_name="$(basename $input)"
     input_dir=$(realpath $INPUT_PATH/$(dirname $input))
 
@@ -261,18 +240,8 @@ for input_file in $file_list; do
     "msh") msh2nbin $input_file 1>${input_name%.*}.log 2>error.log ;;
     esac
 
-    if [ $? -ne 0 ]; then
-        printf '  %-10s %-67s\n' "Error:" "Mesh not created: $input_file"
-        cd $CURRENT_DIR
-        continue
-    fi
+    cp *.nmsh -ft $OUTPUT_PATH/$input_dir
 
-    if [ -n "$OUTPUT_FILE" ]; then
-        mkdir -p $(dirname $OUTPUT_PATH/$OUTPUT_FILE)
-        cp -f $input_name.nmsh $OUTPUT_PATH/$OUTPUT_FILE
-    else
-        find -name "*.nmsh" -exec cp -t $OUTPUT_PATH/$input_dir {} \;
-    fi
     cd $CURRENT_DIR
 
     # Clean up the temporary files

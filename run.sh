@@ -1,4 +1,5 @@
 #!/bin/bash
+set +e # Do not exit on error
 # ============================================================================ #
 # Define the help function
 function help() {
@@ -58,12 +59,11 @@ CLEAN=false
 NEKO=false
 DELETE=false
 CLUSTER=""
-SEQUENTIAL=false
 DRY=false
 RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run
 OPT=a,c,h,n,s:,d,r
 
 # Parse the inputs for options
@@ -78,12 +78,9 @@ while true; do
     "-h" | "--help") help && exit ;;              # Print help
     "-n" | "--neko") NEKO=true && shift ;;        # Look for example in neko
     "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
-    "-s" | "--submit") CLUSTER="${2^^}" && shift 2 ;; # Submit to the queue
-    "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
-
-    # Long option with no short option
+    "-s" | "--submit") CLUSTER="$2" && shift 2 ;; # Submit to the queue
     "--dry-run") DRY=true && shift ;;             # Dry run
-    "--sequential") SEQUENTIAL=true && shift ;;   # Submit sequentially
+    "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
 
     # End of options
     "--") shift && break ;;
@@ -110,12 +107,10 @@ export DPATH="$MAIN_DIR/data"        # Official data
 export DLPATH="$MAIN_DIR/data_local" # Local data
 
 # Define the job script folder
-if [ -n "$CLUSTER" ]; then
+if [ ! -z "$CLUSTER" ]; then
     export HPATH="$MAIN_DIR/scripts/jobscripts/$CLUSTER" # Submission settings
-    if [ ! -d "$HPATH" ]; then
-        printf >&2 "\e[1;31mInvalid Cluster:\e[m $CLUSTER\n"
-        exit 1
-    fi
+else
+    export HPATH="$MAIN_DIR/scripts/jobscripts" # Submission settings
 fi
 
 [ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
@@ -125,13 +120,11 @@ if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
-    export HPATH="$HPATH/neko"
 fi
 
 # End of user inputs
 # ============================================================================ #
 # Find the examples to run
-set +e # Do not exit on error
 
 example_list=()
 for in in $@; do
@@ -217,7 +210,7 @@ for i in ${!example_list[@]}; do
     parent=$(dirname ${example%/*.*})
     while [ $parent != "." ]; do
 
-        if [[ -n "$(find $EPATH/$parent -maxdepth 1 -name '*.case' -or -name '*.json')" ]]; then
+        if [[ ! -z "$(find $EPATH/$parent -maxdepth 1 -name '*.case' -or -name '*.json')" ]]; then
 
             printf >&2 "\e[1;31mInvalid example file:\e[m\n"
             printf >&2 "$EPATH/$example\n"
@@ -304,7 +297,7 @@ function Submit() {
             printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$MN5_ACCOUNT"
+            ACCOUNT="-A $MN5_ACCOUNT"
         fi
 
     elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
@@ -314,28 +307,14 @@ function Submit() {
             printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$LUMI_ACCOUNT"
+            ACCOUNT="-A $LUMI_ACCOUNT"
         fi
     fi
 
     if [ -n "$(which bsub 2>/dev/null)" ]; then
         bsub -J $1 -env "all" <job_script.sh
     elif [ -n "$(which sbatch 2>/dev/null)" ]; then
-        if [ "$(squeue -h --name=$1 | wc -l)" -gt 0 ]; then
-            printf '\t%-12s %-s\n' "In queue:" "$1"
-            cd $CURRENT_DIR
-            return
-        fi
-        DEPENDENCY=""
-        if [ "$SEQUENTIAL" == true ]; then
-            job_list=$(squeue -ho "%i" -S "i" --me | tail -n 1)
-            if [ -n "$job_list" ]; then
-                DEPENDENCY="--dependency=afterany:$job_list"
-            else
-                DEPENDENCY=""
-            fi
-        fi
-        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh 1>/dev/null 2>error.log
+        sbatch -J $1 $ACCOUNT job_script.sh 1>/dev/null 2>error.log
     else
         printf >&2 "Unknown submission system.\n"
         exit 1
@@ -389,35 +368,23 @@ for case in ${example_list[@]}; do
     fi
 
     if [ "$RERUN" == false ] && [ -d "$RPATH/$example" ]; then
-        printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$example"
+        printf '\t%-12s %-s\n' "Skipped:" "$example"
         continue
     fi
 
-    case "$CLUSTER" in
-        "MN5" | "LUMI-C" | "LUMI-G")
-            if [[ "$(squeue -h --name=$example | wc -l)" -gt 0 ]]; then
-                printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
-                continue
-            fi
-        ;;
-        "") ;;
-    esac
-
-    export log=$LPATH/$example
-    if [[ "$CLEAN" == true && -d "$log" ]]; then
-        rm -fr $log
-    fi
+    export log=$LPATH/$example && mkdir -p $log
+    [ "$CLEAN" == true ] && rm -fr $log/*
 
     # Setup the log folder
     if [[ -f "$log/output.log" &&
         "$(head -n 1 $log/output.log)" == "Ready" ]]; then
         rm -f $log/error.log && touch $log/error.log
 
-        [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
+        [ ! -z "$CLUSTER" ] && printf '\t%-12s %-s\n' "Queued:" "$example"
         QUEUE="$QUEUE $example"
         continue
 
-    elif [[ -s "$log/error.log" ]]; then
+    elif [[ -s "$log/output.log" ]]; then
         # Move old log files to folder with counter padded to 2 digits
         old_run=run_$(find $log -maxdepth 1 -type d -name "run_*" | wc -l)
         old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
@@ -425,12 +392,9 @@ for case in ${example_list[@]}; do
 
         find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
-    elif [[ -f "$log/output.log" ]]; then
-        printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Skipped:" "$example"
-        continue
+
     fi
 
-    mkdir -p $log
     touch $log/output.log $log/error.log
 
     # Copy the case files to the log folder
@@ -456,11 +420,19 @@ for case in ${example_list[@]}; do
 
     # If we are submitting to a cluster, look for the associated jobscript
     if [ -n "$CLUSTER" ]; then
+        if [ ! -d "$HPATH" ]; then
+            printf >&2 "\e[1;31mInvalid Cluster:\e[m $HPATH/$CLUSTER\n"
+            exit 1
+        fi
 
-        setting=$HPATH/${case%.*}.sh
+        if [ "$NEKO" == true ]; then
+            setting=$HPATH/neko/${case%.*}.sh
+        else
+            setting=$HPATH/${case%.*}.sh
+        fi
 
         # Find the setting file for the case recursively
-        while [[ ! -f $setting && "$(dirname $setting)" != "$HPATH" ]]; do
+        while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
         setting=$(realpath $setting)
@@ -501,7 +473,7 @@ for example in $QUEUE; do
     # Move to the log folder and submit the job
     if [ $INTERRUPTED == 1 ]; then
         continue
-    elif [ -n "$CLUSTER" ]; then
+    elif [ ! -z "$CLUSTER" ]; then
         Submit $example
     else
         Run $example
