@@ -128,7 +128,8 @@ function find_gslib() {
             GSLIB_DIR="$(realpath $1)"
         fi
     else
-        GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
+        export GSLIB_DIR=""
+        return
     fi
 
     # Ensure GSLIB is installed, if not install it.
