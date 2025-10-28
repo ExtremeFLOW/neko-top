@@ -18,14 +18,14 @@ export mesh_pattern="mixer"
 
 export hpc_path="${MAIN_DIR}/scripts/jobscripts"
 export data_path="${MAIN_DIR}/data_local/static_mixer"
-export example_path="${MAIN_DIR}/examples/lumi_mixer"
+export root_path="${MAIN_DIR}/bench/mixer"
+export example_path="${MAIN_DIR}/examples/benchmark_mixer"
+export template_path="${root_path}/templates"
 
-export case_path="${example_path}/cases"
-export template_path="${example_path}/templates"
-export experiment_path="${example_path}/experiments"
+export experiment_path="${root_path}/experiments"
 
 [ ! -d "${data_path}" ] && mkdir -p "${data_path}"
-[ ! -d "${case_path}" ] && mkdir -p "${case_path}"
+[ ! -d "${example_path}" ] && mkdir -p "${example_path}"
 [ ! -d "${experiment_path}" ] && mkdir -p "${experiment_path}"
 
 function create_case() {
@@ -62,8 +62,8 @@ function create_case() {
 
     # Set file names
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
-    local case_file="${case_path}/${case_name}.case"
-    local job_path="${hpc_path}/${cluster}/lumi_mixer/cases"
+    local case_file="${example_path}/${case_name}.case"
+    local job_path="${hpc_path}/${cluster}/benchmark_mixer"
 
     # Create the mesh if it does not exist
     if [[ ! -f "${mesh_file}" && "$MESH" == "true" ]]; then
@@ -79,7 +79,10 @@ function create_case() {
     [ -n "${end_time}" ] && sed -i "s|\"end_time\": .*|\"end_time\": ${end_time},|g" "${case_file}"
 
     [ ! -d "${job_path}" ] && mkdir -p ${job_path}
-    [ ! -f ${job_path}/.gitignore ] && echo "*.sh" > ${job_path}/.gitignore
+    if [ ! -f ${job_path}/.gitignore ]; then
+        echo "*.sh" > ${job_path}/.gitignore
+        echo ".gitignore" >> ${job_path}/.gitignore
+    fi
 
     # Create the jobscript
     cp "${template_path}/${cluster}.sh" "${job_path}/${case_name}.sh"
@@ -106,13 +109,26 @@ function create_case() {
 cluster="LUMI-G"
 
 # Clean up old cases
-find "${case_path}" -type f -name "*.case" -delete
-find "${experiment_path}" -type f -name "*.csv" -delete
-find "${hpc_path}/${cluster}/lumi_mixer/cases" -type f -name "*.sh" -delete
+if [ -d "${example_path}" ]; then
+    find "${example_path}" -type f -name "*.case" -delete
+fi
+if [ -d "${experiment_path}" ]; then
+    find "${experiment_path}" -type f -name "*.csv" -delete
+fi
+if [ -d "${hpc_path}/${cluster}/benchmark_mixer" ]; then
+    find "${hpc_path}/${cluster}/benchmark_mixer" -type f -name "*.sh" -delete
+fi
+
+if [ ! -f "${example_path}/.gitignore" ]; then
+    echo "*" > "${example_path}/.gitignore"
+fi
+
+# Update template files in case they have changed
+rsync -u "${template_path}/mixer.f90" "${template_path}/CMakeLists.txt" \
+    "${example_path}/"
 
 # Check max capacity of a single node
 experiment="single_node_capacity"
-create_case ${experiment}  16   4   4 "${cluster}" 1
 create_case ${experiment}  16   4   4 "${cluster}" 1
 create_case ${experiment}  32   8   8 "${cluster}" 1
 create_case ${experiment}  64   8   8 "${cluster}" 1
