@@ -12,7 +12,7 @@ program usrneko
   use objective, only: objective_t
 
 
-  use example_problem, only: mma_obj, beamweight_obj, stress_con
+  use example_problem, only: deflection_obj, beamweight_obj, stress_con
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -34,7 +34,7 @@ program usrneko
   integer :: num_constraints = 10
 
   ! number of beam sections to distribute the constraint
-  integer :: num_constraint_partitions=10
+  integer :: num_constraint_partitions = 10
   ! ========================================================================== !
 
   ! JSON related arguments
@@ -111,8 +111,8 @@ program usrneko
   ! initialize the problem
   call prob%init(parameters, des)
 
-  allocate(beamweight_obj :: deflection)
-  allocate(mma_obj :: beamweight)
+  allocate(beamweight_obj :: beamweight)
+  allocate(deflection_obj :: deflection)
 
   allocate(stress_global_indices(num_constraints))
   allocate(stress_sigma_max(num_constraints))
@@ -122,8 +122,19 @@ program usrneko
 
   stress_sigma_max = 250e6_rp ! Same max stress for all
 
-  call deflection%init_json(parameters, des)
-  call beamweight%init_json(parameters, des)
+  select type(beamweight)
+  type is (beamweight_obj)
+     call beamweight%beamweight_obj_init( 1.0_rp, des)
+  class default
+     call neko_error("beamweight is not beamweight_obj!")
+  end select
+
+  select type(deflection)
+  type is (deflection_obj)
+     call deflection%deflection_obj_init( 2.723885_rp, des)
+  class default
+     call neko_error("deflection is not deflection_obj!")
+  end select
 
   ! Add each constraint to the problem
   do i = 1, size(stress_global_indices)
@@ -213,7 +224,7 @@ end program usrneko
 
 subroutine finite_difference_validation(des, k_test, delta)
   use comm, only: pe_rank
-  use example_problem, only: mma_obj
+  use example_problem, only: deflection_obj
   use design_3dto1d, only: design_3dto1d_t
   use num_types, only: rp
   use vector, only: vector_t
@@ -224,14 +235,14 @@ subroutine finite_difference_validation(des, k_test, delta)
 
   type(vector_t) :: designvec
   type(design_3dto1d_t) :: pert_design
-  type(mma_obj) :: obj
+  type(deflection_obj) :: obj
   real(rp) :: f_original, f_perturbed, fd_derivative, analytical_derivative
   real(rp) :: error, rel_error
   integer :: n
   real(rp), allocatable :: sensitivities(:)
 
   ! Initialize objective
-  call obj%init_from_components("test_obj", des, 1.0_rp)
+  call obj%deflection_obj_init(1.0_rp, des)
 
   ! Get original value and sensitivities
   call obj%update_value(des)

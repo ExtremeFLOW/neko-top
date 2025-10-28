@@ -38,7 +38,6 @@ module example_problem
 
   use design, only: design_t
   use math, only: glsum
-  use json_module, only: json_file
   use vector, only: vector_t
 
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
@@ -67,23 +66,20 @@ module example_problem
   real(rp), public :: u_tip_max = 0.25_rp ! max tip deflection (m)
   ! ========================================================================== !
   ! Objective: tip deflection
-  type, public, extends(objective_t) :: mma_obj
+  type, public, extends(objective_t) :: deflection_obj
    contains
-     procedure, public, pass(this) :: init_json => mma_obj_init_from_json
-     procedure, public, pass(this) :: init_from_components => &
-          mma_obj_init_from_components
-     procedure, public, pass(this) :: free => mma_obj_free
-     procedure, public, pass(this) :: update_value => mma_obj_update_value
+     procedure, public, pass(this) :: deflection_obj_init
+     procedure, public, pass(this) :: free => deflection_obj_free
+     procedure, public, pass(this) :: update_value => &
+          deflection_obj_update_value
      procedure, public, pass(this) :: update_sensitivity => &
-          mma_obj_update_sensitivity
-  end type mma_obj
+          deflection_obj_update_sensitivity
+  end type deflection_obj
   ! ========================================================================== !
   ! Objective: beam weight
   type, public, extends(objective_t) :: beamweight_obj
    contains
-     procedure, public, pass(this) :: init_json => beamweight_init_from_json
-     procedure, public, pass(this) :: init_from_components => &
-          beamweight_init_from_components
+     procedure, public, pass(this) :: beamweight_obj_init
      procedure, public, pass(this) :: free => beamweight_free
      procedure, public, pass(this) :: update_value => beamweight_update_value
      procedure, public, pass(this) :: update_sensitivity => &
@@ -109,35 +105,22 @@ contains
 
   ! ========================================================================== !
   ! Methods for the Objective Function (tip deflection for the beam)
-
-  subroutine mma_obj_init_from_json(this, json, design)
-    class(mma_obj), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    class(design_t), intent(in) :: design
-    character(len=256), parameter :: name = 'tip_deflection'
-    real(kind=rp) :: weight = 1.0_rp
-
-
-    call this%init_from_components(name, design, weight)
-
-  end subroutine mma_obj_init_from_json
-
-  subroutine mma_obj_init_from_components(this, name, design, weight)
-    class(mma_obj), intent(inout) :: this
-    character(len=*), intent(in) :: name
+  subroutine deflection_obj_init (this, weight, design)
+    class(deflection_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: weight
+    character(len=256), parameter :: name = 'tip_deflection'
 
     call this%init_base(name, design%size(), weight)
-  end subroutine mma_obj_init_from_components
+  end subroutine deflection_obj_init
 
-  subroutine mma_obj_free(this)
-    class(mma_obj), intent(inout) :: this
+  subroutine deflection_obj_free(this)
+    class(deflection_obj), intent(inout) :: this
     call this%free_base()
-  end subroutine mma_obj_free
+  end subroutine deflection_obj_free
 
-  subroutine mma_obj_update_value(this, design)
-    class(mma_obj), intent(inout) :: this
+  subroutine deflection_obj_update_value(this, design)
+    class(deflection_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(vector_t) :: h, I, contrib, Delta
     integer :: ierr, n, offset, k
@@ -198,11 +181,11 @@ contains
     call h%free()
     call I%free()
     call contrib%free()
-  end subroutine mma_obj_update_value
+  end subroutine deflection_obj_update_value
 
 
-  subroutine mma_obj_update_sensitivity(this, design)
-    class(mma_obj), intent(inout) :: this
+  subroutine deflection_obj_update_sensitivity(this, design)
+    class(deflection_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
 
     real(rp) :: Le
@@ -250,36 +233,26 @@ contains
     call vector_col2(sensitivity, h, n)
 
     ! Normalize by u_tip_max
-    call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
+    call vector_cmult(sensitivity, this%weight/u_tip_max, n)
 
     call vector_copy(this%sensitivity, sensitivity, n)
 
     call sensitivity%free()
     call h%free()
     call Delta%free()
-  end subroutine mma_obj_update_sensitivity
+  end subroutine deflection_obj_update_sensitivity
 
   ! ========================================================================== !
   ! Methods for the Beam Weight Objective
 
-  subroutine beamweight_init_from_json(this, json, design)
+  subroutine beamweight_obj_init(this, weight, design)
     class(beamweight_obj), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-    class(design_t), intent(in) :: design
-    character(len=256), parameter :: name = 'beam_weight'
-    real(kind=rp) :: weight = 1.0_rp
-
-    call this%init_from_components(name, design, weight)
-  end subroutine beamweight_init_from_json
-
-  subroutine beamweight_init_from_components(this, name, design, weight)
-    class(beamweight_obj), intent(inout) :: this
-    character(len=*), intent(in) :: name
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: weight
+    character(len=256), parameter :: name = 'beam_weight'
 
     call this%init_base(name, design%size(), weight)
-  end subroutine beamweight_init_from_components
+  end subroutine beamweight_obj_init
 
   subroutine beamweight_free(this)
     class(beamweight_obj), intent(inout) :: this
@@ -321,8 +294,7 @@ contains
     n = design%size()
     Le = L_total / real(design%size_global(), kind=rp)
 
-    ! Sensitivity: dm/dh_k = rho * b * Le
-    this%sensitivity%x = rho * b * Le * (h_max - h_min)
+    this%sensitivity%x = this%weight * rho * b * Le * (h_max - h_min)
     if (neko_bcknd_device .eq. 1) then
        call device_memcpy(this%sensitivity%x,this%sensitivity%x_d, n, &
             HOST_TO_DEVICE, sync = .false.)
