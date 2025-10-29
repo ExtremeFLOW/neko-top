@@ -267,6 +267,7 @@ contains
             constraint_value, constraint_sensitivities)
        call profiler_end_region("MMA KKT computation")
 
+       call profiler_start_region("Optimizer logging")
        if (this%enable_output) then
           ! Stamp the i^th iteration
           call mma_logger_assemble_data(log_data, iter, objective_value, &
@@ -281,6 +282,7 @@ contains
           end if
           call design%write(iter)
        end if
+       call profiler_end_region("Optimizer logging")
 
        if (present(simulation)) call simulation%reset()
     end do

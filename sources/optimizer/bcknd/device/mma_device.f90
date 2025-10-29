@@ -49,6 +49,7 @@ submodule (mma) mma_device
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
 
@@ -71,10 +72,13 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
+    call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
+    call profiler_end_region("MMA gensub")
 
     !solve the approximation problem using interior point method
+    call profiler_start_region("MMA subsolve")
     if (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_device(this, x)
     else if (this%subsolver .eq. "dpip") then
@@ -82,6 +86,7 @@ contains
     else
        call neko_error("Unrecognized subsolver for MMA in mma_device.")
     end if
+    call profiler_end_region("MMA subsolve")
 
     this%is_updated = .true.
   end subroutine mma_update_device
