@@ -62,8 +62,8 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 6,
-            "tolerance": 1.0e-4,
+            "max_iterations": 20,
+            "tolerance": 1.0e-6,
             "enable_output": true,
             "mma": {
                 "max_iter": 100,

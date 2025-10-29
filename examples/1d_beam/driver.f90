@@ -12,7 +12,7 @@ program usrneko
   use objective, only: objective_t
 
 
-  use example_problem, only: deflection_obj, beamweight_obj, stress_con
+  use example_problem, only: deflection_con, beamweight_obj, stress_con
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -54,7 +54,7 @@ program usrneko
 
   !> The problem type
   type(problem_t) :: prob
-  class(objective_t), allocatable :: deflection
+  class(constraint_t), allocatable :: deflection
   class(objective_t), allocatable :: beamweight
   class(constraint_t), allocatable :: tmp_constraint
 
@@ -112,7 +112,7 @@ program usrneko
   call prob%init(parameters, des)
 
   allocate(beamweight_obj :: beamweight)
-  allocate(deflection_obj :: deflection)
+  allocate(deflection_con :: deflection)
 
   allocate(stress_global_indices(num_constraints))
   allocate(stress_sigma_max(num_constraints))
@@ -130,11 +130,12 @@ program usrneko
   end select
 
   select type(deflection)
-  type is (deflection_obj)
-     call deflection%deflection_obj_init( 2.723885_rp, des)
+  type is (deflection_con)
+     call deflection%deflection_con_init(des)
   class default
-     call neko_error("deflection is not deflection_obj!")
+     call neko_error("deflection is not deflection_con!")
   end select
+  call prob%add_constraint(deflection)
 
   ! Add each constraint to the problem
   do i = 1, size(stress_global_indices)
@@ -157,7 +158,6 @@ program usrneko
   end do
 
   ! Add objectives to the problem
-  call prob%add_objective(deflection)
   call prob%add_objective(beamweight)
 
   call MPI_Barrier(neko_comm, ierr)
@@ -224,7 +224,7 @@ end program usrneko
 
 subroutine finite_difference_validation(des, k_test, delta)
   use comm, only: pe_rank
-  use example_problem, only: deflection_obj
+  use example_problem, only: deflection_con
   use design_3dto1d, only: design_3dto1d_t
   use num_types, only: rp
   use vector, only: vector_t
@@ -235,14 +235,14 @@ subroutine finite_difference_validation(des, k_test, delta)
 
   type(vector_t) :: designvec
   type(design_3dto1d_t) :: pert_design
-  type(deflection_obj) :: obj
+  type(deflection_con) :: obj
   real(rp) :: f_original, f_perturbed, fd_derivative, analytical_derivative
   real(rp) :: error, rel_error
   integer :: n
   real(rp), allocatable :: sensitivities(:)
 
   ! Initialize objective
-  call obj%deflection_obj_init(1.0_rp, des)
+  call obj%deflection_con_init(des)
 
   ! Get original value and sensitivities
   call obj%update_value(des)

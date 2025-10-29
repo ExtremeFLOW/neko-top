@@ -66,15 +66,15 @@ module example_problem
   real(rp), public :: u_tip_max = 0.25_rp ! max tip deflection (m)
   ! ========================================================================== !
   ! Objective: tip deflection
-  type, public, extends(objective_t) :: deflection_obj
+  type, public, extends(constraint_t) :: deflection_con
    contains
-     procedure, public, pass(this) :: deflection_obj_init
-     procedure, public, pass(this) :: free => deflection_obj_free
+     procedure, public, pass(this) :: deflection_con_init
+     procedure, public, pass(this) :: free => deflection_con_free
      procedure, public, pass(this) :: update_value => &
-          deflection_obj_update_value
+          deflection_con_update_value
      procedure, public, pass(this) :: update_sensitivity => &
-          deflection_obj_update_sensitivity
-  end type deflection_obj
+          deflection_con_update_sensitivity
+  end type deflection_con
   ! ========================================================================== !
   ! Objective: beam weight
   type, public, extends(objective_t) :: beamweight_obj
@@ -105,22 +105,21 @@ contains
 
   ! ========================================================================== !
   ! Methods for the Objective Function (tip deflection for the beam)
-  subroutine deflection_obj_init (this, weight, design)
-    class(deflection_obj), intent(inout) :: this
+  subroutine deflection_con_init (this, design)
+    class(deflection_con), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: weight
     character(len=256), parameter :: name = 'tip_deflection'
 
-    call this%init_base(name, design%size(), weight)
-  end subroutine deflection_obj_init
+    call this%init_base(name, design%size())
+  end subroutine deflection_con_init
 
-  subroutine deflection_obj_free(this)
-    class(deflection_obj), intent(inout) :: this
+  subroutine deflection_con_free(this)
+    class(deflection_con), intent(inout) :: this
     call this%free_base()
-  end subroutine deflection_obj_free
+  end subroutine deflection_con_free
 
-  subroutine deflection_obj_update_value(this, design)
-    class(deflection_obj), intent(inout) :: this
+  subroutine deflection_con_update_value(this, design)
+    class(deflection_con), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(vector_t) :: h, I, contrib, Delta
     integer :: ierr, n, offset, k
@@ -181,11 +180,11 @@ contains
     call h%free()
     call I%free()
     call contrib%free()
-  end subroutine deflection_obj_update_value
+  end subroutine deflection_con_update_value
 
 
-  subroutine deflection_obj_update_sensitivity(this, design)
-    class(deflection_obj), intent(inout) :: this
+  subroutine deflection_con_update_sensitivity(this, design)
+    class(deflection_con), intent(inout) :: this
     class(design_t), intent(in) :: design
 
     real(rp) :: Le
@@ -233,14 +232,14 @@ contains
     call vector_col2(sensitivity, h, n)
 
     ! Normalize by u_tip_max
-    call vector_cmult(sensitivity, this%weight/u_tip_max, n)
+    call vector_cmult(sensitivity, 1.0_rp/u_tip_max, n)
 
     call vector_copy(this%sensitivity, sensitivity, n)
 
     call sensitivity%free()
     call h%free()
     call Delta%free()
-  end subroutine deflection_obj_update_sensitivity
+  end subroutine deflection_con_update_sensitivity
 
   ! ========================================================================== !
   ! Methods for the Beam Weight Objective
