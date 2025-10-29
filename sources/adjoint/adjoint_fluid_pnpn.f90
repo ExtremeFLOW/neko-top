@@ -88,14 +88,15 @@ module adjoint_fluid_pnpn
   use time_state, only: time_state_t
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4
+  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4, col3, add2s2, col2
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
   use scratch_registry, only: neko_scratch_registry
-  use operators, only : opgrad, curl
+  use operators, only : opgrad, curl, grad
+  use gather_scatter, only : gs_t, GS_OP_ADD
 
   implicit none
   private
@@ -684,7 +685,7 @@ contains
     type(ksp_monitor_t) :: ksp_results(4)
     type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, chi
     type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
-    integer :: temp_indices(11)
+    integer :: temp_indices(3)
 
     if (this%freeze) return
 
@@ -761,63 +762,71 @@ contains
       ! Compute velocity residual.
 
       !------------------------------------------------------------------------!
+      ! attempt 1, as written on PDF
       ! Compute the additional RHS contributions due to the discrete adjoint
       ! Karniadakis scheme
-      call neko_scratch_registry%request_field(ta1, temp_indices(1))
-      call neko_scratch_registry%request_field(ta2, temp_indices(2))
-      call neko_scratch_registry%request_field(ta3, temp_indices(3))
-      call neko_scratch_registry%request_field(wa1, temp_indices(4))
-      call neko_scratch_registry%request_field(wa2, temp_indices(5))
-      call neko_scratch_registry%request_field(wa3, temp_indices(6))
-      call neko_scratch_registry%request_field(work1, temp_indices(7))
-      call neko_scratch_registry%request_field(work2, temp_indices(8))
-      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(9))
-      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(10))
-      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
+     !  call neko_scratch_registry%request_field(ta1, temp_indices(1))
+     !  call neko_scratch_registry%request_field(ta2, temp_indices(2))
+     !  call neko_scratch_registry%request_field(ta3, temp_indices(3))
+     !  call neko_scratch_registry%request_field(wa1, temp_indices(4))
+     !  call neko_scratch_registry%request_field(wa2, temp_indices(5))
+     !  call neko_scratch_registry%request_field(wa3, temp_indices(6))
+     !  call neko_scratch_registry%request_field(work1, temp_indices(7))
+     !  call neko_scratch_registry%request_field(work2, temp_indices(8))
+     !  call neko_scratch_registry%request_field(dx_p_adj, temp_indices(9))
+     !  call neko_scratch_registry%request_field(dy_p_adj, temp_indices(10))
+     !  call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
 
+<<<<<<< HEAD
       ! gradient of adjoint pressure (explicit)
       call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+=======
+     !  ! gradient of adjoint pressure (explicit)
+     !  call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+>>>>>>> 6987f784 (yeeessss it works)
 
-      ! adjoint advection operator
-      call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
-              f_x, f_y, f_z, &
-              Xh, c_Xh, dm_Xh%size())
+     !  ! adjoint advection operator
+     !  call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
+     !          f_x, f_y, f_z, &
+     !          Xh, c_Xh, dm_Xh%size())
 
-      ! 1/dt (NOTE, I'm not 100% sure about rho)
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("not implemented")
-      else
-         call addcol3s2(f_x%x, dx_p_adj%x, c_Xh%B, 1.0_rp / dt, f_x%size())
-         call addcol3s2(f_y%x, dy_p_adj%x, c_Xh%B, 1.0_rp / dt, f_y%size())
-         call addcol3s2(f_z%x, dz_p_adj%x, c_Xh%B, 1.0_rp / dt, f_z%size())
-      end if
+     !  ! 1/dt (NOTE, I'm not 100% sure about rho)
+     !  if (NEKO_BCKND_DEVICE .eq. 1) then
+     !     call neko_error("not implemented")
+     !  else
+     !     call addcol3s2(f_x%x, dx_p_adj%x, c_Xh%B, 1.0_rp / dt, f_x%size())
+     !     call addcol3s2(f_y%x, dy_p_adj%x, c_Xh%B, 1.0_rp / dt, f_y%size())
+     !     call addcol3s2(f_z%x, dz_p_adj%x, c_Xh%B, 1.0_rp / dt, f_z%size())
+     !  end if
 
-      ! curl curl
-      ! (NOTE, not 100% sure about adjoint consistency with the gsop)
-      call curl(ta1, ta2, ta3, dx_p_adj, dy_p_adj, dz_p_adj, work1, work2, c_Xh)
-      call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("not implemented")
-      else
-         call subcol3(f_x%x, wa1%x, c_Xh%B, f_x%size())
-         call subcol3(f_y%x, wa2%x, c_Xh%B, f_y%size())
-         call subcol3(f_z%x, wa3%x, c_Xh%B, f_z%size())
-      end if
+     !  ! curl curl
+     !  ! (NOTE, not 100% sure about adjoint consistency with the gsop)
+     !  call curl(ta1, ta2, ta3, dx_p_adj, dy_p_adj, dz_p_adj, work1, work2, c_Xh)
+     !  call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
+     !  if (NEKO_BCKND_DEVICE .eq. 1) then
+     !     call neko_error("not implemented")
+     !  else
+     !     call subcol3(f_x%x, wa1%x, c_Xh%B, f_x%size())
+     !     call subcol3(f_y%x, wa2%x, c_Xh%B, f_y%size())
+     !     call subcol3(f_z%x, wa3%x, c_Xh%B, f_z%size())
+     !  end if
 
-      ! Brinkman
-      ! damn... this one is hidden in a source term, be we can get it from the
-      ! registry, not ideal, but ok until we find a better solution.
-      ! also... this one needs over integration :/
-      chi => neko_field_registry%get_field("brinkman_amplitude")
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("not implemented")
-      else
-         call subcol4(f_x%x, chi%x, dx_p_adj%x, c_Xh%B, f_x%size())
-         call subcol4(f_y%x, chi%x, dy_p_adj%x, c_Xh%B, f_y%size())
-         call subcol4(f_z%x, chi%x, dz_p_adj%x, c_Xh%B, f_z%size())
-      end if
+     !  ! Brinkman
+     !  ! damn... this one is hidden in a source term, be we can get it from the
+     !  ! registry, not ideal, but ok until we find a better solution.
+     !  ! also... this one needs over integration :/
+     !  chi => neko_field_registry%get_field("brinkman_amplitude")
+     !  if (NEKO_BCKND_DEVICE .eq. 1) then
+     !     call neko_error("not implemented")
+     !  else
+     !     call subcol4(f_x%x, chi%x, dx_p_adj%x, c_Xh%B, f_x%size())
+     !     call subcol4(f_y%x, chi%x, dy_p_adj%x, c_Xh%B, f_y%size())
+     !     call subcol4(f_z%x, chi%x, dz_p_adj%x, c_Xh%B, f_z%size())
+     !  end if
 
-      call neko_scratch_registry%relinquish_field(temp_indices)
+     !  call neko_scratch_registry%relinquish_field(temp_indices)
+      !------------------------------------------------------------------------!
+      ! attempt 2, think of u as an intermediate velocity
       !------------------------------------------------------------------------!
 
 
@@ -922,6 +931,35 @@ contains
          call neko_error('Forced flow rate is not implemented for the adjoint')
 
       end if
+
+      !------------------------------------------------------------------------!
+      ! attempt 2
+      ! correct the velocity with the pressure
+      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1))
+      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2))
+      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3))
+
+      ! gradient of adjoint pressure (explicit)
+      call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! HERE IS WHERE THE PROBLEM IS !
+      ! You should have \nabla p_adj = 0 on the boundaries... but you don't..
+      ! you have \partial p /\partial n = 0. The other directions?
+      ! ChatGPT says I'm allowed to disclude this on the boundaries for some
+      ! reason??
+      call this%bclst_vel_res%apply(dx_p_adj, dy_p_adj, dz_p_adj, time)
+      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("not implemented")
+      else
+         call add2s2(this%u_adj%x, dx_p_adj%x, -1.0_rp, u%size())
+         call add2s2(this%v_adj%x, dy_p_adj%x, -1.0_rp, u%size())
+         call add2s2(this%w_adj%x, dz_p_adj%x, -1.0_rp, u%size())
+      end if
+
+      call neko_scratch_registry%relinquish_field(temp_indices)
+      !------------------------------------------------------------------------!
 
       call fluid_step_info(time, ksp_results, &
            this%full_stress_formulation, this%strict_convergence)

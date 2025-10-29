@@ -11,7 +11,7 @@ module adjoint_pnpn_res_cpu
   use mesh, only : mesh_t
   use num_types, only : rp
   use space, only : space_t
-  use math, only : copy, cmult2, invers2, rzero
+  use math, only : copy, cmult2, invers2, rzero, glsc3
   use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
@@ -50,6 +50,7 @@ contains
     integer :: i
     type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
     integer :: temp_indices(6)
+    real(kind=rp) :: fld_norm
 
     call neko_scratch_registry%request_field(ta1, temp_indices(1))
     call neko_scratch_registry%request_field(ta2, temp_indices(2))
@@ -94,11 +95,22 @@ contains
    !     ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
    !  end do
 
+   ! --------------------------------------------------------------------------!
    do concurrent (i = 1:n)
-      ta1%x(i,1,1,1) = f_x%x(i,1,1,1)
-      ta2%x(i,1,1,1) = f_y%x(i,1,1,1)
-      ta3%x(i,1,1,1) = f_z%x(i,1,1,1)
+      ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
+      ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
+      ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
    end do
+
+   call gs_Xh%op(ta1, GS_OP_ADD)
+   call gs_Xh%op(ta2, GS_OP_ADD)
+   call gs_Xh%op(ta3, GS_OP_ADD)
+
+   ! do concurrent (i = 1:n)
+   !    ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   !    ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   !    ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   ! end do
 
    call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
    call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)
@@ -109,22 +121,21 @@ contains
     call Ax%compute(p_res%x, p%x, c_Xh, p%msh, p%Xh)
 
     do concurrent (i = 1:n)
-       p_res%x(i,1,1,1) = (-p_res%x(i,1,1,1)) &
-            + wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1)
+       p_res%x(i,1,1,1) = ((-p_res%x(i,1,1,1)) &
+            + wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1)) 
     end do
 
     !
     ! Surface velocity terms
     !
-    ! I DON'T UNDERSTAND SYM BCs !!
-   !  do concurrent (i = 1:n)
-   !     wa1%x(i,1,1,1) = 0.0_rp
-   !     wa2%x(i,1,1,1) = 0.0_rp
-   !     wa3%x(i,1,1,1) = 0.0_rp
-   !  end do
+    do concurrent (i = 1:n)
+       wa1%x(i,1,1,1) = 0.0_rp
+       wa2%x(i,1,1,1) = 0.0_rp
+       wa3%x(i,1,1,1) = 0.0_rp
+    end do
 
-   !  call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, ta3%x,&
-   !                                    n)
+    call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, ta3%x,&
+                                      n)
 
     dtbd = bd / dt
     do concurrent (i = 1:n)
@@ -137,8 +148,8 @@ contains
 
     do concurrent (i = 1:n)
        p_res%x(i,1,1,1) = p_res%x(i,1,1,1) &
-            - (dtbd * (ta1%x(i,1,1,1) + ta2%x(i,1,1,1) + ta3%x(i,1,1,1))) !&
-           ! - (wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1))
+            - (dtbd * (ta1%x(i,1,1,1) + ta2%x(i,1,1,1) + ta3%x(i,1,1,1))) &
+            - (wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1))
     end do
 
     call neko_scratch_registry%relinquish_field(temp_indices)
@@ -159,10 +170,11 @@ contains
     real(kind=rp), intent(in) :: bd
     real(kind=rp), intent(in) :: dt
     real(kind=rp) :: rho_val, mu_val
-    integer :: temp_indices(3)
-    type(field_t), pointer :: ta1, ta2, ta3
     integer, intent(in) :: n
     integer :: i
+    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
+    integer :: temp_indices(8)
+    real(kind=rp) :: u_norm, v_norm, w_norm, fld_norm
 
     ! We assume the material properties are constant
     rho_val = rho%x(1,1,1,1)
@@ -177,22 +189,63 @@ contains
     call Ax%compute(u_res%x, u%x, c_Xh, msh, Xh)
     call Ax%compute(v_res%x, v%x, c_Xh, msh, Xh)
     call Ax%compute(w_res%x, w%x, c_Xh, msh, Xh)
-    ! call neko_scratch_registry%request_field(ta1, temp_indices(1))
-    ! call neko_scratch_registry%request_field(ta2, temp_indices(2))
-    ! call neko_scratch_registry%request_field(ta3, temp_indices(3))
 
-    ! call opgrad(ta1%x, ta2%x, ta3%x, p%x, c_Xh)
+    call neko_scratch_registry%request_field(ta1, temp_indices(1))
+    call neko_scratch_registry%request_field(ta2, temp_indices(2))
+    call neko_scratch_registry%request_field(ta3, temp_indices(3))
+    call neko_scratch_registry%request_field(wa1, temp_indices(4))
+    call neko_scratch_registry%request_field(wa2, temp_indices(5))
+    call neko_scratch_registry%request_field(wa3, temp_indices(6))
+    call neko_scratch_registry%request_field(work1, temp_indices(7))
+    call neko_scratch_registry%request_field(work2, temp_indices(8))
+
+    call curl(ta1, ta2, ta3, u, v, w, work1, work2, c_Xh)
+    call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
+
+    ! do concurrent (i = 1:n)
+       ! ta1%x(i,1,1,1) = ((wa1%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_x%x(i,1,1,1)
+       ! ta2%x(i,1,1,1) = ((wa2%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_y%x(i,1,1,1)
+       ! ta3%x(i,1,1,1) = ((wa3%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_z%x(i,1,1,1)
+       ! ta1%x(i,1,1,1) = f_x%x(i,1,1,1)
+       ! ta2%x(i,1,1,1) = f_y%x(i,1,1,1)
+       ! ta3%x(i,1,1,1) = f_z%x(i,1,1,1)
+    ! end do
+
+   ! call c_Xh%gs_h%op(wa1, GS_OP_ADD)
+   ! call c_Xh%gs_h%op(wa2, GS_OP_ADD)
+   ! call c_Xh%gs_h%op(wa3, GS_OP_ADD)
+
+    ! do concurrent (i = 1:n)
+    !    ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+    !    ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+    !    ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+    ! end do
+
+    call opgrad(ta1%x, ta2%x, ta3%x, p%x, c_Xh)
+
+    ! I think the residual should be scaled by the norm of the fields
+    u_norm = glsc3(u%x, u%x, c_Xh%B, u%size())
+    v_norm = glsc3(v%x, v%x, c_Xh%B, u%size())
+    w_norm = glsc3(w%x, w%x, c_Xh%B, u%size())
+    fld_norm = sqrt(u_norm + v_norm + w_norm)
+
+    if (fld_norm .lt. 0.000000001_rp) then
+    fld_norm = 0.000000001_rp
+    end if
 
     do concurrent (i = 1:n)
-       ! u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) - ta1%x(i,1,1,1) + f_x%x(i,1,1,1)
-       ! v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) - ta2%x(i,1,1,1) + f_y%x(i,1,1,1)
-       ! w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) - ta3%x(i,1,1,1) + f_z%x(i,1,1,1)
+       ! u_res%x(i,1,1,1) = ((-u_res%x(i,1,1,1)) + ta1%x(i,1,1,1))
+       ! v_res%x(i,1,1,1) = ((-v_res%x(i,1,1,1)) + ta2%x(i,1,1,1))
+       ! w_res%x(i,1,1,1) = ((-w_res%x(i,1,1,1)) + ta3%x(i,1,1,1))
+       ! u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + ta1%x(i,1,1,1) + f_x%x(i,1,1,1)
+       ! v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + ta2%x(i,1,1,1) + f_y%x(i,1,1,1)
+       ! w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + ta3%x(i,1,1,1) + f_z%x(i,1,1,1)
        u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + f_x%x(i,1,1,1)
        v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + f_y%x(i,1,1,1)
        w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + f_z%x(i,1,1,1)
     end do
 
-    ! call neko_scratch_registry%relinquish_field(temp_indices)
+    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine adjoint_pnpn_vel_res_cpu_compute
 

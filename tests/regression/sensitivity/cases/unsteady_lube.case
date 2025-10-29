@@ -6,11 +6,11 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 5e-3,
-            "timestep": 1e-3
+            "end_time": 3e-4,
+            "timestep": 1e-4
         },
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
@@ -34,7 +34,7 @@
                 "preconditioner": {
                     "type": "hsmg"
                 },
-                "absolute_tolerance": 1e-12,
+                "absolute_tolerance": 1e-14,
                 "max_iterations": 800
             },
             "boundary_conditions": [
@@ -48,7 +48,8 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "tsteps",
+            "output_value": 1,
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -96,7 +97,7 @@
     },
     "checkpoints": {
         "enabled": true,
-        "n_memory": 20
+        "n_memory": 100
     },
     "optimization": {
         "design": {

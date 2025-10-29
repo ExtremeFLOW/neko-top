@@ -34,7 +34,7 @@
 module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult
+  use field_math, only: field_col3, field_addcol3, field_cmult, field_copy
   use scratch_registry, only: scratch_registry_t, neko_scratch_registry
   use objective, only: objective_t
   use simulation_m, only: simulation_t
@@ -217,6 +217,16 @@ contains
     integer :: temp_indices_GL(3)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(dx_p_adj, temp_indices(2))
+    call neko_scratch_registry%request_field(dy_p_adj, temp_indices(3))
+    call neko_scratch_registry%request_field(dz_p_adj, temp_indices(4))
+
+    ! call field_cmult(this%adjoint_p, -1.0_rp * 1e-3_rp)
+    ! call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%adjoint_p%x, this%c_Xh_GLL)
+    ! call field_cmult(this%adjoint_p, -1.0_rp / 1e-3_rp)
+    ! call invcol2(dx_p_adj%x, this%c_Xh_GLL%B, dx_p_adj%size())
+    ! call invcol2(dy_p_adj%x, this%c_Xh_GLL%B, dx_p_adj%size())
+    ! call invcol2(dz_p_adj%x, this%c_Xh_GLL%B, dx_p_adj%size())
 
     if (this%dealias) then
 
@@ -230,16 +240,22 @@ contains
        call this%GLL_to_GL%map(adjoint_fld_GL%x, this%adjoint_u%x, nel, &
             this%Xh_GL)
        call field_col3(accumulate, fld_GL, adjoint_fld_GL)
+       ! call this%GLL_to_GL%map(adjoint_fld_GL%x, dx_p_adj%x, nel, this%Xh_GL)
+       ! call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
 
        call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(adjoint_fld_GL%x, this%adjoint_v%x, nel, &
             this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
+       ! call this%GLL_to_GL%map(adjoint_fld_GL%x, dy_p_adj%x, nel, this%Xh_GL)
+       ! call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
 
        call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(adjoint_fld_GL%x, this%adjoint_w%x, nel, &
             this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
+       ! call this%GLL_to_GL%map(adjoint_fld_GL%x, dz_p_adj%x, nel, this%Xh_GL)
+       ! call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
 
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
