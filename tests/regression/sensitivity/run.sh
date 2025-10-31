@@ -85,12 +85,13 @@ z=$(python3 -c "print(1.0 / $N)")
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
 genmeshbox 0 2 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
-cases=$(find . -maxdepth 1 -type f -name "*.case")
-for case in $cases; do
+cases=$(find cases/ -type f -name "*.case")
+for case in ${cases[@]}; do
     case=${case#./}
+    case_name=$(basename "$case")
     echo "Running ${case} with mpirun -n $NP"
     mpirun -n "$NP" ./sensitivity_regression_driver "${case}" || exit 1
-    mv steady_state_data.csv steady_state_data_${case%.*}.csv
+    mv steady_state_data.csv steady_state_data_${case_name%.*}.csv
 done
 
 python steady_state_plotter.py || exit 1

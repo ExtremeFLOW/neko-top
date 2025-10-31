@@ -92,18 +92,18 @@
         },
         "design": {
             "type": "brinkman",
-             "mapping": [
+            "mapping": [
                 {
                     "type": "PDE_filter",
                     "r": 0.05,
                     "tol": 1.0e-20,
                     "max_iter": 600
                 },
-             {
-                 "type": "RAMP",
-                 "f_max": 100
-             }
-             ],
+                {
+                    "type": "RAMP",
+                    "f_max": 100
+                }
+            ],
             "initial_distribution": {
                 "type": "point_zone",
                 "base_value": 0.0,
@@ -134,11 +134,7 @@
             {
                 "type": "minimum_dissipation",
                 "weight": 1.0
-            },
-            {
-                "type": "lube_term",
-                "weight": 1.0,
             }
-        ],
+        ]
     }
 }
