@@ -95,8 +95,8 @@ for case in $cases; do
     mv steady_state_data.csv steady_state_data_${case%.*}.csv
 done
 
-python plotter_FD_check.py || exit 1
 python steady_state_plotter.py || exit 1
+python plotter_FD_check.py || exit 1
 
 cd "$CURRENT_DIR" || exit 1
 
