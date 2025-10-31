@@ -1,9 +1,10 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
 import glob
 
-csv_files = sorted(glob.glob("steady_state_data*.csv"))
-for csv_file in csv_files:
+csv_files = glob.glob("steady_state_data*.csv")
+for csv_file in sorted(csv_files):
     df = pd.read_csv(csv_file)
 
     reset_indices = df.index[df['time'].diff() < 0].tolist()
@@ -40,6 +41,9 @@ for csv_file in csv_files:
     plt.grid(True, which="both", linestyle='--', linewidth=0.5)
     plt.tight_layout()
     plt.show()
+
+    if not os.path.exists("plots"):
+        os.makedirs("plots")
     plt.savefig(
-        f'steady_state_plot_{csv_file.replace("steady_state_data_", "").replace(".csv", ".png")}',
+        f'plots/{csv_file.replace("_data_", "_").replace(".csv", ".png")}',
         dpi=200)

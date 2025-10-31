@@ -83,8 +83,12 @@ for ax in axes[n_files:]:
     ax.axis('off')
 
 plt.tight_layout()
-plt.savefig('FD_comparison.png', dpi=200)
 plt.show()
+
+# Create plots folder if it does not exist
+if not os.path.exists("plots"):
+    os.makedirs("plots")
+plt.savefig('plots/FD_comparison.png', dpi=200)
 
 if not return_value:
     raise SystemExit("Discrepancies found compared to reference data.")
