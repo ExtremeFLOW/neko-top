@@ -58,9 +58,7 @@ Nz=1
 
 # Clean up old files
 find . -maxdepth 1 -type f -name "steady_state_data*.csv" -delete
-find . -maxdepth 1 -type f -name "steady_state_plot*.png" -delete
 find . -maxdepth 1 -type f -name "FD_check_*.csv" -delete
-find . -maxdepth 1 -type f -name "FD_check_*.png" -delete
 find . -maxdepth 1 -type f -name "*.log" -delete
 
 # ============================================================================ #
