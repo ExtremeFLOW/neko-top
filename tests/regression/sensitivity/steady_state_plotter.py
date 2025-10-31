@@ -41,5 +41,5 @@ for csv_file in csv_files:
     plt.tight_layout()
     plt.show()
     plt.savefig(
-        f'steady_state_plot_{csv_file.replace("steady_state_data_", "").replace(".csv", "")}.png',
+        f'steady_state_plot_{csv_file.replace("steady_state_data_", "").replace(".csv", ".png")}',
         dpi=200)
