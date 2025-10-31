@@ -37,6 +37,7 @@ for i, csv_file in enumerate(csv_files):
 
     # Matching reference: FD_check_foo.csv -> ref_FD_check_foo.csv
     ref_file = csv_file.replace("FD_check", "ref_FD_check", 1)
+    ref_file = os.path.join("reference_data", ref_file)
     if os.path.exists(ref_file):
         df_ref = pd.read_csv(ref_file)
         axes[i].loglog(df_ref["perturbation"].abs(),
