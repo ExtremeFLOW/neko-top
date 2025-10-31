@@ -97,6 +97,9 @@ contains
 
    ! --------------------------------------------------------------------------!
    do concurrent (i = 1:n)
+      ! ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
+      ! ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
+      ! ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
       ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
       ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
       ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
@@ -106,11 +109,14 @@ contains
    call gs_Xh%op(ta2, GS_OP_ADD)
    call gs_Xh%op(ta3, GS_OP_ADD)
 
-   ! do concurrent (i = 1:n)
-   !    ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !    ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !    ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   ! end do
+   do concurrent (i = 1:n)
+      ! ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
+      ! ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
+      ! ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
+      ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+      ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+      ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+   end do
 
    call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
    call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)
@@ -125,32 +131,32 @@ contains
             + wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1)) 
     end do
 
-    !
-    ! Surface velocity terms
-    !
-    do concurrent (i = 1:n)
-       wa1%x(i,1,1,1) = 0.0_rp
-       wa2%x(i,1,1,1) = 0.0_rp
-       wa3%x(i,1,1,1) = 0.0_rp
-    end do
+   !  !
+   !  ! Surface velocity terms
+   !  !
+   !  do concurrent (i = 1:n)
+   !     wa1%x(i,1,1,1) = 0.0_rp
+   !     wa2%x(i,1,1,1) = 0.0_rp
+   !     wa3%x(i,1,1,1) = 0.0_rp
+   !  end do
 
-    call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, ta3%x,&
-                                      n)
+   !  call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, ta3%x,&
+   !                                    n)
 
-    dtbd = bd / dt
-    do concurrent (i = 1:n)
-       ta1%x(i,1,1,1) = 0.0_rp
-       ta2%x(i,1,1,1) = 0.0_rp
-       ta3%x(i,1,1,1) = 0.0_rp
-    end do
+   !  dtbd = bd / dt
+   !  do concurrent (i = 1:n)
+   !     ta1%x(i,1,1,1) = 0.0_rp
+   !     ta2%x(i,1,1,1) = 0.0_rp
+   !     ta3%x(i,1,1,1) = 0.0_rp
+   !  end do
 
-    call bc_prs_surface%apply_surfvec(ta1%x, ta2%x, ta3%x, u%x, v%x, w%x, n)
+   !  call bc_prs_surface%apply_surfvec(ta1%x, ta2%x, ta3%x, u%x, v%x, w%x, n)
 
-    do concurrent (i = 1:n)
-       p_res%x(i,1,1,1) = p_res%x(i,1,1,1) &
-            - (dtbd * (ta1%x(i,1,1,1) + ta2%x(i,1,1,1) + ta3%x(i,1,1,1))) &
-            - (wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1))
-    end do
+   !  do concurrent (i = 1:n)
+   !     p_res%x(i,1,1,1) = p_res%x(i,1,1,1) &
+   !          - (dtbd * (ta1%x(i,1,1,1) + ta2%x(i,1,1,1) + ta3%x(i,1,1,1))) &
+   !          - (wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1))
+   !  end do
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -186,6 +192,10 @@ contains
     end do
     c_Xh%ifh2 = .true.
 
+   ! call c_Xh%gs_h%op(u, GS_OP_ADD)
+   ! call c_Xh%gs_h%op(v, GS_OP_ADD)
+   ! call c_Xh%gs_h%op(w, GS_OP_ADD)
+
     call Ax%compute(u_res%x, u%x, c_Xh, msh, Xh)
     call Ax%compute(v_res%x, v%x, c_Xh, msh, Xh)
     call Ax%compute(w_res%x, w%x, c_Xh, msh, Xh)
@@ -199,47 +209,26 @@ contains
     call neko_scratch_registry%request_field(work1, temp_indices(7))
     call neko_scratch_registry%request_field(work2, temp_indices(8))
 
-    call curl(ta1, ta2, ta3, u, v, w, work1, work2, c_Xh)
-    call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
+    ! call curl(ta1, ta2, ta3, u, v, w, work1, work2, c_Xh)
+    ! call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
 
-    ! do concurrent (i = 1:n)
-       ! ta1%x(i,1,1,1) = ((wa1%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_x%x(i,1,1,1)
-       ! ta2%x(i,1,1,1) = ((wa2%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_y%x(i,1,1,1)
-       ! ta3%x(i,1,1,1) = ((wa3%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1)) + f_z%x(i,1,1,1)
-       ! ta1%x(i,1,1,1) = f_x%x(i,1,1,1)
-       ! ta2%x(i,1,1,1) = f_y%x(i,1,1,1)
-       ! ta3%x(i,1,1,1) = f_z%x(i,1,1,1)
-    ! end do
+   !  do concurrent (i = 1:n)
+   !     ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   !     ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   !     ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+   !  end do
 
    ! call c_Xh%gs_h%op(wa1, GS_OP_ADD)
    ! call c_Xh%gs_h%op(wa2, GS_OP_ADD)
    ! call c_Xh%gs_h%op(wa3, GS_OP_ADD)
 
-    ! do concurrent (i = 1:n)
-    !    ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-    !    ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-    !    ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-    ! end do
-
-    call opgrad(ta1%x, ta2%x, ta3%x, p%x, c_Xh)
-
-    ! I think the residual should be scaled by the norm of the fields
-    u_norm = glsc3(u%x, u%x, c_Xh%B, u%size())
-    v_norm = glsc3(v%x, v%x, c_Xh%B, u%size())
-    w_norm = glsc3(w%x, w%x, c_Xh%B, u%size())
-    fld_norm = sqrt(u_norm + v_norm + w_norm)
-
-    if (fld_norm .lt. 0.000000001_rp) then
-    fld_norm = 0.000000001_rp
-    end if
+   !  do concurrent (i = 1:n)
+   !     ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+   !     ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+   !     ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+   !  end do
 
     do concurrent (i = 1:n)
-       ! u_res%x(i,1,1,1) = ((-u_res%x(i,1,1,1)) + ta1%x(i,1,1,1))
-       ! v_res%x(i,1,1,1) = ((-v_res%x(i,1,1,1)) + ta2%x(i,1,1,1))
-       ! w_res%x(i,1,1,1) = ((-w_res%x(i,1,1,1)) + ta3%x(i,1,1,1))
-       ! u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + ta1%x(i,1,1,1) + f_x%x(i,1,1,1)
-       ! v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + ta2%x(i,1,1,1) + f_y%x(i,1,1,1)
-       ! w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + ta3%x(i,1,1,1) + f_z%x(i,1,1,1)
        u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + f_x%x(i,1,1,1)
        v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + f_y%x(i,1,1,1)
        w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + f_z%x(i,1,1,1)

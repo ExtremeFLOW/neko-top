@@ -88,7 +88,7 @@ module adjoint_fluid_pnpn
   use time_state, only: time_state_t
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4, col3, add2s2, col2
+  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4, col3, add2s2, col2, invcol2
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
@@ -777,13 +777,8 @@ contains
      !  call neko_scratch_registry%request_field(dy_p_adj, temp_indices(10))
      !  call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
 
-<<<<<<< HEAD
-      ! gradient of adjoint pressure (explicit)
-      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
-=======
      !  ! gradient of adjoint pressure (explicit)
      !  call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
->>>>>>> 6987f784 (yeeessss it works)
 
      !  ! adjoint advection operator
      !  call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
@@ -831,6 +826,22 @@ contains
 
 
       call profiler_start_region('Adjoint_velocity_residual')
+
+      ! call invcol2(f_x%x, c_Xh%B, f_x%size())
+      ! call invcol2(f_y%x, c_Xh%B, f_y%size())
+      ! call invcol2(f_z%x, c_Xh%B, f_z%size())
+
+      ! call gs_Xh%op(f_x, GS_OP_ADD, event)
+      ! call device_event_sync(event)
+      ! call gs_Xh%op(f_y, GS_OP_ADD, event)
+      ! call device_event_sync(event)
+      ! call gs_Xh%op(f_z, GS_OP_ADD, event)
+      ! call device_event_sync(event)
+
+      ! call col2(f_x%x, c_Xh%B, f_x%size())
+      ! call col2(f_y%x, c_Xh%B, f_y%size())
+      ! call col2(f_z%x, c_Xh%B, f_z%size())
+
       call vel_res%compute(Ax_vel, u, v, w, &
            u_res, v_res, w_res, &
            p, &
@@ -865,6 +876,14 @@ contains
       call profiler_end_region("Adjoint_velocity_solve")
 
       ! Compute pressure residual.
+      !------------------------------------------------------------------------!
+      ! now the RHS of our pressure eqn is the new adjoint velocity
+      ! be careful with the order of the gsops here, we will handle this in the
+      ! residual calculation. So we enter WITHOUT a mass matrix.
+      call field_copy(f_x, u)
+      call field_copy(f_y, v)
+      call field_copy(f_z, w)
+      !------------------------------------------------------------------------!
       call profiler_start_region('Adjoint_pressure_residual')
 
       call prs_res%compute(p, p_res, &
@@ -940,22 +959,31 @@ contains
       call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3))
 
       ! gradient of adjoint pressure (explicit)
-      call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
 
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-      ! HERE IS WHERE THE PROBLEM IS !
-      ! You should have \nabla p_adj = 0 on the boundaries... but you don't..
-      ! you have \partial p /\partial n = 0. The other directions?
-      ! ChatGPT says I'm allowed to disclude this on the boundaries for some
-      ! reason??
-      call this%bclst_vel_res%apply(dx_p_adj, dy_p_adj, dz_p_adj, time)
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+      ! they gsop the residual (which has the pressure gradient)
+      call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dy_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! divide by mass matrix
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call neko_error("not implemented")
       else
-         call add2s2(this%u_adj%x, dx_p_adj%x, -1.0_rp, u%size())
-         call add2s2(this%v_adj%x, dy_p_adj%x, -1.0_rp, u%size())
-         call add2s2(this%w_adj%x, dz_p_adj%x, -1.0_rp, u%size())
+         ! NOTE. This term comes from the handling of the pressure RHS, which
+         ! DOES include the multiplicity in the op.
+         call col2(dx_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dy_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dz_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+      end if
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call neko_error("not implemented")
+      else
+         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, -1.0_rp, n, msh%gdim)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)

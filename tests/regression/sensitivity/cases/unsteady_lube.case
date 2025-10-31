@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 3e-4,
-            "timestep": 1e-4
+            "end_time": 250e-3,
+            "timestep": 5e-3
         },
         "numerics": {
             "time_order": 1,
@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 100,
+            "Re": 20,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -48,8 +48,9 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 1,
+            //"output_control": "tsteps",
+            //"output_value": 1,
+            "output_control": "never",
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -138,7 +139,7 @@
         },
         "objectives": [
             {
-                "type": "lube_term",
+                "type": "minimum_dissipation",
                 "weight": 1.0
             }
         ],
