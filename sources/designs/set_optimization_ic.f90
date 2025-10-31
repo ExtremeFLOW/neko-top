@@ -343,7 +343,7 @@ contains
        ! Evaluate design
        ! NOTE. Is is currently the convention in the design0.f* files that
        ! the unfiltered design should be stored in the u component.
-       call global_interp%evaluate(fld%x, fld_data%u%x)
+       call global_interp%evaluate(fld%x, fld_data%u%x, on_host=.false.)
        call global_interp%free()
 
     else ! No interpolation, just potentially from different spaces
