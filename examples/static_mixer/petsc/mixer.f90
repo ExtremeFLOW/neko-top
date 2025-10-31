@@ -106,11 +106,7 @@ contains
 
        do i = 1, bc%msk(0)
           z = bc%dof%z(bc%msk(i), 1, 1, 1)
-          if (z .gt. 0.5_rp) then
-             s%x(bc%msk(i), 1, 1, 1) = 1.0_rp
-          else
-             s%x(bc%msk(i), 1, 1, 1) = 0.0_rp
-          end if
+          s%x(bc%msk(i), 1, 1, 1) = smooth_step(z, 0.45_rp, 0.55_rp)
        end do
 
        call s%copy_from(HOST_TO_DEVICE, .true.)
