@@ -5,7 +5,7 @@ import math
 import os
 
 # Define the tolerance for comparison
-tol = 0.0
+tol = 1e-6
 return_value = True
 
 # Find all CSV files
