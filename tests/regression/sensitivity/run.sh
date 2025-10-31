@@ -96,7 +96,7 @@ for case in $cases; do
 done
 
 python steady_state_plotter.py || exit 1
-python plotter_FD_check.py || exit 1
+python FD_check.py || exit 1
 
 cd "$CURRENT_DIR" || exit 1
 
