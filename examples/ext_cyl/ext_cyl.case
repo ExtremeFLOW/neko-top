@@ -5,8 +5,10 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "end_time": 1.0,
-        "timestep": 5e-3,
+        "time": {
+            "end_time": 1.0,
+            "timestep": 5e-3
+        },
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
@@ -22,17 +24,19 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-9,
-                "max_iterations": 100
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
-                "projection_space_size": 0,
-                "absolute_tolerance": 1e-7,
-                "max_iterations": 100
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 800
             },
             "output_control": "never",
             "boundary_conditions": [ // these don't actually do anything
@@ -47,6 +51,12 @@
             ],
         },
         "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
+            },
             "boundary_conditions": [
                 {
                     "type": "no_slip",
