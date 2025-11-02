@@ -8,9 +8,7 @@ module cylinder
    ! Additional neko-top libraries (to solve linearized and adjoint)
    use num_types, only : rp, dp
    use neko, only: neko_init, neko_finalize, neko_solve
-   use case, only : case_t
-   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
-   use simulation_adjoint, only: solve_adjoint, adjoint_reset
+   use simulation_m, only: simulation_t
    use json_module, only: json_file
    ! Specific to the state vector
    use field, only: field_t
@@ -30,7 +28,7 @@ module cylinder
    ! This one is silly... But we need coef to initialize fields
    use global_coef, only: global_coef_t, global_coef_getter
    ! sponges
-   use sponge_source_term, only: sponge_source_term_t
+   ! use sponge_source_term, only: sponge_source_term_t
    ! debugging, my own eigs
    use LightKrylov_Constants
    use LightKrylov_Utils
@@ -88,20 +86,14 @@ module cylinder
    !-----------------------------------
  
    type, extends(abstract_linop_rdp), public :: neko_propagator
-      ! The primal case
-      type(case_t), public :: neko_case
-      ! The linear case 
-      ! (I know the name is stupid here... I've had to hack around the fact we
-      ! only have an adjoint type, not "perturb" as in Nek5000)
-      type(adjoint_case_t), public :: linear_case
-      ! The adjoint case
-      type(adjoint_case_t), public :: adjoint_case
-      ! a way to spy on the vector (mostly for debugging)
+      ! A simulation
+      type(simulation_t), public :: simulation
       type(fld_file_output_t), public :: output_primal
       type(fld_file_output_t), public :: output_linear
       type(fld_file_output_t), public :: output_adjoint
     contains
       private
+      procedure, pass(self), public :: non_linear => non_linear_solve
       procedure, pass(self), public :: matvec => direct_solver
       procedure, pass(self), public :: rmatvec => adjoint_solver
       ! we also want a clean way to initialize, free and reset
@@ -470,26 +462,26 @@ end subroutine state_vector_assignment
         select type(vec_out)
         type is(state_vector)
            ! Reset propagator.
-           call reset_wrapper(self%linear_case)
+           call self%simulation%reset_adjoint()
            ! Get state vector.
            ! (again... the naming with "adjoint" isn't smart here)
-           call field_copy(self%linear_case%fluid_adj%u_adj, vec_in%u)
-           call field_copy(self%linear_case%fluid_adj%v_adj, vec_in%v)
-           call field_copy(self%linear_case%fluid_adj%w_adj, vec_in%w)
-           call field_copy(self%linear_case%fluid_adj%p_adj, vec_in%p)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%u_adj, vec_in%u)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%v_adj, vec_in%v)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, vec_in%w)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%p_adj, vec_in%p)
            ! Integrate forward in time.
            ! call self%write_linear(self%get_counter(.false.))
-           call solve_wrapper(self%linear_case)
+           call self%simulation%run_backward()
            ! call self%write_linear(1)
            ! Since vec_out has intent out, I HOPE we can safely assume it wont
            ! care about the value it held before computing.
            ! however, we need to init again.
            call init_wrapper(vec_out)
            ! Pass-back the state vector.
-           call field_copy(vec_out%u, self%linear_case%fluid_adj%u_adj)
-           call field_copy(vec_out%v, self%linear_case%fluid_adj%v_adj)
-           call field_copy(vec_out%w, self%linear_case%fluid_adj%w_adj)
-           call field_copy(vec_out%p, self%linear_case%fluid_adj%p_adj)
+           call field_copy(vec_out%u, self%simulation%adjoint_case%fluid_adj%u_adj)
+           call field_copy(vec_out%v, self%simulation%adjoint_case%fluid_adj%v_adj)
+           call field_copy(vec_out%w, self%simulation%adjoint_case%fluid_adj%w_adj)
+           call field_copy(vec_out%p, self%simulation%adjoint_case%fluid_adj%p_adj)
            ! fucking quasi 2D...
            call z_plane_fix(vec_out%u)
            call z_plane_fix(vec_out%v)
@@ -513,22 +505,22 @@ end subroutine state_vector_assignment
         select type(vec_out)
         type is(state_vector)
            ! Reset propagator.
-           call reset_wrapper(self%adjoint_case)
+           call self%simulation%reset_adjoint()
            ! Get state vector.
            ! (again... the naming with "adjoint" isn't smart here)
-           call field_copy(self%adjoint_case%fluid_adj%u_adj, vec_in%u)
-           call field_copy(self%adjoint_case%fluid_adj%v_adj, vec_in%v)
-           call field_copy(self%adjoint_case%fluid_adj%w_adj, vec_in%w)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%u_adj, vec_in%u)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%v_adj, vec_in%v)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, vec_in%w)
            ! Integrate forward in time.
            !call self%write_adjoint(0)
-           call solve_wrapper(self%linear_case)
+           call self%simulation%run_backward()
            !call self%write_adjoint(0)
            ! There is a chance that vec_out isn't initialized!
            call init_wrapper(vec_out)
            ! Pass-back the state vector.
-           call field_copy(vec_out%u, self%adjoint_case%fluid_adj%u_adj)
-           call field_copy(vec_out%v, self%adjoint_case%fluid_adj%v_adj)
-           call field_copy(vec_out%w, self%adjoint_case%fluid_adj%w_adj)
+           call field_copy(vec_out%u, self%simulation%adjoint_case%fluid_adj%u_adj)
+           call field_copy(vec_out%v, self%simulation%adjoint_case%fluid_adj%v_adj)
+           call field_copy(vec_out%w, self%simulation%adjoint_case%fluid_adj%w_adj)
            
         end select
      end select
@@ -539,47 +531,44 @@ end subroutine state_vector_assignment
    !-----     EXTRA PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
    !-------------------------------------------------------------------
 
-   subroutine neko_propagator_init(self)
+   subroutine neko_propagator_init(self, parameters)
      ! Linear Operator.
      class(neko_propagator), intent(inout)  :: self
-     type(sponge_source_term_t) :: linear_sponge, adjoint_sponge
+     type(json_file), intent(inout) :: parameters
+     real(kind=rp) :: T_fin, dt 
+     integer :: n_steps
 
-     ! initialize the "baseflow"
-     call neko_init(self%neko_case)
-     ! initialize the linear
-     ! This is hacky, we'll work on a cleaner way soon :-)
-     self%linear_case%if_adjoint = .false.
-     call adjoint_init(self%linear_case, self%neko_case)
-     ! initialize the adjoint
-     call adjoint_init(self%adjoint_case, self%neko_case)
-
-     ! Also hacky... but throw on a sponge
-     call linear_sponge%init_from_components(self%linear_case%fluid_adj%f_adj_x, &
-        self%linear_case%fluid_adj%f_adj_y, self%linear_case%fluid_adj%f_adj_z, &
-        self%linear_case%fluid_adj%u_adj, self%linear_case%fluid_adj%v_adj, &
-        self%linear_case%fluid_adj%w_adj, self%linear_case%fluid_adj%c_Xh)
-     ! call self%linear_case%fluid_adj%source_term%add(linear_sponge)
-
+     ! initalize the simulation
+     call self%simulation%init(parameters)
+     ! Make it linear
+     self%simulation%adjoint_case%if_adjoint = .false.
+     ! since we never actually do the forward, we need to manually enter the
+     ! total timesteps...
+     T_fin = self%simulation%neko_case%time%end_time
+     dt = self%simulation%neko_case%time%dt
+     n_steps = int(T_fin/dt)
+     self%simulation%n_timesteps = n_steps
+     
      ! NOTE baseflow should be loaded via IC in .case file, but let's double
      ! check
           call self%output_primal%init(sp, 'checking_base', 4)
-          call self%output_primal%fields%assign(2, self%neko_case%fluid%u)
-          call self%output_primal%fields%assign(3, self%neko_case%fluid%v)
-          call self%output_primal%fields%assign(4, self%neko_case%fluid%w)
-          call self%output_primal%fields%assign(1, self%neko_case%fluid%p)
+          call self%output_primal%fields%assign(2, self%simulation%neko_case%fluid%u)
+          call self%output_primal%fields%assign(3, self%simulation%neko_case%fluid%v)
+          call self%output_primal%fields%assign(4, self%simulation%neko_case%fluid%w)
+          call self%output_primal%fields%assign(1, self%simulation%neko_case%fluid%p)
           call self%output_primal%sample(0.0_rp)
      ! Assign samplers for the forward and adjoint in case we want to look at
      ! them (debugging)
           call self%output_linear%init(sp, 'checking_linear', 4)
-          call self%output_linear%fields%assign(2, self%linear_case%fluid_adj%u_adj)
-          call self%output_linear%fields%assign(3, self%linear_case%fluid_adj%v_adj)
-          call self%output_linear%fields%assign(4, self%linear_case%fluid_adj%w_adj)
-          call self%output_linear%fields%assign(1, self%linear_case%fluid_adj%p_adj)
+          call self%output_linear%fields%assign(2, self%simulation%adjoint_case%fluid_adj%u_adj)
+          call self%output_linear%fields%assign(3, self%simulation%adjoint_case%fluid_adj%v_adj)
+          call self%output_linear%fields%assign(4, self%simulation%adjoint_case%fluid_adj%w_adj)
+          call self%output_linear%fields%assign(1, self%simulation%adjoint_case%fluid_adj%p_adj)
           call self%output_adjoint%init(sp, 'checking_adjoint', 4)
-          call self%output_adjoint%fields%assign(2, self%adjoint_case%fluid_adj%u_adj)
-          call self%output_adjoint%fields%assign(3, self%adjoint_case%fluid_adj%v_adj)
-          call self%output_adjoint%fields%assign(4, self%adjoint_case%fluid_adj%w_adj)
-          call self%output_adjoint%fields%assign(1, self%adjoint_case%fluid_adj%p_adj)
+          call self%output_adjoint%fields%assign(2, self%simulation%adjoint_case%fluid_adj%u_adj)
+          call self%output_adjoint%fields%assign(3, self%simulation%adjoint_case%fluid_adj%v_adj)
+          call self%output_adjoint%fields%assign(4, self%simulation%adjoint_case%fluid_adj%w_adj)
+          call self%output_adjoint%fields%assign(1, self%simulation%adjoint_case%fluid_adj%p_adj)
 
      return
    end subroutine neko_propagator_init
@@ -588,31 +577,9 @@ end subroutine state_vector_assignment
      ! Linear Operator.
      class(neko_propagator), intent(inout)  :: self
 
-     call adjoint_free(self%adjoint_case)
-     call adjoint_free(self%linear_case)
-     call neko_finalize(self%neko_case)
+     call self%simulation%free()
      return
    end subroutine neko_propagator_free
-
-   ! silly little wrapper to ignore intent.
-   subroutine solve_wrapper(self)
-     ! Case
-     class(adjoint_case_t)  :: self
-
-     call solve_adjoint(self)
-
-     return
-   end subroutine solve_wrapper
-
-   ! silly little wrapper to ignore intent.
-   subroutine reset_wrapper(self)
-     ! Linear Operator.
-     class(adjoint_case_t)  :: self
-
-     call adjoint_reset(self)
-
-     return
-   end subroutine reset_wrapper
 
    ! silly little wrapper to ignore intent.
    subroutine write_linear_wrapper(self, idx)

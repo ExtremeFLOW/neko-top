@@ -8,6 +8,11 @@ program usrneko
   use cylinder, only: neko_propagator, state_vector, my_eigs
   use global_coef, only: global_coef_t, global_coef_getter
   use LightKrylov_IterativeSolvers, only: write_results_cdp
+  use json_module, only: json_file
+  use json_utils, only: json_get
+  use utils, only: neko_error
+  use json_utils_ext, only: json_read_file
+  use neko_top, only: neko_top_register_types
   implicit none
 
   character(len=128), parameter :: this_module = 'Example cylinder'
@@ -39,12 +44,16 @@ program usrneko
   real(kind=wp), allocatable    :: residuals(:)
   !> Information flag.
   integer          :: info
-
   !> writer
   type(state_vector), allocatable :: X_writer
-
   !> Miscellaneous.
   integer :: i, j
+  ! JSON related arguments
+  integer :: argc
+  character(len=256) :: parameter_file
+  type(json_file) :: parameters, design_parameters
+  ! MPI parameters
+  integer :: ierr
 
   !=============================================================================
 
@@ -55,15 +64,31 @@ program usrneko
   !> Set up logging
   call logger_setup()
 
+  ! Initialize the MPI environment
+
+  call MPI_Init(ierr)
+  call neko_top_register_types()
+
+  ! -------------------------------------------------------------------------- !
+  ! Read the parameters file as the first terminal argument
+
+  argc = command_argument_count()
+  if (argc .lt. 1) call neko_error('Missing parameter file')
+  call get_command_argument(1, parameter_file)
+
+  ! Read the parameters file
+  parameters = json_read_file(trim(parameter_file))
+
   !> Initialize exponential propagator.
+  ! -------------------------------------------------------------------------- !
   allocate(A)
-  call A%init()
+  call A%init(parameters)
 
   !> Get the integration time
-  tau = real(A%neko_case%time%end_time,kind=wp)
+  tau = real(A%simulation%neko_case%time%end_time,kind=wp)
 
   !> Extract the global coef from neko
-  my_global_coef_getter%global_coef = A%neko_case%fluid%c_Xh
+  my_global_coef_getter%global_coef = A%simulation%neko_case%fluid%c_Xh
   global_coef_getter => my_global_coef_getter
 
   !> Initialize Krylov subspace.
