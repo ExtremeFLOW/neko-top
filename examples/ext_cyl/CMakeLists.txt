@@ -33,20 +33,19 @@ ExternalProject_Add(
 # Call the normal example builder
 build_example()
 
-# Construct example target name (matches what build_example sets)
-string(REPLACE "/" "_" EXAMPLE_NAME "ext_cyl")
-set(EXAMPLE_TARGET "Examples-${EXAMPLE_NAME}")
+# Ensure the example target exists, then patch it
+if (TARGET ext_cyl)
 
-# Wait until the example target is defined, then patch it
-if (TARGET ${EXAMPLE_TARGET})
+  # Make sure LightKrylov is built/installed before compiling the example
+  add_dependencies(ext_cyl LightKrylov_ext_cyl)
 
-    # Ensure LightKrylov builds before the example
-    add_dependencies(${EXAMPLE_TARGET} LightKrylov_ext_cyl)
 
-    # Add include path for LightKrylov modules
-    target_include_directories(${EXAMPLE_TARGET} PRIVATE ${LIGHTKRYLOV_INSTALL_DIR}/include)
+  # target_include_directories requires keyword signature
+  target_include_directories(ext_cyl PRIVATE
+    ${LIGHTKRYLOV_INSTALL_DIR}/include)
 
-    # Link LightKrylov static libraries
-    target_link_libraries(${EXAMPLE_TARGET} ${LIGHTKRYLOV_INSTALL_DIR}/lib/libLightKrylov.a)
+  # target_link_libraries must stay in plain form to match build_example()
+  target_link_libraries(ext_cyl
+    ${LIGHTKRYLOV_INSTALL_DIR}/lib/libLightKrylov.a)
 endif()
 
