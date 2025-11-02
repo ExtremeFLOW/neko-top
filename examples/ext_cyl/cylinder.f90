@@ -93,7 +93,6 @@ module cylinder
       type(fld_file_output_t), public :: output_adjoint
     contains
       private
-      procedure, pass(self), public :: non_linear => non_linear_solve
       procedure, pass(self), public :: matvec => direct_solver
       procedure, pass(self), public :: rmatvec => adjoint_solver
       ! we also want a clean way to initialize, free and reset

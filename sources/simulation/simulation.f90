@@ -115,6 +115,10 @@ module simulation_m
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
+     !> Reset the adjoint only
+     procedure, pass(this) :: reset_adjoint => simulation_reset_adjoint
+     !> Reset the forward only
+     procedure, pass(this) :: reset_forward => simulation_reset_forward
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
 
@@ -277,6 +281,23 @@ contains
     call this%checkpoint%reset()
 
   end subroutine simulation_reset
+
+  !> Reset the simulation
+  subroutine simulation_reset_adjoint(this)
+    class(simulation_t), intent(inout) :: this
+
+    call reset_adjoint(this%adjoint_case, this%neko_case)
+
+  end subroutine simulation_reset_adjoint
+
+  !> Reset the simulation
+  subroutine simulation_reset_forward(this)
+    class(simulation_t), intent(inout) :: this
+
+    call reset(this%neko_case)
+    call this%checkpoint%reset()
+
+  end subroutine simulation_reset_forward
 
   !> Write current state of the simulation to disk
   subroutine simulation_write(this, idx)
