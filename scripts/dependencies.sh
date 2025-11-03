@@ -485,7 +485,7 @@ function find_cubit() {
 
     # Check if Cubit are available
     if command -v cubit 2>&1 1>/dev/null; then
-        return
+        export cubit=$(command -v cubit)
     elif command -v coreform_cubit 2>&1 1>/dev/null; then
         export cubit=$(command -v coreform_cubit)
     elif command -v trelis 2>&1 1>/dev/null; then
@@ -504,7 +504,7 @@ function find_exo2nek() {
 
     # Check if exo2nek is available
     if command -v exo2nek 2>&1 1>/dev/null; then
-        return
+        export exo2nek=$(command -v exo2nek)
     elif [ -x "$NEK5000_DIR/bin/exo2nek" ]; then
         export exo2nek="$NEK5000_DIR/bin/exo2nek"
     elif [ -x "$NEK5000_DIR/tools/maketools" ]; then
@@ -531,7 +531,7 @@ function find_rea2nbin() {
 
     # Check if rea2nbin is available
     if command -v rea2nbin 2>&1 1>/dev/null; then
-        return
+        export rea2nbin=$(command -v rea2nbin)
     elif [ -x "$NEKO_DIR/bin/rea2nbin" ]; then
         export rea2nbin="$NEKO_DIR/bin/rea2nbin"
     else
@@ -558,14 +558,14 @@ function find_gmsh2nek() {
 
     # Check if gmsh2nek is available
     if command -v gmsh2nek 2>&1 1>/dev/null; then
-        return
+        export gmsh2nek=$(command -v gmsh2nek)
     elif [ -x "$NEKO_DIR/bin/gmsh2nek" ]; then
         export gmsh2nek="$NEKO_DIR/bin/gmsh2nek"
     elif [ -f "$NEKO_DIR/contrib/gmsh2nek/compile.sh" ]; then
-        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        tmp_dir=$(pwd)
         cd $NEKO_DIR/contrib/gmsh2nek
         ./compile.sh
-        cd $CURRENT_DIR
+        cd $tmp_dir
         export gmsh2nek="$NEKO_DIR/contrib/gmsh2nek/gmsh2nek"
     else
         error "gmsh2nek not found."
