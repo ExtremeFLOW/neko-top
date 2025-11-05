@@ -59,7 +59,7 @@ contains
     if (.not. this%is_initialized) then
        call neko_error("The MMA object is not initialized.")
     end if
-    
+
     call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
