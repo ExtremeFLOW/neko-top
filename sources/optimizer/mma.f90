@@ -352,7 +352,7 @@ contains
        call device_memcpy(this%xmax%x, this%xmax%x_d, n, HOST_TO_DEVICE, &
             sync = .false.)
        call device_memcpy(this%xmin%x, this%xmin%x_d, n, HOST_TO_DEVICE, &
-            sync = .false.)
+            sync = .true.)
     end if
 
 

@@ -300,8 +300,7 @@ contains
 
     open(newunit=funit, file=filename, status='replace', action='write', iostat=ios)
     if (ios .ne. 0) then
-       print *, 'Error opening file ', filename
-       stop
+       call neko_error('Error opening file ' // filename)
     end if
 
     ! Header
