@@ -43,15 +43,13 @@ module adjoint_scalar_convection_source_term
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
-  use field_math, only: field_subcol3, field_sub2
+  use field_math, only: field_subcol3, field_sub2, field_col3
   use operators, only: grad, dudxyz
   use utils, only: neko_error
-  use field_registry, only: neko_field_registry
+  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
-  use vector, only: vector_t
-  use vector_math, only: vector_col3
   implicit none
   private
 
@@ -81,8 +79,8 @@ module adjoint_scalar_convection_source_term
      type(interpolator_t), pointer :: GLL_to_GL
      !> if dealiasing should be applied
      logical :: dealias
-     !> work arrays
-     type(vector_t) :: accumulate, fld_GL, s_GL, s_adj_GL
+     !> GL scratch registry
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -132,8 +130,9 @@ contains
   !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
   !! @param GLL_to_GL Interpolator between GLL and GL.
   !! @param dealias if dealiasing should be applied.
+  !! @param scratch_GL A scratch registry on the GL space.
   subroutine adjoint_scalar_convection_source_term_init_from_components(this,&
-       f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias)
+       f_x, f_y, f_z, s, s_adj, coef, c_Xh_GL, GLL_to_GL, dealias, scratch_GL)
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_t), intent(in), target :: s, s_adj
@@ -141,11 +140,11 @@ contains
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
+    type(scratch_registry_t), intent(in), target :: scratch_GL
 
     type(field_list_t) :: fields
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
-    integer :: nel, n_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...
@@ -173,16 +172,7 @@ contains
     this%Xh_GL => this%c_Xh_GL%Xh
     this%Xh_GLL => this%coef%Xh
     this%GLL_to_GL => GLL_to_GL
-
-    if (this%dealias) then
-       ! allocate work arrays for dealiasing
-       nel = this%coef%msh%nelv
-       n_GL = nel * this%Xh_GL%lxyz
-       call this%accumulate%init(n_GL)
-       call this%fld_GL%init(n_GL)
-       call this%s_GL%init(n_GL)
-       call this%s_adj_GL%init(n_GL)
-    end if
+    this%scratch_GL => scratch_GL
 
   end subroutine adjoint_scalar_convection_source_term_init_from_components
 
@@ -191,16 +181,13 @@ contains
     class(adjoint_scalar_convection_source_term_t), intent(inout) :: this
 
     call this%free_base()
-    call this%accumulate%free()
-    call this%fld_GL%free()
-    call this%s_GL%free()
-    call this%s_adj_GL%free()
     nullify(this%s_adj)
     nullify(this%s)
     nullify(this%c_Xh_GL)
     nullify(this%Xh_GL)
     nullify(this%Xh_GLL)
     nullify(this%GLL_to_GL)
+    nullify(this%scratch_GL)
 
   end subroutine adjoint_scalar_convection_source_term_free
 
@@ -213,6 +200,8 @@ contains
     type(field_t), pointer :: fu, fv, fw
     integer :: temp_indices(4)
     type(field_t), pointer :: dsdx, dsdy, dsdz, work
+    type(field_t), pointer :: accumulate, fld_GL, s_GL, s_adj_GL
+    integer :: temp_indices_GL(4)
     integer :: n_GL, nel
 
 
@@ -229,57 +218,63 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
+       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3))
+       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4))
 
-       call this%GLL_to_GL%map(this%s_GL%x, this%s%x, nel, this%Xh_GL)
-       call this%GLL_to_GL%map(this%s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
 
        ! u
-       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdx, &
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdx, &
             this%c_Xh_GL%dsdx, this%c_Xh_GL%dtdx, this%c_Xh_GL)
-       call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fu, work)
 
        ! v
-       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdy, &
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdy, &
             this%c_Xh_GL%dsdy, this%c_Xh_GL%dtdy, this%c_Xh_GL)
-       call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fv, work)
 
        ! w
-       call dudxyz(this%fld_GL%x, this%s_GL%x, this%c_Xh_GL%drdz, &
+       call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdz, &
             this%c_Xh_GL%dsdz, this%c_Xh_GL%dtdz, this%c_Xh_GL)
-       call vector_col3(this%accumulate, this%s_adj_GL, this%fld_GL)
+       call field_col3(accumulate, s_adj_GL, fld_GL)
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(this%accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
-          call col2(this%accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, this%accumulate%x, nel, this%Xh_GLL)
+          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fw, work)
+
+       call this%scratch_GL%relinquish_field(temp_indices_GL)
 
     else
        call grad(dsdx%x, dsdy%x, dsdz%x, this%s%x, this%coef)

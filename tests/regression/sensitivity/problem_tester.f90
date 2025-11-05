@@ -1,4 +1,4 @@
-program minimum_dissipation_sensitivity
+program problem_tester
 
   use simulation_m, only: simulation_t
   use brinkman_design, only: brinkman_design_t
@@ -157,4 +157,4 @@ program minimum_dissipation_sensitivity
   call des%free()
   call sim%free()
 
-end program minimum_dissipation_sensitivity
+end program problem_tester

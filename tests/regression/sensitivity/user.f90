@@ -15,6 +15,7 @@ module user
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
   use scratch_registry, only : neko_scratch_registry
+  use device, only: HOST_TO_DEVICE, device_memcpy
   implicit none
   !> Case parameters
   ! To define the initial boundary conditions we don't wish to introduce a
@@ -72,6 +73,12 @@ contains
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
 
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync=.false.)
+          call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, sync=.false.)
+          call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync=.true.)
+       end if
+
     else
        s => fields%get("s")
 
@@ -81,6 +88,9 @@ contains
           ! Inflow scalar profile is a bump
           s%x(idx, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
        end do
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync=.true.)
+       end if
     end if
   end subroutine user_bc
 
@@ -101,6 +111,9 @@ contains
        s%x(i, 1, 1, 1) = 0.5_rp * (1.0_rp - cos(2.0_rp*pi*y))
     end do
 
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync=.true.)
+    end if
   end subroutine scalar_ic
 
 end module user

@@ -413,7 +413,7 @@ contains
          simulation%fluid%c_Xh, &
          simulation%adjoint_fluid%c_Xh_GL, &
          simulation%adjoint_fluid%GLL_to_GL, &
-         dealias)
+         dealias, simulation%adjoint_fluid%scratch_GL)
     ! append brinkman source term to the forward problem
     call simulation%fluid%source_term%add(forward_brinkman)
 
@@ -429,7 +429,7 @@ contains
          simulation%adjoint_fluid%c_Xh, &
          simulation%adjoint_fluid%c_Xh_GL, &
          simulation%adjoint_fluid%GLL_to_GL, &
-         dealias)
+         dealias, simulation%adjoint_fluid%scratch_GL)
     ! append brinkman source term based on design
 
     select type (f => simulation%adjoint_fluid)

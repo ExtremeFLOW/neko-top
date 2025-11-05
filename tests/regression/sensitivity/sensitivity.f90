@@ -65,14 +65,14 @@ contains
     end if
 
     ! Get global target sensitivity
-    if (i.ge.0) then
+    if (i .ge. 0) then
        work_arr(1) = target_sensitivities%x(i)
     else
        work_arr(1) = 0.0_rp
     end if
     target_sensitivity_i = glsum(work_arr, 1)
 
-    if (i.ge.0) then
+    if (i .ge. 0) then
        write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
             i, 'Design variable ', design_vector%x(i), &
             'Location [', des%x(i), des%y(i), des%z(i), ']'
@@ -80,9 +80,9 @@ contains
        write(*, fmt_data) 0.0_rp, constraint, target_sensitivity_i, 0.0_rp
     end if
 
-    ! Init the csv writer
+    ! Init the csv writer we assume file_name sits in cases/ and ends with .case
     n = len_trim(file_name)
-    call logger%init('FD_check_'//trim(file_name(:n-5))//'.csv')
+    call logger%init('FD_check_'//trim(file_name(7:n-5))//'.csv')
     call logger%set_header('perturbation,F,dFdx,error')
     call log_data%init(4)
 
@@ -93,7 +93,7 @@ contains
        ! Reset the design field
        design_perturbed%x = design_vector%x
        ! only one rank perturbs, we assume i < 0 implies this rank doesn't
-       if (i.ge.0) then
+       if (i .ge. 0) then
           ! Ensure the perturbation stays within the bounds
           if (design_vector%x(i) .gt. 0.5_rp) perturb = -perturb
           design_perturbed%x(i) = design_vector%x(i) + perturb

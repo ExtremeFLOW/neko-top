@@ -192,7 +192,7 @@ contains
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
                this%fluid_adj%GLL_to_GL, &
-               dealias_adjoint_scalar_convection)
+               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)
