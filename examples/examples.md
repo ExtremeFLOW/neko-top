@@ -6,3 +6,4 @@
 4. \subpage rugby-verification
 5. \subpage brinkman-parameters
 6. \subpage passive-scalar
+6. \subpage static-mixers
