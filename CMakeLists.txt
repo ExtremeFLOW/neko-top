@@ -64,11 +64,17 @@ option(ONLY_DOCS "Only build the documentation" OFF)
 
 # Modify default options based on the build type
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DEFAULT_EXAMPLES ON)
+    set(BUILD_EXAMPLES ON)
+    set(BUILD_TESTING ON)
+    set(BUILD_DOCS OFF)
 elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
+    set(BUILD_EXAMPLES ON)
     set(BUILD_TESTING ON)
     set(BUILD_DOCS ON)
-    set(BUILD_EXAMPLES ON)
+elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
+    set(BUILD_EXAMPLES OFF)
+    set(BUILD_TESTING OFF)
+    set(BUILD_DOCS OFF)
 endif()
 
 # ============================================================================ #
