@@ -47,7 +47,7 @@ if [ $# -lt 1 ]; then help; fi
 # Define the main directory
 
 export CURRENT_DIR=$(pwd)
-export MAIN_DIR=$(dirname $(realpath -m $0))
+export MAIN_DIR=$(dirname $(realpath $0))
 export EXTERNAL_DIR="$MAIN_DIR/external"
 
 # ============================================================================ #
@@ -111,7 +111,7 @@ else
 fi
 
 [ -z "$NEKO_DIR" ] && export NEKO_DIR="$MAIN_DIR/external/neko"
-export NEKO_DIR=$(realpath -m $NEKO_DIR)
+export NEKO_DIR=$(realpath $NEKO_DIR)
 
 if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
@@ -419,7 +419,7 @@ for case in ${example_list[@]}; do
         while [[ ! -f $setting && "$(dirname $setting)" != "/" ]]; do
             setting=$(dirname ${setting%/default.sh})/default.sh
         done
-        setting=$(realpath -m $setting)
+        setting=$(realpath $setting)
 
         if [ ! -f $setting ]; then
             printf >&2 "\e[1;31mInvalid setting file:\e[m\n"

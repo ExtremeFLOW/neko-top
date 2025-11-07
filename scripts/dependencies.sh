@@ -40,9 +40,9 @@ function find_json_fortran() {
 
     # Determine the JSON-Fortran installation directory
     if [ ! -z "$1" ]; then
-        JSON_FORTRAN_DIR="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
+        JSON_FORTRAN_DIR="$(realpath $1)"
     elif [ -z "$JSON_FORTRAN_DIR" ]; then
-        JSON_FORTRAN_DIR="$(realpath -m $EXTERNAL_DIR/json-fortran)"
+        JSON_FORTRAN_DIR="$(realpath $EXTERNAL_DIR/json-fortran)"
     fi
 
     # Ensure JSON-Fortran is installed, if not install it.
@@ -81,10 +81,10 @@ function find_json_fortran() {
         exit 1
     fi
 
-    JSON_FORTRAN_LIB=$(realpath -m $JSON_FORTRAN_LIB)
+    JSON_FORTRAN_LIB=$(realpath $JSON_FORTRAN_LIB)
 
     # Setup environment variables
-    export JSON_FORTRAN_DIR=$(realpath -m $JSON_FORTRAN_LIB/../)
+    export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_LIB/../)
     export PKG_CONFIG_PATH="$JSON_FORTRAN_LIB/pkgconfig:$PKG_CONFIG_PATH"
     export LD_LIBRARY_PATH="$JSON_FORTRAN_LIB:$LD_LIBRARY_PATH"
 }
@@ -96,9 +96,9 @@ function find_nek5000() {
 
     # Determine the Nek5000 installation directory
     if [ ! -z "$1" ]; then
-        NEK5000_DIR="$(realpath -m $1)"
+        NEK5000_DIR="$(realpath $1)"
     elif [ -z "$NEK5000_DIR" ]; then
-        NEK5000_DIR="$(realpath -m $EXTERNAL_DIR/nek5000)"
+        NEK5000_DIR="$(realpath $EXTERNAL_DIR/nek5000)"
     fi
 
     if [[ ! -d $NEK5000_DIR || $(ls -A $NEK5000_DIR | wc -l) -eq 0 ]]; then
@@ -116,9 +116,9 @@ function find_gslib() {
 
     # Determine the GSLib installation directory
     if [ ! -z "$1" ]; then
-        GSLIB_DIR="$(realpath -m $1)"
+        GSLIB_DIR="$(realpath $1)"
     elif [ -z "$GSLIB_DIR" ]; then
-        GSLIB_DIR="$(realpath -m $EXTERNAL_DIR/gslib)"
+        GSLIB_DIR="$(realpath $EXTERNAL_DIR/gslib)"
     fi
 
     # Ensure GSLIB is installed, if not install it.
@@ -157,7 +157,7 @@ function find_gslib() {
         exit 1
     fi
 
-    export GSLIB_DIR=$(realpath -m $GSLIB_LIB/../)
+    export GSLIB_DIR=$(realpath $GSLIB_LIB/../)
 }
 
 # ============================================================================ #
@@ -167,9 +167,9 @@ function find_pfunit() {
 
     # Determine the pFUnit installation directory
     if [ ! -z "$1" ]; then
-        PFUNIT_DIR="$(realpath -m $1)"
+        PFUNIT_DIR="$(realpath $1)"
     elif [ -z "$PFUNIT_DIR" ]; then
-        PFUNIT_DIR="$(realpath -m $EXTERNAL_DIR/pfunit)"
+        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/pfunit)"
     fi
 
     # Clone pFUnit from the repository if it does not exist.
@@ -219,7 +219,7 @@ _ACEOF
         exit 1
     fi
 
-    export PFUNIT_DIR=$(realpath -m $PFUNIT_LIB/../)
+    export PFUNIT_DIR=$(realpath $PFUNIT_LIB/../)
 }
 
 # ============================================================================ #
@@ -229,9 +229,9 @@ function find_hdf5() {
 
     # Determine the HDF5 installation directory
     if [ ! -z "$1" ]; then
-        HDF5_DIR="$(realpath -m $1)"
+        HDF5_DIR="$(realpath $1)"
     elif [ -z "$HDF5_DIR" ]; then
-        HDF5_DIR="$(realpath -m $EXTERNAL_DIR/hdf5)"
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
     fi
 
     # Ensure HDF5 is installed, if not install it.
@@ -268,7 +268,7 @@ function find_hdf5() {
         exit 1
     fi
 
-    export HDF5_DIR=$(realpath -m $HDF5_LIB/../)
+    export HDF5_DIR=$(realpath $HDF5_LIB/../)
     export LD_LIBRARY_PATH="$HDF5_LIB:$LD_LIBRARY_PATH"
     export PKG_CONFIG_PATH="$HDF5_LIB/pkgconfig:$PKG_CONFIG_PATH"
 }
@@ -285,9 +285,9 @@ function find_neko() {
 
     # Determine the Neko installation directory
     if [ ! -z "$1" ]; then
-        NEKO_DIR="$(realpath -m $1)"
+        NEKO_DIR="$(realpath $1)"
     elif [ -z "$NEKO_DIR" ]; then
-        NEKO_DIR="$(realpath -m $EXTERNAL_DIR/neko)"
+        NEKO_DIR="$(realpath $EXTERNAL_DIR/neko)"
     fi
 
     # Check if Neko is installed, if not install it.
@@ -342,7 +342,7 @@ function find_neko() {
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
-            ./configure --prefix="$(realpath -m ./)" $FEATURES
+            ./configure --prefix="$(realpath ./)" $FEATURES
         fi
 
         # Update compile dependencies if makedepf90 is installed
@@ -391,7 +391,7 @@ function find_neko() {
         exit 1
     fi
 
-    export NEKO_DIR=$(realpath -m $NEKO_DIR)
+    export NEKO_DIR=$(realpath $NEKO_DIR)
     export PKG_CONFIG_PATH=$NEKO_DIR/lib/pkgconfig:$PKG_CONFIG_PATH
     export LD_LIBRARY_PATH=$NEKO_DIR/lib:$LD_LIBRARY_PATH
     export PATH=$NEKO_DIR/bin:$PATH
@@ -512,7 +512,7 @@ function check_external_dir() {
     if [ -z "$EXTERNAL_DIR" ]; then
         echo "Environment EXTERNAL_DIR is not set."
         echo "Default path will be used: ~/tmp/external"
-        export EXTERNAL_DIR=$(realpath -m ~/tmp/external)
+        export EXTERNAL_DIR=$(realpath ~/tmp/external)
     fi
 
     mkdir -p $EXTERNAL_DIR

@@ -32,7 +32,7 @@ function help() {
 # Set main directories
 
 export CURRENT_DIR=$(pwd)
-export MAIN_DIR=$(dirname $(realpath -m $0))
+export MAIN_DIR=$(dirname $(realpath $0))
 export EXTERNAL_DIR="$MAIN_DIR/external"
 
 # ============================================================================ #

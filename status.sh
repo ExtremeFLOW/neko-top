@@ -18,7 +18,7 @@ function help() {
 }
 
 # Variable setups
-MAIN_DIR=$(dirname $(realpath -m $0))
+MAIN_DIR=$(dirname $(realpath $0))
 
 RPATH=$MAIN_DIR/$RPATH
 LPATH=$MAIN_DIR/$LPATH
