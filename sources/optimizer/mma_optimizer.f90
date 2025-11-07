@@ -32,6 +32,8 @@ module mma_optimizer
   use mask_ops, only: mask_exterior_const
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
 
+  use constraint, only: constraint_t
+  use dummy_constraint, only: dummy_constraint_t
   implicit none
   private
   public :: mma_optimizer_t
@@ -42,13 +44,16 @@ module mma_optimizer
      type(mma_t) :: mma
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
-     !! Note that the values are not updated but they are scaled when passed
-     !! to the optimizer.
-     !! (if auto_scale then constraint_value%x=scale else constraint_value%x=scale*constraint_value%x)
+     !! (if auto_scale then constraint_value%x=scale else
+     !! constraint_value%x=scale*constraint_value%x)
      !! When auto_scale is true, we use an adaptable scale for
-     !! constraint_value%x and constraint_sensitivities%x in every iteration (variable scale factors)
+     !! constraint_value%x and constraint_sensitivities%x
+     !! in every iteration (variable scale factors)
      real(kind=rp) :: scale
      logical :: auto_scale
+
+     ! Set to flase to remove logging for optimal performance
+     logical :: enable_output
 
    contains
 
@@ -68,20 +73,22 @@ contains
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
-       max_iterations, tolerance, simulation)
+       simulation)
     class(mma_optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
-    integer, intent(in) :: max_iterations
-    real(kind=rp), intent(in) :: tolerance
     type(simulation_t), optional, intent(in) :: simulation
+    logical :: enable_output
+    integer :: max_iterations
+    real(kind=rp) :: tolerance
 
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
 
     type(vector_t) :: x
     type(json_file) :: solver_parameters
+    logical :: unconstrained_problem
 
     ! Initialize the logger
     call this%logger%init('optimization_data.csv')
@@ -90,7 +97,6 @@ contains
     problem_header = problem%get_log_header()
     optimization_header = 'iter, ' // trim(problem_header) // &
          ', KKTmax, KKTnorm2, scaling factor'
-    call this%logger%set_header(trim(optimization_header))
 
     call design%get_values(x)
 
@@ -100,24 +106,46 @@ contains
 
     call json_get(parameters, "optimization.solver", &
          solver_parameters)
-    call this%mma%init(x%x, design%size(), problem%get_n_constraints(), &
-         solver_parameters, this%scale, this%auto_scale)
+
+    ! Initialize mma_t, handling the dummy_constraint added for unconstrained
+    ! problems in mma_optimizer_run()
+    unconstrained_problem = (problem%get_n_constraints() == 0)
+    if (unconstrained_problem) then
+       call this%mma%init(x, design%size(), 1, &
+            solver_parameters, this%scale, this%auto_scale)
+    else
+       call this%mma%init(x, design%size(), problem%get_n_constraints(), &
+            solver_parameters, this%scale, this%auto_scale)
+    end if
+
+    call json_get_or_default(parameters, "optimization.solver.max_iterations", &
+         max_iterations, 100)
+    call json_get_or_default(parameters, "optimization.solver.tolerance", &
+         tolerance, 1.0e-3_rp)
+    call json_get_or_default(parameters, "optimization.solver.enable_output", &
+         enable_output, .true.)
 
     call this%init_from_components(problem, design, &
-         max_iterations, tolerance, simulation)
+         max_iterations, tolerance, enable_output, simulation)
 
+    call this%logger%set_header(trim(optimization_header) // &
+         this%mma%get_backend_and_subsolver())
     call x%free()
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       max_iterations, tolerance, simulation)
+       max_iterations, tolerance, enable_output, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     type(simulation_t), intent(in), optional :: simulation
+    logical, intent(in) :: enable_output
+
+    !set the enable_output flag
+    this%enable_output = enable_output
 
     call this%init_base(max_iterations, tolerance)
 
@@ -142,9 +170,19 @@ contains
     type(matrix_t) :: constraint_sensitivities
 
     type(vector_t) :: log_data
+    logical :: unconstrained_problem = .false.
+    class(constraint_t), allocatable :: dummy_con
+    type(json_file) :: parameters
 
     n = design%size()
     call MPI_Allreduce(n, nglobal, 1, MPI_INTEGER, mpi_sum, neko_comm, ierr)
+
+    unconstrained_problem = (problem%get_n_constraints() == 0)
+    if (unconstrained_problem) then
+       allocate(dummy_constraint_t::dummy_con)
+       call dummy_con%init(parameters, design)
+       call problem%add_constraint(dummy_con)
+    end if
 
     ! Initialize the vectors
     call x%init(n)
@@ -171,14 +209,22 @@ contains
 
     call profiler_end_region("Optimizer iteration")
 
-    ! Stamp the initial condition
-    call problem%get_all_objective_values(all_objectives)
-    call mma_logger_assemble_data(log_data, 0, objective_value, &
-         all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
-         problem%get_n_objectives(), problem%get_n_constraints())
-    call this%logger%write(log_data)
+    if (this%enable_output) then
+       call profiler_start_region("Optimizer logging")
+       ! Stamp the initial condition
+       call problem%get_all_objective_values(all_objectives)
+       call mma_logger_assemble_data(log_data, 0, objective_value, &
+            all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
+            problem%get_n_objectives(), problem%get_n_constraints(), &
+            unconstrained_problem)
+       call this%logger%write(log_data)
 
-    if (present(simulation)) call simulation%write(0)
+       if (present(simulation)) then
+          call simulation%write(0)
+       end if
+
+       call profiler_end_region("Optimizer logging")
+    end if
     call design%write(0)
 
     do iter = 1, this%max_iterations
@@ -228,16 +274,23 @@ contains
 
        call profiler_end_region("Optimizer iteration")
 
-       ! Stamp the i^th iteration
-       call problem%get_all_objective_values(all_objectives)
-       call mma_logger_assemble_data(log_data, iter, objective_value, &
-            all_objectives, constraint_value, this%mma%get_residumax(), &
-            this%mma%get_residunorm(), scaling_factor, &
-            problem%get_n_objectives(), problem%get_n_constraints())
-       call this%logger%write(log_data)
+       if (this%enable_output) then
+          call profiler_start_region("Optimizer logging")
+          ! Stamp the i^th iteration
+          call problem%get_all_objective_values(all_objectives)
+          call mma_logger_assemble_data(log_data, iter, objective_value, &
+               all_objectives, constraint_value, this%mma%get_residumax(), &
+               this%mma%get_residunorm(), scaling_factor, &
+               problem%get_n_objectives(), problem%get_n_constraints(), &
+               unconstrained_problem)
+          call this%logger%write(log_data)
 
-       if (present(simulation)) call simulation%write(iter)
-       call design%write(iter)
+          if (present(simulation)) then
+             call simulation%write(iter)
+          end if
+          call design%write(iter)
+          call profiler_end_region("Optimizer logging")
+       end if
 
     end do
 
@@ -294,19 +347,26 @@ contains
   ! package up the log data
   subroutine mma_logger_assemble_data(log_data, iter, objective_value, &
        all_objectives, constraint_value, residumax, residunorm, &
-       scaling_factor, n, m)
+       scaling_factor, n, m, unconstrained_problem)
     type(vector_t), intent(out) :: log_data
     integer, intent(in) :: iter
     real(kind=rp), intent(in) ::objective_value
     type(vector_t), intent(in) :: all_objectives
     type(vector_t), intent(in) :: constraint_value
     real(kind=rp), intent(in) :: residumax, residunorm, scaling_factor
+    logical, intent(in) :: unconstrained_problem
     integer, intent(in) :: n, m
     integer :: i_tmp1, i_tmp2
 
+
+
     ! initialize the logger data
     ! iter | tot F | F_1 | .. |F_n | C_1 | ... | C_n | KKT | KKT2 | scale |
-    call log_data%init(5 + n + m)
+    if (unconstrained_problem) then
+       call log_data%init(5 + n)
+    else
+       call log_data%init(5 + n + m)
+    endif
 
     ! iteration
     log_data%x(1) = real(iter, kind=rp)
@@ -320,9 +380,12 @@ contains
     log_data%x(i_tmp1 : i_tmp2) = all_objectives%x
 
     ! constraints
-    i_tmp1 = i_tmp2 + 1
-    i_tmp2 = i_tmp1 + m - 1
-    log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
+    if (.not. unconstrained_problem) then
+       i_tmp1 = i_tmp2 + 1
+       i_tmp2 = i_tmp1 + m - 1
+       log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
+    end if
+
 
     ! convergence stuff
     log_data%x(i_tmp2 + 1) = residumax

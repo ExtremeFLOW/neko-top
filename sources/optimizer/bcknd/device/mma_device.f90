@@ -34,8 +34,8 @@ submodule (mma) mma_device
 
   use device_math, only: device_copy, device_cmult, device_cadd, device_cfill, &
        device_add2, device_add3s2, device_invcol2, device_col2, device_col3, &
-       device_sub2, device_sub3, device_add2s2, device_cadd2, &
-       device_glsum, device_cmult2, device_pwmax2
+       device_sub2, device_sub3, device_add2s2, device_cadd2, device_pwmax2, &
+       device_glsum, device_cmult2
   use device_mma_math, only: device_maxval, device_norm, device_lcsc2, &
        device_maxval2, device_maxval3, device_mma_gensub3, &
        device_mma_gensub4, device_mma_max, device_max2, device_rex, &
@@ -49,6 +49,7 @@ submodule (mma) mma_device
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
 
@@ -71,10 +72,13 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
+    call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
+    call profiler_end_region("MMA gensub")
 
     !solve the approximation problem using interior point method
+    call profiler_start_region("MMA subsolve")
     if (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_device(this, x)
     else if (this%subsolver .eq. "dpip") then
@@ -82,6 +86,7 @@ contains
     else
        call neko_error("Unrecognized subsolver for MMA in mma_device.")
     end if
+    call profiler_end_region("MMA subsolve")
 
     this%is_updated = .true.
   end subroutine mma_update_device

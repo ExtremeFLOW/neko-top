@@ -80,6 +80,9 @@ module mma
      procedure, public, pass(this) :: get_residumax => mma_get_residumax
      procedure, public, pass(this) :: get_residunorm => mma_get_residunorm
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
+     procedure, public, pass(this) :: get_backend_and_subsolver => &
+          mma_get_backend_and_subsolver
+
 
      generic, public :: update => update_vector, update_cpu, update_device
      procedure, pass(this) :: update_vector => mma_update_vector
@@ -152,7 +155,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
 
     type(json_file), intent(inout) :: json
 
@@ -211,7 +214,6 @@ contains
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .false.)
 
-    call json_get_or_default(json, 'mma.epsimin', epsimin, 1.0e-9_rp)
     ! Initialize the MMA object with the parsed parameters
     a = a_const
     c = c_const
@@ -225,8 +227,7 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
-    ! call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-    !      max_iter, epsimin, asyinit, asyincr, asydecr, bcknd)
+
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
@@ -281,7 +282,7 @@ contains
     ! ----------------------------------------------------- !
     class(mma_t), intent(inout) :: this
     integer, intent(in) :: n, m
-    real(kind=rp), intent(in), dimension(n) :: x
+    type(vector_t), intent(in) :: x
     ! -------------------------------------------------------------------!
     !      Internal parameters for MMA                                   !
     !      Minimize  f_0(x) + a_0*z + sum( c_i*y_i + 0.5*d_i*(y_i)^2 )   !
@@ -303,8 +304,8 @@ contains
 
     call this%xold1%init(n)
     call this%xold2%init(n)
-    this%xold1%x = x
-    this%xold2%x = x
+    this%xold1 = x
+    this%xold2 = x
 
     call this%alpha%init(n)
     call this%beta%init(n)
@@ -324,7 +325,7 @@ contains
     call this%qij%init(m, n)
     call this%bi%init(m)
 
-    !---nesessary for KKT check after updating df0dx, fval, dfdx --------
+    ! Necessary for KKT check after updating df0dx, fval, dfdx
     call this%y%init(m)
     call this%lambda%init(m)
     call this%s%init(m)
@@ -337,14 +338,25 @@ contains
     this%c%x = c
     this%d%x = d
 
-    !setting the bounds for the design variable based on the problem
+    ! Set the bounds for the design variable based on the problem
     this%xmax%x = xmax
     this%xmin%x = xmin
 
-    this%low%x(:) = minval(x)
-    this%upp%x(:) = maxval(x)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%a%x, this%a%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%c%x, this%c%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%d%x, this%d%x_d, m, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%xmax%x, this%xmax%x_d, n, HOST_TO_DEVICE, &
+            sync = .false.)
+       call device_memcpy(this%xmin%x, this%xmin%x_d, n, HOST_TO_DEVICE, &
+            sync = .true.)
+    end if
 
-    !setting KKT norms to a large number for the initial design
+
+    ! Set KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
@@ -355,21 +367,6 @@ contains
           print *, "MMA initialized with CPU backend!"
        end if
     case ("device")
-       ! upload all init values to device pointers
-       call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, &
-            HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%xold1%x, this%xold2%x_d, this%n, &
-            HOST_TO_DEVICE, sync = .false.)
-       call device_memcpy(this%a%x, this%a%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%c%x, this%c%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%d%x, this%d%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, HOST_TO_DEVICE, &
-            sync = .false.)
        if (pe_rank == 0) then
           if (NEKO_BCKND_CUDA .eq. 1) then
              print *, "MMA initialized with CUDA backend!"
@@ -382,17 +379,17 @@ contains
           end if
        end if
     case default
-       call neko_error('Unknown backend in mma_init_attributes')
+       call neko_error('Unknown backend in mma_init_components')
     end select
 
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
-    ! based on the Cpp Code by Niels
+    ! Based on the Cpp Code by Niels
     if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
     if (.not. present(max_iter)) this%max_iter = 100
 
-    ! Following parameters are set based on eq.3.8:--------
+    ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
@@ -419,7 +416,7 @@ contains
        print *, "MMA is initialized with a0 = ", a0, ", a = ", a, ", c = ", c, &
             ", d = ", d, "epsimin = ", this%epsimin
     end if
-    !the object is correctly initialized
+    ! The object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_from_components
 
@@ -453,7 +450,6 @@ contains
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
-       call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, sync = .true.)
     end select
 
   end subroutine mma_update_vector
@@ -522,4 +518,11 @@ contains
     max_iter_value = this%max_iter
   end function mma_get_max_iter
 
+  !> Get the maximum number of iterations for the mma_subsolve inner loop
+  pure function mma_get_backend_and_subsolver(this) result(backend_subsolver)
+    class(mma_t), intent(in) :: this
+    character(len=:), allocatable :: backend_subsolver
+    backend_subsolver = ', backend:' // this%bcknd // ',subsolver:' // &
+         this%subsolver
+  end function mma_get_backend_and_subsolver
 end module mma
