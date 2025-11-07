@@ -50,8 +50,11 @@ DOCS=false
 OPTIONS=help,test,clean,clean-neko,quiet,device:,doc
 OPT=h,t,c,q,d:
 
-# Parse the inputs for options
-PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+# Parse the options using robust-getopt
+source $MAIN_DIR/scripts/robust-getopt.sh
+PARSED=$(robust-getopt $0 $OPT $OPTIONS "$@")
+
+# Set the positional parameters to the parsed options
 eval set -- "$PARSED"
 
 # Loop through the options and set the variables

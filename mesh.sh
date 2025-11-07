@@ -49,9 +49,9 @@ DIMENSION=2  # Dimension of GMSH file
 OPTIONS=help,all,keep,remesh,dimension:
 OPT=h,a,k,r,d:
 
-# Parse the inputs for options
-PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
-eval set -- "$PARSED"
+# Parse the options using robust-getopt
+source $MAIN_DIR/scripts/robust-getopt.sh
+PARSED=$(robust-getopt $0 $OPT $OPTIONS "$@")
 
 # Loop through the options and set the variables
 while true; do
