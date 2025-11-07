@@ -6,23 +6,22 @@
 
 function robust-getopt {
     # Define the options
-    local NAME=$1
-    local OPT=$2
-    local OPTIONS=$3
-    local PARSED
+    local NAME=$1    # The name of the script
+    local OPT=$2     # Short options, e.g., "h,t,c,q,d:"
+    local OPTIONS=$3 # Long options, e.g., "help,test,procs:"
+    local PARSED     # The parsed options to be returned
     shift 3
 
-    local OS_TYPE=$(uname)
-
     local GETOPT=""
-    local GNU_GETOPT=""
+    local OS_TYPE=$(uname)
 
     # Check if the OS is Linux or Darwin (macOS)
     if [ "$OS_TYPE" == "Linux" ]; then
         if command -v getopt >/dev/null 2>&1; then
             GETOPT=$(command -v getopt)
         else
-            echo "Error: getopt is not installed. Please install it and try again." >&2
+            echo "Error: getopt is not installed." >&2
+            echo "Please install it and try again." >&2
             exit 1
         fi
     elif [ "$OS_TYPE" == "Darwin" ]; then
@@ -34,7 +33,8 @@ function robust-getopt {
         elif command -v getopt >/dev/null 2>&1; then
             GETOPT=$(command -v getopt)
         else
-            echo "Error: Neither GNU getopt nor BSD getopt is available. Please ensure one is installed and try again." >&2
+            echo "Error: Neither GNU getopt nor BSD getopt is available." >&2
+            echo "Please ensure one is installed and try again." >&2
             exit 1
         fi
     else
@@ -43,7 +43,7 @@ function robust-getopt {
 
     $GETOPT -T >/dev/null
     if [ $? -eq 4 ]; then
-        PARSED=$($GETOPT --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+        PARSED=$($GETOPT --options=$OPT --longoptions=$OPTIONS --name $NAME -- "$@")
     else
         PARSED=$($GETOPT $OPT "$@")
     fi
