@@ -51,6 +51,8 @@ module adjoint_fluid_scheme
   use field_series, only: field_series_t
   use time_step_controller, only: time_step_controller_t
   use field_list, only : field_list_t
+  use interpolation, only: interpolator_t
+  use scratch_registry, only : scratch_registry_t
 
   implicit none
   private
@@ -65,6 +67,19 @@ module adjoint_fluid_scheme
      type(dofmap_t) :: dm_Xh !< Dofmap associated with \f$ X_h \f$
      type(gs_t) :: gs_Xh !< Gather-scatter associated with \f$ X_h \f$
      type(coef_t) :: c_Xh !< Coefficients associated with \f$ X_h \f$
+
+     ! Tim. This will need to be refactored, but since we have so many extra
+     ! terms that involve products of variables, we often need to increase our
+     ! quadrature. So it's natural to have an over integration coef and a
+     ! way of converting between them
+     type(space_t) :: Xh_GL !< Function space \f$ X_h_GL \f$
+     type(dofmap_t) :: dm_Xh_GL !< Dofmap associated with \f$ X_h_GL \f$
+     type(gs_t) :: gs_Xh_GL !< Gather-scatter associated with \f$ X_h_GL \f$
+     type(coef_t) :: c_Xh_GL !< Coefficients associated with \f$ X_h_GL \f$
+     !> Interpolator between the original and higher-order spaces
+     type(interpolator_t) :: GLL_to_GL
+     !> Scratch registry on the GL space
+     type(scratch_registry_t) :: scratch_GL
 
      type(time_scheme_controller_t), allocatable :: ext_bdf
 

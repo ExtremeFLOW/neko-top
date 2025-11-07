@@ -37,13 +37,14 @@ module problem
   use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use vector, only: vector_t
   use matrix, only: matrix_t
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use json_module, only: json_file
-  use json_utils, only: json_extract_item, json_get
+  use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use device_math, only: device_copy
@@ -227,6 +228,7 @@ contains
     character(len=:), allocatable :: path, type
     type(json_file) :: objective_json
     integer :: n_objectives, i
+    logical :: dealias
 
     call neko_log%section("Reading objectives")
 
@@ -244,6 +246,20 @@ contains
           call objective_factory(objective, objective_json, design, simulation)
           call this%add_objective(objective)
        end do
+    end if
+
+    if (present(simulation)) then
+       if (allocated(objective)) deallocate(objective)
+       allocate(augmented_lagrangian_objective_t::objective)
+       select type(ALO => objective)
+       class is (augmented_lagrangian_objective_t)
+          call json_get_or_default(parameters, &
+               "adjoint_fluid.dealias_sensitivity", dealias, .true.)
+          call ALO%init_from_attributes(design, simulation, weight = 1.0_rp, &
+               name = "Augmented Lagrangian", mask_name = "", &
+               dealias = dealias)
+       end select
+       call this%add_objective(objective)
     end if
 
     call neko_log%end_section()
