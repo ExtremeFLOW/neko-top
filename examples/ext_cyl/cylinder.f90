@@ -537,10 +537,11 @@ end subroutine state_vector_assignment
      real(kind=rp) :: T_fin, dt 
      integer :: n_steps
 
-     ! initalize the simulation
-     call self%simulation%init(parameters)
      ! Make it linear
      self%simulation%adjoint_case%if_adjoint = .false.
+     ! initalize the simulation
+     call self%simulation%init(parameters)
+     
      ! since we never actually do the forward, we need to manually enter the
      ! total timesteps...
      T_fin = self%simulation%neko_case%time%end_time
