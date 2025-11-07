@@ -116,6 +116,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
+    logical :: dealias_adjoint_scalar_convection
 
     !
     ! Setup adjoint fluid
@@ -182,11 +183,16 @@ contains
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! initialize the coupling term
+          call json_get_or_default(neko_case%params, &
+               'case.adjoint_scalar.dealias_coupling_term', &
+               dealias_adjoint_scalar_convection, .true.)
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
                this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-               this%fluid_adj%c_Xh)
+               this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
+               this%fluid_adj%GLL_to_GL, &
+               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)

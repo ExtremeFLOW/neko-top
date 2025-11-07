@@ -31,17 +31,17 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `volume_constraint_t` type.
-! $V = \frac{1}{|\Omega_O|}\int_{\Omega_O} \tilde{\rho} d\Omega$
-! Either
-! $V < V_\text{max}$
-! $V > V_\text{min}$
+!! \f$V = \frac{1}{|\Omega_O|}\int_{\Omega_O} \tilde{\rho} d\Omega\f$
+!! Either
+!! \f$V < V_\text{max} \f$
+!! \f$V > V_\text{min} \f$
 module volume_constraint
   use constraint, only: constraint_t
 
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use simulation_m, only: simulation_t
-
+  use mapping_handler, only: mapping_handler_t
   use num_types, only: rp
   use coefs, only: coef_t
   use json_module, only: json_file
@@ -51,12 +51,14 @@ module volume_constraint
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
-  use math, only: glsc2
-  use device_math, only: device_glsc2
+  use math, only: glsc2, copy, cmult
+  use device_math, only: device_glsc2, device_copy, device_cmult
   use vector_math, only: vector_cmult
   use math_ext, only: glsc2_mask
-  use field_math, only: field_rone, field_copy
+  use field_math, only: field_rone, field_copy, field_cmult, field_cfill
   use utils, only: neko_error
+  use vector, only: vector_t
+  use neko_ext, only: field_to_vector
   implicit none
   private
 
@@ -65,16 +67,19 @@ module volume_constraint
      private
 
      !> whether it is minimum or maximum volume
-     !! is_max = .false., 	ie V > V_min  		=>		 -V + V_max < 0
-     !! is_max = .true. , 	ie V < V_max  		=>		  V - V_max < 0
+     !! is_max = .false.,   ie V > V_min      =>     -V + V_max < 0
+     !! is_max = .true. ,   ie V < V_max      =>      V - V_max < 0
      logical :: is_max
      !> Maximum (or minimum) volume
      real(kind=rp) :: limit
      !> Volume of the optimization domain
      real(kind=rp) :: volume_domain
-
      !> Pointer to the SEM field.
      class(coef_t), pointer :: c_Xh => null()
+     !> Mapping cascade
+     type(mapping_handler_t) :: mapping
+     !> if mapping is needed
+     logical :: if_mapping = .false.
 
    contains
 
@@ -82,8 +87,8 @@ module volume_constraint
      procedure, public, pass(this) :: init_json_sim => &
           volume_constraint_init_json_sim
      !> The direct initializer from attributes.
-     procedure, public, pass(this) :: init_from_attributes => &
-          volume_constraint_init_attributes
+     procedure, public, pass(this) :: init_from_components => &
+          volume_constraint_init_from_components
      !> Destructor.
      procedure, public, pass(this) :: free => volume_constraint_free
      !> Computes the source term and adds the result to `fields`.
@@ -116,13 +121,24 @@ contains
     logical :: is_max
     real(kind=rp) :: limit
 
-    call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Volume constraint")
+    call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "is_max", is_max, .false.)
     call json_get(json, "limit", limit)
 
-    call this%init_from_attributes(design, simulation, name, mask_name, &
+    call this%init_from_components(design, simulation, name, mask_name, &
          is_max, limit)
+
+    ! check if we have a mapping
+    if ('mapping' .in. json) then
+       ! Initialize the mapper
+       call this%mapping%init_base(this%c_Xh)
+       call this%mapping%add(json, 'mapping')
+       this%if_mapping = .true.
+       ! recompute value after mapping
+       call this%update_value(design)
+    end if
+
   end subroutine volume_constraint_init_json_sim
 
   !> The direct initializer from attributes.
@@ -133,7 +149,7 @@ contains
   !! @param mask_name the name of the mask.
   !! @param is_max whether it is a maximum volume constraint.
   !! @param limit The volume limit value.
-  subroutine volume_constraint_init_attributes(this, design, simulation, &
+  subroutine volume_constraint_init_from_components(this, design, simulation, &
        name, mask_name, is_max, limit)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -143,7 +159,6 @@ contains
     logical, intent(in) :: is_max
     real(kind=rp), intent(in) :: limit
 
-    real(kind=rp) :: volume
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
@@ -161,9 +176,9 @@ contains
        ! calculate the volume of the optimization domain
        call neko_scratch_registry%request_field(work, temp_indices(1))
        call field_rone(work)
+       call mask_exterior_const(work, this%mask, 0.0_rp)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call mask_exterior_const(work, this%mask, 0.0_rp)
           this%volume_domain = device_glsc2(work%x_d, this%c_xh%B_d, &
                work%size())
        else
@@ -179,28 +194,34 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Initialize the value of constraint
 
-    ! Compute the volume of the design
-    volume = this%compute_volume(design)
-
-    ! Compute the distance to the target volume
-    this%value = this%limit - volume / this%volume_domain
-
-    ! Invert the sign if it is a maximum constraint
-    if (this%is_max) this%value = - ( this%value )
+    call this%update_value(design)
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the sensitivity value
 
-    this%sensitivity = 1.0_rp / this%volume_domain
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, this%c_xh%B_d, design%size())
+       call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, &
+            design%size())
 
-    ! Invert the sign if it is a maximum constraint
-    call vector_cmult(this%sensitivity, -1.0_rp)
+       if (this%is_max) then
+          call device_cmult(this%sensitivity%x_d, -1.0_rp, design%size())
+       end if
+    else
+       call copy(this%sensitivity%x, this%c_Xh%B, design%size())
+       call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, &
+            design%size())
+
+       if (this%is_max) then
+          call vector_cmult(this%sensitivity, -1.0_rp)
+       end if
+    end if
 
     if (this%has_mask) then
        call mask_exterior_const(this%sensitivity, this%mask, 0.0_rp)
     end if
 
-  end subroutine volume_constraint_init_attributes
+  end subroutine volume_constraint_init_from_components
 
   !> Destructor.
   subroutine volume_constraint_free(this)
@@ -223,7 +244,7 @@ contains
     this%value = this%limit - volume / this%volume_domain
 
     ! Invert the sign if it is a maximum constraint
-    if (this%is_max) this%value = - ( this%value )
+    if (this%is_max) this%value = -this%value
 
   end subroutine volume_constraint_update_value
 
@@ -233,15 +254,37 @@ contains
   subroutine volume_constraint_update_sensitivity(this, design)
     class(volume_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
+    !> Sensitivity field
+    type(field_t), pointer :: unmapped, mapped
+    integer :: temp_indices(2)
 
-    ! Sensitivity is just a constant so it should not be updated
+    if (this%if_mapping) then
+       ! Recompute and map backward
+       call neko_scratch_registry%request_field(unmapped, temp_indices(1))
+       call neko_scratch_registry%request_field(mapped, temp_indices(2))
+       ! The mapping will handle the mass matrix
+       call field_cfill(unmapped, -1.0_rp / this%volume_domain)
+       if (this%is_max) then
+          call field_cmult(unmapped, -1.0_rp)
+       end if
+       ! mask
+       if (this%has_mask) then
+          call mask_exterior_const(unmapped, this%mask, 0.0_rp)
+       end if
+       ! map backwards
+       call this%mapping%apply_backward(mapped, unmapped)
+       call field_to_vector(this%sensitivity, mapped)
+
+       call neko_scratch_registry%relinquish_field(temp_indices)
+
+    else
+       ! Sensitivity is just a constant so it should not be updated
+    end if
 
   end subroutine volume_constraint_update_sensitivity
 
-
   ! ========================================================================== !
   ! The actual volume computations for different types of designs
-
 
   !> Computes the volume of the design.
   !!
@@ -271,38 +314,46 @@ contains
     class(volume_constraint_t), intent(inout) :: this
     type(brinkman_design_t), intent(in) :: design
     real(kind=rp) :: volume
-    type(field_t), pointer :: work, design_indicator
+    type(field_t), pointer :: work
+    type(vector_t) :: values, unmapped_values
     integer :: temp_indices(1)
 
     volume = 0.0_rp
-    design_indicator => neko_field_registry%get_field("design_indicator")
+    if (this%if_mapping) then
+       call design%get_values(unmapped_values)
+       call values%init(unmapped_values%size())
+       call this%mapping%apply_forward(values, unmapped_values)
+       call unmapped_values%free()
+    else
+       call design%get_values(values)
+    end if
 
-    ! in the future we should be using the mapped design variable
-    ! corresponding to this constraint!!!
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call neko_scratch_registry%request_field(work, temp_indices(1))
-          call field_copy(work, design_indicator)
+          call device_copy(work%x_d, values%x_d, design%size())
           call mask_exterior_const(work, this%mask, 0.0_rp)
+
           volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
+
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          volume = glsc2_mask(design_indicator%x, &
-               this%c_Xh%B, design%size(), this%mask%mask%get(), this%mask%size)
+          volume = glsc2_mask(values%x, this%c_Xh%B, design%size(), &
+               this%mask%mask%get(), this%mask%size)
        end if
 
     else
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          volume = device_glsc2(design_indicator%x_d, &
-               this%c_xh%B_d, design%size())
+          volume = device_glsc2(values%x_d, this%c_xh%B_d, design%size())
        else
-          volume = glsc2(design_indicator%x, &
-               this%c_Xh%B, design%size())
+          volume = glsc2(values%x, this%c_Xh%B, design%size())
        end if
 
     end if
+
+    call values%free()
 
   end function volume_brinkman_design
 
