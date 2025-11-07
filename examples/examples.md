@@ -8,3 +8,4 @@
 6. \subpage passive-scalar
 7. \subpage beam
 8. \subpage mma
+6. \subpage static-mixers
