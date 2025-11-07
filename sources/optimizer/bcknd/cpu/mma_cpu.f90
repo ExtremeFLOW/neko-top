@@ -35,6 +35,8 @@ submodule (mma) mma_cpu
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use math, only: NEKO_EPS
+  use profiler, only: profiler_start_region, profiler_end_region
+
   implicit none
 
 contains
@@ -58,15 +60,19 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
+    call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
+    call profiler_end_region("MMA gensub")
 
     !solve the approximation problem using interior point method
+    call profiler_start_region("MMA subsolve")
     if (this%subsolver .eq. "dip") then
        call mma_subsolve_dip_cpu(this, x)
     else
        call mma_subsolve_dpip_cpu(this, x)
     end if
+    call profiler_end_region("MMA subsolve")
 
     this%is_updated = .true.
   end subroutine mma_update_cpu

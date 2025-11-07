@@ -43,9 +43,11 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_3dto1d.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_brinkman.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simplefield.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/set_optimization_ic.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
@@ -64,6 +66,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/dummy_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
