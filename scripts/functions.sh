@@ -15,7 +15,7 @@ function run {
         casefile=${casefile[0]}
         logfile=$(basename -- ${casefile%.*}).log
     else
-        logfile=$(basename -- $(dirname $(realpath $0))).log
+        logfile=$(basename -- $(dirname $(realpath -m $0))).log
     fi
 
     # Run the example
@@ -177,18 +177,18 @@ function prepare {
 
     if [ -f ./neko ]; then
         printf "Using user provided Neko executable.\n"
-        neko=$(realpath ./neko)
+        neko=$(realpath -m ./neko)
 
     elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
         $NEKO_DIR/bin/makeneko *.f90
-        neko=$(realpath ./neko)
+        neko=$(realpath -m ./neko)
 
     else
         printf "Using default Neko executable.\n"
-        neko=$(realpath $NEKO_DIR/bin/neko)
+        neko=$(realpath -m $NEKO_DIR/bin/neko)
     fi
 
     if [ ! -f "$neko" ]; then

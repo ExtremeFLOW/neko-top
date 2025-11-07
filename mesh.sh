@@ -73,7 +73,7 @@ export ALL KEEP REMESH DIMENSION
 
 # Define all needed folders relative to the project folder. (without trailing /)
 export CURRENT_DIR=$(pwd)
-export MAIN_DIR=$(dirname $(realpath $0))
+export MAIN_DIR=$(dirname $(realpath -m $0))
 
 # Set the path to the input files and the output meshes
 [ -z $INPUT_PATH ] && INPUT_PATH="$MAIN_DIR/data"         # Input files
@@ -85,11 +85,11 @@ export MAIN_DIR=$(dirname $(realpath $0))
 [ -z "$JSON_FORTRAN_DIR" ] && JSON_FORTRAN_DIR="$MAIN_DIR/external/json-fortran"
 
 # Force the paths to be absolute
-export INPUT_PATH=$(realpath $INPUT_PATH)
-export OUTPUT_PATH=$(realpath $OUTPUT_PATH)
-export NEK5000_DIR=$(realpath $NEK5000_DIR)
-export NEKO_DIR=$(realpath $NEKO_DIR)
-export JSON_FORTRAN_DIR=$(realpath $JSON_FORTRAN_DIR)
+export INPUT_PATH=$(realpath -m $INPUT_PATH)
+export OUTPUT_PATH=$(realpath -m $OUTPUT_PATH)
+export NEK5000_DIR=$(realpath -m $NEK5000_DIR)
+export NEKO_DIR=$(realpath -m $NEKO_DIR)
+export JSON_FORTRAN_DIR=$(realpath -m $JSON_FORTRAN_DIR)
 
 # ============================================================================ #
 # Ensure executables are available
@@ -106,7 +106,7 @@ file_list=""
 for input in $@; do
     [[ $ALL == "true" ]] && break
     input_name="$(basename $input)"
-    input_dir=$(realpath $INPUT_PATH/$(dirname $input))
+    input_dir=$(realpath -m $INPUT_PATH/$(dirname $input))
 
     tmp_list=$(find $input_dir -type f -name "$input_name")
 
