@@ -46,7 +46,7 @@ module adjoint_minimum_dissipation_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error
   use field, only: field_t
-  use field_math, only: field_subcol3, field_add2, field_add2s2
+  use field_math, only: field_subcol3, field_add2, field_add2s2, field_rzero
   use json_module, only: json_file
   use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
@@ -55,13 +55,14 @@ module adjoint_minimum_dissipation_source_term
   use num_types, only: rp
   use field, only: field_t
   use field_registry, only: neko_field_registry
-  use math, only: rzero, copy, chsign
-  use device_math, only: device_copy, device_cmult
+  use math, only: rzero, copy, chsign, cfill, invcol2
+  use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
-  use operators, only: curl
   use scratch_registry, only: neko_scratch_registry
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
+  use ax_product, only : ax_t, ax_helm_factory
+
   implicit none
   private
 
@@ -81,6 +82,10 @@ module adjoint_minimum_dissipation_source_term
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
+     !> an ax_helm type to compute weak laplacian
+     class(ax_t), allocatable :: Ax
+     !> volume of the objective domain.
+     real(kind=rp) :: volume
 
    contains
      !> The common constructor using a JSON object.
@@ -126,11 +131,12 @@ contains
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
+  !! @param volume volume of the objective domain.
   subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
        u, v, w, obj_scale, &
        mask, if_mask, &
-       coef)
+       coef, volume)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -140,6 +146,7 @@ contains
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), target :: mask
+    real(kind=rp), intent(in) :: volume
     logical :: if_mask
 
     ! I wish you didn't need a start time and end time...
@@ -164,11 +171,15 @@ contains
     this%w => w
 
     this%obj_scale = obj_scale
+    this%volume = volume
 
     this%if_mask = if_mask
     if (this%if_mask) then
        this%mask => mask
     end if
+
+    ! Initialize the ax_helm object
+    call ax_helm_factory(this%Ax, full_formulation = .false.)
 
   end subroutine adjoint_minimum_dissipation_source_term_init_from_components
 
@@ -177,6 +188,14 @@ contains
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%u)
+    nullify(this%v)
+    nullify(this%w)
+    nullify(this%mask)
+    if (allocated(this%Ax)) then
+       deallocate(this%Ax)
+    end if
+
   end subroutine adjoint_minimum_dissipation_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -187,14 +206,9 @@ contains
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
-    !type(field_t), pointer :: dudx, dudy, dudz
-    !type(field_t), pointer :: dvdx, dvdy, dvdz
-    !type(field_t), pointer :: dwdx, dwdy, dwdz
-    type(field_t), pointer :: wo1, wo2, wo3, wo4, wo5, wo6
-    type(field_t), pointer :: t1 , t2
-    integer :: temp_indices(8)
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
     integer n
-
 
     fu => this%fields%get_by_index(1)
     fv => this%fields%get_by_index(2)
@@ -202,58 +216,88 @@ contains
 
     n = fu%size()
 
-    ! fuck I'm not sure about this... I need a pen and paper
-    ! also there should be a way to pre-process this forcing term...
-    ! instead of recalculating it every time
     u => this%u
     v => this%v
     w => this%w
-    call neko_scratch_registry%request_field(wo1, temp_indices(1))
-    call neko_scratch_registry%request_field(wo2, temp_indices(2))
-    call neko_scratch_registry%request_field(wo3, temp_indices(3))
-    call neko_scratch_registry%request_field(wo4, temp_indices(4))
-    call neko_scratch_registry%request_field(wo5, temp_indices(5))
-    call neko_scratch_registry%request_field(wo6, temp_indices(6))
-    call neko_scratch_registry%request_field(t1 , temp_indices(7))
-    call neko_scratch_registry%request_field(t2 , temp_indices(8))
 
-    ! TODO
-    ! ok we're computing gradients at every timestep... which is stupid...
-    ! BUT
-    ! if this was unsteady we would have to do this.
+    call neko_scratch_registry%request_field(work, temp_indices(1))
 
-    ! TODO
-    ! this is cheating a little bit...
-    ! in strong form, \nabla u . \nabla v => - v . \nabla^2 u + bdry
-    !
-    ! we can do this properly later in weak form, ideally using ax_helm or so
-    !
-    ! for now we'll work in strong form and ignore the bdry
-    ! and suffer the double derivative :/
-    !
-    ! in fact, we'll go even quicker and use
-    ! \nabla ^2 u = grad (div (u)) - curl ( curl (u ))
-    ! and assume divergence free u
+    associate(coef => this%coef)
 
-    ! => - \nabla ^2 u =  curl ( curl (u ))
+      ! Note that axhelm computes h1 * lap u + h2 * u
+      ! we set h1 = 1 and h2 = 0 to compute the weak laplacian.
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_cfill(coef%h1_d, 1.0_rp, n)
+         call device_cfill(coef%h2_d, 0.0_rp, n)
+      else
+         call cfill(coef%h1, 1.0_rp, n)
+         call cfill(coef%h2, 0.0_rp, n)
+      end if
+      coef%ifh2 = .false.
 
-    call curl(wo1, wo2, wo3, u, v, w, t1, t2, this%coef)
-    call curl(wo4, wo5, wo6, wo1, wo2, wo3, t1, t2, this%coef)
+      ! ------------------------------------------------------------------------
+      ! u
 
-    ! mask
-    if (this%if_mask) then
-       call mask_exterior_const(wo4, this%mask, 0.0_rp)
-       call mask_exterior_const(wo5, this%mask, 0.0_rp)
-       call mask_exterior_const(wo6, this%mask, 0.0_rp)
-    end if
+      call this%Ax%compute(work%x, u%x, coef, coef%msh, coef%xh)
 
-    call field_add2s2(fu, wo4, this%obj_scale)
-    call field_add2s2(fv, wo5, this%obj_scale)
-    call field_add2s2(fw, wo6, this%obj_scale)
+      ! pre-divide out the mass matrix to counteract it's multiplication
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_invcol2(work%x_d, coef%B_d, work%size())
+      else
+         call invcol2(work%x, coef%B, work%size())
+      end if
 
-    ! don't worry... we'll write this MUCH cleaner in the final version
+      ! mask
+      if (this%if_mask) then
+         call mask_exterior_const(work, this%mask, 0.0_rp)
+      end if
 
-    call neko_scratch_registry%relinquish_field(temp_indices)
+      ! add to RHS
+      call field_add2s2(fu, work, this%obj_scale / this%volume)
+
+      ! ------------------------------------------------------------------------
+      ! v
+
+      call this%Ax%compute(work%x, v%x, coef, coef%msh, coef%xh)
+
+      ! pre-divide out the mass matrix to counteract it's multiplication
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_invcol2(work%x_d, coef%B_d, work%size())
+      else
+         call invcol2(work%x, coef%B, work%size())
+      end if
+
+      ! mask
+      if (this%if_mask) then
+         call mask_exterior_const(work, this%mask, 0.0_rp)
+      end if
+
+      ! add to RHS
+      call field_add2s2(fv, work, this%obj_scale / this%volume)
+
+      ! ------------------------------------------------------------------------
+      ! w
+
+      call this%Ax%compute(work%x, w%x, coef, coef%msh, coef%xh)
+
+      ! pre-divide out the mass matrix to counteract it's multiplication
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_invcol2(work%x_d, coef%B_d, work%size())
+      else
+         call invcol2(work%x, coef%B, work%size())
+      end if
+
+      ! mask
+      if (this%if_mask) then
+         call mask_exterior_const(work, this%mask, 0.0_rp)
+      end if
+
+      ! add to RHS
+      call field_add2s2(fw, work, this%obj_scale / this%volume)
+
+      call neko_scratch_registry%relinquish_field(temp_indices)
+
+    end associate
 
   end subroutine adjoint_minimum_dissipation_source_term_compute
 

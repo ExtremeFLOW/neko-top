@@ -81,7 +81,7 @@ module minimum_dissipation_objective
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use point_zone, only: point_zone_t
-  use mask_ops, only: mask_exterior_const
+  use mask_ops, only: mask_exterior_const, compute_masked_volume
   use math_ext, only: glsc2_mask
   use utils, only: neko_error
   use json_module, only: json_file
@@ -90,8 +90,7 @@ module minimum_dissipation_objective
   private
 
   !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega + K \int_Omega \frac{1}{2} \chi
-  !! |\mathbf{u}|^2 d \Omega \f$
+  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega \f$
   type, public, extends(objective_t) :: minimum_dissipation_objective_t
      private
 
@@ -103,13 +102,14 @@ module minimum_dissipation_objective
      type(field_t), pointer :: w => null()
      !> Pointer to the coefficient field.
      type(coef_t), pointer :: c_Xh => null()
-
      !> Pointer to adjoint u field.
      type(field_t), pointer :: adjoint_u => null()
      !> Pointer to adjoint v field.
      type(field_t), pointer :: adjoint_v => null()
      !> Pointer to adjoint w field.
      type(field_t), pointer :: adjoint_w => null()
+     !> Volume of the objective domain.
+     real(kind=rp) :: volume
 
    contains
      !> The common constructor using a JSON object.
@@ -168,7 +168,6 @@ contains
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
-
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
@@ -182,6 +181,13 @@ contains
     this%adjoint_v => neko_field_registry%get_field('v_adj')
     this%adjoint_w => neko_field_registry%get_field('w_adj')
 
+    ! compute the volume of the objective domain
+    if (this%has_mask) then
+       this%volume = compute_masked_volume(this%mask, this%c_Xh)
+    else
+       this%volume = this%c_Xh%volume
+    end if
+
     ! you will need to init this!
     ! append a source term based on the minimum dissipation
     ! init the adjoint forcing term for the adjoint
@@ -191,7 +197,7 @@ contains
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
-         this%c_Xh)
+         this%c_Xh, this%volume)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
@@ -260,19 +266,19 @@ contains
           call mask_exterior_const(work, this%mask, 0.0_rp)
           this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%C_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
                n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
           this%value = device_glsc2(objective_field%x_d, &
-               this%C_Xh%b_d, n)
+               this%c_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%C_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
        end if
     end if
 
-    this%value = this%value * 0.5_rp
+    this%value = this%value * 0.5_rp / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -284,25 +290,6 @@ contains
   subroutine minimum_dissipation_update_sensitivity(this, design)
     class(minimum_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(field_t), pointer :: work
-    integer :: temp_indices(1)
-
-    call neko_scratch_registry%request_field(work, temp_indices(1))
-
-    ! here it should just be an inner product between the forward and adjoint
-    call field_col3(work, this%u, this%adjoint_u)
-    call field_addcol3(work, this%v, this%adjoint_v)
-    call field_addcol3(work, this%w, this%adjoint_w)
-    ! but negative
-    call field_cmult(work, -1.0_rp)
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
-    else
-       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
-    end if
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine minimum_dissipation_update_sensitivity
 

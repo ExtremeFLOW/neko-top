@@ -9,6 +9,7 @@ module mma_optimizer
   use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use design, only: design_t
+  use brinkman_design, only: brinkman_design_t
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use profiler, only: profiler_start_region, profiler_end_region
@@ -204,7 +205,12 @@ contains
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
-    call problem%get_objective_sensitivities(objective_sensitivities)
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     call profiler_end_region("Optimizer iteration")
@@ -264,7 +270,12 @@ contains
 
        call problem%get_objective_value(objective_value)
        call problem%get_constraint_values(constraint_value)
-       call problem%get_objective_sensitivities(objective_sensitivities)
+       select type (des => design)
+       type is (brinkman_design_t)
+          call des%get_sensitivity(objective_sensitivities)
+       class default
+          call problem%get_objective_sensitivities(objective_sensitivities)
+       end select
        call problem%get_constraint_sensitivities(constraint_sensitivities)
 
        call profiler_start_region("MMA KKT computation")

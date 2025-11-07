@@ -47,7 +47,7 @@ __global__ void copy_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = b[mask[i]-1];
+        a[mask[i]] = b[mask[i]];
     }
 }
 
@@ -63,7 +63,7 @@ __global__ void cadd_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = a[mask[i]-1] + c;
+        a[mask[i]] = a[mask[i]] + c;
     }
 }
 
@@ -79,7 +79,7 @@ __global__ void invcol1_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = 1.0 / a[mask[i]-1];
+        a[mask[i]] = 1.0 / a[mask[i]];
     }
 }
 
@@ -95,7 +95,7 @@ __global__ void col2_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = a[mask[i]-1] * b[mask[i]-1];
+        a[mask[i]] = a[mask[i]] * b[mask[i]];
     }
 }
 
@@ -111,7 +111,7 @@ __global__ void col3_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = b[mask[i]-1] * c[mask[i]-1];
+        a[mask[i]] = b[mask[i]] * c[mask[i]];
     }
 }
 
@@ -127,7 +127,7 @@ __global__ void sub3_mask_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]-1] = b[mask[i]-1] - c[mask[i]-1];
+        a[mask[i]] = b[mask[i]] - c[mask[i]];
     }
 }
 
