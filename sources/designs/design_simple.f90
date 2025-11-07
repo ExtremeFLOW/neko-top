@@ -39,12 +39,11 @@ module simple_design
   use RAMP_mapping, only: RAMP_mapping_t
   use coefs, only: coef_t
   use scratch_registry, only: neko_scratch_registry
-  use fld_file_output, only: fld_file_output_t
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use design, only: design_t
   use math, only: rzero
   use simulation_m, only: simulation_t
@@ -55,7 +54,8 @@ module simple_design
   use vector, only: vector_t
   use math, only: copy
   use field_registry, only: neko_field_registry
-  use utils, only:neko_error
+  use mpi_f08, only: MPI_Comm_size, MPI_COMM_WORLD
+  use utils, only: neko_error
   implicit none
   private
 
@@ -67,6 +67,9 @@ module simple_design
      type(vector_t) :: x_coord
      type(vector_t) :: y_coord
      type(vector_t) :: z_coord
+
+     ! needed to write the design into a vtk file with connectivity
+     integer :: nx, ny, nz
 
    contains
 
@@ -118,7 +121,7 @@ contains
     class(simple_design_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     character(len=:), allocatable :: type, name
-    integer :: n, nx, ny, nz, i, j, k
+    integer :: n, nx, ny, nz, i, j, k, index
     real(kind=rp), dimension(:), allocatable :: limits
     type(vector_t) :: x, y, z
 
@@ -127,28 +130,39 @@ contains
 
     select case (trim(type))
     case ("box")
-       call json_get(parameters, 'domain.nx', nx)
-       call json_get(parameters, 'domain.ny', ny)
-       call json_get(parameters, 'domain.nz', nz)
-       call json_get(parameters, 'domain.limits', limits)
-       n = nx * ny * nz
+       call json_get(parameters, 'optimization.design.domain.nx', nx)
+       call json_get(parameters, 'optimization.design.domain.ny', ny)
+       call json_get(parameters, 'optimization.design.domain.nz', nz)
+       call json_get(parameters, 'optimization.design.domain.limits', limits)
+       n = (nx + 1) * (ny + 1) * (nz + 1)
+       this%nx = nx
+       this%ny = ny
+       this%nz = nz
+
 
        call x%init(n)
        call y%init(n)
        call z%init(n)
-
-       do i = 1, nx
-          do j = 1, ny
-             do k = 1, nz
-                x%x(i) = limits(1) + (limits(2) - limits(1)) * &
+       index = 1
+       do k = 1, nz + 1
+          do j = 1, ny + 1
+             do i = 1, nx + 1
+                x%x(index) = limits(1) + (limits(2) - limits(1)) * &
                      real(i - 1, kind=rp) / real(nx, kind=rp)
-                y%x(i) = limits(3) + (limits(4) - limits(3)) * &
+                y%x(index) = limits(3) + (limits(4) - limits(3)) * &
                      real(j - 1, kind=rp) / real(ny, kind=rp)
-                z%x(i) = limits(5) + (limits(6) - limits(5)) * &
+                z%x(index) = limits(5) + (limits(6) - limits(5)) * &
                      real(k - 1, kind=rp) / real(nz, kind=rp)
+                index = index + 1
              end do
           end do
        end do
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(x%x, x%x_d, n, HOST_TO_DEVICE, sync = .false.)
+          call device_memcpy(y%x, y%x_d, n, HOST_TO_DEVICE, sync = .false.)
+          call device_memcpy(z%x, z%x_d, n, HOST_TO_DEVICE, sync = .true.)
+       end if
 
     end select
 
@@ -161,6 +175,13 @@ contains
     character(len=*), intent(in) :: name
     integer, intent(in) :: n
     type(vector_t), intent(in) :: x, y, z
+    integer :: nproc, ierr
+
+    ! Throw an error if we run on multiple MPI ranks
+    call MPI_Comm_size(MPI_COMM_WORLD, nproc, ierr)
+    if (nproc .gt. 1) then
+       call neko_error('simple_design_t can only be used on a single MPI rank')
+    end if
 
     if (pe_size .ne. 1) then
        call neko_error("Simple design can only be used with a single MPI " // &
@@ -253,6 +274,58 @@ contains
     class(simple_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
+    integer :: i
+    integer :: npts, nx, ny, nz
+    character(len=100) :: filename
+    integer :: ios, funit
+
+    nx = this%nx + 1
+    ny = this%ny + 1
+    nz = this%nz + 1
+    npts = nx * ny * nz
+
+    ! Synchronize the device memory if using a GPU backend is enabled
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(this%x_coord%x, this%x_coord%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%y_coord%x, this%y_coord%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%z_coord%x, this%z_coord%x_d, npts, &
+            DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%values%x, this%values%x_d, npts, &
+            DEVICE_TO_HOST, sync = .true.)
+    end if
+
+    write(filename, '(A,I4.4,A)') 'design_', idx, '.vtk'
+
+    open(newunit=funit, file=filename, status='replace', action='write', iostat=ios)
+    if (ios .ne. 0) then
+       call neko_error('Error opening file ' // filename)
+    end if
+
+    ! Header
+    write(funit, '(A)') '# vtk DataFile Version 3.0'
+    write(funit, '(A)') 'Simple Scalar Field'
+    write(funit, '(A)') 'ASCII'
+    write(funit, '(A)') 'DATASET STRUCTURED_GRID'
+    write(funit, '(A,3(1X,I0))') 'DIMENSIONS', nx, ny, nz
+
+    ! Points
+    write(funit, '(A,1X,I0,1X,A)') 'POINTS', npts, 'float'
+    do i = 1, npts
+       write(funit, '(3(F20.12,1X))') this%x_coord%x(i), this%y_coord%x(i), &
+            this%z_coord%x(i)
+    end do
+
+    ! Scalars
+    write(funit, '(A,1X,I0)') 'POINT_DATA', npts
+    write(funit, '(A)') 'SCALARS density float 1'
+    write(funit, '(A)') 'LOOKUP_TABLE default'
+    do i = 1, npts
+       write(funit, '(F20.12)') this%values%x(i)
+    end do
+
+    close(funit)
   end subroutine design_simple_write
 
 end module simple_design
