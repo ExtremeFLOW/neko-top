@@ -14,57 +14,42 @@ function robust-getopt {
 
     local OS_TYPE=$(uname)
 
-    # Use GNU getopt if available, fallback to BSD getopt on macOS
+    local GETOPT=""
+    local GNU_GETOPT=""
+
+    # Check if the OS is Linux or Darwin (macOS)
     if [ "$OS_TYPE" == "Linux" ]; then
         if command -v getopt >/dev/null 2>&1; then
-            PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
-
-            if [ $? -ne 0 ]; then
-                echo "Error: Failed to parse options using GNU getopt." >&2
-                exit 1
-            fi
+            GETOPT=$(command -v getopt)
         else
-            echo "Error: GNU getopt is not installed. Please install it and try again." >&2
+            echo "Error: getopt is not installed. Please install it and try again." >&2
             exit 1
         fi
     elif [ "$OS_TYPE" == "Darwin" ]; then
+
         if command -v gnugetopt >/dev/null 2>&1; then
-            PARSED=$(gnugetopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
-
-            if [ $? -ne 0 ]; then
-                echo "Error: Failed to parse options using GNU getopt on macOS." >&2
-                exit 1
-            fi
-        # Check if the user has installed GNU getopt via Homebrew
+            GETOPT=$(command -v gnugetopt)
         elif command -v gnu-getopt >/dev/null 2>&1; then
-            PARSED=$(gnu-getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
-
-            if [ $? -ne 0 ]; then
-                echo "Error: Failed to parse options using GNU getopt on macOS." >&2
-                exit 1
-            fi
-        # Fallback to BSD getopt if GNU getopt is not available
-        # Note: BSD getopt does not support long options
+            GETOPT=$(command -v gnu-getopt)
         elif command -v getopt >/dev/null 2>&1; then
-            echo "Warning: macOS uses BSD getopt, long options are not supported." >&2
-            PARSED=$(getopt $OPT "$@")
-
-            if [ $? -ne 0 ]; then
-                echo "Error: Failed to parse options using BSD getopt." >&2
-                exit 1
-            fi
+            GETOPT=$(command -v getopt)
         else
             echo "Error: Neither GNU getopt nor BSD getopt is available. Please ensure one is installed and try again." >&2
             exit 1
         fi
     else
         echo "Error: Unsupported operating system: $OS_TYPE" >&2
-        exit 1
     fi
 
-    # Check if the parsed options are empty
-    if [ -z "$PARSED" ]; then
-        echo "Error: No options provided." >&2
+    $GETOPT -T >/dev/null
+    if [ $? -eq 4 ]; then
+        PARSED=$($GETOPT --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
+    else
+        PARSED=$($GETOPT $OPT "$@")
+    fi
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to parse options." >&2
         exit 1
     fi
 
