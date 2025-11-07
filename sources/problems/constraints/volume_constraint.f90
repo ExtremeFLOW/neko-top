@@ -57,7 +57,6 @@ module volume_constraint
   use math_ext, only: glsc2_mask
   use field_math, only: field_rone, field_copy
   use utils, only: neko_error
-
   implicit none
   private
 
