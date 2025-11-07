@@ -1,0 +1,666 @@
+module newton
+   ! LightKrylov for linear algebra.
+   use LightKrylov
+   use LightKrylov, only: wp => dp
+   ! Standard Library.
+   use stdlib_math, only : linspace
+   use stdlib_optval, only : optval
+   ! Additional neko-top libraries (to solve linearized and adjoint)
+   use num_types, only : rp, dp
+   use neko, only: neko_init, neko_finalize, neko_solve
+   use simulation_m, only: simulation_t
+   use json_module, only: json_file
+   ! Specific to the state vector
+   use field, only: field_t
+   use coefs, only: coef_t
+   use dofmap, only : dofmap_t
+   use fld_file_output, only: fld_file_output_t
+   ! various imports for some specific neko operations
+   use neko_config, only : NEKO_BCKND_DEVICE
+   use scratch_registry, only: neko_scratch_registry
+   use field_math, only: field_addcol3, field_rzero, field_cmult, &
+      field_add2s2, field_copy, field_add3s2, field_sub2
+   use math, only: glsc3
+   use device_math, only: device_glsc3
+   use device, only : device_memcpy, HOST_TO_DEVICE
+   use gather_scatter, only: gs_t, GS_OP_ADD
+   use comm, only: pe_rank
+   use fluid_pnpn, only: fluid_pnpn_t
+   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
+   ! This one is silly... But we need coef to initialize fields
+   use global_coef, only: global_coef_t, global_coef_getter
+   ! sponges
+   ! use sponge_source_term, only: sponge_source_term_t
+   ! debugging, my own eigs
+   use LightKrylov_Constants
+   use LightKrylov_Utils
+       use LightKrylov_Logger, only: log_warning, log_error, log_message, log_information, &
+    &                             log_debug, stop_error, check_info, type_error
+
+   ! this my "my_eigs"
+   use LightKrylov_Timing, only: timer => global_lightkrylov_timer, time_lightkrylov
+   use stdlib_stats, only: median
+   use stdlib_sorting, only: sort_index
+   use LightKrylov_IterativeSolvers, only: write_results_cdp
+   use stdlib_linalg, only: schur
+   use lightkrylov_IterativeSolvers, only: gmres_rdp
+
+
+
+   implicit none
+  character(len=*), parameter :: eigs_output      = 'eigs_output.txt'
+   character*128, parameter, private :: this_module = 'newton'
+ 
+   !------------------------------
+   !-----     PARAMETERS     -----
+   !------------------------------
+
+   ! generally parameters enter via the .case file
+
+   !-------------------------------------------
+   !-----     LIGHTKRYLOV VECTOR TYPE     -----
+   !-------------------------------------------
+ 
+   type, extends(abstract_vector_rdp), public :: state_vector
+      ! velocity and pressure fields
+      type(field_t) :: u, v, w, p
+      ! we need the mass matrix to integrate fields..
+      type(coef_t), pointer :: coef => null()
+      logical, private :: initialized = .false.
+      ! a way to spy on the vector (mostly for debugging)
+      type(fld_file_output_t), public :: output
+    contains
+      private
+      procedure, pass(self), public :: zero
+      procedure, pass(self), public :: dot
+      procedure, pass(self), public :: scal
+      procedure, pass(self), public :: axpby
+      procedure, pass(self), public :: rand
+      procedure, pass(self), public :: get_size
+      ! we also want some other things
+      procedure, pass(self), public :: init => state_vector_init
+      procedure, pass(self), public :: free => state_vector_free
+      procedure, pass(self), public :: write => state_vector_write
+      procedure, pass(self), public :: copy => state_vector_copy
+   end type state_vector
+ 
+   !-----------------------------------
+   !-----     NEKO PROPAGATOR     -----
+   !-----------------------------------
+   type, extends(abstract_system_rdp), public :: non_linear_propagator
+      type(simulation_t), public :: simulation
+      type(fld_file_output_t), public :: output_primal
+      type(fld_file_output_t), public :: output_linear
+      type(fld_file_output_t), public :: output_adjoint
+   contains
+      private
+      procedure, pass(self), public :: response => nonlinear_map
+      procedure, pass(self), public :: init => non_linear_propagator_init
+      procedure, pass(self), public :: free => non_linear_propagator_free
+   end type non_linear_propagator
+
+   type, extends(abstract_jacobian_linop_rdp), public :: linear_propagator
+      type(simulation_t), pointer, public :: simulation
+    contains
+      private
+      procedure, pass(self), public :: matvec => linear_map
+      procedure, pass(self), public :: rmatvec => linear_map
+      procedure, pass(self), public :: init => linear_propagator_init
+      procedure, pass(self), public :: free => linear_propagator_free
+   end type linear_propagator
+
+   interface assignment(=)
+    module procedure state_vector_assignment
+   end interface
+ 
+ contains
+
+ 
+   !======================================================================
+   !======================================================================
+   !=====                                                            =====
+   !=====     PHYSICAL MODEL : Linearize NAVIER-STOKES EQUATIONS     =====
+   !=====                                                            =====
+   !======================================================================
+   !======================================================================
+ 
+    subroutine state_vector_init(self)
+     class(state_vector), intent(inout) :: self
+
+     ! Check for global coef
+     ! if (.not. self%initialized) then
+     if (.not. allocated(self%u%x)) then
+       if (.not. associated(global_coef_getter)) then
+          error stop "No global coef set!"
+       end if
+          call self%free()
+          ! Take the global coef
+          self%coef => global_coef_getter%global_coef
+
+          ! initialize fields
+          ! allocate(self%u)
+          ! allocate(self%v)
+          ! allocate(self%w)
+          ! allocate(self%p)
+          call self%u%init(self%coef%dof, fld_name = "state_u")
+          call self%v%init(self%coef%dof, fld_name = "state_v")
+          call self%w%init(self%coef%dof, fld_name = "state_w")
+          call self%p%init(self%coef%dof, fld_name = "state_p")
+
+          ! initialize the sampler so we can spy in if needed
+          call self%output%init(sp, 'state', 4)
+          call self%output%fields%assign_to_field(1, self%p)
+          call self%output%fields%assign_to_field(2, self%u)
+          call self%output%fields%assign_to_field(3, self%v)
+          call self%output%fields%assign_to_field(4, self%w)
+          
+
+          ! done
+          self%initialized = .true.
+
+          ! hard code the zero so you don't go into an infinite loop
+          call field_rzero(self%u)
+          call field_rzero(self%v)
+          call field_rzero(self%w)
+          call field_rzero(self%p)
+
+          if (pe_rank.eq.0) then
+             print *, "im initializing myself!"
+          end if
+     end if
+
+     return
+   end subroutine state_vector_init
+ 
+   !=========================================================
+   !=========================================================
+   !=====                                               =====
+   !=====     LIGHTKRYLOV MANDATORY IMPLEMENTATIONS     =====
+   !=====                                               =====
+   !=========================================================
+   !=========================================================
+ 
+   !----------------------------------------------------
+   !-----     TYPE-BOUND PROCEDURE FOR VECTORS     -----
+   !----------------------------------------------------
+ 
+   subroutine zero(self)
+     class(state_vector), intent(inout) :: self
+     
+     ! If we're going to zero, we're going to completely reinitilize.
+     ! this protects us against shallow copying
+     ! call self%free()
+     call self%init()
+
+     call field_rzero(self%u)
+     call field_rzero(self%v)
+     call field_rzero(self%w)
+     call field_rzero(self%p)
+     return
+   end subroutine zero
+ 
+   real(kind=wp) function dot(self, vec) result(alpha)
+     class(state_vector)   , intent(in) :: self
+     class(abstract_vector_rdp), intent(in) :: vec
+     integer :: n
+     real(kind=rp) :: alpha_rp
+     select type(vec)
+     type is(state_vector)
+        ! always try initializing
+        ! call state_vector_init_wrapper(self)
+        ! call state_vector_init_wrapper(vec)
+
+        ! here we're going to take an energy norm I guess...
+        n = self%u%size()
+        alpha_rp = 0.0_rp
+        if (NEKO_BCKND_DEVICE .eq. 1) then
+           alpha_rp = device_glsc3(self%u%x_d, vec%u%x_d, self%coef%B_d, n)
+           alpha_rp = alpha_rp + device_glsc3(self%v%x_d, vec%v%x_d, self%coef%B_d, n)
+           ! force 2D
+           ! alpha_rp = alpha_rp + device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
+       else
+           alpha_rp = glsc3(self%u%x, vec%u%x, self%coef%B, n)
+           alpha_rp = alpha_rp + glsc3(self%v%x, vec%v%x, self%coef%B, n)
+           ! force 2D
+           ! alpha_rp = alpha_rp + glsc3(self%w%x, vec%w%x, self%coef%B, n)
+       end if
+       ! alpha_rp = alpha_rp * 0.5_rp
+       alpha = real(alpha_rp, wp)
+
+     end select
+     return
+   end function dot
+ 
+   subroutine scal(self, alpha)
+     class(state_vector), intent(inout) :: self
+     real(kind=wp)      , intent(in)    :: alpha
+     real(kind=rp) :: alpha_rp
+     ! always try initializing
+     ! call state_vector_init_wrapper(self)
+
+     alpha_rp = real(alpha, rp)
+     call field_cmult(self%u, alpha_rp)
+     call field_cmult(self%v, alpha_rp)
+     call field_cmult(self%w, alpha_rp)
+     ! force 2D
+     ! call field_rzero(self%w)
+     call field_cmult(self%p, alpha_rp)
+     return
+   end subroutine scal
+ 
+   subroutine axpby(alpha, vec, beta, self)
+     class(state_vector)   , intent(inout) :: self
+     class(abstract_vector_rdp), intent(in)    :: vec
+     real(kind=wp)         , intent(in)    :: alpha, beta
+     real(kind=rp) :: alpha_rp, beta_rp
+     select type(vec)
+     type is(state_vector)
+        ! always try initializing
+        call state_vector_init_wrapper(self)
+        call state_vector_init_wrapper(vec)
+
+        alpha_rp = real(alpha, kind=rp)
+        beta_rp = real(beta, kind=rp)
+
+        ! call self%scal(beta)
+        ! call field_add2s2(self%u, vec%u, alpha_rp)
+        ! call field_add2s2(self%v, vec%v, alpha_rp)
+        ! call field_add2s2(self%w, vec%w, alpha_rp)
+        ! ! force 2D
+        ! ! call field_rzero(self%w)
+        ! call field_add2s2(self%p, vec%p, alpha_rp)
+        call field_add3s2(self%u, self%u, vec%u, beta_rp, alpha_rp)
+        call field_add3s2(self%v, self%v, vec%v, beta_rp, alpha_rp)
+        call field_add3s2(self%w, self%w, vec%w, beta_rp, alpha_rp)
+        call field_add3s2(self%p, self%p, vec%p, beta_rp, alpha_rp)
+     end select
+     return
+   end subroutine axpby
+ 
+   integer function get_size(self) result(N)
+     class(state_vector), intent(in) :: self
+     ! always try initializing
+     ! call state_vector_init_wrapper(self)
+     ! hmmm self is a bit confusing. I assume you mean the TOTAL size, ie,
+     ! number of GLL pts for all 3 components...
+     N = self%u%size() + self%v%size() + self%w%size()
+     return
+   end function get_size
+ 
+   subroutine rand(self, ifnorm)
+     class(state_vector), intent(inout) :: self
+     logical, optional,   intent(in)    :: ifnorm
+     ! internals
+     logical :: normalize
+     real(kind=wp) :: alpha
+     
+     ! always try initializing
+     ! call self%init()
+
+     normalize = optval(ifnorm,.true.)
+     call rand_ic(self%u, self%v, self%w)
+
+    ! enforce continuity across the field
+    call self%coef%gs_h%op(self%u, GS_OP_ADD)
+    call self%coef%gs_h%op(self%v, GS_OP_ADD)
+    call self%coef%gs_h%op(self%w, GS_OP_ADD)
+
+     if (normalize) then
+       alpha = self%norm()
+       call self%scal(1.0_wp/alpha)
+     endif
+     return
+   end subroutine rand
+
+   !---------------------------------------------------
+   !-----     EXTRA PROCEDURES FOR THE VECTOR     -----
+   !---------------------------------------------------
+
+! Since we're using pointers, we need to make sure that a direct assignment
+! really creates NEW versions of the fields and then copies them over.
+subroutine state_vector_assignment(lhs, rhs)
+    class(state_vector), intent(out) :: lhs
+    class(state_vector), intent(in)  :: rhs
+
+    if (pe_rank.eq.0) then
+      print *, "YOU DID A HARD COPY"
+    end if
+    
+    call lhs%init()
+    call lhs%copy(rhs)
+
+end subroutine state_vector_assignment
+
+   subroutine state_vector_free(self)
+     class(state_vector), intent(inout) :: self
+
+     !if (associated(self%u)) then
+        call self%u%free()
+        ! nullify(self%u)
+     !end if
+     !if (associated(self%v)) then
+        call self%v%free()
+        ! nullify(self%v)
+     !end if
+     !if (associated(self%w)) then
+        call self%w%free()
+        ! nullify(self%w)
+     !end if
+     !if (associated(self%p)) then
+        call self%p%free()
+        ! nullify(self%p)
+     !end if
+     self%coef => null()
+     
+
+     self%initialized = .false.
+
+     return
+   end subroutine state_vector_free
+
+   subroutine state_vector_copy(self, vec)
+     class(state_vector), intent(inout) :: self
+     class(state_vector), intent(in) :: vec
+
+     call field_copy(self%u, vec%u)
+     call field_copy(self%v, vec%v)
+     call field_copy(self%w, vec%w)
+     call field_copy(self%p, vec%p)
+
+     return
+   end subroutine state_vector_copy
+
+  ! User defined initial condition
+  subroutine rand_ic(u, v, w)
+    type(field_t), intent(inout) :: u
+    type(field_t), intent(inout) :: v
+    type(field_t), intent(inout) :: w
+    integer :: iel, ix, iy, iz
+    real(kind=rp) :: fcoeff(3), xl(2)
+
+
+
+    do iel = 1, u%msh%nelv
+       do iz = 1, u%Xh%lz
+          do iy = 1, u%Xh%ly
+             do ix = 1, u%Xh%lx
+                xl(1) = u%dof%x(ix, iy, iz, iel)
+                xl(2) = u%dof%y(ix, iy, iz, iel)
+                fcoeff(1) = 3.0e4_rp
+                fcoeff(2) = -1.5e3_rp
+                fcoeff(3) = 0.5e5_rp
+                u%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, 1, iel, xl, &
+                     fcoeff) * 1.0e-08_rp
+                fcoeff(1) = 2.3e4_rp
+                fcoeff(2) = 2.3e3_rp
+                fcoeff(3) = -2.0e5_rp
+                v%x(ix, iy, iz, iel) = math_ran_dst(ix, iy, 1, iel, xl, &
+                     fcoeff) * 1.0e-08_rp
+                ! 2D
+                w%x(ix, iy, iz, iel) = 0.0_rp
+             end do
+          end do
+       end do
+    end do
+
+    ! fucking quasi 2D
+    call z_plane_fix(u)
+    call z_plane_fix(v)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+      call device_memcpy(u%x, u%x_d, u%size(), host_to_device, .true.)
+      call device_memcpy(v%x, v%x_d, v%size(), host_to_device, .true.)
+      call device_memcpy(w%x, w%x_d, w%size(), host_to_device, .true.)
+    end if
+
+  end subroutine rand_ic
+
+
+  ! The original Nek5000 random number generator is implementted
+  ! in @ref ran1. This totally ad-hoc random number generator below
+  ! could be preferable to the original one for the simple reason that it
+  ! gives the same initial condition independent of the number of
+  real(kind=rp) function math_ran_dst(ix, iy, iz, ieg, xl, fcoeff)
+    implicit none
+    integer ix, iy, iz, ieg
+    real(kind=rp) :: fcoeff(3), xl(2)
+
+    math_ran_dst = fcoeff(1)*(ieg+xl(1)*sin(xl(2))) + &
+         fcoeff(2)*ix*iy + fcoeff(3)*ix
+    math_ran_dst = 1.0e3_rp * sin(math_ran_dst)
+    math_ran_dst = 1.0e3_rp * sin(math_ran_dst)
+    math_ran_dst = cos(math_ran_dst)
+
+    return
+  end function math_ran_dst
+
+  subroutine state_vector_write(self, idx)
+     class(state_vector), intent(inout) :: self
+     integer :: idx
+      ! always try initializing
+      call state_vector_init_wrapper(self)
+      call self%output%sample(real(idx, kind=rp))
+
+     return
+   end subroutine state_vector_write
+ 
+  ! silly wrapper to ignore intent
+  subroutine state_vector_init_wrapper(self)
+     class(state_vector) :: self
+
+     call self%init()
+
+     return
+   end subroutine state_vector_init_wrapper
+   !------------------------------------------------------------------------
+   !-----     TYPE-BOUND PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
+   !------------------------------------------------------------------------
+ 
+   subroutine nonlinear_map(self, vec_in, vec_out, atol)
+     ! Linear Operator.
+     class(non_linear_propagator), intent(inout)  :: self
+     ! Input vector.
+     class(abstract_vector_rdp) , intent(in)  :: vec_in
+     ! Output vector.
+     class(abstract_vector_rdp) , intent(out) :: vec_out
+     ! Solver tolerances if needed
+     real(wp),                   intent(in)  :: atol
+ 
+     select type(vec_in)
+     type is(state_vector)
+        select type(vec_out)
+        type is(state_vector)
+           ! Reset propagator.
+           call self%simulation%reset_forward()
+           ! Get state vector.
+           ! (again... the naming with "adjoint" isn't smart here)
+           call field_copy(self%simulation%neko_case%fluid%u, vec_in%u)
+           call field_copy(self%simulation%neko_case%fluid%v, vec_in%v)
+           call field_copy(self%simulation%neko_case%fluid%w, vec_in%w)
+           call field_copy(self%simulation%neko_case%fluid%p, vec_in%p)
+           
+          !  ! set the tolerances on the forward and linear to scale with atol
+          !  select type (f => self%simulation%neko_case%fluid)
+          !  type is (fluid_pnpn_t)
+          !  f%ksp_vel%abs_tol = atol * 0.5_rp
+          !  f%ksp_prs%abs_tol = atol * 0.5_rp
+          !  end select
+          !  select type (f => self%simulation%adjoint_case%fluid_adj)
+          !  type is (adjoint_fluid_pnpn_t)
+          !  f%ksp_vel%abs_tol = atol * 0.5_rp
+          !  f%ksp_prs%abs_tol = atol * 0.5_rp
+          !  end select
+
+           ! Integrate forward in time.
+           call self%simulation%run_forward()
+           call self%simulation%write(1)
+           ! call self%write_linear(1)
+           ! Since vec_out has intent out, I HOPE we can safely assume it wont
+           ! care about the value it held before computing.
+           ! however, we need to init again.
+           call init_wrapper(vec_out)
+           ! Pass-back the state vector.
+           call field_copy(vec_out%u, self%simulation%neko_case%fluid%u)
+           call field_copy(vec_out%v, self%simulation%neko_case%fluid%v)
+           call field_copy(vec_out%w, self%simulation%neko_case%fluid%w)
+           call field_copy(vec_out%p, self%simulation%neko_case%fluid%p)
+           ! fucking quasi 2D...
+           call z_plane_fix(vec_out%u)
+           call z_plane_fix(vec_out%v)
+           call z_plane_fix(vec_out%w)
+           call z_plane_fix(vec_out%p)
+
+           ! Evaluate residual F(X) - X.
+           call vec_out%sub(vec_in)
+        end select
+     end select
+     return
+   end subroutine nonlinear_map
+
+
+   subroutine linear_map(self, vec_in, vec_out)
+     ! Linear Operator.
+     class(linear_propagator), intent(inout)  :: self
+     ! Input vector.
+     class(abstract_vector_rdp) , intent(in)  :: vec_in
+     ! Output vector.
+     class(abstract_vector_rdp) , intent(out) :: vec_out
+ 
+     select type(vec_in)
+     type is(state_vector)
+        select type(vec_out)
+        type is(state_vector)
+           ! Reset propagator.
+           call self%simulation%reset_adjoint()
+           ! Get state vector.
+           ! (again... the naming with "adjoint" isn't smart here)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%u_adj, vec_in%u)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%v_adj, vec_in%v)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, vec_in%w)
+           call field_copy(self%simulation%adjoint_case%fluid_adj%p_adj, vec_in%p)
+           ! Integrate forward in time.
+           ! call self%write_linear(self%get_counter(.false.))
+           call self%simulation%run_backward()
+           ! call self%write_linear(1)
+           ! Since vec_out has intent out, I HOPE we can safely assume it wont
+           ! care about the value it held before computing.
+           ! however, we need to init again.
+           call init_wrapper(vec_out)
+           ! Pass-back the state vector.
+           call field_copy(vec_out%u, self%simulation%adjoint_case%fluid_adj%u_adj)
+           call field_copy(vec_out%v, self%simulation%adjoint_case%fluid_adj%v_adj)
+           call field_copy(vec_out%w, self%simulation%adjoint_case%fluid_adj%w_adj)
+           call field_copy(vec_out%p, self%simulation%adjoint_case%fluid_adj%p_adj)
+           ! fucking quasi 2D...
+           call z_plane_fix(vec_out%u)
+           call z_plane_fix(vec_out%v)
+           call z_plane_fix(vec_out%w)
+           call z_plane_fix(vec_out%p)
+           ! Evaluate residual F(X) - X.
+           call vec_out%sub(vec_in)
+        end select
+     end select
+     return
+   end subroutine linear_map
+
+   !-------------------------------------------------------------------
+   !-----     EXTRA PROCEDURES FOR THE EXPONENTIAL PROPAGATOR     -----
+   !-------------------------------------------------------------------
+
+   subroutine non_linear_propagator_init(self, parameters)
+     ! Linear Operator.
+     class(non_linear_propagator), intent(inout)  :: self
+     type(json_file), intent(inout) :: parameters
+     real(kind=rp) :: T_fin, dt 
+     integer :: n_steps
+
+     ! Make it linear
+     self%simulation%adjoint_case%if_adjoint = .false.
+     ! initalize the simulation
+     call self%simulation%init(parameters)
+     ! since we never actually do the forward, we need to manually enter the
+     ! total timesteps...
+     T_fin = self%simulation%neko_case%time%end_time
+     dt = self%simulation%neko_case%time%dt
+     n_steps = int(T_fin/dt)
+     self%simulation%n_timesteps = n_steps
+     
+     ! NOTE baseflow should be loaded via IC in .case file, but let's double
+     ! check
+          call self%output_primal%init(sp, 'checking_base', 4)
+          call self%output_primal%fields%assign(2, self%simulation%neko_case%fluid%u)
+          call self%output_primal%fields%assign(3, self%simulation%neko_case%fluid%v)
+          call self%output_primal%fields%assign(4, self%simulation%neko_case%fluid%w)
+          call self%output_primal%fields%assign(1, self%simulation%neko_case%fluid%p)
+          call self%output_primal%sample(0.0_rp)
+     ! Assign samplers for the forward and adjoint in case we want to look at
+     ! them (debugging)
+          call self%output_linear%init(sp, 'checking_linear', 4)
+          call self%output_linear%fields%assign(2, self%simulation%adjoint_case%fluid_adj%u_adj)
+          call self%output_linear%fields%assign(3, self%simulation%adjoint_case%fluid_adj%v_adj)
+          call self%output_linear%fields%assign(4, self%simulation%adjoint_case%fluid_adj%w_adj)
+          call self%output_linear%fields%assign(1, self%simulation%adjoint_case%fluid_adj%p_adj)
+          call self%output_adjoint%init(sp, 'checking_adjoint', 4)
+          call self%output_adjoint%fields%assign(2, self%simulation%adjoint_case%fluid_adj%u_adj)
+          call self%output_adjoint%fields%assign(3, self%simulation%adjoint_case%fluid_adj%v_adj)
+          call self%output_adjoint%fields%assign(4, self%simulation%adjoint_case%fluid_adj%w_adj)
+          call self%output_adjoint%fields%assign(1, self%simulation%adjoint_case%fluid_adj%p_adj)
+
+     return
+   end subroutine non_linear_propagator_init
+
+   subroutine non_linear_propagator_free(self)
+     ! Linear Operator.
+     class(non_linear_propagator), intent(inout)  :: self
+
+     call self%simulation%free()
+     return
+   end subroutine non_linear_propagator_free
+
+   subroutine linear_propagator_init(self, simulation)
+     ! Linear Operator.
+     class(linear_propagator), intent(inout)  :: self
+     type(simulation_t), intent(in), target :: simulation
+
+     self%simulation => simulation
+     return
+   end subroutine linear_propagator_init
+
+   subroutine linear_propagator_free(self)
+     ! Linear Operator.
+     class(linear_propagator), intent(inout)  :: self
+
+     nullify(self%simulation)
+     return
+   end subroutine linear_propagator_free
+
+    ! silly little wrapper to ignore intent.
+   subroutine init_wrapper(self)
+     class(state_vector) :: self
+
+     call self%init()
+
+     return
+   end subroutine init_wrapper
+
+
+   subroutine z_plane_fix(fld)
+  type(field_t), intent(inout) :: fld
+  integer :: iel, iz, iy, ix, nel
+  ! note this wont work on GPUs
+
+  do iel = 1, fld%msh%nelv
+     do iz = 2, fld%xh%lz
+     do iy = 1, fld%xh%ly
+     do ix = 1, fld%xh%lx
+
+     fld%x(ix, iy, iz, iel) = fld%x(ix, iy, 1, iel)
+     
+     end do
+     end do
+     end do
+  end do
+
+  end subroutine z_plane_fix
+ 
+ end module newton
