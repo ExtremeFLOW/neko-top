@@ -28,12 +28,9 @@ for file_name in [
                                   "optimization_data_" + subsolver + ".csv")
 
     if not os.path.exists(reference_file):
-        # copy current data as reference
-
         df_current.to_csv(reference_file, index=False)
-        print(
-            f"Reference data file not found. Created new reference file at '{reference_file}'."
-        )
+        print(f"Reference data file not found." +
+              f"Created new reference file at '{reference_file}'.")
         continue
     df_reference = pd.read_csv(reference_file)
 
