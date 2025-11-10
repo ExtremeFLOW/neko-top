@@ -42,6 +42,7 @@ module simulation_checkpoint
   use mpi_f08, only: MPI_WTIME
   use utils, only: neko_error
   use field_math, only: field_copy, field_rzero
+  use profiler, only: profiler_start_region, profiler_end_region
   implicit none
   private
 
@@ -51,12 +52,18 @@ module simulation_checkpoint
      ! ----------------------------------------------------------------------- !
      ! User parameters
 
+     !> Whether checkpointing is enabled
+     logical :: enabled = .false.
      !> The checkpointing algorithm to use
      character(len=256) :: algorithm = "linear"
      !> The name of the checkpoint file
      character(len=256) :: filename = "checkpoint"
+     !> The format of the checkpoint file
+     character(len=8) :: fmt = "chkp"
      !> Number of checkpoints to keep in memory
      integer :: n_saves_memory = 10
+     !> Whether to keep the checkpoint files on disk after the simulation ends
+     logical :: keep_checkpoints = .true.
 
      ! Internal parameters
      integer :: n_saves_disc = 0
@@ -124,24 +131,33 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), target, intent(inout) :: params
     integer :: n_saves_memory
-    character(len=:), allocatable :: filename, algorithm
+    character(len=:), allocatable :: filename, algorithm, fmt
+    logical :: enabled, keep_checkpoints
+
+    call json_get_or_default(params, "enabled", enabled, .false.)
+    if (.not. enabled) return
 
     call json_get_or_default(params, "algorithm", algorithm, "linear")
     call json_get_or_default(params, "n_memory", n_saves_memory, 10)
-    call json_get_or_default(params, "filename", filename, "checkpoint.chkp")
+    call json_get_or_default(params, "filename", filename, "checkpoint")
+    call json_get_or_default(params, "format", fmt, "chkp")
+    call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
+         .true.)
 
     call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-         filename)
+         filename, fmt, keep_checkpoints)
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
-       n_saves_memory, filename)
+       n_saves_memory, filename, fmt, keep_checkpoints)
     class(simulation_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     character(len=*), optional, intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
     character(len=*), optional, intent(in) :: filename
+    character(len=*), optional, intent(in) :: fmt
+    logical, optional, intent(in) :: keep_checkpoints
 
     class(scalar_scheme_t), pointer :: scalar_i
     integer :: i, j
@@ -150,15 +166,21 @@ contains
     call this%free()
 
     ! Set internal parameters
+    this%enabled = .true.
     if (present(algorithm)) this%algorithm = algorithm
     if (present(filename)) this%filename = filename
     if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
+    if (present(fmt)) this%fmt = fmt
+    if (present(keep_checkpoints)) this%keep_checkpoints = keep_checkpoints
+
     if (allocated(neko_case%scalars)) then
        this%n_scalars = size(neko_case%scalars%scalar_fields)
     end if
 
+
     ! Initialize the Neko checkpoint output
-    call this%chkp_output%init(neko_case%chkp, this%filename)
+    call this%chkp_output%init(neko_case%chkp, this%filename, fmt = this%fmt, &
+         overwrite = .true.)
 
     ! Allocate the RAM Checkpoints
     allocate(this%p_list(this%n_saves_memory))
@@ -207,6 +229,7 @@ contains
        do i = 1, size(this%s_list)
           call this%s_list(i)%free()
        end do
+       this%n_scalars = 0
     end if
 
     if (allocated(this%p_list)) deallocate(this%p_list)
@@ -214,6 +237,26 @@ contains
     if (allocated(this%v_list)) deallocate(this%v_list)
     if (allocated(this%w_list)) deallocate(this%w_list)
     if (allocated(this%s_list)) deallocate(this%s_list)
+
+    ! Delete the checkpoint file list
+    ! call this%chkp_output%free()
+    if (.not. this%keep_checkpoints) then
+       call system("rm -f $(ls | grep -E '" // &
+            trim(this%filename) // "[0-9]{5}\.(chkp|h5)$')")
+    end if
+
+    ! Reset to default values
+    this%enabled = .false.
+    this%filename = "checkpoint"
+    this%fmt = "chkp"
+    this%algorithm = "linear"
+    this%n_saves_memory = 10
+    this%keep_checkpoints = .true.
+
+    this%n_saves_disc = 0
+    this%n_timesteps = 0
+    this%first_valid_timestep = 2
+    this%loaded_checkpoint = -1
 
   end subroutine checkpoint_free
 
@@ -225,6 +268,10 @@ contains
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
 
+    if (.not. this%enabled) return
+
+    call profiler_start_region("Checkpoint save")
+
     ! Update the number of recorded timesteps
     this%n_timesteps = this%n_timesteps + 1
 
@@ -234,6 +281,8 @@ contains
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
+
+    call profiler_end_region("Checkpoint save")
   end subroutine checkpoint_save
 
   !> Restore the forward simulation state
@@ -242,6 +291,10 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: tstep
     character(len=256) :: msg
+
+    if (.not. this%enabled) return
+
+    call profiler_start_region("Checkpoint restore")
 
     if (tstep .lt. 1 .or. tstep .gt. this%n_timesteps) then
        write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
@@ -255,6 +308,8 @@ contains
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
+
+    call profiler_end_region("Checkpoint restore")
   end subroutine checkpoint_restore
 
   ! ========================================================================== !
@@ -264,6 +319,8 @@ contains
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i
+
+    if (.not. this%enabled) return
 
     ! Reset our checkpoints
     this%loaded_checkpoint = -1
@@ -277,9 +334,11 @@ contains
        call field_rzero(this%w_list(i))
     end do
 
-    do i = 1, size(this%s_list)
-       call field_rzero(this%s_list(i))
-    end do
+    if (allocated(this%s_list)) then
+       do i = 1, size(this%s_list)
+          call field_rzero(this%s_list(i))
+       end do
+    end if
   end subroutine checkpoint_reset
 
 end module simulation_checkpoint

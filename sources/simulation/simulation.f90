@@ -50,7 +50,7 @@ module simulation_m
   use fld_file_output, only: fld_file_output_t
   use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
-  use neko_ext, only: reset
+  use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use field_math, only: field_rzero, field_copy
@@ -59,12 +59,13 @@ module simulation_m
   use utils, only: neko_warning, neko_error
   use comm, only: pe_rank
   use json_file_module, only: json_file
-  use json_utils, only: json_extract_item, json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
   use logger, only: LOG_SIZE, neko_log
   use mpi_f08, only: MPI_WTIME
   use jobctrl, only: jobctrl_time_limit
-  use profiler, only: profiler_start, profiler_stop
+  use profiler, only: profiler_start, profiler_stop, &
+       profiler_start_region, profiler_end_region
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
@@ -100,8 +101,6 @@ module simulation_m
      ! ----------------------------------------------------------------------- !
      ! Checkpoint system
 
-     !> Enable checkpoint system
-     logical :: checkpoint_enable = .false.
      !> The checkpoint system data
      type(simulation_checkpoint_t) :: checkpoint
 
@@ -127,12 +126,16 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
+    type(json_file) :: checkpoint_params
     integer :: i, n_scalars
 
     ! initialize the primal
     call neko_init(this%neko_case)
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
+
+    ! Start the profiler
+    call profiler_start
 
     select type (fluid => this%neko_case%fluid)
     type is (fluid_pnpn_t)
@@ -192,10 +195,9 @@ contains
        end do
     end if
 
-    call json_get_or_default(parameters, "checkpoints.enable", &
-         this%checkpoint_enable, .false.)
-    if (this%checkpoint_enable) then
-       call this%checkpoint%init(this%neko_case, parameters)
+    if ("checkpoints" .in. parameters) then
+       call json_get(parameters, 'checkpoints', checkpoint_params)
+       call this%checkpoint%init(this%neko_case, checkpoint_params)
     end if
 
   end subroutine simulation_initialize
@@ -204,9 +206,10 @@ contains
   subroutine simulation_free(this)
     class(simulation_t), intent(inout) :: this
 
-    if (this%checkpoint_enable) then
-       call this%checkpoint%free()
-    end if
+    ! Stop the profiler
+    call profiler_stop
+
+    call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -222,18 +225,17 @@ contains
 
     call simulation_init(this%neko_case, dt_controller)
 
-    call profiler_start
+    call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
+    this%n_timesteps = 0
     do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
        this%n_timesteps = this%n_timesteps + 1
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       if (this%checkpoint_enable) then
-          call this%checkpoint%save(this%neko_case)
-       end if
+       call this%checkpoint%save(this%neko_case)
     end do
-    call profiler_stop
+    call profiler_end_region("Forward simulation")
 
     call simulation_finalize(this%neko_case)
 
@@ -251,19 +253,16 @@ contains
 
     call simulation_adjoint_init(this%adjoint_case, dt_controller)
 
-    call profiler_start
+    call profiler_start_region("Adjoint simulation")
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
-
     do i = this%n_timesteps, 1, -1
-       if (this%checkpoint_enable) then
-          call this%checkpoint%restore(this%neko_case, i)
-       end if
+       call this%checkpoint%restore(this%neko_case, i)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
     end do
-    call profiler_stop
+    call profiler_end_region("Adjoint simulation")
 
     call simulation_adjoint_finalize(this%adjoint_case)
 
@@ -272,32 +271,11 @@ contains
   !> Reset the simulation
   subroutine simulation_reset(this)
     class(simulation_t), intent(inout) :: this
-    integer :: i, n_scalars
 
     call reset(this%neko_case)
+    call reset_adjoint(this%adjoint_case, this%neko_case)
+    call this%checkpoint%reset()
 
-    ! TODO
-    ! reset for the adjoint
-    ! call reset(this%adjoint_case)
-    this%adjoint_case%time%t = 0.0_rp
-    this%adjoint_case%time%tstep = 0
-    this%n_timesteps = 0
-
-    call field_rzero(this%adjoint_case%fluid_adj%u_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%v_adj)
-    call field_rzero(this%adjoint_case%fluid_adj%w_adj)
-    n_scalars = 0
-    if (allocated(this%adjoint_case%adjoint_scalars)) then
-       n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
-       do i = 1, n_scalars
-          call field_rzero(&
-               this%adjoint_case%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
-       end do
-    end if
-
-    if (this%checkpoint_enable) then
-       call this%checkpoint%reset()
-    end if
   end subroutine simulation_reset
 
   !> Write current state of the simulation to disk

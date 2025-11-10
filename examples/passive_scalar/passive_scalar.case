@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 5.0,
-            "timestep": 2e-4
+            "timestep": 5e-3
         },
         "numerics": {
             "time_order": 1,
@@ -39,7 +39,7 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user_velocity_pointwise",
+                    "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -55,7 +55,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 5000.0,
+            "Pe": 500.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
@@ -69,7 +69,7 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user_pointwise",
+                    "type": "user",
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -158,33 +158,33 @@
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.05
+                    "r": 0.05,
+                    "tol": 1e-15
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 1000
+                    "f_max": 100
                 }
             ],
             "initial_distribution": {
                 "type": "uniform",
                 "value": 0.0
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {
             "type": "mma",
             "max_iterations": 100,
-            "tolerance": 1.0e-3,
+            "tolerance": 1.0e-13,
             "mma": {
-                "m": 0,
                 "scale": 1000.0,
                 "xmin": 0.0,
                 "xmax": 1.0
@@ -198,6 +198,13 @@
                 "weight": 1.0
             }
         ],
-        "constraints": [ ]
+        "constraints": [
+            {
+                "type": "volume",
+                "mask_name": "optimization_domain",
+                "limit": 0.05,
+                "is_max": false
+            }
+        ],
     }
 }

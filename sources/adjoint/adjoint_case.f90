@@ -45,8 +45,7 @@ module adjoint_case
   use output_controller, only: output_controller_t
   use file, only: file_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default, json_extract_object, &
-       json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
@@ -111,6 +110,7 @@ contains
     integer :: precision
     integer :: n_scalars_primal, n_scalars_adjoint, i
     logical :: scalar = .false.
+    logical :: temperature_found = .false.
 
     ! extra things for json
     type(json_file) :: ic_json, numerics_params
@@ -165,13 +165,13 @@ contains
 
     if (this%have_scalar) then
        allocate(this%adjoint_scalars)
-       call json_extract_object(neko_case%params, 'case.numerics', &
+       call json_get(neko_case%params, 'case.numerics', &
             numerics_params)
        if (neko_case%params%valid_path('case.adjoint_scalar')) then
           ! For backward compatibility
-          call json_extract_object(neko_case%params, 'case.adjoint_scalar', &
+          call json_get(neko_case%params, 'case.adjoint_scalar', &
                scalar_params_adjoint)
-          call json_extract_object(neko_case%params, 'case.scalar', &
+          call json_get(neko_case%params, 'case.scalar', &
                scalar_params_primal)
           call this%adjoint_scalars%init(neko_case%msh, neko_case%fluid%c_Xh, &
                neko_case%fluid%gs_Xh, scalar_params_adjoint, &
@@ -196,9 +196,9 @@ contains
        else
           ! Multiple scalars
 
-          call json_extract_object(this%case%params, &
+          call json_get(this%case%params, &
                'case.adjoint_scalars', scalar_params_adjoint)
-          call json_extract_object(this%case%params, &
+          call json_get(this%case%params, &
                'case.scalars', scalar_params_primal)
           call this%adjoint_scalars%init(n_scalars_adjoint, n_scalars_primal, &
                neko_case%msh, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, &
@@ -214,7 +214,7 @@ contains
     !
     ! Time control
     !
-    call json_extract_object(this%case%params, 'case.time', json_subdict)
+    call json_get(this%case%params, 'case.time', json_subdict)
     call this%time%init(json_subdict)
 
     !
@@ -242,7 +242,7 @@ contains
     json_key = json_key_fallback(neko_case%params, &
          'case.adjoint_fluid.initial_condition', 'case.fluid.initial_condition')
 
-    call json_extract_object(neko_case%params, json_key, ic_json)
+    call json_get(neko_case%params, json_key, ic_json)
     call json_get(ic_json, 'type', string_val)
 
     if (trim(string_val) .ne. 'user') then
@@ -265,17 +265,26 @@ contains
           ! we shouldn't fallback to the primal here.
           call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition.type', string_val)
-          call json_extract_object(neko_case%params, &
+          call json_get(neko_case%params, &
                'case.adjoint_scalar.initial_condition', ic_json)
 
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             call set_scalar_ic(&
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
-                  this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
-                  string_val, ic_json)
+             if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+                  'temperature') then
+                call set_scalar_ic(&
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
+                     string_val, ic_json, 0)
+             else
+                call set_scalar_ic(&
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%c_Xh, &
+                     this%adjoint_scalars%adjoint_scalar_fields(1)%gs_Xh, &
+                     string_val, ic_json, 1)
+             end if
           else
              call neko_error("user ICs not implemented for adjoint scalar")
              ! call set_scalar_ic(this%adjoint_scalars%s_adj, &
@@ -292,15 +301,35 @@ contains
                   i, scalar_params_adjoint)
              call json_get(scalar_params_adjoint, &
                   'initial_condition.type', string_val)
-             call json_extract_object(scalar_params_adjoint, &
+             call json_get(scalar_params_adjoint, &
                   'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
-                call set_scalar_ic(&
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
-                     this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
-                     string_val, json_subdict)
+                if (trim(neko_case%scalars%scalar_fields(i)%name) .eq. &
+                     'temperature') then
+                   call set_scalar_ic(&
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                        this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                        string_val, json_subdict, 0)
+                   temperature_found = .true.
+                else
+                   if (temperature_found) then
+                      ! if temperature is found, scalars start from index 1
+                      call set_scalar_ic(&
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                           string_val, json_subdict, i - 1)
+                   else
+                      ! if temperature is not found, scalars start from index 0
+                      call set_scalar_ic(&
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%c_Xh, &
+                           this%adjoint_scalars%adjoint_scalar_fields(i)%gs_Xh, &
+                           string_val, json_subdict, i)
+                   end if
+                end if
              else
                 call neko_error("user ICs not implemented for adjoint scalar")
              end if

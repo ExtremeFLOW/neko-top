@@ -21,6 +21,8 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
 elseif(CMAKE_BUILD_TYPE STREQUAL "Release")
     add_compile_options(
         $<$<COMPILE_LANGUAGE:Fortran>:-e0> # Initialize to 0
+        $<$<COMPILE_LANGUAGE:Fortran>:-O2> # Optimize to level 2
         $<$<COMPILE_LANGUAGE:Fortran>:-m4> # Set message level to Error only
+        $<$<COMPILE_LANGUAGE:HIP>:-w>      #
     )
 endif()
