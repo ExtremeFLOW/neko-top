@@ -24,9 +24,8 @@ for file_name in [
     backend = df_current.keys().tolist()[-2].split(':')[1].strip()
     subsolver = df_current.keys().tolist()[-1].split(':')[1].strip()
 
-    reference_file = os.path.join(
-        current_dir, "reference_data",
-        "optimization_data_" + backend + "_" + subsolver + ".csv")
+    reference_file = os.path.join(current_dir, "reference_data",
+                                  "optimization_data_" + subsolver + ".csv")
 
     if not os.path.exists(reference_file):
         # copy current data as reference
