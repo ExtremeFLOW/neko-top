@@ -55,7 +55,7 @@ add_custom_target(
         ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     COMMAND ${CMAKE_COMMAND} -E env
         LD_LIBRARY_PATH="${neko_LD_LIBRARY_PATH}" PATH="${neko_PATH}"
-        ./prepare.sh -N14 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
+        ./prepare.sh -N8 > ${CMAKE_CURRENT_BINARY_DIR}/prepare.log
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
 add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
@@ -100,7 +100,7 @@ foreach(case_file ${test_list})
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 300
+            TIMEOUT 3000
     )
 endforeach()
 

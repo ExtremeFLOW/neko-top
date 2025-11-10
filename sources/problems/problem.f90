@@ -57,6 +57,7 @@ module problem
        simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
+  use math, only: glsum
 
   implicit none
   private
@@ -823,9 +824,12 @@ contains
     class(problem_t), intent(in) :: this
     type(vector_t), intent(inout) :: sensitivity
     integer :: i
+    real(kind=rp) :: spy
 
     call sensitivity%init(this%n_design)
     do i = 1, this%n_objectives
+       spy = glsum(this%objective_list(i)%objective%sensitivity%x, this%objective_list(i)%objective%sensitivity%size())
+       print *, "yo", i, spy
        call vector_add2(sensitivity, &
             this%objective_list(i)%objective%sensitivity)
     end do

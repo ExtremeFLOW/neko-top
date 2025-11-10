@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 250e-3,
-            "timestep": 5e-3
+            "end_time": 100e-3,
+            "timestep": 1e-3
         },
         "numerics": {
             "time_order": 1,
