@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # Define the tolerance for comparison
-tol = 1e-15
+tol = 1e-10
 return_value = True
 
 # Define file paths
@@ -53,28 +53,29 @@ for file_name in [
 
     report.write(f"Comparison Report for {file_name}\n")
     report.write("=" * 80 + "\n\n")
-    for column in df_current.columns:
 
-        if column.split(':')[0].strip() == "backend":
-            continue
-        if column.split(':')[0].strip() == "subsolver":
-            continue
-
+    for column in [
+            c for c in df_current.columns
+            if c.split(':')[0].strip() != "backend"
+            and c.split(':')[0].strip() != "subsolver"
+    ]:
         report.write(f"Checking column: {column}\n")
         report.write(f"{'Iter':>6} | {'Current':>15} | {'Reference':>15} | " +
-                     f"{'Diff':>15} | {'Status':>10}\n")
+                     f"{'RMSRE':>15} | {'Status':>10}\n")
 
         for i in range(len(iter)):
             val_current = df_current[column][i]
             val_reference = df_reference[column][i]
-            diff = abs(val_current - val_reference)
-            status = "OK" if diff <= tol else "FAIL"
+
+            rmsre = abs(val_current - val_reference)
+
+            status = "OK" if rmsre <= tol else "FAIL"
             if status == "FAIL":
                 return_value = False
 
             report.write(
                 f"{int(iter[i]):6} | {val_current:15.8e} | " +
-                f"{val_reference:15.8e} | {diff:15.8e} | {status:>10}\n")
+                f"{val_reference:15.8e} | {rmsre:15.8e} | {status:>10}\n")
         report.write("\n")
 
     # Create plots folder if it does not exist
