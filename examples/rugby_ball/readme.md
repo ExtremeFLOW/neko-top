@@ -1,7 +1,7 @@
 # Rugby ball {#rugby-ball}
 
-This example follows the classic "rugby ball" example by 
-[Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426). 
+This example follows the classic "rugby ball" example by
+[Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426).
 
 The objective is to minimize the dissipation
 
