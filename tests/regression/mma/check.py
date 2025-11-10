@@ -9,6 +9,9 @@ return_value = True
 current_dir = os.path.dirname(os.path.abspath(__file__))
 report = open(os.path.join(current_dir, "test_report.txt"), "w")
 
+if not os.path.exists(os.path.join(current_dir, "reference_data")):
+    os.makedirs(os.path.join(current_dir, "reference_data"))
+
 for file_name in [
         f for f in os.listdir(current_dir)
         if f.startswith("optimization_data_") and f.endswith(".csv")
@@ -27,6 +30,7 @@ for file_name in [
 
     if not os.path.exists(reference_file):
         # copy current data as reference
+
         df_current.to_csv(reference_file, index=False)
         print(
             f"Reference data file not found. Created new reference file at '{reference_file}'."
