@@ -12,7 +12,7 @@ program usrneko
   use objective, only: objective_t
 
 
-  use example_problem, only: deflection_con, beamweight_obj, stress_con
+  use example_problem_1d_beam, only: deflection_con, beamweight_obj, stress_con
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -224,7 +224,7 @@ end program usrneko
 
 subroutine finite_difference_validation(des, k_test, delta)
   use comm, only: pe_rank
-  use example_problem, only: deflection_con
+  use example_problem_1d_beam, only: deflection_con
   use design_3dto1d, only: design_3dto1d_t
   use num_types, only: rp
   use vector, only: vector_t
