@@ -3,13 +3,14 @@ module neko_linop
    use num_types, only : rp, sp
    use simulation_m, only : simulation_t
    use field, only : field_t
-   use field_math, only : field_copy
+   use field_math, only : field_copy, field_rzero
    use fld_file_output, only : fld_file_output_t
    use neko_vector, only : state_vector_t
 
    implicit none
    type, extends(abstract_linop_rdp), public :: linear_propagator_t
       type(simulation_t), pointer, public :: simulation
+      logical :: if_2d = .false.
       type(fld_file_output_t), public :: output_primal
       type(fld_file_output_t), public :: output_linear
       type(fld_file_output_t), public :: output_adjoint
@@ -54,10 +55,12 @@ module neko_linop
            call field_copy(vec_out%p, self%simulation%adjoint_case%fluid_adj%p_adj)
 
            ! quasi 2D hack...
+           if (self%if_2d) then
            call z_plane_fix(vec_out%u)
            call z_plane_fix(vec_out%v)
-           call z_plane_fix(vec_out%w)
+           call field_rzero(vec_out%w)
            call z_plane_fix(vec_out%p)
+           end if
         end select
      end select
      return
@@ -75,6 +78,9 @@ module neko_linop
      dt = self%simulation%neko_case%time%dt
      n_steps = int(T_fin/dt)
      self%simulation%n_timesteps = n_steps
+     if(self%simulation%neko_case%fluid%c_Xh%msh%gdim .eq. 2) then
+             self%if_2d = .true.
+     end if
      
      ! NOTE baseflow should be loaded via IC in .case file, but let's double
      ! check

@@ -1,13 +1,14 @@
 module neko_jacobian
    use LightKrylov, only: abstract_vector_rdp, abstract_jacobian_linop_rdp
    use field, only: field_t
-   use field_math, only: field_copy
+   use field_math, only: field_copy, field_rzero
    use neko_vector, only: state_vector_t
    use simulation_m, only: simulation_t
 
    implicit none
    type, extends(abstract_jacobian_linop_rdp), public :: jacobian_t
       type(simulation_t), pointer, public :: simulation
+      logical :: if_2d = .false.
     contains
       private
       procedure, pass(self), public :: matvec => linear_map
@@ -52,10 +53,12 @@ module neko_jacobian
            call field_copy(vec_out%p, self%simulation%adjoint_case%fluid_adj%p_adj)
 
            ! quasi 2D hack...
+           if (self%if_2d) then
            call z_plane_fix(vec_out%u)
            call z_plane_fix(vec_out%v)
-           call z_plane_fix(vec_out%w)
+           call field_rzero(vec_out%w)
            call z_plane_fix(vec_out%p)
+           end if
 
            ! Evaluate residual F(X) - X.
            call vec_out%sub(vec_in)
@@ -69,6 +72,9 @@ module neko_jacobian
      class(jacobian_t), intent(inout)  :: self
      type(simulation_t), intent(in), target :: simulation
      self%simulation => simulation
+     if(self%simulation%neko_case%fluid%c_Xh%msh%gdim .eq. 2) then
+             self%if_2d = .true.
+     end if
      return
    end subroutine linear_propagator_init
 
