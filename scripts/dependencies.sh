@@ -241,16 +241,15 @@ function find_hdf5() {
     check_external_dir
 
     # Determine the HDF5 installation directory
-    if [[ $# -ge 1 ]]; then
-        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
-            HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
-        else
-            HDF5_DIR="$(realpath $1)"
-        fi
+
+    if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
+    elif [ $# -ge 1 ]; then
+        HDF5_DIR="$(realpath $1)"
     else
-        export HDF5_DIR=""
-        return
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
     fi
+
 
     # Ensure HDF5 is installed, if not install it.
     HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
