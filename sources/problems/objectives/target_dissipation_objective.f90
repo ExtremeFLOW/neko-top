@@ -53,11 +53,11 @@ module target_dissipation_objective
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use point_zone, only: point_zone_t
-  use mask_ops, only: mask_exterior_const
+  use mask_ops, only: mask_exterior_const, compute_masked_volume
   use math_ext, only: glsc2_mask
   use utils, only: neko_error
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get_or_default, json_get
   implicit none
   private
 
@@ -73,13 +73,14 @@ module target_dissipation_objective
      type(field_t), pointer :: w => null()
      !> Pointer to the coefficient field.
      type(coef_t), pointer :: c_Xh => null()
-
      !> Pointer to adjoint u field.
      type(field_t), pointer :: adjoint_u => null()
      !> Pointer to adjoint v field.
      type(field_t), pointer :: adjoint_v => null()
      !> Pointer to adjoint w field.
      type(field_t), pointer :: adjoint_w => null()
+     !> Volume of the objective domain.
+     real(kind=rp) :: volume
      !> Initial dissipation.
      real(kind=rp) :: initial_dissipation = 0.0_rp
      !> Current dissipation.
@@ -150,7 +151,6 @@ contains
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
     real(kind=rp), intent(in) :: target_fraction
-
     type(adjoint_target_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
@@ -165,6 +165,12 @@ contains
     this%adjoint_w => neko_field_registry%get_field('w_adj')
     this%target_fraction = target_fraction
 
+    ! compute the volume of the objective domain
+    if (this%has_mask) then
+       this%volume = compute_masked_volume(this%mask, this%c_Xh)
+    else
+       this%volume = this%c_Xh%volume
+    end if
     ! append a source term based on the target dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
@@ -173,8 +179,8 @@ contains
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%target_fraction, this%current_dissipation, &
-         this%initial_dissipation)
+         this%c_Xh, this%volume, this%target_fraction, &
+         this%current_dissipation, this%initial_dissipation)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
@@ -256,7 +262,7 @@ contains
        end if
     end if
 
-    this%current_dissipation = this%current_dissipation * 0.5_rp
+    this%current_dissipation = this%current_dissipation * 0.5_rp / this%volume
 
     ! Check if it's the first time, and if so, set the initial dissipation
     if (this%is_first_time) then
