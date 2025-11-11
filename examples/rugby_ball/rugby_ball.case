@@ -102,6 +102,7 @@
     "optimization": {
         "design": {
             "type": "brinkman",
+            "dealias": false,
             "mapping": [
                 {
                     "type": "PDE_filter",
@@ -109,7 +110,9 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100,
+                    "q": 3,
+                    "convex_up": true
                 }
             ],
             "initial_distribution": {
@@ -132,14 +135,14 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 10.0,
+                "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
                 "c": 1000.0,
-                "d": 1.0
+                "d": 10.0
             }
         },
         "objectives": [
@@ -150,7 +153,8 @@
             {
                 "type": "lube_term",
                 "weight": 1.0,
-                "K": 1.0
+                "dealias_sensitivity": false,
+                "dealias_forcing": false
             }
         ],
         "constraints": [
