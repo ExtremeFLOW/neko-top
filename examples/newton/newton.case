@@ -18,13 +18,13 @@
             "scheme": "pnpn",
             "Re": 100,
             "initial_condition": {
-                //"type": "field",
-                //"file_name": "steady0.f00000",
+                "type": "field",
+                "file_name": "steady_baseflow0.f00012",
                 //"interpolate": true
-                "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                // "type": "uniform",
+                // "value": [
+                //     0.0, 0.0, 0.0
+                // ]
             },
             "velocity_solver": {
                 "type": "cg",
