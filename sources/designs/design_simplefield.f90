@@ -165,11 +165,10 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%designfield%x_d, n)
     else
-       values%x = reshape(this%designfield%x, shape(values%x))
+       call copy(values%x, this%designfield%x, n)
     end if
   end subroutine design_simple_get_values
 
@@ -202,11 +201,10 @@ contains
     integer :: n
 
     n = this%size()
-
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%designfield%x_d, values%x_d, n)
     else
-       this%designfield%x = reshape(values%x, shape(this%designfield%x))
+       call copy(this%designfield%x, values%x, n)
     end if
   end subroutine design_simple_update_design
 
