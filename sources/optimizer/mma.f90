@@ -522,7 +522,19 @@ contains
   pure function mma_get_backend_and_subsolver(this) result(backend_subsolver)
     class(mma_t), intent(in) :: this
     character(len=:), allocatable :: backend_subsolver
-    backend_subsolver = ', backend:' // this%bcknd // ',subsolver:' // &
-         this%subsolver
+    character(len=:), allocatable :: backend
+
+    if (NEKO_BCKND_CUDA .eq. 1) then
+       backend = "cuda"
+    else if (NEKO_BCKND_HIP .eq. 1) then
+       backend = "hip"
+    else if (NEKO_BCKND_OPENCL .eq. 1) then
+       backend = "opencl"
+    else
+       backend = "cpu"
+    end if
+
+    backend_subsolver = 'backend:' // trim(backend) // ', subsolver:' // &
+         trim(this%subsolver)
   end function mma_get_backend_and_subsolver
 end module mma
