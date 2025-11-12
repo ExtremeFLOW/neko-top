@@ -87,8 +87,8 @@ module adjoint_fluid_pnpn
   use dong_outflow, only: dong_outflow_t
   use time_state, only: time_state_t
   use vector, only: vector_t
-  use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult, addcol3s2, subcol3, subcol4, col3, add2s2, col2, invcol2
+  use device_math, only: device_vlsc3, device_cmult, device_col2
+  use math, only: vlsc3, cmult, col2
   use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
@@ -890,7 +890,9 @@ contains
 
       ! divide by mass matrix
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("not implemented")
+         call device_col2(dx_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dy_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dz_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
       else
          ! NOTE. This term comes from the handling of the pressure RHS, which
          ! DOES include the multiplicity in the op.
@@ -900,9 +902,9 @@ contains
       end if
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call neko_error("not implemented")
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, dy_p_adj%x_d, dz_p_adj%x_d, 1.0_rp, n, msh%gdim)
       else
-         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, 1.0_rp, n, msh%gdim)
+         call opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, dy_p_adj%x_d, dz_p_adj%x_d, 1.0_rp, n, msh%gdim)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)
