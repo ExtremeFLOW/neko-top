@@ -3,8 +3,8 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 
 # Provide a list of .case files
 set(test_list
-    #"volume.case"
-    #"volume_filtered.case"
+    "volume.case"
+    "volume_filtered.case"
     "unsteady_lube.case"
     "unsteady_diss.case"
 )

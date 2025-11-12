@@ -542,10 +542,6 @@ contains
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
             cfl, loop_start, total_time)
     end do
-    ! really there should be one final call to restore the IC of the primal
-    ! and then one more accumulate on that one, but the IC of the primal
-    ! should always be zero, if not, special treatment of the adjoint is
-    ! required.
 
     call profiler_end_region("Forward simulation")
 

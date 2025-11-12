@@ -120,8 +120,8 @@ contains
        call logger%write(log_data)
 
        if (abs(fd_error) .gt. tolerance) then
-          !call neko_error('Finite difference estimate does not match ' // &
-          !     'sensitivity')
+          call neko_error('Finite difference estimate does not match ' // &
+               'sensitivity')
        end if
     end do
 
