@@ -41,7 +41,6 @@ module base_functional
   use vector, only: vector_t
   use utils, only: neko_error
   use vector_math, only: vector_add2s1
-  use math, only: glsum
   implicit none
   private
 
@@ -210,15 +209,12 @@ contains
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: dt
-    real(kind=rp) :: spy
     type(vector_t) :: temp
 
     temp = this%sensitivity
     call this%update_sensitivity(design)
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    spy = glsum(this%sensitivity%x, this%sensitivity%size())
-    print *, "yo ", this%name, spy
     call vector_add2s1(this%sensitivity, temp, dt)
   end subroutine functional_accumulate_sensitivity
 end module base_functional

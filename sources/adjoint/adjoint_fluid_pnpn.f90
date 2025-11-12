@@ -684,7 +684,6 @@ contains
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
     type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, chi
-    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
     integer :: temp_indices(3)
 
     if (this%freeze) return
@@ -903,7 +902,7 @@ contains
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call neko_error("not implemented")
       else
-         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, -1.0_rp, n, msh%gdim)
+         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, 1.0_rp, n, msh%gdim)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)

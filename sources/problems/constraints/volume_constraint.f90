@@ -182,10 +182,8 @@ contains
           this%volume_domain = device_glsc2(work%x_d, this%c_xh%B_d, &
                work%size())
        else
-          this%volume_domain = glsc2(work%x, this%c_xh%B, &
-               work%size())
-          ! this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
-          !      design%size(), this%mask%mask%get(), this%mask%size)
+          this%volume_domain = glsc2_mask(work%x, this%c_Xh%B, &
+               design%size(), this%mask%mask%get(), this%mask%size)
        end if
 
        call neko_scratch_registry%relinquish_field(temp_indices)
@@ -247,8 +245,6 @@ contains
 
     ! Invert the sign if it is a maximum constraint
     if (this%is_max) this%value = -this%value
-
-    print *, "VOLUME", this%value, "DOMAIN", this%volume_domain
 
   end subroutine volume_constraint_update_value
 
@@ -343,12 +339,8 @@ contains
 
           call neko_scratch_registry%relinquish_field(temp_indices)
        else
-          call neko_scratch_registry%request_field(work, temp_indices(1))
-          call copy(work%x, values%x, design%size())
-          call mask_exterior_const(work, this%mask, 0.0_rp)
-          ! volume = glsc2_mask(values%x, this%c_Xh%B, design%size(), &
-          !      this%mask%mask%get(), this%mask%size)
-          volume = glsc2(work%x, this%c_xh%B, design%size())
+          volume = glsc2_mask(values%x, this%c_Xh%B, design%size(), &
+               this%mask%mask%get(), this%mask%size)
        end if
 
     else

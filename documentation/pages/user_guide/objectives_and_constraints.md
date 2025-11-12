@@ -140,51 +140,6 @@ and has the following input parameters:
 | `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Scalar Mixing`|
 
-### Target dissipation {#target_dissipation}
-
-This objective is set a target dissipation expressed as a percentage of the
-dissipation of the first iteration.
-If one defines the dissipation as
-\f[
-\mathcal{D} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} 
-\frac{1}{2} |\nabla \mathbf{u}|^2 d\Omega,
-\f]
-
-then this objective takes the form of
-
-\f[
-\mathcal{F} = \frac{1}{2}\left(\frac{\mathcal{D}}{\gamma \mathcal{D}|_{i=0}} -1\right)^2
-\f]
-
-where \f$\mathcal{D}|_{i=0}\f$ is the dissipation at the first optimization
-iteration and \f$\gamma\f$ is the target multiple of this dissipation.
-
-The objective can be selected by prescribing `"type": "target_dissipation"` 
-and has the following input parameters:
-
-
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `weight`| The weight used in the objective. | Real | `1.0` |
-| `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
-| `target` | \f$\gamma\f$ in the above equation. | Real | - |
-| `name`| The name that will appear in `objective_data.csv` | String | `Target Dissipation`|
-
-\note By considering the mechanical energy equation, that is, taking an
-inner product between the momentum equation and \f$\mathbf{u}\f$, one obtains
-\f[
-\rho \frac{D}{Dt}\left(\frac{1}{2} u_i u_i\right)= - u_i \frac{\partial p}{\partial x_i} + u_i \frac{\partial \tau_{ij}}{\partial x_j},
-\f]
-By integrating over a control volume and assuming assuming 
-\f$\mathbf{u}|_{in} \approx \mathbf{u}|_{out}\f$ and that 
-\f$\frac{\partial}{\partial t}\left(\frac{1}{2} u_i u_i\right) = 0\f$
- in certain circumstances, one can argue this constraint
-is approximately equivalent to a preasure drop constraint, ie,
-\f[
-\mathcal{F} = \frac{1}{2}\left(\frac{\Delta p}{\gamma \Delta p|_{i=0}} -1\right)^2.
-\f]
-
-
 ## Constraints {#constraints}
 
 ### Volume constraint {#constraint_volume}
