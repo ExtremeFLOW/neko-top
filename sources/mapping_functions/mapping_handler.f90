@@ -50,7 +50,7 @@ module mapping_handler
   use utils, only: neko_warning
   use vector, only:vector_t
   use neko_ext, only: field_to_vector, vector_to_field
-  use gather_scatter, only : gs_t, gs_op_add
+  use gather_scatter, only : gs_op_add
   implicit none
   private
 
