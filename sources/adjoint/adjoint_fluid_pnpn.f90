@@ -95,7 +95,7 @@ module adjoint_fluid_pnpn
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
   use scratch_registry, only: neko_scratch_registry
-  use operators, only : opgrad, curl, grad
+  use operators, only : opgrad
   use gather_scatter, only : gs_t, GS_OP_ADD
 
   implicit none
@@ -683,7 +683,7 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
-    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, chi
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj
     integer :: temp_indices(3)
 
     if (this%freeze) return
