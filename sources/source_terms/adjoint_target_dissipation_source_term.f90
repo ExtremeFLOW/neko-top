@@ -84,6 +84,8 @@ module adjoint_target_dissipation_source_term
      logical :: if_mask
      !> an ax_helm type to compute weak laplacian
      class(ax_t), allocatable :: Ax
+     !> volume of the objective domain.
+     real(kind=rp) :: volume
      !> Initial dissipation.
      real(kind=rp), pointer :: initial_dissipation => null()
      !> Current dissipation.
@@ -135,14 +137,13 @@ contains
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
+  !! @param volume volume of the objective domain.
   !! @param target_fraction target fraction of the initial dissipation.
   !! @param current_dissipation the current dissipation.
   !! @param initial_dissipation the initial dissipation.
   subroutine adjoint_target_dissipation_source_term_init_from_components(this,&
-       f_x, f_y, f_z, &
-       u, v, w, obj_scale, &
-       mask, if_mask, &
-       coef, target_fraction, current_dissipation, initial_dissipation)
+       f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, volume, &
+       target_fraction, current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
@@ -151,10 +152,11 @@ contains
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
+    class(point_zone_t), intent(in), target :: mask
+    real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: target_fraction
     real(kind=rp), target, intent(in) :: current_dissipation
     real(kind=rp), target, intent(in) :: initial_dissipation
-    class(point_zone_t), intent(in), target :: mask
     logical :: if_mask
 
     ! I wish you didn't need a start time and end time...
@@ -182,6 +184,7 @@ contains
     this%initial_dissipation => initial_dissipation
 
     this%obj_scale = obj_scale
+    this%volume = volume
 
     this%if_mask = if_mask
     if (this%if_mask) then
@@ -198,6 +201,13 @@ contains
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%u)
+    nullify(this%v)
+    nullify(this%w)
+    nullify(this%mask)
+    if (allocated(this%Ax)) then
+       deallocate(this%Ax)
+    end if
   end subroutine adjoint_target_dissipation_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
@@ -228,12 +238,12 @@ contains
 
     ! compute the scaling to go in front of the forcing term
     scale_forcing = (this%current_dissipation / &
-         (this%initial_dissipation * this%target_fraction) - 1.0_rp)
+         (this%initial_dissipation * this%target_fraction) - 1.0_rp) &
+         / (this%initial_dissipation * this%target_fraction) / this%volume
 
     associate(coef => this%coef)
 
-
-      ! note that axhelm computes h1 * lap u + h2 * u
+      ! Note that axhelm computes h1 * lap u + h2 * u
       ! we set h1 = 1 and h2 = 0 to compute the weak laplacian.
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_cfill(coef%h1_d, 1.0_rp, n)
@@ -244,8 +254,9 @@ contains
       end if
       coef%ifh2 = .false.
 
-      ! u
       ! ------------------------------------------------------------------------
+      ! u
+
       call this%Ax%compute(result%x, u%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication
@@ -263,8 +274,9 @@ contains
       ! add to RHS
       call field_add2s2(fu, result, this%obj_scale * scale_forcing)
 
-      ! v
       ! ------------------------------------------------------------------------
+      ! v
+
       call this%Ax%compute(result%x, v%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication
@@ -282,8 +294,9 @@ contains
       ! add to RHS
       call field_add2s2(fv, result, this%obj_scale * scale_forcing)
 
-      ! w
       ! ------------------------------------------------------------------------
+      ! w
+
       call this%Ax%compute(result%x, w%x, coef, coef%msh, coef%xh)
 
       ! pre-divide out the mass matrix to counteract it's multiplication

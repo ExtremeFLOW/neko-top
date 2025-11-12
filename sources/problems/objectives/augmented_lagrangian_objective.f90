@@ -34,7 +34,7 @@
 module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_copy
+  use field_math, only: field_col3, field_addcol3, field_cmult
   use scratch_registry, only: scratch_registry_t, neko_scratch_registry
   use objective, only: objective_t
   use simulation_m, only: simulation_t
@@ -86,8 +86,6 @@ module augmented_lagrangian_objective
      logical :: dealias
      !> GL scratch registry
      type(scratch_registry_t), pointer :: scratch_GL
-     !> Physical dimension
-     integer :: gdim
 
    contains
      !> The common constructor using a JSON object.
@@ -166,7 +164,6 @@ contains
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
     this%Xh_GLL => this%c_Xh_GLL%Xh
-    this%gdim = this%c_Xh_GLL%msh%gdim
 
     ! GL
     this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
@@ -220,9 +217,6 @@ contains
     integer :: temp_indices_GL(3)
 
     call neko_scratch_registry%request_field(work, temp_indices(1))
-    call neko_scratch_registry%request_field(dx_p_adj, temp_indices(2))
-    call neko_scratch_registry%request_field(dy_p_adj, temp_indices(3))
-    call neko_scratch_registry%request_field(dz_p_adj, temp_indices(4))
 
     if (this%dealias) then
 
@@ -242,12 +236,10 @@ contains
             this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
 
-       if (this%gdim .eq. 3) then
        call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(adjoint_fld_GL%x, this%adjoint_w%x, nel, &
             this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, adjoint_fld_GL)
-       end if
 
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -264,9 +256,7 @@ contains
     else
        call field_col3(work, this%u, this%adjoint_u)
        call field_addcol3(work, this%v, this%adjoint_v)
-       if (this%gdim .eq. 3) then
        call field_addcol3(work, this%w, this%adjoint_w)
-       end if
     end if
     ! but negative
     call field_cmult(work, -1.0_rp)

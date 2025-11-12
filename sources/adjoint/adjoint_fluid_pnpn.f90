@@ -759,88 +759,9 @@ contains
       ! Update material properties if necessary
       call this%update_material_properties(time)
 
-      ! Compute velocity residual.
-
-      !------------------------------------------------------------------------!
-      ! attempt 1, as written on PDF
-      ! Compute the additional RHS contributions due to the discrete adjoint
-      ! Karniadakis scheme
-     !  call neko_scratch_registry%request_field(ta1, temp_indices(1))
-     !  call neko_scratch_registry%request_field(ta2, temp_indices(2))
-     !  call neko_scratch_registry%request_field(ta3, temp_indices(3))
-     !  call neko_scratch_registry%request_field(wa1, temp_indices(4))
-     !  call neko_scratch_registry%request_field(wa2, temp_indices(5))
-     !  call neko_scratch_registry%request_field(wa3, temp_indices(6))
-     !  call neko_scratch_registry%request_field(work1, temp_indices(7))
-     !  call neko_scratch_registry%request_field(work2, temp_indices(8))
-     !  call neko_scratch_registry%request_field(dx_p_adj, temp_indices(9))
-     !  call neko_scratch_registry%request_field(dy_p_adj, temp_indices(10))
-     !  call neko_scratch_registry%request_field(dz_p_adj, temp_indices(11))
-
-     !  ! gradient of adjoint pressure (explicit)
-     !  call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
-
-     !  ! adjoint advection operator
-     !  call this%adv%compute_adjoint(dx_p_adj, dy_p_adj, dz_p_adj, u_b, v_b, w_b, &
-     !          f_x, f_y, f_z, &
-     !          Xh, c_Xh, dm_Xh%size())
-
-     !  ! 1/dt (NOTE, I'm not 100% sure about rho)
-     !  if (NEKO_BCKND_DEVICE .eq. 1) then
-     !     call neko_error("not implemented")
-     !  else
-     !     call addcol3s2(f_x%x, dx_p_adj%x, c_Xh%B, 1.0_rp / dt, f_x%size())
-     !     call addcol3s2(f_y%x, dy_p_adj%x, c_Xh%B, 1.0_rp / dt, f_y%size())
-     !     call addcol3s2(f_z%x, dz_p_adj%x, c_Xh%B, 1.0_rp / dt, f_z%size())
-     !  end if
-
-     !  ! curl curl
-     !  ! (NOTE, not 100% sure about adjoint consistency with the gsop)
-     !  call curl(ta1, ta2, ta3, dx_p_adj, dy_p_adj, dz_p_adj, work1, work2, c_Xh)
-     !  call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
-     !  if (NEKO_BCKND_DEVICE .eq. 1) then
-     !     call neko_error("not implemented")
-     !  else
-     !     call subcol3(f_x%x, wa1%x, c_Xh%B, f_x%size())
-     !     call subcol3(f_y%x, wa2%x, c_Xh%B, f_y%size())
-     !     call subcol3(f_z%x, wa3%x, c_Xh%B, f_z%size())
-     !  end if
-
-     !  ! Brinkman
-     !  ! damn... this one is hidden in a source term, be we can get it from the
-     !  ! registry, not ideal, but ok until we find a better solution.
-     !  ! also... this one needs over integration :/
-     !  chi => neko_field_registry%get_field("brinkman_amplitude")
-     !  if (NEKO_BCKND_DEVICE .eq. 1) then
-     !     call neko_error("not implemented")
-     !  else
-     !     call subcol4(f_x%x, chi%x, dx_p_adj%x, c_Xh%B, f_x%size())
-     !     call subcol4(f_y%x, chi%x, dy_p_adj%x, c_Xh%B, f_y%size())
-     !     call subcol4(f_z%x, chi%x, dz_p_adj%x, c_Xh%B, f_z%size())
-     !  end if
-
-     !  call neko_scratch_registry%relinquish_field(temp_indices)
-      !------------------------------------------------------------------------!
-      ! attempt 2, think of u as an intermediate velocity
-      !------------------------------------------------------------------------!
-
+      ! Compute intermediate velocity residual.
 
       call profiler_start_region('Adjoint_velocity_residual')
-
-      ! call invcol2(f_x%x, c_Xh%B, f_x%size())
-      ! call invcol2(f_y%x, c_Xh%B, f_y%size())
-      ! call invcol2(f_z%x, c_Xh%B, f_z%size())
-
-      ! call gs_Xh%op(f_x, GS_OP_ADD, event)
-      ! call device_event_sync(event)
-      ! call gs_Xh%op(f_y, GS_OP_ADD, event)
-      ! call device_event_sync(event)
-      ! call gs_Xh%op(f_z, GS_OP_ADD, event)
-      ! call device_event_sync(event)
-
-      ! call col2(f_x%x, c_Xh%B, f_x%size())
-      ! call col2(f_y%x, c_Xh%B, f_y%size())
-      ! call col2(f_z%x, c_Xh%B, f_z%size())
 
       call vel_res%compute(Ax_vel, u, v, w, &
            u_res, v_res, w_res, &
@@ -952,7 +873,6 @@ contains
       end if
 
       !------------------------------------------------------------------------!
-      ! attempt 2
       ! correct the velocity with the pressure
       call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1))
       call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2))
