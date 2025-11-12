@@ -4,11 +4,17 @@
 # Define the help function
 
 function help() {
-    echo -e "test.sh [options]"
-    echo -e "  Script to execute the tests."
+    echo -e "test.sh [options] TEST_NAME [TEST_NAME ...]"
+    echo -e "  Script to execute tests."
+    echo -e ""
+    echo -e " TEST_NAME options:"
+    echo -e "  unit           Run unit tests."
+    echo -e "  sensitivity    Run sensitivity regression tests."
+    echo -e "  mma            Run MMA regression tests."
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help      Show this help message and exit."
+    echo -e "  -a, --all       Run all tests (unit and sensitivity)."
     echo -e ""
     echo -e "  See Readme for additional details."
     exit 0
@@ -32,16 +38,17 @@ done
 
 [ "$ALL" == true ] && UNIT_TEST=true || UNIT_TEST=false
 [ "$ALL" == true ] && SENSITIVITY_TEST=true || SENSITIVITY_TEST=false
+[ "$ALL" == true ] && MMA_TEST=true || MMA_TEST=false
+
+if [ $# -eq 0 ] && [ "$ALL" == false ]; then help; fi
 
 for arg in "$@"; do
-    if [ "$arg" == "unit" ]; then
-        UNIT_TEST=true
-    elif [ "$arg" == "sensitivity" ]; then
-        SENSITIVITY_TEST=true
-    else
-        echo "Invalid argument: $arg"
-        help
-    fi
+    case "$arg" in
+        unit) UNIT_TEST=true ;;
+        sensitivity) SENSITIVITY_TEST=true ;;
+        mma) MMA_TEST=true ;;
+        *) echo "Invalid argument: $arg" && help ;;
+    esac
 done
 
 # ============================================================================ #
@@ -78,8 +85,17 @@ if [ "$SENSITIVITY_TEST" == true ]; then
     if [ $? -ne 0 ]; then
         echo "Sensitivity regression tests failed."
         exit 1
-    else
-        echo "Regression tests passed successfully."
-        exit 0
+    fi
+fi
+
+# ============================================================================ #
+# Run the mma regression tests
+
+if [ "$MMA_TEST" == true ]; then
+    $MAIN_DIR/tests/regression/mma/run.sh
+
+    if [ $? -ne 0 ]; then
+        echo "MMA regression tests failed."
+        exit 1
     fi
 fi
