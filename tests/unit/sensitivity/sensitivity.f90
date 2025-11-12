@@ -96,12 +96,11 @@ contains
        call problem%get_objective_value(perturbed_constraint)
        if (is_objective) then
           call problem%get_objective_value(perturbed_constraint)
-          call sim%write_forward(ip)
        else
           call problem%get_constraint_values(constraint_vec)
           perturbed_constraint = constraint_vec%x(1)
        end if
-
+       call sim%write(ip)
        call sim%reset()
 
        fd_estimate = perturbed_constraint - constraint
