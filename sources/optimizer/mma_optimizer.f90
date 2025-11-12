@@ -242,20 +242,12 @@ contains
 
        ! Scaling
        if (this%auto_scale .eqv. .true.) then
-          scaling_factor = abs(this%scale/constraint_value%x(1))
+          scaling_factor = abs(this%scale/maxval(objective_sensitivities%x))
        else
           scaling_factor = abs(this%scale)
        end if
 
-       call vector_cmult(constraint_value, scaling_factor)
-
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_cmult(constraint_sensitivities%x_d, scaling_factor, &
-               constraint_sensitivities%size())
-       else
-          call cmult(constraint_sensitivities%x, scaling_factor, &
-               constraint_sensitivities%size())
-       end if
+       call vector_cmult(objective_sensitivities, scaling_factor)
 
        ! Use scaled sensitivities to update the design variable
        call profiler_start_region("MMA update")
