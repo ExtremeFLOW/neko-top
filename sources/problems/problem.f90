@@ -520,7 +520,7 @@ contains
     ! for the fluid of u=0, so this doesn't matter. Then we use u_adj = 0 on
     ! the other end.
     !
-    ! we have: 
+    ! we have:
     !  - n    time steps to compute
     !  - n+1  fields to consider
     !  - n-1  non-zero contributions to u * u_adj

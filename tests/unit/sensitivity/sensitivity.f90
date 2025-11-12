@@ -101,7 +101,7 @@ contains
           call problem%get_constraint_values(constraint_vec)
           perturbed_constraint = constraint_vec%x(1)
        end if
-       
+
        call sim%reset()
 
        fd_estimate = perturbed_constraint - constraint
