@@ -58,7 +58,6 @@ MAIN_DIR=$(realpath $(dirname $0)/../)
 
 EXTERNAL_DIR="$MAIN_DIR/external"
 source "$MAIN_DIR/scripts/dependencies.sh"
-find_hdf5
 find_neko
 
 # ============================================================================ #
