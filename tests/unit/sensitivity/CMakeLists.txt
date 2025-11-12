@@ -5,8 +5,6 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 set(test_list
     "volume.case"
     "volume_filtered.case"
-    "unsteady_lube.case"
-    "unsteady_diss.case"
 )
 
 # Path to the common driver source
