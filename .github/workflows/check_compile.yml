@@ -41,22 +41,10 @@ jobs:
         # Default matrix
         precision: [dp]
         backend: [CPU, CUDA, HIP]
-        compiler: [GNU, GNU-13, GNU-14]
-
-        # Exclude specific combinations
-        exclude:
-          - backend: CUDA
-            compiler: GNU-13
-          - backend: HIP
-            compiler: GNU-13
+        compiler: [GNU-13, GNU-14]
 
         # Define the setup jobs
         include:
-          - compiler: GNU
-            setup-compiler: |
-              echo "c-compiler=gcc" >> $GITHUB_OUTPUT
-              echo "f-compiler=gfortran" >> $GITHUB_OUTPUT
-
           - compiler: GNU-13
             setup-compiler: |
               echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
