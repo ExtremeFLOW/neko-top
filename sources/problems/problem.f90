@@ -403,12 +403,10 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     class(simulation_t), optional, intent(inout) :: simulation
-    logical :: unsteady
 
     if (present(simulation)) then
        call simulation%reset()
-       call simulation%checkpoint%get_enabled(unsteady)
-       if (unsteady) then
+       if (simulation%unsteady) then
           ! Objective value accumulated
           call this%run_forward_unsteady(simulation, design)
        else
@@ -429,13 +427,11 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     class(simulation_t), optional, intent(inout) :: simulation
-    logical :: unsteady
 
     type(vector_t) :: objective_sensitivity
 
     if (present(simulation)) then
-       call simulation%checkpoint%get_enabled(unsteady)
-       if (unsteady) then
+       if (simulation%unsteady) then
           ! Objective sensitivity accumulated
           call this%run_backward_unsteady(simulation, design)
        else

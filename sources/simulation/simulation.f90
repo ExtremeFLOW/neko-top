@@ -94,6 +94,8 @@ module simulation_m
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_adjoint
+     !> Whether the simulation is steady or unsteady
+     logical :: unsteady = .false.
 
      logical :: have_scalar = .false.
      integer :: n_timesteps = 0
@@ -131,7 +133,8 @@ contains
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(json_file) :: checkpoint_params
-    integer :: i, n_scalars
+    integer :: i, n_scalars, unsteady_support
+    logical :: unsteady
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -197,6 +200,28 @@ contains
           call this%output_adjoint%fields%assign(4 + i, &
                this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
+    end if
+
+    ! Check if the simulation is steady or unsteady
+    call json_get_or_default(parameters, "unsteady", unsteady, .false.)
+    this%unsteady = unsteady
+
+    ! Ensure there is a means to deal with unsteadiness
+    if (this%unsteady) then
+       unsteady_support = 0
+       if ("checkpoints" .in. parameters) then
+          unsteady_support = unsteady_support + 1
+       end if
+
+       if (unsteady_support .eq. 0) then
+          call neko_error("No support for unsteady simulation provided, \\ &
+               \\ current options include enabling checkpoints.")
+       end if
+
+       if (unsteady_support .gt. 1) then
+          call neko_error("Too many supports for unsteady simulation \\ &
+               \\ provided, please select one.")
+       end if
     end if
 
     if ("checkpoints" .in. parameters) then

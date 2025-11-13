@@ -94,6 +94,7 @@
             },
         ]
     },
+    "unsteady" : true,
     "checkpoints": {
         "enabled": true,
         "n_memory": 100
