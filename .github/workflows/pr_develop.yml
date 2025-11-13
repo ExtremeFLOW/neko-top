@@ -48,6 +48,7 @@ env:
   PFUNIT_VERSION: v4.12.0
   JSON_FORTRAN_VERSION: master
   NEKO_VERSION: neko-top
+  HDF5_VERSION: hdf5_2_0_0
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -71,6 +72,7 @@ jobs:
       pfunit-version: ${{ steps.store.outputs.pfunit-version }}
       json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
       neko-version: ${{ steps.store.outputs.neko-version }}
+      hdf5-version: ${{ steps.store.outputs.hdf5-version }}
 
     steps:
       - name: Check if PR is a draft
@@ -86,6 +88,7 @@ jobs:
         run: |
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
           echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
 
   # -------------------------------------------------------------------------- #
@@ -127,6 +130,7 @@ jobs:
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       neko-version: ${{ needs.prepare.outputs.neko-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
       neko-top-version: ${{ github.head_ref || github.ref_name }}
 
   # -------------------------------------------------------------------------- #
