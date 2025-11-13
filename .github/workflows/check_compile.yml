@@ -52,6 +52,15 @@ jobs:
 
         # Define the setup jobs
         include:
+          - compiler: gfortran-13
+            setup-compiler: |
+              echo "FC=gfortran-13" >> $GITHUB_ENV
+              echo "CC=gcc-13" >> $GITHUB_ENV
+          - compiler: gfortran-14
+            setup-compiler: |
+              echo "FC=gfortran-14" >> $GITHUB_ENV
+              echo "CC=gcc-14" >> $GITHUB_ENV
+
           - backend: CUDA
             setup-backend: |
               sudo apt-get update
@@ -81,6 +90,11 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Compiler
+        id: setup-compiler
+        shell: bash
+        run: ${{ matrix.setup-compiler }}
 
       - name: Setup system dependencies
         shell: bash
