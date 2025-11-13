@@ -18,6 +18,10 @@ on:
         description: "The version of pFUnit to use."
         required: true
         type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
 
 # ---------------------------------------------------------------------------- #
 # Define the jobs that will be run in this workflow. The jobs are run in a
@@ -123,6 +127,7 @@ jobs:
         id: get-hdf5
         uses: ./.github/actions/setup_hdf5
         with:
+          version: ${{ inputs.hdf5-version }}
           compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
           c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 

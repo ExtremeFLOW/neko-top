@@ -120,6 +120,7 @@ jobs:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
 
   check_scripts:
     name: Scripting
