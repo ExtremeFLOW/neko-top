@@ -215,12 +215,12 @@ contains
 
        if (unsteady_support .eq. 0) then
           call neko_error("No support for unsteady simulation provided, \\ &
-               & \\ current options include enabling checkpoints.")
+          & \\ current options include enabling checkpoints.")
        end if
 
        if (unsteady_support .gt. 1) then
           call neko_error("Too many supports for unsteady simulation \\ &
-               & \\ provided, please select one.")
+          & \\ provided, please select one.")
        end if
     end if
 
