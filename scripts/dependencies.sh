@@ -251,7 +251,6 @@ function find_hdf5() {
         HDF5_DIR="$(realpath $EXTERNAL_DIR/$HDF5_DIR)"
     fi
 
-
     # Ensure HDF5 is installed, if not install it.
     HDF5_LIB=$(find $HDF5_DIR -type d -name 'lib*' \
         -exec test -f '{}'/libhdf5_fortran.so \; -print 2>/dev/null) || true
