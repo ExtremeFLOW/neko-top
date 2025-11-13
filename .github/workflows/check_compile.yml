@@ -54,12 +54,12 @@ jobs:
         include:
           - compiler: gfortran-13
             setup-compiler: |
-              echo "FC=gfortran-13" >> $GITHUB_ENV
-              echo "CC=gcc-13" >> $GITHUB_ENV
+              echo "c-compiler=gcc-13" >> $GITHUB_OUTPUT
+              echo "f-compiler=gfortran-13" >> $GITHUB_OUTPUT
           - compiler: gfortran-14
             setup-compiler: |
-              echo "FC=gfortran-14" >> $GITHUB_ENV
-              echo "CC=gcc-14" >> $GITHUB_ENV
+              echo "c-compiler=gcc-14" >> $GITHUB_OUTPUT
+              echo "f-compiler=gfortran-14" >> $GITHUB_OUTPUT
 
           - backend: CUDA
             setup-backend: |
@@ -117,19 +117,20 @@ jobs:
         uses: ./.github/actions/setup_json-fortran
         with:
           version: ${{ inputs.json-fortran-version }}
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
 
       - name: Get ParMETIS
         id: get-parmetis
         uses: ./.github/actions/setup_parmetis
         with:
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
 
       - name: Get HDF5
         id: get-hdf5
         uses: ./.github/actions/setup_hdf5
         with:
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
+          c-compiler: ${{ steps.setup-compiler.outputs.c-compiler }}
 
       - name: Get neko
         id: get-neko
@@ -140,7 +141,7 @@ jobs:
           hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
           precision: ${{ matrix.precision }}
-          compiler: ${{ matrix.compiler }}
+          compiler: ${{ steps.setup-compiler.outputs.f-compiler }}
           backend: ${{ matrix.backend }}
           backend-path: ${{ steps.setup-backend.outputs.backend-path }}
 
