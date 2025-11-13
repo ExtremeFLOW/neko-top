@@ -238,16 +238,17 @@ _ACEOF
 # ============================================================================ #
 # Ensure HDF5 is installed, if not install it.
 function find_hdf5() {
-    check_external_dir
 
     # Determine the HDF5 installation directory
+    check_external_dir
+    if [[ $# -ge 1 ]]; then
+        HDF5_DIR="$1"
+    elif [ -z "$HDF5_DIR" ]; then
+        HDF5_DIR="hdf5"
+    fi
 
-    if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
-        HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
-    elif [ $# -ge 1 ]; then
-        HDF5_DIR="$(realpath $1)"
-    else
-        HDF5_DIR="$(realpath $EXTERNAL_DIR/hdf5)"
+    if [[ "${HDF5_DIR:0:1}" != "/" && "${HDF5_DIR:0:1}" != "~" ]]; then
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/$HDF5_DIR)"
     fi
 
 
