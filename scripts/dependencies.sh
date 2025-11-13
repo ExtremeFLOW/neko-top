@@ -258,7 +258,7 @@ function find_hdf5() {
 
         # Clone HDF5 from the repository if it does not exist.
         if [ ! -d "$HDF5_DIR" ]; then
-            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
+            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_2.0.0"
             git clone --depth 1 --branch $HDF5_VERSION \
                 https://github.com/HDFGroup/hdf5.git $HDF5_DIR
         fi
