@@ -464,6 +464,7 @@ contains
 
     call dt_controller%init(simulation%neko_case%params)
 
+    call simulation%reset()
     call simulation_init(simulation%neko_case, dt_controller)
 
     ! Reset the objective value to zero
@@ -471,6 +472,7 @@ contains
 
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
+    simulation%n_timesteps = 0
     do while (simulation%neko_case%time%t .lt. simulation%neko_case%time%end_time)
        simulation%n_timesteps = simulation%n_timesteps + 1
        ! step forward
