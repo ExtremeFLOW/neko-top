@@ -216,5 +216,6 @@ contains
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
     call vector_add2s1(this%sensitivity, temp, dt)
+    call temp%free()
   end subroutine functional_accumulate_sensitivity
 end module base_functional
