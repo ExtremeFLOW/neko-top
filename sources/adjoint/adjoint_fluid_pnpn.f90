@@ -793,6 +793,17 @@ contains
            u_res%x, v_res%x, w_res%x, n, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
            this%ksp_vel%max_iter)
+      
+      call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
+           dt_controller)
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, &
+              du%x_d, dv%x_d, dw%x_d, 1.0_rp, n, msh%gdim)
+      else
+         call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
+      end if
       call profiler_end_region("Adjoint_velocity_solve")
 
       ! Compute pressure residual.
@@ -854,17 +865,6 @@ contains
       ksp_results(2)%name = 'Adjoint Velocity U'
       ksp_results(3)%name = 'Adjoint Velocity V'
       ksp_results(4)%name = 'Adjoint Velocity W'
-
-      call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
-           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
-           dt_controller)
-
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_opadd2cm(u%x_d, v%x_d, w%x_d, &
-              du%x_d, dv%x_d, dw%x_d, 1.0_rp, n, msh%gdim)
-      else
-         call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
-      end if
 
       if (this%forced_flow_rate) then
          call neko_error('Forced flow rate is not implemented for the adjoint')
