@@ -58,8 +58,6 @@ contains
     call neko_scratch_registry%request_field(wa1, temp_indices(4))
     call neko_scratch_registry%request_field(wa2, temp_indices(5))
     call neko_scratch_registry%request_field(wa3, temp_indices(6))
-    ! call neko_scratch_registry%request_field(work1, temp_indices(7))
-    ! call neko_scratch_registry%request_field(work2, temp_indices(8))
 
     n = c_Xh%dof%size()
 
@@ -72,37 +70,10 @@ contains
     end do
     c_Xh%ifh2 = .false.
 
-   !  call curl(ta1, ta2, ta3, u_e, v_e, w_e, work1, work2, c_Xh)
-   !  call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
-
-   !  ! ta = f / rho - wa * mu / rho * B
-   !  do concurrent (i = 1:n)
-   !     ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val &
-   !          - ((wa1%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1))
-   !     ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val &
-   !          - ((wa2%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1))
-   !     ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val &
-   !          - ((wa3%x(i,1,1,1) * (mu_val / rho_val)) * c_Xh%B(i,1,1,1))
-   !  end do
-
-   !  call gs_Xh%op(ta1, GS_OP_ADD)
-   !  call gs_Xh%op(ta2, GS_OP_ADD)
-   !  call gs_Xh%op(ta3, GS_OP_ADD)
-
-   !  do concurrent (i = 1:n)
-   !     ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !     ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !     ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !  end do
-
-   ! --------------------------------------------------------------------------!
    do concurrent (i = 1:n)
-      ! ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
-      ! ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
-      ! ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val! * c_Xh%B(i,1,1,1)
-      ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
-      ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
-      ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val * c_Xh%Binv(i,1,1,1)
+      ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
+      ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
+      ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
    end do
 
    call gs_Xh%op(ta1, GS_OP_ADD)
@@ -110,12 +81,9 @@ contains
    call gs_Xh%op(ta3, GS_OP_ADD)
 
    do concurrent (i = 1:n)
-      ! ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
-      ! ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
-      ! ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%mult(i,1,1,1)
-      ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%B(i,1,1,1)
-      ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%B(i,1,1,1)
-      ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%B(i,1,1,1)
+      ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+      ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
+      ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
    end do
 
    call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
@@ -175,12 +143,9 @@ contains
     type(field_t), intent(in) :: rho
     real(kind=rp), intent(in) :: bd
     real(kind=rp), intent(in) :: dt
-    real(kind=rp) :: rho_val, mu_val
     integer, intent(in) :: n
+    real(kind=rp) :: rho_val, mu_val
     integer :: i
-    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
-    integer :: temp_indices(8)
-    real(kind=rp) :: u_norm, v_norm, w_norm, fld_norm
 
     ! We assume the material properties are constant
     rho_val = rho%x(1,1,1,1)
@@ -192,49 +157,15 @@ contains
     end do
     c_Xh%ifh2 = .true.
 
-   ! call c_Xh%gs_h%op(u, GS_OP_ADD)
-   ! call c_Xh%gs_h%op(v, GS_OP_ADD)
-   ! call c_Xh%gs_h%op(w, GS_OP_ADD)
-
     call Ax%compute(u_res%x, u%x, c_Xh, msh, Xh)
     call Ax%compute(v_res%x, v%x, c_Xh, msh, Xh)
     call Ax%compute(w_res%x, w%x, c_Xh, msh, Xh)
-
-    call neko_scratch_registry%request_field(ta1, temp_indices(1))
-    call neko_scratch_registry%request_field(ta2, temp_indices(2))
-    call neko_scratch_registry%request_field(ta3, temp_indices(3))
-    call neko_scratch_registry%request_field(wa1, temp_indices(4))
-    call neko_scratch_registry%request_field(wa2, temp_indices(5))
-    call neko_scratch_registry%request_field(wa3, temp_indices(6))
-    call neko_scratch_registry%request_field(work1, temp_indices(7))
-    call neko_scratch_registry%request_field(work2, temp_indices(8))
-
-    ! call curl(ta1, ta2, ta3, u, v, w, work1, work2, c_Xh)
-    ! call curl(wa1, wa2, wa3, ta1, ta2, ta3, work1, work2, c_Xh)
-
-   !  do concurrent (i = 1:n)
-   !     ta1%x(i,1,1,1) = f_x%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !     ta2%x(i,1,1,1) = f_y%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !     ta3%x(i,1,1,1) = f_z%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-   !  end do
-
-   ! call c_Xh%gs_h%op(wa1, GS_OP_ADD)
-   ! call c_Xh%gs_h%op(wa2, GS_OP_ADD)
-   ! call c_Xh%gs_h%op(wa3, GS_OP_ADD)
-
-   !  do concurrent (i = 1:n)
-   !     ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%B(i,1,1,1)
-   !     ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%B(i,1,1,1)
-   !     ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%B(i,1,1,1)
-   !  end do
 
     do concurrent (i = 1:n)
        u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + f_x%x(i,1,1,1)
        v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + f_y%x(i,1,1,1)
        w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + f_z%x(i,1,1,1)
     end do
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine adjoint_pnpn_vel_res_cpu_compute
 
