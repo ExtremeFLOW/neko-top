@@ -8,6 +8,7 @@ module user
   use time_state, only : time_state_t
   use field_registry, only : neko_field_registry
   use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: HOST_TO_DEVICE, device_memcpy
   implicit none
   !> Case parameters
   real(kind=rp), parameter :: T_fin = 0.5_rp
@@ -48,6 +49,11 @@ contains
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync=.false.)
+          call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, sync=.false.)
+          call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync=.false.)
+       end if
     end if
   end subroutine dirichlet_conditions
 
