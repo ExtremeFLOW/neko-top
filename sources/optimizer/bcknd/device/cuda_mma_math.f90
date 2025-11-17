@@ -38,6 +38,14 @@ module cuda_mma_math
   public
 
   interface
+     subroutine cuda_solve_linear_system(A_d, b_d, n, info) &
+          bind(c, name = 'cuda_solve_linear_system')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine cuda_solve_linear_system
+
      subroutine delta_1dbeam_cuda(Delta_d, L_total, Le, offset, n) &
           bind(c, name = 'delta_1dbeam_cuda')
        import c_rp, c_int, c_ptr

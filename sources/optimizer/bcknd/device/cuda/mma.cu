@@ -55,6 +55,27 @@ extern "C" {
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
 
+ void cuda_solve_linear_system(void* A, void* b, int n, int* info) {
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    if (n <= 0 || n > 50) {
+        *info = -1; // Use CPU fallback
+        return;
+    }
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(1, 1, 1);
+
+    mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)A, (real*)b, n);
+    
+    cudaError_t err = cudaGetLastError();
+    if (err == cudaSuccess) {
+        *info = 0; // GPU solver succeeded
+    } else {
+        *info = -1; // GPU failed, use CPU fallback
+    }
+  }
+
  void delta_1dbeam_cuda(void* Delta, real* L_total, real* Le, 
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);

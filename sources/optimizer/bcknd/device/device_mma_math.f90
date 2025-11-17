@@ -42,7 +42,8 @@ module device_mma_math
        cuda_updateAA, cuda_dx, cuda_dy, cuda_deta, cuda_dxsi, cuda_maxval2, &
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
-       mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda
+       mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
+       cuda_solve_linear_system
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -62,9 +63,26 @@ module device_mma_math
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess, device_delta_1dbeam
+       device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, device_solve_linear_system
 
 contains
+  !> Solve linear system Ax = b on device
+  subroutine device_solve_linear_system(A_d, b_d, n, info)
+    type(c_ptr) :: A_d, b_d
+    integer(c_int), value :: n
+    integer(c_int) :: info
+#if HAVE_HIP
+    ! call hip_solve_linear_system(A_d, b_d, n, info)
+    call neko_error('no device backend configured')
+#elif HAVE_CUDA
+    call cuda_solve_linear_system(A_d, b_d, n, info)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_solve_linear_system
+
 
   !> A device support to do the following calculation for 1D beam elements:
   !!   Delta(k) = ((L_total - Le*(offset+k-1))**3 - &

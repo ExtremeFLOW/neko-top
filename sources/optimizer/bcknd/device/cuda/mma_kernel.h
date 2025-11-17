@@ -35,6 +35,93 @@
 #ifndef MMA_CUDA_KERNEL_H
 #define MMA_CUDA_KERNEL_H
 
+// Small linear solver for MMA (n <= 50)
+template <typename T>
+__global__ void mma_small_lu_kernel(T* __restrict__ A, T* __restrict__ b, 
+                                   const int n) {
+    const int tid = threadIdx.x;
+    
+    // For m=1
+    if (n == 1) {
+        if (tid == 0) {
+            if (abs(A[0]) > (T)1e-12) {
+                b[0] = b[0] / A[0];
+            }
+            // If singular, leave b unchanged
+        }
+        return;
+    }
+    
+    // LU decomposition with partial pivoting
+    for (int k = 0; k < n; k++) {
+        // Find pivot - single thread
+        if (tid == 0) {
+            int max_row = k;
+            T max_val = abs(A[k * n + k]);
+            
+            for (int i = k + 1; i < n; i++) {
+                const T val = abs(A[i * n + k]);
+                if (val > max_val) {
+                    max_val = val;
+                    max_row = i;
+                }
+            }
+            
+            if (max_val > (T)1e-12 && max_row != k) {
+                // Swap rows
+                for (int j = 0; j < n; j++) {
+                    const T temp = A[k * n + j];
+                    A[k * n + j] = A[max_row * n + j];
+                    A[max_row * n + j] = temp;
+                }
+                // Swap rhs
+                const T temp_b = b[k];
+                b[k] = b[max_row];
+                b[max_row] = temp_b;
+            }
+        }
+        __syncthreads();
+        
+        // Parallel elimination
+        const T diag = A[k * n + k];
+        if (abs(diag) > (T)1e-12) {
+            for (int i = tid + k + 1; i < n; i += blockDim.x) {
+                if (i < n) {
+                    const T factor = A[i * n + k] / diag;
+                    A[i * n + k] = factor;
+                    
+                    for (int j = k + 1; j < n; j++) {
+                        A[i * n + j] -= factor * A[k * n + j];
+                    }
+                }
+            }
+        }
+        __syncthreads();
+    }
+    
+    // Forward substitution
+    if (tid == 0) {
+        for (int i = 0; i < n; i++) {
+            for (int j = 0; j < i; j++) {
+                b[i] -= A[i * n + j] * b[j];
+            }
+        }
+    }
+    __syncthreads();
+    
+    // Backward substitution
+    if (tid == 0) {
+        for (int i = n - 1; i >= 0; i--) {
+            for (int j = i + 1; j < n; j++) {
+                b[i] -= A[i * n + j] * b[j];
+            }
+            if (abs(A[i * n + i]) > (T)1e-12) {
+                b[i] /= A[i * n + i];
+            }
+        }
+    }
+}
+
 template <typename T>
 __global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
      const T L_total, const T Le, const int offset, const int n) {
