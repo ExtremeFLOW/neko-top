@@ -140,6 +140,9 @@ contains
        C%time%t = final_time - t_bkp
     end if
     call C%time%status()
+    if (present(final_time)) then
+       C%time%t = t_bkp
+    end if
     call neko_log%begin()
 
     write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', C%time%dt
@@ -187,10 +190,6 @@ contains
     call neko_log%end_section()
     call neko_log%end()
     call profiler_end_region
-
-    if (present(final_time)) then
-       C%time%t = t_bkp
-    end if
 
   end subroutine simulation_adjoint_step
 

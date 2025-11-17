@@ -789,7 +789,7 @@ contains
       call this%pc_vel%update()
 
       call profiler_start_region("Adjoint_velocity_solve")
-      ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
+      ksp_results(1:3) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
            u_res%x, v_res%x, w_res%x, n, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
            this%ksp_vel%max_iter)
@@ -847,7 +847,7 @@ contains
       call profiler_start_region('Adjoint_pressure_solve')
 
       ! Solve for the pressure increment.
-      ksp_results(1) = &
+      ksp_results(4) = &
            this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, &
            this%bclst_dp, gs_Xh)
 
@@ -861,10 +861,10 @@ contains
       call field_add2(p, dp, n)
       if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
 
-      ksp_results(1)%name = 'Adjoint Pressure'
-      ksp_results(2)%name = 'Adjoint Velocity U'
-      ksp_results(3)%name = 'Adjoint Velocity V'
-      ksp_results(4)%name = 'Adjoint Velocity W'
+      ksp_results(4)%name = 'Adjoint Pressure'
+      ksp_results(1)%name = 'Adjoint Velocity U'
+      ksp_results(2)%name = 'Adjoint Velocity V'
+      ksp_results(3)%name = 'Adjoint Velocity W'
 
       if (this%forced_flow_rate) then
          call neko_error('Forced flow rate is not implemented for the adjoint')
