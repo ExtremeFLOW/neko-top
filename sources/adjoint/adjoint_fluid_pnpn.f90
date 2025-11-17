@@ -904,7 +904,7 @@ contains
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, dy_p_adj%x_d, dz_p_adj%x_d, 1.0_rp, n, msh%gdim)
       else
-         call opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, dy_p_adj%x_d, dz_p_adj%x_d, 1.0_rp, n, msh%gdim)
+         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, 1.0_rp, n, msh%gdim)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)
