@@ -176,7 +176,7 @@ contains
     type(matrix_t) :: constraint_sensitivities
     integer :: ind(4)
 
-    type(vector_t), pointer :: log_data
+    type(vector_t) :: log_data
     integer :: ind_log
     logical :: unconstrained_problem = .false.
     class(constraint_t), allocatable :: dummy_con
@@ -298,8 +298,7 @@ contains
 
        if (this%enable_output) then
           call profiler_start_region("Optimizer logging")
-          call neko_vector_scratch_registry%request_vector(n, &
-               log_data, ind_log)
+
           ! Stamp the i^th iteration
           call problem%get_all_objective_values(all_objectives)
           call mma_logger_assemble_data(log_data, iter, objective_value, &
@@ -308,6 +307,7 @@ contains
                problem%get_n_objectives(), problem%get_n_constraints(), &
                unconstrained_problem)
           call this%logger%write(log_data)
+          call log_data%free()
 
           call neko_vector_scratch_registry%relinquish_vector(ind_log)
 
