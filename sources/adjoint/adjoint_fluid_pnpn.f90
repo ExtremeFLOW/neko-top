@@ -76,7 +76,7 @@ module adjoint_fluid_pnpn
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error, neko_type_error
-  use field_math, only: field_add2, field_copy
+  use field_math, only: field_add2, field_copy, field_sub2, field_rzero, field_add2s2
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
@@ -95,8 +95,9 @@ module adjoint_fluid_pnpn
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
   use scratch_registry, only: neko_scratch_registry
-  use operators, only : opgrad
+  use operators, only : opgrad, curl
   use gather_scatter, only : gs_t, GS_OP_ADD
+  use normal_vec_bcs, only: normal_vec_bcs_t
 
   implicit none
   private
@@ -136,6 +137,9 @@ module adjoint_fluid_pnpn
 
      !> Surface term in pressure rhs. Masks symmetry bcs.
      type(facet_normal_t) :: bc_sym_surface
+
+     !> Surface term in pressure rhs. Masks symmetry bcs.
+     type(normal_vec_bcs_t) :: bc_curl_curl
 
      !
      ! Boundary conditions and  lists for residuals and solution increments
@@ -604,6 +608,7 @@ contains
 
     call this%bc_prs_surface%free()
     call this%bc_sym_surface%free()
+    call this%bc_curl_curl%free()
     call this%bclst_vel_res%free()
     call this%bclst_dp%free()
     call this%proj_prs%free()
@@ -683,8 +688,10 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
-    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2
     integer :: temp_indices(3)
+    integer :: big_temp_indices(8)
+    real(kind=rp) :: rho_val, mu_val
 
     if (this%freeze) return
 
@@ -754,6 +761,60 @@ contains
 
       call this%bc_apply_vel(time, strong = .true.)
       call this%bc_apply_prs(time)
+
+      ! Now we need the surface contribution of the curl curl BC. (explicit in p)
+      call neko_scratch_registry%request_field(dx_p_adj, big_temp_indices(1))
+      call neko_scratch_registry%request_field(dy_p_adj, big_temp_indices(2))
+      call neko_scratch_registry%request_field(dz_p_adj, big_temp_indices(3))
+      call neko_scratch_registry%request_field(nx1, big_temp_indices(4))
+      call neko_scratch_registry%request_field(nx2, big_temp_indices(5))
+      call neko_scratch_registry%request_field(nx3, big_temp_indices(6))
+      call neko_scratch_registry%request_field(work1, big_temp_indices(7))
+      call neko_scratch_registry%request_field(work2, big_temp_indices(8))
+
+      call field_rzero(nx1)
+      call field_rzero(nx2)
+      call field_rzero(nx3)
+
+      ! gradient of adjoint pressure (explicit)
+      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+
+      ! they gsop the residual (which has the pressure gradient)
+      call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dy_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! divide by mass matrix
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_col2(dx_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dy_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dz_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+      else
+         ! NOTE. This term comes from the handling of the pressure RHS, which
+         ! DOES include the multiplicity in the op.
+         call col2(dx_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dy_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dz_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+      end if
+
+      ! Now we compute the n x grad(p) (this include 2D weights)
+      call this%bc_curl_curl%apply_n_cross(nx1%x, nx2%x, nx3%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, dx_p_adj%size())
+
+      ! Now we need curl on the test function, note that transpose of curl is
+      ! negative curl
+      ! reuse dx_p_adj etc as fx, fy, fz etc
+      call curl(dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2, c_Xh)
+      rho_val = rho%x(1,1,1,1)
+      mu_val = mu%x(1,1,1,1)
+      call field_add2s2(f_x, dx_p_adj, -mu_val / rho_val)
+      call field_add2s2(f_y, dy_p_adj, -mu_val / rho_val)
+      call field_add2s2(f_z, dz_p_adj, -mu_val / rho_val)
+
+
+      call neko_scratch_registry%relinquish_field(big_temp_indices)
 
       ! Update material properties if necessary
       call this%update_material_properties(time)
@@ -954,6 +1015,7 @@ contains
     ! Special PnPn boundary conditions for pressure
     call this%bc_prs_surface%init_from_components(this%c_Xh)
     call this%bc_sym_surface%init_from_components(this%c_Xh)
+    call this%bc_curl_curl%init_from_components(this%c_Xh)
 
     json_key = 'case.adjoint_fluid.boundary_conditions'
 
@@ -1072,6 +1134,9 @@ contains
                    call this%bc_prs_surface%mark_facets(bc_i%marked_facet)
                 end if
 
+                ! add all BCs to curl curl
+                call this%bc_curl_curl%mark_facets(bc_i%marked_facet)
+
                 call this%bcs_vel%append(bc_i)
              end select
           end if
@@ -1123,6 +1188,7 @@ contains
 
     call this%bc_prs_surface%finalize()
     call this%bc_sym_surface%finalize()
+    call this%bc_curl_curl%finalize()
 
     call this%bc_vel_res%finalize()
     call this%bc_du%finalize()

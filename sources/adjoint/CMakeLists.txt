@@ -22,4 +22,5 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/adjoint_pnpn_res_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/normal_vec_bcs.f90
 )
