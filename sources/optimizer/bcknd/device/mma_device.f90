@@ -279,7 +279,6 @@ contains
     call device_sub2(this%bi%x_d, fval, this%m)
 
     call neko_vector_scratch_registry%relinquish_vector(ind)
-
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
