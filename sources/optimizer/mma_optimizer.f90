@@ -177,7 +177,6 @@ contains
     integer :: ind(4)
 
     type(vector_t) :: log_data
-    integer :: ind_log
     logical :: unconstrained_problem = .false.
     class(constraint_t), allocatable :: dummy_con
     type(json_file) :: parameters
