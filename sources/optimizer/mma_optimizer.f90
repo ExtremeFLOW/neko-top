@@ -309,8 +309,6 @@ contains
           call this%logger%write(log_data)
           call log_data%free()
 
-          call neko_vector_scratch_registry%relinquish_vector(ind_log)
-
           if (present(simulation)) then
              call simulation%write(iter)
           end if
