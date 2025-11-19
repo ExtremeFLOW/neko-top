@@ -38,6 +38,14 @@ module cuda_mma_math
   public
 
   interface
+     subroutine gpu_solve_system(A_d, b_d, n, info_d) &
+          bind(c, name = 'gpu_solve_system')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int) :: info_d
+       integer(c_int), value :: n
+     end subroutine gpu_solve_system
+
      subroutine cuda_solve_linear_system(A_d, b_d, n, info) &
           bind(c, name = 'cuda_solve_linear_system')
        import c_int, c_ptr

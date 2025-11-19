@@ -1,5 +1,4 @@
 program usrneko
-
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
 
@@ -22,8 +21,11 @@ program usrneko
   use matrix, only: matrix_t
 
   use comm, only: pe_rank
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
+  
+  use device_mma_math, only: device_solve_linear_system, device_gpu_solve_system
+  use iso_c_binding
 
   implicit none
 
@@ -52,11 +54,85 @@ program usrneko
   integer :: nloc
   type(vector_t) :: xcoord, ycoord, zcoord, initdesign
   real(kind=rp) :: t_start, t_end
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  type(vector_t) :: bvec, bvec_original, rhs
+  type(matrix_t) :: Amat
+  integer :: info, systemsize, i, j
+  real(kind=rp) :: time_custom, time_cusolver, error_custom, error_cusolver
+  integer, parameter :: sizes(8) = [10, 50, 100, 500, 1000, 2000, 5000, 10000]
+ 
+  call MPI_Init(ierr)
+
+do i = 1, size(sizes)
+   systemsize = sizes(i)
+   call bvec%init(systemsize)
+   call bvec_original%init(systemsize)  ! Store original RHS
+   call Amat%init(systemsize, systemsize)
+   
+   ! Initialize matrix
+   do j = 1, systemsize
+      Amat%x(j,j) = 0.5_rp 
+      bvec%x(j) = 1.0_rp
+      bvec_original%x(j) = 1.0_rp  ! Store original RHS
+   end do
+   
+   call device_memcpy(Amat%x, Amat%x_d, systemsize*systemsize, HOST_TO_DEVICE, sync=.true.)
+   call device_memcpy(bvec%x, bvec%x_d, systemsize, HOST_TO_DEVICE, sync=.true.)
+   
+   ! Time custom solver
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   t_start = MPI_Wtime()
+   call device_solve_linear_system(Amat%x_d, bvec%x_d, systemsize, info)
+   call device_memcpy(bvec%x, bvec%x_d, systemsize, DEVICE_TO_HOST, sync=.true.)
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   t_end = MPI_Wtime()
+   time_custom = t_end - t_start
+   
+   ! Correct error calculation
+   rhs%x = matmul(Amat%x, bvec%x)  ! A*x
+   rhs%x = bvec_original%x - rhs%x  ! b - A*x
+   error_custom = maxval(abs(rhs%x))
+   
+   print *, "Size:", systemsize, "custom info=", info, "error:", error_custom
+   
+   ! Reset for cuSOLVER
+   do j = 1, systemsize
+      Amat%x(j,j) = 0.5_rp 
+      bvec%x(j) = 1.0_rp
+   end do
+   
+   call device_memcpy(Amat%x, Amat%x_d, systemsize*systemsize, HOST_TO_DEVICE, sync=.true.)
+   call device_memcpy(bvec%x, bvec%x_d, systemsize, HOST_TO_DEVICE, sync=.true.)
+   
+   ! Time cuSOLVER
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   t_start = MPI_Wtime()
+   call device_gpu_solve_system(Amat%x_d, bvec%x_d, systemsize, info)
+   call device_memcpy(bvec%x, bvec%x_d, systemsize, DEVICE_TO_HOST, sync=.true.)
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   t_end = MPI_Wtime()
+   time_cusolver = t_end - t_start
+   
+   ! Correct error calculation
+   rhs%x = matmul(Amat%x, bvec%x)  ! A*x
+   rhs%x = bvec_original%x - rhs%x  ! b - A*x
+   error_cusolver = maxval(abs(rhs%x))
+   
+   print *, "Size:", systemsize, "cuSOLVER info=", info, "error:", error_cusolver
+   
+   if (pe_rank == 0) then
+      print *, "Size:", systemsize, "Custom:", time_custom, "cuSOLVER:", time_cusolver, "Ratio:", time_cusolver/time_custom
+      print *, "---------------------------------------------------------------"
+   end if
+end do
+call neko_error('Done comparing cuSOLVER and my custom solver!')
+
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
 
-  call MPI_Init(ierr)
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument

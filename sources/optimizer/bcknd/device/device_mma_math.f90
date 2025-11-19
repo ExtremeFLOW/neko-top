@@ -43,7 +43,7 @@ module device_mma_math
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
-       cuda_solve_linear_system
+       cuda_solve_linear_system, gpu_solve_system
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -63,9 +63,27 @@ module device_mma_math
        device_bb, device_updatebb, device_AA, device_updateAA, device_dx, &
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, device_solve_linear_system
+       device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
+       device_solve_linear_system, device_gpu_solve_system
 
 contains
+  subroutine device_gpu_solve_system(A_d, b_d, n, info_d)
+    type(c_ptr) :: A_d, b_d
+    integer(c_int), value :: n
+    integer(c_int) :: info_d
+
+#if HAVE_HIP
+    ! You might want to implement a HIP version later
+    call neko_error('gpu_solve_system not implemented for HIP')
+#elif HAVE_CUDA
+    call gpu_solve_system(A_d, b_d, n, info_d)
+#elif HAVE_OPENCL
+    call neko_error('no device backend configured')
+#else
+    call neko_error('no device backend configured')
+#endif
+  end subroutine device_gpu_solve_system
+
   !> Solve linear system Ax = b on device
   subroutine device_solve_linear_system(A_d, b_d, n, info)
     type(c_ptr) :: A_d, b_d
