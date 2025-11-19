@@ -95,7 +95,7 @@ module adjoint_fluid_pnpn
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
   use scratch_registry, only: neko_scratch_registry
-  use operators, only : opgrad, curl
+  use operators, only : opgrad, curl, grad
   use gather_scatter, only : gs_t, GS_OP_ADD
   use normal_vec_bcs, only: normal_vec_bcs_t
 
@@ -772,12 +772,23 @@ contains
       call neko_scratch_registry%request_field(work1, big_temp_indices(7))
       call neko_scratch_registry%request_field(work2, big_temp_indices(8))
 
+      ! zero interior
       call field_rzero(nx1)
       call field_rzero(nx2)
       call field_rzero(nx3)
 
       ! gradient of adjoint pressure (explicit)
-      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+      call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+
+      ! Now we compute the n x grad(p) (this include 2D weights)
+      call this%bc_curl_curl%apply_n_cross(nx1%x, nx2%x, nx3%x, dx_p_adj%x, &
+           dy_p_adj%x, dz_p_adj%x, dx_p_adj%size())
+
+      ! Now we need curl on the test function, note that transpose of curl is
+      ! negative curl
+      ! reuse dx_p_adj etc as fx, fy, fz etc
+      call curl(dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2, c_Xh)
+      ! call cpu_curlt_action(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, nx1%x, nx2%x, nx3%x, c_Xh)
 
       ! they gsop the residual (which has the pressure gradient)
       call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
@@ -787,32 +798,22 @@ contains
       call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
       call device_event_sync(event)
 
-      ! divide by mass matrix
+      ! multiplcity
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_col2(dx_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
-         call device_col2(dy_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
-         call device_col2(dz_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dx_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
+         call device_col2(dy_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
+         call device_col2(dz_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
       else
-         ! NOTE. This term comes from the handling of the pressure RHS, which
-         ! DOES include the multiplicity in the op.
-         call col2(dx_p_adj%x, c_Xh%Binv, dx_p_adj%size())
-         call col2(dy_p_adj%x, c_Xh%Binv, dx_p_adj%size())
-         call col2(dz_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dx_p_adj%x, c_Xh%mult, dx_p_adj%size())
+         call col2(dy_p_adj%x, c_Xh%mult, dx_p_adj%size())
+         call col2(dz_p_adj%x, c_Xh%mult, dx_p_adj%size())
       end if
-
-      ! Now we compute the n x grad(p) (this include 2D weights)
-      call this%bc_curl_curl%apply_n_cross(nx1%x, nx2%x, nx3%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, dx_p_adj%size())
-
-      ! Now we need curl on the test function, note that transpose of curl is
-      ! negative curl
-      ! reuse dx_p_adj etc as fx, fy, fz etc
-      call curl(dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2, c_Xh)
+      
       rho_val = rho%x(1,1,1,1)
       mu_val = mu%x(1,1,1,1)
       call field_add2s2(f_x, dx_p_adj, -mu_val / rho_val)
       call field_add2s2(f_y, dy_p_adj, -mu_val / rho_val)
       call field_add2s2(f_z, dz_p_adj, -mu_val / rho_val)
-
 
       call neko_scratch_registry%relinquish_field(big_temp_indices)
 
@@ -840,7 +841,6 @@ contains
 
       ! Set residual to zero at strong velocity boundaries.
       call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
-
 
       call profiler_end_region('Adjoint_velocity_residual')
 
@@ -1543,6 +1543,166 @@ contains
     !call neko_log%end_section('Power Iterations', lvl = NEKO_LOG_DEBUG)
     call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
+
+subroutine cpu_curlt_action(rx, ry, rz, gx, gy, gz, coef)
+  !> Output: result of curl^T acting on g
+  real(kind=rp), intent(inout) :: rx(:,:,:,:)   ! (lx,lx,lx,nel)
+  real(kind=rp), intent(inout) :: ry(:,:,:,:)   ! (lx,lx,lx,nel)
+  real(kind=rp), intent(inout) :: rz(:,:,:,:)   ! (lx,lx,lx,nel)
+  !> Input: g = n x grad(p) (with your 2D weights already baked in)
+  real(kind=rp), intent(in)    :: gx(:,:,:,:)   ! (lx,lx,lx,nel)
+  real(kind=rp), intent(in)    :: gy(:,:,:,:)   ! (lx,lx,lx,nel)
+  real(kind=rp), intent(in)    :: gz(:,:,:,:)   ! (lx,lx,lx,nel)
+  type(coef_t), intent(in)     :: coef
+
+  integer :: lx, nel
+  integer :: e, i, j, k, l
+  real(kind=rp), pointer :: dxt(:,:), dyt(:,:), dzt(:,:)
+  real(kind=rp) :: tmp
+
+  ! Pull everything from coef / space
+  associate(Xh => coef%Xh)
+     lx  = Xh%lx
+     dxt => Xh%dxt
+     dyt => Xh%dyt
+     dzt => Xh%dzt
+  end associate
+
+  nel = size(rx, 4)
+
+  !--------------------------------------------------------------------
+  ! Loop over elements
+  !--------------------------------------------------------------------
+  do e = 1, nel
+
+     ! Optional: zero rx, ry, rz here if they are not already zeroed.
+     do k = 1, lx
+        do j = 1, lx
+           do i = 1, lx
+              rx(i,j,k,e) = 0.0_rp
+              ry(i,j,k,e) = 0.0_rp
+              rz(i,j,k,e) = 0.0_rp
+           end do
+        end do
+     end do
+
+     ! ================================================================
+     ! r_z contributions
+     ! ================================================================
+
+     ! T1:  g_x * (∂v_z/∂y)  → r_z
+     !     (curl v)_x has +∂v_z/∂y
+     ! J_T1 = Σ g_x(i,j,k) * Σ_l dyt(j,l) v_z(i,l,k)
+     !      = Σ r_z(i,l,k) v_z(i,l,k)
+     ! => r_z(i,l,k) += Σ_j dyt(j,l) * g_x(i,j,k)
+     do k = 1, lx
+        do i = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do j = 1, lx
+                 tmp = tmp + dyt(j,l) * gx(i,j,k,e)
+              end do
+              rz(i,l,k,e) = rz(i,l,k,e) + tmp
+           end do
+        end do
+     end do
+
+     ! T4: -g_y * (∂v_z/∂x)  → r_z
+     !     (curl v)_y has -∂v_z/∂x
+     ! J_T4 = - Σ g_y(i,j,k) * Σ_l dxt(i,l) v_z(l,j,k)
+     !      = Σ r_z(l,j,k) v_z(l,j,k)
+     ! => r_z(l,j,k) += - Σ_i dxt(i,l) * g_y(i,j,k)
+     do k = 1, lx
+        do j = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do i = 1, lx
+                 tmp = tmp + dxt(i,l) * gy(i,j,k,e)
+              end do
+              rz(l,j,k,e) = rz(l,j,k,e) - tmp
+           end do
+        end do
+     end do
+
+     ! ================================================================
+     ! r_y contributions
+     ! ================================================================
+
+     ! T2: -g_x * (∂v_y/∂z)  → r_y
+     !     (curl v)_x has -∂v_y/∂z
+     ! J_T2 = - Σ g_x(i,j,k) * Σ_l dzt(k,l) v_y(i,j,l)
+     !      = Σ r_y(i,j,l) v_y(i,j,l)
+     ! => r_y(i,j,l) += - Σ_k dzt(k,l) * g_x(i,j,k)
+     do j = 1, lx
+        do i = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do k = 1, lx
+                 tmp = tmp + dzt(k,l) * gx(i,j,k,e)
+              end do
+              ry(i,j,l,e) = ry(i,j,l,e) - tmp
+           end do
+        end do
+     end do
+
+     ! T5:  g_z * (∂v_y/∂x)  → r_y
+     !     (curl v)_z has +∂v_y/∂x
+     ! J_T5 = Σ g_z(i,j,k) * Σ_l dxt(i,l) v_y(l,j,k)
+     !      = Σ r_y(l,j,k) v_y(l,j,k)
+     ! => r_y(l,j,k) += Σ_i dxt(i,l) * g_z(i,j,k)
+     do k = 1, lx
+        do j = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do i = 1, lx
+                 tmp = tmp + dxt(i,l) * gz(i,j,k,e)
+              end do
+              ry(l,j,k,e) = ry(l,j,k,e) + tmp
+           end do
+        end do
+     end do
+
+     ! ================================================================
+     ! r_x contributions
+     ! ================================================================
+
+     ! T3:  g_y * (∂v_x/∂z)  → r_x
+     !     (curl v)_y has +∂v_x/∂z
+     ! J_T3 = Σ g_y(i,j,k) * Σ_l dzt(k,l) v_x(i,j,l)
+     !      = Σ r_x(i,j,l) v_x(i,j,l)
+     ! => r_x(i,j,l) += Σ_k dzt(k,l) * g_y(i,j,k)
+     do j = 1, lx
+        do i = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do k = 1, lx
+                 tmp = tmp + dzt(k,l) * gy(i,j,k,e)
+              end do
+              rx(i,j,l,e) = rx(i,j,l,e) + tmp
+           end do
+        end do
+     end do
+
+     ! T6: -g_z * (∂v_x/∂y)  → r_x
+     !     (curl v)_z has -∂v_x/∂y
+     ! J_T6 = - Σ g_z(i,j,k) * Σ_l dyt(j,l) v_x(i,l,k)
+     !      = Σ r_x(i,l,k) v_x(i,l,k)
+     ! => r_x(i,l,k) += - Σ_j dyt(j,l) * g_z(i,j,k)
+     do k = 1, lx
+        do i = 1, lx
+           do l = 1, lx
+              tmp = 0.0_rp
+              do j = 1, lx
+                 tmp = tmp + dyt(j,l) * gz(i,j,k,e)
+              end do
+              rx(i,l,k,e) = rx(i,l,k,e) - tmp
+           end do
+        end do
+     end do
+
+  end do  ! e
+
+end subroutine cpu_curlt_action
 
 
 end module adjoint_fluid_pnpn
