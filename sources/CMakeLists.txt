@@ -13,6 +13,7 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
 if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
+    find_package(CUDAToolkit REQUIRED)
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
     add_compile_definitions(HAVE_HIP=1)
@@ -103,6 +104,8 @@ target_link_libraries(neko-top
     MPI::MPI_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
 
 # ============================================================================ #

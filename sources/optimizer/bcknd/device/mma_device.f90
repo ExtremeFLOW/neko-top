@@ -565,28 +565,11 @@ contains
           call device_memcpy(AA%x, AA%x_d, &
                (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
 !=-----------------------------------------------------------------------------
-
-          !---------------------solve the system on gpu -----------------------
-            ! Solve on GPU for n <= 50, otherwise use CPU
+            ! Solve on GPU
             call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
             if (info .ne. 0) then
-               ! if (this%m <51) then
                   call neko_error("Linear solver failed on the device in  " // &
-                     "mma_subsolve_dpip, although m<51")
-               ! end if
-               ! n > 50, use CPU solver
-               call device_memcpy(AA%x, AA%x_d, &
-                    (this%m + 1) * (this%m + 1), DEVICE_TO_HOST, sync = .true.)
-               call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
-                    sync = .true.)
-               call DGESV(this%m + 1, 1, AA%x, this%m + 1, ipiv, bb%x, this%m + 1, &
-               info)
-               if (info .ne. 0) then
-                  call neko_error("DGESV failed to solve the linear system in " // &
-                       "mma_subsolve_dpip (device).")
-               end if
-               call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
-                    sync = .true.)
+                     "mma_subsolve_dpip")
             end if
 
 !!!!!!!!!!!!!!!!!a device translation is needed for this part as well!!!!!!!!!
@@ -1051,23 +1034,11 @@ contains
             call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, sync = .true.)
             !===================================================================
 
-            ! Solve on GPU for n <= 50, otherwise use CPU
+            ! Solve on GPU
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, this%m, info)
             if (info .ne. 0) then
-               ! if (this%m <51) then
                   call neko_error("Linear solver failed on the device in  " // &
-                     "mma_subsolve_dip, although m<51")
-               ! end if
-               ! n > 50, use CPU solver
-               call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, sync = .true.)
-               call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, DEVICE_TO_HOST, sync = .true.)
-               call DGESV(this%m , 1, Hess%x, this%m , ipiv, &
-                    gradlambda%x, this%m, info)
-               if (info .ne. 0) then
-                  call neko_error("DGESV failed to solve the linear system in " // &
-                       "mma_subsolve_dip (device).")
-               end if
-               call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, sync = .true.)
+                     "mma_subsolve_dip")
             end if
 
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
