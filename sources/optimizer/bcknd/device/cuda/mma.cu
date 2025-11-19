@@ -55,6 +55,72 @@ extern "C" {
   int mma_red_s = 0;
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
+  // Update Hess and apply Levenberg-Marquardt stabilization
+//   void mma_prepare_hessian_cuda(void* Hess, void* y, void* d, 
+//                              void* mu, void* lambda, int* m) {
+//     const dim3 nthrds(1024, 1, 1);
+//     const dim3 nblcks(((*m) + 1024 - 1) / 1024, 1, 1);
+
+//     // Update diagonal elements
+//     mma_update_hessian_diagonal_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+//          ((real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, *m);
+//     CUDA_CHECK(cudaGetLastError());
+
+//     // Synchronize to ensure diagonal updates are complete
+//     CUDA_CHECK(cudaStreamSynchronize((cudaStream_t)glb_cmd_queue));
+//   }
+  void mma_prepare_hessian_cuda(void* Hess, void* y, void* d, 
+                             void* mu, void* lambda, int* m) {
+    const int M = *m;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((M + 1024 - 1) / 1024, 1, 1);
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    // Update diagonal elements
+    mma_update_hessian_diagonal_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Synchronize to ensure diagonal updates are complete
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    // Choose kernel based on problem size
+    if (M <= 1024) {
+        // Single-block version (fast for small m)
+        const dim3 stab_nblcks(1, 1, 1);
+        mma_stabilize_hessian_single_kernel<real><<<stab_nblcks, nthrds, 0, stream>>>(
+            (real*)Hess, M);
+        CUDA_CHECK(cudaGetLastError());
+    } else {
+        // Multi-block version (for large m)
+        // Compute trace on host (simple and reliable)
+        real* h_Hess = (real*)malloc(M * sizeof(real));
+        
+        // Extract diagonal elements
+        for (int i = 0; i < M; i++) {
+            CUDA_CHECK(cudaMemcpyAsync(&h_Hess[i], 
+                                      (real*)Hess + i * M + i, 
+                                      sizeof(real), 
+                                      cudaMemcpyDeviceToHost, stream));
+        }
+        CUDA_CHECK(cudaStreamSynchronize(stream));
+        
+        // Compute trace and LM factor
+        real trace = 0.0;
+        for (int i = 0; i < M; i++) {
+            trace += h_Hess[i];
+        }
+        real lm_factor = fmax(-1.0e-4 * trace / M, 1.0e-7);
+        
+        // Apply stabilization in parallel
+        mma_stabilize_hessian_multi_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+            (real*)Hess, lm_factor, M);
+        CUDA_CHECK(cudaGetLastError());
+        
+        free(h_Hess);
+    }
+  }
+
 
   void cuSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     cusolverDnHandle_t handle;

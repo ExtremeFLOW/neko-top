@@ -43,7 +43,8 @@ submodule (mma) mma_device
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess, device_solve_linear_system
+       device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
+       device_prepare_hessian
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST
@@ -564,7 +565,7 @@ contains
 
           call device_memcpy(AA%x, AA%x_d, &
                (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
-!=-----------------------------------------------------------------------------
+     !=-----------------------------------------------------------------------------
             ! Solve on GPU
             call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
             if (info .ne. 0) then
@@ -572,7 +573,7 @@ contains
                      "mma_subsolve_dpip")
             end if
 
-!!!!!!!!!!!!!!!!!a device translation is needed for this part as well!!!!!!!!!
+     !!!!!!!!!!!!!!!!!a device translation is needed for this part as well!!!!!!!!!
           call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
                sync = .true.)
           dlambda%x = bb%x(1:this%m)
@@ -580,7 +581,7 @@ contains
                sync = .true.)
 
           dz = bb%x(this%m + 1)
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
           ! based on eq(5.19)
           call device_dx(dx%x_d, delx%x_d, diagx%x_d, GG%x_d, &
@@ -891,7 +892,7 @@ contains
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-         ! division by dd to avoid devision by 0 (in case this%d%x_d)
+         ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
          call device_invcol2(y%x_d, dd%x_d, this%m)
          call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
@@ -987,8 +988,9 @@ contains
             call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
             ! No need to upload to device since we solve LSE on CPU
-            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
-            ! HOST_TO_DEVICE, sync = .true.)
+            ! But now we solve LSE on GPU, so upload it:
+            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
+            HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are
@@ -1002,37 +1004,49 @@ contains
             ! Note that since we use DGESV to solve LSE on CPU, we dont need
             ! cuda kernel for this part
 
-            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            do i = 1, this%m
-               if (y%x(i) .gt. 0.0_rp) then
-                  if (abs(this%d%x(i)) < 1.0e-15_rp) then
-                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
-                  else
-                     Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
-                  end if
-               end if
-               ! Based on eq(10), note the term (-\Omega \Lambda)
-               Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
-            end do
+          !   call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
+          !        sync = .true.)
+          !   call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
+          !        sync = .true.)
+          !   call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
+          !        sync = .true.)
+
+
+          !   do i = 1, this%m
+          !      if (y%x(i) .gt. 0.0_rp) then
+          !         if (abs(this%d%x(i)) < 1.0e-15_rp) then
+          !            ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
+          !         else
+          !            Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
+          !         end if
+          !      end if
+          !      ! Based on eq(10), note the term (-\Omega \Lambda)
+          !      Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
+          !   end do
 
             !================this part should also be done on gpu===============
             ! Improve the robustness by stablizing the Hess using
             ! Levenberg-Marquardt algorithm (heuristically)
-            Hesstrace = 0.0_rp
-            do i=1, this%m
-               Hesstrace = Hesstrace + Hess%x(i, i)
-            end do
-            do i=1, this%m
-               Hess%x(i,i) = Hess%x(i, i) - &
-                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
-            end do
-            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, sync = .true.)
+          !   Hesstrace = 0.0_rp
+          !   do i=1, this%m
+          !      Hesstrace = Hesstrace + Hess%x(i, i)
+          !   end do
+          !   do i=1, this%m
+          !      Hess%x(i,i) = Hess%x(i, i) - &
+          !           max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
+          !   end do
+          !   print *, "OldHess=", Hess%x
+            call device_prepare_hessian(Hess%x_d, y%x_d, this%d%x_d, &
+                           mu%x_d, lambda%x_d, this%m)
+          !   call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, sync = .true.)
+          !   print *, "NewHess=", Hess%x
+
+
+
+          !   call neko_error("stop!") 
+          !   call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, sync = .true.)
             !===================================================================
+
 
             ! Solve on GPU
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, this%m, info)
@@ -1074,7 +1088,7 @@ contains
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
 
             call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-            ! division by dd to avoid devision by 0 (in case this%d%x_d)
+            ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
             call device_invcol2(y%x_d, dd%x_d, this%m)
             call device_pwmax2(y%x_d, zerom%x_d, this%m)
 

@@ -38,6 +38,15 @@ module cuda_mma_math
   public
 
   interface
+
+     subroutine mma_prepare_hessian_cuda(Hess, y, d, mu, lambda, m) &
+          bind(C, name="mma_prepare_hessian_cuda")
+       import c_ptr, c_int
+       type(c_ptr), value :: Hess, y, d, mu, lambda
+       integer(c_int) :: m
+     end subroutine
+
+
      subroutine cuSOLVER_wrapper(A_d, b_d, n, info) &
           bind(c, name = 'cuSOLVER_wrapper')
        import c_int, c_ptr
