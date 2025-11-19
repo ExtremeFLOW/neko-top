@@ -44,6 +44,7 @@ contains
 
     ! Get the design vector for reference
     ! This is the design vector we will perturb
+    call design_vector%init(des%size())
     call des%get_values(design_vector)
 
     if (is_objective) then

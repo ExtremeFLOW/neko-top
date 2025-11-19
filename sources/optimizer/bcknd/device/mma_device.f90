@@ -50,6 +50,7 @@ submodule (mma) mma_device
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use vector_scratch_registry, only: neko_vector_scratch_registry
 
   implicit none
 
@@ -108,10 +109,11 @@ contains
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
-    type(vector_t) :: relambda, remu
+    type(vector_t), pointer :: relambda, remu
+    integer :: ind(2)
 
-    call relambda%init(this%m)
-    call remu%init(this%m)
+    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(1))
+    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(2))
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
     call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
@@ -122,14 +124,12 @@ contains
     ! Compute residual for mu (eta in the paper)
     call device_col3 (remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
 
-
     this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
          device_maxval(remu%x_d, this%m)])
     this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
          device_norm(remu%x_d, this%m))
 
-    call relambda%free()
-    call remu%free()
+    call neko_vector_scratch_registry%relinquish_vector(ind)
   end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -139,19 +139,19 @@ contains
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
     real(kind=rp) :: rez, rezeta
-    type(vector_t) :: rey, relambda, remu, res
-    type(vector_t) :: rex, rexsi, reeta
-    integer :: ierr
+    type(vector_t), pointer :: rey, relambda, remu, res
+    type(vector_t), pointer :: rex, rexsi, reeta
+    integer :: ierr, ind(7)
     real(kind=rp) :: re_sq_norm
 
-    call rey%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call res%init(this%m)
+    call neko_vector_scratch_registry%request_vector(this%m, rey, ind(1))
+    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(2))
+    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(3))
+    call neko_vector_scratch_registry%request_vector(this%m, res, ind(4))
 
-    call rex%init(this%n)
-    call rexsi%init(this%n)
-    call reeta%init(this%n)
+    call neko_vector_scratch_registry%request_vector(this%n, rex, ind(5))
+    call neko_vector_scratch_registry%request_vector(this%n, rexsi, ind(6))
+    call neko_vector_scratch_registry%request_vector(this%n, reeta, ind(7))
 
     call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
@@ -211,13 +211,7 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    call rey%free()
-    call relambda%free()
-    call remu%free()
-    call res%free()
-    call rex%free()
-    call rexsi%free()
-    call reeta%free()
+    call neko_vector_scratch_registry%relinquish_vector(ind)
   end subroutine mma_dpip_KKT_device
 
   !============================================================================!
@@ -239,10 +233,12 @@ contains
     integer, intent(in) :: iter
     integer :: ierr
 
-    type(vector_t):: x_diff
+    type(vector_t), pointer :: x_diff
+    integer :: ind
 
-    call x_diff%init(this%n)
-    call device_sub3 (x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
+    call neko_vector_scratch_registry%request_vector(this%n, x_diff, ind)
+
+    call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
     call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
          DEVICE_TO_HOST, sync = .true.)
 
@@ -282,6 +278,7 @@ contains
          sync = .true.)
     call device_sub2(this%bi%x_d, fval, this%m)
 
+    call neko_vector_scratch_registry%relinquish_vector(ind)
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
@@ -293,14 +290,14 @@ contains
     real(kind=rp) :: epsi, residual_max, residual_norm, z, zeta, rez, rezeta, &
          delz, dz, dzeta, steg, zold, zetaold, new_residual
     ! vectors with size m
-    type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
+    type(vector_t) , pointer :: y, lambda, s, mu, rey, relambda, remu, res, &
          dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
 
     ! vectors with size n
-    type(vector_t) :: x, xsi, eta, rex, rexsi, reeta, &
+    type(vector_t), pointer :: x, xsi, eta, rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
 
-    type(vector_t) :: bb
+    type(vector_t), pointer :: bb
     type(matrix_t) :: GG
     type(matrix_t) :: AA
 
@@ -308,43 +305,43 @@ contains
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_sq_norm
 
-    integer :: i
+    integer :: i, ind(33)
 
     real(kind=rp) :: minimal_epsilon
 
-    call y%init(this%m)
-    call lambda%init(this%m)
-    call s%init(this%m)
-    call mu%init(this%m)
-    call rey%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call res%init(this%m)
-    call dely%init(this%m)
-    call dellambda%init(this%m)
-    call dy%init(this%m)
-    call dlambda%init(this%m)
-    call ds%init(this%m)
-    call dmu%init(this%m)
-    call yold%init(this%m)
-    call lambdaold%init(this%m)
-    call sold%init(this%m)
-    call muold%init(this%m)
-    call x%init(this%n)
-    call xsi%init(this%n)
-    call eta%init(this%n)
-    call rex%init(this%n)
-    call rexsi%init(this%n)
-    call reeta%init(this%n)
-    call delx%init(this%n)
-    call diagx%init(this%n)
-    call dx%init(this%n)
-    call dxsi%init(this%n)
-    call deta%init(this%n)
-    call xold%init(this%n)
-    call xsiold%init(this%n)
-    call etaold%init(this%n)
-    call bb%init(this%m+1)
+    call neko_vector_scratch_registry%request_vector(this%m, y, ind(1))
+    call neko_vector_scratch_registry%request_vector(this%m, lambda, ind(2))
+    call neko_vector_scratch_registry%request_vector(this%m, s, ind(3))
+    call neko_vector_scratch_registry%request_vector(this%m, mu, ind(4))
+    call neko_vector_scratch_registry%request_vector(this%m, rey, ind(5))
+    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(6))
+    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(7))
+    call neko_vector_scratch_registry%request_vector(this%m, res, ind(8))
+    call neko_vector_scratch_registry%request_vector(this%m, dely, ind(9))
+    call neko_vector_scratch_registry%request_vector(this%m, dellambda, ind(10))
+    call neko_vector_scratch_registry%request_vector(this%m, dy, ind(11))
+    call neko_vector_scratch_registry%request_vector(this%m, dlambda, ind(12))
+    call neko_vector_scratch_registry%request_vector(this%m, ds, ind(13))
+    call neko_vector_scratch_registry%request_vector(this%m, dmu, ind(14))
+    call neko_vector_scratch_registry%request_vector(this%m, yold, ind(15))
+    call neko_vector_scratch_registry%request_vector(this%m, lambdaold, ind(16))
+    call neko_vector_scratch_registry%request_vector(this%m, sold, ind(17))
+    call neko_vector_scratch_registry%request_vector(this%m, muold, ind(18))
+    call neko_vector_scratch_registry%request_vector(this%n, x, ind(19))
+    call neko_vector_scratch_registry%request_vector(this%n, xsi, ind(20))
+    call neko_vector_scratch_registry%request_vector(this%n, eta, ind(21))
+    call neko_vector_scratch_registry%request_vector(this%n, rex, ind(22))
+    call neko_vector_scratch_registry%request_vector(this%n, rexsi, ind(23))
+    call neko_vector_scratch_registry%request_vector(this%n, reeta, ind(24))
+    call neko_vector_scratch_registry%request_vector(this%n, delx, ind(25))
+    call neko_vector_scratch_registry%request_vector(this%n, diagx, ind(26))
+    call neko_vector_scratch_registry%request_vector(this%n, dx, ind(27))
+    call neko_vector_scratch_registry%request_vector(this%n, dxsi, ind(28))
+    call neko_vector_scratch_registry%request_vector(this%n, deta, ind(29))
+    call neko_vector_scratch_registry%request_vector(this%n, xold, ind(30))
+    call neko_vector_scratch_registry%request_vector(this%n, xsiold, ind(31))
+    call neko_vector_scratch_registry%request_vector(this%n, etaold, ind(32))
+    call neko_vector_scratch_registry%request_vector(this%m+1, bb, ind(33))
 
     call GG%init(this%m, this%n)
     call AA%init(this%m+1, this%m+1)
@@ -766,39 +763,10 @@ contains
     call device_copy(this%s%x_d, s%x_d, this%m)
 
     !free all the initiated variables in this subroutine
-    call y%free()
-    call lambda%free()
-    call s%free()
-    call mu%free()
-    call rey%free()
-    call relambda%free()
-    call remu%free()
-    call res%free()
-    call dely%free()
-    call dellambda%free()
-    call dy%free()
-    call dlambda%free()
-    call ds%free()
-    call dmu%free()
-    call yold%free()
-    call lambdaold%free()
-    call sold%free()
-    call muold%free()
-    call x%free()
-    call xsi%free()
-    call eta%free()
-    call rex%free()
-    call rexsi%free()
-    call reeta%free()
-    call delx%free()
-    call diagx%free()
-    call dx%free()
-    call dxsi%free()
-    call deta%free()
-    call xold%free()
-    call xsiold%free()
-    call etaold%free()
-    call bb%free()
+    call neko_vector_scratch_registry%relinquish_vector(ind)
+
+    call GG%free()
+    call AA%free()
 
   end subroutine mma_subsolve_dpip_device
 
@@ -810,42 +778,42 @@ contains
     integer :: iter, ierr
     real(kind=rp) :: epsi, residumax, z, steg
     ! vectors with size m
-    type(vector_t) :: y, lambda, mu, relambda, remu, dlambda, dmu, &
+    type(vector_t), pointer :: y, lambda, mu, relambda, remu, dlambda, dmu, &
          gradlambda, zerom, dd, dummy_m
     ! vectors with size n
-    type(vector_t) :: x, pjlambda, qjlambda
+    type(vector_t), pointer :: x, pjlambda, qjlambda
 
     ! inverse of a diag matrix:
-    type(vector_t) :: Ljjxinv ! [∇_x^2 Ljj]−1
+    type(vector_t), pointer :: Ljjxinv ! [∇_x^2 Ljj]−1
     type(matrix_t) :: hijx ! ∇_x hij
     type(matrix_t) :: Hess
     real(kind=rp) :: Hesstrace
 
-    integer :: info
+    integer :: info, ind(15)
     integer, dimension(this%m+1) :: ipiv
     integer :: i
 
     real(kind=rp) :: minimal_epsilon
 
-    call y%init(this%m)
-    call lambda%init(this%m)
-    call mu%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call dlambda%init(this%m)
-    call dmu%init(this%m)
-    call gradlambda%init(this%m)
-    call zerom%init(this%m)
-    call dd%init(this%m)
-    call dummy_m%init(this%m)
+    call neko_vector_scratch_registry%request_vector(this%m, y, ind(1))
+    call neko_vector_scratch_registry%request_vector(this%m, lambda, ind(2))
+    call neko_vector_scratch_registry%request_vector(this%m, mu, ind(3))
+    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(4))
+    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(5))
+    call neko_vector_scratch_registry%request_vector(this%m, dlambda, ind(6))
+    call neko_vector_scratch_registry%request_vector(this%m, dmu, ind(7))
+    call neko_vector_scratch_registry%request_vector(this%m, gradlambda, ind(8))
+    call neko_vector_scratch_registry%request_vector(this%m, zerom, ind(9))
+    call neko_vector_scratch_registry%request_vector(this%m, dd, ind(10))
+    call neko_vector_scratch_registry%request_vector(this%m, dummy_m, ind(11))
 
-    call x%init(this%n)
-    call pjlambda%init(this%n)
-    call qjlambda%init(this%n)
+    call neko_vector_scratch_registry%request_vector(this%n, x, ind(12))
+    call neko_vector_scratch_registry%request_vector(this%n, pjlambda,ind(13))
+    call neko_vector_scratch_registry%request_vector(this%n, qjlambda, ind(14))
 
-    call Ljjxinv%init(this%n)
-    call hijx%init(this%m,this%n)
-    call Hess%init(this%m,this%m)
+    call neko_vector_scratch_registry%request_vector(this%n, Ljjxinv, ind(15))
+    call hijx%init(this%m, this%n)
+    call Hess%init(this%m, this%m)
 
     call device_cfill(zerom%x_d, 0.0_rp, this%m)
 
@@ -1149,23 +1117,7 @@ contains
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
 
-    call y%free()
-    call lambda%free()
-    call mu%free()
-    call relambda%free()
-    call remu%free()
-    call dlambda%free()
-    call dmu%free()
-    call gradlambda%free()
-    call zerom%free()
-    call dd%free()
-    call dummy_m%free()
-
-    call x%free()
-    call pjlambda%free()
-    call qjlambda%free()
-
-    call Ljjxinv%free()
+    call neko_vector_scratch_registry%relinquish_vector(ind)
     call hijx%free()
     call Hess%free()
   end subroutine mma_subsolve_dip_device

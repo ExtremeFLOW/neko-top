@@ -49,6 +49,7 @@ module volume_constraint
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
+  use vector_scratch_registry, only: neko_vector_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
   use math, only: glsc2, copy, cmult
@@ -315,15 +316,19 @@ contains
     type(brinkman_design_t), intent(in) :: design
     real(kind=rp) :: volume
     type(field_t), pointer :: work
-    type(vector_t) :: values, unmapped_values
-    integer :: temp_indices(1)
+    type(vector_t), pointer :: values, unmapped_values
+    integer :: temp_indices, ind_value, ind_um_value
+
+    call neko_vector_scratch_registry%request_vector(design%size(), values, &
+         ind_value)
 
     volume = 0.0_rp
     if (this%if_mapping) then
+       call neko_vector_scratch_registry%request_vector(design%size(), &
+            unmapped_values, ind_um_value)
        call design%get_values(unmapped_values)
-       call values%init(unmapped_values%size())
        call this%mapping%apply_forward(values, unmapped_values)
-       call unmapped_values%free()
+       call neko_vector_scratch_registry%relinquish_vector(ind_um_value)
     else
        call design%get_values(values)
     end if
@@ -331,7 +336,7 @@ contains
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_scratch_registry%request_field(work, temp_indices(1))
+          call neko_scratch_registry%request_field(work, temp_indices)
           call device_copy(work%x_d, values%x_d, design%size())
           call mask_exterior_const(work, this%mask, 0.0_rp)
 
@@ -353,7 +358,7 @@ contains
 
     end if
 
-    call values%free()
+    call neko_vector_scratch_registry%relinquish_vector(ind_value)
 
   end function volume_brinkman_design
 
