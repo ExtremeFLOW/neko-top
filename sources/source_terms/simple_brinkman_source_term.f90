@@ -48,7 +48,8 @@ module simple_brinkman_source_term
   use space, only: space_t, GL
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
+  use field_scratch_registry, only: field_scratch_registry_t
   implicit none
   private
 
@@ -75,7 +76,7 @@ module simple_brinkman_source_term
      !> if dealiasing should be applied
      logical :: dealias
      !> GL scratch registry
-     type(scratch_registry_t), pointer :: scratch_GL
+     type(field_scratch_registry_t), pointer :: scratch_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -136,7 +137,7 @@ contains
     real(kind=rp) :: end_time
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
-    type(scratch_registry_t), intent(in), target :: scratch_GL
+    type(field_scratch_registry_t), intent(in), target :: scratch_GL
 
     ! I wish you didn't need a start time and end time...
     ! but I'm just going to set a super big number...

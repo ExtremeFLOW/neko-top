@@ -52,7 +52,7 @@ module adjoint_fluid_scheme
   use time_step_controller, only: time_step_controller_t
   use field_list, only : field_list_t
   use interpolation, only: interpolator_t
-  use scratch_registry, only : scratch_registry_t
+  use field_scratch_registry, only : field_scratch_registry_t
 
   implicit none
   private
@@ -79,7 +79,7 @@ module adjoint_fluid_scheme
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t) :: GLL_to_GL
      !> Scratch registry on the GL space
-     type(scratch_registry_t) :: scratch_GL
+     type(field_scratch_registry_t) :: scratch_GL
 
      type(time_scheme_controller_t), allocatable :: ext_bdf
 
