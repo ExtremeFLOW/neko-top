@@ -38,9 +38,16 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mma_prepare_aa_matrix_cuda(AA, s, lambda, d, mu, y, a, zeta, &
+          z, m) bind(c, name="mma_prepare_aa_matrix_cuda")
+       import c_rp, c_ptr, c_int
+       type(c_ptr), value :: AA, s, lambda, d, mu, y, a
+       real(c_rp) :: zeta, z
+       integer(c_int) :: m
+     end subroutine mma_prepare_aa_matrix_cuda
 
      subroutine mma_prepare_hessian_cuda(Hess, y, d, mu, lambda, m) &
-          bind(C, name="mma_prepare_hessian_cuda")
+          bind(c, name="mma_prepare_hessian_cuda")
        import c_ptr, c_int
        type(c_ptr), value :: Hess, y, d, mu, lambda
        integer(c_int) :: m

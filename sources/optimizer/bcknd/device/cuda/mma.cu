@@ -55,20 +55,22 @@ extern "C" {
   int mma_red_s = 0;
   real * mma_bufred = NULL;
   real * mma_bufred_d = NULL;
-  // Update Hess and apply Levenberg-Marquardt stabilization
-//   void mma_prepare_hessian_cuda(void* Hess, void* y, void* d, 
-//                              void* mu, void* lambda, int* m) {
-//     const dim3 nthrds(1024, 1, 1);
-//     const dim3 nblcks(((*m) + 1024 - 1) / 1024, 1, 1);
 
-//     // Update diagonal elements
-//     mma_update_hessian_diagonal_kernel<real> <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-//          ((real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, *m);
-//     CUDA_CHECK(cudaGetLastError());
+  void mma_prepare_aa_matrix_cuda(void* AA, void* s, void* lambda,
+                               void* d, void* mu, void* y,
+                               void* a, real* zeta, real* z, int* m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*m) + 1024 - 1) / 1024, 1, 1);
 
-//     // Synchronize to ensure diagonal updates are complete
-//     CUDA_CHECK(cudaStreamSynchronize((cudaStream_t)glb_cmd_queue));
-//   }
+    // Launch kernel to prepare AA matrix
+    mma_prepare_aa_matrix_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
+        (real*)AA, (real*)s, (real*)lambda, (real*)d, 
+        (real*)mu, (real*)y, (real*)a, 
+        *zeta, *z, *m);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
+
   void mma_prepare_hessian_cuda(void* Hess, void* y, void* d, 
                              void* mu, void* lambda, int* m) {
     const int M = *m;

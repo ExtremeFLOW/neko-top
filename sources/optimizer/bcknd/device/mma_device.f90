@@ -44,7 +44,7 @@ submodule (mma) mma_device
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
-       device_prepare_hessian
+       device_prepare_hessian, device_prepare_aa_matrix
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST
@@ -244,8 +244,6 @@ contains
 
     call x_diff%init(this%n)
     call device_sub3 (x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
-    call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
-         DEVICE_TO_HOST, sync = .true.)
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -529,7 +527,6 @@ contains
           call device_updatebb(bb%x_d, dellambda%x_d, dely%x_d, &
                this%d%x_d, mu%x_d, y%x_d, delz, this%m)
 
-          !-----------------------this part should be done on device------------!
           ! assembling the coefficients matrix AA based on eq(5.20)
           ! AA(1:this%m,1:this%m) =  &
           ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
@@ -539,49 +536,32 @@ contains
 
           call device_cfill(AA%x_d, 0.0_rp, (this%m+1) * (this%m+1))
           call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
+
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
-
           call MPI_Allreduce(MPI_IN_PLACE, AA%x, &
                (this%m + 1)**2, mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
+               HOST_TO_DEVICE, sync = .true.)
 
-          call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(s%x, s%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
-          do i = 1, this%m
-             ! update the diag AA
-             AA%x(i, i) = AA%x(i, i) &
-                  + s%x(i) / lambda%x(i) &
-                  + 1.0_rp / (this%d%x(i) + mu%x(i) / y%x(i))
-          end do
-          AA%x(1:this%m, this%m+1) = this%a%x
-          AA%x(this%m+1, 1:this%m) = this%a%x
-          AA%x(this%m+1, this%m+1) = - zeta/z
+          call device_prepare_aa_matrix(AA%x_d, s%x_d, lambda%x_d, &
+               this%d%x_d, mu%x_d, y%x_d, this%a%x_d, zeta, z, this%m)
 
-          call device_memcpy(AA%x, AA%x_d, &
-               (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
-     !=-----------------------------------------------------------------------------
-            ! Solve on GPU
-            call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
-            if (info .ne. 0) then
-                  call neko_error("Linear solver failed on the device in  " // &
-                     "mma_subsolve_dpip")
-            end if
+          ! Device solve for the linear system
+          call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
+          if (info .ne. 0) then
+             call neko_error("Linear solver failed on the device in  " // &
+                  "mma_subsolve_dpip")
+          end if
 
-     !!!!!!!!!!!!!!!!!a device translation is needed for this part as well!!!!!!!!!
+          call device_copy(dlambda%x_d, bb%x_d, this%m)
+
+
+          !We need to write the last element of bb to dz so this is necessary
           call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
                sync = .true.)
-          dlambda%x = bb%x(1:this%m)
-          call device_memcpy(dlambda%x, dlambda%x_d, this%m, HOST_TO_DEVICE, &
-               sync = .true.)
-
           dz = bb%x(this%m + 1)
-     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
           ! based on eq(5.19)
           call device_dx(dx%x_d, delx%x_d, diagx%x_d, GG%x_d, &
@@ -937,13 +917,8 @@ contains
          call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
          call device_cadd(remu%x_d, -epsi, this%m)
 
-         ! Download the re(lambda, mu) to CPU to calculate residumax
-
-         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-         call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-         residumax = maxval(abs([relambda%x, remu%x]))
+         residumax = maxval([device_maxval(relambda%x_d, this%m), &
+                    device_maxval(remu%x_d, this%m)])
 
          ! ------------------------------------------------------------------- !
          ! Internal loop
@@ -976,9 +951,6 @@ contains
             call device_GG(hijx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                  this%pij%x_d, this%qij%x_d, this%n, this%m)
 
-            call device_memcpy(hijx%x, hijx%x_d, this%n*this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-
             call device_cfill(Hess%x_d, 0.0_rp, (this%m) * (this%m) )
             call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
 
@@ -1003,53 +975,14 @@ contains
             ! contribute to the Hessian matrix.
             ! Note that since we use DGESV to solve LSE on CPU, we dont need
             ! cuda kernel for this part
-
-          !   call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-          !        sync = .true.)
-          !   call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-          !        sync = .true.)
-          !   call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-          !        sync = .true.)
-
-
-          !   do i = 1, this%m
-          !      if (y%x(i) .gt. 0.0_rp) then
-          !         if (abs(this%d%x(i)) < 1.0e-15_rp) then
-          !            ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
-          !         else
-          !            Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
-          !         end if
-          !      end if
-          !      ! Based on eq(10), note the term (-\Omega \Lambda)
-          !      Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
-          !   end do
-
-            !================this part should also be done on gpu===============
-            ! Improve the robustness by stablizing the Hess using
+            ! Also, improve the robustness by stablizing the Hess using
             ! Levenberg-Marquardt algorithm (heuristically)
-          !   Hesstrace = 0.0_rp
-          !   do i=1, this%m
-          !      Hesstrace = Hesstrace + Hess%x(i, i)
-          !   end do
-          !   do i=1, this%m
-          !      Hess%x(i,i) = Hess%x(i, i) - &
-          !           max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
-          !   end do
-          !   print *, "OldHess=", Hess%x
             call device_prepare_hessian(Hess%x_d, y%x_d, this%d%x_d, &
                            mu%x_d, lambda%x_d, this%m)
-          !   call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, DEVICE_TO_HOST, sync = .true.)
-          !   print *, "NewHess=", Hess%x
 
-
-
-          !   call neko_error("stop!") 
-          !   call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, HOST_TO_DEVICE, sync = .true.)
-            !===================================================================
-
-
-            ! Solve on GPU
-            call device_solve_linear_system(Hess%x_d, gradlambda%x_d, this%m, info)
+            ! Device solve for the linear system
+            call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
+                 this%m, info)
             if (info .ne. 0) then
                   call neko_error("Linear solver failed on the device in  " // &
                      "mma_subsolve_dip")
@@ -1074,11 +1007,6 @@ contains
 
             call device_add2s2(lambda%x_d, dlambda%x_d, steg, this%m)
             call device_add2s2(mu%x_d, dmu%x_d, steg, this%m)
-
-            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
 
             ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
             ! the updated values of λ
@@ -1135,14 +1063,8 @@ contains
             call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
             call device_cadd(remu%x_d, -epsi, this%m)
 
-
-            !> Download the re(lambda, mu) to CPU to calculate residumax
-
-            call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            residumax = maxval(abs([relambda%x, remu%x]))
+            residumax = maxval([device_maxval(relambda%x_d, this%m), &
+                    device_maxval(remu%x_d, this%m)])
          end do
        end associate
        epsi = 0.1_rp * epsi

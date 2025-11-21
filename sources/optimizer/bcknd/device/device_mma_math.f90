@@ -43,7 +43,7 @@ module device_mma_math
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
-       cuSOLVER_wrapper, mma_prepare_hessian_cuda
+       cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -64,9 +64,28 @@ module device_mma_math
        device_dy, device_deta, device_dxsi, device_maxval2, device_maxval3, &
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
-       device_solve_linear_system, device_prepare_hessian
+       device_solve_linear_system, device_prepare_hessian, &
+       device_prepare_aa_matrix
 
 contains
+  !> Prepare AA matrix for dual-primal solver on device
+  subroutine device_prepare_aa_matrix(AA_d, s_d, lambda_d, d_d, mu_d, y_d, &
+       a_d, zeta, z, m)
+    type(c_ptr) :: AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d
+    real(c_rp) :: zeta, z
+    integer, value :: m
+#if HAVE_HIP
+    call neko_error('AA matrix preparation not implemented for HIP')
+#elif HAVE_CUDA
+    call mma_prepare_aa_matrix_cuda(AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d, &
+         zeta, z, m)
+#elif HAVE_OPENCL
+    call neko_error('AA matrix preparation not implemented for OpenCL')
+#else
+    call neko_error('No device backend configured for AA matrix preparation')
+#endif
+  end subroutine device_prepare_aa_matrix
+
   !> Solve linear system Ax = b on device
   subroutine device_prepare_hessian(Hess_d, y_d, d_d, mu_d, lambda_d, m)
     type(c_ptr) :: Hess_d, y_d, d_d, mu_d, lambda_d

@@ -35,6 +35,27 @@
 #ifndef MMA_CUDA_KERNEL_H
 #define MMA_CUDA_KERNEL_H
 
+template<typename T>
+__global__ void mma_prepare_aa_matrix_kernel(T* __restrict__ AA,
+    const T* __restrict__ s, const T* __restrict__ lambda,
+    const T* __restrict__ d, const T* __restrict__ mu,
+    const T* __restrict__ y, const T* __restrict__ a,
+    const T zeta, const T z, const int m) {
+  const int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  const int matrix_size = m + 1;
+  
+  if (tj >= m) return;
+  AA[tj * matrix_size + tj] += s[tj] / lambda[tj] + 
+       (T)1.0 / (d[tj] + mu[tj] / y[tj]);
+  AA[tj * matrix_size + m] = a[tj]; // column m+1
+  AA[m * matrix_size + tj] = a[tj];// row m+1
+  
+  // Only first thread updates the bottom-right  corner element.
+  if (tj == 0)
+    AA[m * matrix_size + m] = -zeta / z;
+}
+
+
 //Update Hessian diagonal elements (y contributions for dip subsolve)
 template<typename T>
 __global__ void mma_update_hessian_diagonal_kernel(T* __restrict__ Hess,
