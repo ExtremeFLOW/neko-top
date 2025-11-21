@@ -45,7 +45,7 @@ submodule (mma) mma_device
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess
 
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
@@ -129,7 +129,7 @@ contains
     this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
          device_norm(remu%x_d, this%m))
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -211,7 +211,7 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dpip_KKT_device
 
   !============================================================================!
@@ -239,8 +239,6 @@ contains
     call neko_scratch_registry%request_vector(this%n, x_diff, ind)
 
     call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
-    call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
-         DEVICE_TO_HOST, sync = .true.)
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -270,15 +268,20 @@ contains
     call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
 
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-         sync = .true.)
-    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
-         mpi_real_precision, mpi_sum, neko_comm, ierr)
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .true.)
+    if (NEKO_DEVICE_MPI) then
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x_d, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+    else
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
+            sync = .true.)
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
+            sync = .true.)
+    end if
     call device_sub2(this%bi%x_d, fval, this%m)
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
@@ -298,14 +301,14 @@ contains
          delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
 
     type(vector_t), pointer :: bb
-    type(matrix_t) :: GG
-    type(matrix_t) :: AA
+    type(matrix_t), pointer :: GG
+    type(matrix_t), pointer :: AA
 
     integer :: info
     integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_sq_norm
 
-    integer :: i, ind(33)
+    integer :: i, ind(35)
 
     real(kind=rp) :: minimal_epsilon
 
@@ -343,8 +346,8 @@ contains
     call neko_scratch_registry%request_vector(this%n, etaold, ind(32))
     call neko_scratch_registry%request_vector(this%m+1, bb, ind(33))
 
-    call GG%init(this%m, this%n)
-    call AA%init(this%m+1, this%m+1)
+    call neko_scratch_registry%request_matrix(this%m, this%n, GG, ind(34))
+    call neko_scratch_registry%request_matrix(this%m+1, this%m+1, AA, ind(35))
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -406,12 +409,17 @@ contains
        ! Computing the norm of the residuals
 
        ! Complete the computations of lambda residuals
-       call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-            sync = .true.)
-       call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .true.)
+       if (NEKO_DEVICE_MPI) then
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x_d, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+       else
+          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
+               sync = .true.)
+       end if
 
        call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
        call device_sub2(relambda%x_d, y%x_d, this%m)
@@ -763,11 +771,7 @@ contains
     call device_copy(this%s%x_d, s%x_d, this%m)
 
     !free all the initiated variables in this subroutine
-    call neko_scratch_registry%relinquish_vector(ind)
-
-    call GG%free()
-    call AA%free()
-
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dpip_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual
@@ -785,11 +789,11 @@ contains
 
     ! inverse of a diag matrix:
     type(vector_t), pointer :: Ljjxinv ! [∇_x^2 Ljj]−1
-    type(matrix_t) :: hijx ! ∇_x hij
-    type(matrix_t) :: Hess
+    type(matrix_t), pointer :: hijx ! ∇_x hij
+    type(matrix_t), pointer :: Hess
     real(kind=rp) :: Hesstrace
 
-    integer :: info, ind(15)
+    integer :: info, ind(17)
     integer, dimension(this%m+1) :: ipiv
     integer :: i
 
@@ -812,10 +816,9 @@ contains
     call neko_scratch_registry%request_vector(this%n, qjlambda, ind(14))
 
     call neko_scratch_registry%request_vector(this%n, Ljjxinv, ind(15))
-    call hijx%init(this%m, this%n)
-    call Hess%init(this%m, this%m)
 
-    call device_cfill(zerom%x_d, 0.0_rp, this%m)
+    call neko_scratch_registry%request_matrix(this%m, this%n, hijx, ind(16))
+    call neko_scratch_registry%request_matrix(this%m, this%m, Hess, ind(17))
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -1117,9 +1120,7 @@ contains
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
 
-    call neko_scratch_registry%relinquish_vector(ind)
-    call hijx%free()
-    call Hess%free()
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device
