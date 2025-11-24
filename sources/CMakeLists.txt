@@ -108,6 +108,15 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
 
+# Add HIP libraries directly
+if(${DEVICE_TYPE} STREQUAL "HIP")
+    target_link_libraries(neko-top 
+        /opt/rocm/lib/libhipsolver.so 
+        /opt/rocm/lib/libhipblas.so 
+        /opt/rocm/lib/libamdhip64.so
+    )
+endif()
+
 # ============================================================================ #
 # Specify installation instructions
 

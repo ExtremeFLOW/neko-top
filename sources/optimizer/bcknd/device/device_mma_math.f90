@@ -51,7 +51,9 @@ module device_mma_math
        hip_updateAA, hip_dx, hip_dy, hip_deta, hip_dxsi, hip_maxval2, &
        hip_maxval3, hip_kkt_rex, mma_gensub1_hip, mma_gensub2_hip, &
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
-       mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip
+       mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip, &
+       hip_custom_solver, mma_prepare_hessian_hip, &
+       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper
 
   implicit none
   private
@@ -76,7 +78,8 @@ contains
     real(c_rp) :: zeta, z
     integer, value :: m
 #if HAVE_HIP
-    call neko_error('AA matrix preparation not implemented for HIP')
+    call mma_prepare_aa_matrix_hip(AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d, &
+         zeta, z, m)
 #elif HAVE_CUDA
     call mma_prepare_aa_matrix_cuda(AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d, &
          zeta, z, m)
@@ -92,9 +95,9 @@ contains
     type(c_ptr) :: Hess_d, y_d, d_d, mu_d, lambda_d
     integer, value :: m
 #if HAVE_HIP
-    call neko_error('no device backend configured')
+    call mma_prepare_hessian_hip(Hess_d, y_d, d_d, mu_d, lambda_d, m)
 #elif HAVE_CUDA
-  call mma_prepare_hessian_cuda(Hess_d, y_d, d_d, mu_d, lambda_d, m)
+    call mma_prepare_hessian_cuda(Hess_d, y_d, d_d, mu_d, lambda_d, m)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
 #else
@@ -107,8 +110,8 @@ contains
     integer(c_int), value :: n
     integer(c_int) :: info
 #if HAVE_HIP
-    ! call hip_solve_linear_system(A_d, b_d, n, info)
-    call neko_error('no device backend configured')
+    call hipSOLVER_wrapper(A_d, b_d, n, info)
+    ! call hip_custom_solver(A_d, b_d, n, info)
 #elif HAVE_CUDA
     call cuSOLVER_wrapper(A_d, b_d, n, info)
     ! call cuda_custom_solver(A_d, b_d, n, info)

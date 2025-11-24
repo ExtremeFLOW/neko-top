@@ -140,7 +140,7 @@ extern "C" {
     if (err == cudaSuccess) {
         *info = 0; // GPU solver succeeded
     } else {
-        *info = -1; // GPU failed, use CPU fallback
+        *info = -1; // GPU failed
     }
  }
 
