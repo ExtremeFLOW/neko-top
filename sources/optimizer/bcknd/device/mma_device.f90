@@ -301,10 +301,9 @@ contains
     type(matrix_t) :: AA
 
     integer :: info
-    integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_sq_norm
 
-    integer :: i, ind(33)
+    integer :: ind(33)
 
     real(kind=rp) :: minimal_epsilon
 
@@ -766,11 +765,8 @@ contains
     type(vector_t), pointer :: Ljjxinv ! [∇_x^2 Ljj]−1
     type(matrix_t) :: hijx ! ∇_x hij
     type(matrix_t) :: Hess
-    real(kind=rp) :: Hesstrace
 
     integer :: info, ind(15)
-    integer, dimension(this%m+1) :: ipiv
-    integer :: i
 
     real(kind=rp) :: minimal_epsilon
 
