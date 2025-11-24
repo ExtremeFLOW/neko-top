@@ -461,7 +461,6 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
@@ -475,7 +474,6 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
@@ -489,7 +487,6 @@ contains
     integer :: n
 
     n = this%size()
-    call x%init(n)
     call copy(x%x, this%design_indicator%dof%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
@@ -518,7 +515,6 @@ contains
     integer :: n
 
     n = this%size()
-    call y%init(n)
     call copy(y%x, this%design_indicator%dof%y, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
@@ -547,7 +543,6 @@ contains
     integer :: n
 
     n = this%size()
-    call z%init(n)
     call copy(z%x, this%design_indicator%dof%z, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
