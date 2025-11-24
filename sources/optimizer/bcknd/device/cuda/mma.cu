@@ -123,6 +123,26 @@ extern "C" {
     }
   }
 
+ void cuda_custom_solver(void* A, void* b, int n, int* info) {
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    if (n <= 0) {
+        *info = -1; // Use CPU fallback
+        return;
+    }
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(1, 1, 1);
+
+    mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)A, (real*)b, n);
+    
+    cudaError_t err = cudaGetLastError();
+    if (err == cudaSuccess) {
+        *info = 0; // GPU solver succeeded
+    } else {
+        *info = -1; // GPU failed, use CPU fallback
+    }
+ }
 
   void cuSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     cusolverDnHandle_t handle;

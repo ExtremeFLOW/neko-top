@@ -53,6 +53,13 @@ module cuda_mma_math
        integer(c_int) :: m
      end subroutine
 
+     subroutine cuda_custom_solver(A_d, b_d, n, info) &
+          bind(c, name = 'cuda_custom_solver')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine cuda_custom_solver
 
      subroutine cuSOLVER_wrapper(A_d, b_d, n, info) &
           bind(c, name = 'cuSOLVER_wrapper')

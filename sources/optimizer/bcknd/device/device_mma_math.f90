@@ -43,7 +43,8 @@ module device_mma_math
        cuda_maxval3, cuda_kkt_rex, mma_gensub1_cuda, mma_gensub2_cuda, &
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
-       cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda
+       cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda, &
+       cuda_custom_solver
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -110,6 +111,7 @@ contains
     call neko_error('no device backend configured')
 #elif HAVE_CUDA
     call cuSOLVER_wrapper(A_d, b_d, n, info)
+    ! call cuda_custom_solver(A_d, b_d, n, info)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
 #else
