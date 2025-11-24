@@ -103,7 +103,7 @@ contains
 #else
     call neko_error('no device backend configured')
 #endif
-  end subroutine
+  end subroutine device_prepare_hessian
 
   subroutine device_solve_linear_system(A_d, b_d, n, info)
     type(c_ptr) :: A_d, b_d

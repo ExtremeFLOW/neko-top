@@ -886,7 +886,7 @@ contains
          call device_cadd(remu%x_d, -epsi, this%m)
 
          residumax = maxval([device_maxval(relambda%x_d, this%m), &
-                    device_maxval(remu%x_d, this%m)])
+              device_maxval(remu%x_d, this%m)])
 
          ! ------------------------------------------------------------------- !
          ! Internal loop
@@ -930,7 +930,7 @@ contains
             ! No need to upload to device since we solve LSE on CPU
             ! But now we solve LSE on GPU, so upload it:
             call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
-            HOST_TO_DEVICE, sync = .true.)
+                 HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are
@@ -946,14 +946,14 @@ contains
             ! Also, improve the robustness by stablizing the Hess using
             ! Levenberg-Marquardt algorithm (heuristically)
             call device_prepare_hessian(Hess%x_d, y%x_d, this%d%x_d, &
-                           mu%x_d, lambda%x_d, this%m)
+                 mu%x_d, lambda%x_d, this%m)
 
             ! Device solve for the linear system
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
                  this%m, info)
             if (info .ne. 0) then
-                  call neko_error("Linear solver failed on the device in  " // &
-                     "mma_subsolve_dip")
+               call neko_error("Linear solver failed on the device in  " // &
+                    "mma_subsolve_dip")
             end if
 
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
@@ -1032,7 +1032,7 @@ contains
             call device_cadd(remu%x_d, -epsi, this%m)
 
             residumax = maxval([device_maxval(relambda%x_d, this%m), &
-                    device_maxval(remu%x_d, this%m)])
+                 device_maxval(remu%x_d, this%m)])
          end do
        end associate
        epsi = 0.1_rp * epsi
