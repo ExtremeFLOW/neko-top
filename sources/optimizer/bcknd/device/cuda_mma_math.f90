@@ -51,7 +51,7 @@ module cuda_mma_math
        import c_ptr, c_int
        type(c_ptr), value :: Hess, y, d, mu, lambda
        integer(c_int) :: m
-     end subroutine
+     end subroutine mma_prepare_hessian_cuda
 
      subroutine cuda_custom_solver(A_d, b_d, n, info) &
           bind(c, name = 'cuda_custom_solver')
