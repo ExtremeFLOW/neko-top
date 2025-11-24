@@ -108,12 +108,22 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
 )
 
-# Add HIP libraries directly
 if(${DEVICE_TYPE} STREQUAL "HIP")
-    target_link_libraries(neko-top 
-        /opt/rocm/lib/libhipsolver.so 
-        /opt/rocm/lib/libhipblas.so 
-        /opt/rocm/lib/libamdhip64.so
+    # Add ROCm paths to CMake search paths
+    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} /opt/rocm /opt/rocm-6.3.3 /opt/rocm-7.1.0)
+
+    find_library(HIPSOLVER_LIB hipsolver REQUIRED)
+    find_library(HIPBLAS_LIB hipblas REQUIRED)
+    find_library(AMDHIP64_LIB amdhip64 REQUIRED)
+
+    message(STATUS "Found hipsolver: ${HIPSOLVER_LIB}")
+    message(STATUS "Found hipblas: ${HIPBLAS_LIB}")
+    message(STATUS "Found amdhip64: ${AMDHIP64_LIB}")
+
+    target_link_libraries(neko-top
+        ${HIPSOLVER_LIB}
+        ${HIPBLAS_LIB}
+        ${AMDHIP64_LIB}
     )
 endif()
 
