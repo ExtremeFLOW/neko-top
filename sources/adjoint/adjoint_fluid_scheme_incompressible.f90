@@ -57,7 +57,6 @@ module adjoint_fluid_scheme_incompressible
   use field_registry, only: neko_field_registry
   use json_utils, only: json_get, json_get_or_default
   use json_module, only: json_file
-  use field_scratch_registry, only: field_scratch_registry_t
   use user_intf, only: user_t, dummy_user_material_properties, &
        user_material_properties_intf
   use utils, only: neko_error
