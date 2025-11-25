@@ -31,7 +31,7 @@ program usrneko
   ! Set up distributed stress constraints
 
   ! number of elements with stress constraints
-  integer :: num_constraints = 0
+  integer :: num_constraints = 10
 
   ! number of beam sections to distribute the constraint
   integer :: num_constraint_partitions = 10
@@ -141,7 +141,7 @@ program usrneko
 
      stress_sigma_max = 250e6_rp ! Same max stress for all
 
-      ! Add each constraint to the problem
+     ! Add each constraint to the problem
      do i = 1, size(stress_global_indices)
         allocate(stress_con ::tmp_constraint)
         write(index_str, '(I0)') i
@@ -150,8 +150,8 @@ program usrneko
         type is (stress_con)
            call c%init_stress_con("stress_con_"//trim(index_str), des, &
                 stress_global_indices(i), stress_sigma_max(i))
-         class default
-            call neko_error("tmp_constraint is not stress_con!")
+        class default
+           call neko_error("tmp_constraint is not stress_con!")
         end select
 
         call prob%add_constraint(tmp_constraint)
