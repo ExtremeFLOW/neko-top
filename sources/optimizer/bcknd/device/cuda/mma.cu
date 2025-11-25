@@ -64,7 +64,7 @@ extern "C" {
 
     // Launch kernel to prepare AA matrix
     mma_prepare_aa_matrix_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
-        (real*)AA, (real*)s, (real*)lambda, (real*)d, 
+        (real*)AA, (real*)s, (real*)lambda, (real*)d,
         (real*)mu, (real*)y, (real*)a,
         *zeta, *z, *m);
 
