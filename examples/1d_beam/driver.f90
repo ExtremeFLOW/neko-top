@@ -31,7 +31,7 @@ program usrneko
   ! Set up distributed stress constraints
 
   ! number of elements with stress constraints
-  integer :: num_constraints = 10
+  integer :: num_constraints = 0
 
   ! number of beam sections to distribute the constraint
   integer :: num_constraint_partitions = 10
@@ -114,14 +114,6 @@ program usrneko
   allocate(beamweight_obj :: beamweight)
   allocate(deflection_con :: deflection)
 
-  allocate(stress_global_indices(num_constraints))
-  allocate(stress_sigma_max(num_constraints))
-  ! Add constraints on global indices
-  call fill_constraint_indices(stress_global_indices, num_constraints, &
-       num_constraint_partitions, des%size_global())
-
-  stress_sigma_max = 250e6_rp ! Same max stress for all
-
   select type(beamweight)
   type is (beamweight_obj)
      call beamweight%beamweight_obj_init( 1.0_rp, des)
@@ -137,25 +129,38 @@ program usrneko
   end select
   call prob%add_constraint(deflection)
 
-  ! Add each constraint to the problem
-  do i = 1, size(stress_global_indices)
-     allocate(stress_con ::tmp_constraint)
-     write(index_str, '(I0)') i
+  if (num_constraint_partitions>num_constraints) then
+     num_constraint_partitions = num_constraints
+  end if
+  if (num_constraints>0) then
+     allocate(stress_global_indices(num_constraints))
+     allocate(stress_sigma_max(num_constraints))
+     ! Add constraints on global indices
+     call fill_constraint_indices(stress_global_indices, num_constraints, &
+          num_constraint_partitions, des%size_global())
 
-     select type(c => tmp_constraint)
-     type is (stress_con)
-        call c%init_stress_con("stress_con_"//trim(index_str), des, &
-             stress_global_indices(i), stress_sigma_max(i))
-     class default
-        call neko_error("tmp_constraint is not stress_con!")
-     end select
+     stress_sigma_max = 250e6_rp ! Same max stress for all
 
-     call prob%add_constraint(tmp_constraint)
+      ! Add each constraint to the problem
+     do i = 1, size(stress_global_indices)
+        allocate(stress_con ::tmp_constraint)
+        write(index_str, '(I0)') i
 
-     if (allocated(tmp_constraint)) then
-        deallocate(tmp_constraint)
-     end if
-  end do
+        select type(c => tmp_constraint)
+        type is (stress_con)
+           call c%init_stress_con("stress_con_"//trim(index_str), des, &
+                stress_global_indices(i), stress_sigma_max(i))
+         class default
+            call neko_error("tmp_constraint is not stress_con!")
+        end select
+
+        call prob%add_constraint(tmp_constraint)
+
+        if (allocated(tmp_constraint)) then
+           deallocate(tmp_constraint)
+        end if
+     end do
+  end if
 
   ! Add objectives to the problem
   call prob%add_objective(beamweight)
@@ -214,7 +219,11 @@ program usrneko
   call des%free()
 
   if (allocated(opt)) deallocate(opt)
-
+  if (allocated(beamweight)) deallocate(beamweight)
+  if (allocated(deflection)) deallocate(deflection)
+  call all_objectives%free()
+  call constraint_value%free()
+  call initdesign%free()
 end program usrneko
 
 
