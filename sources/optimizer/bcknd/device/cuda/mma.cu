@@ -53,8 +53,8 @@
 extern "C" {
 
   int mma_red_s = 0;
-  real * mma_bufred = NULL;
-  real * mma_bufred_d = NULL;
+  real* mma_bufred = NULL;
+  real* mma_bufred_d = NULL;
 
   void mma_prepare_aa_matrix_cuda(void* AA, void* s, void* lambda,
                                void* d, void* mu, void* y,
