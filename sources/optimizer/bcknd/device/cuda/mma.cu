@@ -102,7 +102,7 @@ extern "C" {
         for (int i = 0; i < M; i++) {
             CUDA_CHECK(cudaMemcpyAsync(&h_Hess[i],
                                       (real*)Hess + i * M + i,
-                                      sizeof(real), 
+                                      sizeof(real),
                                       cudaMemcpyDeviceToHost, stream));
         }
         CUDA_CHECK(cudaStreamSynchronize(stream));
