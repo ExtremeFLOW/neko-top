@@ -134,13 +134,7 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
 
         # --- Try to locate HIP installation path ---
         set(HIP_ROOT "")
-
-        find_package(hip CONFIG QUIET)
-        if (hip_FOUND)
-            message(STATUS "Found HIP package at: ${hip_DIR}")
-            get_filename_component(HIP_ROOT "${hip_DIR}/../../" ABSOLUTE)
-        endif()
-
+        message(STATUS "checking 1")
         find_package(hip-lang CONFIG QUIET)
         message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
         if (NOT HIP_ROOT)
@@ -149,6 +143,7 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
                 get_filename_component(HIP_ROOT "${hip-lang_DIR}/../../" ABSOLUTE)
             endif()
         endif()
+        message(STATUS "checking 2")
 
         if (HIP_ROOT)
             message(STATUS "Detected HIP root: ${HIP_ROOT}")
