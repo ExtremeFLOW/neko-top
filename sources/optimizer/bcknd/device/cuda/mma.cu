@@ -150,7 +150,7 @@ extern "C" {
     cusolverDnCreate(&handle);
     
     int lwork;
-    double *workspace;
+    double* workspace;
     int* ipiv;
     int* info;  // Device pointer for cuSOLVER info
     int host_info = 0;  // Host variable to store the info
