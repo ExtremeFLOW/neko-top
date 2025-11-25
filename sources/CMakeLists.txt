@@ -109,17 +109,16 @@ target_link_libraries(neko-top
 )
 
 if(${DEVICE_TYPE} STREQUAL "HIP")
-    set(CMAKE_PREFIX_PATH
-        ${CMAKE_PREFIX_PATH}
+    list(APPEND CMAKE_PREFIX_PATH
         /opt/rocm
         /opt/rocm-6.3.3
     )
 
-    # Try to find hipSOLVER library (ROCm ≤6.x)
+    # --- FIRST TRY
     find_library(HIPSOLVER_LIB hipsolver)
 
     if (HIPSOLVER_LIB)
-        message(STATUS "Found legacy hipSOLVER library: ${HIPSOLVER_LIB}")
+        message(STATUS "Found legacy hipSOLVER: ${HIPSOLVER_LIB}")
 
         find_library(HIPBLAS_LIB hipblas REQUIRED)
         find_library(AMDHIP64_LIB amdhip64 REQUIRED)
@@ -131,19 +130,79 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
         )
 
     else()
-        message(STATUS "hipsolver library NOT found — using ROCm >= 7.x backend")
-        message(STATUS "Linking rocSOLVER and rocBLAS instead")
+        message(STATUS "hipsolver NOT found in legacy locations → trying hip/hip-lang package method")
 
-        # hipSOLVER API still exists, but you link to backend libs
-        find_library(ROCSOLVER_LIB rocsolver REQUIRED)
-        find_library(ROCBLAS_LIB rocblas REQUIRED)
-        find_library(AMDHIP64_LIB amdhip64 REQUIRED)
+        # --- Try to locate HIP installation path ---
+        set(HIP_ROOT "")
 
+        find_package(hip CONFIG QUIET)
+        if (hip_FOUND)
+            message(STATUS "Found HIP package at: ${hip_DIR}")
+            get_filename_component(HIP_ROOT "${hip_DIR}/../../" ABSOLUTE)
+        endif()
+
+        find_package(hip-lang CONFIG QUIET)
+        message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
+        if (NOT HIP_ROOT)
+            if (hip-lang_FOUND)
+                message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
+                get_filename_component(HIP_ROOT "${hip-lang_DIR}/../../" ABSOLUTE)
+            endif()
+        endif()
+
+        if (HIP_ROOT)
+            message(STATUS "Detected HIP root: ${HIP_ROOT}")
+        else()
+            message(FATAL_ERROR "Could not locate HIP installation via hip or hip-lang packages.")
+        endif()
+
+        # --- Try to find hipSOLVER again within HIP root ---
+        find_library(
+            HIPSOLVER_LIB
+            hipsolver
+            PATHS
+                "${HIP_ROOT}/lib"
+                "${HIP_ROOT}/lib64"
+                "${HIP_ROOT}/lib/x86_64-linux-gnu"
+                "${HIP_ROOT}/hip/lib"
+                "${HIP_ROOT}/hip/lib64"
+            NO_DEFAULT_PATH
+        )
+
+        if (HIPSOLVER_LIB)
+            message(STATUS "Found hipSOLVER inside HIP installation: ${HIPSOLVER_LIB}")
+        else()
+            message(FATAL_ERROR "Could not find libhipsolver.so inside HIP installation at ${HIP_ROOT}")
+        endif()
+
+        # hipBLAS + runtime in same place
+        find_library(HIPBLAS_LIB hipblas
+            PATHS
+                "${HIP_ROOT}/lib"
+                "${HIP_ROOT}/lib64"
+                "${HIP_ROOT}/lib/x86_64-linux-gnu"
+        )
+        find_library(AMDHIP64_LIB amdhip64
+            PATHS
+                "${HIP_ROOT}/lib"
+                "${HIP_ROOT}/lib64"
+                "${HIP_ROOT}/lib/x86_64-linux-gnu"
+        )
+
+        if (NOT HIPBLAS_LIB OR NOT AMDHIP64_LIB)
+            message(FATAL_ERROR "Could not find hipblas or amdhip64 inside HIP installation at ${HIP_ROOT}")
+        endif()
+
+        message(STATUS "hipBLAS:   ${HIPBLAS_LIB}")
+        message(STATUS "amdhip64:  ${AMDHIP64_LIB}")
+
+        # --- FINAL LINK ---
         target_link_libraries(neko-top
-            ${ROCSOLVER_LIB}
-            ${ROCBLAS_LIB}
+            ${HIPSOLVER_LIB}
+            ${HIPBLAS_LIB}
             ${AMDHIP64_LIB}
         )
+
     endif()
 
 endif()
