@@ -114,7 +114,7 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
         /opt/rocm-6.3.3
     )
 
-    # --- FIRST TRY
+    # --- FIRST TRY: Dardel/legacy ROCm ---
     find_library(HIPSOLVER_LIB hipsolver)
 
     if (HIPSOLVER_LIB)
@@ -132,18 +132,37 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
     else()
         message(STATUS "hipsolver NOT found in legacy locations → trying hip/hip-lang package method")
 
+        # --- DEBUG: Find ALL ROCm installations and search EVERYWHERE ---
+        message(STATUS "=== DEBUG: Searching for ROCm installations ===")
+        
+        # Find all possible ROCm directories
+        file(GLOB ROCM_DIRS "/opt/rocm*")
+        foreach(rocm_dir ${ROCM_DIRS})
+            if(IS_DIRECTORY ${rocm_dir})
+                message(STATUS "Found ROCm directory: ${rocm_dir}")
+            endif()
+        endforeach()
+
         # --- Try to locate HIP installation path ---
         set(HIP_ROOT "")
         message(STATUS "checking 1")
         find_package(hip-lang CONFIG QUIET)
-        message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
-        if (NOT HIP_ROOT)
-            if (hip-lang_FOUND)
-                message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
-                get_filename_component(HIP_ROOT "${hip-lang_DIR}/../../" ABSOLUTE)
-            endif()
+        if(hip-lang_FOUND)
+            message(STATUS "Found hip-lang package at: ${hip-lang_DIR}")
+            get_filename_component(HIP_ROOT "${hip-lang_DIR}/../../.." ABSOLUTE)
+            message(STATUS "Extracted HIP_ROOT: ${HIP_ROOT}")
         endif()
         message(STATUS "checking 2")
+
+        if (NOT HIP_ROOT)
+            # Fallback: use the most recent ROCm installation
+            if(EXISTS "/opt/rocm-7.1.0")
+                set(HIP_ROOT "/opt/rocm-7.1.0")
+            elseif(EXISTS "/opt/rocm")
+                set(HIP_ROOT "/opt/rocm")
+            endif()
+            message(STATUS "Using fallback HIP_ROOT: ${HIP_ROOT}")
+        endif()
 
         if (HIP_ROOT)
             message(STATUS "Detected HIP root: ${HIP_ROOT}")
@@ -151,43 +170,131 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
             message(FATAL_ERROR "Could not locate HIP installation via hip or hip-lang packages.")
         endif()
 
-        # --- Try to find hipSOLVER again within HIP root ---
-        find_library(
-            HIPSOLVER_LIB
-            hipsolver
-            PATHS
+        # --- DEBUG: Search EVERYWHERE in HIP_ROOT for hipsolver ---
+        message(STATUS "=== DEBUG: Searching for hipsolver in ${HIP_ROOT} ===")
+        
+        # Recursive search for any file containing "hipsolver"
+        execute_process(
+            COMMAND find "${HIP_ROOT}" -name "*hipsolver*" -type f
+            OUTPUT_VARIABLE HIPSOLVER_FILES
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        if(HIPSOLVER_FILES)
+            message(STATUS "Found hipsolver-related files:")
+            string(REPLACE "\n" "\n  - " HIPSOLVER_FILES_FORMATTED "  - ${HIPSOLVER_FILES}")
+            message(STATUS "${HIPSOLVER_FILES_FORMATTED}")
+        else()
+            message(STATUS "No hipsolver-related files found in ${HIP_ROOT}")
+        endif()
+
+        # Search for libhipsolver.so specifically in ALL subdirectories
+        execute_process(
+            COMMAND find "${HIP_ROOT}" -name "libhipsolver.so" -type f
+            OUTPUT_VARIABLE HIPSOLVER_LIB_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+
+        if(HIPSOLVER_LIB_PATH)
+            message(STATUS "Found libhipsolver.so at: ${HIPSOLVER_LIB_PATH}")
+            set(HIPSOLVER_LIB "${HIPSOLVER_LIB_PATH}")
+        else()
+            # Try alternative library names and locations
+            message(STATUS "=== DEBUG: Trying alternative search methods ===")
+            
+            # Method 1: Search in common library directories
+            set(SEARCH_DIRS
                 "${HIP_ROOT}/lib"
                 "${HIP_ROOT}/lib64"
                 "${HIP_ROOT}/lib/x86_64-linux-gnu"
                 "${HIP_ROOT}/hip/lib"
                 "${HIP_ROOT}/hip/lib64"
-            NO_DEFAULT_PATH
-        )
+                "${HIP_ROOT}/hipsolver/lib"
+                "${HIP_ROOT}/hipsolver/lib64"
+                "${HIP_ROOT}/rocm/lib"
+                "${HIP_ROOT}/rocm/lib64"
+            )
+            
+            foreach(search_dir ${SEARCH_DIRS})
+                if(EXISTS "${search_dir}")
+                    message(STATUS "Searching in: ${search_dir}")
+                    file(GLOB LIB_FILES "${search_dir}/libhipsolver*")
+                    foreach(lib_file ${LIB_FILES})
+                        message(STATUS "  Found: ${lib_file}")
+                    endforeach()
+                endif()
+            endforeach()
+
+            # Method 2: Try find_library with all possible paths
+            find_library(
+                HIPSOLVER_LIB
+                NAMES hipsolver
+                PATHS ${SEARCH_DIRS}
+                NO_DEFAULT_PATH
+            )
+
+            if(NOT HIPSOLVER_LIB)
+                # Method 3: Last resort - search system wide
+                message(STATUS "=== DEBUG: Trying system-wide search ===")
+                find_library(HIPSOLVER_LIB hipsolver)
+            endif()
+        endif()
 
         if (HIPSOLVER_LIB)
-            message(STATUS "Found hipSOLVER inside HIP installation: ${HIPSOLVER_LIB}")
+            message(STATUS "Found hipSOLVER: ${HIPSOLVER_LIB}")
         else()
-            message(FATAL_ERROR "Could not find libhipsolver.so inside HIP installation at ${HIP_ROOT}")
+            message(FATAL_ERROR "Could not find libhipsolver.so anywhere! Searched in ${HIP_ROOT} and system-wide")
         endif()
 
-        # hipBLAS + runtime in same place
-        find_library(HIPBLAS_LIB hipblas
-            PATHS
-                "${HIP_ROOT}/lib"
-                "${HIP_ROOT}/lib64"
-                "${HIP_ROOT}/lib/x86_64-linux-gnu"
+        # --- Find other libraries with similar exhaustive search ---
+        message(STATUS "=== DEBUG: Searching for hipblas and amdhip64 ===")
+        
+        # Search for hipblas
+        execute_process(
+            COMMAND find "${HIP_ROOT}" -name "libhipblas.so" -type f
+            OUTPUT_VARIABLE HIPBLAS_LIB_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
         )
-        find_library(AMDHIP64_LIB amdhip64
-            PATHS
-                "${HIP_ROOT}/lib"
-                "${HIP_ROOT}/lib64"
-                "${HIP_ROOT}/lib/x86_64-linux-gnu"
-        )
-
-        if (NOT HIPBLAS_LIB OR NOT AMDHIP64_LIB)
-            message(FATAL_ERROR "Could not find hipblas or amdhip64 inside HIP installation at ${HIP_ROOT}")
+        
+        if(HIPBLAS_LIB_PATH)
+            set(HIPBLAS_LIB "${HIPBLAS_LIB_PATH}")
+        else()
+            find_library(HIPBLAS_LIB hipblas
+                PATHS ${SEARCH_DIRS}
+                NO_DEFAULT_PATH
+            )
+            if(NOT HIPBLAS_LIB)
+                find_library(HIPBLAS_LIB hipblas)  # System-wide
+            endif()
         endif()
 
+        # Search for amdhip64
+        execute_process(
+            COMMAND find "${HIP_ROOT}" -name "libamdhip64.so" -type f
+            OUTPUT_VARIABLE AMDHIP64_LIB_PATH
+            OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        
+        if(AMDHIP64_LIB_PATH)
+            set(AMDHIP64_LIB "${AMDHIP64_LIB_PATH}")
+        else()
+            find_library(AMDHIP64_LIB amdhip64
+                PATHS ${SEARCH_DIRS}
+                NO_DEFAULT_PATH
+            )
+            if(NOT AMDHIP64_LIB)
+                find_library(AMDHIP64_LIB amdhip64)  # System-wide
+            endif()
+        endif()
+
+        if (NOT HIPBLAS_LIB)
+            message(FATAL_ERROR "Could not find hipblas")
+        endif()
+        if (NOT AMDHIP64_LIB)
+            message(FATAL_ERROR "Could not find amdhip64")
+        endif()
+
+        message(STATUS "hipSOLVER: ${HIPSOLVER_LIB}")
         message(STATUS "hipBLAS:   ${HIPBLAS_LIB}")
         message(STATUS "amdhip64:  ${AMDHIP64_LIB}")
 
@@ -199,7 +306,6 @@ if(${DEVICE_TYPE} STREQUAL "HIP")
         )
 
     endif()
-
 endif()
 
 
