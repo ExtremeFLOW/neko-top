@@ -109,23 +109,45 @@ target_link_libraries(neko-top
 )
 
 if(${DEVICE_TYPE} STREQUAL "HIP")
-    # Add ROCm paths to CMake search paths
-    set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} /opt/rocm /opt/rocm-6.3.3 /opt/rocm-7.1.0)
-
-    find_library(HIPSOLVER_LIB hipsolver REQUIRED)
-    find_library(HIPBLAS_LIB hipblas REQUIRED)
-    find_library(AMDHIP64_LIB amdhip64 REQUIRED)
-
-    message(STATUS "Found hipsolver: ${HIPSOLVER_LIB}")
-    message(STATUS "Found hipblas: ${HIPBLAS_LIB}")
-    message(STATUS "Found amdhip64: ${AMDHIP64_LIB}")
-
-    target_link_libraries(neko-top
-        ${HIPSOLVER_LIB}
-        ${HIPBLAS_LIB}
-        ${AMDHIP64_LIB}
+    set(CMAKE_PREFIX_PATH
+        ${CMAKE_PREFIX_PATH}
+        /opt/rocm
+        /opt/rocm-6.3.3
     )
+
+    # Try to find hipSOLVER library (ROCm ≤6.x)
+    find_library(HIPSOLVER_LIB hipsolver)
+
+    if (HIPSOLVER_LIB)
+        message(STATUS "Found legacy hipSOLVER library: ${HIPSOLVER_LIB}")
+
+        find_library(HIPBLAS_LIB hipblas REQUIRED)
+        find_library(AMDHIP64_LIB amdhip64 REQUIRED)
+
+        target_link_libraries(neko-top
+            ${HIPSOLVER_LIB}
+            ${HIPBLAS_LIB}
+            ${AMDHIP64_LIB}
+        )
+
+    else()
+        message(STATUS "hipsolver library NOT found — using ROCm >= 7.x backend")
+        message(STATUS "Linking rocSOLVER and rocBLAS instead")
+
+        # hipSOLVER API still exists, but you link to backend libs
+        find_library(ROCSOLVER_LIB rocsolver REQUIRED)
+        find_library(ROCBLAS_LIB rocblas REQUIRED)
+        find_library(AMDHIP64_LIB amdhip64 REQUIRED)
+
+        target_link_libraries(neko-top
+            ${ROCSOLVER_LIB}
+            ${ROCBLAS_LIB}
+            ${AMDHIP64_LIB}
+        )
+    endif()
+
 endif()
+
 
 # ============================================================================ #
 # Specify installation instructions
