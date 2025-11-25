@@ -151,8 +151,8 @@ extern "C" {
     
     int lwork;
     double *workspace;
-    int *ipiv;
-    int *info;  // Device pointer for cuSOLVER info
+    int* ipiv;
+    int* info;  // Device pointer for cuSOLVER info
     int host_info = 0;  // Host variable to store the info
     
     // Workspace query
