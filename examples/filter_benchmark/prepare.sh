@@ -26,7 +26,7 @@ function help() {
 }
 
 # Handle options
-Nx=30 && Ny=10 && Nz=10
+Nx=240 && Ny=80 && Nz=80
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
