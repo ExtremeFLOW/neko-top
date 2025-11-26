@@ -110,140 +110,25 @@ target_link_libraries(neko-top
 
 if(${DEVICE_TYPE} STREQUAL "HIP")
 
-    list(APPEND CMAKE_PREFIX_PATH
-        /opt/rocm
-        /opt/rocm-6.3.3
+    # Pick up any ROCm version present on the system
+    file(GLOB ROCM_ROOTS /opt/rocm /opt/rocm-*)
+    list(APPEND CMAKE_PREFIX_PATH ${ROCM_ROOTS})
+
+    find_library(HIPSOLVER_LIB hipsolver REQUIRED)
+    find_library(HIPBLAS_LIB hipblas REQUIRED)
+    find_library(AMDHIP64_LIB amdhip64 REQUIRED)
+
+    message(STATUS "hipsolver: ${HIPSOLVER_LIB}")
+    message(STATUS "hipblas:   ${HIPBLAS_LIB}")
+    message(STATUS "amdhip64:  ${AMDHIP64_LIB}")
+
+    target_link_libraries(neko-top
+        ${HIPSOLVER_LIB}
+        ${HIPBLAS_LIB}
+        ${AMDHIP64_LIB}
     )
 
-    # ======================================================================
-    # FIRST: Try legacy hipSOLVER library (ROCm ≤6.x)
-    # ======================================================================
-    find_library(HIPSOLVER_LIB hipsolver)
-
-    if(HIPSOLVER_LIB)
-        message(STATUS "Found legacy hipSOLVER: ${HIPSOLVER_LIB}")
-
-        find_library(HIPBLAS_LIB hipblas REQUIRED)
-        find_library(AMDHIP64_LIB amdhip64 REQUIRED)
-
-        target_link_libraries(neko-top
-            ${HIPSOLVER_LIB}
-            ${HIPBLAS_LIB}
-            ${AMDHIP64_LIB}
-        )
-
-    else()
-        # ==================================================================
-        # SECOND: ROCm ≥ 7.x – headers exist but no libhipsolver.so
-        # We will search for libraries that *contain* hipsolver and hipblas.
-        # ==================================================================
-        message(STATUS "hipsolver NOT found → scanning ROCm installation manually")
-
-        # Paths to scan
-        set(ROCM_SCAN_DIRS
-            /opt/rocm
-            /opt/rocm/lib
-            /opt/rocm/lib64
-            /opt/rocm-7.1.0
-            /opt/rocm-7.1.0/lib
-            /opt/rocm-7.1.0/lib64
-        )
-
-        # Print scan dirs
-        foreach(dir ${ROCM_SCAN_DIRS})
-            message(STATUS "Scanning ROCm path: ${dir}")
-        endforeach()
-
-        # ------------------------------------------------------------------
-        # Find hipsolver.h
-        # ------------------------------------------------------------------
-        find_path(HIPSOLVER_INCLUDE_DIR hipsolver.h
-            PATHS ${ROCM_SCAN_DIRS}
-                  ${ROCM_SCAN_DIRS}/include
-                  ${ROCM_SCAN_DIRS}/include/hipsolver
-        )
-
-        if(HIPSOLVER_INCLUDE_DIR)
-            message(STATUS "Found hipsolver.h at: ${HIPSOLVER_INCLUDE_DIR}")
-        else()
-            message(WARNING "Could NOT find hipsolver.h — HIP solver headers missing!")
-        endif()
-
-        # ------------------------------------------------------------------
-        # Find hipblas.h
-        # ------------------------------------------------------------------
-        find_path(HIPBLAS_INCLUDE_DIR hipblas.h
-            PATHS ${ROCM_SCAN_DIRS}
-                  ${ROCM_SCAN_DIRS}/include
-                  ${ROCM_SCAN_DIRS}/include/hipblas
-        )
-
-        if(HIPBLAS_INCLUDE_DIR)
-            message(STATUS "Found hipblas.h at: ${HIPBLAS_INCLUDE_DIR}")
-        else()
-            message(WARNING "Could NOT find hipblas.h — HIP BLAS headers missing!")
-        endif()
-
-        # ------------------------------------------------------------------
-        # Search for REAL ROCm backend libraries providing hipsolver symbols
-        # (ROCsolver + ROCblas)
-        # ------------------------------------------------------------------
-
-        message(STATUS "Searching for real ROCm backend libraries...")
-
-        set(CANDIDATE_LIBS rocsolver rocblas roc::rocsolver roc::rocblas)
-
-        unset(FOUND_BACKEND_LIBS)
-
-        foreach(libname ${CANDIDATE_LIBS})
-            find_library(LIB_${libname} NAMES ${libname}
-                PATHS ${ROCM_SCAN_DIRS}
-                      ${ROCM_SCAN_DIRS}/lib
-                      ${ROCM_SCAN_DIRS}/lib64
-            )
-
-            if(LIB_${libname})
-                message(STATUS "Found backend library for ${libname}: ${LIB_${libname}}")
-                list(APPEND FOUND_BACKEND_LIBS ${LIB_${libname}})
-            else()
-                message(STATUS "Missing backend library candidate: ${libname}")
-            endif()
-        endforeach()
-
-        # ------------------------------------------------------------------
-        # Fallback: if nothing was detected, warn but do NOT stop CMake
-        # ------------------------------------------------------------------
-        if(NOT FOUND_BACKEND_LIBS)
-            message(WARNING "No ROCsolver/ROCblas backend libraries found — HIP solver API may fail to link!")
-        endif()
-
-        # ------------------------------------------------------------------
-        # ALWAYS link amdhip64 (HIP runtime)
-        # ------------------------------------------------------------------
-        find_library(AMDHIP64_LIB amdhip64
-            PATHS ${ROCM_SCAN_DIRS}
-                  ${ROCM_SCAN_DIRS}/lib
-                  ${ROCM_SCAN_DIRS}/lib64
-        )
-
-        if(AMDHIP64_LIB)
-            message(STATUS "Found HIP runtime: ${AMDHIP64_LIB}")
-        else()
-            message(WARNING "Could NOT find amdhip64 runtime library!")
-        endif()
-
-        # ------------------------------------------------------------------
-        # Link discovered ROCm backend libraries
-        # ------------------------------------------------------------------
-        message(STATUS "Final ROCm backend libs to link: ${FOUND_BACKEND_LIBS} ${AMDHIP64_LIB}")
-
-        target_link_libraries(neko-top
-            ${FOUND_BACKEND_LIBS}
-            ${AMDHIP64_LIB}
-        )
-
-    endif() # end fallback
-endif() # end HIP block
+endif()
 
 
 
