@@ -71,7 +71,7 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-  void mma_prepare_hessian_cuda(void* Hess, void* y, void* d, 
+  void mma_prepare_hessian_cuda(void* Hess, void* y, void* d,
                              void* mu, void* lambda, int* m) {
     const int M = *m;
     const dim3 nthrds(1024, 1, 1);
@@ -97,7 +97,7 @@ extern "C" {
         // Multi-block version (for large m)
         // Compute trace on host (simple and reliable)
         real* h_Hess = (real*)malloc(M * sizeof(real));
-        
+
         // Extract diagonal elements
         for (int i = 0; i < M; i++) {
             CUDA_CHECK(cudaMemcpyAsync(&h_Hess[i],
@@ -106,19 +106,19 @@ extern "C" {
                                       cudaMemcpyDeviceToHost, stream));
         }
         CUDA_CHECK(cudaStreamSynchronize(stream));
-        
+
         // Compute trace and LM factor
         real trace = 0.0;
         for (int i = 0; i < M; i++) {
             trace += h_Hess[i];
         }
         real lm_factor = fmax(-1.0e-4 * trace / M, 1.0e-7);
-        
+
         // Apply stabilization in parallel
         mma_stabilize_hessian_multi_kernel<real><<<nblcks, nthrds, 0, stream>>>(
             (real*)Hess, lm_factor, M);
         CUDA_CHECK(cudaGetLastError());
-        
+
         free(h_Hess);
     }
   }
@@ -135,7 +135,7 @@ extern "C" {
 
     mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
         (real*)A, (real*)b, n);
-    
+
     cudaError_t err = cudaGetLastError();
     if (err == cudaSuccess) {
         *info = 0; // GPU solver succeeded
@@ -148,25 +148,25 @@ extern "C" {
     cusolverDnHandle_t handle;
     cusolverStatus_t status;
     cusolverDnCreate(&handle);
-    
+
     int lwork;
     double* workspace;
     int* ipiv;
     int* info;  // Device pointer for cuSOLVER info
     int host_info = 0;  // Host variable to store the info
-    
+
     // Workspace query
     status = cusolverDnDgetrf_bufferSize(handle, n, n, (double*)A, n, &lwork);
     cudaMalloc(&workspace, lwork * sizeof(double));
     cudaMalloc(&ipiv, n * sizeof(int));
     cudaMalloc(&info, sizeof(int));
-    
+
     // LU factorization and solve
     cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
-    
+
     // Copy info from device to host to check if factorization succeeded
     cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
-    
+
     if (host_info == 0) {
         // Only solve if factorization was successful
         cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
@@ -174,10 +174,10 @@ extern "C" {
         cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
     }
 
-    
+
     // Return the actual info value through jj
     *jj = host_info;
-    
+
     // Cleanup
     cudaFree(workspace);
     cudaFree(ipiv);
@@ -197,7 +197,7 @@ extern "C" {
 
     mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
         (real*)A, (real*)b, n);
-    
+
     cudaError_t err = cudaGetLastError();
     if (err == cudaSuccess) {
         *info = 0; // GPU solver succeeded
@@ -206,7 +206,7 @@ extern "C" {
     }
   }
 
-  void delta_1dbeam_cuda(void* Delta, real* L_total, real* Le, 
+  void delta_1dbeam_cuda(void* Delta, real* L_total, real* Le,
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

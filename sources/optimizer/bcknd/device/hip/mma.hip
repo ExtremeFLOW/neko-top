@@ -102,17 +102,17 @@ void mma_prepare_aa_matrix_hip(void* AA, void* s, void* lambda,
     const dim3 nthrds(256, 1, 1);
     const dim3 nblcks((M + 256 - 1) / 256, 1, 1);
     const hipStream_t stream = (hipStream_t)glb_cmd_queue;
-    
+
     // Launch kernel to prepare AA matrix entirely on device
-    hipLaunchKernelGGL(mma_prepare_aa_matrix_kernel<real>, 
+    hipLaunchKernelGGL(mma_prepare_aa_matrix_kernel<real>,
                       nblcks, nthrds, 0, stream,
-                      (real*)AA, (real*)s, (real*)lambda, (real*)d, 
+                      (real*)AA, (real*)s, (real*)lambda, (real*)d,
                       (real*)mu, (real*)y, (real*)a, zeta, z, M);
-    
+
     HIP_CHECK(hipGetLastError());
 }
 
-void mma_prepare_hessian_hip(void* Hess, void* y, void* d, 
+void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
                                        void* mu, void* lambda, int m) {
     const int M = m;
     const dim3 nthrds(1024, 1, 1);
@@ -120,7 +120,7 @@ void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
     const hipStream_t stream = (hipStream_t)glb_cmd_queue;
 
     // Update diagonal elements
-    hipLaunchKernelGGL(mma_update_hessian_diagonal_kernel<real>, 
+    hipLaunchKernelGGL(mma_update_hessian_diagonal_kernel<real>,
                       nblcks, nthrds, 0, stream,
                       (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
     HIP_CHECK(hipGetLastError());
@@ -132,7 +132,7 @@ void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
     if (M <= 1024) {
         // Single-block version (fast for small m)
         const dim3 stab_nblcks(1, 1, 1);
-        hipLaunchKernelGGL(mma_stabilize_hessian_single_kernel<real>, 
+        hipLaunchKernelGGL(mma_stabilize_hessian_single_kernel<real>,
                           stab_nblcks, nthrds, 0, stream,
                           (real*)Hess, M);
         HIP_CHECK(hipGetLastError());
@@ -140,29 +140,29 @@ void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
         // Multi-block version (for large m)
         // Compute trace on host (simple and reliable)
         real* h_Hess = (real*)malloc(M * sizeof(real));
-        
+
         // Extract diagonal elements
         for (int i = 0; i < M; i++) {
-            HIP_CHECK(hipMemcpyAsync(&h_Hess[i], 
-                                   (real*)Hess + i * M + i, 
-                                   sizeof(real), 
+            HIP_CHECK(hipMemcpyAsync(&h_Hess[i],
+                                   (real*)Hess + i * M + i,
+                                   sizeof(real),
                                    hipMemcpyDeviceToHost, stream));
         }
         HIP_CHECK(hipStreamSynchronize(stream));
-        
+
         // Compute trace and LM factor
         real trace = 0.0;
         for (int i = 0; i < M; i++) {
             trace += h_Hess[i];
         }
         real lm_factor = fmax(-1.0e-4 * trace / M, 1.0e-7);
-        
+
         // Apply stabilization in parallel
-        hipLaunchKernelGGL(mma_stabilize_hessian_multi_kernel<real>, 
+        hipLaunchKernelGGL(mma_stabilize_hessian_multi_kernel<real>,
                           nblcks, nthrds, 0, stream,
                           (real*)Hess, lm_factor, M);
         HIP_CHECK(hipGetLastError());
-        
+
         free(h_Hess);
     }
 }
@@ -178,9 +178,9 @@ extern "C" void hip_custom_solver(void* A, void* b, int n, int* info) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(1, 1, 1);
 
-    hipLaunchKernelGGL(mma_small_lu_kernel<real>, nblcks, nthrds, 0, stream, 
+    hipLaunchKernelGGL(mma_small_lu_kernel<real>, nblcks, nthrds, 0, stream,
         (real*)A, (real*)b, n);
-    
+
     hipError_t err = hipGetLastError();
     if (err == hipSuccess) {
         *info = 0; // GPU solver succeeded
@@ -189,11 +189,11 @@ extern "C" void hip_custom_solver(void* A, void* b, int n, int* info) {
     }
 }
 
-void delta_1dbeam_hip(void* Delta, real* L_total, real* Le, 
+void delta_1dbeam_hip(void* Delta, real* L_total, real* Le,
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    hipLaunchKernelGGL(delta_1dbeam_kernel<real>, 
+    hipLaunchKernelGGL(delta_1dbeam_kernel<real>,
                       nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
                       (real*)Delta, *L_total, *Le, *offset, *n);
     HIP_CHECK(hipGetLastError());

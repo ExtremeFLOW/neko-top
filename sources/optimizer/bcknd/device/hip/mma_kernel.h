@@ -202,7 +202,7 @@ __global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
   T x1 = L_total - Le * static_cast<T>(offset + idx - 1);
   T term1 = x1 * x1 * x1;
 
-  // Calculate second term: (L_total - Le*(offset+idx))^3  
+  // Calculate second term: (L_total - Le*(offset+idx))^3
   T x2 = L_total - Le * static_cast<T>(offset + idx);
   T term2 = x2 * x2 * x2;
 
@@ -251,7 +251,7 @@ __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
      const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
      const int n) {
-  
+
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
 
@@ -293,12 +293,12 @@ __global__ void mattrans_v_mul_kernel(T* __restrict__ output,
 
 template <typename T>
 __global__ void mma_sub1_kernel(
-    T* __restrict__ xlow, 
+    T* __restrict__ xlow,
     T* __restrict__ xupp,
-    const T* __restrict__ x, 
+    const T* __restrict__ x,
     const T* __restrict__ xmin,
-    const T* __restrict__ xmax, 
-    const T asyinit, 
+    const T* __restrict__ xmax,
+    const T asyinit,
     const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
@@ -324,7 +324,7 @@ __global__ void mma_sub2_kernel(T* __restrict__ low, T* __restrict__ upp,
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
 
-  // Load data into registers for faster accessing compare to global memory 
+  // Load data into registers for faster accessing compare to global memory
   // when accessing repeatedly)
   const T xval     = x[tj];
   const T xold1val = xold1[tj];
@@ -401,9 +401,9 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
   const T max_df0_pos = max(df0, T(0));
   const T max_df0_neg = max(-df0, T(0));
 
-  p0j[tj] = upp_minus_x_sq * (T(1.001) * max_df0_pos + 
+  p0j[tj] = upp_minus_x_sq * (T(1.001) * max_df0_pos +
        T(0.001) * max_df0_neg + eps * inv_xgap);
-  q0j[tj] = x_minus_low_sq * (T(0.001) * max_df0_pos + 
+  q0j[tj] = x_minus_low_sq * (T(0.001) * max_df0_pos +
        T(1.001) * max_df0_neg + eps * inv_xgap);
 
   // Loop over m for pij and qij
@@ -414,9 +414,9 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
     T max_pos = max(dfdx_val, T(0));
     T max_neg = max(-dfdx_val, T(0));
 
-    pij[idx] = upp_minus_x_sq * (T(1.001) * max_pos + 
+    pij[idx] = upp_minus_x_sq * (T(1.001) * max_pos +
          T(0.001) * max_neg + eps * inv_xgap);
-    qij[idx] = x_minus_low_sq * (T(0.001) * max_pos + 
+    qij[idx] = x_minus_low_sq * (T(0.001) * max_pos +
          T(1.001) * max_neg + eps * inv_xgap);
   }
 }
@@ -612,7 +612,7 @@ __global__ void delx_kernel(
     const T* __restrict__ lambda,
     const T epsi,
     const int n,
-    const int m) 
+    const int m)
 {
     int tj = blockIdx.x * blockDim.x + threadIdx.x;
     if (tj < n) {
@@ -621,7 +621,7 @@ __global__ void delx_kernel(
         T xupp_j = xupp[tj];
         T alpha_j = alpha[tj];
         T beta_j = beta[tj];
-        
+
         // Precompute denominators squared for better performance
         T denom_low = xt - xlow_j;
         T denom_upp = xupp_j - xt;
@@ -961,7 +961,7 @@ __global__ void RexCalculation_kernel(
     const T* __restrict__ xsi,
     const T* __restrict__ eta,
     const int n,
-    const int m) 
+    const int m)
 {
     int tj = blockIdx.x * blockDim.x + threadIdx.x;
     if (tj < n) {
