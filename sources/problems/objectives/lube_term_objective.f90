@@ -69,8 +69,7 @@ module lube_term_objective
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
-  use scratch_registry, only: neko_scratch_registry
-  use field_scratch_registry, only: field_scratch_registry_t
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
@@ -121,7 +120,7 @@ module lube_term_objective
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
      !> GL scratch registry
-     type(field_scratch_registry_t), pointer :: scratch_GL
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
 

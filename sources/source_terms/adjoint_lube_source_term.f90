@@ -60,8 +60,7 @@ module adjoint_lube_source_term
   use point_zone, only: point_zone_t
   use utils, only: neko_error
   use field_registry, only : neko_field_registry
-  use scratch_registry, only: neko_scratch_registry
-  use field_scratch_registry, only: field_scratch_registry_t
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
@@ -97,7 +96,7 @@ module adjoint_lube_source_term
      !> Interpolator between the original and higher-order spaces
      type(interpolator_t), pointer :: GLL_to_GL
      !> GL scratch registry
-     type(field_scratch_registry_t), pointer :: scratch_GL
+     type(scratch_registry_t), pointer :: scratch_GL
      !> Volume of the objective domain
      real(kind=rp) :: volume
 
@@ -168,7 +167,7 @@ contains
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
     real(kind=rp), intent(in) :: volume
-    type(field_scratch_registry_t), intent(in), target :: scratch_GL
+    type(scratch_registry_t), intent(in), target :: scratch_GL
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     type(field_list_t) :: fields

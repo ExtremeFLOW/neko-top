@@ -35,8 +35,7 @@ module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult
-  use scratch_registry, only: neko_scratch_registry
-  use field_scratch_registry, only: field_scratch_registry_t
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -86,7 +85,7 @@ module augmented_lagrangian_objective
      !> If dealiasing should be applied
      logical :: dealias
      !> GL scratch registry
-     type(field_scratch_registry_t), pointer :: scratch_GL
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
      !> The common constructor using a JSON object.

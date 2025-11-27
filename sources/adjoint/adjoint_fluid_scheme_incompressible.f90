@@ -103,7 +103,6 @@ module adjoint_fluid_scheme_incompressible
      integer(kind=i8) :: glb_n_points
      !> Global number of GLL points for the fluid (unique)
      integer(kind=i8) :: glb_unique_points
-     type(field_scratch_registry_t) :: scratch !< Manager for temporary fields
    contains
      !> Constructor for the base type
      procedure, pass(this) :: init_base => adjoint_fluid_scheme_init_base
@@ -191,10 +190,7 @@ contains
     call this%GLL_to_GL%init(this%Xh_GL, this%Xh)
 
     ! Overintegration scratch registry (5 should be sufficient)
-    call this%scratch_GL%init(this%dm_Xh_GL, 5, 2)
-
-    ! Local scratch registry
-    call this%scratch%init(this%dm_Xh, 10, 2)
+    call this%scratch_GL%init(5, 2, this%dm_Xh_GL)
 
     ! Assign a name
     call json_get_or_default(params, 'case.fluid.name', this%name, "fluid")
@@ -420,7 +416,6 @@ contains
 
     call this%c_Xh%free()
 
-    call this%scratch%free()
     call this%scratch_GL%free()
 
     nullify(this%u_adj)

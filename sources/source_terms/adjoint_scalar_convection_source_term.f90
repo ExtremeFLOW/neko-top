@@ -45,8 +45,7 @@ module adjoint_scalar_convection_source_term
   use field_math, only: field_subcol3, field_sub2, field_col3
   use operators, only: grad, dudxyz
   use utils, only: neko_error
-  use scratch_registry, only: neko_scratch_registry
-  use field_scratch_registry, only: field_scratch_registry_t
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
@@ -80,7 +79,7 @@ module adjoint_scalar_convection_source_term
      !> if dealiasing should be applied
      logical :: dealias
      !> GL scratch registry
-     type(field_scratch_registry_t), pointer :: scratch_GL
+     type(scratch_registry_t), pointer :: scratch_GL
 
    contains
      !> The common constructor using a JSON object.
@@ -140,7 +139,7 @@ contains
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
     logical, intent(in) :: dealias
-    type(field_scratch_registry_t), intent(in), target :: scratch_GL
+    type(scratch_registry_t), intent(in), target :: scratch_GL
 
     type(field_list_t) :: fields
     real(kind=rp) :: start_time
