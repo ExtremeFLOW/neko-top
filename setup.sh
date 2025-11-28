@@ -159,10 +159,9 @@ printf "=%.0s" {1..80} && printf "\n"
 printf "Neko installed to:\n"
 printf "\t$NEKO_DIR\n"
 printf "Supported features:\n"
-printf "\tMPI: YES\n"
-printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
-printf "\tDevice: $DEVICE_TYPE\n"
+printf "\tMPI:           YES\n"
+printf "\tTests:         " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
+printf "\tExamples:      " && [[ "$EXAMPLES" == true ]] && printf "YES\n" || printf "NO\n"
+printf "\tDocumentation: " && [[ "$DOCS" == true ]] && printf "YES\n" || printf "NO\n"
+printf "\tDevice:        $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
-if [ "$TEST" == true ]; then
-    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
-fi
