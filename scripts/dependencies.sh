@@ -238,18 +238,17 @@ _ACEOF
 # ============================================================================ #
 # Ensure HDF5 is installed, if not install it.
 function find_hdf5() {
-    check_external_dir
 
     # Determine the HDF5 installation directory
+    check_external_dir
     if [[ $# -ge 1 ]]; then
-        if [[ "${1:0:1}" != "/" && "${1:0:1}" != "~" ]]; then
-            HDF5_DIR="$(realpath $EXTERNAL_DIR/$1)"
-        else
-            HDF5_DIR="$(realpath $1)"
-        fi
-    else
-        export HDF5_DIR=""
-        return
+        HDF5_DIR="$1"
+    elif [ -z "$HDF5_DIR" ]; then
+        HDF5_DIR="hdf5"
+    fi
+
+    if [[ "${HDF5_DIR:0:1}" != "/" && "${HDF5_DIR:0:1}" != "~" ]]; then
+        HDF5_DIR="$(realpath $EXTERNAL_DIR/$HDF5_DIR)"
     fi
 
     # Ensure HDF5 is installed, if not install it.
@@ -259,7 +258,7 @@ function find_hdf5() {
 
         # Clone HDF5 from the repository if it does not exist.
         if [ ! -d "$HDF5_DIR" ]; then
-            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_1.14.6 "
+            [ -z "$HDF5_VERSION" ] && HDF5_VERSION="hdf5_2.0.0"
             git clone --depth 1 --branch $HDF5_VERSION \
                 https://github.com/HDFGroup/hdf5.git $HDF5_DIR
         fi
@@ -361,6 +360,7 @@ function find_neko() {
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
+    [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -388,6 +388,7 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
+        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -441,8 +442,11 @@ function find_neko() {
                 rm -fr autom4te.cache
             fi
         fi
+
         [ "$CLEAN_NEKO" == true ] && make clean
-        [ "$QUIET" == true ] && make -s -j install || make -j install
+        [ "$QUIET" == true ] && make -s -j || make -j
+        [ "$TEST" == true ] && make check -j
+        make install
 
         cd $CURRENT_DIR
     fi

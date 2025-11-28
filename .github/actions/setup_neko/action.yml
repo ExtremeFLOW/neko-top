@@ -26,6 +26,10 @@ inputs:
     description: "The directory where the ParMETIS library was installed."
     required: true
 
+  hdf5-dir:
+    description: "The directory where the HDF5 library was installed."
+    required: true
+
   os:
     description: "The operating system to use."
     required: false
@@ -149,6 +153,7 @@ runs:
         BACKEND_PATH: ${{ inputs.backend-path }}
         RP: ${{ inputs.precision }}
         PARMETIS_DIR: ${{ inputs.parmetis-dir }}
+        HDF5_DIR: ${{ inputs.hdf5-dir }}
       run: |
         BACKEND_FLAGS=""
         if [ "$BACKEND" == "CUDA" ]; then
@@ -164,6 +169,7 @@ runs:
         [ -n "$BACKEND_FLAGS" ] && CONFIG_FLAGS="$CONFIG_FLAGS $BACKEND_FLAGS"
         [ -n "$RP" ] && CONFIG_FLAGS="$CONFIG_FLAGS --enable-real=$RP"
         [ -n "$PARMETIS_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-parmetis=$PARMETIS_DIR"
+        [ -n "$HDF5_DIR" ] && CONFIG_FLAGS="$CONFIG_FLAGS --with-hdf5=$HDF5_DIR"
 
         cd $WORKING_DIR
         ./regen.sh

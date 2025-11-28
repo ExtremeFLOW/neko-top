@@ -26,6 +26,7 @@ function help() {
 CURRENT_DIR=$(pwd)
 WORKING_DIR=$(dirname "$0")
 cd "$WORKING_DIR" || exit 1
+ROOT_DIR=$(realpath ${WORKING_DIR}/../../../)
 
 # Handle options
 NP=1
@@ -65,6 +66,10 @@ for case in ${cases[@]}; do
     mpirun -n "$NP" ./reg_mma_bin "${case}" || exit 1
     mv optimization_data.csv optimization_data_${case_name}.csv
 done
+
+if [[ -z "$VIRTUAL_ENV" && -f "${ROOT_DIR}/.venv/bin/activate" ]]; then
+    source "${ROOT_DIR}/.venv/bin/activate"
+fi
 
 python plot_design.py all || exit 1
 python check.py || exit 1
