@@ -124,9 +124,7 @@ jobs:
 
   check_scripts:
     name: Scripting
-    needs:
-      - prepare
-      - check_compile
+    needs: prepare
     uses: ./.github/workflows/check_scripts.yml
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
