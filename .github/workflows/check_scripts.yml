@@ -14,6 +14,10 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
       neko-top-version:
         description: "The version of Neko-TOP to use."
         required: true
@@ -119,14 +123,20 @@ jobs:
         id: get-parmetis
         uses: ./.github/actions/setup_parmetis
 
+      - name: Get hdf5
+        id: get-hdf5
+        uses: ./.github/actions/setup_hdf5
+        with:
+          version: ${{ inputs.hdf5-version }}
+
       - name: Get neko
         id: get-neko
         uses: ./.github/actions/setup_neko
         with:
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
           version: ${{ inputs.neko-version }}
-
 
       # ---------------------------------------------------------------------- #
       # Build and test the code
@@ -140,6 +150,7 @@ jobs:
           version: ${{ inputs.neko-top-version }}
           neko-dir: ${{ steps.get-neko.outputs.install-dir }}
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
           configure-options: "-DBUILD_EXAMPLES=ON"
 
       - name: Run Rugby Ball
@@ -147,6 +158,7 @@ jobs:
           NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
           JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
           PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
+          HDF5_DIR: ${{ steps.get-hdf5.outputs.install-dir }}
         run: |
           # Adjust the end time and max iterations for the rugby ball case
           sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
