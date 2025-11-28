@@ -36,7 +36,6 @@ module adjoint_scalar_convection_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
   use field, only: field_t
-  use scratch_registry, only: neko_scratch_registry
   use json_module, only: json_file
   use time_state, only: time_state_t
   use source_term, only: source_term_t
@@ -46,7 +45,7 @@ module adjoint_scalar_convection_source_term
   use field_math, only: field_subcol3, field_sub2, field_col3
   use operators, only: grad, dudxyz
   use utils, only: neko_error
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
