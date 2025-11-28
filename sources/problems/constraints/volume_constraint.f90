@@ -49,7 +49,6 @@ module volume_constraint
   use field, only: field_t
   use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
-  use vector_scratch_registry, only: neko_vector_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
   use math, only: glsc2, copy, cmult
@@ -319,16 +318,16 @@ contains
     type(vector_t), pointer :: values, unmapped_values
     integer :: temp_indices, ind_value, ind_um_value
 
-    call neko_vector_scratch_registry%request_vector(design%size(), values, &
+    call neko_scratch_registry%request_vector(design%size(), values, &
          ind_value)
 
     volume = 0.0_rp
     if (this%if_mapping) then
-       call neko_vector_scratch_registry%request_vector(design%size(), &
+       call neko_scratch_registry%request_vector(design%size(), &
             unmapped_values, ind_um_value)
        call design%get_values(unmapped_values)
        call this%mapping%apply_forward(values, unmapped_values)
-       call neko_vector_scratch_registry%relinquish_vector(ind_um_value)
+       call neko_scratch_registry%relinquish_vector(ind_um_value)
     else
        call design%get_values(values)
     end if
@@ -358,7 +357,7 @@ contains
 
     end if
 
-    call neko_vector_scratch_registry%relinquish_vector(ind_value)
+    call neko_scratch_registry%relinquish_vector(ind_value)
 
   end function volume_brinkman_design
 

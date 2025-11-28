@@ -44,7 +44,7 @@ module example_problem_mma
   use neko_config, only: NEKO_BCKND_DEVICE
   use vector_math, only: vector_sub2, vector_col2, vector_glsum, vector_cmult
 
-  use vector_scratch_registry, only: neko_vector_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
 
   implicit none
   private
@@ -106,9 +106,9 @@ contains
     type(vector_t), pointer :: x_coordinate
     integer :: ind(2)
 
-    call neko_vector_scratch_registry%request_vector(design%size(), &
+    call neko_scratch_registry%request_vector(design%size(), &
          x_coordinate, ind(1))
-    call neko_vector_scratch_registry%request_vector(design%size(), &
+    call neko_scratch_registry%request_vector(design%size(), &
          difference, ind(2))
 
     call design%get_x(x_coordinate)
@@ -120,7 +120,7 @@ contains
     this%value = vector_glsum(difference, design%size()) / &
          real(design%size_global(), kind=rp)
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish_vector(ind)
   end subroutine mma_obj_update_value
 
   subroutine mma_obj_update_sensitivity(this, design)
@@ -131,9 +131,9 @@ contains
     type(vector_t), pointer :: x_coordinate
     integer :: ind(2)
 
-    call neko_vector_scratch_registry%request_vector(design%size(), &
+    call neko_scratch_registry%request_vector(design%size(), &
          x_coordinate, ind(1))
-    call neko_vector_scratch_registry%request_vector(design%size(), &
+    call neko_scratch_registry%request_vector(design%size(), &
          difference, ind(2))
 
     call design%get_x(x_coordinate)
@@ -144,7 +144,7 @@ contains
          real(design%size_global(), kind=rp), design%size())
     this%sensitivity = difference
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish_vector(ind)
   end subroutine mma_obj_update_sensitivity
 
 end module example_problem_mma

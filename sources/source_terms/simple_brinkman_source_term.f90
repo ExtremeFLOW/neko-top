@@ -48,7 +48,7 @@ module simple_brinkman_source_term
   use space, only: space_t, GL
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   implicit none
   private
 
