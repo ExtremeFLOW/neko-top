@@ -528,7 +528,7 @@ contains
        nut => neko_field_registry%get_field(this%nut_field_name)
 
        ! lambda = lambda + rho * cp * nut / pr_turb
-       call neko_scratch_registry%request_field(lambda_factor, index)
+       call neko_scratch_registry%request_field(lambda_factor, index, .false.)
 
        call field_col3(lambda_factor, this%cp, this%rho)
        call field_col2(lambda_factor, nut)

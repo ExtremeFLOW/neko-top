@@ -236,7 +236,7 @@ contains
     ! \f$1/2 \int_\Omega_{obj} (\phi - \phi_ref)^2 d\Omega\f$
 
     ! get a working array
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
     n = work%size()
 
     ! \f$ \phi \f$
