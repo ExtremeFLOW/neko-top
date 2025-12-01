@@ -37,6 +37,7 @@ submodule (mapping) mapping_fctry
   use linear_mapping, only : linear_mapping_t
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
+  use SIMP_mapping, only: SIMP_mapping_t
   use json_utils, only : json_get
   use utils, only : concat_string_array, neko_error
   implicit none
@@ -45,7 +46,8 @@ submodule (mapping) mapping_fctry
   character(len=20) :: MAPPING_KNOWN_TYPES(3) = [character(len=20) :: &
        "linear", &
        "PDE_filter", &
-       "RAMP"]
+       "RAMP", &
+       "SIMP"]
 
 contains
 
@@ -67,6 +69,8 @@ contains
        allocate(PDE_filter_t::object)
     case ("RAMP")
        allocate(RAMP_mapping_t::object)
+    case ("SIMP")
+       allocate(SIMP_mapping_t::object)
     case default
        call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
     end select
