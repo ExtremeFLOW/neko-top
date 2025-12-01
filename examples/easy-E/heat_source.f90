@@ -38,7 +38,7 @@ contains
     call json_get(params, "case.fluid.Re", Re)
     call json_get(params, "case.scalar.Pe", Pe)
     call json_get(params, "case.scalar.target_temperature", target_temperature)
-    call json_get(params, "case.end_time", ramp_time_end)
+    call json_get(params, "case.time.end_time", ramp_time_end)
     ramp_time_end = ramp_time_end * 0.01_rp
 
   end subroutine user_startup

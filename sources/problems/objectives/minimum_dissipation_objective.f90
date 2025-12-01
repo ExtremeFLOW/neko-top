@@ -234,11 +234,12 @@ contains
     integer :: temp_indices(5)
     integer n
 
-    call neko_scratch_registry%request_field(wo1, temp_indices(1))
-    call neko_scratch_registry%request_field(wo2, temp_indices(2))
-    call neko_scratch_registry%request_field(wo3, temp_indices(3))
-    call neko_scratch_registry%request_field(objective_field, temp_indices(4))
-    call neko_scratch_registry%request_field(work, temp_indices(5))
+    call neko_scratch_registry%request_field(wo1, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(wo2, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(wo3, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(objective_field, temp_indices(4), &
+         .false.)
+    call neko_scratch_registry%request_field(work, temp_indices(5), .false.)
 
     ! update_value the objective function.
     call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)

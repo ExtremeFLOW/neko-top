@@ -214,8 +214,8 @@ contains
     integer :: temp_indices(2)
 
     n = this%coef%dof%size()
-    call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    call neko_scratch_registry%request_field(d_X_out, temp_indices(2))
+    call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(d_X_out, temp_indices(2), .false.)
     ! in a similar fasion to pressure/velocity, we will solve for d_X_out.
 
     ! to improve convergence, we use X_in as an initial guess for X_out.
@@ -323,8 +323,8 @@ contains
 
     n = this%coef%dof%size()
 
-    call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    call neko_scratch_registry%request_field(delta, temp_indices(2))
+    call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(delta, temp_indices(2), .false.)
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
