@@ -19,6 +19,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/PDE_filter_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 
