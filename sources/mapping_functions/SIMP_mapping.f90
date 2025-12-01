@@ -153,8 +153,8 @@ contains
        call neko_error("not implemented")
     else
        do i = 1, n
-          sens_out%x(i,1,1,1) = (this%f_max - this%f_min) * this%p * &
-               (sens_in%x(i,1,1,1)) ** (this%p - 1.0_rp)
+          sens_out%x(i,1,1,1) = sens_in%x(i,1,1,1) * (this%f_max - this%f_min) &
+               * this%p * (X_in%x(i,1,1,1)) ** (this%p - 1.0_rp)
        end do
     end if
 
