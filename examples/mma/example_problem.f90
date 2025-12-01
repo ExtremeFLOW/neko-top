@@ -107,9 +107,9 @@ contains
     integer :: ind(2)
 
     call neko_scratch_registry%request_vector(design%size(), &
-         x_coordinate, ind(1))
+         x_coordinate, ind(1), .false.)
     call neko_scratch_registry%request_vector(design%size(), &
-         difference, ind(2))
+         difference, ind(2), .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)
@@ -132,9 +132,9 @@ contains
     integer :: ind(2)
 
     call neko_scratch_registry%request_vector(design%size(), &
-         x_coordinate, ind(1))
+         x_coordinate, ind(1), .false.)
     call neko_scratch_registry%request_vector(design%size(), &
-         difference, ind(2))
+         difference, ind(2), .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)

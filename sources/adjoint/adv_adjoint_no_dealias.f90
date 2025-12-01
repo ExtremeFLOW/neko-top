@@ -155,15 +155,15 @@ contains
 
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_scratch_registry%request_field(tduxb, temp_indices(1))
-       call neko_scratch_registry%request_field(tdvxb, temp_indices(2))
-       call neko_scratch_registry%request_field(tdwxb, temp_indices(3))
-       call neko_scratch_registry%request_field(tduyb, temp_indices(4))
-       call neko_scratch_registry%request_field(tdvyb, temp_indices(5))
-       call neko_scratch_registry%request_field(tdwyb, temp_indices(6))
-       call neko_scratch_registry%request_field(tduzb, temp_indices(7))
-       call neko_scratch_registry%request_field(tdvzb, temp_indices(8))
-       call neko_scratch_registry%request_field(tdwzb, temp_indices(9))
+       call neko_scratch_registry%request_field(tduxb, temp_indices(1), .false.)
+       call neko_scratch_registry%request_field(tdvxb, temp_indices(2), .false.)
+       call neko_scratch_registry%request_field(tdwxb, temp_indices(3), .false.)
+       call neko_scratch_registry%request_field(tduyb, temp_indices(4), .false.)
+       call neko_scratch_registry%request_field(tdvyb, temp_indices(5), .false.)
+       call neko_scratch_registry%request_field(tdwyb, temp_indices(6), .false.)
+       call neko_scratch_registry%request_field(tduzb, temp_indices(7), .false.)
+       call neko_scratch_registry%request_field(tdvzb, temp_indices(8), .false.)
+       call neko_scratch_registry%request_field(tdwzb, temp_indices(9), .false.)
        fx_d = fx%x_d
        fy_d = fy%x_d
        fz_d = fz%x_d
@@ -473,12 +473,12 @@ contains
     integer :: temp_indices(6)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_scratch_registry%request_field(w1_d, temp_indices(1))
-       call neko_scratch_registry%request_field(w2_d, temp_indices(2))
-       call neko_scratch_registry%request_field(w3_d, temp_indices(3))
-       call neko_scratch_registry%request_field(w4_d, temp_indices(4))
-       call neko_scratch_registry%request_field(w5_d, temp_indices(5))
-       call neko_scratch_registry%request_field(w6_d, temp_indices(6))
+       call neko_scratch_registry%request_field(w1_d, temp_indices(1), .false.)
+       call neko_scratch_registry%request_field(w2_d, temp_indices(2), .false.)
+       call neko_scratch_registry%request_field(w3_d, temp_indices(3), .false.)
+       call neko_scratch_registry%request_field(w4_d, temp_indices(4), .false.)
+       call neko_scratch_registry%request_field(w5_d, temp_indices(5), .false.)
+       call neko_scratch_registry%request_field(w6_d, temp_indices(6), .false.)
 
        call adjoint_weak_no_dealias_device(fs%x_d, s%x_d, &
             vxb%x, vyb%x, vzb%x, &

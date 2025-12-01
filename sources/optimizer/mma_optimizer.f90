@@ -94,7 +94,7 @@ contains
     type(json_file) :: solver_parameters
     logical :: unconstrained_problem
 
-    call neko_scratch_registry%request_vector(design%size(), x, ind)
+    call neko_scratch_registry%request_vector(design%size(), x, ind, .false.)
 
     call design%get_values(x)
 
@@ -192,13 +192,13 @@ contains
     end if
 
     ! Initialize the vectors
-    call neko_scratch_registry%request_vector(n, x, ind(1))
+    call neko_scratch_registry%request_vector(n, x, ind(1), .false.)
     call neko_scratch_registry%request_vector( &
-         problem%get_n_objectives(), all_objectives, ind(2))
+         problem%get_n_objectives(), all_objectives, ind(2), .false.)
     call neko_scratch_registry%request_vector( &
-         problem%get_n_constraints(), constraint_value, ind(3))
+         problem%get_n_constraints(), constraint_value, ind(3), .false.)
     call neko_scratch_registry%request_vector(n, &
-         objective_sensitivities, ind(4))
+         objective_sensitivities, ind(4), .false.)
 
     call constraint_sensitivities%init(problem%get_n_constraints(), n)
 
@@ -340,7 +340,7 @@ contains
     integer :: ind
 
     call neko_scratch_registry%request_vector( &
-         problem%get_n_constraints(), constraint_values, ind)
+         problem%get_n_constraints(), constraint_values, ind, .false.)
 
     call problem%get_constraint_values(constraint_values)
     if (NEKO_BCKND_DEVICE .eq. 1) then

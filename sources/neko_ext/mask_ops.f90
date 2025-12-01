@@ -81,7 +81,7 @@ contains
     !
     ! In any case, it's a bit confusing and we should throw an error if the
     ! sizes are different
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     if (vec%size() .ne. work%size()) then
        call neko_error('vector and field are of incompatible dimension')
@@ -122,7 +122,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(work , temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     ! fill background fld
     call field_cfill(work, const)
@@ -153,7 +153,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(work , temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     ! fill background fld
     call field_copy(work, background)
@@ -188,7 +188,7 @@ contains
     ! This would be much smarter with a kernel similar to masked_glsc2
     ! When that kernel get written, we can update this function.
 
-    call neko_scratch_registry%request_field(work , temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
     n = work%size()
     call field_rone(work)
     call mask_exterior_const_fld(work, mask, 0.0_rp)

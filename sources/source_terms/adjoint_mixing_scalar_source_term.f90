@@ -170,7 +170,7 @@ contains
 
     fs => this%fields%get(1)
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
     ! \phi
     call field_copy(work, this%s)
     ! \phi - \phi_ref

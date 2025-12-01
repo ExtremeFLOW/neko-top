@@ -112,8 +112,8 @@ contains
     type(vector_t), pointer :: relambda, remu
     integer :: ind(2)
 
-    call neko_scratch_registry%request_vector(this%m, relambda, ind(1))
-    call neko_scratch_registry%request_vector(this%m, remu, ind(2))
+    call neko_scratch_registry%request_vector(this%m, relambda, ind(1), .false.)
+    call neko_scratch_registry%request_vector(this%m, remu, ind(2), .false.)
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
     call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
@@ -144,14 +144,14 @@ contains
     integer :: ierr, ind(7)
     real(kind=rp) :: re_sq_norm
 
-    call neko_scratch_registry%request_vector(this%m, rey, ind(1))
-    call neko_scratch_registry%request_vector(this%m, relambda, ind(2))
-    call neko_scratch_registry%request_vector(this%m, remu, ind(3))
-    call neko_scratch_registry%request_vector(this%m, res, ind(4))
+    call neko_scratch_registry%request_vector(this%m, rey, ind(1), .false.)
+    call neko_scratch_registry%request_vector(this%m, relambda, ind(2), .false.)
+    call neko_scratch_registry%request_vector(this%m, remu, ind(3), .false.)
+    call neko_scratch_registry%request_vector(this%m, res, ind(4), .false.)
 
-    call neko_scratch_registry%request_vector(this%n, rex, ind(5))
-    call neko_scratch_registry%request_vector(this%n, rexsi, ind(6))
-    call neko_scratch_registry%request_vector(this%n, reeta, ind(7))
+    call neko_scratch_registry%request_vector(this%n, rex, ind(5), .false.)
+    call neko_scratch_registry%request_vector(this%n, rexsi, ind(6), .false.)
+    call neko_scratch_registry%request_vector(this%n, reeta, ind(7), .false.)
 
     call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
@@ -236,7 +236,7 @@ contains
     type(vector_t), pointer :: x_diff
     integer :: ind
 
-    call neko_scratch_registry%request_vector(this%n, x_diff, ind)
+    call neko_scratch_registry%request_vector(this%n, x_diff, ind, .false.)
 
     call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
 
@@ -312,42 +312,44 @@ contains
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_scratch_registry%request_vector(this%m, y, ind(1))
-    call neko_scratch_registry%request_vector(this%m, lambda, ind(2))
-    call neko_scratch_registry%request_vector(this%m, s, ind(3))
-    call neko_scratch_registry%request_vector(this%m, mu, ind(4))
-    call neko_scratch_registry%request_vector(this%m, rey, ind(5))
-    call neko_scratch_registry%request_vector(this%m, relambda, ind(6))
-    call neko_scratch_registry%request_vector(this%m, remu, ind(7))
-    call neko_scratch_registry%request_vector(this%m, res, ind(8))
-    call neko_scratch_registry%request_vector(this%m, dely, ind(9))
-    call neko_scratch_registry%request_vector(this%m, dellambda, ind(10))
-    call neko_scratch_registry%request_vector(this%m, dy, ind(11))
-    call neko_scratch_registry%request_vector(this%m, dlambda, ind(12))
-    call neko_scratch_registry%request_vector(this%m, ds, ind(13))
-    call neko_scratch_registry%request_vector(this%m, dmu, ind(14))
-    call neko_scratch_registry%request_vector(this%m, yold, ind(15))
-    call neko_scratch_registry%request_vector(this%m, lambdaold, ind(16))
-    call neko_scratch_registry%request_vector(this%m, sold, ind(17))
-    call neko_scratch_registry%request_vector(this%m, muold, ind(18))
-    call neko_scratch_registry%request_vector(this%n, x, ind(19))
-    call neko_scratch_registry%request_vector(this%n, xsi, ind(20))
-    call neko_scratch_registry%request_vector(this%n, eta, ind(21))
-    call neko_scratch_registry%request_vector(this%n, rex, ind(22))
-    call neko_scratch_registry%request_vector(this%n, rexsi, ind(23))
-    call neko_scratch_registry%request_vector(this%n, reeta, ind(24))
-    call neko_scratch_registry%request_vector(this%n, delx, ind(25))
-    call neko_scratch_registry%request_vector(this%n, diagx, ind(26))
-    call neko_scratch_registry%request_vector(this%n, dx, ind(27))
-    call neko_scratch_registry%request_vector(this%n, dxsi, ind(28))
-    call neko_scratch_registry%request_vector(this%n, deta, ind(29))
-    call neko_scratch_registry%request_vector(this%n, xold, ind(30))
-    call neko_scratch_registry%request_vector(this%n, xsiold, ind(31))
-    call neko_scratch_registry%request_vector(this%n, etaold, ind(32))
-    call neko_scratch_registry%request_vector(this%m+1, bb, ind(33))
+    call neko_scratch_registry%request_vector(this%m, y, ind(1), .false.)
+    call neko_scratch_registry%request_vector(this%m, lambda, ind(2), .false.)
+    call neko_scratch_registry%request_vector(this%m, s, ind(3), .false.)
+    call neko_scratch_registry%request_vector(this%m, mu, ind(4), .false.)
+    call neko_scratch_registry%request_vector(this%m, rey, ind(5), .false.)
+    call neko_scratch_registry%request_vector(this%m, relambda, ind(6), .false.)
+    call neko_scratch_registry%request_vector(this%m, remu, ind(7), .false.)
+    call neko_scratch_registry%request_vector(this%m, res, ind(8), .false.)
+    call neko_scratch_registry%request_vector(this%m, dely, ind(9), .false.)
+    call neko_scratch_registry%request_vector(this%m, dellambda, ind(10), .false.)
+    call neko_scratch_registry%request_vector(this%m, dy, ind(11), .false.)
+    call neko_scratch_registry%request_vector(this%m, dlambda, ind(12), .false.)
+    call neko_scratch_registry%request_vector(this%m, ds, ind(13), .false.)
+    call neko_scratch_registry%request_vector(this%m, dmu, ind(14), .false.)
+    call neko_scratch_registry%request_vector(this%m, yold, ind(15), .false.)
+    call neko_scratch_registry%request_vector(this%m, lambdaold, ind(16), .false.)
+    call neko_scratch_registry%request_vector(this%m, sold, ind(17), .false.)
+    call neko_scratch_registry%request_vector(this%m, muold, ind(18), .false.)
+    call neko_scratch_registry%request_vector(this%n, x, ind(19), .false.)
+    call neko_scratch_registry%request_vector(this%n, xsi, ind(20), .false.)
+    call neko_scratch_registry%request_vector(this%n, eta, ind(21), .false.)
+    call neko_scratch_registry%request_vector(this%n, rex, ind(22), .false.)
+    call neko_scratch_registry%request_vector(this%n, rexsi, ind(23), .false.)
+    call neko_scratch_registry%request_vector(this%n, reeta, ind(24), .false.)
+    call neko_scratch_registry%request_vector(this%n, delx, ind(25), .false.)
+    call neko_scratch_registry%request_vector(this%n, diagx, ind(26), .false.)
+    call neko_scratch_registry%request_vector(this%n, dx, ind(27), .false.)
+    call neko_scratch_registry%request_vector(this%n, dxsi, ind(28), .false.)
+    call neko_scratch_registry%request_vector(this%n, deta, ind(29), .false.)
+    call neko_scratch_registry%request_vector(this%n, xold, ind(30), .false.)
+    call neko_scratch_registry%request_vector(this%n, xsiold, ind(31), .false.)
+    call neko_scratch_registry%request_vector(this%n, etaold, ind(32), .false.)
+    call neko_scratch_registry%request_vector(this%m+1, bb, ind(33), .false.)
 
-    call neko_scratch_registry%request_matrix(this%m, this%n, GG, ind(34))
-    call neko_scratch_registry%request_matrix(this%m+1, this%m+1, AA, ind(35))
+    call neko_scratch_registry%request_matrix(this%m, this%n, GG, &
+         ind(34), .false.)
+    call neko_scratch_registry%request_matrix(this%m+1, this%m+1, AA, &
+         ind(35), .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -799,26 +801,28 @@ contains
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_scratch_registry%request_vector(this%m, y, ind(1))
-    call neko_scratch_registry%request_vector(this%m, lambda, ind(2))
-    call neko_scratch_registry%request_vector(this%m, mu, ind(3))
-    call neko_scratch_registry%request_vector(this%m, relambda, ind(4))
-    call neko_scratch_registry%request_vector(this%m, remu, ind(5))
-    call neko_scratch_registry%request_vector(this%m, dlambda, ind(6))
-    call neko_scratch_registry%request_vector(this%m, dmu, ind(7))
-    call neko_scratch_registry%request_vector(this%m, gradlambda, ind(8))
-    call neko_scratch_registry%request_vector(this%m, zerom, ind(9))
-    call neko_scratch_registry%request_vector(this%m, dd, ind(10))
-    call neko_scratch_registry%request_vector(this%m, dummy_m, ind(11))
+    call neko_scratch_registry%request_vector(this%m, y, ind(1), .false.)
+    call neko_scratch_registry%request_vector(this%m, lambda, ind(2), .false.)
+    call neko_scratch_registry%request_vector(this%m, mu, ind(3), .false.)
+    call neko_scratch_registry%request_vector(this%m, relambda, ind(4), .false.)
+    call neko_scratch_registry%request_vector(this%m, remu, ind(5), .false.)
+    call neko_scratch_registry%request_vector(this%m, dlambda, ind(6), .false.)
+    call neko_scratch_registry%request_vector(this%m, dmu, ind(7), .false.)
+    call neko_scratch_registry%request_vector(this%m, gradlambda, ind(8), .false.)
+    call neko_scratch_registry%request_vector(this%m, zerom, ind(9), .false.)
+    call neko_scratch_registry%request_vector(this%m, dd, ind(10), .false.)
+    call neko_scratch_registry%request_vector(this%m, dummy_m, ind(11), .false.)
 
-    call neko_scratch_registry%request_vector(this%n, x, ind(12))
-    call neko_scratch_registry%request_vector(this%n, pjlambda,ind(13))
-    call neko_scratch_registry%request_vector(this%n, qjlambda, ind(14))
+    call neko_scratch_registry%request_vector(this%n, x, ind(12), .false.)
+    call neko_scratch_registry%request_vector(this%n, pjlambda,ind(13), .false.)
+    call neko_scratch_registry%request_vector(this%n, qjlambda, ind(14), .false.)
 
-    call neko_scratch_registry%request_vector(this%n, Ljjxinv, ind(15))
+    call neko_scratch_registry%request_vector(this%n, Ljjxinv, ind(15), .false.)
 
-    call neko_scratch_registry%request_matrix(this%m, this%n, hijx, ind(16))
-    call neko_scratch_registry%request_matrix(this%m, this%m, Hess, ind(17))
+    call neko_scratch_registry%request_matrix(this%m, this%n, hijx, &
+         ind(16), .false.)
+    call neko_scratch_registry%request_matrix(this%m, this%m, Hess, &
+         ind(17), .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
