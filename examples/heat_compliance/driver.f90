@@ -2,6 +2,8 @@ program usrneko
 
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
+  use objective, only: objective_t
+  use design, only: design_t
 
   use json_module, only: json_file
   use utils, only: neko_error
@@ -9,10 +11,9 @@ program usrneko
 
   use mpi_f08, only: MPI_Init, MPI_Wtime, MPI_COMM_WORLD
   use constraint, only: constraint_t
-  use objective, only: objective_t
 
 
-  use heat_compliance, only: heat_compliance_t, thermal_conductivity_design_t
+  use heat_compliance, only: heat_compliance_t, thermal_conductivity_design_t, thermal_volume_constraint_t
 
   use design_3dto1d , only: design_3dto1d_t
   use neko, only: neko_init, neko_finalize, neko_solve
@@ -30,11 +31,6 @@ program usrneko
   ! ========================================================================== !
   ! Set up distributed stress constraints
 
-  ! number of elements with stress constraints
-  integer :: num_constraints = 10
-
-  ! number of beam sections to distribute the constraint
-  integer :: num_constraint_partitions = 10
   ! ========================================================================== !
 
   ! JSON related arguments
@@ -50,11 +46,12 @@ program usrneko
   type(field_t) :: neko_field
 
   ! !> The design
-  type(thermal_conductivity_design_t) :: des
+  class(design_t), allocatable :: des
 
   !> The problem type
   type(problem_t) :: prob
-  class(objective_t), allocatable :: objective
+  class(objective_t), allocatable :: heat_compliance
+  class(constraint_t), allocatable :: volume_constraint
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
@@ -91,7 +88,14 @@ program usrneko
   call neko_field%init(neko_case%msh, neko_case%fluid%Xh, "neko_field")
   nloc = neko_field%dof%size()
 
-  call des%init(neko_case%fluid%c_Xh)
+  allocate(thermal_conductivity_design_t :: des)
+  select type(des)
+  type is (thermal_conductivity_design_t)
+     call des%init(parameters, neko_case%fluid%c_Xh)
+  class default
+     call neko_error("??!")
+  end select
+  
 
   ! -------------------------------------------------------------------------- !
   ! Construct the problem
@@ -99,16 +103,30 @@ program usrneko
   ! initialize the problem
   call prob%init(parameters, des)
 
-  allocate(heat_compliance_t :: objective)
+  allocate(heat_compliance_t :: heat_compliance)
 
-  select type(objective)
+  select type(heat_compliance)
   type is (heat_compliance_t)
-     call objective%init(des, neko_case%fluid%c_Xh)
+     call heat_compliance%init_from_attributes(des, neko_case%fluid%c_Xh, parameters)
   class default
      call neko_error("??!")
   end select
   ! Add objectives to the problem
-  call prob%add_objective(beamweight)
+  call prob%add_objective(heat_compliance)
+
+  allocate(thermal_volume_constraint_t :: volume_constraint)
+
+  select type(volume_constraint)
+  type is (thermal_volume_constraint_t)
+     call volume_constraint%init_from_components(des, neko_case%fluid%c_Xh, &
+     name   = 'Volume constraint', &
+     is_max = .true., &
+     limit  = 0.4_rp)
+  class default
+     call neko_error("??!")
+  end select
+  ! Add constraint to the problem
+  call prob%add_constraint(volume_constraint)
 
   call MPI_Barrier(neko_comm, ierr)
   ! -------------------------------------------------------------------------- !
@@ -125,20 +143,13 @@ program usrneko
 
   call prob%update_objectives(des)
   call prob%update_objective_sensitivities(des)
-  call prob%update_constraints(des)
-  call prob%update_constraint_sensitivities(des)
+  !call prob%update_constraints(des)
+  !call prob%update_constraint_sensitivities(des)
 
 
   call prob%get_all_objective_values(all_objectives)
-  call prob%get_constraint_values(constraint_value)
+  !call prob%get_constraint_values(constraint_value)
   call prob%get_objective_value(objective_value)
-
-  if (pe_rank == 0) then
-     print *, "nobject=", prob%get_n_objectives(), "nconstraint=", &
-          prob%get_n_constraints(), "total objective=", objective_value, &
-          "all_objectives%x=", all_objectives%x, "constraint_value", &
-          constraint_value%x
-  end if
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
@@ -146,7 +157,6 @@ program usrneko
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_start = MPI_Wtime()
-
   call opt%run(prob, des)
 
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
