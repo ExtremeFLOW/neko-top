@@ -281,7 +281,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
@@ -326,13 +326,14 @@ contains
 
     ! if we have the lube term we also get an extra term in the sensitivity
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     if(this%dealias_sensitivity) then
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+            .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
 
        call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
        call field_col3(accumulate, fld_GL, fld_GL)

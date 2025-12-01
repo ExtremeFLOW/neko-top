@@ -204,10 +204,10 @@ contains
     integer :: n_GL, nel
 
 
-    call neko_scratch_registry%request_field(dsdx, temp_indices(1))
-    call neko_scratch_registry%request_field(dsdy, temp_indices(2))
-    call neko_scratch_registry%request_field(dsdz, temp_indices(3))
-    call neko_scratch_registry%request_field(work, temp_indices(4))
+    call neko_scratch_registry%request_field(dsdx, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(dsdy, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(dsdz, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(work, temp_indices(4), .false.)
 
     fu => this%fields%get(1)
     fv => this%fields%get(2)
@@ -217,10 +217,10 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
-       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3))
-       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
+       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3), .false.)
+       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4), .false.)
 
        call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)

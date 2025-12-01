@@ -133,8 +133,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     ! Start by copying the first X_in into the tmp_fld_out to begin the
     ! cascade.
@@ -172,8 +174,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     call vector_to_field(tmp_fld_in, X_in)
     call mapping_handler_apply_forward_field(this, tmp_fld_out, tmp_fld_in)
@@ -198,8 +202,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     ! Start by copying the first sens_in into the tmp_fld_out to begin the
     ! cascade.
@@ -250,8 +256,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     call vector_to_field(tmp_fld_in, X_in)
     call mapping_handler_apply_backward_field(this, tmp_fld_out, tmp_fld_in)

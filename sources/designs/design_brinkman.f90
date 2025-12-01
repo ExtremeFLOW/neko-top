@@ -591,7 +591,7 @@ contains
     type(field_t), pointer :: tmp_fld
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1))
+    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1), .false.)
 
     call vector_to_field(tmp_fld, sensitivity)
 
