@@ -31,83 +31,73 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 
 module heat_compliance
-  use num_types, only: rp
+  use num_types,        only : rp, sp
+  use mpi_f08,          only : mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
+  use comm,             only : pe_rank, pe_size, neko_comm, mpi_real_precision
 
-  use objective, only: objective_t
+  use objective,        only : objective_t
+  use design,           only : design_t
+  use constraint,       only : constraint_t
 
-  use design, only: design_t
-  use math, only: glsum
-  use vector, only: vector_t
+  use math,             only : glsum, col2, rzero, cmult, copy, glsc2
+  use vector,           only : vector_t
 
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use device,           only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device_math,      only : device_copy, device_col2, device_cfill,        &
+                               device_subcol3, device_cmult, device_glsc2
+  use neko_config,      only : NEKO_BCKND_DEVICE
 
-  use mpi_f08, only: mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
-  use comm, only: pe_rank, pe_size, neko_comm, mpi_real_precision
+  use field,            only : field_t
+  use field_math,       only : field_rzero, field_col2, field_addcol3,        &
+                               field_rone, field_copy, field_add3, field_cmult, field_cfill
+  use field_registry,   only : neko_field_registry
+  use fld_file_output,  only : fld_file_output_t
 
-    use num_types, only: rp, sp
-  use field, only: field_t
-  use json_module, only: json_file
-  use mapping_handler, only: mapping_handler_t
-  use coefs, only: coef_t
-  use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
-  use scratch_registry, only: neko_scratch_registry
-  use fld_file_output, only: fld_file_output_t
-  use point_zone_registry, only: neko_point_zone_registry
-  use point_zone, only: point_zone_t
-  use mask_ops, only: mask_exterior_const
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
-  use design, only: design_t
-  use math, only: rzero
-  use simulation_m, only: simulation_t
-  use json_module, only: json_file
-  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
-  use vector, only: vector_t
-  use math, only: copy
-  use device_math, only: device_copy
-  use field_registry, only: neko_field_registry
-  use neko_ext, only: field_to_vector, vector_to_field
-  use optimization_ic, only: set_optimization_ic
-  use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_get
-  use utils, only: neko_error
-    use num_types, only: rp
-  use json_module, only: json_file
-  use field_registry, only: neko_field_registry
-  use field, only: field_t
-  use coefs, only: coef_t
-  use ax_product, only: ax_t, ax_helm_factory
-  use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
-  use precon, only: pc_t, precon_factory, precon_destroy
-  use bc_list, only: bc_list_t
-  use neumann, only: neumann_t
-  use profiler, only: profiler_start_region, profiler_end_region
-  use gather_scatter, only: gs_t, GS_OP_ADD
-  use pnpn_residual, only: pnpn_prs_res_t
-  use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use field_registry, only: neko_field_registry
-  use mapping, only: mapping_t
-  use scratch_registry, only: neko_scratch_registry
-  use field_math, only: field_copy, field_add3
-  use coefs, only: coef_t
-  use logger, only: neko_log, LOG_SIZE
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use dofmap, only: dofmap_t
-  use jacobi, only: jacobi_t
-  use device_jacobi, only: device_jacobi_t
-  use sx_jacobi, only: sx_jacobi_t
-  use utils, only: neko_error
-  use device_math, only: device_cfill, device_subcol3, device_cmult
-  use json_utils, only: json_get, json_get_or_default
-  use math, only: glsc2
-  use device_math, only: device_glsc2
+  use mapping_handler,  only : mapping_handler_t
+  use coefs,            only : coef_t
+  use mapping,          only : mapping_t
+
+  use scratch_registry, only : neko_scratch_registry
+  use point_zone_registry, only : neko_point_zone_registry
+  use point_zone,       only : point_zone_t
+
+  use json_module,      only : json_file
+  use json_utils,       only : json_get, json_get_or_default
+
+  use simple_brinkman_source_term, only : simple_brinkman_source_term_t
+  use neko_ext,         only : field_to_vector, vector_to_field
+  use optimization_ic,  only : set_optimization_ic
+
+  use ax_product,       only : ax_t, ax_helm_factory
+  use krylov,           only : ksp_t, ksp_monitor_t, krylov_solver_factory
+  use precon,           only : pc_t, precon_factory, precon_destroy
+  use jacobi,           only : jacobi_t
+  use device_jacobi,    only : device_jacobi_t
+  use sx_jacobi,        only : sx_jacobi_t
+
+  use bc_list,          only : bc_list_t
+  use neumann,          only : neumann_t
+  use zero_dirichlet,   only : zero_dirichlet_t
+
+  use profiler,         only : profiler_start_region, profiler_end_region
+  use gather_scatter,   only : gs_t, GS_OP_ADD
+  use pnpn_residual,    only : pnpn_prs_res_t
+  use mesh,             only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
+  use mapping,          only : mapping_t
+  use dofmap,           only : dofmap_t
+
+  use logger,           only : neko_log, LOG_SIZE
+  use utils,            only : neko_error
+  use operators,        only : grad
+  use mask_ops,         only : mask_exterior_const
 
   implicit none
   private
 
   ! ========================================================================== !
-  ! Objective: minimum compliance
+  ! Objective: minimum heat compliance (∫ φ dΩ) with uniform heat source
+  ! and a Dirichlet “sink” at zone id = 2 (φ = 0).
+  ! ========================================================================== !
   type, public, extends(objective_t) :: heat_compliance_t
      ! temperature
      type(field_t) :: phi
@@ -119,20 +109,29 @@ module heat_compliance
      class(ksp_t), allocatable :: ksp
      !> Preconditioner
      class(pc_t), allocatable :: pc
-     !> boundary conditions (they will all be Neumann, so empty)
+     !> boundary-condition list (now contains a zero-dirichlet bc)
      type(bc_list_t) :: bclst
+     !> zero Dirichlet BC on sink zone (id = 2)
+     type(zero_dirichlet_t) :: bc_sink
      !> tolerance
-     real(kind=rp) :: abstol = 0.0000000001_rp
+     real(kind=rp) :: abstol = 1.0e-10_rp
      !> max iterations
-     integer :: ksp_max_iter = 200
+     integer :: ksp_max_iter = 600
      !> method for solving PDE
      character(len=5) :: ksp_solver = "gmres"
-     ! > preconditioner type
-     character(len=4) :: precon_type = "hsmg"
-     ! > coef
+     !> preconditioner type
+     character(len=6) :: precon_type = "jacobi"
+     !> coef
      type(coef_t), pointer :: coef
+     !> mapped conductivity field
+     type(field_t) :: thermal_conductivity
+     !> Mapping between design indicator and conductivity
+     type(mapping_handler_t) :: mapping
      integer :: ksp_n, n, i
+     !> output here
+     type(fld_file_output_t), private :: output
    contains
+     procedure, public :: init_from_attributes => heat_compliance_init
      procedure, public, pass(this) :: heat_compliance_init
      procedure, public, pass(this) :: free => heat_compliance_free
      procedure, public, pass(this) :: update_value => &
@@ -141,81 +140,147 @@ module heat_compliance
           heat_compliance_update_sensitivity
   end type heat_compliance_t
 
-!> A topology optimization design variable
+  !> Topology optimization design variable (thermal conductivity mapping)
   type, extends(design_t), public :: thermal_conductivity_design_t
      private
-
      type(field_t), pointer :: design_indicator
-     type(field_t), pointer :: thermal_conductivity
      type(field_t), pointer :: sensitivity
-     type(mapping_handler_t), public :: mapping
      !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain
      logical :: has_mask
-     type(fld_file_output_t), private :: output
      type(coef_t), pointer :: coef
-
    contains
-     !> Retrieve the design variables
-     procedure, pass(this) :: get_values => thermal_conductivity_design_get_design
-     !> Retrieve the sensitivity
+     procedure, pass(this) :: get_values      => thermal_conductivity_design_get_design
      procedure, pass(this) :: get_sensitivity => thermal_conductivity_design_get_sensitivity
-     !> Initialize the design
-     procedure, pass(this) :: init => thermal_conductivity_design_init
-     !> Update the design
-     procedure, pass(this) :: update_design => thermal_conductivity_design_update_design
-     !> map forward
-     procedure, pass(this) :: map_forward => thermal_conductivity_design_map_forward
-     !> chain rule
-     procedure, pass(this) :: map_backward => thermal_conductivity_design_map_backward
-     !> chain rule
-     procedure, pass(this) :: map_backward_safe => thermal_conductivity_design_map_backward_safe
-     ! a writer being called from outside would be nice
-     procedure, pass(this) :: write => thermal_conductivity_design_write
-     !> Destructor
-     procedure, pass(this) :: free => thermal_conductivity_design_free
-
+     procedure, pass(this) :: init            => thermal_conductivity_design_init
+     procedure, pass(this) :: update_design   => thermal_conductivity_design_update_design
+     procedure, pass(this) :: map_forward     => thermal_conductivity_design_map_forward
+     procedure, pass(this) :: map_backward    => thermal_conductivity_design_map_backward
+     procedure, pass(this) :: write           => thermal_conductivity_design_write
+     procedure, pass(this) :: free            => thermal_conductivity_design_free
   end type thermal_conductivity_design_t
-contains
 
-  subroutine heat_compliance_init (this, design, coef)
+  !> Volume constraint for thermal_conductivity_design_t
+  !!   V = (1/|Omega|) ∫ rho dΩ
+  !!   g = limit - V       (or -g if is_max = .true.)
+  type, public, extends(constraint_t) :: thermal_volume_constraint_t
+     private
+     logical :: is_max               ! .false. => V > V_min; .true. => V < V_max
+     real(kind=rp) :: limit          ! V_min or V_max
+     real(kind=rp) :: volume_domain  ! |Omega|
+     type(coef_t), pointer :: coef => null()  ! to access B and volume
+   contains
+     procedure, public, pass(this) :: init_from_components => &
+          thermal_volume_constraint_init
+     procedure, public, pass(this) :: free => thermal_volume_constraint_free
+     procedure, public, pass(this) :: update_value => &
+          thermal_volume_constraint_update_value
+     procedure, public, pass(this) :: update_sensitivity => &
+          thermal_volume_constraint_update_sensitivity
+     procedure, private, pass(this) :: compute_volume => &
+          thermal_volume_constraint_compute_volume
+  end type thermal_volume_constraint_t
+
+contains
+  !=========================================================================!
+  !  Objective init
+  !=========================================================================!
+  subroutine heat_compliance_init (this, design, coef, parameters)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(coef_t), target, intent(in) :: coef
+    class(design_t),          intent(in)    :: design
+    type(coef_t), target,     intent(in)    :: coef
+    type(json_file),          intent(inout), optional :: parameters
     character(len=256), parameter :: name = 'heat_compliance'
     integer :: n
+    character(len=LOG_SIZE) :: log_buf
+    integer, parameter :: DIRICHLET_ZONE_ID = 2
+    type(json_file) :: dummy_json
 
     call this%init_base(name, design%size(), 1.0_rp)
     this%coef => coef
 
-    ! set the number of dofs
+    ! Design-to-conductivity mapping
+    call this%mapping%init_base(coef)
+    if (present(parameters)) then
+       if ('mapping' .in. parameters) then
+          call this%mapping%add(parameters, 'mapping')
+       else
+          call parameters%print()
+          call neko_error("heat_compliance: missing 'mapping' block in parameters")
+       end if
+    else
+       call neko_error("heat_compliance: parameters JSON required (for mapping + BC init)")
+    end if
+
+    ! Number of dofs
     n = this%coef%dof%size()
 
-    ! init the bc list (all Neuman BCs, will remain empty)
+    ! ------------------------------------------------------------------ !
+    ! Boundary conditions: Dirichlet φ = 0 on mesh zone with id = 2
+    ! ------------------------------------------------------------------ !
     call this%bclst%init()
 
-    ! Setup backend dependent Ax routines
+    ! zero_dirichlet_t%init(coef, json)
+    if (present(parameters)) then
+       call this%bc_sink%init(this%coef, parameters)
+    else
+       call dummy_json%initialize()
+       call this%bc_sink%init(this%coef, dummy_json)
+       call dummy_json%destroy()
+    end if
+
+    ! Mark zone index 2 as Dirichlet sink (φ = 0)
+    call this%bc_sink%mark_zone(this%coef%msh%labeled_zones(DIRICHLET_ZONE_ID))
+
+    ! Finalize the BC (build masks etc.)
+    call this%bc_sink%finalize()
+
+    ! Add this bc to the list used by Ax/KSP
+    call this%bclst%append(this%bc_sink)
+
+    ! ------------------------------------------------------------------ !
+    ! Helmholtz operator and Krylov solver
+    ! ------------------------------------------------------------------ !
     call ax_helm_factory(this%Ax, full_formulation = .false.)
 
-    ! set up krylov solver
     call krylov_solver_factory(this%ksp, n, this%ksp_solver, &
          this%ksp_max_iter, this%abstol)
 
-    ! set up preconditioner
     call heat_compliance_precon_factory(this%pc, this%ksp, &
          this%coef, this%coef%dof, this%coef%gs_h, this%bclst, &
          this%precon_type)
-    
-    ! init the temperature field
+
+    ! Temperature field and conductivity field
     call this%phi%init(this%coef%dof)
+    call this%thermal_conductivity%init(this%coef%dof)
+
+    ! Output fields
+    select type(design)
+    type is (thermal_conductivity_design_t)
+       call this%output%init(sp, 'design', 4)
+       call this%output%fields%assign_to_field(1, design%design_indicator)
+       call this%output%fields%assign_to_field(2, this%thermal_conductivity)
+       call this%output%fields%assign_to_field(3, this%phi)
+       call this%output%fields%assign_to_field(4, design%sensitivity)
+    class default
+       call neko_error("heat_compliance_init: design must be thermal_conductivity_design_t")
+    end select
+
+    write(log_buf,'(A)') 'heat_compliance: initialized with Dirichlet sink on zone 2.'
+    call neko_log%message(log_buf)
 
   end subroutine heat_compliance_init
 
+  !=========================================================================!
+  !  Objective free
+  !=========================================================================!
   subroutine heat_compliance_free(this)
     class(heat_compliance_t), intent(inout) :: this
+
     call this%free_base()
-        if (allocated(this%Ax)) then
+
+    if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
 
@@ -229,121 +294,152 @@ contains
        deallocate(this%pc)
     end if
 
+    call this%bc_sink%free()
+    call this%mapping%free()
     call this%bclst%free()
     call this%phi%free()
+    call this%thermal_conductivity%free()
 
     call this%free_base()
   end subroutine heat_compliance_free
 
+  !=========================================================================!
+  !  Forward solve and objective value
+  !=========================================================================!
   subroutine heat_compliance_update_value(this, design)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    integer :: n, i
+    class(design_t),         intent(in)    :: design
+    integer :: n
     type(field_t), pointer :: RHS
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(1)
 
-select type(design)
-  type is (thermal_conductivity_design_t)
-    n = this%coef%dof%size()
-    call neko_scratch_registry%request_field(RHS, temp_indices(1))
+    select type(design)
+    type is (thermal_conductivity_design_t)
+       n = this%coef%dof%size()
+       call neko_scratch_registry%request_field(RHS, temp_indices(1))
 
-    ! set up Helmholtz operators and RHS
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%coef%h1_d, design%thermal_conductivity%x_d, n)
-       call device_cmult(this%coef%h1_d, -1.0_rp, n)
-       call device_cfill(this%coef%h2_d, 0.0_rp, n)
-    else
-       ! h1 is now the design variable
-       call copy(this%coef%h1, design%thermal_conductivity%x, n)
-       ! but negative
-       call cmult(this%coef%h1, -1.0_rp, n)
-       ! no h2
-       this%coef%h2 = 0.0_rp
-    end if
-    this%coef%ifh2 = .false.
-    
-    ! RHS is unit forcing
-    call field_rone(RHS)
+       ! Optional masking of design outside optimization region
+       if (design%has_mask) then
+          call mask_exterior_const(design%design_indicator, &
+               design%optimization_domain, 0.0_rp)
+       end if
 
-    ! Solve Helmholtz equation for phi
-    call profiler_start_region('Forward solve')
-    this%ksp_results(1) = &
-         this%ksp%solve(this%Ax, this%phi, RHS%x, n, this%coef, &
-         this%bclst, this%coef%gs_h)
+       ! Map design indicator -> physical thermal conductivity
+       call this%mapping%apply_forward(this%thermal_conductivity, &
+            design%design_indicator)
 
-    call profiler_end_region
+       ! ----------------------------------------------------------------!
+       ! RHS: uniform heating throughout the domain
+       ! ----------------------------------------------------------------!
+       call field_rone(RHS)             ! RHS = 1 everywhere
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(RHS%x_d, this%coef%B_d, n)     ! apply mass matrix B
+       else
+          call col2(RHS%x, this%coef%B, n)
+       end if
 
-    ! update preconditioner (needed?)
-    call this%pc%update()
+       ! Set Helmholtz coefficients: k(x) from mapped design
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_copy(this%coef%h1_d, this%thermal_conductivity%x_d, n)
+          call device_cfill(this%coef%h2_d, 0.0_rp, n)
+       else
+          call copy(this%coef%h1, this%thermal_conductivity%x, n)
+          this%coef%h2 = 0.0_rp
+       end if
+       this%coef%ifh2 = .false.
 
-    ! write it all out
-    call neko_log%message('Forward problem')
+       ! Gather-scatter on RHS
+       call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
-    write(log_buf, '(A,A,A)') 'Iterations:   ',&
-         'Start residual:     ', 'Final residual:'
-    call neko_log%message(log_buf)
-    write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
-         this%ksp_results%res_start, this%ksp_results%res_final
-    call neko_log%message(log_buf)
+       ! Apply strong BCs to RHS (Dirichlet sink on zone 2)
+       call this%bclst%apply_scalar(RHS%x, n)
 
-    call neko_scratch_registry%relinquish_field(temp_indices)
+       ! Solve Helmholtz equation for phi
+       call profiler_start_region('Forward solve')
+       this%ksp_results(1) = &
+            this%ksp%solve(this%Ax, this%phi, RHS%x, n, this%coef, &
+            this%bclst, this%coef%gs_h)
+       call profiler_end_region('Forward solve')
 
-    ! Now compute the objective
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       this%value = device_glsc2(this%phi%x_d, this%coef%B_d, n)
-    else
-       this%value = glsc2(this%phi%x, this%coef%B, n)
-    end if
+       ! Update preconditioner (if needed)
+       call this%pc%update()
+
+       call neko_log%message('Forward problem')
+       write(log_buf, '(A,A,A)') 'Iterations:   ', &
+            'Start residual:     ', 'Final residual:'
+       call neko_log%message(log_buf)
+       write(log_buf, '(I11,3x, E15.7,5x, E15.7)') this%ksp_results%iter, &
+            this%ksp_results%res_start, this%ksp_results%res_final
+       call neko_log%message(log_buf)
+
+       call neko_scratch_registry%relinquish_field(temp_indices)
+
+       ! Objective: compliance = ∫ φ dΩ (mass-matrix weighted)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          this%value = device_glsc2(this%phi%x_d, this%coef%B_d, n)
+       else
+          this%value = glsc2(this%phi%x, this%coef%B, n)
+       end if
 
     class default
-     call neko_error("needs a thermal conductivity design type")
-  end select
+       call neko_error("heat_compliance_update_value: requires thermal_conductivity_design_t")
+    end select
   end subroutine heat_compliance_update_value
 
-
+  !=========================================================================!
+  !  Sensitivity (gradient wrt design indicator)
+  !=========================================================================!
   subroutine heat_compliance_update_sensitivity(this, design)
     class(heat_compliance_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
+    class(design_t),         intent(in)    :: design
     type(field_t), pointer :: grad_phi_x, grad_phi_y, grad_phi_z
     integer :: temp_indices(3)
     integer :: n
-
 
     n = this%coef%dof%size()
     call neko_scratch_registry%request_field(grad_phi_x, temp_indices(1))
     call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2))
     call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3))
 
-    ! dF = grad(phi) . grad(phi_adj)
-    ! This problem should be self adjoint?
-    call grad(grad_phi_x, grad_phi_y, grad_phi_z, this%phi)
+    ! Self-adjoint problem: dF/dk ~ |grad(phi)|^2 (up to mapping chain rule)
+    call grad(grad_phi_x%x, grad_phi_y%x, grad_phi_z%x, this%phi%x, this%coef)
     call field_col2(grad_phi_x, grad_phi_x)
     call field_addcol3(grad_phi_x, grad_phi_y, grad_phi_y)
     call field_addcol3(grad_phi_x, grad_phi_z, grad_phi_z)
 
-    ! now we want to map this backwards through the design
+    call field_cmult(grad_phi_x, -1.0_rp)
+
     select type(design)
-      type is (thermal_conductivity_design_t)
-        call design%map_backward_safe(this%sensitivity, grad_phi_x)
-      class default
-        call neko_error("Heat compliance requires ad thermal conductivity design type")
+    type is (thermal_conductivity_design_t)
+       ! Chain rule through mapping
+       call this%mapping%apply_backward(design%sensitivity, grad_phi_x)
+       if (design%has_mask) then
+          call mask_exterior_const(design%sensitivity, &
+               design%optimization_domain, 0.0_rp)
+       end if
+       call field_to_vector(this%sensitivity, design%sensitivity)
+    class default
+       call neko_error("heat_compliance_update_sensitivity: requires thermal_conductivity_design_t")
     end select
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
+    call this%output%sample(1.0_rp)
   end subroutine heat_compliance_update_sensitivity
 
+  !=========================================================================!
+  !  Preconditioner factory
+  !=========================================================================!
   subroutine heat_compliance_precon_factory(pc, ksp, coef, dof, gs, bclst, pctype)
-
     implicit none
-    class(pc_t), allocatable, target, intent(inout) :: pc
-    class(ksp_t), target, intent(inout) :: ksp
-    type(coef_t), target, intent(in) :: coef
-    type(dofmap_t), target, intent(in) :: dof
-    type(gs_t), target, intent(inout) :: gs
-    type(bc_list_t), target, intent(inout) :: bclst
-    character(len=*) :: pctype
+    class(pc_t),   allocatable, target, intent(inout) :: pc
+    class(ksp_t),  target,      intent(inout)         :: ksp
+    type(coef_t),  target,      intent(in)            :: coef
+    type(dofmap_t),target,      intent(in)            :: dof
+    type(gs_t),    target,      intent(inout)         :: gs
+    type(bc_list_t),target,     intent(inout)         :: bclst
+    character(len=*),           intent(in)            :: pctype
 
     call precon_factory(pc, pctype)
 
@@ -357,18 +453,17 @@ select type(design)
     end select
 
     call ksp%set_pc(pc)
-
   end subroutine heat_compliance_precon_factory
 
-  !----------------------------------------------------------------------------!
-  !> Initialize the design from a JSON file
+  !=========================================================================!
+  !  Design: init
+  !=========================================================================!
   subroutine thermal_conductivity_design_init(this, parameters, coef)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(json_file), intent(inout) :: parameters
-    type(coef_t), target, intent(in) :: coef
+    type(json_file),                      intent(inout) :: parameters
+    type(coef_t),              target,    intent(in)    :: coef
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
-    logical :: dealias
 
     call json_get_or_default(parameters, 'name', name, 'Thermal Conductivity Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
@@ -381,159 +476,209 @@ select type(design)
        call json_get(parameters, 'domain.zone_name', domain_name)
        this%optimization_domain => &
             neko_point_zone_registry%get_point_zone(domain_name)
-
     case default
-       call neko_error('Thermal Conductivity design only supports point_zones for ' // &
-            'optimization domain types')
-
+       call neko_error('Thermal Conductivity design only supports point_zones for optimization domain types')
     end select
 
     this%coef => coef
 
-    ! Initialize the fields
+    ! Design and sensitivity fields
     call neko_field_registry%add_field(coef%dof, "design_indicator", .true.)
-      call neko_field_registry%add_field(coef%dof, "thermal_conductivity", .true.)
-      call neko_field_registry%add_field(coef%dof, "sensitivity", .true.)
-    this%design_indicator => &
-         neko_field_registry%get_field("design_indicator")
-    this%thermal_conductivity => &
-         neko_field_registry%get_field("thermal_conductivity")
-    this%sensitivity => &
-         neko_field_registry%get_field("sensitivity")
+    call neko_field_registry%add_field(coef%dof, "sensitivity",     .true.)
+    this%design_indicator => neko_field_registry%get_field("design_indicator")
+    this%sensitivity      => neko_field_registry%get_field("sensitivity")
 
-    ! Initialize the output
-    call this%output%init(sp, 'design', 3)
-    call this%output%fields%assign_to_field(1, this%design_indicator)
-    call this%output%fields%assign_to_field(2, this%thermal_conductivity)
-    call this%output%fields%assign_to_field(3, this%sensitivity)
+    call this%init_base(name, this%design_indicator%dof%size())
 
-    ! Initialize the mapper
-      if ('mapping' .in. parameters) then
-         call this%mapping%init_base(coef)
-         call this%mapping%add(parameters, 'mapping')
-      end if
-
-      if ('initial_distribution' .in. parameters) then
-         call json_get(parameters, 'initial_distribution', json_subdict)
-         call set_optimization_ic(this%design_indicator, coef, coef%gs_h, &
-              json_subdict)
-      else
-         call field_rzero(this%design_indicator)
-      end if
-
-    ! Map to the thermal conductivity amplitude
-    call this%map_forward()
-
+    call field_cfill(this%design_indicator, 1.0_rp)
   end subroutine thermal_conductivity_design_init
 
-  !> Free the design
+  !=========================================================================!
+  !  Design: free
+  !=========================================================================!
   subroutine thermal_conductivity_design_free(this)
     class(thermal_conductivity_design_t), intent(inout) :: this
 
     call this%free_base()
-    call this%thermal_conductivity%free()
     call this%design_indicator%free()
     call this%sensitivity%free()
-
   end subroutine thermal_conductivity_design_free
 
+  !=========================================================================!
+  !  Design: update from optimizer vector
+  !=========================================================================!
   subroutine thermal_conductivity_design_update_design(this, values)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: values
+    type(vector_t),                       intent(inout) :: values
     integer :: n
 
     n = this%size()
-    call copy(this%design_indicator%x, values%x, n)
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%design_indicator%x_d, values%x_d, n)
-    end if
-
-    call this%map_forward()
-
-    call copy(values%x, this%design_indicator%x, n)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(this%design_indicator%x, values%x, n)
     end if
   end subroutine thermal_conductivity_design_update_design
 
   subroutine thermal_conductivity_design_map_forward(this)
     class(thermal_conductivity_design_t), intent(inout) :: this
-
-    if (this%has_mask) then
-       call mask_exterior_const(this%design_indicator, &
-            this%optimization_domain, 0.0_rp)
-    end if
-
-    call this%mapping%apply_forward(this%thermal_conductivity, &
-         this%design_indicator)
-
+    ! No-op: mapping handled by heat_compliance_t%mapping
   end subroutine thermal_conductivity_design_map_forward
 
   subroutine thermal_conductivity_design_map_backward(this, sensitivity)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    type(vector_t), intent(in) :: sensitivity
-
+    type(vector_t),                       intent(in)    :: sensitivity
+    ! No-op: mapping back handled in heat_compliance_update_sensitivity
   end subroutine thermal_conductivity_design_map_backward
-
-  subroutine thermal_conductivity_design_map_backward_safe(this, sens_out, sens_in)
-    class(thermal_conductivity_design_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: sens_out
-    type(field_t), intent(in) :: sens_in
-    type(field_t), pointer :: tmp_fld_in, tmp_fld_out
-    integer :: temp_indices(2)
-
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
-
-    call field_copy(tmp_fld_in, sens_in)
-
-    call this%mapping%apply_backward(tmp_fld_out, sens_in)
-
-    if (this%has_mask) then
-       call mask_exterior_const(tmp_fld_out, this%optimization_domain, &
-            0.0_rp)
-    end if
-
-    call field_to_vector(sens_out, tmp_fld_out)
-
-    call neko_scratch_registry%relinquish_field(temp_indices)
-
-  end subroutine thermal_conductivity_design_map_backward_safe
 
   subroutine thermal_conductivity_design_write(this, idx)
     class(thermal_conductivity_design_t), intent(inout) :: this
-    integer, intent(in) :: idx
-
-    call this%output%sample(real(idx, kind=rp))
-
+    integer,                             intent(in)     :: idx
+    ! Hook for custom writing of design if you want it
   end subroutine thermal_conductivity_design_write
 
+  !=========================================================================!
+  !  Design: get current design vector
+  !=========================================================================!
   subroutine thermal_conductivity_design_get_design(this, values)
-    class(thermal_conductivity_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: values
+    class(thermal_conductivity_design_t), intent(in)    :: this
+    type(vector_t),                       intent(inout) :: values
     integer :: n
 
     n = this%size()
     call values%init(n)
-    call copy(values%x, this%design_indicator%x, n)
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(values%x, this%design_indicator%x, n)
     end if
-
   end subroutine thermal_conductivity_design_get_design
 
+  !=========================================================================!
+  !  Design: get sensitivity vector
+  !=========================================================================!
   subroutine thermal_conductivity_design_get_sensitivity(this, values)
-    class(thermal_conductivity_design_t), intent(in) :: this
-    type(vector_t), intent(inout) :: values
+    class(thermal_conductivity_design_t), intent(in)    :: this
+    type(vector_t),                       intent(inout) :: values
     integer :: n
 
     n = this%size()
     call values%init(n)
-    call copy(values%x, this%sensitivity%x, n)
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
+    else
+       call copy(values%x, this%sensitivity%x, n)
+    end if
+  end subroutine thermal_conductivity_design_get_sensitivity
+
+  !=========================================================================!
+  !  Volume constraint: init
+  !=========================================================================!
+  !> Direct initializer:
+  !!   - design: must be thermal_conductivity_design_t
+  !!   - coef  : same coef used by the objective
+  !!   - name  : constraint name (for logs)
+  !!   - is_max: .false. => V > limit; .true. => V < limit
+  !!   - limit : target volume fraction
+  subroutine thermal_volume_constraint_init(this, design, coef, name, &
+       is_max, limit)
+    class(thermal_volume_constraint_t), intent(inout) :: this
+    class(design_t),                    intent(in)    :: design
+    type(coef_t),           target,     intent(in)    :: coef
+    character(len=*),                  intent(in)    :: name
+    logical,                           intent(in)    :: is_max
+    real(kind=rp),                     intent(in)    :: limit
+
+    integer :: n
+
+    ! Base class init (no separate mask_name)
+    call this%init_base(name, design%size(), '')
+
+    this%is_max  = is_max
+    this%limit   = limit
+    this%coef    => coef
+
+    n = design%size()
+
+    ! Domain volume: use the SEM coef volume
+    this%volume_domain = this%coef%volume
+
+    ! Initialize value and sensitivity
+    call this%update_value(design)
+
+    ! Sensitivity: d/d rho = -B / |Omega|   (flip sign if is_max)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, this%coef%B_d, n)
+       call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, n)
+       if (this%is_max) then
+          call device_cmult(this%sensitivity%x_d, -1.0_rp, n)
+       end if
+    else
+       call copy(this%sensitivity%x, this%coef%B, n)
+       call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, n)
+       if (this%is_max) then
+          call cmult(this%sensitivity%x, -1.0_rp, n)
+       end if
     end if
 
-  end subroutine thermal_conductivity_design_get_sensitivity
+  end subroutine thermal_volume_constraint_init
+
+  subroutine thermal_volume_constraint_free(this)
+    class(thermal_volume_constraint_t), intent(inout) :: this
+    call this%free_base()
+  end subroutine thermal_volume_constraint_free
+
+  !> Recompute g(design) = limit - V/|Omega|  (flip sign if is_max)
+  subroutine thermal_volume_constraint_update_value(this, design)
+    class(thermal_volume_constraint_t), intent(inout) :: this
+    class(design_t),                    intent(in)    :: design
+    real(kind=rp) :: volume
+
+    volume = this%compute_volume(design)
+
+    this%value = this%limit - volume / this%volume_domain
+    if (this%is_max) this%value = -this%value
+
+  end subroutine thermal_volume_constraint_update_value
+
+  !> Sensitivity is constant in this implementation (set in init).
+  subroutine thermal_volume_constraint_update_sensitivity(this, design)
+    class(thermal_volume_constraint_t), intent(inout) :: this
+    class(design_t),                    intent(in)    :: design
+    ! No-op: this%sensitivity is already correct from init.
+  end subroutine thermal_volume_constraint_update_sensitivity
+
+  !> Computes V(design) = ∫ rho dΩ over the whole domain
+  function thermal_volume_constraint_compute_volume(this, design) result(volume)
+    class(thermal_volume_constraint_t), intent(inout) :: this
+    class(design_t),                    intent(in)    :: design
+    real(kind=rp) :: volume
+
+    type(vector_t) :: values
+    integer :: n
+
+    volume = 0.0_rp
+
+    select type(d => design)
+    type is (thermal_conductivity_design_t)
+       n = d%size()
+       call d%get_values(values)
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          volume = device_glsc2(values%x_d, this%coef%B_d, n)
+       else
+          volume = glsc2(values%x, this%coef%B, n)
+       end if
+
+       call values%free()
+
+    class default
+       call neko_error('thermal_volume_constraint_compute_volume: requires thermal_conductivity_design_t')
+    end select
+
+  end function thermal_volume_constraint_compute_volume
 
 end module heat_compliance

@@ -11,7 +11,7 @@
         "runtime_statistics": { "enabled": true },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 2,
+            "polynomial_order": 7,
             "dealias": true
         },
         "fluid": {
@@ -63,7 +63,7 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 20,
+            "max_iterations": 100,
             "tolerance": 1.0e-6,
             "enable_output": true,
             "mma": {
@@ -78,10 +78,24 @@
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 1000.0,
-                "d": 1.0
+                "c": 10.0,
+                "d": 10.0
             }
         },
     },
+    "mapping": [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.1
+                },
+                {
+                    "type": "RAMP",
+                    "f_max": 1,
+                    "f_min": 0.001,
+                    "q": 3,
+                    "convex_up": true
+                }
+    ]
+
 
 }
