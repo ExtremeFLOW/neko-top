@@ -39,8 +39,8 @@ module SIMP_mapping
   use field, only: field_t
   use coefs, only: coef_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  ! use device_SIMP_mapping, only: device_SIMP_mapping_apply, &
-  !      device_SIMP_mapping_apply_backward
+  use device_SIMP_mapping, only: device_SIMP_mapping_apply, &
+       device_SIMP_mapping_apply_backward
   use json_utils, only: json_get, json_get_or_default
   implicit none
   private
