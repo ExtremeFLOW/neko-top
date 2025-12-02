@@ -50,6 +50,7 @@ module mapping_handler
   use utils, only: neko_warning
   use vector, only:vector_t
   use neko_ext, only: field_to_vector, vector_to_field
+  use gather_scatter, only : gs_op_add
   implicit none
   private
 
@@ -91,6 +92,8 @@ module mapping_handler
      !> Read from the json file and initialize the mapping_cascade.
      procedure, pass(this) :: add_json_mappings => &
           mapping_handler_add_json_mappings
+     !> Force a field to be continuous.
+     procedure, pass(this) :: make_cts => mapping_handler_make_cts
   end type mapping_handler_t
 
 contains
@@ -139,6 +142,9 @@ contains
     ! Start by copying the first X_in into the tmp_fld_out to begin the
     ! cascade.
     call field_copy(tmp_fld_out, X_in)
+
+    ! enforce continuity in the field
+    call this%make_cts(tmp_fld_out)
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
@@ -204,6 +210,9 @@ contains
     ! Start by copying the first sens_in into the tmp_fld_out to begin the
     ! cascade.
     call field_copy(tmp_fld_out, sens_in)
+
+    ! enforce continuity in the field
+    call this%make_cts(tmp_fld_out)
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
@@ -334,4 +343,21 @@ contains
     this%mapping_cascade(n_mappings + 1)%mapping = mapping
 
   end subroutine mapping_handler_add_mapping
+
+  !> Force a field to be continuous.
+  !! This can be done in many ways, here it is a simple average.
+  !! @param this The handler object
+  !! @param fld The field to be made continuous.
+  subroutine mapping_handler_make_cts(this, fld)
+    class(mapping_handler_t), intent(inout) :: this
+    type(field_t), intent(inout) :: fld
+
+    call this%coef%gs_h%op(fld, gs_op_add)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(fld%x_d, this%coef%mult_d, fld%size())
+    else
+       call col2(fld%x, this%coef%mult, fld%size())
+    end if
+
+  end subroutine mapping_handler_make_cts
 end module mapping_handler
