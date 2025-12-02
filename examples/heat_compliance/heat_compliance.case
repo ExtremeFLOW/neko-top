@@ -48,14 +48,6 @@
                     "type": "velocity_value",
                     "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1, 2 ]
-                },
-                {
-                    "type": "outflow",
-                    "zone_indices": [ 3 ]
-                },
-                {
-                    "type": "no_slip",
-                    "zone_indices": [ 4, 5, 6 ]
                 }
             ]
         },
@@ -68,17 +60,17 @@
             "enable_output": true,
             "mma": {
                 "max_iter": 100,
-                "subsolver": "dip",
+                "subsolver": "dpip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 1.0,
+                "scale": 10.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 10.0,
+                "c": 1000.0,
                 "d": 10.0
             }
         },
@@ -86,14 +78,13 @@
     "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.1
+                    "r": 0.3
                 },
                 {
-                    "type": "RAMP",
+                    "type": "SIMP",
                     "f_max": 1,
                     "f_min": 0.001,
-                    "q": 3,
-                    "convex_up": true
+                    "p": 2,
                 }
     ]
 

@@ -111,6 +111,22 @@ program usrneko
   class default
      call neko_error("??!")
   end select
+
+!   ! -------------------------------------------------------------------------- !
+!   ! Perform finite difference validation
+!   ! update obj and cons and sensitivities for the init design
+!     if (pe_rank == 0) then
+!        print *, "Performing finite difference validation..."
+!     endif
+!     select type(des)
+!   type is (thermal_conductivity_design_t)
+!     call finite_difference_validation(des, 110, 1.0e-6_rp, neko_case%fluid%c_Xh, parameters)
+!   class default
+!      call neko_error("??!")
+!   end select
+
+!    call neko_error("done")
+!   ! -------------------------------------------------------------------------- !
   ! Add objectives to the problem
   call prob%add_objective(heat_compliance)
 
@@ -129,27 +145,17 @@ program usrneko
   call prob%add_constraint(volume_constraint)
 
   call MPI_Barrier(neko_comm, ierr)
-  ! -------------------------------------------------------------------------- !
-  ! Perform finite difference validation
-  ! update obj and cons and sensitivities for the init design
-  !   call deflection%update_value(des)
-  !   call beamweight%update_value(des)
-  !   call deflection%update_sensitivity(des)
-  !   call beamweight%update_sensitivity(des)
-  !   if (pe_rank == 0) then
-  !      print *, "Performing finite difference validation..."
-  !   endif
-  !   call finite_difference_validation(des, 1, 1.0e-6_rp)
 
-  call prob%update_objectives(des)
-  call prob%update_objective_sensitivities(des)
+
+  !call prob%update_objectives(des)
+  !call prob%update_objective_sensitivities(des)
   !call prob%update_constraints(des)
   !call prob%update_constraint_sensitivities(des)
 
 
-  call prob%get_all_objective_values(all_objectives)
+  !call prob%get_all_objective_values(all_objectives)
   !call prob%get_constraint_values(constraint_value)
-  call prob%get_objective_value(objective_value)
+  !call prob%get_objective_value(objective_value)
 
   ! -------------------------------------------------------------------------- !
   ! Execute the optimization
@@ -175,4 +181,93 @@ program usrneko
 
   if (allocated(opt)) deallocate(opt)
 
-end program usrneko
+  end program usrneko
+
+  ! ========================================================================== !
+! Finite difference validation subroutines
+! ========================================================================== !
+
+subroutine finite_difference_validation(des, k_test, delta, coef, parameters)
+  use comm, only: pe_rank
+  use heat_compliance, only: heat_compliance_t, thermal_conductivity_design_t, thermal_volume_constraint_t
+  use num_types, only: rp
+  use vector, only: vector_t
+  use coefs, only: coef_t
+  use json_module, only: json_file
+  use design, only: design_t
+
+  type(thermal_conductivity_design_t), intent(in) :: des
+  integer, intent(in) :: k_test
+  real(rp), intent(in) :: delta
+  type(coef_t), intent(in) :: coef
+  type(json_file), intent(inout) :: parameters
+
+  type(vector_t) :: designvec
+  type(thermal_conductivity_design_t) :: pert_design
+  type(heat_compliance_t) :: obj
+  real(rp) :: f_original, f_perturbed, fd_derivative, analytical_derivative
+  real(rp) :: error, rel_error
+  integer :: n
+  real(rp), allocatable :: sensitivities(:)
+
+  ! Initialize objective
+  call obj%init_from_attributes(des, coef, parameters)
+
+  ! Get original value and sensitivities
+  call obj%update_value(des)
+  call obj%update_sensitivity(des)
+  f_original = obj%value
+
+  n = des%size()
+  allocate(sensitivities(n))
+  sensitivities = obj%sensitivity%x
+
+  ! Create perturbed design
+  call pert_design%init(parameters, coef)
+  call designvec%init(n)
+  call des%get_values(designvec)
+  if (pe_rank == 0) then !only have one rank perturb
+  if (k_test >= 1 .and. k_test <= n) then
+     designvec%x(k_test) = designvec%x(k_test) + delta
+  endif
+  end if
+  call pert_design%update_design(designvec)
+
+
+  ! Compute perturbed value
+  call obj%update_value(pert_design)
+  f_perturbed = obj%value
+
+  ! Finite difference derivative
+  fd_derivative = (f_perturbed - f_original) / delta
+  analytical_derivative = sensitivities(k_test)
+
+  ! Calculate error
+  error = abs(fd_derivative - analytical_derivative)
+  if (abs(analytical_derivative) > 1e-12) then
+     rel_error = error / abs(analytical_derivative)
+  else
+     rel_error = error
+  endif
+
+  ! Output results
+  if (pe_rank == 0) then
+     print *, "=============================================="
+     print *, "FINITE DIFFERENCE VALIDATION"
+     print *, "=============================================="
+     print *, "Test variable index:      ", k_test
+     print *, "Perturbation size (delta):", delta
+     print *, "Original function value:  ", f_original
+     print *, "Perturbed function value: ", f_perturbed
+     print *, "Finite difference deriv:  ", fd_derivative
+     print *, "Analytical derivative:    ", analytical_derivative
+     print *, "Absolute error:           ", error
+     print *, "Relative error:           ", rel_error
+     print *, "=============================================="
+  endif
+
+  deallocate(sensitivities)
+  call obj%free()
+end subroutine finite_difference_validation
+
+
