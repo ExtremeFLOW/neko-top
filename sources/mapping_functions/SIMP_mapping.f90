@@ -122,8 +122,8 @@ contains
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       !call device_SIMP_mapping_apply(f_min, f_max, p, X_out%x_d, X_in%x_d, n)
-       call neko_error("not implemented")
+       call device_SIMP_mapping_apply(this%f_min, this%f_max, this%p, &
+            X_out%x_d, X_in%x_d, n)
     else
        do i = 1, n
           X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
@@ -148,9 +148,8 @@ contains
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       ! call device_SIMP_mapping_apply_backward(f_min, f_max, p, sens_out%x_d, &
-       !      sens_in%x_d, X_in%x_d, n)
-       call neko_error("not implemented")
+       call device_SIMP_mapping_apply_backward(this%f_min, this%f_max, this%p, &
+            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
        do i = 1, n
           sens_out%x(i,1,1,1) = sens_in%x(i,1,1,1) * (this%f_max - this%f_min) &
