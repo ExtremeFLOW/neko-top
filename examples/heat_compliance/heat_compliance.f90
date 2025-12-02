@@ -31,104 +31,65 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 
 module heat_compliance
-  use num_types,        only : rp, sp
-  use mpi_f08,          only : mpi_exscan, mpi_sum, MPI_INTEGER, MPI_Allreduce
-  use comm,             only : pe_rank, pe_size, neko_comm, mpi_real_precision
-
-  use objective,        only : objective_t
-  use design,           only : design_t
-  use constraint,       only : constraint_t
-
-  use math,             only : glsum, col2, rzero, cmult, copy, glsc2
-  use vector,           only : vector_t
-
-  use device,           only : device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use device_math,      only : device_copy, device_col2, device_cfill,        &
-                               device_subcol3, device_cmult, device_glsc2
-  use neko_config,      only : NEKO_BCKND_DEVICE
-
-  use field,            only : field_t
-  use field_math,       only : field_rzero, field_col2, field_addcol3,        &
-                               field_rone, field_copy, field_add3, field_cmult, field_cfill
-  use field_registry,   only : neko_field_registry
-  use fld_file_output,  only : fld_file_output_t
-
-  use mapping_handler,  only : mapping_handler_t
-  use coefs,            only : coef_t
-  use mapping,          only : mapping_t
-
-  use scratch_registry, only : neko_scratch_registry
-  use point_zone_registry, only : neko_point_zone_registry
-  use point_zone,       only : point_zone_t
-
-  use json_module,      only : json_file
-  use json_utils,       only : json_get, json_get_or_default
-
-  use simple_brinkman_source_term, only : simple_brinkman_source_term_t
-  use neko_ext,         only : field_to_vector, vector_to_field
-  use optimization_ic,  only : set_optimization_ic
-
-  use ax_product,       only : ax_t, ax_helm_factory
-  use krylov,           only : ksp_t, ksp_monitor_t, krylov_solver_factory
-  use precon,           only : pc_t, precon_factory, precon_destroy
-  use jacobi,           only : jacobi_t
-  use device_jacobi,    only : device_jacobi_t
-  use sx_jacobi,        only : sx_jacobi_t
-
-  use bc_list,          only : bc_list_t
-  use neumann,          only : neumann_t
-  use zero_dirichlet,   only : zero_dirichlet_t
-
-  use profiler,         only : profiler_start_region, profiler_end_region
-  use gather_scatter,   only : gs_t, GS_OP_ADD
-  use pnpn_residual,    only : pnpn_prs_res_t
-  use mesh,             only : mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use mapping,          only : mapping_t
-  use dofmap,           only : dofmap_t
-
-  use logger,           only : neko_log, LOG_SIZE
-  use utils,            only : neko_error
-  use operators,        only : grad
-  use mask_ops,         only : mask_exterior_const
+  use num_types, only: rp, sp
+  use objective, only: objective_t
+  use design, only: design_t
+  use constraint, only: constraint_t
+  use vector, only: vector_t
+  use field, only: field_t
+  use field_math, only: field_rzero, field_col2, field_addcol3, field_rone, &
+       field_copy, field_cmult, field_cfill
+  use field_registry, only: neko_field_registry
+  use fld_file_output, only: fld_file_output_t
+  use mapping_handler, only: mapping_handler_t
+  use coefs, only: coef_t
+  use scratch_registry, only: neko_scratch_registry
+  use point_zone_registry, only: neko_point_zone_registry
+  use point_zone, only: point_zone_t
+  use json_module, only: json_file
+  use json_utils, only: json_get, json_get_or_default
+  use neko_ext, only: field_to_vector, vector_to_field
+  use optimization_ic, only: set_optimization_ic
+  use device_math, only: device_copy, device_cmult, device_glsc2
+  use math, only: col2, cmult, copy, glsc2
+  use ax_product, only: ax_t, ax_helm_factory
+  use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
+  use precon, only: pc_t, precon_factory, precon_destroy
+  use jacobi, only: jacobi_t
+  use device_jacobi, only: device_jacobi_t
+  use sx_jacobi, only: sx_jacobi_t
+  use hsmg, only: hsmg_t
+  use bc_list, only: bc_list_t
+  use zero_dirichlet, only: zero_dirichlet_t
+  use profiler, only: profiler_start_region, profiler_end_region
+  use gather_scatter, only: gs_t, GS_OP_ADD
+  use dofmap, only: dofmap_t
+  use logger, only: neko_log, LOG_SIZE
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use operators, only: grad
+  use mask_ops, only: mask_exterior_const
+  use utils, only: neko_error
 
   implicit none
   private
 
-  ! ========================================================================== !
-  ! Objective: minimum heat compliance (∫ φ dΩ) with uniform heat source
-  ! and a Dirichlet “sink” at zone id = 2 (φ = 0).
-  ! ========================================================================== !
   type, public, extends(objective_t) :: heat_compliance_t
      ! temperature
      type(field_t) :: phi
-     !> Ax
      class(ax_t), allocatable :: Ax
-     !> Solver results monitors
      type(ksp_monitor_t) :: ksp_results(1)
-     !> Krylov solver
      class(ksp_t), allocatable :: ksp
-     !> Preconditioner
      class(pc_t), allocatable :: pc
-     !> boundary-condition list (now contains a zero-dirichlet bc)
      type(bc_list_t) :: bclst
-     !> zero Dirichlet BC on sink zone (id = 2)
      type(zero_dirichlet_t) :: bc_sink
-     !> tolerance
      real(kind=rp) :: abstol = 1.0e-10_rp
-     !> max iterations
-     integer :: ksp_max_iter = 600
-     !> method for solving PDE
-     character(len=5) :: ksp_solver = "gmres"
-     !> preconditioner type
+     integer :: ksp_max_iter = 10000
+     character(len=2) :: ksp_solver = "cg"
      character(len=6) :: precon_type = "jacobi"
-     !> coef
      type(coef_t), pointer :: coef
-     !> mapped conductivity field
      type(field_t) :: thermal_conductivity
-     !> Mapping between design indicator and conductivity
      type(mapping_handler_t) :: mapping
      integer :: ksp_n, n, i
-     !> output here
      type(fld_file_output_t), private :: output
    contains
      procedure, public :: init_from_attributes => heat_compliance_init
@@ -140,14 +101,11 @@ module heat_compliance
           heat_compliance_update_sensitivity
   end type heat_compliance_t
 
-  !> Topology optimization design variable (thermal conductivity mapping)
   type, extends(design_t), public :: thermal_conductivity_design_t
      private
      type(field_t), pointer :: design_indicator
      type(field_t), pointer :: sensitivity
-     !> A mask indicating the optimization domain
      class(point_zone_t), pointer :: optimization_domain
-     !> A logical if we're restricting the optimization domain
      logical :: has_mask
      type(coef_t), pointer :: coef
    contains
@@ -310,7 +268,7 @@ contains
     class(heat_compliance_t), intent(inout) :: this
     class(design_t),         intent(in)    :: design
     integer :: n
-    type(field_t), pointer :: RHS
+    type(field_t), pointer :: RHS, work
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(1)
 
@@ -402,6 +360,18 @@ contains
     call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2))
     call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3))
 
+    ! call this%Ax%compute(grad_phi_x%x, this%phi%x, this%coef, this%coef%msh, &
+    !      this%coef%Xh)
+    ! call field_col2(grad_phi_x, this%phi)
+    ! call field_cmult(grad_phi_x, -1.0_rp)
+    ! ! Gather-scatter on RHS
+    ! call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
+    !   if (NEKO_BCKND_DEVICE .eq. 1) then
+    !       call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
+    !    else
+    !       call col2(grad_phi_x%x, this%coef%Binv, n)
+    !    end if
+
     ! Self-adjoint problem: dF/dk ~ |grad(phi)|^2 (up to mapping chain rule)
     call grad(grad_phi_x%x, grad_phi_y%x, grad_phi_z%x, this%phi%x, this%coef)
     call field_col2(grad_phi_x, grad_phi_x)
@@ -409,6 +379,18 @@ contains
     call field_addcol3(grad_phi_x, grad_phi_z, grad_phi_z)
 
     call field_cmult(grad_phi_x, -1.0_rp)
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(grad_phi_x%x_d, this%coef%B_d, n)
+       else
+          call col2(grad_phi_x%x, this%coef%B, n)
+       end if
+       call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
+       else
+          call col2(grad_phi_x%x, this%coef%Binv, n)
+       end if      
+
 
     select type(design)
     type is (thermal_conductivity_design_t)
@@ -490,7 +472,7 @@ contains
 
     call this%init_base(name, this%design_indicator%dof%size())
 
-    call field_cfill(this%design_indicator, 1.0_rp)
+    call field_cfill(this%design_indicator, 0.3_rp)
   end subroutine thermal_conductivity_design_init
 
   !=========================================================================!
