@@ -5,10 +5,10 @@
 # - linear
 # - RAMP (both convexities)
 # - PDE filter
+# - SIMP
 #
 # Possible extensions include
 # - exponential
-# - SIMP
 # - sigmoid/heavyside step
 
 target_sources(neko-top

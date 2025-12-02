@@ -61,6 +61,7 @@ The following mappings are currently implemented in `Neko-top`.
 1. [PDE filter](@ref mapping_PDE_filter)
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
+4. [SIMP mapping](@ref mapping_SIMP)
 
 ## PDE based filter {#mapping_PDE_filter}
 A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.1002/nme.3072)
