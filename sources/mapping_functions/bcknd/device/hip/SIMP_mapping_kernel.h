@@ -47,7 +47,7 @@ __global__ void SIMP_mapping_apply_kernel(
     const int str = blockDim.x * gridDim.x;
 
     for (int i = idx; i < n; i += str) {
-        X_out_d[i] = f_min + (f_max - f_min) * X_in_d[i] ** p;
+        X_out_d[i] = f_min + (f_max - f_min) * pow(X_in_d[i], p);
     }
 }
 
@@ -64,7 +64,7 @@ __global__ void SIMP_mapping_apply_backward_kernel(
 
     for (int i = idx; i < n; i += str) {
         sens_out_d[i] = sens_in_d[i] * 
-        (f_max - f_min) * p * X_in_d[i] ** (p - 1.0)
+        (f_max - f_min) * p * pow(X_in_d[i], p - 1.0);
     }
 }
 
