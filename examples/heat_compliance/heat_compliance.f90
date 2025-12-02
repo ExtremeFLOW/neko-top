@@ -50,7 +50,8 @@ module heat_compliance
   use json_utils, only: json_get, json_get_or_default
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
-  use device_math, only: device_copy, device_cmult, device_glsc2
+  use device_math, only: device_copy, device_cmult, device_glsc2, device_col2, &
+       device_cfill
   use math, only: col2, cmult, copy, glsc2
   use ax_product, only: ax_t, ax_helm_factory
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
