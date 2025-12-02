@@ -104,13 +104,15 @@ forms depending on the convexity,
 
 concave up:
 \f[
-    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}}{1 +q(1 - X_\text{in})}
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}}{1 +q(1 - X_\text{in})},
 \f]
 
 concave down:
 \f[
-    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}(q + 1)}{q + X_\text{in}}
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}(q + 1)}{q + X_\text{in}},
 \f]
+
+where \f$q\f$ is a penalty parameter.
 
 The mapping can be selected by prescribing `"type": "RAMP"` and has the
 following input parameters:
@@ -122,3 +124,22 @@ following input parameters:
 | `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
 | `q` | \f$q\f$ in the above equation. | Real | `1.0`|
 | `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
+
+## SIMP mapping {#mapping_SIMP}
+A mapping based on the [RAMP](https://doi.org/10.1007/BF01650949) taking the following form
+
+\f[
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  X_\text{in}^p,
+\f]
+
+where \f$p\f$ is a penalty parameter.
+
+The mapping can be selected by prescribing `"type": "SIMP"` and has the
+following input parameters:
+
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
+| `p` | \f$p\f$ in the above equation. | Real | `1.0`|
