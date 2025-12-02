@@ -21,12 +21,14 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_SIMP_mapping.f90
 )
 
 if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping.cu
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/SIMP_mapping.cu
     )
 
     target_include_directories(neko-top
@@ -38,6 +40,7 @@ elseif(DEVICE_TYPE STREQUAL "HIP")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/SIMP_mapping.hip
     )
 
     target_include_directories(neko-top
