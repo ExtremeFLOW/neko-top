@@ -113,30 +113,6 @@ target_link_libraries(neko-top
 
 )
 
-if(${DEVICE_TYPE} STREQUAL "HIP")
-
-    # Pick up any ROCm version present on the system
-    file(GLOB ROCM_ROOTS /opt/rocm /opt/rocm-*)
-    list(APPEND CMAKE_PREFIX_PATH ${ROCM_ROOTS})
-
-    find_library(HIPSOLVER_LIB hipsolver REQUIRED)
-    find_library(HIPBLAS_LIB hipblas REQUIRED)
-    find_library(AMDHIP64_LIB amdhip64 REQUIRED)
-
-    message(STATUS "hipsolver: ${HIPSOLVER_LIB}")
-    message(STATUS "hipblas:   ${HIPBLAS_LIB}")
-    message(STATUS "amdhip64:  ${AMDHIP64_LIB}")
-
-    target_link_libraries(neko-top
-        ${HIPSOLVER_LIB}
-        ${HIPBLAS_LIB}
-        ${AMDHIP64_LIB}
-    )
-
-endif()
-
-
-
 # ============================================================================ #
 # Specify installation instructions
 
