@@ -126,7 +126,7 @@ following input parameters:
 | `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
 
 ## SIMP mapping {#mapping_SIMP}
-A mapping based on the [RAMP](https://doi.org/10.1007/BF01650949) taking the following form
+A mapping based on the [SIMP](https://doi.org/10.1007/BF01650949) taking the following form
 
 \f[
     X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  X_\text{in}^p,
