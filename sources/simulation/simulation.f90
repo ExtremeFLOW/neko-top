@@ -52,7 +52,7 @@ module simulation_m
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use field_math, only: field_rzero, field_copy
   use checkpoint, only: chkp_t
   use file, only: file_t

@@ -35,7 +35,7 @@ module adjoint_fluid_pnpn
   use, intrinsic :: iso_fortran_env, only: error_unit
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
@@ -305,8 +305,8 @@ contains
 
     ! Add pressure field to the registry. For this scheme it is in the same
     ! Xh as the velocity
-    call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
-    this%p_adj => neko_field_registry%get_field('p_adj')
+    call neko_registry%add_field(this%dm_Xh, 'p_adj')
+    this%p_adj => neko_registry%get_field('p_adj')
 
     !
     ! Select governing equations via associated residual and Ax types
@@ -471,14 +471,14 @@ contains
 
     ! The baseflow is the solution to the forward.
     ! Userdefined baseflows can be invoked via setting initial conditions
-    ! call neko_field_registry%add_field(this%dm_Xh, 'u')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'v')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'w')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'p')
-    this%u_b => neko_field_registry%get_field('u')
-    this%v_b => neko_field_registry%get_field('v')
-    this%w_b => neko_field_registry%get_field('w')
-    this%p_b => neko_field_registry%get_field('p')
+    ! call neko_registry%add_field(this%dm_Xh, 'u')
+    ! call neko_registry%add_field(this%dm_Xh, 'v')
+    ! call neko_registry%add_field(this%dm_Xh, 'w')
+    ! call neko_registry%add_field(this%dm_Xh, 'p')
+    this%u_b => neko_registry%get_field('u')
+    this%v_b => neko_registry%get_field('v')
+    this%w_b => neko_registry%get_field('w')
+    this%p_b => neko_registry%get_field('p')
 
     ! Read the json file
     call json_get_or_default(params, 'norm_target', &
