@@ -28,7 +28,7 @@ contains
 
     type(field_t), pointer :: u, v, w, s, brinkman_indicator
 
-    brinkman_indicator => neko_field_registry%get_field("brinkman_indicator")
+    brinkman_indicator => neko_registry%get_field("brinkman_indicator")
 
     ! See scalar.name in the case file, makes sure that we only
     ! run this for the scalar field.

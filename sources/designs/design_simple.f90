@@ -53,7 +53,6 @@ module simple_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
-  use field_registry, only: neko_field_registry
   use mpi_f08, only: MPI_Comm_size, MPI_COMM_WORLD
   use utils, only: neko_error
   implicit none

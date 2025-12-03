@@ -54,7 +54,7 @@ module adjoint_fluid_scheme_incompressible
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use json_utils, only: json_get, json_get_or_default
   use json_module, only: json_file
   use user_intf, only: user_t, dummy_user_material_properties, &
@@ -205,12 +205,12 @@ contains
     call neko_log%message(log_buf)
 
     ! Assign velocity fields
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj')
-    this%u_adj => neko_field_registry%get_field('u_adj')
-    this%v_adj => neko_field_registry%get_field('v_adj')
-    this%w_adj => neko_field_registry%get_field('w_adj')
+    call neko_registry%add_field(this%dm_Xh, 'u_adj')
+    call neko_registry%add_field(this%dm_Xh, 'v_adj')
+    call neko_registry%add_field(this%dm_Xh, 'w_adj')
+    this%u_adj => neko_registry%get_field('u_adj')
+    this%v_adj => neko_registry%get_field('v_adj')
+    this%w_adj => neko_registry%get_field('w_adj')
 
     !
     ! Material properties
@@ -367,12 +367,12 @@ contains
     call this%vlag%init(this%v_adj, 2)
     call this%wlag%init(this%w_adj, 2)
 
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj_e')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj_e')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj_e')
-    this%u_adj_e => neko_field_registry%get_field('u_adj_e')
-    this%v_adj_e => neko_field_registry%get_field('v_adj_e')
-    this%w_adj_e => neko_field_registry%get_field('w_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'u_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'v_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'w_adj_e')
+    this%u_adj_e => neko_registry%get_field('u_adj_e')
+    this%v_adj_e => neko_registry%get_field('v_adj_e')
+    this%w_adj_e => neko_registry%get_field('w_adj_e')
 
     ! Initialize the source term
     call this%source_term%init(this%f_adj_x, this%f_adj_y, this%f_adj_z, &
@@ -637,7 +637,7 @@ contains
          this%material_properties, time)
 
     if (len(trim(this%nut_field_name)) > 0) then
-       nut => neko_field_registry%get_field(this%nut_field_name)
+       nut => neko_registry%get_field(this%nut_field_name)
        call field_addcol3(this%mu, nut, this%rho)
     end if
 
