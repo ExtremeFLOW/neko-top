@@ -11,7 +11,6 @@ module mma_optimizer
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
 

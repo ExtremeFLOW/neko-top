@@ -56,7 +56,7 @@ module adjoint_scalar_scheme
   use facet_zone, only : facet_zone_t
   use time_scheme_controller, only : time_scheme_controller_t
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
-  use field_registry, only : neko_field_registry
+  use registry, only : neko_registry
   use json_utils, only : json_get, json_get_or_default, json_extract_item
   use json_module, only : json_file
   use user_intf, only : user_t, dummy_user_material_properties, &
@@ -268,9 +268,9 @@ contains
     character(len=:), allocatable :: solver_type, solver_precon
     type(json_file) :: precon_params
 
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
+    this%u => neko_registry%get_field('u')
+    this%v => neko_registry%get_field('v')
+    this%w => neko_registry%get_field('w')
     this%rho => rho
 
     ! get the primal adjoint's name
@@ -325,15 +325,15 @@ contains
     this%params => params_adjoint
     this%msh => msh
 
-    if (.not. neko_field_registry%field_exists(this%name)) then
-       call neko_field_registry%add_field(this%dm_Xh, this%name)
+    if (.not. neko_registry%field_exists(this%name)) then
+       call neko_registry%add_field(this%dm_Xh, this%name)
     end if
 
-    this%s_adj => neko_field_registry%get_field(this%name)
+    this%s_adj => neko_registry%get_field(this%name)
 
     call this%s_adj_lag%init(this%s_adj, 2)
 
-    this%s => neko_field_registry%get_field(this%primal_name)
+    this%s => neko_registry%get_field(this%primal_name)
 
     this%gs_Xh => gs_Xh
     this%c_Xh => c_Xh
@@ -525,7 +525,7 @@ contains
     ! factor = rho * cp / pr_turb
     if (this%variable_material_properties .and. &
          len(trim(this%nut_field_name)) > 0) then
-       nut => neko_field_registry%get_field(this%nut_field_name)
+       nut => neko_registry%get_field(this%nut_field_name)
 
        ! lambda = lambda + rho * cp * nut / pr_turb
        call neko_scratch_registry%request_field(lambda_factor, index, .false.)

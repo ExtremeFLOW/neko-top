@@ -53,7 +53,7 @@ module brinkman_design
   use vector, only: vector_t
   use math, only: copy
   use device_math, only: device_copy
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
@@ -318,18 +318,18 @@ contains
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 
-      call neko_field_registry%add_field(dof, "design_indicator", .true.)
-      call neko_field_registry%add_field(dof, "brinkman_amplitude", .true.)
-      call neko_field_registry%add_field(dof, "sensitivity", .true.)
+      call neko_registry%add_field(dof, "design_indicator", .true.)
+      call neko_registry%add_field(dof, "brinkman_amplitude", .true.)
+      call neko_registry%add_field(dof, "sensitivity", .true.)
 
     end associate
 
     this%design_indicator => &
-         neko_field_registry%get_field("design_indicator")
+         neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => &
-         neko_field_registry%get_field("brinkman_amplitude")
+         neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => &
-         neko_field_registry%get_field("sensitivity")
+         neko_registry%get_field("sensitivity")
 
     ! TODO
     ! this is where we steal basically everything in

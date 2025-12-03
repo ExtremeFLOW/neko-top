@@ -47,7 +47,6 @@ module volume_constraint
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use field, only: field_t
-  use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const

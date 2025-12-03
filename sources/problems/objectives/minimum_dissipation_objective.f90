@@ -74,7 +74,7 @@ module minimum_dissipation_objective
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use coefs, only: coef_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
@@ -173,13 +173,13 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
+    this%u => neko_registry%get_field('u')
+    this%v => neko_registry%get_field('v')
+    this%w => neko_registry%get_field('w')
     this%c_Xh => simulation%fluid%c_Xh
-    this%adjoint_u => neko_field_registry%get_field('u_adj')
-    this%adjoint_v => neko_field_registry%get_field('v_adj')
-    this%adjoint_w => neko_field_registry%get_field('w_adj')
+    this%adjoint_u => neko_registry%get_field('u_adj')
+    this%adjoint_v => neko_registry%get_field('v_adj')
+    this%adjoint_w => neko_registry%get_field('w_adj')
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
