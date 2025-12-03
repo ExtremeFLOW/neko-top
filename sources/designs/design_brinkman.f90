@@ -301,9 +301,9 @@ contains
     class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
-    call this%brinkman_amplitude%free()
-    call this%design_indicator%free()
-    call this%sensitivity%free()
+    nullify(this%brinkman_amplitude)
+    nullify(this%design_indicator)
+    nullify(this%sensitivity)
 
   end subroutine brinkman_design_free
 
