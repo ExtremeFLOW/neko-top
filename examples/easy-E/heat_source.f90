@@ -100,7 +100,7 @@ contains
        end if
     end if
 
-    s => neko_field_registry%get_field('s')
+    s => neko_registry%get_field('s')
 
     current_temperature = min(1.0_rp, time%t / ramp_time_end) * target_temperature
 

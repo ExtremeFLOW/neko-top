@@ -45,7 +45,9 @@ module adjoint_scalars
   use json_utils, only: json_get, json_get_or_default, json_extract_item
   use field, only: field_t
   use field_series, only: field_series_t
-  use field_registry, only: neko_field_registry
+  use scalar_aux, only : scalar_step_info
+  use krylov, only : ksp_monitor_t
+  use registry, only: neko_registry
   use checkpoint, only: chkp_t
   use krylov, only: ksp_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
@@ -265,11 +267,26 @@ contains
     type(time_state_t), intent(in) :: time
     type(time_scheme_controller_t), intent(inout) :: ext_bdf
     type(time_step_controller_t), intent(inout) :: dt_controller
+    type(ksp_monitor_t), dimension(size(this%adjoint_scalar_fields)) :: ksp_results
     integer :: i
+    logical :: all_frozen
+
+    all_frozen = .true.
 
     ! Iterate through all scalar fields
     do i = 1, size(this%adjoint_scalar_fields)
-       call this%adjoint_scalar_fields(i)%step(time, ext_bdf, dt_controller)
+       all_frozen = all_frozen .and. this%adjoint_scalar_fields(i)%freeze
+       call this%adjoint_scalar_fields(i)%step(time, ext_bdf, dt_controller, &
+            ksp_results(i))
+    end do
+
+    if (.not. all_frozen) then
+       call ksp_results(i)%print_header()
+    end if
+
+    do i = 1, size(this%adjoint_scalar_fields)
+       if (this%adjoint_scalar_fields(i)%freeze) cycle
+       call scalar_step_info(time, ksp_results(i))
     end do
   end subroutine adjoint_scalars_step
 

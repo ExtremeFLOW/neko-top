@@ -59,7 +59,7 @@ module adjoint_lube_source_term
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use utils, only: neko_error
-  use field_registry, only : neko_field_registry
+  use registry, only : neko_registry
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
@@ -203,7 +203,7 @@ contains
 
     select type (design)
     type is (brinkman_design_t)
-       this%chi => neko_field_registry%get_field("brinkman_amplitude")
+       this%chi => neko_registry%get_field("brinkman_amplitude")
     class default
        call neko_error('Unknown design type')
     end select

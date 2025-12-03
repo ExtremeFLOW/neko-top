@@ -54,7 +54,6 @@ module simplefield_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
-  use field_registry, only: neko_field_registry
 
   use fld_file_output, only: fld_file_output_t
 
