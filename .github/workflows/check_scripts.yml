@@ -133,7 +133,6 @@ jobs:
         id: get-neko
         uses: ./.github/actions/setup_neko
         with:
-          neko-version: ${{ inputs.neko-version }}
           json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
           parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
           hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
