@@ -75,7 +75,7 @@ runs:
         REPO: https://github.com/jacobwilliams/json-fortran.git
       run: |
         # Get the GIT sha for the current commit
-        SHA=$(git rev-parse --short HEAD)
+        SHA=$(git ls-remote $REPO $VERSION | awk '{print $1}')
         key="json-fortran-$SHA-$OS-$COMPILER-${COMPILER_FLAGS// /_}"
         printf "key=%s\n" "$key" | tee -a $GITHUB_OUTPUT
 
