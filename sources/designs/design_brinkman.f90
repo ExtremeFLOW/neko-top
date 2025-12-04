@@ -461,9 +461,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(values%x, this%design_indicator%x, n)
     end if
 
   end subroutine brinkman_design_get_design
@@ -474,9 +475,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
+    else
+       call copy(values%x, this%sensitivity%x, n)
     end if
 
   end subroutine brinkman_design_get_sensitivity
@@ -487,9 +489,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(x%x, this%design_indicator%dof%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
+    else
+       call copy(x%x, this%design_indicator%dof%x, n)
     end if
 
   end subroutine brinkman_design_get_x
@@ -515,9 +518,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(y%x, this%design_indicator%dof%y, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
+    else
+       call copy(y%x, this%design_indicator%dof%y, n)
     end if
 
   end subroutine brinkman_design_get_y
@@ -543,9 +547,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(z%x, this%design_indicator%dof%z, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
+    else
+       call copy(z%x, this%design_indicator%dof%z, n)
     end if
 
   end subroutine brinkman_design_get_z
@@ -571,16 +576,18 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(this%design_indicator%x, values%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%design_indicator%x_d, values%x_d, n)
+    else
+       call copy(this%design_indicator%x, values%x, n)
     end if
 
     call this%map_forward()
 
-    call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(values%x, this%design_indicator%x, n)
     end if
 
   end subroutine brinkman_design_update_design
