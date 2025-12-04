@@ -43,6 +43,10 @@ contains
     type(csv_file_t) :: logger
     integer :: n
 
+    ! Initialize the vectors
+    call design_vector%init(des%size())
+    call constraint_vec%init(problem%get_n_constraints())
+
     ! Get the design vector for reference
     ! This is the design vector we will perturb
     call des%get_values(design_vector)
@@ -137,6 +141,12 @@ contains
        log_data%x(4) = fd_error
        call logger%write(log_data)
     end do
+
+    ! Free the internal vectors
+    call design_vector%free()
+    call design_perturbed%free()
+    call constraint_vec%free()
+    call log_data%free()
 
   end subroutine compute_sensitivity_i
 
