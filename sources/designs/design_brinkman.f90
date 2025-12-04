@@ -596,9 +596,9 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
     type(field_t), pointer :: tmp_fld
-    integer :: temp_indices(1)
+    integer :: temp_index
 
-    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1), .false.)
+    call neko_scratch_registry%request(tmp_fld, temp_index, .false.)
 
     call vector_to_field(tmp_fld, sensitivity)
 
@@ -609,7 +609,7 @@ contains
             0.0_rp)
     end if
 
-    call neko_scratch_registry%relinquish_field(temp_indices)
+    call neko_scratch_registry%relinquish_field(temp_index)
 
   end subroutine brinkman_design_map_backward
 
