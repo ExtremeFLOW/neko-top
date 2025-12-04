@@ -210,7 +210,13 @@ contains
     call profiler_start_region("Optimizer iteration")
 
     call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(0)
+    end if
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(0)
+    end if
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -233,12 +239,6 @@ contains
             problem%get_n_objectives(), problem%get_n_constraints(), &
             unconstrained_problem)
        call this%logger%write(log_data)
-
-       if (present(simulation)) then
-          call simulation%write(0)
-       end if
-
-       call design%write(0)
 
        call profiler_end_region("Optimizer logging")
     end if
@@ -276,7 +276,13 @@ contains
        call design%update_design(x)
 
        call problem%compute(design, simulation)
+       if (present(simulation) .and. this%enable_output) then
+          call simulation%write_forward(iter)
+       end if
        call problem%compute_sensitivity(design, simulation)
+       if (present(simulation) .and. this%enable_output) then
+          call simulation%write_adjoint(iter)
+       end if
 
        call problem%get_objective_value(objective_value)
        call problem%get_constraint_values(constraint_value)
@@ -308,9 +314,6 @@ contains
           call this%logger%write(log_data)
           call log_data%free()
 
-          if (present(simulation)) then
-             call simulation%write(iter)
-          end if
           call design%write(iter)
           call profiler_end_region("Optimizer logging")
        end if
