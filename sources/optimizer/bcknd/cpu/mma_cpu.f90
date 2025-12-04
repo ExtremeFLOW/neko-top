@@ -60,8 +60,10 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
-    call profiler_start_region("MMA gensub")
+    call profiler_start_region("MMA update")
+
     ! generate a convex approximation of the problem
+    call profiler_start_region("MMA gensub")
     call mma_gensub_cpu(this, iter, x, df0dx, fval, dfdx)
     call profiler_end_region("MMA gensub")
 
@@ -73,6 +75,8 @@ contains
        call mma_subsolve_dpip_cpu(this, x)
     end if
     call profiler_end_region("MMA subsolve")
+
+    call profiler_end_region("MMA update")
 
     this%is_updated = .true.
   end subroutine mma_update_cpu
@@ -104,11 +108,15 @@ contains
     real(kind=rp), dimension(this%m), intent(in) :: fval
     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
 
+    call profiler_start_region("MMA KKT computation")
+
     if (this%subsolver .eq. "dip") then
        call mma_dip_KKT_cpu(this, x, df0dx, fval, dfdx)
     else
        call mma_dpip_KKT_cpu(this, x, df0dx, fval, dfdx)
     end if
+
+    call profiler_end_region("MMA KKT computation")
   end subroutine mma_KKT_cpu
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -443,8 +451,7 @@ contains
             low => this%low%x, upp => this%upp%x, &
             alpha => this%alpha%x, beta => this%beta%x, &
             c => this%c%x, d => this%d%x, &
-            a0 => this%a0, a => this%a%x, &
-            bi => this%bi%x)
+            a0 => this%a0, a => this%a%x)
 
          rex = (p0j + matmul(transpose(pij), lambda)) / (upp - x)**2 &
               - (q0j + matmul(transpose(qij), lambda)) / (x - low)**2 &
