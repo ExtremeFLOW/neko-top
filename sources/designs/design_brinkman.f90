@@ -313,7 +313,7 @@ contains
     character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
     logical, intent(in) :: dealias
-    integer :: n, i
+    integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
@@ -324,12 +324,9 @@ contains
 
     end associate
 
-    this%design_indicator => &
-         neko_registry%get_field("design_indicator")
-    this%brinkman_amplitude => &
-         neko_registry%get_field("brinkman_amplitude")
-    this%sensitivity => &
-         neko_registry%get_field("sensitivity")
+    this%design_indicator => neko_registry%get_field("design_indicator")
+    this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
+    this%sensitivity => neko_registry%get_field("sensitivity")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -337,20 +334,7 @@ contains
     ! for now, make it a cylinder by hand
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
-    this%design_indicator%x = 0.0_rp
-
-    n = this%design_indicator%dof%size()
-    ! This is probably getting fixed in tim's PR anyway, otherwise I'll fix it.
-    do i = 1, n
-       this%design_indicator%x(i,1,1,1) = 0.0_rp
-    end do
-
-    ! again this will be handled better in the future...
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%design_indicator%x, &
-            this%design_indicator%x_d, n, &
-            HOST_TO_DEVICE, sync = .false.)
-    end if
+    this%design_indicator = 0.0_rp
 
     ! TODO
     ! Regarding masks and filters,
@@ -399,6 +383,7 @@ contains
     call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
+    n = this%design_indicator%dof%size()
     call this%init_base(name, n)
 
     ! init the simple brinkman term for the forward problem
@@ -461,9 +446,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(values%x, this%design_indicator%x, n)
     end if
 
   end subroutine brinkman_design_get_design
@@ -474,9 +460,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
+    else
+       call copy(values%x, this%sensitivity%x, n)
     end if
 
   end subroutine brinkman_design_get_sensitivity
@@ -487,9 +474,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(x%x, this%design_indicator%dof%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
+    else
+       call copy(x%x, this%design_indicator%dof%x, n)
     end if
 
   end subroutine brinkman_design_get_x
@@ -515,9 +503,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(y%x, this%design_indicator%dof%y, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
+    else
+       call copy(y%x, this%design_indicator%dof%y, n)
     end if
 
   end subroutine brinkman_design_get_y
@@ -543,9 +532,10 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(z%x, this%design_indicator%dof%z, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
+    else
+       call copy(z%x, this%design_indicator%dof%z, n)
     end if
 
   end subroutine brinkman_design_get_z
@@ -571,16 +561,18 @@ contains
     integer :: n
 
     n = this%size()
-    call copy(this%design_indicator%x, values%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%design_indicator%x_d, values%x_d, n)
+    else
+       call copy(this%design_indicator%x, values%x, n)
     end if
 
     call this%map_forward()
 
-    call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
+    else
+       call copy(values%x, this%design_indicator%x, n)
     end if
 
   end subroutine brinkman_design_update_design
@@ -589,9 +581,9 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     type(vector_t), intent(in) :: sensitivity
     type(field_t), pointer :: tmp_fld
-    integer :: temp_indices(1)
+    integer :: temp_index
 
-    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1), .false.)
+    call neko_scratch_registry%request(tmp_fld, temp_index, .false.)
 
     call vector_to_field(tmp_fld, sensitivity)
 
@@ -602,7 +594,7 @@ contains
             0.0_rp)
     end if
 
-    call neko_scratch_registry%relinquish_field(temp_indices)
+    call neko_scratch_registry%relinquish_field(temp_index)
 
   end subroutine brinkman_design_map_backward
 
