@@ -157,6 +157,9 @@ extern "C" {
 
     // Workspace query
     status = cusolverDnDgetrf_bufferSize(handle, n, n, (double*)A, n, &lwork);
+    if (status != CUSOLVER_STATUS_SUCCESS) {
+        exit(EXIT_FAILURE);
+    }
     cudaMalloc(&workspace, lwork * sizeof(double));
     cudaMalloc(&ipiv, n * sizeof(int));
     cudaMalloc(&info, sizeof(int));

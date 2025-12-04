@@ -10,7 +10,7 @@ module optimizer
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
-  use csv_file, only: csv_file_t
+
   implicit none
   private
 
@@ -22,8 +22,6 @@ module optimizer
      integer, public :: max_iterations
      !> The tolerance for the optimization loop
      real(kind=rp), public :: tolerance
-     !> A file writer to document the convergence history
-     type(csv_file_t), public :: logger
 
    contains
      !> Initialize the optimizer, associate it with a specific problem
@@ -33,9 +31,13 @@ module optimizer
      procedure(optimizer_run), pass(this), public, deferred :: run
      !> Free resources.
      procedure(optimizer_free), pass(this), public, deferred :: free
+     !> Free base resources.
+     procedure, pass(this) :: free_base => optimizer_free_base
 
      !> Validate the solution
      procedure(optimizer_validate), pass(this), public, deferred :: validate
+     !> Write the progress of the optimizer to the log file
+     procedure(optimizer_write), pass(this), public, deferred :: write
 
      !> The base initializer
      procedure, pass(this) :: init_base => optimizer_init_base
@@ -53,7 +55,7 @@ module optimizer
        import optimizer_t, json_file, simulation_t, problem_t, design_t, rp
        class(optimizer_t), intent(inout) :: this
        type(json_file), intent(inout) :: parameters
-       class(problem_t), intent(in) :: problem
+       class(problem_t), intent(inout) :: problem
        class(design_t), intent(in) :: design
        type(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_init_from_json
@@ -66,6 +68,14 @@ module optimizer
        class(design_t), intent(inout) :: design
        type(simulation_t), optional, intent(inout) :: simulation
      end subroutine optimizer_run
+
+     !> Interface for writing the optimizer progress
+     subroutine optimizer_write(this, iter, problem)
+       import optimizer_t, simulation_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       integer, intent(in) :: iter
+       class(problem_t), intent(in) :: problem
+     end subroutine optimizer_write
 
      !> Interface for freeing resources
      subroutine optimizer_free(this)
@@ -119,5 +129,11 @@ contains
     this%tolerance = tolerance
 
   end subroutine optimizer_init_base
+
+  !> Base free routine for the optimizer
+  !! @param this The optimizer object.
+  subroutine optimizer_free_base(this)
+    class(optimizer_t), intent(inout) :: this
+  end subroutine optimizer_free_base
 
 end module optimizer
