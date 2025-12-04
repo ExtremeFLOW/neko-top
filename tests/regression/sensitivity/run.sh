@@ -89,7 +89,7 @@ cases=$(find cases/ -type f -name "*.case")
 for case in ${cases[@]}; do
     case=${case#./}
     case_name=$(basename "$case")
-    export NEKO_LOG_FILE="sensitivity_regression_${case_name%.*}.log"
+    export NEKO_LOG_FILE="neko_${case_name%.*}.log"
     echo "Running ${case} with mpirun -n $NP"
     mpirun -n "$NP" ./sensitivity_regression_driver "${case}" || exit 1
     mv steady_state_data.csv steady_state_data_${case_name%.*}.csv
