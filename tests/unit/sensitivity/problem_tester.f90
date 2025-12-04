@@ -96,6 +96,9 @@ program problem_tester
   ! -------------------------------------------------------------------------- !
   ! Compute the sensitivity with our method
 
+  call sensitivities%init(des%size())
+  call constraint_sensitivity%init(prob%get_n_constraints(), des%size())
+
   call prob%compute(des, sim)
   call prob%compute_sensitivity(des, sim)
   if (is_objective) then
