@@ -103,11 +103,17 @@ program problem_tester
 
   call prob%compute(des, sim)
   call prob%compute_sensitivity(des, sim)
+
   if (is_objective) then
+     call sensitivities%init(des%size())
      call des%get_sensitivity(sensitivities)
   else
+     call constraint_sensitivity%init(des%size(), prob%get_n_constraints())
+
      call prob%get_constraint_sensitivities(constraint_sensitivity)
+
      call sensitivities%init(constraint_sensitivity%size())
+
      call copy(sensitivities%x, constraint_sensitivity%x, &
           constraint_sensitivity%size())
   end if
@@ -152,6 +158,9 @@ program problem_tester
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
+
+  call sensitivities%free()
+  call constraint_sensitivity%free()
 
   call prob%free()
   call des%free()

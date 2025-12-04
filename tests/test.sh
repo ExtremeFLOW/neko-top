@@ -1,4 +1,5 @@
 #!/bin/bash
+set -e
 
 # ============================================================================ #
 # Define the help function
@@ -22,7 +23,7 @@ function help() {
 
 # Handle options
 OPT="h,a"
-OPTIONS="help,all"
+OPTIONS="help,all,procs:"
 parser=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
 
 ALL=false
@@ -31,25 +32,35 @@ while true; do
     case "$1" in
         -h|--help) help && shift ;;
         -a|--all) ALL=true && shift ;;
+        --procs) NP=$2 && shift 2 ;;
         --) shift && break ;;
         *) echo "Unexpected option: $1" && help ;;
     esac
 done
 
-[ "$ALL" == true ] && UNIT_TEST=true || UNIT_TEST=false
-[ "$ALL" == true ] && SENSITIVITY_TEST=true || SENSITIVITY_TEST=false
-[ "$ALL" == true ] && MMA_TEST=true || MMA_TEST=false
-
 if [ $# -eq 0 ] && [ "$ALL" == false ]; then help; fi
 
-for arg in "$@"; do
-    case "$arg" in
-        unit) UNIT_TEST=true ;;
-        sensitivity) SENSITIVITY_TEST=true ;;
-        mma) MMA_TEST=true ;;
-        *) echo "Invalid argument: $arg" && help ;;
-    esac
-done
+# ============================================================================ #
+# Determine which tests to run
+
+UNIT_TEST=false
+SENSITIVITY_TEST=false
+MMA_TEST=false
+
+if [ "$ALL" == true ]; then
+    UNIT_TEST=true
+    SENSITIVITY_TEST=true
+    MMA_TEST=true
+else
+    for arg in "$@"; do
+        case "$arg" in
+            unit) UNIT_TEST=true ;;
+            sensitivity) SENSITIVITY_TEST=true ;;
+            mma) MMA_TEST=true ;;
+            *) echo "Invalid argument: $arg" && help ;;
+        esac
+    done
+fi
 
 # ============================================================================ #
 # Set up environment variables and source dependencies
@@ -67,11 +78,8 @@ if [ "$UNIT_TEST" == true ]; then
     ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
 
     if [ $? -ne 0 ]; then
-        echo "Some tests failed. Check test_report.log for details."
+        echo "Unit tests failed."
         exit 1
-    else
-        echo "Unit tests passed successfully."
-        exit 0
     fi
 fi
 
@@ -79,7 +87,7 @@ fi
 # Run the sensitivity regression tests
 
 if [ "$SENSITIVITY_TEST" == true ]; then
-    $MAIN_DIR/tests/regression/sensitivity/run.sh
+    $MAIN_DIR/tests/regression/sensitivity/run.sh -np=$NP
 
     if [ $? -ne 0 ]; then
         echo "Sensitivity regression tests failed."
@@ -91,7 +99,7 @@ fi
 # Run the mma regression tests
 
 if [ "$MMA_TEST" == true ]; then
-    $MAIN_DIR/tests/regression/mma/run.sh
+    $MAIN_DIR/tests/regression/mma/run.sh -np=$NP
 
     if [ $? -ne 0 ]; then
         echo "MMA regression tests failed."
