@@ -45,6 +45,7 @@ module mma
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
+  use logger, only: neko_log
 
   implicit none
   private
@@ -220,10 +221,6 @@ contains
     d = d_const
     xmin = xmin_const
     xmax = xmax_const
-    ! initializing the mma concrete type (mma_cpu_t or mma_device_t)
-    if (pe_rank .eq. 0) then
-       print *, "Initializing MMA backend to >>> ", bcknd
-    end if
 
     ! ------------------------------------------------------------------------ !
     ! Initialize the MMA object with the parameters read from json
@@ -296,6 +293,8 @@ contains
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     character(len=:), intent(in), allocatable :: bcknd, subsolver
+    character(len=256) :: log_msg
+    integer :: i
 
     call this%free()
 
@@ -360,28 +359,6 @@ contains
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
-    ! Select backend type
-    select case (bcknd)
-    case ("cpu")
-       if (pe_rank == 0) then
-          print *, "MMA initialized with CPU backend!"
-       end if
-    case ("device")
-       if (pe_rank == 0) then
-          if (NEKO_BCKND_CUDA .eq. 1) then
-             print *, "MMA initialized with CUDA backend!"
-          else if (NEKO_BCKND_HIP .eq. 1) then
-             print *, "MMA initialized with HIP backend!"
-          else if (NEKO_BCKND_OPENCL .eq. 1) then
-             print *, "MMA initialized with OPENCL backend!"
-          else
-             call neko_error('Unknown backend device in mma_init_components')
-          end if
-       end if
-    case default
-       call neko_error('Unknown backend in mma_init_components')
-    end select
-
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
@@ -402,20 +379,51 @@ contains
     if (present(asydecr)) this%asydecr = asydecr
     this%bcknd = bcknd
     this%subsolver = subsolver
-    if (pe_rank == 0) then
-       if (this%subsolver .eq. "dip") then
-          print *, "Using dual solver for MMA subsolve."
-       elseif (this%subsolver .eq. "dpip") then
-          print *, "Using dual-primal solver for MMA subsolve."
-       else
-          call neko_error('Unknown subsolver for MMA, mma_init_from_components')
-       end if
-    end if
 
-    if (pe_rank .eq. 0) then
-       print *, "MMA is initialized with a0 = ", a0, ", a = ", a, ", c = ", c, &
-            ", d = ", d, "epsimin = ", this%epsimin
-    end if
+    call neko_log%section('MMA Parameters')
+
+    write(log_msg, '(A10,1X,A)') 'backend   ', trim(this%bcknd)
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
+    call neko_log%message(log_msg)
+
+    write(log_msg, '(A10,1X,I0)') 'n         ', this%n
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,I0)') 'm         ', this%m
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,I0)') 'max_iter  ', this%max_iter
+    call neko_log%message(log_msg)
+
+    write(log_msg, '(A10,1X,E11.5)') 'epsimin   ', this%epsimin
+    call neko_log%message(log_msg)
+
+    write(log_msg, '(A10,1X,E11.5)') 'asyinit   ', this%asyinit
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,E11.5)') 'asyincr   ', this%asyincr
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,E11.5)') 'asydecr   ', this%asydecr
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,E11.5)') 'a0        ', this%a0
+    call neko_log%message(log_msg)
+
+    call neko_log%message('Parameters a')
+    do i = 1, this%m
+       write(log_msg, '(3X,A,I2,A,E11.5)') 'a(', i, ') = ', this%a%x(i)
+       call neko_log%message(log_msg)
+    end do
+    call neko_log%message('Parameters c')
+    do i = 1, this%m
+       write(log_msg, '(3X,A,I2,A,E11.5)') 'c(', i, ') = ', this%c%x(i)
+       call neko_log%message(log_msg)
+    end do
+    call neko_log%message('Parameters d')
+    do i = 1, this%m
+       write(log_msg, '(3X,A,I2,A,E11.5)') 'd(', i, ') = ', this%d%x(i)
+       call neko_log%message(log_msg)
+    end do
+
+    call neko_log%end_section()
+
     ! The object is correctly initialized
     this%is_initialized = .true.
   end subroutine mma_init_from_components
