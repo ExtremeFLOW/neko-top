@@ -1,6 +1,5 @@
 module mma_optimizer
   use optimizer, only: optimizer_t
-  use problem, only : problem_t
   use mma, only: mma_t
   use problem, only: problem_t
   use num_types, only: rp
@@ -10,7 +9,6 @@ module mma_optimizer
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use field, only: field_t
   use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
@@ -20,21 +18,13 @@ module mma_optimizer
   use matrix, only: matrix_t
 
   !only to print nglobal when running in parallel
-  use comm, only: neko_comm, pe_rank
-  use mpi_f08, only: MPI_INTEGER, mpi_sum, MPI_Allreduce
+  use comm, only: pe_rank
 
   use neko_config, only: NEKO_BCKND_DEVICE
-  ! Inclusions from external dependencies and standard libraries
-  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
 
-  use math, only: copy, cmult
-  use device_math, only: device_copy
-  use field_math, only: field_rzero
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use neko_ext, only: reset
-  use mask_ops, only: mask_exterior_const
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device, only: device_memcpy, HOST_TO_DEVICE
 
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
