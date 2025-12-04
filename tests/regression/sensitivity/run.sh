@@ -98,6 +98,12 @@ done
 python steady_state_plotter.py || exit 1
 python FD_check.py || exit 1
 
+# Clean up generated files
+find . -maxdepth 1 -type f -name "box.nmsh" -delete
+find . -maxdepth 1 -type f -name "*.log" -delete
+find . -maxdepth 1 -type f -name "*.nek5000" \
+    -exec sh -c 'rm "$1" "${1%.nek5000}".f*' _ {} \;
+
 cd "$CURRENT_DIR" || exit 1
 
 # ============================================================================ #
