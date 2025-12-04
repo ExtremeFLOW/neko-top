@@ -324,12 +324,9 @@ contains
 
     end associate
 
-    this%design_indicator => &
-         neko_registry%get_field("design_indicator")
-    this%brinkman_amplitude => &
-         neko_registry%get_field("brinkman_amplitude")
-    this%sensitivity => &
-         neko_registry%get_field("sensitivity")
+    this%design_indicator => neko_registry%get_field("design_indicator")
+    this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
+    this%sensitivity => neko_registry%get_field("sensitivity")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -337,20 +334,7 @@ contains
     ! for now, make it a cylinder by hand
     this%design_indicator = 0.0_rp
     this%brinkman_amplitude = 0.0_rp
-    this%design_indicator%x = 0.0_rp
-
-    n = this%design_indicator%dof%size()
-    ! This is probably getting fixed in tim's PR anyway, otherwise I'll fix it.
-    do i = 1, n
-       this%design_indicator%x(i,1,1,1) = 0.0_rp
-    end do
-
-    ! again this will be handled better in the future...
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%design_indicator%x, &
-            this%design_indicator%x_d, n, &
-            HOST_TO_DEVICE, sync = .false.)
-    end if
+    this%design_indicator = 0.0_rp
 
     ! TODO
     ! Regarding masks and filters,
