@@ -53,7 +53,7 @@ module brinkman_design
   use vector, only: vector_t
   use math, only: copy
   use device_math, only: device_copy
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
@@ -301,9 +301,9 @@ contains
     class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
-    call this%brinkman_amplitude%free()
-    call this%design_indicator%free()
-    call this%sensitivity%free()
+    nullify(this%brinkman_amplitude)
+    nullify(this%design_indicator)
+    nullify(this%sensitivity)
 
   end subroutine brinkman_design_free
 
@@ -318,18 +318,18 @@ contains
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 
-      call neko_field_registry%add_field(dof, "design_indicator", .true.)
-      call neko_field_registry%add_field(dof, "brinkman_amplitude", .true.)
-      call neko_field_registry%add_field(dof, "sensitivity", .true.)
+      call neko_registry%add_field(dof, "design_indicator", .true.)
+      call neko_registry%add_field(dof, "brinkman_amplitude", .true.)
+      call neko_registry%add_field(dof, "sensitivity", .true.)
 
     end associate
 
     this%design_indicator => &
-         neko_field_registry%get_field("design_indicator")
+         neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => &
-         neko_field_registry%get_field("brinkman_amplitude")
+         neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => &
-         neko_field_registry%get_field("sensitivity")
+         neko_registry%get_field("sensitivity")
 
     ! TODO
     ! this is where we steal basically everything in
@@ -461,7 +461,6 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     call copy(values%x, this%design_indicator%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%design_indicator%x_d, n)
@@ -475,7 +474,6 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     call copy(values%x, this%sensitivity%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%sensitivity%x_d, n)
@@ -489,7 +487,6 @@ contains
     integer :: n
 
     n = this%size()
-    call x%init(n)
     call copy(x%x, this%design_indicator%dof%x, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(x%x_d, this%design_indicator%dof%x_d, n)
@@ -518,7 +515,6 @@ contains
     integer :: n
 
     n = this%size()
-    call y%init(n)
     call copy(y%x, this%design_indicator%dof%y, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(y%x_d, this%design_indicator%dof%y_d, n)
@@ -547,7 +543,6 @@ contains
     integer :: n
 
     n = this%size()
-    call z%init(n)
     call copy(z%x, this%design_indicator%dof%z, n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(z%x_d, this%design_indicator%dof%z_d, n)
@@ -596,7 +591,7 @@ contains
     type(field_t), pointer :: tmp_fld
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1))
+    call neko_scratch_registry%request_field(tmp_fld, temp_indices(1), .false.)
 
     call vector_to_field(tmp_fld, sensitivity)
 

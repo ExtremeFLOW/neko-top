@@ -47,7 +47,6 @@ module volume_constraint
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use field, only: field_t
-  use field_registry, only: neko_field_registry
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
@@ -174,7 +173,7 @@ contains
     if (this%has_mask) then
 
        ! calculate the volume of the optimization domain
-       call neko_scratch_registry%request_field(work, temp_indices(1))
+       call neko_scratch_registry%request(work, temp_indices(1), .false.)
        call field_rone(work)
        call mask_exterior_const(work, this%mask, 0.0_rp)
 
@@ -186,7 +185,7 @@ contains
                design%size(), this%mask%mask%get(), this%mask%size)
        end if
 
-       call neko_scratch_registry%relinquish_field(temp_indices)
+       call neko_scratch_registry%relinquish(temp_indices)
     else
        this%volume_domain = this%c_Xh%volume
     end if
@@ -260,8 +259,10 @@ contains
 
     if (this%if_mapping) then
        ! Recompute and map backward
-       call neko_scratch_registry%request_field(unmapped, temp_indices(1))
-       call neko_scratch_registry%request_field(mapped, temp_indices(2))
+       call neko_scratch_registry%request(unmapped, temp_indices(1), &
+            .false.)
+       call neko_scratch_registry%request(mapped, temp_indices(2), &
+            .false.)
        ! The mapping will handle the mass matrix
        call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
@@ -275,7 +276,7 @@ contains
        call this%mapping%apply_backward(mapped, unmapped)
        call field_to_vector(this%sensitivity, mapped)
 
-       call neko_scratch_registry%relinquish_field(temp_indices)
+       call neko_scratch_registry%relinquish(temp_indices)
 
     else
        ! Sensitivity is just a constant so it should not be updated
@@ -315,15 +316,19 @@ contains
     type(brinkman_design_t), intent(in) :: design
     real(kind=rp) :: volume
     type(field_t), pointer :: work
-    type(vector_t) :: values, unmapped_values
-    integer :: temp_indices(1)
+    type(vector_t), pointer :: values, unmapped_values
+    integer :: temp_indices, ind_value, ind_um_value
+
+    call neko_scratch_registry%request(values, ind_value, design%size(), &
+         .false.)
 
     volume = 0.0_rp
     if (this%if_mapping) then
+       call neko_scratch_registry%request(unmapped_values, ind_um_value, &
+            design%size(), .false.)
        call design%get_values(unmapped_values)
-       call values%init(unmapped_values%size())
        call this%mapping%apply_forward(values, unmapped_values)
-       call unmapped_values%free()
+       call neko_scratch_registry%relinquish(ind_um_value)
     else
        call design%get_values(values)
     end if
@@ -331,13 +336,13 @@ contains
     if (this%has_mask) then
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_scratch_registry%request_field(work, temp_indices(1))
+          call neko_scratch_registry%request(work, temp_indices, .false.)
           call device_copy(work%x_d, values%x_d, design%size())
           call mask_exterior_const(work, this%mask, 0.0_rp)
 
           volume = device_glsc2(work%x_d, this%c_xh%B_d, design%size())
 
-          call neko_scratch_registry%relinquish_field(temp_indices)
+          call neko_scratch_registry%relinquish(temp_indices)
        else
           volume = glsc2_mask(values%x, this%c_Xh%B, design%size(), &
                this%mask%mask%get(), this%mask%size)
@@ -353,7 +358,7 @@ contains
 
     end if
 
-    call values%free()
+    call neko_scratch_registry%relinquish(ind_value)
 
   end function volume_brinkman_design
 

@@ -35,7 +35,7 @@
 module PDE_filter
   use num_types, only: rp
   use json_module, only: json_file
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use field, only: field_t
   use coefs, only: coef_t
   use ax_product, only: ax_t, ax_helm_factory
@@ -47,7 +47,7 @@ module PDE_filter
   use gather_scatter, only: gs_t, GS_OP_ADD
   use pnpn_residual, only: pnpn_prs_res_t
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use mapping, only: mapping_t
   use scratch_registry, only: neko_scratch_registry
   use field_math, only: field_copy, field_add3
@@ -214,8 +214,8 @@ contains
     integer :: temp_indices(2)
 
     n = this%coef%dof%size()
-    call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    call neko_scratch_registry%request_field(d_X_out, temp_indices(2))
+    call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(d_X_out, temp_indices(2), .false.)
     ! in a similar fasion to pressure/velocity, we will solve for d_X_out.
 
     ! to improve convergence, we use X_in as an initial guess for X_out.
@@ -323,8 +323,8 @@ contains
 
     n = this%coef%dof%size()
 
-    call neko_scratch_registry%request_field(RHS, temp_indices(1))
-    call neko_scratch_registry%request_field(delta, temp_indices(2))
+    call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(delta, temp_indices(2), .false.)
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then

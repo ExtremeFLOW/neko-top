@@ -14,6 +14,10 @@ on:
         description: "The version of Neko to use."
         required: true
         type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
       neko-top-version:
         description: "The version of Neko-TOP to use."
         required: true
@@ -90,92 +94,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: setup-script-logs
-          path: logs/**/*.log
-          overwrite: true
-
-  setup-action:
-    name: Check setup action
-    runs-on: ubuntu-latest
-
-    steps:
-      # ---------------------------------------------------------------------- #
-      # Checkout the repository and setup the environment
-      # ---------------------------------------------------------------------- #
-
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      # ---------------------------------------------------------------------- #
-      # Setup the external dependencies
-      # ---------------------------------------------------------------------- #
-
-      - name: Get json-fortran
-        id: get-json-fortran
-        uses: ./.github/actions/setup_json-fortran
-        with:
-          version: ${{ inputs.json-fortran-version }}
-
-      - name: Get parmetis
-        id: get-parmetis
-        uses: ./.github/actions/setup_parmetis
-
-      - name: Get neko
-        id: get-neko
-        uses: ./.github/actions/setup_neko
-        with:
-          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
-          parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
-          version: ${{ inputs.neko-version }}
-
-
-      # ---------------------------------------------------------------------- #
-      # Build and test the code
-      # ---------------------------------------------------------------------- #
-
-      - name: Get neko-top
-        id: get-neko-top
-        uses: ./.github/actions/setup_neko-top
-        with:
-          working-dir: ${{ github.workspace }}
-          version: ${{ inputs.neko-top-version }}
-          neko-dir: ${{ steps.get-neko.outputs.install-dir }}
-          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
-          configure-options: "-DBUILD_EXAMPLES=ON"
-
-      - name: Run Rugby Ball
-        env:
-          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
-          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
-          PARMETIS_DIR: ${{ steps.get-parmetis.outputs.install-dir }}
-        run: |
-          # Adjust the end time and max iterations for the rugby ball case
-          sed -i -r 's/"end_time":.*/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
-          sed -i -r 's/"max_iterations":.*/"max_iterations": 2,/g' examples/rugby_ball/rugby_ball.case
-
-          ./run.sh -rc rugby_ball
-
-      # ---------------------------------------------------------------------- #
-      # Report errors if any step fails
-      # ---------------------------------------------------------------------- #
-      - name: Report errors
-        if: failure()
-        run: |
-          echo "Errors encountered during script execution. Please check the logs for details."
-          logs=($(find logs/ -name "error.log"))
-
-          for file in ${logs[@]}; do
-            if [[ -s $file ]]; then
-              printf "\nContents of $file:\n" >&2
-              cat $file >&2
-            elif [ -f $file ]; then
-              rm -fr $(dirname $file)
-            fi
-          done
-
-      - name: Save logs
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: setup-action-logs
           path: logs/**/*.log
           overwrite: true

@@ -11,7 +11,7 @@ module mma_optimizer
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
+  use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
 
   use vector, only: vector_t
@@ -35,6 +35,7 @@ module mma_optimizer
 
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
+
   implicit none
   private
   public :: mma_optimizer_t
@@ -87,10 +88,12 @@ contains
     character(len=1024) :: optimization_header
     character(len=1024) :: problem_header
 
-    type(vector_t) :: x
+    type(vector_t), pointer :: x
+    integer :: ind
     type(json_file) :: solver_parameters
     logical :: unconstrained_problem
 
+    call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
     call design%get_values(x)
 
@@ -112,6 +115,8 @@ contains
             solver_parameters, this%scale, this%auto_scale)
     end if
 
+    call neko_scratch_registry%relinquish_vector(ind)
+
     call json_get_or_default(parameters, "optimization.solver.max_iterations", &
          max_iterations, 100)
     call json_get_or_default(parameters, "optimization.solver.tolerance", &
@@ -131,7 +136,6 @@ contains
          ', KKTmax, KKTnorm2, scaling factor, ' // &
          this%mma%get_backend_and_subsolver()
     call this%logger%set_header(trim(optimization_header))
-    call x%free()
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
@@ -159,16 +163,17 @@ contains
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
 
-    type(vector_t) :: x
+    type(vector_t), pointer :: x
 
     integer :: iter, ierr, nglobal, n
     real(kind=rp) :: scaling_factor
 
     real(kind=rp) :: objective_value
-    type(vector_t) :: all_objectives
-    type(vector_t) :: constraint_value
-    type(vector_t) :: objective_sensitivities
+    type(vector_t), pointer :: all_objectives
+    type(vector_t), pointer :: constraint_value
+    type(vector_t), pointer :: objective_sensitivities
     type(matrix_t) :: constraint_sensitivities
+    integer :: ind(4)
 
     type(vector_t) :: log_data
     logical :: unconstrained_problem = .false.
@@ -186,10 +191,14 @@ contains
     end if
 
     ! Initialize the vectors
-    call x%init(n)
-    call all_objectives%init(problem%get_n_objectives())
-    call constraint_value%init(problem%get_n_constraints())
-    call objective_sensitivities%init(n)
+    call neko_scratch_registry%request(x, ind(1), n, .false.)
+    call neko_scratch_registry%request( &
+         all_objectives, ind(2), problem%get_n_objectives(), .false.)
+    call neko_scratch_registry%request( &
+         constraint_value, ind(3), problem%get_n_constraints(), .false.)
+    call neko_scratch_registry%request( &
+         objective_sensitivities, ind(4), n, .false.)
+
     call constraint_sensitivities%init(problem%get_n_constraints(), n)
 
     !>initializing the scaling factor
@@ -233,7 +242,6 @@ contains
 
        call profiler_end_region("Optimizer logging")
     end if
-    call design%write(0)
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
@@ -295,6 +303,7 @@ contains
 
        if (this%enable_output) then
           call profiler_start_region("Optimizer logging")
+
           ! Stamp the i^th iteration
           call problem%get_all_objective_values(all_objectives)
           call mma_logger_assemble_data(log_data, iter, objective_value, &
@@ -303,6 +312,7 @@ contains
                problem%get_n_objectives(), problem%get_n_constraints(), &
                unconstrained_problem)
           call this%logger%write(log_data)
+          call log_data%free()
 
           call design%write(iter)
           call profiler_end_region("Optimizer logging")
@@ -318,11 +328,7 @@ contains
     end if
 
     ! Free local resources
-    call x%free()
-    call log_data%free()
-    call all_objectives%free()
-    call constraint_value%free()
-    call objective_sensitivities%free()
+    call neko_scratch_registry%relinquish_vector(ind)
     call constraint_sensitivities%free()
 
   end subroutine mma_optimizer_run
@@ -333,9 +339,12 @@ contains
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
 
-    type(vector_t) :: constraint_values
+    type(vector_t), pointer :: constraint_values
+    integer :: ind
 
-    call constraint_values%init(problem%get_n_constraints())
+    call neko_scratch_registry%request( &
+         constraint_values, ind, problem%get_n_constraints(), .false.)
+
     call problem%get_constraint_values(constraint_values)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(constraint_values%x, constraint_values%x_d, &
@@ -348,7 +357,7 @@ contains
     end if
 
     ! Free local resources
-    call constraint_values%free()
+    call neko_scratch_registry%relinquish_vector(ind)
 
   end subroutine mma_optimizer_validate
 
@@ -364,7 +373,7 @@ contains
   subroutine mma_logger_assemble_data(log_data, iter, objective_value, &
        all_objectives, constraint_value, residumax, residunorm, &
        scaling_factor, n, m, unconstrained_problem)
-    type(vector_t), intent(out) :: log_data
+    type(vector_t), intent(inout) :: log_data
     integer, intent(in) :: iter
     real(kind=rp), intent(in) ::objective_value
     type(vector_t), intent(in) :: all_objectives
@@ -373,8 +382,6 @@ contains
     logical, intent(in) :: unconstrained_problem
     integer, intent(in) :: n, m
     integer :: i_tmp1, i_tmp2
-
-
 
     ! initialize the logger data
     ! iter | tot F | F_1 | .. |F_n | C_1 | ... | C_n | KKT | KKT2 | scale |

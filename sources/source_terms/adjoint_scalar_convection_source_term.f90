@@ -36,7 +36,6 @@ module adjoint_scalar_convection_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
   use field, only: field_t
-  use scratch_registry, only: neko_scratch_registry
   use json_module, only: json_file
   use time_state, only: time_state_t
   use source_term, only: source_term_t
@@ -46,7 +45,7 @@ module adjoint_scalar_convection_source_term
   use field_math, only: field_subcol3, field_sub2, field_col3
   use operators, only: grad, dudxyz
   use utils, only: neko_error
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
@@ -205,10 +204,10 @@ contains
     integer :: n_GL, nel
 
 
-    call neko_scratch_registry%request_field(dsdx, temp_indices(1))
-    call neko_scratch_registry%request_field(dsdy, temp_indices(2))
-    call neko_scratch_registry%request_field(dsdz, temp_indices(3))
-    call neko_scratch_registry%request_field(work, temp_indices(4))
+    call neko_scratch_registry%request_field(dsdx, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(dsdy, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(dsdz, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(work, temp_indices(4), .false.)
 
     fu => this%fields%get(1)
     fv => this%fields%get(2)
@@ -218,10 +217,10 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
-       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3))
-       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
+       call this%scratch_GL%request_field(s_GL, temp_indices_GL(3), .false.)
+       call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4), .false.)
 
        call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)

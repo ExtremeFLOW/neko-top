@@ -43,13 +43,15 @@ submodule (mma) mma_device
        device_bb, device_updatebb, device_aa, device_updateaa, device_dx, &
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
-       device_mma_Ljjxinv, device_Hess
+       device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
+       device_prepare_hessian, device_prepare_aa_matrix
 
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
+  use scratch_registry, only: neko_scratch_registry
 
   implicit none
 
@@ -108,10 +110,11 @@ contains
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
-    type(vector_t) :: relambda, remu
+    type(vector_t), pointer :: relambda, remu
+    integer :: ind(2)
 
-    call relambda%init(this%m)
-    call remu%init(this%m)
+    call neko_scratch_registry%request(relambda, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(2), this%m, .false.)
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
     call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
@@ -120,16 +123,14 @@ contains
     call device_add2(relambda%x_d, this%mu%x_d, this%m)
 
     ! Compute residual for mu (eta in the paper)
-    call device_col3 (remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
-
+    call device_col3(remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
 
     this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
          device_maxval(remu%x_d, this%m)])
     this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
          device_norm(remu%x_d, this%m))
 
-    call relambda%free()
-    call remu%free()
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -139,19 +140,19 @@ contains
     type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
 
     real(kind=rp) :: rez, rezeta
-    type(vector_t) :: rey, relambda, remu, res
-    type(vector_t) :: rex, rexsi, reeta
-    integer :: ierr
+    type(vector_t), pointer :: rey, relambda, remu, res
+    type(vector_t), pointer :: rex, rexsi, reeta
+    integer :: ierr, ind(7)
     real(kind=rp) :: re_sq_norm
 
-    call rey%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call res%init(this%m)
+    call neko_scratch_registry%request(rey, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(res, ind(4), this%m, .false.)
 
-    call rex%init(this%n)
-    call rexsi%init(this%n)
-    call reeta%init(this%n)
+    call neko_scratch_registry%request(rex, ind(5), this%n, .false.)
+    call neko_scratch_registry%request(rexsi, ind(6), this%n, .false.)
+    call neko_scratch_registry%request(reeta, ind(7), this%n, .false.)
 
     call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
@@ -211,13 +212,7 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    call rey%free()
-    call relambda%free()
-    call remu%free()
-    call res%free()
-    call rex%free()
-    call rexsi%free()
-    call reeta%free()
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dpip_KKT_device
 
   !============================================================================!
@@ -239,12 +234,12 @@ contains
     integer, intent(in) :: iter
     integer :: ierr
 
-    type(vector_t):: x_diff
+    type(vector_t), pointer :: x_diff
+    integer :: ind
 
-    call x_diff%init(this%n)
-    call device_sub3 (x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
-    call device_memcpy(x_diff%x, x_diff%x_d, this%n, &
-         DEVICE_TO_HOST, sync = .true.)
+    call neko_scratch_registry%request(x_diff, ind, this%n, .false.)
+
+    call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -274,14 +269,20 @@ contains
     call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
 
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-         sync = .true.)
-    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
-         mpi_real_precision, mpi_sum, neko_comm, ierr)
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .true.)
+    if (NEKO_DEVICE_MPI) then
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x_d, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+    else
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
+            sync = .true.)
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
+            sync = .true.)
+    end if
     call device_sub2(this%bi%x_d, fval, this%m)
 
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
@@ -293,61 +294,60 @@ contains
     real(kind=rp) :: epsi, residual_max, residual_norm, z, zeta, rez, rezeta, &
          delz, dz, dzeta, steg, zold, zetaold, new_residual
     ! vectors with size m
-    type(vector_t) :: y, lambda, s, mu, rey, relambda, remu, res, &
+    type(vector_t) , pointer :: y, lambda, s, mu, rey, relambda, remu, res, &
          dely, dellambda, dy, dlambda, ds, dmu, yold, lambdaold, sold, muold
 
     ! vectors with size n
-    type(vector_t) :: x, xsi, eta, rex, rexsi, reeta, &
+    type(vector_t), pointer :: x, xsi, eta, rex, rexsi, reeta, &
          delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
 
-    type(vector_t) :: bb
-    type(matrix_t) :: GG
-    type(matrix_t) :: AA
+    type(vector_t), pointer :: bb
+    type(matrix_t), pointer :: GG
+    type(matrix_t), pointer :: AA
 
     integer :: info
-    integer, dimension(this%m+1) :: ipiv
     real(kind=rp) :: re_sq_norm
 
-    integer :: i
+    integer :: ind(35)
 
     real(kind=rp) :: minimal_epsilon
 
-    call y%init(this%m)
-    call lambda%init(this%m)
-    call s%init(this%m)
-    call mu%init(this%m)
-    call rey%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call res%init(this%m)
-    call dely%init(this%m)
-    call dellambda%init(this%m)
-    call dy%init(this%m)
-    call dlambda%init(this%m)
-    call ds%init(this%m)
-    call dmu%init(this%m)
-    call yold%init(this%m)
-    call lambdaold%init(this%m)
-    call sold%init(this%m)
-    call muold%init(this%m)
-    call x%init(this%n)
-    call xsi%init(this%n)
-    call eta%init(this%n)
-    call rex%init(this%n)
-    call rexsi%init(this%n)
-    call reeta%init(this%n)
-    call delx%init(this%n)
-    call diagx%init(this%n)
-    call dx%init(this%n)
-    call dxsi%init(this%n)
-    call deta%init(this%n)
-    call xold%init(this%n)
-    call xsiold%init(this%n)
-    call etaold%init(this%n)
-    call bb%init(this%m+1)
+    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(s, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(mu, ind(4), this%m, .false.)
+    call neko_scratch_registry%request(rey, ind(5), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(6), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(7), this%m, .false.)
+    call neko_scratch_registry%request(res, ind(8), this%m, .false.)
+    call neko_scratch_registry%request(dely, ind(9), this%m, .false.)
+    call neko_scratch_registry%request(dellambda, ind(10), this%m, .false.)
+    call neko_scratch_registry%request(dy, ind(11), this%m, .false.)
+    call neko_scratch_registry%request(dlambda, ind(12), this%m, .false.)
+    call neko_scratch_registry%request(ds, ind(13), this%m, .false.)
+    call neko_scratch_registry%request(dmu, ind(14), this%m, .false.)
+    call neko_scratch_registry%request(yold, ind(15), this%m, .false.)
+    call neko_scratch_registry%request(lambdaold, ind(16), this%m, .false.)
+    call neko_scratch_registry%request(sold, ind(17), this%m, .false.)
+    call neko_scratch_registry%request(muold, ind(18), this%m, .false.)
+    call neko_scratch_registry%request(x, ind(19), this%n, .false.)
+    call neko_scratch_registry%request(xsi, ind(20), this%n, .false.)
+    call neko_scratch_registry%request(eta, ind(21), this%n, .false.)
+    call neko_scratch_registry%request(rex, ind(22), this%n, .false.)
+    call neko_scratch_registry%request(rexsi, ind(23), this%n, .false.)
+    call neko_scratch_registry%request(reeta, ind(24), this%n, .false.)
+    call neko_scratch_registry%request(delx, ind(25), this%n, .false.)
+    call neko_scratch_registry%request(diagx, ind(26), this%n, .false.)
+    call neko_scratch_registry%request(dx, ind(27), this%n, .false.)
+    call neko_scratch_registry%request(dxsi, ind(28), this%n, .false.)
+    call neko_scratch_registry%request(deta, ind(29), this%n, .false.)
+    call neko_scratch_registry%request(xold, ind(30), this%n, .false.)
+    call neko_scratch_registry%request(xsiold, ind(31), this%n, .false.)
+    call neko_scratch_registry%request(etaold, ind(32), this%n, .false.)
+    call neko_scratch_registry%request(bb, ind(33), this%m+1, .false.)
 
-    call GG%init(this%m, this%n)
-    call AA%init(this%m+1, this%m+1)
+    call neko_scratch_registry%request(GG, ind(34), this%m, this%n, .false.)
+    call neko_scratch_registry%request(AA, ind(35), this%m+1, this%m+1, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -409,12 +409,17 @@ contains
        ! Computing the norm of the residuals
 
        ! Complete the computations of lambda residuals
-       call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-            sync = .true.)
-       call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .true.)
+       if (NEKO_DEVICE_MPI) then
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x_d, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+       else
+          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
+               sync = .true.)
+       end if
 
        call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
        call device_sub2(relambda%x_d, y%x_d, this%m)
@@ -528,7 +533,6 @@ contains
           call device_updatebb(bb%x_d, dellambda%x_d, dely%x_d, &
                this%d%x_d, mu%x_d, y%x_d, delz, this%m)
 
-          !--------------------------------------------------------------------!
           ! assembling the coefficients matrix AA based on eq(5.20)
           ! AA(1:this%m,1:this%m) =  &
           ! matmul(matmul(GG,mma_diag(1/diagx)), transpose(GG))
@@ -538,51 +542,32 @@ contains
 
           call device_cfill(AA%x_d, 0.0_rp, (this%m+1) * (this%m+1))
           call device_AA(AA%x_d, GG%x_d, diagx%x_d, this%n, this%m)
+
           call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
                DEVICE_TO_HOST, sync = .true.)
-
           call MPI_Allreduce(MPI_IN_PLACE, AA%x, &
                (this%m + 1)**2, mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(AA%x, AA%x_d, (this%m+1) * (this%m+1), &
+               HOST_TO_DEVICE, sync = .true.)
 
-          call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(s%x, s%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
-          do i = 1, this%m
-             ! update the diag AA
-             AA%x(i, i) = AA%x(i, i) &
-                  + s%x(i) / lambda%x(i) &
-                  + 1.0_rp / (this%d%x(i) + mu%x(i) / y%x(i))
-          end do
-          AA%x(1:this%m, this%m+1) = this%a%x
-          AA%x(this%m+1, 1:this%m) = this%a%x
-          AA%x(this%m+1, this%m+1) = - zeta/z
+          call device_prepare_aa_matrix(AA%x_d, s%x_d, lambda%x_d, &
+               this%d%x_d, mu%x_d, y%x_d, this%a%x_d, zeta, z, this%m)
 
-          call device_memcpy(AA%x, AA%x_d, &
-               (this%m + 1) * (this%m + 1), HOST_TO_DEVICE, sync = .true.)
-
-          call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
-               sync = .true.)
-          call DGESV(this%m + 1, 1, AA%x, this%m + 1, ipiv, bb%x, this%m + 1, &
-               info)
-
+          ! Device solve for the linear system
+          call device_solve_linear_system(AA%x_d, bb%x_d, this%m + 1, info)
           if (info .ne. 0) then
-             call neko_error("DGESV failed to solve the linear system in " // &
-                  "mma_subsolve_dpip (device).")
+             call neko_error("Linear solver failed on the device in  " // &
+                  "mma_subsolve_dpip")
           end if
 
-          call device_memcpy(bb%x, bb%x_d, this%m+1, HOST_TO_DEVICE, &
-               sync = .true.)
+          call device_copy(dlambda%x_d, bb%x_d, this%m)
 
-          dlambda%x = bb%x(1:this%m)
-          call device_memcpy(dlambda%x, dlambda%x_d, this%m, HOST_TO_DEVICE, &
-               sync = .true.)
 
+          !We need to write the last element of bb to dz so this is necessary
+          call device_memcpy(bb%x, bb%x_d, this%m+1, DEVICE_TO_HOST, &
+               sync = .true.)
           dz = bb%x(this%m + 1)
+
 
           ! based on eq(5.19)
           call device_dx(dx%x_d, delx%x_d, diagx%x_d, GG%x_d, &
@@ -766,40 +751,7 @@ contains
     call device_copy(this%s%x_d, s%x_d, this%m)
 
     !free all the initiated variables in this subroutine
-    call y%free()
-    call lambda%free()
-    call s%free()
-    call mu%free()
-    call rey%free()
-    call relambda%free()
-    call remu%free()
-    call res%free()
-    call dely%free()
-    call dellambda%free()
-    call dy%free()
-    call dlambda%free()
-    call ds%free()
-    call dmu%free()
-    call yold%free()
-    call lambdaold%free()
-    call sold%free()
-    call muold%free()
-    call x%free()
-    call xsi%free()
-    call eta%free()
-    call rex%free()
-    call rexsi%free()
-    call reeta%free()
-    call delx%free()
-    call diagx%free()
-    call dx%free()
-    call dxsi%free()
-    call deta%free()
-    call xold%free()
-    call xsiold%free()
-    call etaold%free()
-    call bb%free()
-
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dpip_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual
@@ -810,44 +762,40 @@ contains
     integer :: iter, ierr
     real(kind=rp) :: epsi, residumax, z, steg
     ! vectors with size m
-    type(vector_t) :: y, lambda, mu, relambda, remu, dlambda, dmu, &
+    type(vector_t), pointer :: y, lambda, mu, relambda, remu, dlambda, dmu, &
          gradlambda, zerom, dd, dummy_m
     ! vectors with size n
-    type(vector_t) :: x, pjlambda, qjlambda
+    type(vector_t), pointer :: x, pjlambda, qjlambda
 
     ! inverse of a diag matrix:
-    type(vector_t) :: Ljjxinv ! [∇_x^2 Ljj]−1
-    type(matrix_t) :: hijx ! ∇_x hij
-    type(matrix_t) :: Hess
-    real(kind=rp) :: Hesstrace
+    type(vector_t), pointer :: Ljjxinv ! [∇_x^2 Ljj]−1
+    type(matrix_t), pointer :: hijx ! ∇_x hij
+    type(matrix_t), pointer :: Hess
 
-    integer :: info
-    integer, dimension(this%m+1) :: ipiv
-    integer :: i
+    integer :: info, ind(17)
 
     real(kind=rp) :: minimal_epsilon
 
-    call y%init(this%m)
-    call lambda%init(this%m)
-    call mu%init(this%m)
-    call relambda%init(this%m)
-    call remu%init(this%m)
-    call dlambda%init(this%m)
-    call dmu%init(this%m)
-    call gradlambda%init(this%m)
-    call zerom%init(this%m)
-    call dd%init(this%m)
-    call dummy_m%init(this%m)
+    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(mu, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(4), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(5), this%m, .false.)
+    call neko_scratch_registry%request(dlambda, ind(6), this%m, .false.)
+    call neko_scratch_registry%request(dmu, ind(7), this%m, .false.)
+    call neko_scratch_registry%request(gradlambda, ind(8), this%m, .false.)
+    call neko_scratch_registry%request(zerom, ind(9), this%m, .false.)
+    call neko_scratch_registry%request(dd, ind(10), this%m, .false.)
+    call neko_scratch_registry%request(dummy_m, ind(11), this%m, .false.)
 
-    call x%init(this%n)
-    call pjlambda%init(this%n)
-    call qjlambda%init(this%n)
+    call neko_scratch_registry%request(x, ind(12), this%n, .false.)
+    call neko_scratch_registry%request(pjlambda,ind(13), this%n, .false.)
+    call neko_scratch_registry%request(qjlambda, ind(14), this%n, .false.)
 
-    call Ljjxinv%init(this%n)
-    call hijx%init(this%m,this%n)
-    call Hess%init(this%m,this%m)
+    call neko_scratch_registry%request(Ljjxinv, ind(15), this%n, .false.)
 
-    call device_cfill(zerom%x_d, 0.0_rp, this%m)
+    call neko_scratch_registry%request(hijx, ind(16), this%m, this%n, .false.)
+    call neko_scratch_registry%request(Hess, ind(17), this%m, this%m, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -893,7 +841,7 @@ contains
          ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
          ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
          call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-         ! division by dd to avoid devision by 0 (in case this%d%x_d)
+         ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
          call device_invcol2(y%x_d, dd%x_d, this%m)
          call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
@@ -938,13 +886,8 @@ contains
          call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
          call device_cadd(remu%x_d, -epsi, this%m)
 
-         ! Download the re(lambda, mu) to CPU to calculate residumax
-
-         call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-         call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
-              sync = .true.)
-         residumax = maxval(abs([relambda%x, remu%x]))
+         residumax = maxval([device_maxval(relambda%x_d, this%m), &
+              device_maxval(remu%x_d, this%m)])
 
          ! ------------------------------------------------------------------- !
          ! Internal loop
@@ -977,9 +920,6 @@ contains
             call device_GG(hijx%x_d, x%x_d, this%low%x_d, this%upp%x_d, &
                  this%pij%x_d, this%qij%x_d, this%n, this%m)
 
-            call device_memcpy(hijx%x, hijx%x_d, this%n*this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-
             call device_cfill(Hess%x_d, 0.0_rp, (this%m) * (this%m) )
             call device_Hess(Hess%x_d, hijx%x_d, Ljjxinv%x_d, this%n, this%m)
 
@@ -989,8 +929,9 @@ contains
             call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
             ! No need to upload to device since we solve LSE on CPU
-            ! call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
-            ! HOST_TO_DEVICE, sync = .true.)
+            ! But now we solve LSE on GPU, so upload it:
+            call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
+                 HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are
@@ -1003,47 +944,18 @@ contains
             ! contribute to the Hessian matrix.
             ! Note that since we use DGESV to solve LSE on CPU, we dont need
             ! cuda kernel for this part
-
-            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(y%x, y%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            do i = 1, this%m
-               if (y%x(i) .gt. 0.0_rp) then
-                  if (abs(this%d%x(i)) < 1.0e-15_rp) then
-                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
-                  else
-                     Hess%x(i, i) = Hess%x(i, i) - 1.0_rp/this%d%x(i)
-                  end if
-               end if
-               ! Based on eq(10), note the term (-\Omega \Lambda)
-               Hess%x(i, i) = Hess%x(i, i) - mu%x(i) / lambda%x(i)
-            end do
-
-            ! Improve the robustness by stablizing the Hess using
+            ! Also, improve the robustness by stablizing the Hess using
             ! Levenberg-Marquardt algorithm (heuristically)
-            Hesstrace = 0.0_rp
-            do i=1, this%m
-               Hesstrace = Hesstrace + Hess%x(i, i)
-            end do
-            do i=1, this%m
-               Hess%x(i,i) = Hess%x(i, i) - &
-                    max(-1.0e-4_rp*Hesstrace/this%m, 1.0e-7_rp)
-            end do
+            call device_prepare_hessian(Hess%x_d, y%x_d, this%d%x_d, &
+                 mu%x_d, lambda%x_d, this%m)
 
-            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call DGESV(this%m , 1, Hess%x, this%m , ipiv, &
-                 gradlambda%x, this%m, info)
-
+            ! Device solve for the linear system
+            call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
+                 this%m, info)
             if (info .ne. 0) then
-               call neko_error("DGESV failed to solve the linear system in " // &
-                    "mma_subsolve_dip (device).")
+               call neko_error("Linear solver failed on the device in  " // &
+                    "mma_subsolve_dip")
             end if
-            call device_memcpy(gradlambda%x, gradlambda%x_d, this%m, HOST_TO_DEVICE, &
-                 sync = .true.)
 
             call device_copy(dlambda%x_d, gradlambda%x_d, this%m)
 
@@ -1065,11 +977,6 @@ contains
             call device_add2s2(lambda%x_d, dlambda%x_d, steg, this%m)
             call device_add2s2(mu%x_d, dmu%x_d, steg, this%m)
 
-            call device_memcpy(lambda%x, lambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(mu%x, mu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-
             ! minimize(L_x, L_y, L_z) and compute x(λ), y(λ), z(λ) for
             ! the updated values of λ
 
@@ -1078,7 +985,7 @@ contains
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
 
             call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-            ! division by dd to avoid devision by 0 (in case this%d%x_d)
+            ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
             call device_invcol2(y%x_d, dd%x_d, this%m)
             call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
@@ -1125,14 +1032,8 @@ contains
             call device_col3(remu%x_d, mu%x_d, lambda%x_d, this%m)
             call device_cadd(remu%x_d, -epsi, this%m)
 
-
-            !> Download the re(lambda, mu) to CPU to calculate residumax
-
-            call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            call device_memcpy(remu%x, remu%x_d, this%m, DEVICE_TO_HOST, &
-                 sync = .true.)
-            residumax = maxval(abs([relambda%x, remu%x]))
+            residumax = maxval([device_maxval(relambda%x_d, this%m), &
+                 device_maxval(remu%x_d, this%m)])
          end do
        end associate
        epsi = 0.1_rp * epsi
@@ -1149,25 +1050,7 @@ contains
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
 
-    call y%free()
-    call lambda%free()
-    call mu%free()
-    call relambda%free()
-    call remu%free()
-    call dlambda%free()
-    call dmu%free()
-    call gradlambda%free()
-    call zerom%free()
-    call dd%free()
-    call dummy_m%free()
-
-    call x%free()
-    call pjlambda%free()
-    call qjlambda%free()
-
-    call Ljjxinv%free()
-    call hijx%free()
-    call Hess%free()
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device

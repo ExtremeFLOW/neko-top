@@ -38,6 +38,38 @@ module hip_mma_math
   public
 
   interface
+
+     subroutine hipSOLVER_wrapper(A_d, b_d, n, info) &
+          bind(c, name = 'hipSOLVER_wrapper')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine hipSOLVER_wrapper
+
+     subroutine hip_custom_solver(A_d, b_d, n, info) &
+          bind(c, name = 'hip_custom_solver')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine hip_custom_solver
+
+     subroutine mma_prepare_hessian_hip(Hess_d, y_d, d_d, mu_d, lambda_d, m) &
+          bind(c, name = 'mma_prepare_hessian_hip')
+       import c_int, c_ptr
+       type(c_ptr), value :: Hess_d, y_d, d_d, mu_d, lambda_d
+       integer(c_int), value :: m
+     end subroutine mma_prepare_hessian_hip
+
+     subroutine mma_prepare_aa_matrix_hip(AA_d, s_d, lambda_d, d_d, mu_d, y_d, &
+          a_d, zeta, z, m) bind(c, name = 'mma_prepare_aa_matrix_hip')
+       import c_rp, c_int, c_ptr
+       type(c_ptr), value :: AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d
+       real(c_rp), value :: zeta, z
+       integer(c_int), value :: m
+     end subroutine mma_prepare_aa_matrix_hip
+
      subroutine delta_1dbeam_hip(Delta_d, L_total, Le, offset, n) &
           bind(c, name = 'delta_1dbeam_hip')
        import c_rp, c_int, c_ptr

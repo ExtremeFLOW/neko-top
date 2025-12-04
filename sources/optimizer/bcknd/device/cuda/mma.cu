@@ -38,6 +38,7 @@
 
 // Device includes
 #include <cuda_runtime.h>
+#include <cusolverDn.h>
 
 // Neko includes
 #include <neko/device/device_config.h>
@@ -52,10 +53,160 @@
 extern "C" {
 
   int mma_red_s = 0;
-  real * mma_bufred = NULL;
-  real * mma_bufred_d = NULL;
+  real* mma_bufred = NULL;
+  real* mma_bufred_d = NULL;
 
- void delta_1dbeam_cuda(void* Delta, real* L_total, real* Le, 
+  void mma_prepare_aa_matrix_cuda(void* AA, void* s, void* lambda,
+                               void* d, void* mu, void* y,
+                               void* a, real* zeta, real* z, int* m) {
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*m) + 1024 - 1) / 1024, 1, 1);
+
+    // Launch kernel to prepare AA matrix
+    mma_prepare_aa_matrix_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
+        (real*)AA, (real*)s, (real*)lambda, (real*)d,
+        (real*)mu, (real*)y, (real*)a,
+        *zeta, *z, *m);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
+
+  void mma_prepare_hessian_cuda(void* Hess, void* y, void* d,
+                             void* mu, void* lambda, int* m) {
+    const int M = *m;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((M + 1024 - 1) / 1024, 1, 1);
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    // Update diagonal elements
+    mma_update_hessian_diagonal_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
+    CUDA_CHECK(cudaGetLastError());
+
+    // Synchronize to ensure diagonal updates are complete
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+
+    // Choose kernel based on problem size
+    if (M <= 1024) {
+        // Single-block version (fast for small m)
+        const dim3 stab_nblcks(1, 1, 1);
+        mma_stabilize_hessian_single_kernel<real><<<stab_nblcks, nthrds, 0, stream>>>(
+            (real*)Hess, M);
+        CUDA_CHECK(cudaGetLastError());
+    } else {
+        // Multi-block version (for large m)
+        // Compute trace on host (simple and reliable)
+        real* h_Hess = (real*)malloc(M * sizeof(real));
+
+        // Extract diagonal elements
+        for (int i = 0; i < M; i++) {
+            CUDA_CHECK(cudaMemcpyAsync(&h_Hess[i],
+                                      (real*)Hess + i * M + i,
+                                      sizeof(real),
+                                      cudaMemcpyDeviceToHost, stream));
+        }
+        CUDA_CHECK(cudaStreamSynchronize(stream));
+
+        // Compute trace and LM factor
+        real trace = 0.0;
+        for (int i = 0; i < M; i++) {
+            trace += h_Hess[i];
+        }
+        real lm_factor = fmax(-1.0e-4 * trace / M, 1.0e-7);
+
+        // Apply stabilization in parallel
+        mma_stabilize_hessian_multi_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+            (real*)Hess, lm_factor, M);
+        CUDA_CHECK(cudaGetLastError());
+
+        free(h_Hess);
+    }
+  }
+
+ void cuda_custom_solver(void* A, void* b, int n, int* info) {
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    if (n <= 0) {
+        *info = -1; // Use CPU fallback
+        return;
+    }
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(1, 1, 1);
+
+    mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)A, (real*)b, n);
+
+    cudaError_t err = cudaGetLastError();
+    if (err == cudaSuccess) {
+        *info = 0; // GPU solver succeeded
+    } else {
+        *info = -1; // GPU failed
+    }
+ }
+
+  void cuSOLVER_wrapper(void* A, void* b, int n, int* jj) {
+    cusolverDnHandle_t handle;
+    cusolverStatus_t status;
+    cusolverDnCreate(&handle);
+
+    int lwork;
+    double* workspace;
+    int* ipiv;
+    int* info;  // Device pointer for cuSOLVER info
+    int host_info = 0;  // Host variable to store the info
+
+    // Workspace query
+    status = cusolverDnDgetrf_bufferSize(handle, n, n, (double*)A, n, &lwork);
+    cudaMalloc(&workspace, lwork * sizeof(double));
+    cudaMalloc(&ipiv, n * sizeof(int));
+    cudaMalloc(&info, sizeof(int));
+
+    // LU factorization and solve
+    cusolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
+
+    // Copy info from device to host to check if factorization succeeded
+    cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+
+    if (host_info == 0) {
+        // Only solve if factorization was successful
+        cusolverDnDgetrs(handle, CUBLAS_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
+        // Copy the final info value
+        cudaMemcpy(&host_info, info, sizeof(int), cudaMemcpyDeviceToHost);
+    }
+
+
+    // Return the actual info value through jj
+    *jj = host_info;
+
+    // Cleanup
+    cudaFree(workspace);
+    cudaFree(ipiv);
+    cudaFree(info);
+    cusolverDnDestroy(handle);
+  }
+
+  void custom_solve_linear_system(void* A, void* b, int n, int* info) {
+    const cudaStream_t stream = (cudaStream_t)glb_cmd_queue;
+
+    if (n <= 0) {
+        *info = -1; // Use CPU fallback
+        return;
+    }
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(1, 1, 1);
+
+    mma_small_lu_kernel<real><<<nblcks, nthrds, 0, stream>>>(
+        (real*)A, (real*)b, n);
+
+    cudaError_t err = cudaGetLastError();
+    if (err == cudaSuccess) {
+        *info = 0; // GPU solver succeeded
+    } else {
+        *info = -1; // GPU failed, use CPU fallback
+    }
+  }
+
+  void delta_1dbeam_cuda(void* Delta, real* L_total, real* Le,
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
@@ -64,7 +215,7 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
- void cuda_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
+  void cuda_Hess(void* Hess, void* hijx, void* Ljjxinv, int *n, int *m) {
      const dim3 nthrds(1024, 1, 1);
      const dim3 nblcks(((*n)+1024 - 1)/ 1024, 1, 1);
      const int nb = ((*n) + 1024 - 1)/ 1024;
@@ -94,7 +245,7 @@ extern "C" {
      }
   }
 
- void mma_Ljjxinv_cuda(void* Ljjxinv, void* pjlambda, void* qjlambda, void* x,
+  void mma_Ljjxinv_cuda(void* Ljjxinv, void* pjlambda, void* qjlambda, void* x,
      void* low, void* upp, void* alpha, void* beta, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);

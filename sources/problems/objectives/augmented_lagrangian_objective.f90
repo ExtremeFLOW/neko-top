@@ -35,7 +35,7 @@ module augmented_lagrangian_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -216,15 +216,18 @@ contains
     type(field_t), pointer :: accumulate, fld_GL, adjoint_fld_GL
     integer :: temp_indices_GL(3)
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     if (this%dealias) then
 
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
-       call this%scratch_GL%request_field(adjoint_fld_GL, temp_indices_GL(3))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+            .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), &
+            .false.)
+       call this%scratch_GL%request_field(adjoint_fld_GL, temp_indices_GL(3), &
+            .false.)
 
        call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
        call this%GLL_to_GL%map(adjoint_fld_GL%x, this%adjoint_u%x, nel, &

@@ -54,7 +54,6 @@ module simplefield_design
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
-  use field_registry, only: neko_field_registry
 
   use fld_file_output, only: fld_file_output_t
 
@@ -165,11 +164,10 @@ contains
     integer :: n
 
     n = this%size()
-    call values%init(n)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(values%x_d, this%designfield%x_d, n)
     else
-       values%x = reshape(this%designfield%x, shape(values%x))
+       call copy(values%x, this%designfield%x, n)
     end if
   end subroutine design_simple_get_values
 
@@ -202,11 +200,10 @@ contains
     integer :: n
 
     n = this%size()
-
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%designfield%x_d, values%x_d, n)
     else
-       this%designfield%x = reshape(values%x, shape(this%designfield%x))
+       call copy(this%designfield%x, values%x, n)
     end if
   end subroutine design_simple_update_design
 

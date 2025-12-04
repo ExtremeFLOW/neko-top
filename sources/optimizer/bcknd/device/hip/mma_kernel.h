@@ -35,6 +35,160 @@
 #ifndef MMA_HIP_KERNEL_H
 #define MMA_HIP_KERNEL_H
 
+
+template<typename T>
+__global__ void mma_prepare_aa_matrix_kernel(T* __restrict__ AA,
+    const T* __restrict__ s, const T* __restrict__ lambda,
+    const T* __restrict__ d, const T* __restrict__ mu,
+    const T* __restrict__ y, const T* __restrict__ a,
+    const T zeta, const T z, const int m) {
+  const int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  const int matrix_size = m + 1;
+
+  if (tj >= m) return;
+  AA[tj * matrix_size + tj] += s[tj] / lambda[tj] +
+       (T)1.0 / (d[tj] + mu[tj] / y[tj]);
+  AA[tj * matrix_size + m] = a[tj]; // column m+1
+  AA[m * matrix_size + tj] = a[tj];// row m+1
+
+  // Only first thread updates the bottom-right  corner element.
+  if (tj == 0)
+    AA[m * matrix_size + m] = -zeta / z;
+}
+
+
+//Update Hessian diagonal elements (y contributions for dip subsolve)
+template<typename T>
+__global__ void mma_update_hessian_diagonal_kernel(T* __restrict__ Hess,
+     const T* __restrict__ y, const T* __restrict__ d,
+     const T* __restrict__ mu, const T* __restrict__ lambda, const int m) {
+  int tj = blockIdx.x * blockDim.x + threadIdx.x;
+  if (tj >= m) return;
+
+  T diag = Hess[tj * m + tj];
+  // Contribution from y terms (inactive constraints)
+  if (y[tj] > (T)0.0) {
+      if (fabs(d[tj]) >= (T)1.0e-15) {
+            diag -= (T)1.0 / d[tj];
+        }
+        // else: skip - equivalent to subtracting 1.0/1.0e-8
+  }
+
+  // Contribution from -mu/lambda (eq 10)
+  diag -= mu[tj] / lambda[tj];
+  Hess[tj * m + tj] = diag;
+}
+
+// Levenberg-Marquardt algorithm (heuristically)
+// Single-block version for m <= 1024
+template<typename T>
+__global__ void mma_stabilize_hessian_single_kernel(T* __restrict__ Hess, const int m) {
+    const int tid = threadIdx.x;
+
+    // Single thread computes trace and LM factor
+    if (tid == 0) {
+        T trace = (T)0.0;
+        for (int j = 0; j < m; j++) {
+            trace += Hess[j * m + j];
+        }
+        T lm_factor = max((T)(-1.0e-4) * trace / m, (T)1.0e-7);
+
+        // Apply to all diagonal elements
+        for (int j = 0; j < m; j++) {
+            Hess[j * m + j] -= lm_factor;
+        }
+    }
+}
+
+// Levenberg-Marquardt algorithm (heuristically)
+// Multi-block version for m > 1024
+template<typename T>
+__global__ void mma_stabilize_hessian_multi_kernel(T* __restrict__ Hess, const T lm_factor, const int m) {
+    const int i = blockIdx.x * blockDim.x + threadIdx.x;
+    if (i < m) {
+        Hess[i * m + i] -= lm_factor;
+    }
+}
+
+// Small linear solver efficient for (n <= 100)
+template<typename T>
+__global__ void mma_small_lu_kernel(T* __restrict__ A, T* __restrict__ b, const int n) {
+    const int tid = threadIdx.x;
+
+    // Handle 1x1 case
+    if (n == 1) {
+        if (tid == 0 && abs(A[0]) > (T)1e-12) b[0] /= A[0];
+        return;
+    }
+
+    // LU decomposition with partial pivoting
+    for (int k = 0; k < n; k++) {
+        // Pivoting - single thread
+        if (tid == 0) {
+            int max_row = k;
+            T max_val = abs(A[k * n + k]);
+            for (int i = k + 1; i < n; i++) {
+                T val = abs(A[i * n + k]);
+                if (val > max_val) {
+                    max_val = val;
+                    max_row = i;
+                }
+            }
+            if (max_val > (T)1e-12 && max_row != k) {
+                // Swap rows
+                for (int j = k; j < n; j++) {
+                    T temp = A[k * n + j];
+                    A[k * n + j] = A[max_row * n + j];
+                    A[max_row * n + j] = temp;
+                }
+                // Swap rhs
+                T temp_b = b[k];
+                b[k] = b[max_row];
+                b[max_row] = temp_b;
+            }
+        }
+        __syncthreads();
+
+        // Parallel elimination
+        T diag = A[k * n + k];
+        if (abs(diag) > (T)1e-12) {
+            for (int i = tid + k + 1; i < n; i += blockDim.x) {
+                T factor = A[i * n + k] / diag;
+                A[i * n + k] = factor;
+                for (int j = k + 1; j < n; j++) {
+                    A[i * n + j] -= factor * A[k * n + j];
+                }
+            }
+        }
+        __syncthreads();
+    }
+
+    // Parallel forward substitution
+    for (int i = tid; i < n; i += blockDim.x) {
+        T sum = b[i];
+        for (int j = 0; j < i; j++) {
+            sum -= A[i * n + j] * b[j];
+        }
+        b[i] = sum;
+    }
+    __syncthreads();
+
+    // Parallel backward substitution
+    for (int i = n - 1 - tid; i >= 0; i -= blockDim.x) {
+        if (i >= 0) {
+            T sum = b[i];
+            for (int j = i + 1; j < n; j++) {
+                sum -= A[i * n + j] * b[j];
+            }
+            if (abs(A[i * n + i]) > (T)1e-12) {
+                b[i] = sum / A[i * n + i];
+            }
+        }
+    }
+    __syncthreads();
+}
+
+
 template <typename T>
 __global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
      const T L_total, const T Le, const int offset, const int n) {
@@ -48,7 +202,7 @@ __global__ void delta_1dbeam_kernel(T* __restrict__ Delta,
   T x1 = L_total - Le * static_cast<T>(offset + idx - 1);
   T term1 = x1 * x1 * x1;
 
-  // Calculate second term: (L_total - Le*(offset+idx))^3  
+  // Calculate second term: (L_total - Le*(offset+idx))^3
   T x2 = L_total - Le * static_cast<T>(offset + idx);
   T term2 = x2 * x2 * x2;
 
@@ -97,7 +251,7 @@ __global__ void mma_dipsolvesub1_kernel(T* __restrict__ x,
      const T* __restrict__ low, const T* __restrict__ upp,
      const T* __restrict__ alpha, const T* __restrict__ beta,
      const int n) {
-  
+
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
 
@@ -139,12 +293,12 @@ __global__ void mattrans_v_mul_kernel(T* __restrict__ output,
 
 template <typename T>
 __global__ void mma_sub1_kernel(
-    T* __restrict__ xlow, 
+    T* __restrict__ xlow,
     T* __restrict__ xupp,
-    const T* __restrict__ x, 
+    const T* __restrict__ x,
     const T* __restrict__ xmin,
-    const T* __restrict__ xmax, 
-    const T asyinit, 
+    const T* __restrict__ xmax,
+    const T asyinit,
     const int n) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
@@ -170,7 +324,7 @@ __global__ void mma_sub2_kernel(T* __restrict__ low, T* __restrict__ upp,
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= n) return;
 
-  // Load data into registers for faster accessing compare to global memory 
+  // Load data into registers for faster accessing compare to global memory
   // when accessing repeatedly)
   const T xval     = x[tj];
   const T xold1val = xold1[tj];
@@ -247,9 +401,9 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
   const T max_df0_pos = max(df0, T(0));
   const T max_df0_neg = max(-df0, T(0));
 
-  p0j[tj] = upp_minus_x_sq * (T(1.001) * max_df0_pos + 
+  p0j[tj] = upp_minus_x_sq * (T(1.001) * max_df0_pos +
        T(0.001) * max_df0_neg + eps * inv_xgap);
-  q0j[tj] = x_minus_low_sq * (T(0.001) * max_df0_pos + 
+  q0j[tj] = x_minus_low_sq * (T(0.001) * max_df0_pos +
        T(1.001) * max_df0_neg + eps * inv_xgap);
 
   // Loop over m for pij and qij
@@ -260,9 +414,9 @@ __global__ void mma_sub3_kernel( const T* __restrict__ x,
     T max_pos = max(dfdx_val, T(0));
     T max_neg = max(-dfdx_val, T(0));
 
-    pij[idx] = upp_minus_x_sq * (T(1.001) * max_pos + 
+    pij[idx] = upp_minus_x_sq * (T(1.001) * max_pos +
          T(0.001) * max_neg + eps * inv_xgap);
-    qij[idx] = x_minus_low_sq * (T(0.001) * max_pos + 
+    qij[idx] = x_minus_low_sq * (T(0.001) * max_pos +
          T(1.001) * max_neg + eps * inv_xgap);
   }
 }
@@ -458,7 +612,7 @@ __global__ void delx_kernel(
     const T* __restrict__ lambda,
     const T epsi,
     const int n,
-    const int m) 
+    const int m)
 {
     int tj = blockIdx.x * blockDim.x + threadIdx.x;
     if (tj < n) {
@@ -467,7 +621,7 @@ __global__ void delx_kernel(
         T xupp_j = xupp[tj];
         T alpha_j = alpha[tj];
         T beta_j = beta[tj];
-        
+
         // Precompute denominators squared for better performance
         T denom_low = xt - xlow_j;
         T denom_upp = xupp_j - xt;
@@ -807,7 +961,7 @@ __global__ void RexCalculation_kernel(
     const T* __restrict__ xsi,
     const T* __restrict__ eta,
     const int n,
-    const int m) 
+    const int m)
 {
     int tj = blockIdx.x * blockDim.x + threadIdx.x;
     if (tj < n) {
