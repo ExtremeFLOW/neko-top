@@ -4,33 +4,29 @@ module mma_optimizer
   use problem, only: problem_t
   use num_types, only: rp
   use utils, only: neko_error
-  use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
+  use constraint, only: constraint_t
+  use dummy_constraint, only: dummy_constraint_t
+
+  ! External modules
+  use json_module, only: json_file
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+  use comm, only: pe_rank
+  use neko_config, only: NEKO_BCKND_DEVICE
   use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
-
-  use vector, only: vector_t
-  use matrix, only: matrix_t
-
-  !only to print nglobal when running in parallel
-  use comm, only: pe_rank
-
-  use neko_config, only: NEKO_BCKND_DEVICE
-
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, HOST_TO_DEVICE
-
-  use constraint, only: constraint_t
-  use dummy_constraint, only: dummy_constraint_t
-
   implicit none
   private
+
   public :: mma_optimizer_t
 
   ! Concrete type for MMA optimizer
@@ -114,7 +110,7 @@ contains
 
     ! Local variables
     type(vector_t), pointer :: x
-    integer :: ind_vec
+    integer :: ind
 
     ! Local variables
     class(constraint_t), allocatable :: dummy_con
@@ -138,13 +134,13 @@ contains
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
     ! problems in mma_optimizer_run()
-    call neko_scratch_registry%request(x, ind_vec, design%size(), .false.)
+    call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
     call design%get_values(x)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
-    call neko_scratch_registry%relinquish_vector(ind_vec)
+    call neko_scratch_registry%relinquish_vector(ind)
 
     !set the enable_output flag
     this%enable_output = enable_output
@@ -223,7 +219,7 @@ contains
        call profiler_start_region('Optimizer iteration')
 
        ! Scaling
-       if (this%auto_scale .eqv. .true.) then
+       if (this%auto_scale) then
           this%scaling_factor = abs(this%scale / constraint_value%x(1))
        end if
 
@@ -322,7 +318,7 @@ contains
     real(kind=rp) :: objective_value
     character(len=1024) :: header
 
-    integer :: log_size, ind_vec(3), n, m, i_tmp1, i_tmp2
+    integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
@@ -335,9 +331,9 @@ contains
        log_size = 5 + n + m
     endif
 
-    call neko_scratch_registry%request(log_data, ind_vec(1), log_size, .false.)
-    call neko_scratch_registry%request(all_objectives, ind_vec(2), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind_vec(3), m, .false.)
+    call neko_scratch_registry%request(log_data, ind(1), log_size, .false.)
+    call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
+    call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
 
     if (iter .eq. 0) then
        header = 'iter, ' // &
@@ -384,7 +380,7 @@ contains
     call this%csv_log%write(log_data)
 
     ! Free local resources
-    call neko_scratch_registry%relinquish_vector(ind_vec)
+    call neko_scratch_registry%relinquish_vector(ind)
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
