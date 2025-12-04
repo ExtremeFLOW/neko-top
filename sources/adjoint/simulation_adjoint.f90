@@ -105,11 +105,14 @@ contains
   end subroutine simulation_adjoint_finalize
 
   !> Compute a single time-step of an adjoint case
-  subroutine simulation_adjoint_step(C, dt_controller, cfl, tstep_loop_start_time)
+  subroutine simulation_adjoint_step(C, dt_controller, cfl, &
+       tstep_loop_start_time, final_time)
     type(adjoint_case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
+    real(kind=rp), optional, intent(in) :: final_time
+    real(kind=rp) :: t_bkp
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
@@ -131,6 +134,11 @@ contains
 
     ! Advance time step from t to t+dt and print the status
     call simulation_settime(C%time, C%fluid_adj%ext_bdf)
+    ! for cosmetic reasons we want the simulation to run backwards
+    if (present(final_time)) then
+       t_bkp = C%time%t
+       C%time%t = final_time - t_bkp
+    end if
     call C%time%status()
     call neko_log%begin()
 
@@ -179,6 +187,10 @@ contains
     call neko_log%end_section()
     call neko_log%end()
     call profiler_end_region
+
+    if (present(final_time)) then
+       C%time%t = t_bkp
+    end if
 
   end subroutine simulation_adjoint_step
 

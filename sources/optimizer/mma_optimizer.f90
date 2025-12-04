@@ -194,7 +194,13 @@ contains
     call profiler_start_region('Optimizer iteration')
 
     call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(0)
+    end if
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(0)
+    end if
 
     call problem%get_objective_value(objective_value)
     call problem%get_constraint_values(constraint_value)
@@ -234,7 +240,13 @@ contains
        call design%update_design(x)
 
        call problem%compute(design, simulation)
+       if (present(simulation) .and. this%enable_output) then
+          call simulation%write_forward(iter)
+       end if
        call problem%compute_sensitivity(design, simulation)
+       if (present(simulation) .and. this%enable_output) then
+          call simulation%write_adjoint(iter)
+       end if
 
        call problem%get_constraint_values(constraint_value)
 
@@ -254,7 +266,6 @@ contains
 
        ! Log the progress and outputs
        call this%write(iter, problem)
-       if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
     end do
 
