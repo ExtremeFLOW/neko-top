@@ -74,7 +74,7 @@ module minimum_dissipation_objective
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use coefs, only: coef_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
@@ -173,13 +173,13 @@ contains
     call this%init_base(name, design%size(), weight, mask_name)
 
     ! Save the simulation and design
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
+    this%u => neko_registry%get_field('u')
+    this%v => neko_registry%get_field('v')
+    this%w => neko_registry%get_field('w')
     this%c_Xh => simulation%fluid%c_Xh
-    this%adjoint_u => neko_field_registry%get_field('u_adj')
-    this%adjoint_v => neko_field_registry%get_field('v_adj')
-    this%adjoint_w => neko_field_registry%get_field('w_adj')
+    this%adjoint_u => neko_registry%get_field('u_adj')
+    this%adjoint_v => neko_registry%get_field('v_adj')
+    this%adjoint_w => neko_registry%get_field('w_adj')
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
@@ -234,11 +234,12 @@ contains
     integer :: temp_indices(5)
     integer n
 
-    call neko_scratch_registry%request_field(wo1, temp_indices(1))
-    call neko_scratch_registry%request_field(wo2, temp_indices(2))
-    call neko_scratch_registry%request_field(wo3, temp_indices(3))
-    call neko_scratch_registry%request_field(objective_field, temp_indices(4))
-    call neko_scratch_registry%request_field(work, temp_indices(5))
+    call neko_scratch_registry%request_field(wo1, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(wo2, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(wo3, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(objective_field, temp_indices(4), &
+         .false.)
+    call neko_scratch_registry%request_field(work, temp_indices(5), .false.)
 
     ! update_value the objective function.
     call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)

@@ -36,7 +36,7 @@ module adjoint_mixing_scalar_source_term
   use num_types, only : rp
   use field_list, only : field_list_t
   use field, only: field_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use json_module, only : json_file
   use time_state, only: time_state_t
@@ -170,7 +170,7 @@ contains
 
     fs => this%fields%get(1)
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
     ! \phi
     call field_copy(work, this%s)
     ! \phi - \phi_ref

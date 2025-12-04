@@ -46,12 +46,12 @@ submodule (mma) mma_device
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
        device_prepare_hessian, device_prepare_aa_matrix
 
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
-  use vector_scratch_registry, only: neko_vector_scratch_registry
+  use scratch_registry, only: neko_scratch_registry
 
   implicit none
 
@@ -113,8 +113,8 @@ contains
     type(vector_t), pointer :: relambda, remu
     integer :: ind(2)
 
-    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(1))
-    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(2))
+    call neko_scratch_registry%request(relambda, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(2), this%m, .false.)
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
     call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
@@ -123,14 +123,14 @@ contains
     call device_add2(relambda%x_d, this%mu%x_d, this%m)
 
     ! Compute residual for mu (eta in the paper)
-    call device_col3 (remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
+    call device_col3(remu%x_d, this%lambda%x_d, this%mu%x_d, this%m)
 
     this%residumax = maxval([device_maxval(relambda%x_d, this%m), &
          device_maxval(remu%x_d, this%m)])
     this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
          device_norm(remu%x_d, this%m))
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -145,14 +145,14 @@ contains
     integer :: ierr, ind(7)
     real(kind=rp) :: re_sq_norm
 
-    call neko_vector_scratch_registry%request_vector(this%m, rey, ind(1))
-    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(2))
-    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(3))
-    call neko_vector_scratch_registry%request_vector(this%m, res, ind(4))
+    call neko_scratch_registry%request(rey, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(res, ind(4), this%m, .false.)
 
-    call neko_vector_scratch_registry%request_vector(this%n, rex, ind(5))
-    call neko_vector_scratch_registry%request_vector(this%n, rexsi, ind(6))
-    call neko_vector_scratch_registry%request_vector(this%n, reeta, ind(7))
+    call neko_scratch_registry%request(rex, ind(5), this%n, .false.)
+    call neko_scratch_registry%request(rexsi, ind(6), this%n, .false.)
+    call neko_scratch_registry%request(reeta, ind(7), this%n, .false.)
 
     call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
@@ -212,7 +212,7 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_dpip_KKT_device
 
   !============================================================================!
@@ -237,7 +237,7 @@ contains
     type(vector_t), pointer :: x_diff
     integer :: ind
 
-    call neko_vector_scratch_registry%request_vector(this%n, x_diff, ind)
+    call neko_scratch_registry%request(x_diff, ind, this%n, .false.)
 
     call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
 
@@ -269,15 +269,20 @@ contains
     call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
 
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-         sync = .true.)
-    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
-         mpi_real_precision, mpi_sum, neko_comm, ierr)
-    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
-         sync = .true.)
+    if (NEKO_DEVICE_MPI) then
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x_d, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+    else
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
+            sync = .true.)
+       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
+            sync = .true.)
+    end if
     call device_sub2(this%bi%x_d, fval, this%m)
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
@@ -297,52 +302,52 @@ contains
          delx, diagx, dx, dxsi, deta, xold, xsiold, etaold
 
     type(vector_t), pointer :: bb
-    type(matrix_t) :: GG
-    type(matrix_t) :: AA
+    type(matrix_t), pointer :: GG
+    type(matrix_t), pointer :: AA
 
     integer :: info
     real(kind=rp) :: re_sq_norm
 
-    integer :: ind(33)
+    integer :: ind(35)
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_vector_scratch_registry%request_vector(this%m, y, ind(1))
-    call neko_vector_scratch_registry%request_vector(this%m, lambda, ind(2))
-    call neko_vector_scratch_registry%request_vector(this%m, s, ind(3))
-    call neko_vector_scratch_registry%request_vector(this%m, mu, ind(4))
-    call neko_vector_scratch_registry%request_vector(this%m, rey, ind(5))
-    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(6))
-    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(7))
-    call neko_vector_scratch_registry%request_vector(this%m, res, ind(8))
-    call neko_vector_scratch_registry%request_vector(this%m, dely, ind(9))
-    call neko_vector_scratch_registry%request_vector(this%m, dellambda, ind(10))
-    call neko_vector_scratch_registry%request_vector(this%m, dy, ind(11))
-    call neko_vector_scratch_registry%request_vector(this%m, dlambda, ind(12))
-    call neko_vector_scratch_registry%request_vector(this%m, ds, ind(13))
-    call neko_vector_scratch_registry%request_vector(this%m, dmu, ind(14))
-    call neko_vector_scratch_registry%request_vector(this%m, yold, ind(15))
-    call neko_vector_scratch_registry%request_vector(this%m, lambdaold, ind(16))
-    call neko_vector_scratch_registry%request_vector(this%m, sold, ind(17))
-    call neko_vector_scratch_registry%request_vector(this%m, muold, ind(18))
-    call neko_vector_scratch_registry%request_vector(this%n, x, ind(19))
-    call neko_vector_scratch_registry%request_vector(this%n, xsi, ind(20))
-    call neko_vector_scratch_registry%request_vector(this%n, eta, ind(21))
-    call neko_vector_scratch_registry%request_vector(this%n, rex, ind(22))
-    call neko_vector_scratch_registry%request_vector(this%n, rexsi, ind(23))
-    call neko_vector_scratch_registry%request_vector(this%n, reeta, ind(24))
-    call neko_vector_scratch_registry%request_vector(this%n, delx, ind(25))
-    call neko_vector_scratch_registry%request_vector(this%n, diagx, ind(26))
-    call neko_vector_scratch_registry%request_vector(this%n, dx, ind(27))
-    call neko_vector_scratch_registry%request_vector(this%n, dxsi, ind(28))
-    call neko_vector_scratch_registry%request_vector(this%n, deta, ind(29))
-    call neko_vector_scratch_registry%request_vector(this%n, xold, ind(30))
-    call neko_vector_scratch_registry%request_vector(this%n, xsiold, ind(31))
-    call neko_vector_scratch_registry%request_vector(this%n, etaold, ind(32))
-    call neko_vector_scratch_registry%request_vector(this%m+1, bb, ind(33))
+    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(s, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(mu, ind(4), this%m, .false.)
+    call neko_scratch_registry%request(rey, ind(5), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(6), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(7), this%m, .false.)
+    call neko_scratch_registry%request(res, ind(8), this%m, .false.)
+    call neko_scratch_registry%request(dely, ind(9), this%m, .false.)
+    call neko_scratch_registry%request(dellambda, ind(10), this%m, .false.)
+    call neko_scratch_registry%request(dy, ind(11), this%m, .false.)
+    call neko_scratch_registry%request(dlambda, ind(12), this%m, .false.)
+    call neko_scratch_registry%request(ds, ind(13), this%m, .false.)
+    call neko_scratch_registry%request(dmu, ind(14), this%m, .false.)
+    call neko_scratch_registry%request(yold, ind(15), this%m, .false.)
+    call neko_scratch_registry%request(lambdaold, ind(16), this%m, .false.)
+    call neko_scratch_registry%request(sold, ind(17), this%m, .false.)
+    call neko_scratch_registry%request(muold, ind(18), this%m, .false.)
+    call neko_scratch_registry%request(x, ind(19), this%n, .false.)
+    call neko_scratch_registry%request(xsi, ind(20), this%n, .false.)
+    call neko_scratch_registry%request(eta, ind(21), this%n, .false.)
+    call neko_scratch_registry%request(rex, ind(22), this%n, .false.)
+    call neko_scratch_registry%request(rexsi, ind(23), this%n, .false.)
+    call neko_scratch_registry%request(reeta, ind(24), this%n, .false.)
+    call neko_scratch_registry%request(delx, ind(25), this%n, .false.)
+    call neko_scratch_registry%request(diagx, ind(26), this%n, .false.)
+    call neko_scratch_registry%request(dx, ind(27), this%n, .false.)
+    call neko_scratch_registry%request(dxsi, ind(28), this%n, .false.)
+    call neko_scratch_registry%request(deta, ind(29), this%n, .false.)
+    call neko_scratch_registry%request(xold, ind(30), this%n, .false.)
+    call neko_scratch_registry%request(xsiold, ind(31), this%n, .false.)
+    call neko_scratch_registry%request(etaold, ind(32), this%n, .false.)
+    call neko_scratch_registry%request(bb, ind(33), this%m+1, .false.)
 
-    call GG%init(this%m, this%n)
-    call AA%init(this%m+1, this%m+1)
+    call neko_scratch_registry%request(GG, ind(34), this%m, this%n, .false.)
+    call neko_scratch_registry%request(AA, ind(35), this%m+1, this%m+1, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -404,12 +409,17 @@ contains
        ! Computing the norm of the residuals
 
        ! Complete the computations of lambda residuals
-       call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-            sync = .true.)
-       call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .true.)
+       if (NEKO_DEVICE_MPI) then
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x_d, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+       else
+          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+               sync = .true.)
+          call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+               mpi_real_precision, mpi_sum, neko_comm, ierr)
+          call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
+               sync = .true.)
+       end if
 
        call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
        call device_sub2(relambda%x_d, y%x_d, this%m)
@@ -741,11 +751,7 @@ contains
     call device_copy(this%s%x_d, s%x_d, this%m)
 
     !free all the initiated variables in this subroutine
-    call neko_vector_scratch_registry%relinquish_vector(ind)
-
-    call GG%free()
-    call AA%free()
-
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dpip_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual
@@ -763,34 +769,33 @@ contains
 
     ! inverse of a diag matrix:
     type(vector_t), pointer :: Ljjxinv ! [∇_x^2 Ljj]−1
-    type(matrix_t) :: hijx ! ∇_x hij
-    type(matrix_t) :: Hess
+    type(matrix_t), pointer :: hijx ! ∇_x hij
+    type(matrix_t), pointer :: Hess
 
-    integer :: info, ind(15)
+    integer :: info, ind(17)
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_vector_scratch_registry%request_vector(this%m, y, ind(1))
-    call neko_vector_scratch_registry%request_vector(this%m, lambda, ind(2))
-    call neko_vector_scratch_registry%request_vector(this%m, mu, ind(3))
-    call neko_vector_scratch_registry%request_vector(this%m, relambda, ind(4))
-    call neko_vector_scratch_registry%request_vector(this%m, remu, ind(5))
-    call neko_vector_scratch_registry%request_vector(this%m, dlambda, ind(6))
-    call neko_vector_scratch_registry%request_vector(this%m, dmu, ind(7))
-    call neko_vector_scratch_registry%request_vector(this%m, gradlambda, ind(8))
-    call neko_vector_scratch_registry%request_vector(this%m, zerom, ind(9))
-    call neko_vector_scratch_registry%request_vector(this%m, dd, ind(10))
-    call neko_vector_scratch_registry%request_vector(this%m, dummy_m, ind(11))
+    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
+    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call neko_scratch_registry%request(mu, ind(3), this%m, .false.)
+    call neko_scratch_registry%request(relambda, ind(4), this%m, .false.)
+    call neko_scratch_registry%request(remu, ind(5), this%m, .false.)
+    call neko_scratch_registry%request(dlambda, ind(6), this%m, .false.)
+    call neko_scratch_registry%request(dmu, ind(7), this%m, .false.)
+    call neko_scratch_registry%request(gradlambda, ind(8), this%m, .false.)
+    call neko_scratch_registry%request(zerom, ind(9), this%m, .false.)
+    call neko_scratch_registry%request(dd, ind(10), this%m, .false.)
+    call neko_scratch_registry%request(dummy_m, ind(11), this%m, .false.)
 
-    call neko_vector_scratch_registry%request_vector(this%n, x, ind(12))
-    call neko_vector_scratch_registry%request_vector(this%n, pjlambda,ind(13))
-    call neko_vector_scratch_registry%request_vector(this%n, qjlambda, ind(14))
+    call neko_scratch_registry%request(x, ind(12), this%n, .false.)
+    call neko_scratch_registry%request(pjlambda,ind(13), this%n, .false.)
+    call neko_scratch_registry%request(qjlambda, ind(14), this%n, .false.)
 
-    call neko_vector_scratch_registry%request_vector(this%n, Ljjxinv, ind(15))
-    call hijx%init(this%m, this%n)
-    call Hess%init(this%m, this%m)
+    call neko_scratch_registry%request(Ljjxinv, ind(15), this%n, .false.)
 
-    call device_cfill(zerom%x_d, 0.0_rp, this%m)
+    call neko_scratch_registry%request(hijx, ind(16), this%m, this%n, .false.)
+    call neko_scratch_registry%request(Hess, ind(17), this%m, this%m, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -1045,9 +1050,7 @@ contains
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
 
-    call neko_vector_scratch_registry%relinquish_vector(ind)
-    call hijx%free()
-    call Hess%free()
+    call neko_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device

@@ -69,13 +69,13 @@ module lube_term_objective
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use interpolation, only: interpolator_t
   use space, only: space_t, GL
   use coefs, only: coef_t
@@ -201,16 +201,16 @@ contains
     select type (design)
     type is (brinkman_design_t)
        this%brinkman_amplitude => &
-            neko_field_registry%get_field("brinkman_amplitude")
+            neko_registry%get_field("brinkman_amplitude")
 
 
     class default
        call neko_error('Minimum dissipation only works with brinkman_design')
     end select
 
-    this%u => neko_field_registry%get_field('u')
-    this%v => neko_field_registry%get_field('v')
-    this%w => neko_field_registry%get_field('w')
+    this%u => neko_registry%get_field('u')
+    this%v => neko_registry%get_field('v')
+    this%w => neko_registry%get_field('w')
 
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
@@ -281,7 +281,7 @@ contains
     type(field_t), pointer :: work
     integer :: temp_indices(1)
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
@@ -326,13 +326,14 @@ contains
 
     ! if we have the lube term we also get an extra term in the sensitivity
 
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
     if(this%dealias_sensitivity) then
        nel = this%c_Xh_GLL%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+            .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
 
        call this%GLL_to_GL%map(fld_GL%x, this%u%x, nel, this%Xh_GL)
        call field_col3(accumulate, fld_GL, fld_GL)

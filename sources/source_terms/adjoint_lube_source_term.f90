@@ -59,8 +59,8 @@ module adjoint_lube_source_term
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use utils, only: neko_error
-  use field_registry, only : neko_field_registry
-  use scratch_registry, only: scratch_registry_t, neko_scratch_registry
+  use registry, only : neko_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: col2, invcol2
   use device_math, only: device_col2, device_invcol2
@@ -203,7 +203,7 @@ contains
 
     select type (design)
     type is (brinkman_design_t)
-       this%chi => neko_field_registry%get_field("brinkman_amplitude")
+       this%chi => neko_registry%get_field("brinkman_amplitude")
     class default
        call neko_error('Unknown design type')
     end select
@@ -254,7 +254,7 @@ contains
     ! It make look the same as the Brinkman term, but it's assumed that
     ! this source term acts on the adjoint, and the u,v,w here come from
     ! the primal
-    call neko_scratch_registry%request_field(work, temp_indices(1))
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
     call field_copy(work, this%chi)
 
     ! scale by K and volume
@@ -268,9 +268,10 @@ contains
     if (this%dealias) then
        nel = this%coef%msh%nelv
        n_GL = nel * this%Xh_GL%lxyz
-       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1))
-       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2))
-       call this%scratch_GL%request_field(chi_GL, temp_indices_GL(3))
+       call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+            .false.)
+       call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), .false.)
+       call this%scratch_GL%request_field(chi_GL, temp_indices_GL(3), .false.)
 
        call this%GLL_to_GL%map(chi_GL%x, work%x, nel, this%Xh_GL)
 
