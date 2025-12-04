@@ -38,6 +38,7 @@
 
 // Device includes
 #include <hip/hip_runtime.h>
+#include <hipsolver/hipsolver.h>
 
 // Neko includes
 #include <neko/device/device_config.h>
@@ -53,11 +54,146 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 
-void delta_1dbeam_hip(void* Delta, real* L_total, real* Le, 
+void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
+    hipsolverDnHandle_t handle;
+    hipsolverStatus_t status;
+    hipsolverDnCreate(&handle);
+
+    int lwork;
+    double *workspace;
+    int *ipiv;
+    int *info;  // Device pointer for hipSOLVER info
+    int host_info = 0;  // Host variable to store the info
+
+    // Workspace query
+    status = hipsolverDnDgetrf_bufferSize(handle, n, n, (double*)A, n, &lwork);
+    hipMalloc(&workspace, lwork * sizeof(double));
+    hipMalloc(&ipiv, n * sizeof(int));
+    hipMalloc(&info, sizeof(int));
+
+    // LU factorization and solve
+    hipsolverDnDgetrf(handle, n, n, (double*)A, n, workspace, ipiv, info);
+
+    // Copy info from device to host to check if factorization succeeded
+    hipMemcpy(&host_info, info, sizeof(int), hipMemcpyDeviceToHost);
+
+    if (host_info == 0) {
+        // Only solve if factorization was successful
+        hipsolverDnDgetrs(handle, HIPSOLVER_OP_N, n, 1, (double*)A, n, ipiv, (double*)b, n, info);
+        // Copy the final info value
+        hipMemcpy(&host_info, info, sizeof(int), hipMemcpyDeviceToHost);
+    }
+
+    // Return the actual info value through jj
+    *jj = host_info;
+
+    // Cleanup
+    hipFree(workspace);
+    hipFree(ipiv);
+    hipFree(info);
+    hipsolverDnDestroy(handle);
+}
+
+void mma_prepare_aa_matrix_hip(void* AA, void* s, void* lambda,
+                                         void* d, void* mu, void* y,
+                                         void* a, real zeta, real z, int m) {
+    const int M = m;
+    const int matrix_size = M + 1;
+    const dim3 nthrds(256, 1, 1);
+    const dim3 nblcks((M + 256 - 1) / 256, 1, 1);
+    const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+    // Launch kernel to prepare AA matrix entirely on device
+    hipLaunchKernelGGL(mma_prepare_aa_matrix_kernel<real>,
+                      nblcks, nthrds, 0, stream,
+                      (real*)AA, (real*)s, (real*)lambda, (real*)d,
+                      (real*)mu, (real*)y, (real*)a, zeta, z, M);
+
+    HIP_CHECK(hipGetLastError());
+}
+
+void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
+                                       void* mu, void* lambda, int m) {
+    const int M = m;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((M + 1024 - 1) / 1024, 1, 1);
+    const hipStream_t stream = (hipStream_t)glb_cmd_queue;
+
+    // Update diagonal elements
+    hipLaunchKernelGGL(mma_update_hessian_diagonal_kernel<real>,
+                      nblcks, nthrds, 0, stream,
+                      (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
+    HIP_CHECK(hipGetLastError());
+
+    // Synchronize to ensure diagonal updates are complete
+    HIP_CHECK(hipStreamSynchronize(stream));
+
+    // Choose kernel based on problem size
+    if (M <= 1024) {
+        // Single-block version (fast for small m)
+        const dim3 stab_nblcks(1, 1, 1);
+        hipLaunchKernelGGL(mma_stabilize_hessian_single_kernel<real>,
+                          stab_nblcks, nthrds, 0, stream,
+                          (real*)Hess, M);
+        HIP_CHECK(hipGetLastError());
+    } else {
+        // Multi-block version (for large m)
+        // Compute trace on host (simple and reliable)
+        real* h_Hess = (real*)malloc(M * sizeof(real));
+
+        // Extract diagonal elements
+        for (int i = 0; i < M; i++) {
+            HIP_CHECK(hipMemcpyAsync(&h_Hess[i],
+                                   (real*)Hess + i * M + i,
+                                   sizeof(real),
+                                   hipMemcpyDeviceToHost, stream));
+        }
+        HIP_CHECK(hipStreamSynchronize(stream));
+
+        // Compute trace and LM factor
+        real trace = 0.0;
+        for (int i = 0; i < M; i++) {
+            trace += h_Hess[i];
+        }
+        real lm_factor = fmax(-1.0e-4 * trace / M, 1.0e-7);
+
+        // Apply stabilization in parallel
+        hipLaunchKernelGGL(mma_stabilize_hessian_multi_kernel<real>,
+                          nblcks, nthrds, 0, stream,
+                          (real*)Hess, lm_factor, M);
+        HIP_CHECK(hipGetLastError());
+
+        free(h_Hess);
+    }
+}
+
+// Custom linear solver using kernel
+extern "C" void hip_custom_solver(void* A, void* b, int n, int* info) {
+    const hipStream_t stream = (hipStream_t) glb_cmd_queue;
+
+    if (n <= 0) {
+        *info = -1; // Use CPU fallback
+        return;
+    }
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(1, 1, 1);
+
+    hipLaunchKernelGGL(mma_small_lu_kernel<real>, nblcks, nthrds, 0, stream,
+        (real*)A, (real*)b, n);
+
+    hipError_t err = hipGetLastError();
+    if (err == hipSuccess) {
+        *info = 0; // GPU solver succeeded
+    } else {
+        *info = -1; // GPU failed
+    }
+}
+
+void delta_1dbeam_hip(void* Delta, real* L_total, real* Le,
                        int* offset, int* n) {
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-    hipLaunchKernelGGL(delta_1dbeam_kernel<real>, 
+    hipLaunchKernelGGL(delta_1dbeam_kernel<real>,
                       nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
                       (real*)Delta, *L_total, *Le, *offset, *n);
     HIP_CHECK(hipGetLastError());

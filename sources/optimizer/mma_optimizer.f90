@@ -238,9 +238,10 @@ contains
           call simulation%write(0)
        end if
 
+       call design%write(0)
+
        call profiler_end_region("Optimizer logging")
     end if
-    call design%write(0)
 
     do iter = 1, this%max_iterations
        if (this%mma%get_residumax() .lt. this%tolerance) exit
