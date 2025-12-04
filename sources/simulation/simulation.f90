@@ -94,6 +94,8 @@ module simulation_m
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_adjoint
+     !> Whether the simulation is steady or unsteady
+     logical :: unsteady = .false.
 
      logical :: have_scalar = .false.
      integer :: n_timesteps = 0
@@ -111,12 +113,16 @@ module simulation_m
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
      procedure, pass(this) :: run_forward => simulation_run_forward
-     !> Run the simulation
+     !> Run the adjoint simulation
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
+     !> Write current state of the forward simulation to disk
+     procedure, pass(this) :: write_forward => simulation_write_forward
+     !> Write current state of the adjoint simulation to disk
+     procedure, pass(this) :: write_adjoint => simulation_write_adjoint
 
   end type simulation_t
   public :: simulation_t
@@ -127,7 +133,8 @@ contains
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(json_file) :: checkpoint_params
-    integer :: i, n_scalars
+    integer :: i, n_scalars, unsteady_support
+    logical :: unsteady
 
     ! initialize the primal
     call neko_init(this%neko_case)
@@ -193,6 +200,28 @@ contains
           call this%output_adjoint%fields%assign(4 + i, &
                this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj)
        end do
+    end if
+
+    ! Check if the simulation is steady or unsteady
+    call json_get_or_default(parameters, "unsteady", unsteady, .false.)
+    this%unsteady = unsteady
+
+    ! Ensure there is a means to deal with unsteadiness
+    if (this%unsteady) then
+       unsteady_support = 0
+       if ("checkpoints" .in. parameters) then
+          unsteady_support = unsteady_support + 1
+       end if
+
+       if (unsteady_support .eq. 0) then
+          call neko_error("No support for unsteady simulation provided, \\ &
+          & \\ current options include enabling checkpoints.")
+       end if
+
+       if (unsteady_support .gt. 1) then
+          call neko_error("Too many supports for unsteady simulation \\ &
+          & \\ provided, please select one.")
+       end if
     end if
 
     if ("checkpoints" .in. parameters) then
@@ -287,5 +316,23 @@ contains
     call this%output_adjoint%sample(real(idx, kind=rp))
 
   end subroutine simulation_write
+
+  !> Write current state of the forward simulation to disk
+  subroutine simulation_write_forward(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_forward%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_forward
+
+  !> Write current state of the adjoint simulation to disk
+  subroutine simulation_write_adjoint(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_adjoint%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_adjoint
 
 end module simulation_m

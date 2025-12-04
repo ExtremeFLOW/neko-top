@@ -8,4 +8,5 @@
 6. \subpage passive-scalar
 7. \subpage beam
 8. \subpage mma
-6. \subpage static-mixers
+9. \subpage static-mixers
+10. \subpage unsteady-rugby-ball
