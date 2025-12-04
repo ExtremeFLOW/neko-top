@@ -69,8 +69,10 @@ jobs:
             setup-backend: |
               wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
               sudo apt install ./amdgpu-install_*.deb
-              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev
+              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev hipsolver-dev hipblas-dev
               ROCM_DIR=$(ls -d /opt/rocm-*)
+              CMAKE_PREFIX_PATH="$ROCM_DIR/lib/cmake:$CMAKE_PREFIX_PATH"
+              echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
 
     # ------------------------------------------------------------------------ #
