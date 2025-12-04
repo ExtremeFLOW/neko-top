@@ -66,7 +66,6 @@
             "tolerance": 1.0e-4,
             "mma": {
                 "max_iter": 100,
-                "backend": "cpu",
                 "subsolver": "dip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,

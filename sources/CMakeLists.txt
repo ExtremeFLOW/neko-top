@@ -13,11 +13,14 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
 if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
+    find_package(CUDAToolkit REQUIRED)
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
+    enable_language(C)
     add_compile_definitions(HAVE_HIP=1)
-
     add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+    find_package(hipblas REQUIRED)
+    find_package(hipsolver REQUIRED)
 
 elseif(NOT ${DEVICE_TYPE} STREQUAL "CPU")
     message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
@@ -103,6 +106,10 @@ target_link_libraries(neko-top
     MPI::MPI_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
+    $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
+    $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
 )
 
 # ============================================================================ #

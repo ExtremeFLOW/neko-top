@@ -38,6 +38,37 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mma_prepare_aa_matrix_cuda(AA, s, lambda, d, mu, y, a, zeta, &
+          z, m) bind(c, name="mma_prepare_aa_matrix_cuda")
+       import c_rp, c_ptr, c_int
+       type(c_ptr), value :: AA, s, lambda, d, mu, y, a
+       real(c_rp) :: zeta, z
+       integer(c_int) :: m
+     end subroutine mma_prepare_aa_matrix_cuda
+
+     subroutine mma_prepare_hessian_cuda(Hess, y, d, mu, lambda, m) &
+          bind(c, name="mma_prepare_hessian_cuda")
+       import c_ptr, c_int
+       type(c_ptr), value :: Hess, y, d, mu, lambda
+       integer(c_int) :: m
+     end subroutine mma_prepare_hessian_cuda
+
+     subroutine cuda_custom_solver(A_d, b_d, n, info) &
+          bind(c, name = 'cuda_custom_solver')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine cuda_custom_solver
+
+     subroutine cuSOLVER_wrapper(A_d, b_d, n, info) &
+          bind(c, name = 'cuSOLVER_wrapper')
+       import c_int, c_ptr
+       type(c_ptr), value :: A_d, b_d
+       integer(c_int), value :: n
+       integer(c_int) :: info
+     end subroutine cuSOLVER_wrapper
+
      subroutine delta_1dbeam_cuda(Delta_d, L_total, Le, offset, n) &
           bind(c, name = 'delta_1dbeam_cuda')
        import c_rp, c_int, c_ptr
