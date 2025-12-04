@@ -313,7 +313,7 @@ contains
     character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
     logical, intent(in) :: dealias
-    integer :: n, i
+    integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
