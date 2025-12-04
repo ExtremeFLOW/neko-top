@@ -78,7 +78,7 @@ if [ "$UNIT_TEST" == true ]; then
     ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
 
     if [ $? -ne 0 ]; then
-        echo "Some tests failed. Check test_report.log for details."
+        echo "Unit tests failed."
         exit 1
     fi
 fi
