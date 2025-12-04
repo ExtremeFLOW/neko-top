@@ -383,6 +383,7 @@ contains
     call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
     call this%output%fields%assign_to_field(3, this%sensitivity)
 
+    n = this%design_indicator%dof%size()
     call this%init_base(name, n)
 
     ! init the simple brinkman term for the forward problem
