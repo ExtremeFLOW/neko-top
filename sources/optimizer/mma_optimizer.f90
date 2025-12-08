@@ -15,6 +15,7 @@ module mma_optimizer
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use math, only: abscmp
   use comm, only: pe_rank
   use neko_config, only: NEKO_BCKND_DEVICE
   use scratch_registry, only: neko_scratch_registry
@@ -58,6 +59,7 @@ module mma_optimizer
      procedure, pass(this) :: init_from_components => &
           mma_optimizer_init_from_components
 
+     procedure, pass(this) :: step => mma_optimizer_step
      procedure, pass(this) :: run => mma_optimizer_run
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
@@ -163,104 +165,26 @@ contains
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
-
-    type(vector_t), pointer :: x
-
+    logical :: converged
     integer :: iter, n
-
-    real(kind=rp) :: objective_value
-    type(vector_t), pointer :: constraint_value
-    type(vector_t), pointer :: objective_sensitivities
-    type(matrix_t), pointer :: constraint_sensitivities
-    integer :: ind(4)
 
     n = design%size()
 
-    ! Initialize the vectors
-    call neko_scratch_registry%request(x, ind(1), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind(2), &
-         problem%get_n_constraints(), .false.)
-    call neko_scratch_registry%request(objective_sensitivities, ind(3), &
-         n, .false.)
-    call neko_scratch_registry%request(constraint_sensitivities, ind(4), &
-         problem%get_n_constraints(), n, .false.)
-
-    !>initializing the scaling factor
+    !> initializing the scaling factor
     if (pe_rank .eq. 0) then
        print *, 'max_iterations for the optimization loop = ', &
             this%max_iterations
     end if
-    call profiler_start_region('Optimizer iteration')
-
-    call problem%compute(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_forward(0)
-    end if
-    call problem%compute_sensitivity(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_adjoint(0)
-    end if
-
-    call problem%get_objective_value(objective_value)
-    call problem%get_constraint_values(constraint_value)
-
-    select type (des => design)
-    type is (brinkman_design_t)
-       call des%get_sensitivity(objective_sensitivities)
-    class default
-       call problem%get_objective_sensitivities(objective_sensitivities)
-    end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
-
-    call profiler_end_region('Optimizer iteration')
 
     call this%write(0, problem)
     call design%write(0)
 
+    converged = .false.
     do iter = 1, this%max_iterations
-       if (this%mma%get_residumax() .lt. this%tolerance) exit
+       if (converged) exit
 
        call profiler_start_region('Optimizer iteration')
-
-       ! Scaling
-       if (this%auto_scale) then
-          this%scaling_factor = abs(this%scale / constraint_value%x(1))
-       end if
-
-       call vector_cmult(constraint_value, this%scaling_factor)
-       call matrix_cmult(constraint_sensitivities, this%scaling_factor)
-
-       ! Use scaled sensitivities to update the design variable
-       call design%get_values(x)
-       call this%mma%update(iter, x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
-
-       call design%update_design(x)
-
-       call problem%compute(design, simulation)
-       if (present(simulation) .and. this%enable_output) then
-          call simulation%write_forward(iter)
-       end if
-       call problem%compute_sensitivity(design, simulation)
-       if (present(simulation) .and. this%enable_output) then
-          call simulation%write_adjoint(iter)
-       end if
-
-       call problem%get_constraint_values(constraint_value)
-
-       select type (des => design)
-       type is (brinkman_design_t)
-          call des%get_sensitivity(objective_sensitivities)
-       class default
-          call problem%get_objective_sensitivities(objective_sensitivities)
-       end select
-
-       call problem%get_constraint_sensitivities(constraint_sensitivities)
-
-       call this%mma%KKT(x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
-
+       converged = this%step(iter, problem, design, simulation)
        call profiler_end_region('Optimizer iteration')
 
        ! Log the progress and outputs
@@ -276,10 +200,85 @@ contains
        print *, 'MMA Optimization completed after', iter-1, 'iterations.'
     end if
 
-    ! Free local resources
-    call neko_scratch_registry%relinquish(ind)
-
   end subroutine mma_optimizer_run
+
+  !> Function for computing a step in the optimization loop
+  function mma_optimizer_step(this, iter, problem, design, simulation) &
+       result(converged)
+    class(mma_optimizer_t), intent(inout) :: this
+    integer, intent(in) :: iter
+    class(problem_t), intent(inout) :: problem
+    class(design_t), intent(inout) :: design
+    type(simulation_t), optional, intent(inout) :: simulation
+
+    type(vector_t), pointer :: x
+    type(vector_t), pointer :: constraint_value
+    type(vector_t), pointer :: objective_sensitivities
+    type(matrix_t), pointer :: constraint_sensitivities
+    integer :: n_design, n_constraint, indices(4)
+
+    logical :: converged
+
+    n_design = design%size()
+    n_constraint = problem%get_n_constraints()
+
+    ! Grab some local pointers
+    call neko_scratch_registry%request(x, indices(1), n_design, .false.)
+    call neko_scratch_registry%request(constraint_value, indices(2), &
+         n_constraint, .false.)
+    call neko_scratch_registry%request(objective_sensitivities, indices(3), &
+         n_design, .false.)
+    call neko_scratch_registry%request(constraint_sensitivities, indices(4), &
+         n_constraint, n_design, .false.)
+
+    ! Evaluate the problem based on the current design
+    call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(iter)
+    end if
+    call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(iter)
+    end if
+
+    call problem%get_constraint_values(constraint_value)
+
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
+
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
+
+    ! Execute the scaling
+    if (this%auto_scale) then
+       this%scaling_factor = abs(this%scale / constraint_value%x(1))
+    end if
+
+    if (.not. abscmp(this%scaling_factor, 1.0_rp)) then
+       call vector_cmult(constraint_value, this%scaling_factor)
+       call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    end if
+
+    ! Check the KKT conditions and check for convergence
+    call this%mma%KKT(x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
+    converged = this%mma%get_residumax() .lt. this%tolerance
+
+    ! Update the design variable
+    if (.not. converged) then
+       call design%get_values(x)
+       call this%mma%update(iter, x, objective_sensitivities, &
+            constraint_value, constraint_sensitivities)
+       call design%update_design(x)
+    end if
+
+    ! Free local resources
+    call neko_scratch_registry%relinquish(indices)
+
+  end function mma_optimizer_step
 
   !> Validate the solution for the MMA optimizer
   subroutine mma_optimizer_validate(this, problem, design)
