@@ -177,8 +177,7 @@ contains
     n = design%size()
 
     ! Initialize the vectors
-    call neko_scratch_registry%request(x, ind(1), &
-         n, .false.)
+    call neko_scratch_registry%request(x, ind(1), n, .false.)
     call neko_scratch_registry%request(constraint_value, ind(2), &
          problem%get_n_constraints(), .false.)
     call neko_scratch_registry%request(objective_sensitivities, ind(3), &
@@ -392,7 +391,7 @@ contains
     call this%csv_log%write(log_data)
 
     ! Free local resources
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
