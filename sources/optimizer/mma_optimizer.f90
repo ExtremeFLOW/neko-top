@@ -184,7 +184,6 @@ contains
 
        ! Log the progress and outputs
        call this%write(iter, problem)
-       if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
 
        if (converged) exit
