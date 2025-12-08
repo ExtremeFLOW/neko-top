@@ -8,6 +8,32 @@ module mma_optimizer
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
+  use field, only: field_t
+  use scratch_registry, only: neko_scratch_registry
+  use profiler, only: profiler_start_region, profiler_end_region
+  use logger, only: neko_log
+  use csv_file, only: csv_file_t
+
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+
+  !only to print nglobal when running in parallel
+  use comm, only: neko_comm, pe_rank
+  use mpi_f08, only: MPI_INTEGER, mpi_sum, MPI_Allreduce
+
+  use neko_config, only: NEKO_BCKND_DEVICE
+  ! Inclusions from external dependencies and standard libraries
+  use, intrinsic :: iso_fortran_env, only: stderr => error_unit
+
+  use math, only: copy, cmult
+  use device_math, only: device_copy
+  use field_math, only: field_rzero
+  use vector_math, only: vector_cmult
+  use matrix_math, only: matrix_cmult
+  use neko_ext, only: reset
+  use mask_ops, only: mask_exterior_const
+  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
 
@@ -110,7 +136,7 @@ contains
 
     ! Local variables
     type(vector_t), pointer :: x
-    integer :: ind
+    integer :: ind_vec
 
     ! Local variables
     class(constraint_t), allocatable :: dummy_con
@@ -134,13 +160,13 @@ contains
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
     ! problems in mma_optimizer_run()
-    call neko_scratch_registry%request(x, ind, design%size(), .false.)
+    call neko_scratch_registry%request(x, ind_vec, design%size(), .false.)
 
     call design%get_values(x)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish_vector(ind_vec)
 
     !set the enable_output flag
     this%enable_output = enable_output
@@ -177,7 +203,8 @@ contains
     n = design%size()
 
     ! Initialize the vectors
-    call neko_scratch_registry%request(x, ind(1), n, .false.)
+    call neko_scratch_registry%request(x, ind(1), &
+         n, .false.)
     call neko_scratch_registry%request(constraint_value, ind(2), &
          problem%get_n_constraints(), .false.)
     call neko_scratch_registry%request(objective_sensitivities, ind(3), &
@@ -224,7 +251,7 @@ contains
        call profiler_start_region('Optimizer iteration')
 
        ! Scaling
-       if (this%auto_scale) then
+       if (this%auto_scale .eqv. .true.) then
           this%scaling_factor = abs(this%scale / constraint_value%x(1))
        end if
 
@@ -265,6 +292,7 @@ contains
 
        ! Log the progress and outputs
        call this%write(iter, problem)
+       if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
     end do
 
@@ -328,7 +356,7 @@ contains
     real(kind=rp) :: objective_value
     character(len=1024) :: header
 
-    integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
+    integer :: log_size, ind_vec(3), n, m, i_tmp1, i_tmp2
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
@@ -341,9 +369,9 @@ contains
        log_size = 5 + n + m
     endif
 
-    call neko_scratch_registry%request(log_data, ind(1), log_size, .false.)
-    call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
+    call neko_scratch_registry%request(log_data, ind_vec(1), log_size, .false.)
+    call neko_scratch_registry%request(all_objectives, ind_vec(2), n, .false.)
+    call neko_scratch_registry%request(constraint_value, ind_vec(3), m, .false.)
 
     if (iter .eq. 0) then
        header = 'iter, ' // &
@@ -390,7 +418,7 @@ contains
     call this%csv_log%write(log_data)
 
     ! Free local resources
-    call neko_scratch_registry%relinquish(ind)
+    call neko_scratch_registry%relinquish_vector(ind_vec)
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
