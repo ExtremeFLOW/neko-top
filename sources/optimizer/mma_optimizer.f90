@@ -119,7 +119,7 @@ contains
     call neko_log%section('Optimizer Initialization')
 
     ! Check if the problem is unconstrained
-    this%unconstrained_problem = (problem%get_n_constraints() .eq. 0)
+    this%unconstrained_problem = problem%get_n_constraints() .eq. 0
     if (this%unconstrained_problem) then
        call neko_log%message('Unconstrained problem detected. ' // &
             'Adding a dummy constraint to enable MMA optimization.')
@@ -131,6 +131,7 @@ contains
        end select
 
        call problem%add_constraint(dummy_con)
+       if (allocated(dummy_con)) deallocate(dummy_con)
     end if
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
@@ -141,7 +142,7 @@ contains
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
 
     !set the enable_output flag
     this%enable_output = enable_output
@@ -245,8 +246,8 @@ contains
     type(vector_t), pointer :: constraint_values
     integer :: ind
 
-    call neko_scratch_registry%request( &
-         constraint_values, ind, problem%get_n_constraints(), .false.)
+    call neko_scratch_registry%request(constraint_values, ind, &
+         problem%get_n_constraints(), .false.)
 
     call problem%get_constraint_values(constraint_values)
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -260,7 +261,7 @@ contains
     end if
 
     ! Free local resources
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
 
   end subroutine mma_optimizer_validate
 
