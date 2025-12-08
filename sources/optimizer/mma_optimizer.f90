@@ -166,23 +166,18 @@ contains
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
     logical :: converged
+    character(len=256) :: msg
     integer :: iter, n
 
     n = design%size()
 
-    !> initializing the scaling factor
-    if (pe_rank .eq. 0) then
-       print *, 'max_iterations for the optimization loop = ', &
-            this%max_iterations
-    end if
+    call neko_log%section('Optimization Loop')
 
     call this%write(0, problem)
     call design%write(0)
 
     converged = .false.
     do iter = 1, this%max_iterations
-       if (converged) exit
-
        call profiler_start_region('Optimizer iteration')
        converged = this%step(iter, problem, design, simulation)
        call profiler_end_region('Optimizer iteration')
@@ -191,15 +186,23 @@ contains
        call this%write(iter, problem)
        if (present(simulation)) call simulation%write(iter)
        call design%write(iter)
+
+       if (converged) exit
     end do
 
     call this%validate(problem, design)
 
-    ! Final state after optimization
-    if (pe_rank .eq. 0) then
-       print *, 'MMA Optimization completed after', iter-1, 'iterations.'
+    if (.not. converged) then
+       write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
+            this%max_iterations, ' iterations.'
+       call neko_log%warning(trim(msg))
+    else
+       write(msg, '(A,I0,A)') 'Optimizer converged after ', iter, &
+            ' iterations.'
+       call neko_log%message(trim(msg))
     end if
 
+    call neko_log%end_section()
   end subroutine mma_optimizer_run
 
   !> Function for computing a step in the optimization loop
