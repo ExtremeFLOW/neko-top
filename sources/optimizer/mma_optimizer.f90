@@ -112,8 +112,7 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-
-    ! Local variables
+    character(len=1024) :: header
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -151,6 +150,11 @@ contains
     ! Initialize the logger
     if (this%enable_output) then
        call this%csv_log%init('optimization_data.csv')
+       header = 'iter, ' // trim(problem%get_log_header()) // &
+            ', KKTmax, KKTnorm2, scaling factor, ' // &
+            trim(this%mma%get_backend_and_subsolver())
+
+       call this%csv_log%set_header(trim(header))
     end if
 
     call this%init_base(max_iterations, tolerance)
@@ -283,7 +287,6 @@ contains
     type(vector_t), pointer :: all_objectives
     type(vector_t), pointer :: constraint_value
     real(kind=rp) :: objective_value
-    character(len=1024) :: header
 
     integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
 
@@ -301,15 +304,6 @@ contains
     call neko_scratch_registry%request(log_data, ind(1), log_size, .false.)
     call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
     call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
-
-    if (iter .eq. 0) then
-       header = 'iter, ' // &
-            trim(problem%get_log_header()) // &
-            ', KKTmax, KKTnorm2, scaling factor, ' // &
-            trim(this%mma%get_backend_and_subsolver())
-
-       call this%csv_log%set_header(trim(header))
-    end if
 
     ! Prepare data for logging
     call problem%get_objective_value(objective_value)

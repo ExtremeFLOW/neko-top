@@ -145,10 +145,6 @@ contains
     character(len=256) :: msg
     integer :: iter
 
-    ! Initial logging
-    call this%write(0, problem)
-    call design%write(0)
-
     call neko_log%section('Optimization Loop')
     converged = .false.
     do iter = 1, this%max_iterations
