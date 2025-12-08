@@ -167,17 +167,16 @@ contains
     type(simulation_t), optional, intent(inout) :: simulation
     logical :: converged
     character(len=256) :: msg
-    integer :: iter, n
+    integer :: iter
 
-    n = design%size()
-
-    call neko_log%section('Optimization Loop')
-
+    ! Initial logging
     call this%write(0, problem)
     call design%write(0)
 
+    call neko_log%section('Optimization Loop')
     converged = .false.
     do iter = 1, this%max_iterations
+
        call profiler_start_region('Optimizer iteration')
        converged = this%step(iter, problem, design, simulation)
        call profiler_end_region('Optimizer iteration')
@@ -188,6 +187,7 @@ contains
 
        if (converged) exit
     end do
+    call neko_log%end_section()
 
     call this%validate(problem, design)
 
@@ -201,7 +201,6 @@ contains
        call neko_log%message(trim(msg))
     end if
 
-    call neko_log%end_section()
   end subroutine mma_optimizer_run
 
   !> Function for computing a step in the optimization loop
