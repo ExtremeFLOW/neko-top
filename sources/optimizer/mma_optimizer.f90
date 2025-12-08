@@ -60,7 +60,6 @@ module mma_optimizer
           mma_optimizer_init_from_components
 
      procedure, pass(this) :: step => mma_optimizer_step
-     procedure, pass(this) :: run => mma_optimizer_run
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
      procedure, pass(this) :: free => mma_optimizer_free
@@ -158,50 +157,6 @@ contains
     call neko_log%end_section()
 
   end subroutine mma_optimizer_init_from_components
-
-  !> Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, problem, design, simulation)
-    class(mma_optimizer_t), intent(inout) :: this
-    class(problem_t), intent(inout) :: problem
-    class(design_t), intent(inout) :: design
-    type(simulation_t), optional, intent(inout) :: simulation
-    logical :: converged
-    character(len=256) :: msg
-    integer :: iter
-
-    ! Initial logging
-    call this%write(0, problem)
-    call design%write(0)
-
-    call neko_log%section('Optimization Loop')
-    converged = .false.
-    do iter = 1, this%max_iterations
-
-       call profiler_start_region('Optimizer iteration')
-       converged = this%step(iter, problem, design, simulation)
-       call profiler_end_region('Optimizer iteration')
-
-       ! Log the progress and outputs
-       call this%write(iter, problem)
-       call design%write(iter)
-
-       if (converged) exit
-    end do
-    call neko_log%end_section()
-
-    call this%validate(problem, design)
-
-    if (.not. converged) then
-       write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
-            this%max_iterations, ' iterations.'
-       call neko_log%warning(trim(msg))
-    else
-       write(msg, '(A,I0,A)') 'Optimizer converged after ', iter, &
-            ' iterations.'
-       call neko_log%message(trim(msg))
-    end if
-
-  end subroutine mma_optimizer_run
 
   !> Function for computing a step in the optimization loop
   function mma_optimizer_step(this, iter, problem, design, simulation) &
