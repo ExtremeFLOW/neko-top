@@ -55,7 +55,7 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 100,
+            "max_iterations": 500,
             "tolerance": 1.0e-6,
             "enable_output": true,
             "mma": {
@@ -78,7 +78,7 @@
     "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.3
+                    "r": 0.1
                 },
                 {
                     "type": "SIMP",
