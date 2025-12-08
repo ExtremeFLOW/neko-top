@@ -24,7 +24,7 @@ module mma_optimizer
   use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   implicit none
   private
 
@@ -215,6 +215,7 @@ contains
 
     ! Execute the scaling
     if (this%auto_scale) then
+       call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
        this%scaling_factor = abs(this%scale / constraint_value%x(1))
     end if
 
@@ -256,7 +257,7 @@ contains
     call problem%get_constraint_values(constraint_values)
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(constraint_values%x, constraint_values%x_d, &
-            constraint_values%size(), HOST_TO_DEVICE, .true.)
+            constraint_values%size(), DEVICE_TO_HOST, .true.)
     end if
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
@@ -309,6 +310,9 @@ contains
     call problem%get_objective_value(objective_value)
     call problem%get_all_objective_values(all_objectives)
     call problem%get_constraint_values(constraint_value)
+
+    call all_objectives%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     ! Assemble the log data
     log_data%x(1) = real(iter, kind=rp)

@@ -166,11 +166,11 @@ contains
     if (.not. converged) then
        write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
             this%max_iterations, ' iterations.'
-       call neko_log%warning(trim(msg))
+       call neko_log%warning(msg)
     else
        write(msg, '(A,I0,A)') 'Optimizer converged after ', iter, &
             ' iterations.'
-       call neko_log%message(trim(msg))
+       call neko_log%message(msg)
     end if
 
   end subroutine optimizer_run
