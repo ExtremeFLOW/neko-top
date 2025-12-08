@@ -165,8 +165,10 @@ contains
     call design%write(0)
 
     call neko_log%section('Optimization Loop')
+
+    iter = 1
     converged = .false.
-    do iter = 1, this%max_iterations
+    do while (iter .le. this%max_iterations .and. .not. converged)
 
        call profiler_start_region('Optimizer iteration')
        converged = this%step(iter, problem, design, simulation)
@@ -176,8 +178,9 @@ contains
        call this%write(iter, problem)
        call design%write(iter)
 
-       if (converged) exit
+       iter = iter + 1
     end do
+
     call neko_log%end_section()
 
     call this%validate(problem, design)
