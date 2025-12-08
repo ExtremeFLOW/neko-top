@@ -31,6 +31,9 @@ module optimizer
           init_from_json
      !> Run the optimization loop
      procedure, pass(this), public :: run => optimizer_run
+     !> Prepare the optimizer before starting the optimization loop
+     procedure(optimizer_initialize), pass(this), public, deferred :: &
+          initialize
      !> Perform a single optimization step
      procedure(optimizer_step), pass(this), public, deferred :: step
      !> Free resources.
@@ -63,6 +66,17 @@ module optimizer
        class(design_t), intent(in) :: design
        type(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_init_from_json
+
+     !> Interface for running an optimization initialization
+     !! This subroutine initializes the optimizer before starting the
+     !! optimization loop.
+     subroutine optimizer_initialize(this, problem, design, simulation)
+       import optimizer_t, simulation_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       class(problem_t), intent(inout) :: problem
+       class(design_t), intent(inout) :: design
+       type(simulation_t), optional, intent(inout) :: simulation
+     end subroutine optimizer_initialize
 
      !> Interface for running an optimization step
      logical function optimizer_step(this, iter, problem, design, simulation)
@@ -144,6 +158,11 @@ contains
     logical :: converged
     character(len=256) :: msg
     integer :: iter
+
+    ! Prepare the problem state before starting the optimization
+    call this%initialize(problem, design, simulation)
+    call this%write(0, problem)
+    call design%write(0)
 
     call neko_log%section('Optimization Loop')
     converged = .false.

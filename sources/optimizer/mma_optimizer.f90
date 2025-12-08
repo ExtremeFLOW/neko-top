@@ -59,6 +59,7 @@ module mma_optimizer
      procedure, pass(this) :: init_from_components => &
           mma_optimizer_init_from_components
 
+     procedure, pass(this) :: initialize => mma_optimizer_initialize
      procedure, pass(this) :: step => mma_optimizer_step
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
@@ -163,6 +164,52 @@ contains
 
   end subroutine mma_optimizer_init_from_components
 
+  !> Prepare the MMA optimizer before starting the optimization loop
+  subroutine mma_optimizer_initialize(this, problem, design, simulation)
+    class(mma_optimizer_t), intent(inout) :: this
+    class(problem_t), intent(inout) :: problem
+    class(design_t), intent(inout) :: design
+    type(simulation_t), optional, intent(inout) :: simulation
+
+    type(vector_t), pointer :: x
+    type(vector_t), pointer :: constraint_value
+    type(vector_t), pointer :: objective_sensitivities
+    type(matrix_t), pointer :: constraint_sensitivities
+    integer :: n_design, n_constraint, indices(4)
+
+    ! Grab some local pointers
+    call neko_scratch_registry%request(x, indices(1), n_design, .false.)
+    call neko_scratch_registry%request(constraint_value, indices(2), &
+         n_constraint, .false.)
+    call neko_scratch_registry%request(objective_sensitivities, indices(3), &
+         n_design, .false.)
+    call neko_scratch_registry%request(constraint_sensitivities, indices(4), &
+         n_constraint, n_design, .false.)
+
+    ! Evaluate the problem based on the updated design
+    call problem%compute(design, simulation)
+    call problem%compute_sensitivity(design, simulation)
+
+    ! Retrieve the updated objective and constraint values and sensitivities
+    call design%get_values(x)
+    call problem%get_constraint_values(constraint_value)
+
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
+
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
+
+    ! Check the KKT conditions and check for convergence
+    call this%mma%KKT(x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
+
+    call neko_scratch_registry%relinquish(indices)
+  end subroutine mma_optimizer_initialize
+
   !> Function for computing a step in the optimization loop
   function mma_optimizer_step(this, iter, problem, design, simulation) &
        result(converged)
@@ -192,16 +239,8 @@ contains
     call neko_scratch_registry%request(constraint_sensitivities, indices(4), &
          n_constraint, n_design, .false.)
 
-    ! Evaluate the problem based on the current design
-    call problem%compute(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_forward(iter)
-    end if
-    call problem%compute_sensitivity(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_adjoint(iter)
-    end if
-
+    !  Retrieve the current objective and constraint values and sensitivities
+    call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -224,18 +263,37 @@ contains
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
     end if
 
+    ! Update the design variable
+    call this%mma%update(iter, x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
+    call design%update_design(x)
+
+    ! Evaluate the problem based on the updated design
+    call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(iter)
+    end if
+    call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(iter)
+    end if
+
+    ! Retrieve the updated objective and constraint values and sensitivities
+    call problem%get_constraint_values(constraint_value)
+
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
+
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
+
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
     converged = this%mma%get_residumax() .lt. this%tolerance
-
-    ! Update the design variable
-    if (.not. converged) then
-       call design%get_values(x)
-       call this%mma%update(iter, x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
-       call design%update_design(x)
-    end if
 
     ! Free local resources
     call neko_scratch_registry%relinquish(indices)
@@ -255,10 +313,7 @@ contains
          problem%get_n_constraints(), .false.)
 
     call problem%get_constraint_values(constraint_values)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(constraint_values%x, constraint_values%x_d, &
-            constraint_values%size(), DEVICE_TO_HOST, .true.)
-    end if
+    call constraint_values%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
        call neko_error('MMA optimizer validation failed: ' // &
