@@ -32,6 +32,11 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Module for handling the optimization problem.
+!!
+!! This module defines the `problem_t` type which is the main interface for
+!! the optimization problem. The problem is defined by a set of objectives and
+!! constraints that are evaluated based on the design variables. The problem
+!! also handles the output of the problem and the simulation.
 module problem
   use num_types, only: rp, dp
   use fld_file_output, only: fld_file_output_t
@@ -63,11 +68,6 @@ module problem
   private
 
   !> The abstract problem type.
-  !!
-  !! This module defines the `problem_t` type which is the main interface for
-  !! the optimization problem. The problem is defined by a set of objectives and
-  !! constraints that are evaluated based on the design variables. The problem
-  !! also handles the output of the problem and the simulation.
   type, public :: problem_t
      private
 
@@ -540,8 +540,6 @@ contains
     end do
 
     call profiler_end_region("Forward simulation")
-
-
 
     call simulation_adjoint_finalize(simulation%adjoint_case)
 
