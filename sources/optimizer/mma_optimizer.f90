@@ -18,13 +18,13 @@ module mma_optimizer
   use math, only: abscmp
   use comm, only: pe_rank
   use neko_config, only: NEKO_BCKND_DEVICE
-  use scratch_registry, only: neko_scratch_registry
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
+  use scratch_registry, only: neko_scratch_registry
   implicit none
   private
 
@@ -33,7 +33,7 @@ module mma_optimizer
   ! Concrete type for MMA optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
-     type(mma_t) :: mma
+     type(mma_t), private :: mma
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! (if auto_scale then constraint_value%x=scale else
@@ -41,16 +41,16 @@ module mma_optimizer
      !! When auto_scale is true, we use an adaptable scale for
      !! constraint_value%x and constraint_sensitivities%x
      !! in every iteration (variable scale factors)
-     real(kind=rp) :: scale = 1.0_rp
-     real(kind=rp) :: scaling_factor = 1.0_rp
-     logical :: auto_scale = .false.
+     real(kind=rp), private :: scale = 1.0_rp
+     real(kind=rp), private :: scaling_factor = 1.0_rp
+     logical, private :: auto_scale = .false.
 
-     ! Set to flase to remove logging for optimal performance
-     logical :: unconstrained_problem = .false.
+     ! Set to flags to remove logging for optimal performance
+     logical, private :: unconstrained_problem = .false.
 
      !> A file writer to document the convergence history
-     logical :: enable_output = .true.
-     type(csv_file_t) :: csv_log
+     logical, private :: enable_output = .true.
+     type(csv_file_t), private :: csv_log
    contains
 
      ! Override the deferred methods
@@ -68,6 +68,9 @@ module mma_optimizer
   end type mma_optimizer_t
 
 contains
+
+  ! ========================================================================== !
+  ! Allocator and deallocator methods for the MMA optimizer
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
@@ -163,6 +166,18 @@ contains
     call neko_log%end_section()
 
   end subroutine mma_optimizer_init_from_components
+
+  ! Free resources associated with the MMA optimizer
+  subroutine mma_optimizer_free(this)
+    class(mma_optimizer_t), intent(inout) :: this
+
+    ! Free MMA-specific data
+    call this%free_base()
+    call this%mma%free()
+  end subroutine mma_optimizer_free
+
+  ! ========================================================================== !
+  ! Implementation of the deferred methods for the MMA optimizer
 
   !> Prepare the MMA optimizer before starting the optimization loop
   subroutine mma_optimizer_initialize(this, problem, design, simulation)
@@ -325,15 +340,10 @@ contains
 
   end subroutine mma_optimizer_validate
 
-  ! Free resources associated with the MMA optimizer
-  subroutine mma_optimizer_free(this)
-    class(mma_optimizer_t), intent(inout) :: this
+  ! ========================================================================== !
+  ! Logging and IO methods for the MMA optimizer
 
-    ! Free MMA-specific data
-    call this%free_base()
-    call this%mma%free()
-  end subroutine mma_optimizer_free
-
+  !> Write the progress of the MMA optimizer to the log file
   subroutine mma_optimizer_write(this, iter, problem)
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter

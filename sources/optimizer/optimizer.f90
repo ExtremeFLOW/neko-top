@@ -38,8 +38,6 @@ module optimizer
      procedure(optimizer_step), pass(this), public, deferred :: step
      !> Free resources.
      procedure(optimizer_free), pass(this), public, deferred :: free
-     !> Free base resources.
-     procedure, pass(this) :: free_base => optimizer_free_base
 
      !> Validate the solution
      procedure(optimizer_validate), pass(this), public, deferred :: validate
@@ -48,7 +46,8 @@ module optimizer
 
      !> The base initializer
      procedure, pass(this) :: init_base => optimizer_init_base
-
+     !> Free base resources.
+     procedure, pass(this) :: free_base => optimizer_free_base
 
   end type optimizer_t
 
@@ -183,6 +182,7 @@ contains
 
     call neko_log%end_section()
 
+    ! Check that the final design is valid
     call this%validate(problem, design)
 
     if (.not. converged) then
