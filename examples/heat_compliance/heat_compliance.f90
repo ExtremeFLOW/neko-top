@@ -259,7 +259,6 @@ contains
     call this%phi%free()
     call this%thermal_conductivity%free()
 
-    call this%free_base()
   end subroutine heat_compliance_free
 
   !=========================================================================!

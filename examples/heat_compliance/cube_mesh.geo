@@ -4,7 +4,7 @@ SetFactory("OpenCASCADE");
 // Parameters
 // ------------------------------------------------------------
 L  = 3;        // Cube side length
-N  = 6;        // Default subdivisions per coarse cell (override with -setnumber N)
+N  = 7;        // Default subdivisions per coarse cell (override with -setnumber N)
 
 // Cell size so that everything is cubes
 h  = L/(3*N);  // => 3N cells per cube edge
