@@ -78,7 +78,7 @@
     "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.1
+                    "r": 0.05
                 },
                 {
                     "type": "SIMP",
