@@ -47,8 +47,9 @@ module problem
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
+  use math, only: copy
   use device_math, only: device_copy
-  use vector_math, only: vector_add2
+  use vector_math, only: vector_add2, vector_cfill
   ! not so clean, hopefully a refactor is possible.
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
@@ -827,22 +828,21 @@ contains
   !! @param[inout] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
     class(problem_t), intent(inout) :: this
-    type(matrix_t), intent(inout) :: sensitivity
-    integer :: i, j, n
-    logical :: sync
+    type(matrix_t), target, intent(inout) :: sensitivity
+    real(kind=rp), pointer :: row(:)
+    integer :: i
 
-    ! Sync all constraint sensitivities to host
+    ! Copy all constraint sensitivities to host, sync on last one
     do i = 1, this%n_constraints
-       sync = i .eq. this%n_constraints
        call this%constraint_list(i)%constraint%sensitivity%copy_from( &
-            DEVICE_TO_HOST, sync = sync)
+            DEVICE_TO_HOST, sync = i .eq. this%n_constraints)
     end do
 
     do i = 1, this%n_constraints
-       do j = 1, this%n_design
-          sensitivity%x(i, j) = &
-               this%constraint_list(i)%constraint%sensitivity%x(j)
-       end do
+       row(1:this%n_design) => sensitivity%x(i, :)
+
+       call copy(row, this%constraint_list(i)%constraint%sensitivity%x, &
+            this%n_design)
     end do
 
     call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
