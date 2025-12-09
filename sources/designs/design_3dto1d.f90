@@ -50,6 +50,7 @@ module design_3dto1d
   use simulation_m, only: simulation_t
   use json_module, only: json_file
   use json_utils, only: json_get
+  use utils, only: neko_error
 
   use vector, only: vector_t
   use math, only: copy
