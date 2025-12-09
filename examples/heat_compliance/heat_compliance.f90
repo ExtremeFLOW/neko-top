@@ -39,7 +39,7 @@ module heat_compliance
   use field, only: field_t
   use field_math, only: field_rzero, field_col2, field_addcol3, field_rone, &
        field_copy, field_cmult, field_cfill
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use fld_file_output, only: fld_file_output_t
   use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
@@ -276,7 +276,7 @@ contains
     select type(design)
     type is (thermal_conductivity_design_t)
        n = this%coef%dof%size()
-       call neko_scratch_registry%request_field(RHS, temp_indices(1))
+       call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
 
        ! Optional masking of design outside optimization region
        if (design%has_mask) then
@@ -357,9 +357,9 @@ contains
     integer :: n
 
     n = this%coef%dof%size()
-    call neko_scratch_registry%request_field(grad_phi_x, temp_indices(1))
-    call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2))
-    call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3))
+    call neko_scratch_registry%request_field(grad_phi_x, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3), .false.)
 
     ! call this%Ax%compute(grad_phi_x%x, this%phi%x, this%coef, this%coef%msh, &
     !      this%coef%Xh)
@@ -466,10 +466,10 @@ contains
     this%coef => coef
 
     ! Design and sensitivity fields
-    call neko_field_registry%add_field(coef%dof, "design_indicator", .true.)
-    call neko_field_registry%add_field(coef%dof, "sensitivity",     .true.)
-    this%design_indicator => neko_field_registry%get_field("design_indicator")
-    this%sensitivity      => neko_field_registry%get_field("sensitivity")
+    call neko_registry%add_field(coef%dof, "design_indicator", .true.)
+    call neko_registry%add_field(coef%dof, "sensitivity",     .true.)
+    this%design_indicator => neko_registry%get_field("design_indicator")
+    this%sensitivity      => neko_registry%get_field("sensitivity")
 
     call this%init_base(name, this%design_indicator%dof%size())
 

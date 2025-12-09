@@ -59,8 +59,8 @@
             "tolerance": 1.0e-6,
             "enable_output": true,
             "mma": {
-                "max_iter": 100,
-                "subsolver": "dpip",
+                "max_iter": 1000,
+                "subsolver": "dip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
