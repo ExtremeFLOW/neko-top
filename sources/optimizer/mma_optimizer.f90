@@ -15,15 +15,14 @@ module mma_optimizer
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use comm, only: pe_rank
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use scratch_registry, only: neko_scratch_registry
+  use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, HOST_TO_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST
+  use scratch_registry, only: neko_scratch_registry
   implicit none
   private
 
@@ -32,7 +31,7 @@ module mma_optimizer
   ! Concrete type for MMA optimizer
   type, extends(optimizer_t) :: mma_optimizer_t
 
-     type(mma_t) :: mma
+     type(mma_t), private :: mma
 
      !> Scaling constraint_value%x and constraint_sensitivities%x.
      !! (if auto_scale then constraint_value%x=scale else
@@ -40,16 +39,16 @@ module mma_optimizer
      !! When auto_scale is true, we use an adaptable scale for
      !! constraint_value%x and constraint_sensitivities%x
      !! in every iteration (variable scale factors)
-     real(kind=rp) :: scale = 1.0_rp
-     real(kind=rp) :: scaling_factor = 1.0_rp
-     logical :: auto_scale = .false.
+     real(kind=rp), private :: scale = 1.0_rp
+     real(kind=rp), private :: scaling_factor = 1.0_rp
+     logical, private :: auto_scale = .false.
 
-     ! Set to flase to remove logging for optimal performance
-     logical :: unconstrained_problem = .false.
+     ! Set to flags to remove logging for optimal performance
+     logical, private :: unconstrained_problem = .false.
 
      !> A file writer to document the convergence history
-     logical :: enable_output = .true.
-     type(csv_file_t) :: csv_log
+     logical, private :: enable_output = .true.
+     type(csv_file_t), private :: csv_log
    contains
 
      ! Override the deferred methods
@@ -58,7 +57,8 @@ module mma_optimizer
      procedure, pass(this) :: init_from_components => &
           mma_optimizer_init_from_components
 
-     procedure, pass(this) :: run => mma_optimizer_run
+     procedure, pass(this) :: initialize => mma_optimizer_initialize
+     procedure, pass(this) :: step => mma_optimizer_step
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
      procedure, pass(this) :: free => mma_optimizer_free
@@ -66,6 +66,9 @@ module mma_optimizer
   end type mma_optimizer_t
 
 contains
+
+  ! -------------------------------------------------------------------------- !
+  ! Allocator and deallocator methods for the MMA optimizer
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_json(this, parameters, problem, design, &
@@ -111,14 +114,13 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-
-    ! Local variables
+    character(len=1024) :: header
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
 
     ! Check if the problem is unconstrained
-    this%unconstrained_problem = (problem%get_n_constraints() .eq. 0)
+    this%unconstrained_problem = problem%get_n_constraints() .eq. 0
     if (this%unconstrained_problem) then
        call neko_log%message('Unconstrained problem detected. ' // &
             'Adding a dummy constraint to enable MMA optimization.')
@@ -130,6 +132,7 @@ contains
        end select
 
        call problem%add_constraint(dummy_con)
+       if (allocated(dummy_con)) deallocate(dummy_con)
     end if
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
@@ -140,7 +143,7 @@ contains
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
 
     !set the enable_output flag
     this%enable_output = enable_output
@@ -149,6 +152,11 @@ contains
     ! Initialize the logger
     if (this%enable_output) then
        call this%csv_log%init('optimization_data.csv')
+       header = 'iter, ' // trim(problem%get_log_header()) // &
+            ', KKTmax, KKTnorm2, scaling factor, ' // &
+            trim(this%mma%get_backend_and_subsolver())
+
+       call this%csv_log%set_header(trim(header))
     end if
 
     call this%init_base(max_iterations, tolerance)
@@ -157,51 +165,49 @@ contains
 
   end subroutine mma_optimizer_init_from_components
 
-  !> Define the optimization loop for MMA
-  subroutine mma_optimizer_run(this, problem, design, simulation)
+  ! Free resources associated with the MMA optimizer
+  subroutine mma_optimizer_free(this)
+    class(mma_optimizer_t), intent(inout) :: this
+
+    ! Free MMA-specific data
+    call this%free_base()
+    call this%mma%free()
+  end subroutine mma_optimizer_free
+
+  ! -------------------------------------------------------------------------- !
+  ! Implementation of the deferred methods for the MMA optimizer
+
+  !> Prepare the MMA optimizer before starting the optimization loop
+  subroutine mma_optimizer_initialize(this, problem, design, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
 
     type(vector_t), pointer :: x
-
-    integer :: iter, n
-
-    real(kind=rp) :: objective_value
     type(vector_t), pointer :: constraint_value
     type(vector_t), pointer :: objective_sensitivities
     type(matrix_t), pointer :: constraint_sensitivities
-    integer :: ind(4)
+    integer :: n_design, n_constraint, indices(4)
 
-    n = design%size()
+    n_design = design%size()
+    n_constraint = problem%get_n_constraints()
 
-    ! Initialize the vectors
-    call neko_scratch_registry%request(x, ind(1), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind(2), &
-         problem%get_n_constraints(), .false.)
-    call neko_scratch_registry%request(objective_sensitivities, ind(3), &
-         n, .false.)
-    call neko_scratch_registry%request(constraint_sensitivities, ind(4), &
-         problem%get_n_constraints(), n, .false.)
+    ! Grab some local pointers
+    call neko_scratch_registry%request(x, indices(1), n_design, .false.)
+    call neko_scratch_registry%request(constraint_value, indices(2), &
+         n_constraint, .false.)
+    call neko_scratch_registry%request(objective_sensitivities, indices(3), &
+         n_design, .false.)
+    call neko_scratch_registry%request(constraint_sensitivities, indices(4), &
+         n_constraint, n_design, .false.)
 
-    !>initializing the scaling factor
-    if (pe_rank .eq. 0) then
-       print *, 'max_iterations for the optimization loop = ', &
-            this%max_iterations
-    end if
-    call profiler_start_region('Optimizer iteration')
-
+    ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_forward(0)
-    end if
     call problem%compute_sensitivity(design, simulation)
-    if (present(simulation) .and. this%enable_output) then
-       call simulation%write_adjoint(0)
-    end if
 
-    call problem%get_objective_value(objective_value)
+    ! Retrieve the updated objective and constraint values and sensitivities
+    call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -213,72 +219,102 @@ contains
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-    call profiler_end_region('Optimizer iteration')
+    ! Check the KKT conditions and check for convergence
+    call this%mma%KKT(x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
 
-    call this%write(0, problem)
-    call design%write(0)
+    call neko_scratch_registry%relinquish(indices)
+  end subroutine mma_optimizer_initialize
 
-    do iter = 1, this%max_iterations
-       if (this%mma%get_residumax() .lt. this%tolerance) exit
+  !> Function for computing a step in the optimization loop
+  function mma_optimizer_step(this, iter, problem, design, simulation) &
+       result(converged)
+    class(mma_optimizer_t), intent(inout) :: this
+    integer, intent(in) :: iter
+    class(problem_t), intent(inout) :: problem
+    class(design_t), intent(inout) :: design
+    type(simulation_t), optional, intent(inout) :: simulation
 
-       call profiler_start_region('Optimizer iteration')
+    type(vector_t), pointer :: x
+    type(vector_t), pointer :: constraint_value
+    type(vector_t), pointer :: objective_sensitivities
+    type(matrix_t), pointer :: constraint_sensitivities
+    integer :: n_design, n_constraint, indices(4)
 
-       ! Scaling
-       if (this%auto_scale) then
-          this%scaling_factor = abs(this%scale / constraint_value%x(1))
-       end if
+    logical :: converged
 
-       call vector_cmult(constraint_value, this%scaling_factor)
-       call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    n_design = design%size()
+    n_constraint = problem%get_n_constraints()
 
-       ! Use scaled sensitivities to update the design variable
-       call design%get_values(x)
-       call this%mma%update(iter, x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
+    ! Grab some local pointers
+    call neko_scratch_registry%request(x, indices(1), n_design, .false.)
+    call neko_scratch_registry%request(constraint_value, indices(2), &
+         n_constraint, .false.)
+    call neko_scratch_registry%request(objective_sensitivities, indices(3), &
+         n_design, .false.)
+    call neko_scratch_registry%request(constraint_sensitivities, indices(4), &
+         n_constraint, n_design, .false.)
 
-       call design%update_design(x)
+    !  Retrieve the current objective and constraint values and sensitivities
+    call design%get_values(x)
+    call problem%get_constraint_values(constraint_value)
 
-       call problem%compute(design, simulation)
-       if (present(simulation) .and. this%enable_output) then
-          call simulation%write_forward(iter)
-       end if
-       call problem%compute_sensitivity(design, simulation)
-       if (present(simulation) .and. this%enable_output) then
-          call simulation%write_adjoint(iter)
-       end if
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
 
-       call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-       select type (des => design)
-       type is (brinkman_design_t)
-          call des%get_sensitivity(objective_sensitivities)
-       class default
-          call problem%get_objective_sensitivities(objective_sensitivities)
-       end select
-
-       call problem%get_constraint_sensitivities(constraint_sensitivities)
-
-       call this%mma%KKT(x, objective_sensitivities, &
-            constraint_value, constraint_sensitivities)
-
-       call profiler_end_region('Optimizer iteration')
-
-       ! Log the progress and outputs
-       call this%write(iter, problem)
-       call design%write(iter)
-    end do
-
-    call this%validate(problem, design)
-
-    ! Final state after optimization
-    if (pe_rank .eq. 0) then
-       print *, 'MMA Optimization completed after', iter-1, 'iterations.'
+    ! Execute the scaling
+    if (this%auto_scale) then
+       call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
+       this%scaling_factor = abs(this%scale / constraint_value%x(1))
     end if
 
-    ! Free local resources
-    call neko_scratch_registry%relinquish(ind)
+    if (.not. abscmp(this%scaling_factor, 1.0_rp)) then
+       call vector_cmult(constraint_value, this%scaling_factor)
+       call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    end if
 
-  end subroutine mma_optimizer_run
+    ! Update the design variable
+    call this%mma%update(iter, x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
+    call design%update_design(x)
+
+    ! Evaluate the problem based on the updated design
+    call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(iter)
+    end if
+    call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(iter)
+    end if
+
+    ! Retrieve the updated objective and constraint values and sensitivities
+    call problem%get_constraint_values(constraint_value)
+
+    select type (des => design)
+    type is (brinkman_design_t)
+       call des%get_sensitivity(objective_sensitivities)
+    class default
+       call problem%get_objective_sensitivities(objective_sensitivities)
+    end select
+
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
+
+    ! Check the KKT conditions and check for convergence
+    call this%mma%KKT(x, objective_sensitivities, &
+         constraint_value, constraint_sensitivities)
+    converged = this%mma%get_residumax() .lt. this%tolerance
+
+    ! Free local resources
+    call neko_scratch_registry%relinquish(indices)
+
+  end function mma_optimizer_step
 
   !> Validate the solution for the MMA optimizer
   subroutine mma_optimizer_validate(this, problem, design)
@@ -289,14 +325,11 @@ contains
     type(vector_t), pointer :: constraint_values
     integer :: ind
 
-    call neko_scratch_registry%request( &
-         constraint_values, ind, problem%get_n_constraints(), .false.)
+    call neko_scratch_registry%request(constraint_values, ind, &
+         problem%get_n_constraints(), .false.)
 
     call problem%get_constraint_values(constraint_values)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(constraint_values%x, constraint_values%x_d, &
-            constraint_values%size(), HOST_TO_DEVICE, .true.)
-    end if
+    call constraint_values%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
        call neko_error('MMA optimizer validation failed: ' // &
@@ -304,19 +337,19 @@ contains
     end if
 
     ! Free local resources
-    call neko_scratch_registry%relinquish_vector(ind)
+    call neko_scratch_registry%relinquish(ind)
 
   end subroutine mma_optimizer_validate
 
-  ! Free resources associated with the MMA optimizer
-  subroutine mma_optimizer_free(this)
-    class(mma_optimizer_t), intent(inout) :: this
+  ! -------------------------------------------------------------------------- !
+  ! Logging and IO methods for the MMA optimizer
 
-    ! Free MMA-specific data
-    call this%free_base()
-    call this%mma%free()
-  end subroutine mma_optimizer_free
-
+  !> Write the progress of the MMA optimizer to the log file
+  !! This subroutine logs the current iteration, objective values,
+  !! constraint values, and convergence metrics to a CSV file.
+  !! @param this The MMA optimizer object.
+  !! @param iter The current iteration number.
+  !! @param problem The problem object.
   subroutine mma_optimizer_write(this, iter, problem)
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter
@@ -326,7 +359,6 @@ contains
     type(vector_t), pointer :: all_objectives
     type(vector_t), pointer :: constraint_value
     real(kind=rp) :: objective_value
-    character(len=1024) :: header
 
     integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
 
@@ -345,19 +377,13 @@ contains
     call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
     call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
 
-    if (iter .eq. 0) then
-       header = 'iter, ' // &
-            trim(problem%get_log_header()) // &
-            ', KKTmax, KKTnorm2, scaling factor, ' // &
-            trim(this%mma%get_backend_and_subsolver())
-
-       call this%csv_log%set_header(trim(header))
-    end if
-
     ! Prepare data for logging
     call problem%get_objective_value(objective_value)
     call problem%get_all_objective_values(all_objectives)
     call problem%get_constraint_values(constraint_value)
+
+    call all_objectives%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     ! Assemble the log data
     log_data%x(1) = real(iter, kind=rp)

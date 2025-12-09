@@ -23,7 +23,7 @@ program usrneko
   use matrix, only: matrix_t
 
   use comm, only: pe_rank, neko_comm
-  use device, only: device_memcpy
+  use device, only: device_memcpy, DEVICE_TO_HOST
 
   implicit none
 
@@ -96,10 +96,6 @@ program usrneko
 
   call des%init_from_components(nloc)
 
-  if (pe_rank == 0) then
-     print *, "Global number of design variables=", des%size_global()
-  end if
-
   ! initialize the design
   call initdesign%init(des%size())
   initdesign = 0.5_rp
@@ -120,11 +116,11 @@ program usrneko
   call fill_constraint_indices(stress_global_indices, num_constraints, &
        num_constraint_partitions, des%size_global())
 
-  stress_sigma_max = 250e6_rp ! Same max stress for all
+  stress_sigma_max = huge(1.0_rp) ! Same max stress for all
 
   select type(beamweight)
   type is (beamweight_obj)
-     call beamweight%beamweight_obj_init( 1.0_rp, des)
+     call beamweight%beamweight_obj_init(1.0_rp, des)
   class default
      call neko_error("beamweight is not beamweight_obj!")
   end select
@@ -144,7 +140,7 @@ program usrneko
 
      select type(c => tmp_constraint)
      type is (stress_con)
-        call c%init_stress_con("stress_con_"//trim(index_str), des, &
+        call c%init_stress_con("stress_con_" // trim(index_str), des, &
              stress_global_indices(i), stress_sigma_max(i))
      class default
         call neko_error("tmp_constraint is not stress_con!")
@@ -168,7 +164,7 @@ program usrneko
   !   call beamweight%update_value(des)
   !   call deflection%update_sensitivity(des)
   !   call beamweight%update_sensitivity(des)
-  !   if (pe_rank == 0) then
+  !   if (pe_rank .eq. 0) then
   !      print *, "Performing finite difference validation..."
   !   endif
   !   call finite_difference_validation(des, 1, 1.0e-6_rp)
@@ -179,15 +175,27 @@ program usrneko
   call prob%update_constraint_sensitivities(des)
 
 
+  call prob%get_objective_value(objective_value)
   call prob%get_all_objective_values(all_objectives)
   call prob%get_constraint_values(constraint_value)
-  call prob%get_objective_value(objective_value)
 
-  if (pe_rank == 0) then
-     print *, "nobject=", prob%get_n_objectives(), "nconstraint=", &
-          prob%get_n_constraints(), "total objective=", objective_value, &
-          "all_objectives%x=", all_objectives%x, "constraint_value", &
-          constraint_value%x
+  call all_objectives%copy_from(DEVICE_TO_HOST, sync = .false.)
+  call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+  if (pe_rank .eq. 0) then
+     write(*, '(A,I0)') "Global number of design variables: ", des%size_global()
+     write(*, '(A,I0)') "Number of objectives: ", prob%get_n_objectives()
+     write(*, '(A,I0)') "Number of constraints: ", prob%get_n_constraints()
+     write(*, '(A,F12.6)') "Objective value: ", objective_value
+     do i = 1, all_objectives%size()
+        write(*, '(A,I2,A,F12.6)') "  Objective ", i, ": ", &
+             all_objectives%x(i)
+     end do
+     write(*, '(A)') "Constraint values:"
+     do i = 1, constraint_value%size()
+        write(*, '(A,I2,A,F12.6)') "  Constraint ", i, ": ", &
+             constraint_value%x(i)
+     end do
   end if
 
   ! -------------------------------------------------------------------------- !
@@ -202,8 +210,8 @@ program usrneko
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_end = MPI_Wtime()
 
-  if (pe_rank == 0) then
-     print *, "opt%run execution time:", t_end - t_start, "seconds"
+  if (pe_rank .eq. 0) then
+     write(*,'(A,F12.6,A)') "Optimizer execution time:", t_end - t_start, "s"
   end if
 
   ! -------------------------------------------------------------------------- !
@@ -283,7 +291,7 @@ subroutine finite_difference_validation(des, k_test, delta)
   endif
 
   ! Output results
-  if (pe_rank == 0) then
+  if (pe_rank .eq. 0) then
      print *, "=============================================="
      print *, "FINITE DIFFERENCE VALIDATION"
      print *, "=============================================="
