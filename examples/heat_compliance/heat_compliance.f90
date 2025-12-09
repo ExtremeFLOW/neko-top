@@ -39,7 +39,11 @@ module heat_compliance
   use field, only: field_t
   use field_math, only: field_rzero, field_col2, field_addcol3, field_rone, &
        field_copy, field_cmult, field_cfill
+<<<<<<< HEAD
   use registry, only: neko_registry
+=======
+  use field_registry, only: neko_field_registry
+>>>>>>> e7ae83e4e5843e73653ab243b6739f1b32bfbb53
   use fld_file_output, only: fld_file_output_t
   use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
@@ -259,6 +263,10 @@ contains
     call this%phi%free()
     call this%thermal_conductivity%free()
 
+<<<<<<< HEAD
+=======
+    call this%free_base()
+>>>>>>> e7ae83e4e5843e73653ab243b6739f1b32bfbb53
   end subroutine heat_compliance_free
 
   !=========================================================================!
@@ -275,7 +283,11 @@ contains
     select type(design)
     type is (thermal_conductivity_design_t)
        n = this%coef%dof%size()
+<<<<<<< HEAD
        call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+=======
+       call neko_scratch_registry%request_field(RHS, temp_indices(1))
+>>>>>>> e7ae83e4e5843e73653ab243b6739f1b32bfbb53
 
        ! Optional masking of design outside optimization region
        if (design%has_mask) then
@@ -356,9 +368,15 @@ contains
     integer :: n
 
     n = this%coef%dof%size()
+<<<<<<< HEAD
     call neko_scratch_registry%request_field(grad_phi_x, temp_indices(1), .false.)
     call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2), .false.)
     call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3), .false.)
+=======
+    call neko_scratch_registry%request_field(grad_phi_x, temp_indices(1))
+    call neko_scratch_registry%request_field(grad_phi_y, temp_indices(2))
+    call neko_scratch_registry%request_field(grad_phi_z, temp_indices(3))
+>>>>>>> e7ae83e4e5843e73653ab243b6739f1b32bfbb53
 
     ! call this%Ax%compute(grad_phi_x%x, this%phi%x, this%coef, this%coef%msh, &
     !      this%coef%Xh)
@@ -465,10 +483,17 @@ contains
     this%coef => coef
 
     ! Design and sensitivity fields
+<<<<<<< HEAD
     call neko_registry%add_field(coef%dof, "design_indicator", .true.)
     call neko_registry%add_field(coef%dof, "sensitivity",     .true.)
     this%design_indicator => neko_registry%get_field("design_indicator")
     this%sensitivity      => neko_registry%get_field("sensitivity")
+=======
+    call neko_field_registry%add_field(coef%dof, "design_indicator", .true.)
+    call neko_field_registry%add_field(coef%dof, "sensitivity",     .true.)
+    this%design_indicator => neko_field_registry%get_field("design_indicator")
+    this%sensitivity      => neko_field_registry%get_field("sensitivity")
+>>>>>>> e7ae83e4e5843e73653ab243b6739f1b32bfbb53
 
     call this%init_base(name, this%design_indicator%dof%size())
 
