@@ -293,6 +293,114 @@ function find_hdf5() {
 }
 
 # ============================================================================ #
+# Ensure ADIOS2 is installed, if not install it.
+function find_adios2() {
+    check_external_dir
+
+    # Determine the ADIOS2 installation directory
+    if [[ $# -ge 1 ]]; then
+        ADIOS2_DIR="$1"
+    elif [ -z "$ADIOS2_DIR" ]; then
+        ADIOS2_DIR="adios2"
+    fi
+
+    if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
+        ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
+    fi
+
+    mkdir -p $ADIOS2_DIR
+    ADIOS2_DIR=$(realpath $ADIOS2_DIR)
+    ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
+
+    if [[ ! -x "$ADIOS2_CONFIG" ]]; then
+        [ -z "$ADIOS2_VERSION" ] && ADIOS2_VERSION="2.10.1"
+        [ -z "$ADIOS2_ENABLE_FORTRAN" ] && ADIOS2_ENABLE_FORTRAN="ON"
+        [ -z "$ADIOS2_ENABLE_PYTHON" ] && ADIOS2_ENABLE_PYTHON="ON"
+        [ -z "$ADIOS2_ENABLE_BZIP2" ] && ADIOS2_ENABLE_BZIP2="ON"
+        [ -z "$ADIOS2_BZIP2_VERSION" ] && ADIOS2_BZIP2_VERSION="1.0.8"
+
+        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        cd $ADIOS2_DIR
+
+        # Build BZip2 locally if requested
+        if [ "$ADIOS2_ENABLE_BZIP2" == "ON" ]; then
+            BZIP2_SRC_DIR=$ADIOS2_DIR/bzip2-$ADIOS2_BZIP2_VERSION
+            BZIP2_ARCHIVE=bzip2-$ADIOS2_BZIP2_VERSION.tar.gz
+            if [[ ! -f "$BZIP2_SRC_DIR/libbz2.so.$ADIOS2_BZIP2_VERSION" ]]; then
+                rm -fr $BZIP2_SRC_DIR
+                wget https://www.sourceware.org/pub/bzip2/$BZIP2_ARCHIVE
+                tar -xvf $BZIP2_ARCHIVE
+                rm $BZIP2_ARCHIVE
+                cd $BZIP2_SRC_DIR
+                make CC=${CC:-cc} -f Makefile-libbz2_so
+                cd ..
+            fi
+            BZIP2_INCLUDE_DIR=$BZIP2_SRC_DIR
+            BZIP2_LIBRARY=$BZIP2_SRC_DIR/libbz2.so.$ADIOS2_BZIP2_VERSION
+        fi
+
+        # Clone ADIOS2 from the repository if it does not exist.
+        if [ ! -d ADIOS2/.git ]; then
+            rm -fr ADIOS2
+            git clone --depth 1 --branch v$ADIOS2_VERSION \
+                https://github.com/ornladios/ADIOS2.git ADIOS2
+        fi
+
+        cmake_args=(
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo
+            -DCMAKE_INSTALL_PREFIX=$ADIOS2_DIR
+            -DADIOS2_USE_MPI=ON
+            -DADIOS2_USE_Fortran=$ADIOS2_ENABLE_FORTRAN
+            -DADIOS2_USE_Python=$ADIOS2_ENABLE_PYTHON
+            -DPython_EXECUTABLE=$(which python3)
+            -DPYTHON_EXECUTABLE=$(which python3)
+            -DPython_FIND_STRATEGY=LOCATION
+            -DCMAKE_C_COMPILER=${MPICC:-${CC:-cc}}
+            -DCMAKE_CXX_COMPILER=${MPICXX:-${CXX:-c++}}
+        )
+
+        if [ "$ADIOS2_ENABLE_BZIP2" == "ON" ]; then
+            cmake_args+=(
+                -DADIOS2_USE_BZip2=ON
+                -DBZIP2_INCLUDE_DIR=$BZIP2_INCLUDE_DIR
+                -DBZIP2_LIBRARY_DEBUG=$BZIP2_LIBRARY
+                -DBZIP2_LIBRARY_RELEASE=$BZIP2_LIBRARY
+            )
+        else
+            cmake_args+=(-DADIOS2_USE_BZip2=OFF)
+        fi
+
+        cmake -S ADIOS2 -B build "${cmake_args[@]}"
+        cmake --build build --parallel
+        cmake --install build
+        rm -fr build
+
+        cd $CURRENT_DIR
+        ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
+    fi
+
+    if [ ! -x "$ADIOS2_CONFIG" ]; then
+        error "ADIOS2 not found at:"
+        error "\t$ADIOS2_DIR"
+        error "Please set ADIOS2_DIR to the directory containing"
+        error "the ADIOS2 installation."
+        exit 1
+    fi
+
+    export ADIOS2_DIR=$(realpath $ADIOS2_DIR)
+    export ADIOS2_FORTRAN_DIR=$ADIOS2_DIR
+    export PATH=$ADIOS2_DIR/bin:$PATH
+    [ -d "$ADIOS2_DIR/lib/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib/pkgconfig:$PKG_CONFIG_PATH"
+    [ -d "$ADIOS2_DIR/lib64/pkgconfig" ] && \
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib64/pkgconfig:$PKG_CONFIG_PATH"
+    [ -d "$ADIOS2_DIR/lib" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib:$LD_LIBRARY_PATH"
+    [ -d "$ADIOS2_DIR/lib64" ] && \
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64:$LD_LIBRARY_PATH"
+}
+
+# ============================================================================ #
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
@@ -359,6 +467,7 @@ function find_neko() {
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
+    find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
     [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
 
@@ -387,6 +496,9 @@ function find_neko() {
         [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
+        [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
+        [ -n "$ADIOS2_FORTRAN_DIR" ] && \
+            FEATURES+=" --with-adios2-fortran=$ADIOS2_FORTRAN_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
