@@ -175,6 +175,9 @@ contains
     class(simplefield_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: x
 
+    if (this%size() .ne. x%size()) then
+       call neko_error('Get x: size mismatch')
+    end if
     x = this%x_coord
   end subroutine design_simple_get_x
 
@@ -182,6 +185,9 @@ contains
     class(simplefield_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: y
 
+    if (this%size() .ne. y%size()) then
+       call neko_error('Get y: size mismatch')
+    end if
     y = this%y_coord
   end subroutine design_simple_get_y
 
@@ -189,6 +195,9 @@ contains
     class(simplefield_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: z
 
+    if (this%size() .ne. z%size()) then
+       call neko_error('Get z: size mismatch')
+    end if
     z = this%z_coord
   end subroutine design_simple_get_z
 

@@ -135,6 +135,10 @@ contains
     class(design_3dto1d_t), intent(in) :: this
     type(vector_t), intent(inout) :: values
 
+    if (this%size() .ne. values%size()) then
+       call neko_error('Get design: size mismatch')
+    end if
+
     values = this%values
 
   end subroutine design_3dto1d_get_values
