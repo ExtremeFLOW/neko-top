@@ -136,6 +136,9 @@ program problem_tester
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
+  call sensitivities%free()
+  call constraint_sensitivity%free()
+
   call prob%free()
   call des%free()
   call sim%free()
