@@ -190,6 +190,9 @@ contains
     type(matrix_t), pointer :: constraint_sensitivities
     integer :: n_design, n_constraint, indices(4)
 
+    n_design = design%size()
+    n_constraint = problem%get_n_constraints()
+
     ! Grab some local pointers
     call neko_scratch_registry%request(x, indices(1), n_design, .false.)
     call neko_scratch_registry%request(constraint_value, indices(2), &
