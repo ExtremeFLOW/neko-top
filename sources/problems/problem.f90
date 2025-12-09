@@ -217,10 +217,8 @@ contains
     this%n_objectives = 0
     this%n_constraints = 0
 
-    ! minimum dissipation objective function
+    ! Read the objectives and constraints
     call this%read_objectives(parameters, design, simulation)
-
-    ! volume constraint
     call this%read_constraints(parameters, design, simulation)
 
   end subroutine problem_init
@@ -460,7 +458,6 @@ contains
     class(design_t), intent(inout) :: design
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-
 
     call dt_controller%init(simulation%neko_case%params)
 
@@ -776,15 +773,11 @@ contains
     type(vector_t), intent(inout) :: all_objective_values
     integer :: i
 
-    call all_objective_values%init(this%n_objectives)
     do i = 1, this%n_objectives
        all_objective_values%x(i) = this%objective_list(i)%objective%value
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(all_objective_values%x, all_objective_values%x_d, &
-            this%n_objectives, HOST_TO_DEVICE, sync = .true.)
-    end if
+    call all_objective_values%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_all_objective_values
 
@@ -799,15 +792,11 @@ contains
     type(vector_t), intent(inout) :: constraint_value
     integer :: i
 
-    call constraint_value%init(this%n_constraints)
     do i = 1, this%n_constraints
        constraint_value%x(i) = this%constraint_list(i)%constraint%value
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(constraint_value%x, constraint_value%x_d, &
-            this%n_constraints, HOST_TO_DEVICE, sync = .true.)
-    end if
+    call constraint_value%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_constraint_values
 
@@ -822,7 +811,7 @@ contains
     type(vector_t), intent(inout) :: sensitivity
     integer :: i
 
-    call sensitivity%init(this%n_design)
+    call vector_cfill(sensitivity, 0.0_rp)
     do i = 1, this%n_objectives
        call vector_add2(sensitivity, &
             this%objective_list(i)%objective%sensitivity)
@@ -837,42 +826,26 @@ contains
   !! @param[in] this The problem to update the objectives with.
   !! @param[inout] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
-    class(problem_t), intent(in) :: this
+    class(problem_t), intent(inout) :: this
     type(matrix_t), intent(inout) :: sensitivity
-    type(vector_t) :: tmp
     integer :: i, j, n
+    logical :: sync
 
-    n = this%n_constraints * this%n_design
-    call sensitivity%init(this%n_constraints, this%n_design)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call tmp%init(this%n_design)
-    end if
-
+    ! Sync all constraint sensitivities to host
     do i = 1, this%n_constraints
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          tmp = this%constraint_list(i)%constraint%sensitivity
-          call device_memcpy(tmp%x, tmp%x_d, &
-               this%n_design, DEVICE_TO_HOST, sync = .true.)
-          do j = 1, this%n_design
-             sensitivity%x(i, j) = tmp%x(j)
-          end do
-       else
-          do j = 1, this%n_design
-             sensitivity%x(i, j) = &
-                  this%constraint_list(i)%constraint%sensitivity%x(j)
-          end do
-       end if
+       sync = i .eq. this%n_constraints
+       call this%constraint_list(i)%constraint%sensitivity%copy_from( &
+            DEVICE_TO_HOST, sync = sync)
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(sensitivity%x, sensitivity%x_d, n, &
-            HOST_TO_DEVICE, sync = .true.)
-    end if
+    do i = 1, this%n_constraints
+       do j = 1, this%n_design
+          sensitivity%x(i, j) = &
+               this%constraint_list(i)%constraint%sensitivity%x(j)
+       end do
+    end do
 
-    ! Free the temporary vector
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call tmp%free()
-    end if
+    call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_constraint_sensitivities
 
@@ -910,22 +883,22 @@ contains
     !
     !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
     !
-    ! And then if we also want things like thie iteration or KKT they can be
-    ! appended to the begining or end of this by the optimizer.
+    ! And then if we also want things like this iteration or KKT they can be
+    ! appended to the beginning or end of this by the optimizer.
     !
     ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
     buff = "Total objective function"
     do i = 1, this%get_n_objectives()
        mini_buff = ""
        write(mini_buff, '(", ", A)') this%objective_list(i)%objective%name
-       buff = trim(buff)//trim(mini_buff)
+       buff = trim(buff) // trim(mini_buff)
     end do
 
     do i = 1, this%get_n_constraints()
        mini_buff = ""
        write(mini_buff, '(", ", A)') &
             this%constraint_list(i)%constraint%name
-       buff = trim(buff)//trim(mini_buff)
+       buff = trim(buff) // trim(mini_buff)
     end do
 
   end function problem_get_log_header
