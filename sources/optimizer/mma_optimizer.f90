@@ -16,14 +16,12 @@ module mma_optimizer
   use vector, only: vector_t
   use matrix, only: matrix_t
   use math, only: abscmp
-  use comm, only: pe_rank
-  use neko_config, only: NEKO_BCKND_DEVICE
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
   implicit none
   private
