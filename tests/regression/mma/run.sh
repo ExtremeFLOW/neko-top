@@ -74,6 +74,8 @@ fi
 
 python plot_design.py all || exit 1
 python check.py || exit 1
+
+echo "MMA regression test passed"
 cd "$CURRENT_DIR" || exit 1
 
 # ============================================================================ #

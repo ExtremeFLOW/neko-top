@@ -10,6 +10,8 @@ module optimizer
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
+  use logger, only: neko_log
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
   private
@@ -28,11 +30,14 @@ module optimizer
      procedure(optimizer_init_from_json), pass(this), public, deferred :: &
           init_from_json
      !> Run the optimization loop
-     procedure(optimizer_run), pass(this), public, deferred :: run
+     procedure, pass(this), public :: run => optimizer_run
+     !> Prepare the optimizer before starting the optimization loop
+     procedure(optimizer_initialize), pass(this), public, deferred :: &
+          initialize
+     !> Perform a single optimization step
+     procedure(optimizer_step), pass(this), public, deferred :: step
      !> Free resources.
      procedure(optimizer_free), pass(this), public, deferred :: free
-     !> Free base resources.
-     procedure, pass(this) :: free_base => optimizer_free_base
 
      !> Validate the solution
      procedure(optimizer_validate), pass(this), public, deferred :: validate
@@ -41,7 +46,8 @@ module optimizer
 
      !> The base initializer
      procedure, pass(this) :: init_base => optimizer_init_base
-
+     !> Free base resources.
+     procedure, pass(this) :: free_base => optimizer_free_base
 
   end type optimizer_t
 
@@ -60,14 +66,26 @@ module optimizer
        type(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_init_from_json
 
-     !> Interface for running the optimization loop
-     subroutine optimizer_run(this, problem, design, simulation)
+     !> Interface for running an optimization initialization
+     !! This subroutine initializes the optimizer before starting the
+     !! optimization loop.
+     subroutine optimizer_initialize(this, problem, design, simulation)
        import optimizer_t, simulation_t, problem_t, design_t
        class(optimizer_t), intent(inout) :: this
        class(problem_t), intent(inout) :: problem
        class(design_t), intent(inout) :: design
        type(simulation_t), optional, intent(inout) :: simulation
-     end subroutine optimizer_run
+     end subroutine optimizer_initialize
+
+     !> Interface for running an optimization step
+     logical function optimizer_step(this, iter, problem, design, simulation)
+       import optimizer_t, simulation_t, problem_t, design_t
+       integer, intent(in) :: iter
+       class(optimizer_t), intent(inout) :: this
+       class(problem_t), intent(inout) :: problem
+       class(design_t), intent(inout) :: design
+       type(simulation_t), optional, intent(inout) :: simulation
+     end function optimizer_step
 
      !> Interface for writing the optimizer progress
      subroutine optimizer_write(this, iter, problem)
@@ -116,6 +134,9 @@ module optimizer
 
 contains
 
+  ! -------------------------------------------------------------------------- !
+  ! Base initializer and free routines
+
   !> Base initializer for the optimizer
   !! @param this The optimizer object.
   !! @param max_iterations The maximum number of iterations.
@@ -135,5 +156,65 @@ contains
   subroutine optimizer_free_base(this)
     class(optimizer_t), intent(inout) :: this
   end subroutine optimizer_free_base
+
+  ! -------------------------------------------------------------------------- !
+  ! Optimization loop routine
+
+  !> Define the optimization loop
+  !! This subroutine runs the optimization loop until convergence
+  !! or the maximum number of iterations is reached.
+  !!
+  !! @param this The optimizer object.
+  !! @param problem The problem object.
+  !! @param design The design object.
+  !! @param simulation The simulation object.
+  subroutine optimizer_run(this, problem, design, simulation)
+    class(optimizer_t), intent(inout) :: this
+    class(problem_t), intent(inout) :: problem
+    class(design_t), intent(inout) :: design
+    type(simulation_t), optional, intent(inout) :: simulation
+    logical :: converged
+    character(len=256) :: msg
+    integer :: iter
+
+    ! Prepare the problem state before starting the optimization
+    call this%initialize(problem, design, simulation)
+    call this%write(0, problem)
+    call design%write(0)
+
+    call neko_log%section('Optimization Loop')
+
+    iter = 1
+    converged = .false.
+    do while (iter .le. this%max_iterations .and. .not. converged)
+
+       call profiler_start_region('Optimizer iteration')
+       converged = this%step(iter, problem, design, simulation)
+       call profiler_end_region('Optimizer iteration')
+
+       ! Log the progress and outputs
+       call this%write(iter, problem)
+       call design%write(iter)
+
+       iter = iter + 1
+    end do
+
+    call neko_log%end_section()
+
+    ! Check that the final design is valid
+    call this%validate(problem, design)
+
+    if (.not. converged) then
+       write(msg, '(A,I0,A)') 'Optimizer did not converge in ', &
+            this%max_iterations, ' iterations.'
+       call neko_log%warning(msg)
+    else
+       write(msg, '(A,I0,A)') 'Optimizer converged after ', iter, &
+            ' iterations.'
+       call neko_log%message(msg)
+    end if
+
+  end subroutine optimizer_run
+
 
 end module optimizer
