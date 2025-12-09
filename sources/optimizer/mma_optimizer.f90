@@ -69,7 +69,7 @@ module mma_optimizer
 
 contains
 
-  ! ========================================================================== !
+  ! -------------------------------------------------------------------------- !
   ! Allocator and deallocator methods for the MMA optimizer
 
   !> Initialize the MMA optimizer from JSON file
@@ -176,7 +176,7 @@ contains
     call this%mma%free()
   end subroutine mma_optimizer_free
 
-  ! ========================================================================== !
+  ! -------------------------------------------------------------------------- !
   ! Implementation of the deferred methods for the MMA optimizer
 
   !> Prepare the MMA optimizer before starting the optimization loop
@@ -340,10 +340,15 @@ contains
 
   end subroutine mma_optimizer_validate
 
-  ! ========================================================================== !
+  ! -------------------------------------------------------------------------- !
   ! Logging and IO methods for the MMA optimizer
 
   !> Write the progress of the MMA optimizer to the log file
+  !! This subroutine logs the current iteration, objective values,
+  !! constraint values, and convergence metrics to a CSV file.
+  !! @param this The MMA optimizer object.
+  !! @param iter The current iteration number.
+  !! @param problem The problem object.
   subroutine mma_optimizer_write(this, iter, problem)
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter

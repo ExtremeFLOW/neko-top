@@ -134,6 +134,9 @@ module optimizer
 
 contains
 
+  ! -------------------------------------------------------------------------- !
+  ! Base initializer and free routines
+
   !> Base initializer for the optimizer
   !! @param this The optimizer object.
   !! @param max_iterations The maximum number of iterations.
@@ -148,7 +151,23 @@ contains
 
   end subroutine optimizer_init_base
 
+  !> Base free routine for the optimizer
+  !! @param this The optimizer object.
+  subroutine optimizer_free_base(this)
+    class(optimizer_t), intent(inout) :: this
+  end subroutine optimizer_free_base
+
+  ! -------------------------------------------------------------------------- !
+  ! Optimization loop routine
+
   !> Define the optimization loop
+  !! This subroutine runs the optimization loop until convergence
+  !! or the maximum number of iterations is reached.
+  !!
+  !! @param this The optimizer object.
+  !! @param problem The problem object.
+  !! @param design The design object.
+  !! @param simulation The simulation object.
   subroutine optimizer_run(this, problem, design, simulation)
     class(optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
@@ -197,10 +216,5 @@ contains
 
   end subroutine optimizer_run
 
-  !> Base free routine for the optimizer
-  !! @param this The optimizer object.
-  subroutine optimizer_free_base(this)
-    class(optimizer_t), intent(inout) :: this
-  end subroutine optimizer_free_base
 
 end module optimizer
