@@ -183,6 +183,8 @@ program usrneko
   call prob%update_constraints(des)
   call prob%update_constraint_sensitivities(des)
 
+  call all_objectives%init(prob%get_n_objectives())
+  call constraint_value%init(prob%get_n_constraints())
 
   call prob%get_all_objective_values(all_objectives)
   call prob%get_constraint_values(constraint_value)
