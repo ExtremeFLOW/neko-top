@@ -33,29 +33,30 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Module for handling the optimization problem.
+!!
+!! This module defines the `problem_t` type which is the main interface for
+!! the optimization problem. The problem is defined by a set of objectives and
+!! constraints that are evaluated based on the design variables. The problem
+!! also handles the output of the problem and the simulation.
 module problem
   use num_types, only: rp, dp
-  use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
-  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
-  use device_math, only: device_copy
-  use vector_math, only: vector_add2
-  ! not so clean, hopefully a refactor is possible.
+  use math, only: copy
+  use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
-  use simulation, only: simulation_init, &
-       simulation_step, simulation_finalize
+  use simulation, only: simulation_init, simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
 
@@ -63,20 +64,15 @@ module problem
   private
 
   !> The abstract problem type.
-  !!
-  !! This module defines the `problem_t` type which is the main interface for
-  !! the optimization problem. The problem is defined by a set of objectives and
-  !! constraints that are evaluated based on the design variables. The problem
-  !! also handles the output of the problem and the simulation.
   type, public :: problem_t
      private
 
      !> The number of design variables.
-     integer :: n_design
+     integer :: n_design = 0
      !> Number of objectives in the problem.
-     integer :: n_objectives
+     integer :: n_objectives = 0
      !> Number of constraints in the problem.
-     integer :: n_constraints
+     integer :: n_constraints = 0
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
@@ -214,14 +210,12 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), optional, intent(inout) :: simulation
 
+    call this%free()
+
     this%n_design = design%size()
-    this%n_objectives = 0
-    this%n_constraints = 0
 
-    ! minimum dissipation objective function
+    ! Read the objectives and constraints
     call this%read_objectives(parameters, design, simulation)
-
-    ! volume constraint
     call this%read_constraints(parameters, design, simulation)
 
   end subroutine problem_init
@@ -230,6 +224,10 @@ contains
   subroutine problem_free(this)
     class(problem_t), intent(inout) :: this
     integer :: i
+
+    this%n_design = 0
+    this%n_objectives = 0
+    this%n_constraints = 0
 
     ! Free the objective list
     if (allocated(this%objective_list)) then
@@ -263,8 +261,8 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    class(objective_t), allocatable :: objective
     type(simulation_t), optional, intent(inout) :: simulation
+    class(objective_t), allocatable :: objective
 
     ! A single objective term as its own json_file.
     character(len=:), allocatable :: path, type
@@ -462,7 +460,6 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
 
-
     call dt_controller%init(simulation%neko_case%params)
 
     call simulation%reset()
@@ -543,8 +540,6 @@ contains
     end do
 
     call profiler_end_region("Forward simulation")
-
-
 
     call simulation_adjoint_finalize(simulation%adjoint_case)
 
@@ -777,15 +772,11 @@ contains
     type(vector_t), intent(inout) :: all_objective_values
     integer :: i
 
-    call all_objective_values%init(this%n_objectives)
     do i = 1, this%n_objectives
        all_objective_values%x(i) = this%objective_list(i)%objective%value
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(all_objective_values%x, all_objective_values%x_d, &
-            this%n_objectives, HOST_TO_DEVICE, sync = .true.)
-    end if
+    call all_objective_values%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_all_objective_values
 
@@ -800,15 +791,11 @@ contains
     type(vector_t), intent(inout) :: constraint_value
     integer :: i
 
-    call constraint_value%init(this%n_constraints)
     do i = 1, this%n_constraints
        constraint_value%x(i) = this%constraint_list(i)%constraint%value
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(constraint_value%x, constraint_value%x_d, &
-            this%n_constraints, HOST_TO_DEVICE, sync = .true.)
-    end if
+    call constraint_value%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_constraint_values
 
@@ -823,7 +810,7 @@ contains
     type(vector_t), intent(inout) :: sensitivity
     integer :: i
 
-    call sensitivity%init(this%n_design)
+    call vector_cfill(sensitivity, 0.0_rp)
     do i = 1, this%n_objectives
        call vector_add2(sensitivity, &
             this%objective_list(i)%objective%sensitivity)
@@ -838,42 +825,25 @@ contains
   !! @param[in] this The problem to update the objectives with.
   !! @param[inout] sensitivity The matrix of all constraint sensitivities.
   subroutine problem_get_constraint_sensitivities(this, sensitivity)
-    class(problem_t), intent(in) :: this
-    type(matrix_t), intent(inout) :: sensitivity
-    type(vector_t) :: tmp
-    integer :: i, j, n
+    class(problem_t), intent(inout) :: this
+    type(matrix_t), target, intent(inout) :: sensitivity
+    real(kind=rp), pointer :: row(:)
+    integer :: i
 
-    n = this%n_constraints * this%n_design
-    call sensitivity%init(this%n_constraints, this%n_design)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call tmp%init(this%n_design)
-    end if
-
+    ! Copy all constraint sensitivities to host, sync on last one
     do i = 1, this%n_constraints
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          tmp = this%constraint_list(i)%constraint%sensitivity
-          call device_memcpy(tmp%x, tmp%x_d, &
-               this%n_design, DEVICE_TO_HOST, sync = .true.)
-          do j = 1, this%n_design
-             sensitivity%x(i, j) = tmp%x(j)
-          end do
-       else
-          do j = 1, this%n_design
-             sensitivity%x(i, j) = &
-                  this%constraint_list(i)%constraint%sensitivity%x(j)
-          end do
-       end if
+       call this%constraint_list(i)%constraint%sensitivity%copy_from( &
+            DEVICE_TO_HOST, sync = i .eq. this%n_constraints)
     end do
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(sensitivity%x, sensitivity%x_d, n, &
-            HOST_TO_DEVICE, sync = .true.)
-    end if
+    do i = 1, this%n_constraints
+       row(1:this%n_design) => sensitivity%x(i, :)
 
-    ! Free the temporary vector
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call tmp%free()
-    end if
+       call copy(row, this%constraint_list(i)%constraint%sensitivity%x, &
+            this%n_design)
+    end do
+
+    call sensitivity%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   end subroutine problem_get_constraint_sensitivities
 
@@ -911,22 +881,22 @@ contains
     !
     !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
     !
-    ! And then if we also want things like thie iteration or KKT they can be
-    ! appended to the begining or end of this by the optimizer.
+    ! And then if we also want things like this iteration or KKT they can be
+    ! appended to the beginning or end of this by the optimizer.
     !
     ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
     buff = "Total objective function"
     do i = 1, this%get_n_objectives()
        mini_buff = ""
        write(mini_buff, '(", ", A)') this%objective_list(i)%objective%name
-       buff = trim(buff)//trim(mini_buff)
+       buff = trim(buff) // trim(mini_buff)
     end do
 
     do i = 1, this%get_n_constraints()
        mini_buff = ""
        write(mini_buff, '(", ", A)') &
             this%constraint_list(i)%constraint%name
-       buff = trim(buff)//trim(mini_buff)
+       buff = trim(buff) // trim(mini_buff)
     end do
 
   end function problem_get_log_header
