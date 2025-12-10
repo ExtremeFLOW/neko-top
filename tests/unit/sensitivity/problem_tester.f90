@@ -101,6 +101,7 @@ program problem_tester
   if (is_objective) then
      call des%get_sensitivity(sensitivities)
   else
+     call constraint_sensitivity%init(prob%get_n_constraints(), des%size())
      call prob%get_constraint_sensitivities(constraint_sensitivity)
      call sensitivities%init(constraint_sensitivity%size())
      if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -134,6 +135,9 @@ program problem_tester
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
+
+  call sensitivities%free()
+  call constraint_sensitivity%free()
 
   call prob%free()
   call des%free()

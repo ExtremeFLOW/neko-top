@@ -42,9 +42,13 @@ contains
     type(csv_file_t) :: logger
     integer :: n
 
+    call design_vector%init(des%size())
+    call design_perturbed%init(des%size())
+    call log_data%init(4)
+    call constraint_vec%init(problem%get_n_constraints())
+
     ! Get the design vector for reference
     ! This is the design vector we will perturb
-    call design_vector%init(des%size())
     call des%get_values(design_vector)
 
     if (is_objective) then
@@ -74,7 +78,6 @@ contains
     n = len_trim(file_name)
     call logger%init('FD_check_'//trim(file_name(:n-5))//'.csv')
     call logger%set_header('perturbation,F,dFdx,error')
-    call log_data%init(4)
 
     n_perturbations = size(perturbations)
     do ip = 1, n_perturbations
@@ -124,6 +127,11 @@ contains
                'sensitivity')
        end if
     end do
+
+    call design_vector%free()
+    call design_perturbed%free()
+    call log_data%free()
+    call constraint_vec%free()
 
   end subroutine compute_sensitivity_i
 
