@@ -1,5 +1,6 @@
 !> @file mapping_fctry.f90
-!! @copyright (c) 2024-2025, The Neko-TOP Authors
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
