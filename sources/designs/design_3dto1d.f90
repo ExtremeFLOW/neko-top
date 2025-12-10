@@ -50,6 +50,7 @@ module design_3dto1d
   use simulation_m, only: simulation_t
   use json_module, only: json_file
   use json_utils, only: json_get
+  use utils, only: neko_error
 
   use vector, only: vector_t
   use math, only: copy
@@ -134,6 +135,10 @@ contains
   subroutine design_3dto1d_get_values(this, values)
     class(design_3dto1d_t), intent(in) :: this
     type(vector_t), intent(inout) :: values
+
+    if (this%size() .ne. values%size()) then
+       call neko_error('Get design: size mismatch')
+    end if
 
     values = this%values
 
