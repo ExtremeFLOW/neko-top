@@ -54,11 +54,6 @@ contains
   ! Factory function
 
   !> Factory function
-  !! Allocates and initializes an objective function object
-  !! @param object The objective function object to be created
-  !! @param type The type of the objective function
-  !! @param design The design object
-  !! @param simulation The simulation object
   module subroutine objective_factory(object, json, design, simulation)
     class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
