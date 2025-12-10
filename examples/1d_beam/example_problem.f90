@@ -126,8 +126,9 @@ contains
     real(rp) :: Le, u_global
 
     ! Local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
 
     ! Project design variables to physical height h = (h_max - h_min)*x + h_min
     call vector_cmult(h, (h_max - h_min), n)
