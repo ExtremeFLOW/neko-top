@@ -115,8 +115,10 @@ contains
     this%weight = weight
 
     if (present(mask_name)) then
-       this%has_mask = .true.
-       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+       if (mask_name .ne. "") then
+          this%has_mask = .true.
+          this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+       end if
     end if
 
   end subroutine objective_init_base
