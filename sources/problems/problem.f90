@@ -39,28 +39,23 @@
 !! also handles the output of the problem and the simulation.
 module problem
   use num_types, only: rp, dp
-  use fld_file_output, only: fld_file_output_t
   use design, only: design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
-  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
+  use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use math, only: copy
-  use device_math, only: device_copy
   use vector_math, only: vector_add2, vector_cfill
-  ! not so clean, hopefully a refactor is possible.
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
-  use simulation, only: simulation_init, &
-       simulation_step, simulation_finalize
+  use simulation, only: simulation_init, simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
 
@@ -72,11 +67,11 @@ module problem
      private
 
      !> The number of design variables.
-     integer :: n_design
+     integer :: n_design = 0
      !> Number of objectives in the problem.
-     integer :: n_objectives
+     integer :: n_objectives = 0
      !> Number of constraints in the problem.
-     integer :: n_constraints
+     integer :: n_constraints = 0
 
      !> The objective of the problem.
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
@@ -214,9 +209,9 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), optional, intent(inout) :: simulation
 
+    call this%free()
+
     this%n_design = design%size()
-    this%n_objectives = 0
-    this%n_constraints = 0
 
     ! Read the objectives and constraints
     call this%read_objectives(parameters, design, simulation)
@@ -228,6 +223,10 @@ contains
   subroutine problem_free(this)
     class(problem_t), intent(inout) :: this
     integer :: i
+
+    this%n_design = 0
+    this%n_objectives = 0
+    this%n_constraints = 0
 
     ! Free the objective list
     if (allocated(this%objective_list)) then
@@ -261,8 +260,8 @@ contains
     class(problem_t), intent(inout) :: this
     type(json_file), intent(inout) :: parameters
     class(design_t), intent(in) :: design
-    class(objective_t), allocatable :: objective
     type(simulation_t), optional, intent(inout) :: simulation
+    class(objective_t), allocatable :: objective
 
     ! A single objective term as its own json_file.
     character(len=:), allocatable :: path, type
