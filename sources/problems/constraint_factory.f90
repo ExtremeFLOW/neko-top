@@ -50,11 +50,6 @@ contains
   ! Factory function
 
   !> Factory function
-  !! Allocates and initializes an constraint function object
-  !! @param object The constraint function object to be created
-  !! @param type The type of the constraint function
-  !! @param design The design object
-  !! @param simulation The simulation object
   module subroutine constraint_factory(object, json, design, simulation)
     class(constraint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
