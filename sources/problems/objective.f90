@@ -1,5 +1,5 @@
 !> @file objective.f90
-!! @copyright (c) 2025, The Neko Authors
+!! @copyright (c) 2025, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
