@@ -50,6 +50,7 @@ module objective
   !! This is the base class for objectives, which is a type of base functional.
   !! Each objective contain a weight that is used to scale the objective value.
   type, abstract, extends(base_functional_t) :: objective_t
+     !> Weight of the objective in the overall cost function
      real(kind=rp) :: weight = 1.0_rp
 
    contains
@@ -73,15 +74,20 @@ module objective
   ! -------------------------------------------------------------------------- !
   ! Explicit interfaces
 
-  !> Factory function interface
-  interface
+  !> Factory function
+  !! Allocates and initializes an objective function object
+  !! @param object The objective function object to be created
+  !! @param type The type of the objective function
+  !! @param design The design object
+  !! @param simulation The simulation object
+  interface objective_factory
      module subroutine objective_factory(object, json, design, simulation)
        class(objective_t), allocatable, intent(inout) :: object
        type(json_file), intent(inout) :: json
        class(design_t), intent(in) :: design
        type(simulation_t), target, optional, intent(inout) :: simulation
      end subroutine objective_factory
-  end interface
+  end interface objective_factory
 
 contains
 
@@ -101,16 +107,19 @@ contains
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in), optional :: mask_name
 
+    call this%free_base()
+
     this%name = name
-    this%value = 0.0_rp
     call this%sensitivity%init(design_size)
+    call this%sensitivity_old%init(design_size)
 
     this%weight = weight
 
-    this%has_mask = .false.
-    if (trim(mask_name) .ne. "") then
-       this%has_mask = .true.
-       this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+    if (present(mask_name)) then
+       if (mask_name .ne. "") then
+          this%has_mask = .true.
+          this%mask => neko_point_zone_registry%get_point_zone(mask_name)
+       end if
     end if
 
   end subroutine objective_init_base
@@ -119,9 +128,14 @@ contains
   subroutine objective_free_base(this)
     class(objective_t), target, intent(inout) :: this
 
-    this%value = 0.0_rp
-    call this%sensitivity%free()
+    this%name = ""
     this%weight = 1.0_rp
+
+    this%value = 0.0_rp
+    this%value_old = 0.0_rp
+    call this%sensitivity%free()
+    call this%sensitivity_old%free()
+
     this%has_mask = .false.
     if (associated(this%mask)) nullify(this%mask)
 
