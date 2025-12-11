@@ -141,6 +141,13 @@ endif()
 find_package(MPI REQUIRED COMPONENTS CXX)
 target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
 
+# Some MPI wrappers (e.g., mpifort) do not link libmpi_cxx automatically.
+# Add it explicitly when available so libneko's C++ MPI symbols resolve.
+find_library(MPI_CXX_LIB NAMES mpi_cxx)
+if(MPI_CXX_LIB)
+    target_link_libraries(neko_cxx_support INTERFACE ${MPI_CXX_LIB})
+endif()
+
 # ............................................................................ #
 # Setup of the Neko library
 
@@ -157,9 +164,6 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
-
-# Make sure anything linking against libneko also pulls in its C++/ADIOS2 deps
-target_link_libraries(PkgConfig::neko INTERFACE neko_cxx_support)
 
 # ............................................................................ #
 # Setup PFUnit
