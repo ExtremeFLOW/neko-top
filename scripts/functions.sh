@@ -153,6 +153,7 @@ function prepare {
     source $MAIN_DIR/scripts/dependencies.sh
     find_json_fortran
     find_neko
+    find_adios2
 
     # ------------------------------------------------------------------------ #
     # Run preparation if it exists

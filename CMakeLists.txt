@@ -35,7 +35,7 @@
 # ============================================================================ #
 
 cmake_minimum_required(VERSION 3.21)
-project(Neko-TOP VERSION 0.0.1 LANGUAGES Fortran)
+project(Neko-TOP VERSION 0.0.1 LANGUAGES C Fortran CXX)
 
 # Set language standards
 set(CMAKE_Fortran_STANDARD 2008)
@@ -109,6 +109,38 @@ set(CMAKE_PREFIX_PATH ${JSON_FORTRAN_DIR} ${CMAKE_PREFIX_PATH})
 # Find the JSON-Fortran library
 pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 
+# Interface target to collect all C++/ADIOS2 deps needed by libneko
+add_library(neko_cxx_support INTERFACE)
+
+# --- ADIOS2 C++ libs (C++ interface that nek_adios2.cpp uses) ---
+
+# Try to locate adios2-config either via ADIOS2_DIR or in PATH
+find_program(ADIOS2_CONFIG_EXECUTABLE
+    NAMES adios2-config
+    HINTS $ENV{ADIOS2_DIR}/bin
+)
+
+if(ADIOS2_CONFIG_EXECUTABLE)
+    message(STATUS "Found adios2-config: ${ADIOS2_CONFIG_EXECUTABLE}")
+    execute_process(
+        COMMAND ${ADIOS2_CONFIG_EXECUTABLE} --cxx-libs
+        OUTPUT_VARIABLE ADIOS2_CXX_LIBS
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    if(ADIOS2_CXX_LIBS)
+        message(STATUS "ADIOS2 C++ libs: ${ADIOS2_CXX_LIBS}")
+        separate_arguments(ADIOS2_CXX_LIBS)
+        target_link_libraries(neko_cxx_support INTERFACE ${ADIOS2_CXX_LIBS})
+    endif()
+else()
+    message(STATUS "adios2-config not found; ADIOS2 C++ support will not be linked.")
+endif()
+
+
+# --- MPI C++ and standard C++ runtime ---
+find_package(MPI REQUIRED COMPONENTS CXX)
+target_link_libraries(neko_cxx_support INTERFACE MPI::MPI_CXX stdc++)
+
 # ............................................................................ #
 # Setup of the Neko library
 
@@ -125,6 +157,9 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
+
+# Make sure anything linking against libneko also pulls in its C++/ADIOS2 deps
+target_link_libraries(PkgConfig::neko INTERFACE neko_cxx_support)
 
 # ............................................................................ #
 # Setup PFUnit
@@ -160,6 +195,15 @@ add_custom_target(neko-top_ready
     DEPENDS neko-top
     COMMENT "Neko-TOP library is ready.")
 add_dependencies(neko-top-a neko-top_ready)
+# Anything that links against neko-top-a also needs the full Neko stack
+# (core Neko lib, JSON-Fortran, BLAS/LAPACK and the C++/ADIOS2 bits)
+target_link_libraries(neko-top-a INTERFACE
+    PkgConfig::neko          # libneko.a + its C deps
+    PkgConfig::json-fortran  # JSON-Fortran
+    neko_cxx_support         # ADIOS2 C++ + MPI C++ + libstdc++
+    ${LAPACK_LIBRARIES}
+    ${BLAS_LIBRARIES}
+)
 
 # ============================================================================ #
 # Build the examples

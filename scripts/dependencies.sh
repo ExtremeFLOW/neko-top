@@ -398,6 +398,7 @@ function find_adios2() {
         export LD_LIBRARY_PATH="$ADIOS2_DIR/lib:$LD_LIBRARY_PATH"
     [ -d "$ADIOS2_DIR/lib64" ] && \
         export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64:$LD_LIBRARY_PATH"
+    echo "done"
 }
 
 # ============================================================================ #
@@ -467,7 +468,9 @@ function find_neko() {
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
+    echo "yofam"
     find_adios2 $ADIOS2_DIR
+    echo "done"
     find_parmetis $PARMETIS_DIR
     [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
 
@@ -497,10 +500,9 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
-        [ -n "$ADIOS2_FORTRAN_DIR" ] && \
-            FEATURES+=" --with-adios2-fortran=$ADIOS2_FORTRAN_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        echo $FEATURES
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
