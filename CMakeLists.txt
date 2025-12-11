@@ -85,6 +85,15 @@ find_package(MPI REQUIRED)
 # We need PKG Config to find the JSON-Fortran and Neko libraries
 find_package(PkgConfig REQUIRED)
 
+# Check for HDF5 (optional)
+find_package(HDF5 COMPONENTS Fortran REQUIRED HINTS ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5)
+add_compile_definitions(HAVE_HDF5)
+if (HDF5_FOUND)
+    message(STATUS "HDF5 found: Enabling HDF5 support.")
+else()
+    message(STATUS "HDF5 not found: Disabling HDF5 support.")
+endif()
+
 # Check that the MPI Fortran 2008 module is available
 if (NOT MPI_Fortran_HAVE_F08_MODULE)
     message(FATAL_ERROR "MPI Fortran 2008 module is required for Neko-TOP.")

@@ -110,6 +110,7 @@ target_link_libraries(neko-top
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+    $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5_Fortran>
 )
 
 # ============================================================================ #

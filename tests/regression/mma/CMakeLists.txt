@@ -20,6 +20,35 @@ add_executable(reg_mma_bin
 )
 target_link_libraries(reg_mma_bin PRIVATE Neko-TOP::neko-top)
 
+# Additional regression: MMA HDF5 read/write test
+add_executable(reg_mma_hdf5_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/test_mma_hdf5.f90
+)
+target_link_libraries(reg_mma_hdf5_test PRIVATE Neko-TOP::neko-top)
+
+set_target_properties(reg_mma_hdf5_test
+    PROPERTIES
+        FOLDER "Tests/Regression/MMA"
+        RUNTIME_OUTPUT_NAME "reg_mma_hdf5_test"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+# Expose local .mod dir to the test target
+target_include_directories(reg_mma_hdf5_test PRIVATE ${LOCAL_MOD_DIR})
+
+# Register as a CTest
+add_test(NAME reg_mma_hdf5_test
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/reg_mma_hdf5_test
+)
+
+# Ensure CTest builds the test target before running and run in source dir
+set_tests_properties(reg_mma_hdf5_test PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    DEPENDS reg_mma_hdf5_test
+    TIMEOUT 30
+)
+
+add_dependencies(Regression reg_mma_hdf5_test)
+
 # The driver must also see the regression .mod directory
 target_include_directories(reg_mma_bin
     PRIVATE ${LOCAL_MOD_DIR})

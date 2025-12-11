@@ -67,13 +67,16 @@
 
 module mma
   ! Inclusions from Neko
-  use num_types, only: rp
+  use num_types, only: rp, dp, sp
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
-  use comm, only: pe_rank
+  use mpi_f08, only: MPI_Allreduce, MPI_Scan, MPI_INTEGER, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, MPI_INFO_NULL
+  use comm, only: pe_rank, NEKO_COMM
+#ifdef HAVE_HDF5
+  use hdf5
+#endif
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
@@ -117,6 +120,9 @@ module mma
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
      procedure, public, pass(this) :: get_backend_and_subsolver => &
           mma_get_backend_and_subsolver
+
+     procedure, public, pass(this) :: write_hdf5 => mma_write_hdf5
+     procedure, public, pass(this) :: sync_host => mma_sync_host
 
 
      generic, public :: update => update_vector, update_cpu, update_device
@@ -174,6 +180,324 @@ module mma
   end interface
 
 contains
+
+  !> Sync device memory to host for all internal vectors/matrices
+  subroutine mma_sync_host(this)
+    class(mma_t), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       ! Sync vectors: use DEVICE_TO_HOST. Batch sync with last call sync=.true().
+       call device_memcpy(this%xold1%x, this%xold1%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%xold2%x, this%xold2%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%alpha%x, this%alpha%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%beta%x, this%beta%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%low%x, this%low%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%upp%x, this%upp%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%xmax%x, this%xmax%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%xmin%x, this%xmin%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+
+       call device_memcpy(this%a%x, this%a%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%c%x, this%c%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%d%x, this%d%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%p0j%x, this%p0j%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%q0j%x, this%q0j%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+
+       call device_memcpy(this%y%x, this%y%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%lambda%x, this%lambda%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%s%x, this%s%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%mu%x, this%mu%x_d, this%m, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%xsi%x, this%xsi%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%eta%x, this%eta%x_d, this%n, DEVICE_TO_HOST, sync = .false.)
+
+       ! Sync matrices (flattened storage)
+       call device_memcpy(this%pij%x, this%pij%x_d, this%m * this%n, DEVICE_TO_HOST, sync = .false.)
+       call device_memcpy(this%qij%x, this%qij%x_d, this%m * this%n, DEVICE_TO_HOST, sync = .true.)
+    end if
+  end subroutine mma_sync_host
+
+  !> Write the MMA object to an HDF5 file (parallel-aware).
+  !! This routine will first ensure device-host synchronization for all
+  !! vectors and matrices, then perform the write. Currently the low-level
+  !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
+  !! available at link time a runtime error will be raised.
+  subroutine mma_write_hdf5(this, filename)
+    class(mma_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+#ifdef HAVE_HDF5
+    integer(hid_t) :: plist_id, file_id, dset_id, filespace, memspace, attr_id
+    integer(hid_t) :: H5T_NEKO_REAL
+    integer(hsize_t), dimension(1) :: ddim, dcount, doffset
+    integer :: ierr, info, drank, i
+    integer :: local_n
+    integer(kind=8) :: local_n8, total_n8, prefix8
+
+    ! Ensure device state is on host
+    call this%sync_host()
+    call neko_log%message('mma: device memory synced to host for HDF5 write: '//trim(filename))
+
+    call h5open_f(ierr)
+
+    select case (rp)
+    case (dp)
+       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
+    case (sp)
+       H5T_NEKO_REAL = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma: unsupported real kind for HDF5')
+    end select
+
+    ! Create file with MPIO access
+    call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
+    info = MPI_INFO_NULL%mpi_val
+    call h5pset_fapl_mpio_f(plist_id, NEKO_COMM%mpi_val, info, ierr)
+
+    call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, access_prp = plist_id)
+
+    ! Dataset transfer property list: collective
+    call h5pcreate_f(H5P_DATASET_XFER_F, plist_id, ierr)
+    call h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+
+    ! Write basic scalars as attributes
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
+    ddim = 1
+
+    call h5acreate_f(file_id, 'n', H5T_NATIVE_INTEGER, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%n, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(file_id, 'm', H5T_NATIVE_INTEGER, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%m, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(file_id, 'a0', H5T_NEKO_REAL, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(file_id, 'f0val', H5T_NEKO_REAL, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%f0val, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(file_id, 'z', H5T_NEKO_REAL, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%z, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(file_id, 'zeta', H5T_NEKO_REAL, filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%zeta, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5sclose_f(filespace, ierr)
+
+    ! Helper to write a 1D dataset with rank-0 data only (safe parallel)
+    drank = 1
+
+    ! list of vectors to write (name, size, data) - per-rank hyperslabs
+    if (this%xold1%size() > 0) then
+       local_n = this%xold1%size()
+       local_n8 = int(local_n, 8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1) = prefix8 - local_n8
+       dcount(1) = local_n8
+
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+
+       call h5dcreate_f(file_id, 'xold1', H5T_NEKO_REAL, filespace, dset_id, ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold1%x, total_n8, ierr, file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+       call h5dclose_f(dset_id, ierr)
+       call h5sclose_f(filespace, ierr)
+       call h5sclose_f(memspace, ierr)
+    end if
+
+    if (this%xold2%size() > 0) then
+       local_n = this%xold2%size()
+       local_n8 = int(local_n, 8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1) = prefix8 - local_n8
+       dcount(1) = local_n8
+
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+
+       call h5dcreate_f(file_id, 'xold2', H5T_NEKO_REAL, filespace, dset_id, ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold2%x, total_n8, ierr, file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+       call h5dclose_f(dset_id, ierr)
+       call h5sclose_f(filespace, ierr)
+       call h5sclose_f(memspace, ierr)
+    end if
+
+    ! alpha, beta, low, upp, xmax, xmin
+    if (this%alpha%size() > 0) then
+       local_n = this%alpha%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'alpha',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%alpha%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+    if (this%beta%size() > 0) then
+       local_n = this%beta%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'beta',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%beta%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+    if (this%low%size() > 0) then
+       local_n = this%low%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'low',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%low%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+    if (this%upp%size() > 0) then
+       local_n = this%upp%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'upp',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%upp%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+    if (this%xmax%size() > 0) then
+       local_n = this%xmax%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'xmax',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%xmax%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+    if (this%xmin%size() > 0) then
+       local_n = this%xmin%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'xmin',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%xmin%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+
+    ! write m-length vectors (per-rank)
+    if (this%a%size() > 0) then
+       local_n = this%a%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1) = prefix8 - local_n8; dcount(1) = local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a%x, total_n8, ierr, file_space_id=filespace, mem_space_id=memspace, xfer_prp=plist_id)
+       call h5dclose_f(dset_id, ierr); call h5sclose_f(filespace, ierr); call h5sclose_f(memspace, ierr)
+    end if
+
+    if (this%c%size() > 0) then
+       local_n = this%c%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'c',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%c%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+
+    if (this%d%size() > 0) then
+       local_n = this%d%size(); local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1)=prefix8-local_n8; dcount(1)=local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id,'d',H5T_NEKO_REAL,filespace,dset_id,ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace,H5S_SELECT_SET_F,doffset,dcount,ierr)
+       call h5dwrite_f(dset_id,H5T_NEKO_REAL,this%d%x,total_n8,ierr,file_space_id=filespace,mem_space_id=memspace,xfer_prp=plist_id)
+       call h5dclose_f(dset_id,ierr); call h5sclose_f(filespace,ierr); call h5sclose_f(memspace,ierr)
+    end if
+
+    ! write flattened matrices (m*n) - per-rank
+    if (associated(this%pij)) then
+       local_n = this%pij%size()
+       local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1) = prefix8 - local_n8; dcount(1) = local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id, 'pij', H5T_NEKO_REAL, filespace, dset_id, ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%pij%x, total_n8, ierr, file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+       call h5dclose_f(dset_id, ierr)
+       call h5sclose_f(filespace, ierr); call h5sclose_f(memspace, ierr)
+    end if
+
+    if (associated(this%qij)) then
+       local_n = this%qij%size()
+       local_n8 = int(local_n,8)
+       call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+       doffset(1) = prefix8 - local_n8; dcount(1) = local_n8
+       call h5screate_simple_f(drank, total_n8, filespace, ierr)
+       call h5screate_simple_f(drank, dcount, memspace, ierr)
+       call h5dcreate_f(file_id, 'qij', H5T_NEKO_REAL, filespace, dset_id, ierr)
+       call h5dget_space_f(dset_id, filespace, ierr)
+       call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+       call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%qij%x, total_n8, ierr, file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+       call h5dclose_f(dset_id, ierr)
+       call h5sclose_f(filespace, ierr); call h5sclose_f(memspace, ierr)
+    end if
+
+    call h5pclose_f(plist_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5close_f(ierr)
+
+#else
+    call this%sync_host()
+    call neko_log%message('mma: device memory synced to host for HDF5 write: '//trim(filename))
+    call neko_error('mma: HDF5 support not enabled; rebuild with HAVE_HDF5')
+#endif
+
+  end subroutine mma_write_hdf5
 
   !> Read attributes from the case file, and calling the init function
   subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale)
