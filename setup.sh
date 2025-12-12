@@ -116,7 +116,7 @@ printf "Setting up external dependencies\n"
 
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
-# find_adios2 $ADIOS2_DIR                        # Re-defines the ADIOS2_DIR variable.
+find_adios2 $ADIOS2_DIR                        # Re-defines the ADIOS2_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
 [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
@@ -167,4 +167,3 @@ printf "\tExamples:      " && [[ "$EXAMPLES" == true ]] && printf "YES\n" || pri
 printf "\tDocumentation: " && [[ "$DOCS" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDevice:        $DEVICE_TYPE\n"
 printf "=%.0s" {1..80} && printf "\n"
-echo $ADIOS2_DIR

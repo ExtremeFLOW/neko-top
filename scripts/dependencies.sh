@@ -468,9 +468,7 @@ function find_neko() {
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
-    echo "yofam"
     find_adios2 $ADIOS2_DIR
-    echo "done"
     find_parmetis $PARMETIS_DIR
     [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
 
@@ -502,7 +500,6 @@ function find_neko() {
         [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
-        echo $FEATURES
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
