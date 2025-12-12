@@ -31,10 +31,10 @@ program usrneko
   ! Set up distributed stress constraints
 
   ! number of elements with stress constraints
-  integer :: num_constraints = 10
+  integer :: num_constraints = 0
 
   ! number of beam sections to distribute the constraint
-  integer :: num_constraint_partitions = 10
+  integer :: num_constraint_partitions = 0
   ! ========================================================================== !
 
   ! JSON related arguments

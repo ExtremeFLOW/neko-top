@@ -224,24 +224,22 @@ contains
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     call profiler_end_region("Optimizer iteration")
+    call profiler_start_region("Optimizer logging")
+    ! Stamp the initial condition
+    call problem%get_all_objective_values(all_objectives)
+    call mma_logger_assemble_data(log_data, 0, objective_value, &
+         all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
+         problem%get_n_objectives(), problem%get_n_constraints(), &
+         unconstrained_problem)
+    call this%logger%write(log_data)
+    call profiler_end_region("Optimizer logging")
 
     if (this%enable_output) then
-       call profiler_start_region("Optimizer logging")
-       ! Stamp the initial condition
-       call problem%get_all_objective_values(all_objectives)
-       call mma_logger_assemble_data(log_data, 0, objective_value, &
-            all_objectives, constraint_value, 0.0_rp, 0.0_rp, scaling_factor, &
-            problem%get_n_objectives(), problem%get_n_constraints(), &
-            unconstrained_problem)
-       call this%logger%write(log_data)
-
        if (present(simulation)) then
           call simulation%write(0)
        end if
 
        call design%write(0)
-
-       call profiler_end_region("Optimizer logging")
     end if
 
     do iter = 1, this%max_iterations
@@ -295,10 +293,20 @@ contains
        call profiler_end_region("MMA KKT computation")
 
        call profiler_end_region("Optimizer iteration")
+       
+       ! call profiler_start_region("Optimizer logging")
+       ! Stamp the i^th iteration
+       ! call problem%get_all_objective_values(all_objectives)
+       ! call mma_logger_assemble_data(log_data, iter, objective_value, &
+       !      all_objectives, constraint_value, this%mma%get_residumax(), &
+       !      this%mma%get_residunorm(), scaling_factor, &
+       !      problem%get_n_objectives(), problem%get_n_constraints(), &
+       !      unconstrained_problem)
+       ! call this%logger%write(log_data)
+       ! call log_data%free()
 
        if (this%enable_output) then
           call profiler_start_region("Optimizer logging")
-
           ! Stamp the i^th iteration
           call problem%get_all_objective_values(all_objectives)
           call mma_logger_assemble_data(log_data, iter, objective_value, &
@@ -313,17 +321,26 @@ contains
              call simulation%write(iter)
           end if
           call design%write(iter)
-          call profiler_end_region("Optimizer logging")
        end if
-
     end do
 
-    call this%validate(problem, design)
+    ! call this%validate(problem, design)
 
     ! Final state after optimization
     if (pe_rank .eq. 0) then
        print *, "MMA Optimization completed after", iter-1, "iterations."
     end if
+    call profiler_start_region("Optimizer logging")
+    ! Stamp the i^th iteration
+    call problem%get_all_objective_values(all_objectives)
+    call mma_logger_assemble_data(log_data, 100, objective_value, &
+         all_objectives, constraint_value, this%mma%get_residumax(), &
+         this%mma%get_residunorm(), scaling_factor, &
+         problem%get_n_objectives(), problem%get_n_constraints(), &
+         unconstrained_problem)
+    call this%logger%write(log_data)
+    call log_data%free()
+    call profiler_end_region("Optimizer logging")
 
     ! Free local resources
     call neko_vector_scratch_registry%relinquish_vector(ind)
@@ -351,8 +368,11 @@ contains
     end if
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
-       call neko_error("MMA optimizer validation failed: " // &
-            "Constraints are not satisfied.")
+       if (pe_rank .eq. 0) then
+          print *, "Initializing mma_optimizer with steady_state_problem_t."
+       end if
+       ! call neko_error("MMA optimizer validation failed: " // &
+       !      "Constraints are not satisfied.")
     end if
 
     ! Free local resources

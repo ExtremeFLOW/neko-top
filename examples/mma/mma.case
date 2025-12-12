@@ -9,8 +9,8 @@
             "timestep": 1e-5
         },
         "numerics": {
-            "time_order": 3,
-            "polynomial_order": 2,
+            "time_order": 7,
+            "polynomial_order": 10,
             "dealias": true
         },
         "fluid": {
@@ -62,11 +62,12 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 100,
+            "max_iterations": 15,
             "tolerance": 1.0e-4,
+            "enable_output": false,
             "mma": {
                 "max_iter": 100,
-                "subsolver": "dip",
+                "subsolver": "dpip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
