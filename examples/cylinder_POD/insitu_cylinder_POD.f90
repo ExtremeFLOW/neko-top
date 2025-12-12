@@ -63,18 +63,12 @@ contains
 
     n = u%dof%size()
 
-    ! ! Average over interfaces
-    ! call coef%gs_h%op(u, GS_OP_ADD)
-    ! call _col2(u%x_d, coef%mult_d, n)
-    ! call coef%gs_h%op(v, GS_OP_ADD)
-    ! call device_col2(v%x_d, coef%mult_d, n)
-    ! call coef%gs_h%op(w, GS_OP_ADD)
-    ! call device_col2(w%x_d, coef%mult_d, n)
-
-    ! ! Sync the GPU-CPU
-    ! call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
-    ! call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
-    ! call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+    if (NEKO_BCKND_DEVICE .eq .1) then
+       ! Ensure host buffers are up to date before streaming from a GPU run.
+       call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+    end if
 
     ! Stream the data
     call dstream%stream(u%x)
