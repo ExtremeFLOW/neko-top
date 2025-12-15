@@ -36,11 +36,19 @@ program test_mma_hdf5
 
   call neko_init()
 
-  n = 4
+  if (pe_rank .eq. 0) then
+     n = 4
+  else
+     n = 2
+  end if
   m = 2
 
   call x%init(n)
-  x%x = [1.0_rp, 2.0_rp, 3.0_rp, 4.0_rp]
+  if (pe_rank .eq. 0) then
+     x%x = [3.0_rp, 4.0_rp, 5.0_rp, 6.0_rp]
+  else
+     x%x = [1.0_rp, 2.0_rp]
+  end if
   x%x = x%x + real(pe_rank, kind=rp) * 0.01_rp
 
   allocate(a(m), c(m), d(m), xmin(n), xmax(n))
