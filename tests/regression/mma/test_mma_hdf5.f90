@@ -56,17 +56,25 @@ program test_mma_hdf5
 #ifdef HAVE_HDF5
   call obj%write_hdf5(trim(fname))
 
+  ! -------------------------------------------------------------------------- !
+  ! Read back the data
+
+  ! Initialize reader values
   read_n = -1
   read_m = -1
 
   call read_x%init(n)
 
-  ! open file and read attributes n and m
+  ! -------------------------------------------------------------------------- !
+  ! Read from HDF5 file
+
+  ! Open file and prepare reading
   call h5open_f(ierr)
   call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
   call h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD%mpi_val, MPI_INFO_NULL%mpi_val, ierr)
   call h5fopen_f(trim(fname), H5F_ACC_RDONLY_F, file_id, ierr, access_prp = plist_id)
 
+  ! Read attributes
   ddim(1) = 1
   call h5aopen_by_name_f(file_id, '/MMA/Parameters', 'n', attr_id, ierr)
   call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n, ddim, ierr)
@@ -76,14 +84,19 @@ program test_mma_hdf5
   call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_m, ddim, ierr)
   call h5aclose_f(attr_id, ierr)
 
+  ! Read datasets
   ddim(1) = n
   call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
   call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, read_x%x, ddim, ierr)
   call h5dclose_f(dset_id, ierr)
 
+  ! Close file and property list
   call h5fclose_f(file_id, ierr)
   call h5pclose_f(plist_id, ierr)
   call h5close_f(ierr)
+
+  ! -------------------------------------------------------------------------- !
+  ! Check the values read from file
 
   if (read_n .ne. n) then
      write(*,*) 'TEST FAILED: read n=', read_n, ' expected ', n
@@ -101,6 +114,10 @@ program test_mma_hdf5
      error_flag = .true.
   end if
 
+  ! Clean up
+  call read_x%free()
+  call obj%free()
+  deallocate(a, c, d, xmin, xmax)
 #else
   write(*,*) 'HDF5 not available; test skipped'
 #endif
