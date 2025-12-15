@@ -74,13 +74,14 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mpi_f08, only: MPI_Allreduce, MPI_Scan, MPI_INTEGER, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, MPI_INFO_NULL
-  use comm, only: pe_rank, NEKO_COMM, pe_size
+  use comm, only: pe_rank, NEKO_COMM, pe_size, mpi_real_precision
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
+  use mpi_f08, only: mpi_min, MPI_Allreduce, MPI_IN_PLACE
 
   implicit none
   private
@@ -89,7 +90,7 @@ module mma
   type, public :: mma_t
      private
      integer :: n, m, max_iter
-     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
+     real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
@@ -341,7 +342,7 @@ contains
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     character(len=:), intent(in), allocatable :: bcknd, subsolver
     character(len=256) :: log_msg
-    integer :: i
+    integer :: i, ierr
 
     call this%free()
 
@@ -389,18 +390,12 @@ contains
     this%xmin%x = xmin
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%a%x, this%a%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%c%x, this%c%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%d%x, this%d%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmax%x, this%xmax%x_d, n, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmin%x, this%xmin%x_d, n, HOST_TO_DEVICE, &
-            sync = .true.)
+       call this%a%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%c%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%d%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%xmax%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%xmin%copy_from(HOST_TO_DEVICE, sync = .true.)
     end if
-
 
     ! Set KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
@@ -410,8 +405,8 @@ contains
     ! Assign defaults if nothing is parsed
 
     ! Based on the Cpp Code by Niels
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
     if (.not. present(max_iter)) this%max_iter = 100
+    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
@@ -426,6 +421,10 @@ contains
     if (present(asydecr)) this%asydecr = asydecr
     this%bcknd = bcknd
     this%subsolver = subsolver
+
+    ! Sync parameters across MPI
+    call MPI_Allreduce(MPI_IN_PLACE, this%epsimin, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 

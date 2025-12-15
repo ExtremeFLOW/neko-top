@@ -51,7 +51,7 @@ contains
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer(hid_t) :: fapl_id, xfer_plist_id, file_id, dset_id, filespace, memspace, attr_id,&
-         grp_id, mma_grp_id
+         grp_id, mma_grp_id, str_type
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
@@ -62,8 +62,6 @@ contains
 
     ! Ensure device state is on host
     call this%sync_host()
-    call neko_log%message('mma: device memory synced to host for HDF5 write: ' &
-         // trim(filename))
 
     call h5open_f(ierr)
 
@@ -92,12 +90,30 @@ contains
     call h5pcreate_f(H5P_DATASET_XFER_F, xfer_plist_id, ierr)
     call h5pset_dxpl_mpio_f(xfer_plist_id, H5FD_MPIO_COLLECTIVE_F, ierr)
 
-    ! Write basic scalars as attributes
-    call h5gcreate_f(mma_grp_id, "Parameters", grp_id, ierr, lcpl_id=h5p_default_f, &
-         gcpl_id=h5p_default_f, gapl_id=h5p_default_f)
+    ! ------------------------------------------------------------------------ !
+    ! Write basic Parameters attributes
+
+#ifdef NOTHING
+    real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin
+
+    real(kind=rp), intent(in) :: a0
+    real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+
+    type(vector_t), intent(in) :: xold1, xold2, low, upp,
+    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
+    real(kind=rp), intent(in), dimension(m) :: a, c, d
+
+    character(len=:), intent(in), allocatable :: bcknd, subsolver
+#endif
+
+    call h5gcreate_f(mma_grp_id, "Parameters", grp_id, ierr, &
+         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
+         gapl_id = h5p_default_f)
 
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
     ddim = 1
+
+    ! Integer-valued attributes
 
     call h5acreate_f(grp_id, 'n', H5T_NATIVE_INTEGER, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
@@ -109,70 +125,92 @@ contains
     call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%m, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5acreate_f(grp_id, 'a0', H5T_NEKO_REAL, filespace, attr_id, &
+    call h5acreate_f(grp_id, 'max_iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%max_iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5acreate_f(grp_id, 'f0val', H5T_NEKO_REAL, filespace, attr_id, &
+    ! Real-valued attributes
+
+    call h5acreate_f(grp_id, 'asyinit', H5T_NEKO_REAL, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%f0val, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%asyinit, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5acreate_f(grp_id, 'z', H5T_NEKO_REAL, filespace, attr_id, &
+    call h5acreate_f(grp_id, 'asyincr', H5T_NEKO_REAL, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%z, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%asyincr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5acreate_f(grp_id, 'zeta', H5T_NEKO_REAL, filespace, attr_id, &
+    call h5acreate_f(grp_id, 'asydecr', H5T_NEKO_REAL, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%zeta, ddim, ierr)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%asydecr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
+
+    call h5acreate_f(grp_id, 'epsimin', H5T_NEKO_REAL, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NEKO_REAL, this%epsimin, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! String-valued attributes
+
+    call h5tcopy_f(H5T_C_S1, str_type, ierr)
+
+    ddim(1) = len_trim(this%bcknd)
+    call h5tset_size_f(str_type, ddim(1), ierr)
+    call h5acreate_f(grp_id, 'bcknd', str_type, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, str_type, trim(this%bcknd), ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ddim(1) = len_trim(this%subsolver)
+    call h5tset_size_f(str_type, ddim(1), ierr)
+    call h5acreate_f(grp_id, 'subsolver', str_type, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, str_type, trim(this%subsolver), ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Close the string type
+    call h5tclose_f(str_type, ierr)
 
     ! Close the filespace and Parameters group
     call h5sclose_f(filespace, ierr)
     call h5gclose_f(grp_id, ierr)
 
-    ! ........................................................................ !
-    ! Reference from Neko's hdf5_io module
+    ! ------------------------------------------------------------------------ !
+    ! Global arrays datasets
 
-#ifdef NOTHING
-    ! Create group fro the fields
-    call h5gcreate_f(file_id, "Fields", grp_id, ierr, lcpl_id=h5p_default_f, &
-         gcpl_id=h5p_default_f, gapl_id=h5p_default_f)
+    call h5gcreate_f(mma_grp_id, "Global arrays", grp_id, ierr, &
+         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
+         gapl_id = h5p_default_f)
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
 
-    ! Prepare some parameters for the writing process
-    dcount(1) = int(dof%size(), 8)
-    doffset(1) = int(msh%offset_el, 8) * int((dof%Xh%lx**3),8)
-    ddim = int(dof%size(), 8)
-    drank = 1
-    call MPI_Allreduce(MPI_IN_PLACE, ddim(1), 1, &
-         MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
-
-    ! Create a file and memory space
-    call h5screate_simple_f(drank, ddim, filespace, ierr)
-    call h5screate_simple_f(drank, dcount, memspace, ierr)
-
-    ! Write field at id: i
-    call h5dcreate_f(grp_id, fp(i)%ptr%name, H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dget_space_f(dset_id, filespace, ierr)
-    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, &
-         doffset, dcount, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, &
-         fp(i)%ptr%x(1,1,1,1), &
-         ddim, ierr, file_space_id = filespace, &
-         mem_space_id = memspace, xfer_prp = plist_id)
+    call h5dcreate_f(grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    ddim(1) = 1
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Close the spaces used
-    call h5sclose_f(filespace, ierr)
-    call h5sclose_f(memspace, ierr)
-    call h5gclose_f(grp_id, ierr)
-#endif
+    ! The next batch are vectors of size m
+    ddim(1) = this%m
 
-    ! End of reference
-    ! ........................................................................ !
+    call h5dcreate_f(grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a%x(1), ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    call h5dcreate_f(grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%c%x(1), ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    call h5dcreate_f(grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%d%x(1), ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Close the filespace and Parameters group
+    call h5sclose_f(filespace, ierr)
+    call h5gclose_f(grp_id, ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! Write per-rank datasets
 
     ! Helper to write a 1D dataset with rank-0 data only (safe parallel)
     drank = 1
@@ -189,62 +227,26 @@ contains
     doffset(1) = prefix8 - local_n8
     ddim(1) = total_n8
 
-    do i = 0, pe_size
-       if (i .eq. pe_rank) then
-          write(*,*) '----------------------------------------'
-          write(*,*) 'Writing xold1:', pe_rank
-          write(*,*) '  local size=', local_n, ' total size=', total_n8
-          write(*,*) '  offset=', doffset(1), ' count=', dcount(1)
-          write(*,*) ' Data:'
-          write(*,*) pe_rank, ": ", this%xold1%x
-       end if
-       call MPI_Barrier(NEKO_COMM, ierr)
-    end do
-
-    if (pe_rank .eq. 0) then
-       write(*,*) '----------------------------------------'
-    end if
-
     ! Create a file and memory space
     call h5screate_simple_f(drank, ddim, filespace, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5screate_simple_f(filespace) failed')
     call h5screate_simple_f(drank, dcount, memspace, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5screate_simple_f(memspace) failed')
 
     ! Save the array type objects
     call h5dcreate_f(mma_grp_id, 'xold1', H5T_NEKO_REAL, filespace, dset_id, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5dcreate_f(xold1) failed')
     call h5dget_space_f(dset_id, filespace, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5dget_space_f failed')
 
-    ! Diagnostic: query the dataspace extents
-    call h5sget_simple_extent_dims_f(filespace, qdims, qmaxdims, ierr)
-    if (pe_rank .eq. 0) then
-       write(*,*) 'mma: dataset filespace dims=', qdims(1), ' max=', qmaxdims(1)
-    end if
     call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5sselect_hyperslab_f failed')
 
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xfer_plist_id)
-    if (ierr .ne. 0) then
-       write(*,*) 'mma: h5dwrite_f failed with ierr=', ierr
-       call neko_error('mma: h5dwrite_f failed')
-    end if
 
     call h5dclose_f(dset_id, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5dclose_f failed')
 
     ! Close the spaces used
     call h5sclose_f(filespace, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5sclose_f(filespace) failed')
     call h5sclose_f(memspace, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5sclose_f(memspace) failed')
 
-    ! Ensure data is flushed to disk
-    call h5fflush_f(file_id, H5F_SCOPE_GLOBAL_F, ierr)
-    if (ierr .ne. 0) call neko_error('mma: h5fflush_f failed')
-
+    ! ------------------------------------------------------------------------ !
     ! Close the group and file
     call h5gclose_f(mma_grp_id, ierr)
     call h5pclose_f(xfer_plist_id, ierr)

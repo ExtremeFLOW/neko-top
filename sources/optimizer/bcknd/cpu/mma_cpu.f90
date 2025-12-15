@@ -33,7 +33,7 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
+  use mpi_f08, only: MPI_MAX
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use math, only: NEKO_EPS
   use profiler, only: profiler_start_region, profiler_end_region
@@ -434,8 +434,6 @@ contains
     ! Computing the minimal epsilon and choose the most conservative one
 
     minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
-    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
-         mpi_real_precision, mpi_min, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
@@ -847,8 +845,6 @@ contains
     ! Computing the minimal epsilon and choose the most conservative one
 
     minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
-    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
-         mpi_real_precision, mpi_min, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
