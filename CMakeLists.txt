@@ -85,15 +85,6 @@ find_package(MPI REQUIRED)
 # We need PKG Config to find the JSON-Fortran and Neko libraries
 find_package(PkgConfig REQUIRED)
 
-# Check for HDF5 (optional)
-find_package(HDF5 COMPONENTS Fortran REQUIRED HINTS ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5)
-add_compile_definitions(HAVE_HDF5)
-if (HDF5_FOUND)
-    message(STATUS "HDF5 found: Enabling HDF5 support.")
-else()
-    message(STATUS "HDF5 not found: Disabling HDF5 support.")
-endif()
-
 # Check that the MPI Fortran 2008 module is available
 if (NOT MPI_Fortran_HAVE_F08_MODULE)
     message(FATAL_ERROR "MPI Fortran 2008 module is required for Neko-TOP.")
@@ -134,6 +125,25 @@ set(CMAKE_PREFIX_PATH ${NEKO_DIR} ${CMAKE_PREFIX_PATH})
 # Find the Neko library
 pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
+
+# ............................................................................ #
+# HDF5 Support
+
+if (DEFINED ENV{HDF5_DIR})
+    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING "Path to the Neko installation")
+else()
+    set(HDF5_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5
+        CACHE STRING "Path to the Neko installation")
+endif()
+
+set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+pkg_check_modules(hdf5 QUIET IMPORTED_TARGET hdf5)
+if (hdf5_FOUND)
+    message(STATUS "Neko was built with HDF5 support. Enabling HDF5 support.")
+    add_compile_definitions(HAVE_HDF5)
+else()
+    message(FATAL_ERROR "No HDF5")
+endif()
 
 # ............................................................................ #
 # Setup PFUnit
