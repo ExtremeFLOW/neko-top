@@ -74,14 +74,14 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use mpi_f08, only: MPI_Allreduce, MPI_Scan, MPI_INTEGER, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, MPI_INFO_NULL
-  use comm, only: pe_rank, NEKO_COMM, pe_size, mpi_real_precision
+  use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
-  use mpi_f08, only: mpi_min, MPI_Allreduce, MPI_IN_PLACE
+  use mpi_f08, only: mpi_min, mpi_sum, MPI_Allreduce, MPI_IN_PLACE, MPI_INTEGER
 
   implicit none
   private
@@ -89,13 +89,13 @@ module mma
   !> MMA type
   type, public :: mma_t
      private
-     integer :: n, m, max_iter
+     integer :: n, m, n_global, max_iter
      real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     character(len=:), allocatable :: bcknd, subsolver
+     character(len=:), allocatable :: subsolver, bcknd
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -423,8 +423,10 @@ contains
     this%subsolver = subsolver
 
     ! Sync parameters across MPI
+    call MPI_Allreduce(this%n, this%n_global, 1, &
+         MPI_INTEGER, mpi_sum, neko_comm, ierr)
     call MPI_Allreduce(MPI_IN_PLACE, this%epsimin, 1, &
-         mpi_real_precision, mpi_min, neko_comm, ierr)
+         MPI_REAL_PRECISION, mpi_min, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 

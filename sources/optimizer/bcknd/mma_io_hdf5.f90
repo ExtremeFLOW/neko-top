@@ -154,20 +154,22 @@ contains
 
     ! String-valued attributes
 
-    call h5tcopy_f(H5T_C_S1, str_type, ierr)
+    ! Create the string type
+    call h5tcopy_f(H5T_FORTRAN_S1, str_type, ierr)
+    call h5tset_strpad_f(str_type, H5T_STR_SPACEPAD_F, ierr)
 
     ddim(1) = len_trim(this%bcknd)
     call h5tset_size_f(str_type, ddim(1), ierr)
     call h5acreate_f(grp_id, 'bcknd', str_type, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, str_type, trim(this%bcknd), ddim, ierr)
+    call h5awrite_f(attr_id, str_type, this%bcknd, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ddim(1) = len_trim(this%subsolver)
     call h5tset_size_f(str_type, ddim(1), ierr)
     call h5acreate_f(grp_id, 'subsolver', str_type, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, str_type, trim(this%subsolver), ddim, ierr)
+    call h5awrite_f(attr_id, str_type, this%subsolver, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! Close the string type
@@ -180,50 +182,43 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
-    call h5gcreate_f(mma_grp_id, "Global arrays", grp_id, ierr, &
-         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
-         gapl_id = h5p_default_f)
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-
-    call h5dcreate_f(grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dcreate_f(mma_grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
     ddim(1) = 1
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
     ! The next batch are vectors of size m
     ddim(1) = this%m
+    drank = 1
 
-    call h5dcreate_f(grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5screate_simple_f(drank, ddim, filespace, ierr)
+
+    call h5dcreate_f(mma_grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dcreate_f(mma_grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%c%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dcreate_f(mma_grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%d%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Close the filespace and Parameters group
+    ! Close the filespace and group
     call h5sclose_f(filespace, ierr)
-    call h5gclose_f(grp_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Write per-rank datasets
 
-    ! Helper to write a 1D dataset with rank-0 data only (safe parallel)
-    drank = 1
-
-    ! list of vectors to write (name, size, data) - per-rank hyperslabs
-
     ! Write X_old to the file
-    local_n = this%xold1%size()
-    local_n8 = int(local_n, 8)
-    call MPI_Allreduce(local_n8, total_n8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+    local_n8 = int(this%n, 8)
+    total_n8 = int(this%n_global, 8)
     call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
 
-    dcount(1) = int(this%xold1%size(), kind = 8)
+    drank = pe_size
+    dcount(1) = local_n8
     doffset(1) = prefix8 - local_n8
     ddim(1) = total_n8
 

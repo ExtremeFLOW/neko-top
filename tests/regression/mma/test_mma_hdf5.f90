@@ -2,12 +2,92 @@
 
 #ifdef HAVE_HDF5
 
+module test_mma_util
+  use num_types, only: rp
+  implicit none
+
+  logical :: test_status = .true.
+
+  interface test
+     module procedure test_integer, test_real, test_real_array, test_string
+  end interface test
+
+
+  public :: test, test_status
+
+contains
+
+  subroutine test_integer(name, target, expected)
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: target, expected
+    logical :: is_equal
+
+    is_equal = (target == expected)
+    if (.not. is_equal) then
+       write(*,'(A,A,A,I0,A,I0)') 'TEST FAILED: ', trim(name), ' = ', target, &
+            ' expected ', expected
+    end if
+
+    test_status = test_status .and. is_equal
+  end subroutine test_integer
+
+  subroutine test_real(name, target, expected)
+    character(len=*), intent(in) :: name
+    real(kind=rp), intent(in) :: target, expected
+    logical :: is_equal
+
+    is_equal = (abs(target - expected) .le. 1.0e-12_rp)
+    if (.not. is_equal) then
+       write(*,'(A,A,A,F12.6,A,F12.6)') 'TEST FAILED: ', trim(name), ' = ', &
+            target, ' expected ', expected
+    end if
+
+    test_status = test_status .and. is_equal
+  end subroutine test_real
+
+  subroutine test_real_array(name, target, expected)
+    character(len=*), intent(in) :: name
+    real(kind=rp), intent(in) :: target(:), expected(:)
+    logical :: is_equal
+    integer :: i
+
+    is_equal = all(abs(target - expected) .le. 1.0e-12_rp)
+    if (.not. is_equal) then
+       write(*,'(A,A)') 'TEST FAILED: ', trim(name)
+       do i = 1, size(target)
+          if (abs(target(i) - expected(i)) .gt. 1.0e-12_rp) then
+             write(*,'(A,I0,A,F12.6,A,F12.6)') '  ', i, ': ', target(i), &
+                  ' expected ', expected(i)
+          end if
+       end do
+    end if
+
+    test_status = test_status .and. is_equal
+  end subroutine test_real_array
+
+  subroutine test_string(name, target, expected)
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: target, expected
+    logical :: is_equal
+
+    is_equal = (trim(target) .eq. trim(expected))
+    if (.not. is_equal) then
+       write(*,'(A,A,A,A,A)') 'TEST FAILED: ', trim(name), ' = ', trim(target), &
+            ' expected ', trim(expected)
+    end if
+
+    test_status = test_status .and. is_equal
+  end subroutine test_string
+
+end module test_mma_util
+
 program test_mma_hdf5
   use, intrinsic :: iso_c_binding
   use mpi_f08
   use neko
   use hdf5
   use mma
+  use test_mma_util
   implicit none
 
   integer :: ierr
@@ -23,16 +103,17 @@ program test_mma_hdf5
   character(len=:), allocatable :: bcknd, subsolver
 
   character(len=256) :: fname
-  integer(hid_t) :: H5T_NEKO_REAL
+  integer(hid_t) :: H5T_NEKO_REAL, str_type
   integer(hid_t) :: plist_id, file_id, attr_id, dset_id, atype_id, mem_type_id
   integer(hsize_t), dimension(1) :: ddim
   integer(hsize_t) :: type_size
   integer :: read_n, read_m
   integer :: read_max_iter
   real(kind=rp) :: read_asyinit, read_asyincr, read_asydecr, read_epsimin
-  character(len=:), allocatable :: read_bcknd, read_subsolver
+  real(kind=rp) :: read_a0
+  real(kind=rp), allocatable :: read_a(:), read_c(:), read_d(:)
 
-  logical :: error_flag = .false.
+  character(len=12) :: read_bcknd, read_subsolver
 
   call neko_init()
 
@@ -87,6 +168,8 @@ program test_mma_hdf5
 
   read_bcknd = ''
   read_subsolver = ''
+
+  allocate(read_a(m), read_c(m), read_d(m))
 
   call read_xold1%init(n)
 
@@ -144,30 +227,35 @@ program test_mma_hdf5
 
   ! Read strings
   call h5aopen_by_name_f(file_id, '/MMA/Parameters', 'bcknd', attr_id, ierr)
-  ! determine attribute string size, allocate Fortran string and read with matching memory type
-  call h5aget_type_f(attr_id, atype_id, ierr)
-  call h5tget_size_f(atype_id, type_size, ierr)
-  call h5tclose_f(atype_id, ierr)
-  if (allocated(read_bcknd)) deallocate(read_bcknd)
-  allocate(character(len=int(type_size)) :: read_bcknd)
-  call h5tcopy_f(H5T_C_S1, mem_type_id, ierr)
-  call h5tset_size_f(mem_type_id, type_size, ierr)
-  call h5aread_f(attr_id, mem_type_id, read_bcknd, ddim, ierr)
-  call h5tclose_f(mem_type_id, ierr)
+  call h5aget_type_f(attr_id, str_type, ierr)
+  call h5aread_f(attr_id, str_type, read_bcknd, ddim, ierr)
   call h5aclose_f(attr_id, ierr)
 
   call h5aopen_by_name_f(file_id, '/MMA/Parameters', 'subsolver', attr_id, ierr)
-  ! determine attribute string size, allocate Fortran string and read with matching memory type
-  call h5aget_type_f(attr_id, atype_id, ierr)
-  call h5tget_size_f(atype_id, type_size, ierr)
-  call h5tclose_f(atype_id, ierr)
-  if (allocated(read_subsolver)) deallocate(read_subsolver)
-  allocate(character(len=int(type_size)) :: read_subsolver)
-  call h5tcopy_f(H5T_C_S1, mem_type_id, ierr)
-  call h5tset_size_f(mem_type_id, type_size, ierr)
-  call h5aread_f(attr_id, mem_type_id, read_subsolver, ddim, ierr)
-  call h5tclose_f(mem_type_id, ierr)
+  call h5aget_type_f(attr_id, str_type, ierr)
+  call h5aread_f(attr_id, str_type, read_subsolver, ddim, ierr)
   call h5aclose_f(attr_id, ierr)
+
+  call h5tclose_f(str_type, ierr)
+
+  ! Read penalty parameters
+  ddim(1) = 1
+  call h5dopen_f(file_id, '/MMA/a0', dset_id, ierr)
+  call h5dread_f(dset_id, H5T_NEKO_REAL, read_a0, ddim, ierr)
+  call h5dclose_f(dset_id, ierr)
+
+  ddim(1) = m
+  call h5dopen_f(file_id, '/MMA/a', dset_id, ierr)
+  call h5dread_f(dset_id, H5T_NEKO_REAL, read_a, ddim, ierr)
+  call h5dclose_f(dset_id, ierr)
+
+  call h5dopen_f(file_id, '/MMA/c', dset_id, ierr)
+  call h5dread_f(dset_id, H5T_NEKO_REAL, read_c, ddim, ierr)
+  call h5dclose_f(dset_id, ierr)
+
+  call h5dopen_f(file_id, '/MMA/d', dset_id, ierr)
+  call h5dread_f(dset_id, H5T_NEKO_REAL, read_d, ddim, ierr)
+  call h5dclose_f(dset_id, ierr)
 
   ! Read datasets
   ddim(1) = n
@@ -183,57 +271,24 @@ program test_mma_hdf5
   ! -------------------------------------------------------------------------- !
   ! Check the values read from file
 
-  if (read_n .ne. n) then
-     write(*,*) 'TEST FAILED: read n=', read_n, ' expected ', n
-     error_flag = .true.
-  end if
-  if (read_m .ne. m) then
-     write(*,*) 'TEST FAILED: read m=', read_m, ' expected ', m
-     error_flag = .true.
-  end if
-  if (read_max_iter .ne. max_iter) then
-     write(*,*) 'TEST FAILED: read max_iter=', read_max_iter, &
-          ' expected ', max_iter
-     error_flag = .true.
-  end if
-  if (abs(read_asyinit - asyinit) .gt. 1.0e-12_rp) then
-     write(*,*) 'TEST FAILED: read asyinit=', read_asyinit, &
-          ' expected ', asyinit
-     error_flag = .true.
-  end if
-  if (abs(read_asyincr - asyincr) .gt. 1.0e-12_rp) then
-     write(*,*) 'TEST FAILED: read asyincr=', read_asyincr, &
-          ' expected ', asyincr
-     error_flag = .true.
-  end if
-  if (abs(read_asydecr - asydecr) .gt. 1.0e-12_rp) then
-     write(*,*) 'TEST FAILED: read asydecr=', read_asydecr, &
-          ' expected ', asydecr
-     error_flag = .true.
-  end if
-  if (abs(read_epsimin - epsimin) .gt. 1.0e-12_rp) then
-     write(*,*) 'TEST FAILED: read epsimin=', read_epsimin, &
-          ' expected ', epsimin
-     error_flag = .true.
-  end if
+  call test('n', read_n, n)
+  call test('m', read_m, m)
+  call test('max_iter', read_max_iter, max_iter)
 
-  if (trim(read_bcknd) .ne. trim(bcknd)) then
-     write(*,*) 'TEST FAILED: read bcknd=', trim(read_bcknd), &
-          ' expected ', trim(bcknd)
-     error_flag = .true.
-  end if
-  if (trim(read_subsolver) .ne. trim(subsolver)) then
-     write(*,*) 'TEST FAILED: read subsolver=', trim(read_subsolver), &
-          ' expected ', trim(subsolver)
-     error_flag = .true.
-  end if
+  call test('asyinit', read_asyinit, asyinit)
+  call test('asyincr', read_asyincr, asyincr)
+  call test('asydecr', read_asydecr, asydecr)
+  call test('epsimin', read_epsimin, epsimin)
 
-  if (any(abs(read_xold1%x - x%x) > 1.0e-12_rp)) then
-     write(*,*) 'TEST FAILED: read x does not match written x'
-     write(*,*) ' written x: ', x%x
-     write(*,*) ' read x:    ', read_xold1%x
-     error_flag = .true.
-  end if
+  call test('bcknd', read_bcknd, bcknd)
+  call test('subsolver', read_subsolver, subsolver)
+
+  call test('a0', read_a0, a0)
+  call test('a', read_a, a)
+  call test('c', read_c, c)
+  call test('d', read_d, d)
+
+  call test('xold1', read_xold1%x, x%x)
 
   ! -------------------------------------------------------------------------- !
   ! Clean up
@@ -244,14 +299,14 @@ program test_mma_hdf5
 
   call neko_finalize()
 
-  if (error_flag) then
+  if (test_status) then
+     write(*,*) 'TEST PASSED'
+  else
      write(*,*) 'TEST FAILED'
      error stop 1
-  else
-     write(*,*) 'TEST PASSED'
   end if
-
 end program test_mma_hdf5
+
 
 #else
 

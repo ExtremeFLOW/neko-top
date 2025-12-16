@@ -410,8 +410,6 @@ contains
     real(kind=rp) :: re_sq_norm
     real(kind=rp) :: minimal_epsilon
 
-    integer :: nglobal
-
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
@@ -426,9 +424,6 @@ contains
     xsi = max(1.0_rp, 1.0_rp / (x - this%alpha%x))
     eta = max(1.0_rp, 1.0_rp / (this%beta%x - x))
     mu = max(1.0_rp, 0.5_rp * this%c%x)
-
-    call MPI_Allreduce(this%n, nglobal, 1, &
-         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
@@ -823,8 +818,6 @@ contains
     ! Parameters for global communication
     real(kind=rp) :: minimal_epsilon
 
-    integer :: nglobal
-
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
     ! page 15 of "https://people.kth.se/~krille/mmagcmma.pdf"
@@ -837,9 +830,6 @@ contains
     mu = 1.0_rp !this parameter is eta in Niel's paper
     ! note that mu in the paper translates to epsi in the code following the
     ! same style as the Cpp code by Neils
-
-    call MPI_Allreduce(this%n, nglobal, 1, &
-         MPI_INTEGER, mpi_sum, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
