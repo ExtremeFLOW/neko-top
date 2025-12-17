@@ -81,7 +81,7 @@ module mma
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
-  use mpi_f08, only: mpi_min, mpi_sum, MPI_Allreduce, MPI_IN_PLACE, MPI_INTEGER
+  use mpi_f08, only: mpi_min, mpi_sum, MPI_Allreduce, MPI_INTEGER
 
   implicit none
   private
@@ -425,8 +425,6 @@ contains
     ! Sync parameters across MPI
     call MPI_Allreduce(this%n, this%n_global, 1, &
          MPI_INTEGER, mpi_sum, neko_comm, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, this%epsimin, 1, &
-         MPI_REAL_PRECISION, mpi_min, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 

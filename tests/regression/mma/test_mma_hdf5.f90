@@ -131,6 +131,7 @@ program test_mma_hdf5
      x%x = [1.0_rp, 2.0_rp]
   end if
   x%x = x%x + real(pe_rank, kind=rp) * 0.01_rp
+  call x%copy_from(HOST_TO_DEVICE, sync = .true.)
 
   allocate(a(m), c(m), d(m), xmin(n), xmax(n))
   a = 0.5_rp
@@ -293,6 +294,7 @@ program test_mma_hdf5
   ! -------------------------------------------------------------------------- !
   ! Clean up
 
+  call x%free()
   call read_xold1%free()
   call obj%free()
   deallocate(a, c, d, xmin, xmax)

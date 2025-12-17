@@ -50,8 +50,8 @@ contains
   module subroutine mma_write_hdf5(this, filename)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
-    integer(hid_t) :: fapl_id, xfer_plist_id, file_id, dset_id, filespace, memspace, attr_id,&
-         grp_id, mma_grp_id, str_type
+    integer(hid_t) :: fapl_id, xf_id, file_id, dset_id, filespace, memspace, &
+         attr_id, grp_id, mma_grp_id, str_type
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
@@ -86,25 +86,8 @@ contains
          lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
          gapl_id = h5p_default_f)
 
-    ! Dataset transfer property list: collective
-    call h5pcreate_f(H5P_DATASET_XFER_F, xfer_plist_id, ierr)
-    call h5pset_dxpl_mpio_f(xfer_plist_id, H5FD_MPIO_COLLECTIVE_F, ierr)
-
     ! ------------------------------------------------------------------------ !
     ! Write basic Parameters attributes
-
-#ifdef NOTHING
-    real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin
-
-    real(kind=rp), intent(in) :: a0
-    real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-
-    type(vector_t), intent(in) :: xold1, xold2, low, upp,
-    real(kind=rp), intent(in), dimension(n) :: xmax, xmin
-    real(kind=rp), intent(in), dimension(m) :: a, c, d
-
-    character(len=:), intent(in), allocatable :: bcknd, subsolver
-#endif
 
     call h5gcreate_f(mma_grp_id, "Parameters", grp_id, ierr, &
          lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
@@ -182,9 +165,10 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
-    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-    call h5dcreate_f(mma_grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
     ddim(1) = 1
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
+
+    call h5dcreate_f(mma_grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
@@ -212,12 +196,12 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Write per-rank datasets
 
-    ! Write X_old to the file
+    ! Define the sizes and offsets
     local_n8 = int(this%n, 8)
     total_n8 = int(this%n_global, 8)
     call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
 
-    drank = pe_size
+    drank = 1
     dcount(1) = local_n8
     doffset(1) = prefix8 - local_n8
     ddim(1) = total_n8
@@ -226,27 +210,66 @@ contains
     call h5screate_simple_f(drank, ddim, filespace, ierr)
     call h5screate_simple_f(drank, dcount, memspace, ierr)
 
-    ! Save the array type objects
-    call h5dcreate_f(mma_grp_id, 'xold1', H5T_NEKO_REAL, filespace, dset_id, ierr)
-    call h5dget_space_f(dset_id, filespace, ierr)
+    ! Dataset transfer property list: collective
+    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
+    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
 
-    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, ierr)
+    ! Select hyperslab in the file space
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
+         ierr)
 
+    ! Write xmin
+    call h5dcreate_f(mma_grp_id, 'xmin', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmin%x(1), ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Write xmax
+    call h5dcreate_f(mma_grp_id, 'xmax', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmax%x(1), ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Write xold1
+    call h5dcreate_f(mma_grp_id, 'xold1', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xfer_plist_id)
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
 
+    ! Write xold2
+    call h5dcreate_f(mma_grp_id, 'xold2', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold2%x(1), ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Write low
+    call h5dcreate_f(mma_grp_id, 'low', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%low%x(1), ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Write upp
+    call h5dcreate_f(mma_grp_id, 'upp', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%upp%x(1), ddim, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Close the spaces used
     call h5sclose_f(filespace, ierr)
     call h5sclose_f(memspace, ierr)
+    call h5pclose_f(xf_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Close the group and file
     call h5gclose_f(mma_grp_id, ierr)
-    call h5pclose_f(xfer_plist_id, ierr)
-    call h5pclose_f(fapl_id, ierr)
     call h5fclose_f(file_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
   end subroutine mma_write_hdf5
