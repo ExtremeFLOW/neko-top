@@ -73,7 +73,6 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mpi_f08, only: MPI_Allreduce, MPI_Scan, MPI_INTEGER, MPI_INTEGER8, MPI_SUM, MPI_COMM_WORLD, MPI_INFO_NULL
   use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
@@ -81,7 +80,7 @@ module mma
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
-  use mpi_f08, only: mpi_min, mpi_sum, MPI_Allreduce, MPI_INTEGER
+  use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
 
   implicit none
   private
@@ -229,7 +228,7 @@ contains
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
 
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
-         MPI_SUM, MPI_COMM_WORLD, ierr)
+         MPI_SUM, NEKO_COMM, ierr)
 
     ! Assign default values for the backend based on the NEKO_BCKND_DEVICE
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -424,7 +423,7 @@ contains
 
     ! Sync parameters across MPI
     call MPI_Allreduce(this%n, this%n_global, 1, &
-         MPI_INTEGER, mpi_sum, neko_comm, ierr)
+         MPI_INTEGER, MPI_SUM, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 

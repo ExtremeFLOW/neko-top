@@ -104,9 +104,8 @@ program test_mma_hdf5
 
   character(len=256) :: fname
   integer(hid_t) :: H5T_NEKO_REAL, str_type
-  integer(hid_t) :: plist_id, file_id, attr_id, dset_id, atype_id, mem_type_id
+  integer(hid_t) :: plist_id, file_id, attr_id, dset_id
   integer(hsize_t), dimension(1) :: ddim
-  integer(hsize_t) :: type_size
   integer :: read_n, read_m
   integer :: read_max_iter
   real(kind=rp) :: read_asyinit, read_asyincr, read_asydecr, read_epsimin

@@ -37,6 +37,7 @@ submodule (mma) mma_io_hdf5
 #ifdef HAVE_HDF5
   use hdf5
 #endif
+  use mpi_f08, only: MPI_INFO_NULL, MPI_INTEGER8
 
 contains
 
@@ -55,9 +56,7 @@ contains
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
-    integer :: local_n
     integer(kind=8) :: local_n8, prefix8, total_n8
-    integer(hsize_t), dimension(1) :: qdims, qmaxdims
 
 
     ! Ensure device state is on host
@@ -108,8 +107,8 @@ contains
     call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%m, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5acreate_f(grp_id, 'max_iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
-         ierr, h5p_default_f, h5p_default_f)
+    call h5acreate_f(grp_id, 'max_iter', H5T_NATIVE_INTEGER, filespace, &
+         attr_id, ierr, h5p_default_f, h5p_default_f)
     call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%max_iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 

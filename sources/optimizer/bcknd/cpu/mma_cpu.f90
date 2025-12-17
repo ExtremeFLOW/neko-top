@@ -33,7 +33,7 @@
 
 submodule (mma) mma_cpu
   use lapack_interfaces, only: dgesv
-  use mpi_f08, only: MPI_MAX
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use math, only: NEKO_EPS
   use profiler, only: profiler_start_region, profiler_end_region
@@ -176,7 +176,7 @@ contains
     re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
     call MPI_Allreduce(MPI_IN_PLACE, this%residumax, 1, &
-         mpi_real_precision, mpi_max, neko_comm, ierr)
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
 
     call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
          mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -429,6 +429,8 @@ contains
     ! Computing the minimal epsilon and choose the most conservative one
 
     minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
+         mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
@@ -488,7 +490,7 @@ contains
        re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
 
        call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
-            mpi_real_precision, mpi_max, neko_comm, ierr)
+            mpi_real_precision, MPI_MAX, neko_comm, ierr)
 
        call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
             1, mpi_real_precision, mpi_sum, neko_comm, ierr)
@@ -658,9 +660,9 @@ contains
 
           ! Share the new_residual and steg values
           call MPI_Allreduce(MPI_IN_PLACE, steg, 1, &
-               mpi_real_precision, mpi_min, neko_comm, ierr)
+               mpi_real_precision, MPI_MIN, neko_comm, ierr)
           call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
-               mpi_real_precision, mpi_min, neko_comm, ierr)
+               mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
           ! The innermost loop to determine the suitable step length
           ! using the Backtracking Line Search approach
@@ -730,7 +732,7 @@ contains
           residual_norm = new_residual
           residual_max = maxval(abs(residual))
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
-               mpi_real_precision, mpi_max, neko_comm, ierr)
+               mpi_real_precision, MPI_MAX, neko_comm, ierr)
        end do
 
        epsi = 0.1_rp * epsi
@@ -835,6 +837,8 @@ contains
     ! Computing the minimal epsilon and choose the most conservative one
 
     minimal_epsilon = max(0.9_rp * this%epsimin, 1.0e-12_rp)
+    call MPI_Allreduce(MPI_IN_PLACE, minimal_epsilon, 1, &
+         mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! The main loop of the dual-primal interior point method.
