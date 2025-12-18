@@ -137,7 +137,7 @@ program usrneko
      call volume_constraint%init_from_components(des, neko_case%fluid%c_Xh, &
      name   = 'Volume constraint', &
      is_max = .true., &
-     limit  = 0.2_rp)
+     limit  = 0.1_rp)
   class default
      call neko_error("??!")
   end select

@@ -38,7 +38,7 @@ module heat_compliance
   use vector, only: vector_t
   use field, only: field_t
   use field_math, only: field_rzero, field_col2, field_addcol3, field_rone, &
-       field_copy, field_cmult, field_cfill
+       field_copy, field_cmult, field_cfill, field_add2, field_sub2
   use registry, only: neko_registry
   use fld_file_output, only: fld_file_output_t
   use mapping_handler, only: mapping_handler_t
@@ -51,7 +51,7 @@ module heat_compliance
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use device_math, only: device_copy, device_cmult, device_glsc2, device_col2, &
-       device_cfill
+       device_cfill, device_subcol3
   use math, only: col2, cmult, copy, glsc2
   use ax_product, only: ax_t, ax_helm_factory
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
@@ -83,7 +83,7 @@ module heat_compliance
      class(pc_t), allocatable :: pc
      type(bc_list_t) :: bclst
      type(zero_dirichlet_t) :: bc_sink
-     real(kind=rp) :: abstol = 1.0e-10_rp
+     real(kind=rp) :: abstol = 1.0e-4_rp
      integer :: ksp_max_iter = 10000
      character(len=2) :: ksp_solver = "cg"
      character(len=6) :: precon_type = "jacobi"
@@ -267,15 +267,17 @@ contains
   subroutine heat_compliance_update_value(this, design)
     class(heat_compliance_t), intent(inout) :: this
     class(design_t),         intent(in)    :: design
-    integer :: n
-    type(field_t), pointer :: RHS, work
+    integer :: n, i
+    type(field_t), pointer :: RHS, work, delta_phi
     character(len=LOG_SIZE) :: log_buf
-    integer :: temp_indices(1)
+    integer :: temp_indices(3)
 
     select type(design)
     type is (thermal_conductivity_design_t)
        n = this%coef%dof%size()
        call neko_scratch_registry%request_field(RHS, temp_indices(1), .false.)
+       call neko_scratch_registry%request_field(work, temp_indices(2), .false.)
+       call neko_scratch_registry%request_field(delta_phi, temp_indices(3), .false.)
 
        ! Optional masking of design outside optimization region
        if (design%has_mask) then
@@ -307,6 +309,12 @@ contains
        end if
        this%coef%ifh2 = .false.
 
+       ! We solve for delta phi, so use the previous phi field as initial guess
+       call this%Ax%compute(work%x, this%phi%x, this%coef, this%coef%msh, &
+         this%coef%Xh)
+
+      call field_sub2(RHS, work)
+
        ! Gather-scatter on RHS
        call this%coef%gs_h%op(RHS, GS_OP_ADD)
 
@@ -316,9 +324,12 @@ contains
        ! Solve Helmholtz equation for phi
        call profiler_start_region('Forward solve')
        this%ksp_results(1) = &
-            this%ksp%solve(this%Ax, this%phi, RHS%x, n, this%coef, &
+            this%ksp%solve(this%Ax, delta_phi, RHS%x, n, this%coef, &
             this%bclst, this%coef%gs_h)
        call profiler_end_region('Forward solve')
+
+       ! add result
+       call field_add2(this%phi, delta_phi)
 
        ! Update preconditioner (if needed)
        call this%pc%update()
@@ -472,7 +483,7 @@ contains
 
     call this%init_base(name, this%design_indicator%dof%size())
 
-    call field_cfill(this%design_indicator, 0.3_rp)
+    call field_cfill(this%design_indicator, 1.0_rp)
   end subroutine thermal_conductivity_design_init
 
   !=========================================================================!
