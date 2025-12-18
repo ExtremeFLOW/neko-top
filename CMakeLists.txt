@@ -137,12 +137,10 @@ else()
 endif()
 
 set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+
 pkg_check_modules(hdf5 QUIET IMPORTED_TARGET hdf5)
 if (hdf5_FOUND)
-    message(STATUS "Neko was built with HDF5 support. Enabling HDF5 support.")
     add_compile_definitions(HAVE_HDF5)
-else()
-    message(FATAL_ERROR "No HDF5")
 endif()
 
 # ............................................................................ #
@@ -218,8 +216,9 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "")
     message(STATUS "External dependencies:")
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
-    message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
-    message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
+    message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
+    message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
+    message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
     message(STATUS ${BARRIER})
     message(STATUS "")
 

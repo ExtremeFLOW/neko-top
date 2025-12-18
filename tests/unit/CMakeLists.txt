@@ -21,8 +21,8 @@
 # In addition to the simple unit tests using PFUnit, this file also includes
 # the subdirectory for sensitivity tests and other more complex tests.
 
+# Ensure that the BUILD_TESTING option is enabled.
 if (BUILD_TESTING)
-    # Ensure that the BUILD_TESTING option is enabled.
     message(STATUS "Building Neko-TOP unit tests.")
 else()
     return()
@@ -35,17 +35,21 @@ set_target_properties(Unit PROPERTIES
 )
 add_dependencies(Tests Unit)
 
-# Create a file list of the pFUnit test sources. These should be relative paths.
-set(PFUNIT_TEST_SOURCES
-    mma/io_hdf5.pf
-)
-
 # Add the more complex tests that require additional setup or dependencies.
 add_subdirectory(sensitivity)
 add_subdirectory(checkpointing)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
+
+# Create a file list of the pFUnit test sources. These should be relative paths.
+set(PFUNIT_TEST_SOURCES
+
+)
+
+if (HDF5_FOUND)
+    list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
+endif()
 
 if (NOT PFUNIT_TEST_SOURCES)
     return()

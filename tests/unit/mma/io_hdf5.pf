@@ -5,7 +5,7 @@ module io_hdf5
   use mma, only: mma_t
   use vector, only: vector_t
   use num_types, only: rp, sp, dp
-  use neko, only: neko_init, neko_finalize
+  use neko, only: neko_init
   use comm, only: pe_rank
   use device, only: device_finalize, HOST_TO_DEVICE
   use neko_mpi_types, only: neko_mpi_types_free
