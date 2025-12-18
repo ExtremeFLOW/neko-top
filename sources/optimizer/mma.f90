@@ -133,8 +133,11 @@ module mma
      generic :: write => write_hdf5
      procedure, pass(this) :: write_hdf5 => mma_write_hdf5
 
+     generic :: read => read_hdf5
+     procedure, pass(this) :: read_hdf5 => mma_read_hdf5
+
      ! Private utilities
-     procedure, pass(this) :: sync_host => mma_sync_host
+     procedure, pass(this) :: copy_from => mma_copy_from
   end type mma_t
 
   ! ========================================================================== !
@@ -184,6 +187,11 @@ module mma
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
      end subroutine mma_write_hdf5
+
+     module subroutine mma_read_hdf5(this, filename)
+       class(mma_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+     end subroutine mma_read_hdf5
   end interface
 
 contains
@@ -595,35 +603,37 @@ contains
   ! Private utilities
 
   !> Sync device memory to host for all internal vectors/matrices
-  subroutine mma_sync_host(this)
+  subroutine mma_copy_from(this, direction, sync)
     class(mma_t), intent(inout) :: this
+    integer, intent(in) :: direction
+    logical, intent(in) :: sync
 
-    call this%xold1%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%xold2%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%xmax%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%xmin%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call this%xold1%copy_from(direction, sync = .false.)
+    call this%xold2%copy_from(direction, sync = .false.)
+    call this%xmax%copy_from(direction, sync = .false.)
+    call this%xmin%copy_from(direction, sync = .false.)
 
-    call this%low%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%upp%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call this%low%copy_from(direction, sync = .false.)
+    call this%upp%copy_from(direction, sync = .false.)
 
-    call this%a%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%c%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%d%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%y%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%s%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call this%a%copy_from(direction, sync = .false.)
+    call this%c%copy_from(direction, sync = .false.)
+    call this%d%copy_from(direction, sync = .false.)
+    call this%y%copy_from(direction, sync = .false.)
+    call this%s%copy_from(direction, sync = .false.)
 
-    call this%p0j%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%q0j%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%pij%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%qij%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%bi%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call this%p0j%copy_from(direction, sync = .false.)
+    call this%q0j%copy_from(direction, sync = .false.)
+    call this%pij%copy_from(direction, sync = .false.)
+    call this%qij%copy_from(direction, sync = .false.)
+    call this%bi%copy_from(direction, sync = .false.)
 
-    call this%alpha%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%beta%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%lambda%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%mu%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%xsi%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call this%eta%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call this%alpha%copy_from(direction, sync = .false.)
+    call this%beta%copy_from(direction, sync = .false.)
+    call this%lambda%copy_from(direction, sync = .false.)
+    call this%mu%copy_from(direction, sync = .false.)
+    call this%xsi%copy_from(direction, sync = .false.)
+    call this%eta%copy_from(direction, sync = sync)
 
-  end subroutine mma_sync_host
+  end subroutine mma_copy_from
 end module mma

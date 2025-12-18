@@ -37,7 +37,7 @@ add_dependencies(Tests Unit)
 
 # Create a file list of the pFUnit test sources. These should be relative paths.
 set(PFUNIT_TEST_SOURCES
-    # Add the .pf unit test files here.
+    mma/io_hdf5.pf
 )
 
 # Add the more complex tests that require additional setup or dependencies.
@@ -81,13 +81,16 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Add the test to the CMake project.
     add_pfunit_ctest(${test_name}
         TEST_SOURCES ${pf_file}
-        LINK_LIBRARIES PkgConfig::neko MPI::MPI_Fortran neko-top-a
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 1
     )
+
     set_target_properties(${test_name} PROPERTIES
         FOLDER "Tests/Unit"
     )
     set_tests_properties(${test_name} PROPERTIES
         LABELS "unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/${test_name}.log"
     )
     add_dependencies(Unit ${test_name})
 endforeach()

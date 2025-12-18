@@ -148,8 +148,12 @@ endif()
 # ............................................................................ #
 # Setup PFUnit
 
-set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
+if (DEFINED ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING "Path to the Neko installation")
+else()
+    set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pfunit
+        CACHE STRING "Path to the pFUnit installation")
+endif()
 
 # ============================================================================ #
 # Setup compiler specific options
