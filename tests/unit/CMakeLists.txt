@@ -90,9 +90,11 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     )
 
     # Disable treating unused-variable as error for pfunit tests
-    target_compile_options(${test_name} PRIVATE
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-error=unused-variable>
-    )
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${test_name} PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-error=unused-variable>
+        )
+    endif()
 
     set_target_properties(${test_name} PROPERTIES
         FOLDER "Tests/Unit"
