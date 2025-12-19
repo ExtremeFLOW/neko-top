@@ -89,6 +89,11 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
         MAX_PES 1
     )
 
+    # Disable treating unused-variable as error for pfunit tests
+    target_compile_options(${test_name} PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-error=unused-variable>
+    )
+
     set_target_properties(${test_name} PROPERTIES
         FOLDER "Tests/Unit"
     )

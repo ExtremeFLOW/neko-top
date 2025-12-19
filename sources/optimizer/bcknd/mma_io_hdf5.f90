@@ -280,15 +280,13 @@ contains
   module subroutine mma_read_hdf5(this, filename)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
-    integer(hid_t) :: fapl_id, xf_id, file_id, dset_id, filespace, memspace, &
-         attr_id, grp_id, mma_grp_id, str_type
+    integer(hid_t) :: fapl_id, file_id, dset_id, &
+         attr_id, grp_id, str_type
     integer(hid_t) :: H5T_NEKO_REAL
-    integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: ierr, info, drank
-    integer(kind=8) :: local_n8, prefix8, total_n8
+    integer(hsize_t), dimension(1) :: ddim
+    integer :: ierr
     integer :: n, m, max_iter
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
-    character(len=:), allocatable :: group_name
 
     character(len=12) :: bcknd, subsolver
 
@@ -303,8 +301,6 @@ contains
 
     bcknd = ''
     subsolver = ''
-
-
 
     ! Open file and prepare reading
     call h5open_f(ierr)
@@ -404,6 +400,8 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
+    call h5gopen_f(file_id, 'MMA', grp_id, ierr)
+
     ! Read penalty parameters
     ddim(1) = 1
     call h5dopen_f(file_id, '/MMA/a0', dset_id, ierr)
@@ -455,6 +453,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Close the group and file
 
+    call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)

@@ -354,7 +354,7 @@ contains
     integer :: n, m, i, iter
     real(kind=rp), allocatable :: a(:), c(:), d(:), xmin(:), xmax(:)
     real(kind=rp) :: a0
-    integer :: max_iter, s_max_iter
+    integer :: max_iter
 
     character(len=:), allocatable :: bcknd, subsolver
     real(kind=rp), allocatable :: x_after(:)
