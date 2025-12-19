@@ -197,6 +197,8 @@ program checkpointing_test
      if (error) exit
   end do
 
+  call simulation_finalize(sim%neko_case)
+
   if (error) then
      if (pe_rank .eq. 0) then
         write(stderr, '(A,I0)') 'Inconsistency found at time step: ', i
