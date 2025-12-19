@@ -288,10 +288,31 @@ contains
     integer(kind=8) :: local_n8, prefix8, total_n8
     integer :: n, m, max_iter
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
-    character(len=256) :: bcknd, subsolver
+    character(len=:), allocatable :: group_name
 
-    ! Open file with MPIO access
+    character(len=12) :: bcknd, subsolver
+
+    ! Initialize reader values
+    n = -1
+    m = -1
+    max_iter = -1
+    asyinit = -1.0_rp
+    asyincr = -1.0_rp
+    asydecr = -1.0_rp
+    epsimin = -1.0_rp
+
+    bcknd = ''
+    subsolver = ''
+
+
+
+    ! Open file and prepare reading
     call h5open_f(ierr)
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, &
+         MPI_INFO_NULL%mpi_val, ierr)
+    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
+         access_prp = fapl_id)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -303,67 +324,52 @@ contains
        call neko_error('mma: unsupported real kind for HDF5')
     end select
 
-    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
-    info = MPI_INFO_NULL%mpi_val
-    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
-
-    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
-         access_prp = fapl_id)
-    call h5gopen_f(file_id, "MMA", mma_grp_id, ierr, gapl_id = h5p_default_f)
-
     ! ------------------------------------------------------------------------ !
     ! Read basic Parameters attributes
 
-    call h5gopen_f(mma_grp_id, "Parameters", grp_id, ierr, &
-         gapl_id = h5p_default_f)
+    call h5gopen_f(file_id, 'MMA/Parameters', grp_id, ierr)
 
-    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-    ddim = 1
-
-    ! Integer-valued attributes
-
-    call h5aopen_f(grp_id, 'n', attr_id, ierr, aapl_id = h5p_default_f)
+    ddim(1) = 1
+    call h5aopen_f(grp_id, 'n', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'm', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'm', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, m, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'max_iter', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'max_iter', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, max_iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    ! Real-valued attributes
-    call h5aopen_f(grp_id, 'asyinit', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'asyinit', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, asyinit, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'asyincr', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'asyincr', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, asyincr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'asydecr', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'asydecr', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, asydecr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'epsimin', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'epsimin', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, epsimin, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    ! String-valued attributes
-    call h5aopen_f(grp_id, 'bcknd', attr_id, ierr, aapl_id = h5p_default_f)
+    ! Read strings
+    call h5aopen_f(grp_id, 'bcknd', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, bcknd, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_f(grp_id, 'subsolver', attr_id, ierr, aapl_id = h5p_default_f)
+    call h5aopen_f(grp_id, 'subsolver', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, subsolver, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     call h5tclose_f(str_type, ierr)
-    call h5sclose_f(filespace, ierr)
     call h5gclose_f(grp_id, ierr)
 
     ! Ensure the MMA object is allocated with the same configuration as the file
@@ -398,110 +404,57 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
+    ! Read penalty parameters
     ddim(1) = 1
-    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-
-    call h5dcreate_f(mma_grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dopen_f(file_id, '/MMA/a0', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! The next batch are vectors of size m
-    ddim(1) = this%m
-    drank = 1
-
-    call h5screate_simple_f(drank, ddim, filespace, ierr)
-
-    call h5dcreate_f(mma_grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    ddim(1) = m
+    call h5dopen_f(file_id, '/MMA/a', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%a%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dopen_f(file_id, '/MMA/c', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%c%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dopen_f(file_id, '/MMA/d', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%d%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Close the filespace and group
-    call h5sclose_f(filespace, ierr)
-
     ! ------------------------------------------------------------------------ !
-    ! Write per-rank datasets
+    ! Read per-rank datasets
 
-    ! Define the sizes and offsets
-    local_n8 = int(this%n, 8)
-    total_n8 = int(this%n_global, 8)
-    call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+    ddim(1) = this%n
 
-    drank = 1
-    dcount(1) = local_n8
-    doffset(1) = prefix8 - local_n8
-    ddim(1) = total_n8
-
-    ! Create a file and memory space
-    call h5screate_simple_f(drank, ddim, filespace, ierr)
-    call h5screate_simple_f(drank, dcount, memspace, ierr)
-
-    ! Dataset transfer property list: collective
-    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
-    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
-
-    ! Select hyperslab in the file space
-    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
-         ierr)
-
-    ! Write xmin
-    call h5dcreate_f(mma_grp_id, 'xmin', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmin%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/xmin', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmin%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Write xmax
-    call h5dcreate_f(mma_grp_id, 'xmax', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmax%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/xmax', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmax%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Write xold1
-    call h5dcreate_f(mma_grp_id, 'xold1', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Write xold2
-    call h5dcreate_f(mma_grp_id, 'xold2', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold2%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold2%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Write low
-    call h5dcreate_f(mma_grp_id, 'low', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%low%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/low', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%low%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Write upp
-    call h5dcreate_f(mma_grp_id, 'upp', H5T_NEKO_REAL, &
-         filespace, dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%upp%x(1), ddim, ierr, &
-         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dopen_f(file_id, '/MMA/upp', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%upp%x(1), ddim, ierr)
     call h5dclose_f(dset_id, ierr)
-
-    ! Close the spaces used
-    call h5sclose_f(filespace, ierr)
-    call h5sclose_f(memspace, ierr)
-    call h5pclose_f(xf_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Close the group and file
 
-    call h5gclose_f(mma_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)

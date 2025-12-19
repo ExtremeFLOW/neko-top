@@ -4,14 +4,16 @@ module io_hdf5
   use hdf5
   use mma, only: mma_t
   use vector, only: vector_t
+  use matrix, only: matrix_t
   use num_types, only: rp, sp, dp
   use neko, only: neko_init
   use comm, only: pe_rank
-  use device, only: device_finalize, HOST_TO_DEVICE
+  use device, only: device_finalize, HOST_TO_DEVICE, DEVICE_TO_HOST
   use neko_mpi_types, only: neko_mpi_types_free
   use logger, only: neko_log
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
+
 
   implicit none
 
@@ -41,6 +43,9 @@ contains
     call device_finalize
     call neko_mpi_types_free
   end subroutine tearDown
+
+  ! ========================================================================== !
+  ! Test writing the MMA object to HDF5 file.
 
   @test(npes=[1])
   subroutine write_hdf5(this)
@@ -216,12 +221,12 @@ contains
     call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold1%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
-    call read_xold1%copy_from(HOST_TO_DEVICE, sync = .true.)
 
     call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold2%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
-    call read_xold2%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+
 
     ! Close file and property list
     call h5fclose_f(file_id, ierr)
@@ -240,8 +245,8 @@ contains
     @assertEqual(asydecr, read_asydecr)
     @assertEqual(epsimin, read_epsimin)
 
-    @assertEqual(bcknd, read_bcknd)
-    @assertEqual(subsolver, read_subsolver)
+    @assertEqual(trim(bcknd), trim(read_bcknd))
+    @assertEqual(trim(subsolver), trim(read_subsolver))
 
     @assertEqual(a0, read_a0)
     do i = 1, m
@@ -250,6 +255,9 @@ contains
        @assertEqual(d(i), read_d(i))
     end do
 
+    call read_xold1%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call read_xold2%copy_from(HOST_TO_DEVICE, sync = .true.)
+
     do i = 1, n
        @assertEqual(x%x(i), read_xold1%x(i))
        @assertEqual(x%x(i), read_xold2%x(i))
@@ -257,7 +265,6 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Clean up
-
     call x%free()
     call read_xold1%free()
     call read_xold2%free()
@@ -265,5 +272,163 @@ contains
     deallocate(a, c, d, xmin, xmax)
 
   end subroutine write_hdf5
+
+  ! ========================================================================== !
+  ! Test the MMA object restart functionality.
+
+  ! The test should initialize a MMA object. Perform 5 iterations, write the
+  ! hdf5 file and do another 5 iterations. Then restart from the hdf5 file and
+  ! perform 5 iterations again. The results of each iteration should be the
+  ! same.
+  !
+  ! A good test function would be the following Rosenbrock function:
+  ! min  f(x) = sum_{i=1}^n-1 [100 (x_{i+1} - x_i^2)^2 + (1 - x_i)^2]
+  ! s.t. g_1(x) = + n   - sum_{i=1}^n x_i^2 <= 0
+  ! s.t. g_2(x) = - 0.1 - sum_{i=1}^n x_i^2 <= 0
+  !      -1.5 <= x_i <= 1.5
+
+  subroutine rosenbrock(x, f, df)
+    type(vector_t), intent(inout) :: x
+    real(kind=rp) :: f
+    type(vector_t), intent(inout), optional :: df
+    integer :: i
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    ! Compute function value
+    f = 0.0_rp
+    do i = 1, x%size() - 1
+       f = f + 100.0_rp * (x%x(i + 1) - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
+    end do
+
+    ! Compute gradient if requested
+    if (present(df)) then
+       do i = 1, x%size()
+          if (i .eq. 1) then
+             df%x(i) = -400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          else if (i .eq. x%size()) then
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2)
+          else
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2) - &
+                  400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          end if
+       end do
+
+       call df%copy_from(HOST_TO_DEVICE, sync = .true.)
+    end if
+  end subroutine rosenbrock
+
+  subroutine constraint(x, g, dg)
+    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(inout) :: g
+    type(matrix_t), intent(inout), optional :: dg
+    integer :: i
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    g%x(1) = - real(x%size(), kind=rp) - sum(x%x**2)
+    g%x(2) = 0.1_rp - sum(x%x**2)
+    if (present(dg)) then
+       do i = 1, x%size()
+          dg%x(1, i) = - 2.0_rp * x%x(i)
+          dg%x(2, i) = - 2.0_rp * x%x(i)
+       end do
+       call dg%copy_from(HOST_TO_DEVICE, sync = .false.)
+    end if
+    call g%copy_from(HOST_TO_DEVICE, sync = .true.)
+  end subroutine constraint
+
+  @test(npes=[1])
+  subroutine restart_mma(this)
+    class(test_io_hdf5_case), intent(inout) :: this
+
+    type(vector_t) :: x, x_init, x_50
+
+    real(kind=rp) :: f
+    type(vector_t) :: df, g
+    type(matrix_t) :: dg
+
+    type(mma_t) :: optimizer
+    integer :: n, m, i, iter
+    real(kind=rp), allocatable :: a(:), c(:), d(:), xmin(:), xmax(:)
+    real(kind=rp) :: a0
+    integer :: max_iter, s_max_iter
+
+    character(len=:), allocatable :: bcknd, subsolver
+    real(kind=rp), allocatable :: x_after(:)
+
+    n = 2
+    m = 2
+
+    call x_init%init(n)
+    x_init%x = [0.9_rp, 1.0_rp]
+    call x_init%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    allocate(a(m), c(m), d(m), xmin(n), xmax(n))
+    a0 = 2.0_rp
+    a = 0.0_rp
+    c = 1000.0_rp
+    d = 10.0_rp
+
+    xmin = -1.5_rp
+    xmax = 1.5_rp
+
+    max_iter = 10000
+
+    bcknd = 'cpu'
+    subsolver = 'dip'
+
+    call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = subsolver)
+
+    f = 0.0_rp
+    x = x_init
+    call df%init(n)
+    call g%init(m)
+    call dg%init(m, n)
+
+    ! Run the optimization and save at iteration 5
+    do iter = 1, max_iter
+       call rosenbrock(x, f, df)
+       call constraint(x, g, dg)
+       call optimizer%update(iter, x, df, g, dg)
+
+       if (iter .eq. max_iter / 2) then
+          call optimizer%write_hdf5('mma_restart_test.h5')
+          x_50 = x
+       end if
+    end do
+
+    ! Store result after solving
+    allocate(x_after(n))
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+    x_after = x%x
+
+    call optimizer%free()
+
+    ! Now restart from HDF5 file
+    call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = subsolver)
+    call optimizer%read('mma_restart_test.h5')
+
+    x = x_50
+
+    ! Perform 5 iterations again
+    do iter = max_iter / 2 + 1, max_iter
+       call rosenbrock(x, f, df)
+       call constraint(x, g, dg)
+       call optimizer%update(iter, x, df, g, dg)
+    end do
+
+    ! Check that the result matches the one after 10 iterations
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    do i = 1, n
+       @assertEqual(x%x(i), x_after(i), 1.0e-16_rp)
+    end do
+
+  end subroutine restart_mma
 
 end module io_hdf5

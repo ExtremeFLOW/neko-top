@@ -47,7 +47,7 @@ set(PFUNIT_TEST_SOURCES
 
 )
 
-if (HDF5_FOUND)
+if (hdf5_FOUND)
     list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
 endif()
 
