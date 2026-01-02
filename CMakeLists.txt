@@ -130,10 +130,10 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 # HDF5 Support
 
 if (DEFINED ENV{HDF5_DIR})
-    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING "Path to the Neko installation")
+    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING "Path to the HDF5 installation")
 else()
     set(HDF5_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5
-        CACHE STRING "Path to the Neko installation")
+        CACHE STRING "Path to the HDF5 installation")
 endif()
 
 set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
@@ -147,7 +147,7 @@ endif()
 # Setup PFUnit
 
 if (DEFINED ENV{PFUNIT_DIR})
-    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING "Path to the Neko installation")
+    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING "Path to the pFUnit installation")
 else()
     set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pfunit
         CACHE STRING "Path to the pFUnit installation")
