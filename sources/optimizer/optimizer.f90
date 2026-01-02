@@ -191,7 +191,7 @@ contains
   !! @param this The optimizer object.
   !! @param max_iterations The maximum number of iterations.
   !! @param tolerance The tolerance for the optimization loop.
-  !! @param[optional] max_runtime The maximum runtime in seconds.
+  !! @param max_runtime The maximum runtime in seconds.
   subroutine optimizer_init_base(this, max_iterations, tolerance, max_runtime)
     class(optimizer_t), intent(inout) :: this
     integer, intent(in) :: max_iterations
@@ -304,6 +304,7 @@ contains
   !!
   !! @param this The optimizer object.
   !! @param stop_flag The stopping flag.
+  !! @param iter The number of iterations performed.
   subroutine optimizer_print_status(this, stop_flag, iter)
     class(optimizer_t), intent(in) :: this
     integer, intent(in) :: stop_flag
