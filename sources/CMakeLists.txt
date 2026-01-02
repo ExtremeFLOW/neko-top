@@ -38,6 +38,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
 
 target_sources(neko-top
     PRIVATE
@@ -54,23 +55,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/designs/set_optimization_ic.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
-
-        # Problem setup
-        # Components for the objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
-
-        # List of specific problems, objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/augmented_lagrangian_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/dummy_constraint.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
