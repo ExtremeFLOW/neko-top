@@ -108,8 +108,8 @@ target_link_libraries(neko-top PUBLIC
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
-    $<$<BOOL:${HIPBLAS_FOUND}>:roc::hipblas>
-    $<$<BOOL:${HIPSOLVER_FOUND}>:roc::hipsolver>
+    $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
+    $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
     $<$<BOOL:${HDF5_FOUND}>:PkgConfig::hdf5>
 )
 
