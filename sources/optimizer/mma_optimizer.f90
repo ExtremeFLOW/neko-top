@@ -117,7 +117,7 @@ contains
     type(json_file) :: solver_parameters
     logical :: enable_output
     integer :: max_iterations
-    real(kind=rp) :: tolerance
+    real(kind=rp) :: tolerance, max_runtime
 
     ! Read the solver properties from the JSON file
     call json_get(parameters, 'optimization.solver', solver_parameters)
@@ -127,15 +127,18 @@ contains
          tolerance, 1.0e-3_rp)
     call json_get_or_default(solver_parameters, 'enable_output', &
          enable_output, .true.)
+    call json_get_or_default(solver_parameters, 'max_runtime', &
+         max_runtime, -1.0_rp)
 
     call this%init_from_components(problem, design, max_iterations, tolerance, &
-         enable_output, solver_parameters, simulation)
+         enable_output, solver_parameters, simulation, max_runtime)
 
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       max_iterations, tolerance, enable_output, solver_parameters, simulation)
+       max_iterations, tolerance, enable_output, &
+       solver_parameters, simulation, max_runtime)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
@@ -144,6 +147,7 @@ contains
     logical, intent(in) :: enable_output
     type(json_file), intent(inout), optional :: solver_parameters
     type(simulation_t), intent(in), optional :: simulation
+    real(kind=rp), intent(in), optional :: max_runtime
 
     ! Local variables
     type(vector_t), pointer :: x
@@ -193,7 +197,7 @@ contains
        call this%csv_log%set_header(trim(header))
     end if
 
-    call this%init_base(max_iterations, tolerance)
+    call this%init_base(max_iterations, tolerance, max_runtime)
 
     call neko_log%end_section()
 
