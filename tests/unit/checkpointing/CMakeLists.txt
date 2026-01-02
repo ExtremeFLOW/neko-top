@@ -83,4 +83,5 @@ add_test(NAME checkpointing_test
 set_tests_properties(checkpointing_test PROPERTIES
     ENVIRONMENT "NEKO_LOG_FILE=neko.log"
     LABELS "unit;checkpointing"
+    TIMEOUT 300
 )
