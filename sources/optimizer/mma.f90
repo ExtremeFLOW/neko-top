@@ -65,34 +65,36 @@
 ! using interior point method.                                              !
 !===========================================================================!
 
+!> MMA module
 module mma
   ! Inclusions from Neko
-  use num_types, only: rp
+  use num_types, only: rp, dp, sp
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD
-  use comm, only: pe_rank
+  use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use utils, only: neko_error
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
+  use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
 
   implicit none
   private
 
+  !> MMA type
   type, public :: mma_t
      private
-     integer :: n, m, max_iter
-     real(kind=rp) :: a0, f0val, asyinit, asyincr, asydecr, epsimin, &
+     integer :: n, m, n_global, max_iter
+     real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     character(len=:), allocatable :: bcknd, subsolver
+     character(len=:), allocatable :: subsolver, bcknd
 
      ! Internal dummy variables for MMA
      type(vector_t) :: p0j, q0j
@@ -118,24 +120,31 @@ module mma
      procedure, public, pass(this) :: get_backend_and_subsolver => &
           mma_get_backend_and_subsolver
 
-
      generic, public :: update => update_vector, update_cpu, update_device
      procedure, pass(this) :: update_vector => mma_update_vector
      procedure, pass(this) :: update_cpu => mma_update_cpu
      procedure, pass(this) :: update_device => mma_update_device
 
-     generic, public :: KKT => KKT_vector, KKT_cpu, KKT_device
+     generic, public :: kkt => KKT_vector, KKT_cpu, KKT_device
      procedure, pass(this) :: KKT_vector => mma_KKT_vector
      procedure, pass(this) :: KKT_cpu => mma_KKT_cpu
      procedure, pass(this) :: KKT_device => mma_KKT_device
 
+     generic :: write => write_hdf5
+     procedure, pass(this) :: write_hdf5 => mma_write_hdf5
+
+     generic :: read => read_hdf5
+     procedure, pass(this) :: read_hdf5 => mma_read_hdf5
+
+     ! Private utilities
+     procedure, pass(this) :: copy_from => mma_copy_from
   end type mma_t
 
-  interface
-     ! ======================================================================= !
-     ! interface for cpu backend module subroutines
+  ! ========================================================================== !
+  ! interface for cpu backend module subroutines
 
-     !> CPU update function, runs one iteration of MMA
+  interface
+     ! CPU update function, runs one iteration of MMA
      module subroutine mma_update_cpu(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -145,7 +154,7 @@ module mma
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_update_cpu
 
-     !> CPU KKT check for convergence
+     ! CPU KKT check for convergence
      module subroutine mma_KKT_cpu(this, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        real(kind=rp), dimension(this%n), intent(in) :: x
@@ -154,10 +163,10 @@ module mma
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
-     ! ======================================================================= !
+     ! ========================================================================== !
      ! interface for device backend module subroutines
 
-     !> Device update function, runs one iteration of MMA
+     ! Device update function, runs one iteration of MMA
      module subroutine mma_update_device(this, iter, x, df0dx, fval, dfdx)
        class(mma_t), intent(inout) :: this
        integer, intent(in) :: iter
@@ -171,6 +180,18 @@ module mma
        type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
      end subroutine mma_KKT_device
 
+     ! ======================================================================= !
+     ! Interface for IO routines
+
+     module subroutine mma_write_hdf5(this, filename)
+       class(mma_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+     end subroutine mma_write_hdf5
+
+     module subroutine mma_read_hdf5(this, filename)
+       class(mma_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+     end subroutine mma_read_hdf5
   end interface
 
 contains
@@ -215,7 +236,7 @@ contains
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
 
     call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, &
-         MPI_SUM, MPI_COMM_WORLD, ierr)
+         MPI_SUM, NEKO_COMM, ierr)
 
     ! Assign default values for the backend based on the NEKO_BCKND_DEVICE
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -328,7 +349,7 @@ contains
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
     character(len=:), intent(in), allocatable :: bcknd, subsolver
     character(len=256) :: log_msg
-    integer :: i
+    integer :: i, ierr
 
     call this%free()
 
@@ -376,18 +397,12 @@ contains
     this%xmin%x = xmin
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%a%x, this%a%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%c%x, this%c%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%d%x, this%d%x_d, m, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmax%x, this%xmax%x_d, n, HOST_TO_DEVICE, &
-            sync = .false.)
-       call device_memcpy(this%xmin%x, this%xmin%x_d, n, HOST_TO_DEVICE, &
-            sync = .true.)
+       call this%a%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%c%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%d%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%xmax%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call this%xmin%copy_from(HOST_TO_DEVICE, sync = .true.)
     end if
-
 
     ! Set KKT norms to a large number for the initial design
     this%residumax = huge(0.0_rp)
@@ -397,8 +412,8 @@ contains
     ! Assign defaults if nothing is parsed
 
     ! Based on the Cpp Code by Niels
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
     if (.not. present(max_iter)) this%max_iter = 100
+    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
@@ -413,6 +428,10 @@ contains
     if (present(asydecr)) this%asydecr = asydecr
     this%bcknd = bcknd
     this%subsolver = subsolver
+
+    ! Sync parameters across MPI
+    call MPI_Allreduce(this%n, this%n_global, 1, &
+         MPI_INTEGER, MPI_SUM, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 
@@ -579,4 +598,42 @@ contains
     backend_subsolver = 'backend:' // trim(backend) // ', subsolver:' // &
          trim(this%subsolver)
   end function mma_get_backend_and_subsolver
+
+  ! ========================================================================== !
+  ! Private utilities
+
+  !> Sync device memory to host for all internal vectors/matrices
+  subroutine mma_copy_from(this, direction, sync)
+    class(mma_t), intent(inout) :: this
+    integer, intent(in) :: direction
+    logical, intent(in) :: sync
+
+    call this%xold1%copy_from(direction, sync = .false.)
+    call this%xold2%copy_from(direction, sync = .false.)
+    call this%xmax%copy_from(direction, sync = .false.)
+    call this%xmin%copy_from(direction, sync = .false.)
+
+    call this%low%copy_from(direction, sync = .false.)
+    call this%upp%copy_from(direction, sync = .false.)
+
+    call this%a%copy_from(direction, sync = .false.)
+    call this%c%copy_from(direction, sync = .false.)
+    call this%d%copy_from(direction, sync = .false.)
+    call this%y%copy_from(direction, sync = .false.)
+    call this%s%copy_from(direction, sync = .false.)
+
+    call this%p0j%copy_from(direction, sync = .false.)
+    call this%q0j%copy_from(direction, sync = .false.)
+    call this%pij%copy_from(direction, sync = .false.)
+    call this%qij%copy_from(direction, sync = .false.)
+    call this%bi%copy_from(direction, sync = .false.)
+
+    call this%alpha%copy_from(direction, sync = .false.)
+    call this%beta%copy_from(direction, sync = .false.)
+    call this%lambda%copy_from(direction, sync = .false.)
+    call this%mu%copy_from(direction, sync = .false.)
+    call this%xsi%copy_from(direction, sync = .false.)
+    call this%eta%copy_from(direction, sync = sync)
+
+  end subroutine mma_copy_from
 end module mma
