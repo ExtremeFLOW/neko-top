@@ -39,6 +39,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
 
 target_sources(neko-top
     PRIVATE
@@ -59,16 +60,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/mma_io_hdf5.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/mma_device.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/device_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma.cu
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip/mma.hip
 )
 
 # ============================================================================ #
