@@ -502,9 +502,10 @@ contains
 
 #else
 
-  module subroutine mma_write_hdf5(this, filename)
+  module subroutine mma_write_hdf5(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
     call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
   end subroutine mma_write_hdf5
 
