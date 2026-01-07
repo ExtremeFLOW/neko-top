@@ -1,15 +1,14 @@
-# Extensions to the neko library.
+# CMakeLists.txt for simulation components in Neko-TOP
 #
-# This is a place new functions can be added which are intended to be moved over
-# to neko proper at some point. We should make sure the code structure is
-# similar to the neko library so that it is easy to move over.
-#
-# The functions in this file are not guaranteed to be stable. They may be
-# removed or changed at any time.
+# Extend the neko-top library with the simulation component implementations.
+# Each simulation component is implemented in its own Fortran source file, while
+# the neko_top_simcomps.f90 file aggregates them and extends the Neko simulation
+# component system to include these new simulation components.
 
-# Add the neko-ext library which collects all the extensions.
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top_simcomps.f90
+
+        # Individual simulation components
         ${CMAKE_CURRENT_SOURCE_DIR}/steady_simcomp.f90
 )

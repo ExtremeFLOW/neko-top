@@ -1,6 +1,6 @@
 !> @file neko_top_simcomps.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -34,11 +34,11 @@
 
 !> Neko-TOP Simulation component register.
 submodule(neko_top) neko_top_simcomps
-  use simulation_component, only: simulation_component_t, &
-       simulation_component_allocate, register_simulation_component
+  use simulation_component, only: simulation_component_allocate, &
+       register_simulation_component
 
   ! Our user-defined simulation components
-  use steady_simcomp, only: steady_simcomp_t
+  use steady_simcomp, only: steady_simcomp_allocate
 
 contains
 
@@ -49,17 +49,8 @@ contains
     ! Assign the pointers
     steady => steady_simcomp_allocate
 
-    ! Register the simulation components
+    ! Register the simulation components allocators
     call register_simulation_component('steady', steady)
   end subroutine register_simcomps
-
-  ! ========================================================================== !
-  ! Definitions of the simulation component allocators
-
-  !> Allocator for the steady simulation component.
-  subroutine steady_simcomp_allocate(obj)
-    class(simulation_component_t), allocatable, intent(inout) :: obj
-    allocate(steady_simcomp_t::obj)
-  end subroutine steady_simcomp_allocate
 
 end submodule neko_top_simcomps

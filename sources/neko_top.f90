@@ -1,6 +1,6 @@
 !> @file neko_top.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -32,28 +32,37 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 
+!> @brief Neko-TOP module.
+!! @details
+!! This module contain the registration routines for Neko-TOP specific
+!! types such as simulation components and source terms.
+!!
+!! This will extend Neko with the custom types defined in Neko-TOP.
 module neko_top
 
   !> Registration of custom simulation components used in topology optimization.
-  interface
+  interface register_simcomps
      module subroutine register_simcomps()
      end subroutine register_simcomps
-  end interface
+  end interface register_simcomps
 
   !> Registration of custom source terms used in topology optimization.
-  interface
+  interface register_source_terms
      module subroutine register_source_terms()
      end subroutine register_source_terms
-  end interface
+  end interface register_source_terms
 
 contains
 
-  !> @brief Add all known types to the neko registries
-  !! @details This subroutine adds all known types to the neko registries. It
-  !! is called at the beginning of all our drivers.
+  !> @brief Add all known types to the Neko registries.
+  !! @details
+  !! This subroutine adds all known type extensions to the Neko
+  !! registries. It is called at the beginning of all our drivers.
   subroutine neko_top_register_types()
+
     call register_simcomps()
     call register_source_terms()
+
   end subroutine neko_top_register_types
 
 end module neko_top

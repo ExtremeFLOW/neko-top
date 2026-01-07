@@ -1,6 +1,6 @@
 !> @file neko_top_source_terms.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -34,22 +34,21 @@
 
 !> Neko-TOP Source term register.
 submodule(neko_top) neko_top_source_terms
-  use source_term, only: source_term_t, source_term_allocate, &
-       register_source_term
+  use source_term, only: source_term_allocate, register_source_term
 
   ! Our user-defined source terms
-  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+  use adjoint_lube_source_term, only: adjoint_lube_source_term_allocate
   use adjoint_minimum_dissipation_source_term, only: &
-       adjoint_minimum_dissipation_source_term_t
+       adjoint_minimum_dissipation_source_term_allocate
   use adjoint_mixing_scalar_source_term, only: &
-       adjoint_mixing_scalar_source_term_t
+       adjoint_mixing_scalar_source_term_allocate
   use adjoint_scalar_convection_source_term, only: &
-       adjoint_scalar_convection_source_term_t
-  use simple_brinkman_source_term, only: simple_brinkman_source_term_t
+       adjoint_scalar_convection_source_term_allocate
+  use simple_brinkman_source_term, only: simple_brinkman_source_term_allocate
 
 contains
 
-  !> @brief Register the known source terms from Neko-TOP.
+  !> @brief Register the known source terms from Neko-TOP in the Neko system.
   module subroutine register_source_terms()
     procedure(source_term_allocate), pointer :: adjoint_lube
     procedure(source_term_allocate), pointer :: adjoint_minimum_dissipation
@@ -58,61 +57,21 @@ contains
     procedure(source_term_allocate), pointer :: simple_brinkman
 
     ! Assign the pointers
-    adjoint_lube => &
-         adjoint_lube_source_term_allocate
+    adjoint_lube => adjoint_lube_source_term_allocate
     adjoint_minimum_dissipation => &
          adjoint_minimum_dissipation_source_term_allocate
-    adjoint_mixing_scalar => &
-         adjoint_mixing_scalar_source_term_allocate
-    adjoint_scalar_convection => &
-         adjoint_scalar_convection_source_term_allocate
-    simple_brinkman => &
-         simple_brinkman_source_term_allocate
+    adjoint_mixing_scalar => adjoint_mixing_scalar_source_term_allocate
+    adjoint_scalar_convection => adjoint_scalar_convection_source_term_allocate
+    simple_brinkman => simple_brinkman_source_term_allocate
 
     ! Register the source terms
-    call register_source_term('adjoint_lube', &
-         adjoint_lube)
+    call register_source_term('adjoint_lube', adjoint_lube)
     call register_source_term('adjoint_minimum_dissipation', &
          adjoint_minimum_dissipation)
-    call register_source_term('adjoint_mixing_scalar', &
-         adjoint_mixing_scalar)
+    call register_source_term('adjoint_mixing_scalar', adjoint_mixing_scalar)
     call register_source_term('adjoint_scalar_convection', &
          adjoint_scalar_convection)
-    call register_source_term('simple_brinkman', &
-         simple_brinkman)
+    call register_source_term('simple_brinkman', simple_brinkman)
   end subroutine register_source_terms
-
-  ! ========================================================================== !
-  ! Definitions of the source term allocators
-
-  !> Allocator for the adjoint lube source term.
-  subroutine adjoint_lube_source_term_allocate(obj)
-    class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_lube_source_term_t::obj)
-  end subroutine adjoint_lube_source_term_allocate
-
-  !> Allocator for the adjoint minimum dissipation source term.
-  subroutine adjoint_minimum_dissipation_source_term_allocate(obj)
-    class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_minimum_dissipation_source_term_t::obj)
-  end subroutine adjoint_minimum_dissipation_source_term_allocate
-
-  !> Allocator for the adjoint mixing scalar source term.
-  subroutine adjoint_mixing_scalar_source_term_allocate(obj)
-    class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_mixing_scalar_source_term_t::obj)
-  end subroutine adjoint_mixing_scalar_source_term_allocate
-
-  !> Allocator for the adjoint scalar convection source term.
-  subroutine adjoint_scalar_convection_source_term_allocate(obj)
-    class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_scalar_convection_source_term_t::obj)
-  end subroutine adjoint_scalar_convection_source_term_allocate
-
-  !> Allocator for the simple brinkman source term.
-  subroutine simple_brinkman_source_term_allocate(obj)
-    class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(simple_brinkman_source_term_t::obj)
-  end subroutine simple_brinkman_source_term_allocate
 
 end submodule neko_top_source_terms
