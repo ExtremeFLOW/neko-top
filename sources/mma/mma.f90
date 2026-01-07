@@ -1,6 +1,6 @@
 !> @file mma.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -183,9 +183,10 @@ module mma
      ! ======================================================================= !
      ! Interface for IO routines
 
-     module subroutine mma_write_hdf5(this, filename)
+     module subroutine mma_write_hdf5(this, filename, overwrite)
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
+       logical, intent(in), optional :: overwrite
      end subroutine mma_write_hdf5
 
      module subroutine mma_read_hdf5(this, filename)
