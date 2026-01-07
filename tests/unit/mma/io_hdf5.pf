@@ -63,6 +63,8 @@ contains
     character(len=:), allocatable :: bcknd, subsolver
 
     character(len=256) :: fname
+    logical :: file_exists
+    integer :: file_unit
     integer(hid_t) :: H5T_NEKO_REAL, str_type
     integer(hid_t) :: plist_id, file_id, attr_id, dset_id
     integer(hsize_t), dimension(1) :: ddim
@@ -110,7 +112,14 @@ contains
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
     fname = 'mma_test.h5'
-    call obj%write_hdf5(fname)
+    ! Delete the file if it exists
+    inquire(file=fname, exist=file_exists)
+    if (file_exists) then
+       ! Delete the file
+       open(newunit=file_unit, file=fname, status='old', action='write')
+       close(file_unit, status='delete')
+    end if
+    call obj%write_hdf5(fname, overwrite = .true.)
 
     ! ------------------------------------------------------------------------ !
     ! Read back the data
@@ -356,7 +365,10 @@ contains
     real(kind=rp) :: a0
     integer :: max_iter
 
-    character(len=:), allocatable :: bcknd, subsolver
+    character(len=:), allocatable :: bcknd, subsolver, fname
+    logical :: file_exists
+    integer :: file_unit
+
     real(kind=rp), allocatable :: x_after(:)
 
     n = 2
@@ -383,6 +395,18 @@ contains
     call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
          bcknd = bcknd, subsolver = subsolver)
 
+    fname = 'mma_restart_test.h5'
+    ! Delete the file if it exists
+    inquire(file=fname, exist=file_exists)
+    if (file_exists) then
+       ! Delete the file
+       open(newunit=file_unit, file=fname, status='old', action='write')
+       close(file_unit, status='delete')
+    end if
+
+    ! Write the initial state, this will help us test the overwrite option
+    call optimizer%write_hdf5(fname)
+
     f = 0.0_rp
     x = x_init
     call df%init(n)
@@ -396,7 +420,7 @@ contains
        call optimizer%update(iter, x, df, g, dg)
 
        if (iter .eq. max_iter / 2) then
-          call optimizer%write_hdf5('mma_restart_test.h5')
+          call optimizer%write_hdf5(fname, overwrite = .true.)
           x_50 = x
        end if
     end do
@@ -411,7 +435,7 @@ contains
     ! Now restart from HDF5 file
     call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
          bcknd = bcknd, subsolver = subsolver)
-    call optimizer%read('mma_restart_test.h5')
+    call optimizer%read(fname)
 
     x = x_50
 

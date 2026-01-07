@@ -1,6 +1,6 @@
 !> @file mma.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -48,16 +48,20 @@ contains
   !! vectors and matrices, then perform the write. Currently the low-level
   !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
   !! available at link time a runtime error will be raised.
-  module subroutine mma_write_hdf5(this, filename)
+  module subroutine mma_write_hdf5(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
     integer(hid_t) :: fapl_id, xf_id, file_id, dset_id, filespace, memspace, &
          attr_id, grp_id, mma_grp_id, str_type
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
     integer(kind=8) :: local_n8, prefix8, total_n8
+    logical :: file_exists, mma_exists, overwrite_flag
 
+    overwrite_flag = .false.
+    if (present(overwrite)) overwrite_flag = overwrite
 
     ! Ensure device state is on host
     call this%copy_from(DEVICE_TO_HOST, sync = .true.)
@@ -74,13 +78,46 @@ contains
        call neko_error('mma: unsupported real kind for HDF5')
     end select
 
-    ! Create file with MPIO access
+    ! Prepare the HDF5 settings for MPIO access
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
 
-    call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
-         access_prp = fapl_id)
+    ! Handle overwriting if the file exists
+    file_exists = .false.
+    inquire(file=trim(filename), exist=file_exists)
+    if (file_exists) then
+
+       ! Check for existing MMA group
+       mma_exists = .false.
+       call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
+            access_prp = fapl_id)
+       call h5lexists_f(file_id, "MMA", mma_exists, ierr)
+
+       call h5fclose_f(file_id, ierr)
+
+       if (mma_exists .and. overwrite_flag) then
+
+          call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
+               access_prp = fapl_id)
+          call h5gunlink_f(file_id, "MMA", ierr)
+          call h5fclose_f(file_id, ierr)
+
+       else if (mma_exists .and. .not. overwrite_flag) then
+          call neko_error('mma: HDF5 file "' // trim(filename) // &
+               '" already contains MMA group; use overwrite option to replace')
+       end if
+    end if
+
+    ! Open or create the file
+    if (file_exists) then
+       call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
+            access_prp = fapl_id)
+    else
+       call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
+            access_prp = fapl_id)
+    end if
+
     call h5gcreate_f(file_id, "MMA", mma_grp_id, ierr, &
          lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
          gapl_id = h5p_default_f)
@@ -465,9 +502,10 @@ contains
 
 #else
 
-  module subroutine mma_write_hdf5(this, filename)
+  module subroutine mma_write_hdf5(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
     call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
   end subroutine mma_write_hdf5
 
