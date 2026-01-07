@@ -29,14 +29,20 @@ on:
   pull_request:
     branches:
       - develop
-      - sensitivity
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
   merge_group:
-    types: [checks_requested]
+    types:
+      - checks_requested
+
+  # This allow us to cache parts which can be used by PR checks
+  push:
+    branches:
+      - develop
+      - main
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other
