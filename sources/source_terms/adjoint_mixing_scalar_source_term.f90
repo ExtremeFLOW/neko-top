@@ -1,6 +1,6 @@
 !> @file adjoint_mixing_scalar_source_term.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -50,6 +50,7 @@ module adjoint_mixing_scalar_source_term
   use point_zone, only: point_zone_t
   implicit none
   private
+  public :: adjoint_mixing_scalar_source_term_allocate
 
   ! this will be the adjoint forcing from Casper's objective function
   ! TODO
@@ -88,6 +89,12 @@ module adjoint_mixing_scalar_source_term
   end type adjoint_mixing_scalar_source_term_t
 
 contains
+  !> Allocator for the adjoint mixing scalar source term.
+  subroutine adjoint_mixing_scalar_source_term_allocate(obj)
+    class(source_term_t), allocatable, intent(inout) :: obj
+    allocate(adjoint_mixing_scalar_source_term_t::obj)
+  end subroutine adjoint_mixing_scalar_source_term_allocate
+
   !> The common constructor using a JSON object.
   !! @param this The object.
   !! @param json The JSON object for the source.

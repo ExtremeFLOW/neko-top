@@ -1,6 +1,6 @@
 !> @file adjoint_minimum_dissipation_source_term.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -67,6 +67,7 @@ module adjoint_minimum_dissipation_source_term
 
   implicit none
   private
+  public :: adjoint_minimum_dissipation_source_term_allocate
 
   !> An adjoint source term for objectives of minimum dissipation
   ! $\int \nabla v \cdot \nabla u $
@@ -105,6 +106,13 @@ module adjoint_minimum_dissipation_source_term
   end type adjoint_minimum_dissipation_source_term_t
 
 contains
+
+  !> Allocator for the adjoint minimum dissipation source term.
+  subroutine adjoint_minimum_dissipation_source_term_allocate(obj)
+    class(source_term_t), allocatable, intent(inout) :: obj
+    allocate(adjoint_minimum_dissipation_source_term_t::obj)
+  end subroutine adjoint_minimum_dissipation_source_term_allocate
+
   !> The common constructor using a JSON object.
   !! @param json The JSON object for the source.
   !! @param this The source term.
