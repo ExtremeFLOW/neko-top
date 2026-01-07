@@ -1,6 +1,6 @@
 !> @file simple_brinkman_source_term.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,7 @@ module simple_brinkman_source_term
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   implicit none
   private
+  public :: simple_brinkman_source_term_allocate
 
   !> A simple Brinkman source term.
   ! We have a source term of the form $\chi \mathbf{u}$
@@ -93,6 +94,13 @@ module simple_brinkman_source_term
   end type simple_brinkman_source_term_t
 
 contains
+
+  !> Allocator for the simple brinkman source term.
+  subroutine simple_brinkman_source_term_allocate(obj)
+    class(source_term_t), allocatable, intent(inout) :: obj
+    allocate(simple_brinkman_source_term_t::obj)
+  end subroutine simple_brinkman_source_term_allocate
+
   !> The common constructor using a JSON object.
   !! @param this The source term.
   !! @param json The JSON object for the source.

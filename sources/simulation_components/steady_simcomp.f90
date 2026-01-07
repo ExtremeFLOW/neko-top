@@ -1,6 +1,6 @@
 !> @file steady_simcomp.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -51,6 +51,7 @@ module steady_simcomp
   use utils, only: neko_error
   implicit none
   private
+  public :: steady_simcomp_allocate
 
   !> The `steady_simcomp_t` type is a simulation component that terminates a
   !! simulation when the normed difference between the old and new fields is
@@ -85,6 +86,12 @@ module steady_simcomp
   end type steady_simcomp_t
 
 contains
+
+  !> Allocator for the steady simulation component.
+  subroutine steady_simcomp_allocate(obj)
+    class(simulation_component_t), allocatable, intent(inout) :: obj
+    allocate(steady_simcomp_t::obj)
+  end subroutine steady_simcomp_allocate
 
   ! Constructor from json.
   subroutine steady_simcomp_init_from_json(this, json, case)

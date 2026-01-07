@@ -1,6 +1,6 @@
 !> @file adjoint_scalar_convection_source_term.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -53,6 +53,7 @@ module adjoint_scalar_convection_source_term
   use device_math, only: device_col2, device_invcol2
   implicit none
   private
+  public :: adjoint_scalar_convection_source_term_allocate
 
   ! I don't know how to name this term, but when you have a passive
   ! scalar you get an extra term in the adjoint velocity equation, which comes
@@ -98,6 +99,13 @@ module adjoint_scalar_convection_source_term
   end type adjoint_scalar_convection_source_term_t
 
 contains
+
+  !> Allocator for the adjoint scalar convection source term.
+  subroutine adjoint_scalar_convection_source_term_allocate(obj)
+    class(source_term_t), allocatable, intent(inout) :: obj
+    allocate(adjoint_scalar_convection_source_term_t::obj)
+  end subroutine adjoint_scalar_convection_source_term_allocate
+
   !> The common constructor using a JSON object.
   !! @param this The object.
   !! @param json The JSON object for the source.
