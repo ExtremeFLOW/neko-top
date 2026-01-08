@@ -2,18 +2,21 @@ module io_hdf5
   use mpi
   use pfunit
   use hdf5
+  use neko_config, only: NEKO_BCKND_DEVICE
   use mma, only: mma_t
   use vector, only: vector_t
   use matrix, only: matrix_t
   use num_types, only: rp, sp, dp
   use neko, only: neko_init
-  use comm, only: pe_rank
-  use device, only: device_finalize, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
+  use device, only: device_finalize, HOST_TO_DEVICE, DEVICE_TO_HOST, &
+       device_init
   use neko_mpi_types, only: neko_mpi_types_free
   use logger, only: neko_log
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
-
+  use vector_math, only: vector_glsc2
+  use comm, only:
 
   implicit none
 
@@ -24,30 +27,31 @@ module io_hdf5
      procedure :: tearDown
   end type test_io_hdf5_case
 
+  logical :: initialized = .false.
 contains
 
   subroutine setUp(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
-    call neko_init
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
 
   end subroutine setUp
 
   subroutine tearDown(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
-    call neko_scratch_registry%free()
-    call neko_registry%free()
-    call neko_log%free()
+    ! if ((NEKO_BCKND_DEVICE .eq. 1)) then
+    !    call device_finalize
+    ! end if
 
-    call device_finalize
-    call neko_mpi_types_free
   end subroutine tearDown
 
   ! ========================================================================== !
   ! Test writing the MMA object to HDF5 file.
 
-  @test(npes=[1])
+  @test(npes=[2])
   subroutine write_hdf5(this)
     class(test_io_hdf5_case), intent(inout) :: this
     integer :: ierr
@@ -65,17 +69,25 @@ contains
     character(len=256) :: fname
     logical :: file_exists
     integer :: file_unit
-    integer(hid_t) :: H5T_NEKO_REAL, str_type
-    integer(hid_t) :: plist_id, file_id, attr_id, dset_id
-    integer(hsize_t), dimension(1) :: ddim
+    integer(hid_t) :: H5T_NEKO_REAL, str_type, hdferr
+    integer(hid_t) :: plist_id, file_id, attr_id, dset_id, filespace, memspace
+    integer(hid_t) :: xf_id
+    integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: read_n, read_m
     integer :: read_max_iter
     real(kind=rp) :: read_asyinit, read_asyincr, read_asydecr, read_epsimin
     real(kind=rp) :: read_a0
     real(kind=rp), allocatable :: read_a(:), read_c(:), read_d(:)
     character(len=:), allocatable :: group_name
+    character(len=100) :: msg
+    integer :: drank, n_accum, n_global
 
     character(len=12) :: read_bcknd, read_subsolver
+
+    call neko_log%section("Test MMA HDF5 I/O")
+
+    ! ------------------------------------------------------------------------ !
+    ! Setup the MMA object and write to HDF5 file
 
     if (pe_rank .eq. 0) then
        n = 4
@@ -83,6 +95,8 @@ contains
        n = 2
     end if
     m = 2
+
+    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM%mpi_val, ierr)
 
     call x%init(n)
     if (pe_rank .eq. 0) then
@@ -111,15 +125,11 @@ contains
     call obj%init_from_components(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
-    fname = 'mma_test.h5'
-    ! Delete the file if it exists
-    inquire(file=fname, exist=file_exists)
-    if (file_exists) then
-       ! Delete the file
-       open(newunit=file_unit, file=fname, status='old', action='write')
-       close(file_unit, status='delete')
-    end if
+    fname = 'mma_test_write.h5'
+
+    call neko_log%message("Writing MMA object to HDF5 file: " // trim(fname))
     call obj%write_hdf5(fname, overwrite = .true.)
+    call neko_log%message("Finished writing MMA object to HDF5 file.")
 
     ! ------------------------------------------------------------------------ !
     ! Read back the data
@@ -225,17 +235,43 @@ contains
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_d, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    ! Read datasets
-    ddim(1) = n
+    ! Read distributed datasets
+
+    ! Define the sizes and offsets (each pe_rank reads its local n from the global array)
+    call MPI_Scan(n, n_accum, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM%mpi_val, ierr)
+
+    dcount(1) = n
+    doffset(1) = n_accum - n
+    ddim(1) = n_global
+
+    ! Create file and memory space (pe_rank = 1 for 1D arrays)
+    call h5screate_simple_f(1, ddim, filespace, ierr)
+    call h5screate_simple_f(1, dcount, memspace, ierr)
+
+    ! Dataset transfer property list: MPI collective I/O
+    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
+    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+
+    ! Select hyperslab in the file space for this pe_rank
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
+         ierr)
+
+    ! Read xold1
     call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold1%x, ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold1%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
+    ! Read xold2
     call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold2%x, ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold2%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-
+    ! Close transfer property list and dataspaces
+    call h5pclose_f(xf_id, ierr)
+    call h5sclose_f(memspace, ierr)
+    call h5sclose_f(filespace, ierr)
 
     ! Close file and property list
     call h5fclose_f(file_id, ierr)
@@ -245,41 +281,50 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Check the values read from file
 
-    @assertEqual(n, read_n)
-    @assertEqual(m, read_m)
-    @assertEqual(max_iter, read_max_iter)
+    @assertEqual(m, read_m, message = "m")
+    @assertEqual(max_iter, read_max_iter, message = "max_iter")
 
-    @assertEqual(asyinit, read_asyinit)
-    @assertEqual(asyincr, read_asyincr)
-    @assertEqual(asydecr, read_asydecr)
-    @assertEqual(epsimin, read_epsimin)
+    @assertEqual(asyinit, read_asyinit, message = "asyinit")
+    @assertEqual(asyincr, read_asyincr, message = "asyincr")
+    @assertEqual(asydecr, read_asydecr, message = "asydecr")
+    @assertEqual(epsimin, read_epsimin, message = "epsimin")
 
-    @assertEqual(trim(bcknd), trim(read_bcknd))
-    @assertEqual(trim(subsolver), trim(read_subsolver))
+    @assertEqual(trim(bcknd), trim(read_bcknd), message = "bcknd")
+    @assertEqual(trim(subsolver), trim(read_subsolver), message = "subsolver")
 
-    @assertEqual(a0, read_a0)
+    @assertEqual(a0, read_a0, message = "a0")
     do i = 1, m
-       @assertEqual(a(i), read_a(i))
-       @assertEqual(c(i), read_c(i))
-       @assertEqual(d(i), read_d(i))
+       write(msg, '(A,I0,A)') "(", i, ")"
+       @assertEqual(a(i), read_a(i), message = "a" // trim(msg))
+       @assertEqual(c(i), read_c(i), message = "c" // trim(msg))
+       @assertEqual(d(i), read_d(i), message = "d" // trim(msg))
     end do
 
     call read_xold1%copy_from(HOST_TO_DEVICE, sync = .false.)
     call read_xold2%copy_from(HOST_TO_DEVICE, sync = .true.)
 
     do i = 1, n
-       @assertEqual(x%x(i), read_xold1%x(i))
-       @assertEqual(x%x(i), read_xold2%x(i))
+       write(msg, '(A,I0,A)') "(", i, ")"
+       @assertEqual(x%x(i), read_xold1%x(i), message = "xold1" // trim(msg))
+       @assertEqual(x%x(i), read_xold2%x(i), message = "xold2" // trim(msg))
     end do
 
     ! ------------------------------------------------------------------------ !
     ! Clean up
+
     call x%free()
     call read_xold1%free()
     call read_xold2%free()
     call obj%free()
     deallocate(a, c, d, xmin, xmax)
 
+    ! Delete the file if it exists
+    if (pe_rank .eq. 0) then
+       open(newunit=file_unit, file=fname, status='old', action='write')
+       close(file_unit, status='delete')
+    end if
+
+    call neko_log%end_section()
   end subroutine write_hdf5
 
   ! ========================================================================== !
@@ -298,26 +343,87 @@ contains
 
   subroutine rosenbrock(x, f, df)
     type(vector_t), intent(inout) :: x
-    real(kind=rp) :: f
+    real(kind=rp), intent(out) :: f
     type(vector_t), intent(inout), optional :: df
-    integer :: i
+    real(kind=rp) :: ghost_p, ghost_n
+    real(kind=rp), allocatable :: f_list(:)
+    integer :: rank_p, rank_n
+    integer :: request_p, request_n
+    integer :: i, ierr
 
     call x%copy_from(DEVICE_TO_HOST, sync = .true.)
 
+    ! ------------------------------------------------------------------------ !
+    ! Communicate ghost points
+
+    rank_p = pe_rank + 1
+    rank_n = pe_rank - 1
+
+    ! We need x(i-1) and x(i+1) which might be on a neighbouring process.
+    if (pe_rank .gt. 0) then
+       call MPI_Irecv(ghost_n, 1, MPI_REAL_PRECISION%mpi_val, rank_n, 0, &
+            NEKO_COMM%mpi_val, request_n, ierr)
+    end if
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Irecv(ghost_p, 1, MPI_REAL_PRECISION%mpi_val, rank_p, 1, &
+            NEKO_COMM%mpi_val, request_p, ierr)
+    end if
+
+    if (pe_rank .gt. 0) then
+       call MPI_Send(x%x(1), 1, MPI_REAL_PRECISION%mpi_val, rank_n, 1, &
+            NEKO_COMM%mpi_val, ierr)
+    end if
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Send(x%x(x%size()), 1, MPI_REAL_PRECISION%mpi_val, rank_p, 0, &
+            NEKO_COMM%mpi_val, ierr)
+    end if
+
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Wait(request_p, MPI_STATUS_IGNORE, ierr)
+    end if
+    if (pe_rank .gt. 0) then
+       call MPI_Wait(request_n, MPI_STATUS_IGNORE, ierr)
+    end if
+
+    ! ------------------------------------------------------------------------ !
     ! Compute function value
-    f = 0.0_rp
+
+    allocate(f_list(x%size()))
     do i = 1, x%size() - 1
-       f = f + 100.0_rp * (x%x(i + 1) - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
+       f_list(i) = 100.0_rp * (x%x(i + 1) - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
     end do
 
+    ! Handle the last entry which needs the ghost value
+    i = x%size()
+    if (pe_rank .lt. pe_size - 1) then
+       f_list(i) = 100.0_rp * (ghost_p - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
+    else
+       f_list(i) = 0.0_rp
+    end if
+
+    ! Compute function value as the global sum
+    f = sum(f_list)
+    call MPI_Allreduce(MPI_IN_PLACE, f, 1, MPI_REAL_PRECISION%mpi_val, MPI_SUM, &
+         NEKO_COMM%mpi_val, ierr)
+    deallocate(f_list)
+
+    ! ------------------------------------------------------------------------ !
     ! Compute gradient if requested
     if (present(df)) then
        do i = 1, x%size()
-          if (i .eq. 1) then
+          if (i .eq. 1 .and. pe_rank .eq. 0) then
              df%x(i) = -400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
                   2.0_rp * (1.0_rp - x%x(i))
-          else if (i .eq. x%size()) then
+          else if (i .eq. 1) then
+             df%x(i) = 200.0_rp * (x%x(i) - ghost_n**2) - &
+                  400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          else if (i .eq. x%size() .and. pe_rank .eq. pe_size - 1) then
              df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2)
+          else if (i .eq. x%size()) then
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2) - &
+                  400.0_rp * x%x(i) * (ghost_p - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
           else
              df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2) - &
                   400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
@@ -334,11 +440,13 @@ contains
     type(vector_t), intent(inout) :: g
     type(matrix_t), intent(inout), optional :: dg
     integer :: i
+    real(kind=rp) :: sum_x2
 
+    sum_x2 = vector_glsc2(x, x)
     call x%copy_from(DEVICE_TO_HOST, sync = .true.)
 
-    g%x(1) = - real(x%size(), kind=rp) - sum(x%x**2)
-    g%x(2) = 0.1_rp - sum(x%x**2)
+    g%x(1) = - real(x%size(), kind=rp) - sum_x2
+    g%x(2) = 0.1_rp - sum_x2
     if (present(dg)) then
        do i = 1, x%size()
           dg%x(1, i) = - 2.0_rp * x%x(i)
@@ -349,7 +457,7 @@ contains
     call g%copy_from(HOST_TO_DEVICE, sync = .true.)
   end subroutine constraint
 
-  @test(npes=[1])
+  @test(npes=[2])
   subroutine restart_mma(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
@@ -367,15 +475,23 @@ contains
 
     character(len=:), allocatable :: bcknd, subsolver, fname
     logical :: file_exists
-    integer :: file_unit
+    integer :: file_unit, ierr
 
     real(kind=rp), allocatable :: x_after(:)
 
-    n = 2
+    if (pe_rank .eq. 0) then
+       n = 4
+    else
+       n = 2
+    end if
     m = 2
 
     call x_init%init(n)
-    x_init%x = [0.9_rp, 1.0_rp]
+    if (pe_rank .eq. 0) then
+       x_init%x = [0.9_rp, 1.0_rp, 1.1_rp, 1.2_rp]
+    else
+       x_init%x = [0.9_rp, 1.0_rp]
+    end if
     call x_init%copy_from(HOST_TO_DEVICE, sync = .true.)
 
     allocate(a(m), c(m), d(m), xmin(n), xmax(n))
@@ -398,11 +514,12 @@ contains
     fname = 'mma_restart_test.h5'
     ! Delete the file if it exists
     inquire(file=fname, exist=file_exists)
-    if (file_exists) then
+    if (file_exists .and. pe_rank .eq. 0) then
        ! Delete the file
        open(newunit=file_unit, file=fname, status='old', action='write')
        close(file_unit, status='delete')
     end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
 
     ! Write the initial state, this will help us test the overwrite option
     call optimizer%write_hdf5(fname)
