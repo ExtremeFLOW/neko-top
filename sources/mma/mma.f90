@@ -495,20 +495,16 @@ contains
     select case (this%bcknd)
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
-               sync = .true.)
+          call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
        end if
 
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
+          call x%copy_from(HOST_TO_DEVICE, sync = .true.)
        end if
 
     case ("device")
