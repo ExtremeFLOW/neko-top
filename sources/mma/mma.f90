@@ -409,12 +409,17 @@ contains
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
+    ! Sync parameters across MPI
+    call MPI_Allreduce(n, this%n_global, 1, MPI_INTEGER, MPI_SUM, neko_comm, &
+         ierr)
+
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
     ! Based on the Cpp Code by Niels
     if (.not. present(max_iter)) this%max_iter = 100
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
+    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + &
+         this%n_global, rp))
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
@@ -429,10 +434,6 @@ contains
     if (present(asydecr)) this%asydecr = asydecr
     this%bcknd = bcknd
     this%subsolver = subsolver
-
-    ! Sync parameters across MPI
-    call MPI_Allreduce(this%n, this%n_global, 1, &
-         MPI_INTEGER, MPI_SUM, neko_comm, ierr)
 
     call neko_log%section('MMA Parameters')
 
