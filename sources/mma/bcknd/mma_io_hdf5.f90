@@ -426,8 +426,6 @@ contains
        call neko_error('mma: mismatch in asydecr during HDF5 read')
     end if
     if (.not. abscmp(epsimin, this%epsimin)) then
-       write(*,*) 'Proc ', pe_rank
-       write(*,*) epsimin, this%epsimin, abs(epsimin - this%epsimin)
        call neko_error('mma: mismatch in epsimin during HDF5 read')
     end if
     if (trim(bcknd) .ne. trim(this%bcknd)) then
