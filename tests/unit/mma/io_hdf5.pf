@@ -345,7 +345,7 @@ contains
     type(vector_t), intent(inout) :: x
     real(kind=rp), intent(out) :: f
     type(vector_t), intent(inout), optional :: df
-    real(kind=rp) :: ghost_p, ghost_n
+    real(kind=rp) :: ghost_p, ghost_n, f_buffer
     real(kind=rp), allocatable :: f_list(:)
     integer :: rank_p, rank_n
     integer :: request_p, request_n
@@ -403,7 +403,8 @@ contains
 
     ! Compute function value as the global sum
     f = sum(f_list)
-    call MPI_Allreduce(MPI_IN_PLACE, f, 1, MPI_REAL_PRECISION%mpi_val, MPI_SUM, &
+    f_buffer = f
+    call MPI_Allreduce(f_buffer, f, 1, MPI_REAL_PRECISION%mpi_val, MPI_SUM, &
          NEKO_COMM%mpi_val, ierr)
     deallocate(f_list)
 
@@ -439,10 +440,12 @@ contains
     type(vector_t), intent(inout) :: x
     type(vector_t), intent(inout) :: g
     type(matrix_t), intent(inout), optional :: dg
-    integer :: i
+    integer :: i, ierr
     real(kind=rp) :: sum_x2
 
+    ! Compute sum_i x_i^2
     sum_x2 = vector_glsc2(x, x)
+
     call x%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     g%x(1) = - real(x%size(), kind=rp) - sum_x2
@@ -461,7 +464,7 @@ contains
   subroutine restart_mma(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
-    type(vector_t) :: x, x_init, x_50
+    type(vector_t) :: x, x_init, x_50, x_after
 
     real(kind=rp) :: f
     type(vector_t) :: df, g
@@ -477,7 +480,8 @@ contains
     logical :: file_exists
     integer :: file_unit, ierr
 
-    real(kind=rp), allocatable :: x_after(:)
+    ! ------------------------------------------------------------------------ !
+    ! Setup the MMA object
 
     if (pe_rank .eq. 0) then
        n = 4
@@ -486,7 +490,11 @@ contains
     end if
     m = 2
 
+    call x%init(n)
+    call x_50%init(n)
     call x_init%init(n)
+    call x_after%init(n)
+
     if (pe_rank .eq. 0) then
        x_init%x = [0.9_rp, 1.0_rp, 1.1_rp, 1.2_rp]
     else
@@ -503,7 +511,6 @@ contains
     xmin = -1.5_rp
     xmax = 1.5_rp
 
-    max_iter = 10000
 
     bcknd = 'cpu'
     subsolver = 'dip'
@@ -511,18 +518,13 @@ contains
     call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
          bcknd = bcknd, subsolver = subsolver)
 
-    fname = 'mma_restart_test.h5'
-    ! Delete the file if it exists
-    inquire(file=fname, exist=file_exists)
-    if (file_exists .and. pe_rank .eq. 0) then
-       ! Delete the file
-       open(newunit=file_unit, file=fname, status='old', action='write')
-       close(file_unit, status='delete')
-    end if
-    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
-
     ! Write the initial state, this will help us test the overwrite option
-    call optimizer%write_hdf5(fname)
+    fname = 'mma_restart_test.h5'
+    call optimizer%write_hdf5(fname, overwrite = .true.)
+
+    ! ------------------------------------------------------------------------ !
+    ! Run the optimization save halfway and then continue
+    max_iter = 10
 
     f = 0.0_rp
     x = x_init
@@ -542,14 +544,14 @@ contains
        end if
     end do
 
-    ! Store result after solving
-    allocate(x_after(n))
-    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
-    x_after = x%x
+    ! Store result after solving all iterations
+    x_after = x
 
     call optimizer%free()
 
+    ! ------------------------------------------------------------------------ !
     ! Now restart from HDF5 file
+
     call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
          bcknd = bcknd, subsolver = subsolver)
     call optimizer%read(fname)
@@ -564,11 +566,23 @@ contains
     end do
 
     ! Check that the result matches the one after 10 iterations
-    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call x_after%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     do i = 1, n
-       @assertEqual(x%x(i), x_after(i), 1.0e-16_rp)
+       @assertEqual(x%x(i), x_after%x(i), 1.0e-16_rp)
     end do
+
+    call x%free()
+    call x_50%free()
+    call x_init%free()
+    call x_after%free()
+
+    call df%free()
+    call g%free()
+    call dg%free()
+    call optimizer%free()
+    deallocate(a, c, d, xmin, xmax)
 
   end subroutine restart_mma
 
