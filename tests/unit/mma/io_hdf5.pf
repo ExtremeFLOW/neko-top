@@ -73,7 +73,7 @@ contains
     integer(hid_t) :: plist_id, file_id, attr_id, dset_id, filespace, memspace
     integer(hid_t) :: xf_id
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: read_n, read_m
+    integer :: read_n_global, read_m
     integer :: read_max_iter
     real(kind=rp) :: read_asyinit, read_asyincr, read_asydecr, read_epsimin
     real(kind=rp) :: read_a0
@@ -96,7 +96,8 @@ contains
     end if
     m = 2
 
-    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM%mpi_val, ierr)
+    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, &
+         NEKO_COMM%mpi_val, ierr)
 
     call x%init(n)
     if (pe_rank .eq. 0) then
@@ -135,7 +136,7 @@ contains
     ! Read back the data
 
     ! Initialize reader values
-    read_n = -1
+    read_n_global = -1
     read_m = -1
     read_max_iter = -1
     read_asyinit = -1.0_rp
@@ -175,8 +176,8 @@ contains
     ! Read attributes
     ddim(1) = 1
     group_name = '/MMA/Parameters'
-    call h5aopen_by_name_f(file_id, group_name, 'n', attr_id, ierr)
-    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n, ddim, ierr)
+    call h5aopen_by_name_f(file_id, group_name, 'n_global', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n_global, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     call h5aopen_by_name_f(file_id, group_name, 'm', attr_id, ierr)
@@ -281,6 +282,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Check the values read from file
 
+    @assertEqual(n_global, read_n_global, message = "n_global")
     @assertEqual(m, read_m, message = "m")
     @assertEqual(max_iter, read_max_iter, message = "max_iter")
 
