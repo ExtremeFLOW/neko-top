@@ -905,6 +905,8 @@ contains
          remu = mu * lambda - epsi
 
          residual_max = maxval(abs([relambda, remu]))
+         call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
+              mpi_real_precision, MPI_MAX, neko_comm, ierr)
 
          ! ------------------------------------------------------------------- !
          ! Internal loop
@@ -957,7 +959,7 @@ contains
             end do
 
             call MPI_Allreduce(MPI_IN_PLACE, Hess, &
-                 this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
+                 this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
             !---------------contributions of z terms to Hess-------------------!
             ! There is no contibution to the Hess from z terms as z terms are
@@ -1064,6 +1066,8 @@ contains
             remu = mu * lambda - epsi
 
             residual_max = maxval(abs([relambda, remu]))
+            call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
+                 mpi_real_precision, MPI_MAX, neko_comm, ierr)
          end do
        end associate
 
