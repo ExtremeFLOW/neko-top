@@ -130,11 +130,8 @@ module mma
      procedure, pass(this) :: KKT_cpu => mma_KKT_cpu
      procedure, pass(this) :: KKT_device => mma_KKT_device
 
-     generic :: write => write_hdf5
-     procedure, pass(this) :: write_hdf5 => mma_write_hdf5
-
-     generic :: read => read_hdf5
-     procedure, pass(this) :: read_hdf5 => mma_read_hdf5
+     procedure, pass(this) :: save_checkpoint => mma_save_checkpoint
+     procedure, pass(this) :: load_checkpoint => mma_load_checkpoint
 
      ! Private utilities
      procedure, pass(this) :: copy_from => mma_copy_from
@@ -183,16 +180,16 @@ module mma
      ! ======================================================================= !
      ! Interface for IO routines
 
-     module subroutine mma_write_hdf5(this, filename, overwrite)
+     module subroutine mma_save_checkpoint(this, filename, overwrite)
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
        logical, intent(in), optional :: overwrite
-     end subroutine mma_write_hdf5
+     end subroutine mma_save_checkpoint
 
-     module subroutine mma_read_hdf5(this, filename)
+     module subroutine mma_load_checkpoint(this, filename)
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
-     end subroutine mma_read_hdf5
+     end subroutine mma_load_checkpoint
   end interface
 
 contains

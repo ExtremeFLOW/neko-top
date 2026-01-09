@@ -37,8 +37,10 @@ submodule (mma) mma_io_hdf5
 #ifdef HAVE_HDF5
   use hdf5
 #endif
-  use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8
+  use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8, MPI_MAX, MPI_MIN, &
+       MPI_IN_PLACE
   use math, only: abscmp
+  use comm, only: pe_size
 
 contains
 
@@ -49,7 +51,7 @@ contains
   !! vectors and matrices, then perform the write. Currently the low-level
   !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
   !! available at link time a runtime error will be raised.
-  module subroutine mma_write_hdf5(this, filename, overwrite)
+  module subroutine mma_save_checkpoint(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
@@ -58,8 +60,8 @@ contains
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
-    integer(kind=8) :: local_n8, prefix8, total_n8
     logical :: file_exists, mma_exists, overwrite_flag
+    integer :: n_accum, n_array(pe_size)
 
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
@@ -67,9 +69,10 @@ contains
     ! Ensure device state is on host
     call this%copy_from(DEVICE_TO_HOST, sync = .true.)
 
-    call h5open_f(ierr)
-
+    ! ------------------------------------------------------------------------ !
     ! Prepare the HDF5 settings for MPIO access
+
+    call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
@@ -131,10 +134,23 @@ contains
          gapl_id = h5p_default_f)
 
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-    ddim = 1
+
+    ! Size of the design space
+
+    ddim = pe_size
+    n_array = -1
+    n_array(pe_rank + 1) = this%n
+
+    call MPI_Allreduce(MPI_IN_PLACE, n_array, pe_size, MPI_INTEGER, MPI_MAX, &
+         NEKO_COMM, ierr)
+
+    call h5dcreate_f(grp_id, 'n', H5T_NATIVE_INTEGER, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
 
     ! Integer-valued attributes
 
+    ddim = 1
     call h5acreate_f(grp_id, 'n_global', H5T_NATIVE_INTEGER, filespace, &
          attr_id, ierr, h5p_default_f, h5p_default_f)
     call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%n_global, ddim, ierr)
@@ -234,14 +250,12 @@ contains
     ! Write per-rank datasets
 
     ! Define the sizes and offsets
-    local_n8 = int(this%n, 8)
-    total_n8 = int(this%n_global, 8)
-    call MPI_Scan(local_n8, prefix8, 1, MPI_INTEGER8, MPI_SUM, NEKO_COMM, ierr)
+    call MPI_Scan(this%n, n_accum, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
 
     drank = 1
-    dcount(1) = local_n8
-    doffset(1) = prefix8 - local_n8
-    ddim(1) = total_n8
+    dcount(1) = this%n
+    doffset(1) = n_accum - this%n
+    ddim(1) = this%n_global
 
     ! Create a file and memory space
     call h5screate_simple_f(drank, ddim, filespace, ierr)
@@ -310,12 +324,12 @@ contains
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
-  end subroutine mma_write_hdf5
+  end subroutine mma_save_checkpoint
 
   !> Read the MMA object from an HDF5 file (parallel-aware).
   !! This routine will perform the read and then ensure device-host
   !! synchronization for all vectors and matrices.
-  module subroutine mma_read_hdf5(this, filename)
+  module subroutine mma_load_checkpoint(this, filename)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer(hid_t) :: fapl_id, file_id, dset_id, &
@@ -323,8 +337,9 @@ contains
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr
-    integer :: n_global, m, max_iter, n_accum
+    integer :: n, n_global, m, max_iter, n_accum
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
+    integer, dimension(pe_size) :: n_array
 
     character(len=12) :: bcknd, subsolver
 
@@ -362,6 +377,40 @@ contains
     ! Read basic Parameters attributes
 
     call h5gopen_f(file_id, 'MMA/Parameters', grp_id, ierr)
+
+    ddim = pe_size
+    n_array = -1
+
+    call h5dopen_f(grp_id, 'n', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
+    if (pe_rank .eq. 0) write (*,*) 'MMA checkpoint read:'
+
+    do n = 0, pe_size-1
+       if (pe_rank .eq. n) then
+          write(*,*) pe_rank, n_array
+       end if
+       call sleep(1)
+       call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+    end do
+
+    call MPI_Allreduce(MPI_IN_PLACE, n_array, pe_size, MPI_INTEGER, MPI_MAX, &
+         NEKO_COMM, ierr)
+
+    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
+    if (pe_rank .eq. 0) write (*,*) 'MPI_Allreduce result:'
+
+    do n = 0, pe_size-1
+       if (pe_rank .eq. n) then
+          write(*,*) pe_rank, n_array
+       end if
+       call sleep(1)
+       call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+    end do
+
+    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
 
     ddim(1) = 1
     call h5aopen_f(grp_id, 'n_global', attr_id, ierr)
@@ -407,6 +456,10 @@ contains
     call h5gclose_f(grp_id, ierr)
 
     ! Ensure the MMA object is allocated with the same configuration as the file
+    if (n_array(pe_rank+1) .ne. this%n) then
+       write(*,*) pe_rank, n_array, this%n
+       call neko_error('mma: mismatch in n during HDF5 read')
+    end if
     if (n_global .ne. this%n_global) then
        call neko_error('mma: mismatch in n_global during HDF5 read')
     end if
@@ -529,23 +582,22 @@ contains
     ! Ensure device state is updated
     call this%copy_from(HOST_TO_DEVICE, sync = .true.)
 
-  end subroutine mma_read_hdf5
+  end subroutine mma_load_checkpoint
 
 #else
 
-  module subroutine mma_write_hdf5(this, filename, overwrite)
+  module subroutine mma_save_checkpoint(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
     call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine mma_write_hdf5
+  end subroutine mma_save_checkpoint
 
-  module subroutine mma_read_hdf5(this, filename)
+  module subroutine mma_load_checkpoint(this, filename)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine mma_read_hdf5
-
+  end subroutine mma_load_checkpoint
 #endif
 
 end submodule mma_io_hdf5

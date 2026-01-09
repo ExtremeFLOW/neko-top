@@ -52,7 +52,7 @@ contains
   ! Test writing the MMA object to HDF5 file.
 
   @test(npes=[2])
-  subroutine write_hdf5(this)
+  subroutine save_checkpoint(this)
     class(test_io_hdf5_case), intent(inout) :: this
     integer :: ierr
     integer :: n, m, i
@@ -129,7 +129,7 @@ contains
     fname = 'mma_test_write.h5'
 
     call neko_log%message("Writing MMA object to HDF5 file: " // trim(fname))
-    call obj%write_hdf5(fname, overwrite = .true.)
+    call obj%save_checkpoint(fname, overwrite = .true.)
     call neko_log%message("Finished writing MMA object to HDF5 file.")
 
     ! ------------------------------------------------------------------------ !
@@ -327,7 +327,7 @@ contains
     end if
 
     call neko_log%end_section()
-  end subroutine write_hdf5
+  end subroutine save_checkpoint
 
   ! ========================================================================== !
   ! Test the MMA object restart functionality.
@@ -522,7 +522,7 @@ contains
 
     ! Write the initial state, this will help us test the overwrite option
     fname = 'mma_restart_test.h5'
-    call optimizer%write_hdf5(fname, overwrite = .true.)
+    call optimizer%save_checkpoint(fname, overwrite = .true.)
 
     ! ------------------------------------------------------------------------ !
     ! Run the optimization save halfway and then continue
@@ -541,7 +541,7 @@ contains
        call optimizer%update(iter, x, df, g, dg)
 
        if (iter .eq. max_iter / 2) then
-          call optimizer%write_hdf5(fname, overwrite = .true.)
+          call optimizer%save_checkpoint(fname, overwrite = .true.)
           x_50 = x
        end if
     end do
@@ -556,7 +556,7 @@ contains
 
     call optimizer%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
          bcknd = bcknd, subsolver = subsolver)
-    call optimizer%read(fname)
+    call optimizer%load_checkpoint(fname)
 
     x = x_50
 
