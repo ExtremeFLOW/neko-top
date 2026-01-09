@@ -37,7 +37,8 @@ submodule (mma) mma_io_hdf5
 #ifdef HAVE_HDF5
   use hdf5
 #endif
-  use mpi_f08, only: MPI_INFO_NULL, MPI_INTEGER8
+  use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8
+  use math, only: abscmp
 
 contains
 
@@ -67,16 +68,6 @@ contains
     call this%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     call h5open_f(ierr)
-
-    ! Assign the correct HDF5 data type based on the neko real kind
-    select case (rp)
-    case (dp)
-       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
-    case (sp)
-       H5T_NEKO_REAL = H5T_NATIVE_REAL
-    case default
-       call neko_error('mma: unsupported real kind for HDF5')
-    end select
 
     ! Prepare the HDF5 settings for MPIO access
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
@@ -122,6 +113,16 @@ contains
          lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
          gapl_id = h5p_default_f)
 
+    ! Assign the correct HDF5 data type based on the neko real kind
+    select case (rp)
+    case (dp)
+       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
+    case (sp)
+       H5T_NEKO_REAL = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma: unsupported real kind for HDF5')
+    end select
+
     ! ------------------------------------------------------------------------ !
     ! Write basic Parameters attributes
 
@@ -134,9 +135,9 @@ contains
 
     ! Integer-valued attributes
 
-    call h5acreate_f(grp_id, 'n', H5T_NATIVE_INTEGER, filespace, attr_id, &
-         ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%n, ddim, ierr)
+    call h5acreate_f(grp_id, 'n_global', H5T_NATIVE_INTEGER, filespace, &
+         attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%n_global, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     call h5acreate_f(grp_id, 'm', H5T_NATIVE_INTEGER, filespace, attr_id, &
@@ -318,11 +319,11 @@ contains
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer(hid_t) :: fapl_id, file_id, dset_id, &
-         attr_id, grp_id, str_type
+         attr_id, grp_id, str_type, filespace, memspace, xf_id
     integer(hid_t) :: H5T_NEKO_REAL
-    integer(hsize_t), dimension(1) :: ddim
+    integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr
-    integer :: n, m, max_iter
+    integer :: n_global, m, max_iter, n_accum
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
 
     character(len=12) :: bcknd, subsolver
@@ -363,8 +364,8 @@ contains
     call h5gopen_f(file_id, 'MMA/Parameters', grp_id, ierr)
 
     ddim(1) = 1
-    call h5aopen_f(grp_id, 'n', attr_id, ierr)
-    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n, ddim, ierr)
+    call h5aopen_f(grp_id, 'n_global', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_global, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     call h5aopen_f(grp_id, 'm', attr_id, ierr)
@@ -406,8 +407,8 @@ contains
     call h5gclose_f(grp_id, ierr)
 
     ! Ensure the MMA object is allocated with the same configuration as the file
-    if (n .ne. this%n) then
-       call neko_error('mma: mismatch in n during HDF5 read')
+    if (n_global .ne. this%n_global) then
+       call neko_error('mma: mismatch in n_global during HDF5 read')
     end if
     if (m .ne. this%m) then
        call neko_error('mma: mismatch in m during HDF5 read')
@@ -415,16 +416,18 @@ contains
     if (max_iter .ne. this%max_iter) then
        call neko_error('mma: mismatch in max_iter during HDF5 read')
     end if
-    if (abs(asyinit - this%asyinit) .gt. 1.0e-12_rp) then
+    if (.not. abscmp(asyinit, this%asyinit)) then
        call neko_error('mma: mismatch in asyinit during HDF5 read')
     end if
-    if (abs(asyincr - this%asyincr) .gt. 1.0e-12_rp) then
+    if (.not. abscmp(asyincr, this%asyincr)) then
        call neko_error('mma: mismatch in asyincr during HDF5 read')
     end if
-    if (abs(asydecr - this%asydecr) .gt. 1.0e-12_rp) then
+    if (.not. abscmp(asydecr, this%asydecr)) then
        call neko_error('mma: mismatch in asydecr during HDF5 read')
     end if
-    if (abs(epsimin - this%epsimin) .gt. 1.0e-12_rp) then
+    if (.not. abscmp(epsimin, this%epsimin)) then
+       write(*,*) 'Proc ', pe_rank
+       write(*,*) epsimin, this%epsimin, abs(epsimin - this%epsimin)
        call neko_error('mma: mismatch in epsimin during HDF5 read')
     end if
     if (trim(bcknd) .ne. trim(this%bcknd)) then
@@ -463,29 +466,59 @@ contains
 
     ddim(1) = this%n
 
+    ! Define the sizes and offsets (each pe_rank reads its local n from the global array)
+    call MPI_Scan(this%n, n_accum, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
+
+    dcount(1) = this%n
+    doffset(1) = n_accum - this%n
+    ddim(1) = this%n_global
+
+    ! Create file and memory space (pe_rank = 1 for 1D arrays)
+    call h5screate_simple_f(1, ddim, filespace, ierr)
+    call h5screate_simple_f(1, dcount, memspace, ierr)
+
+    ! Dataset transfer property list: MPI collective I/O
+    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
+    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+
+    ! Select hyperslab in the file space for this pe_rank
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
+         ierr)
+
     call h5dopen_f(file_id, '/MMA/xmin', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmin%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmin%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     call h5dopen_f(file_id, '/MMA/xmax', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmax%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmax%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold1%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold2%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold2%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     call h5dopen_f(file_id, '/MMA/low', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%low%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%low%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     call h5dopen_f(file_id, '/MMA/upp', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%upp%x(1), ddim, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%upp%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
+
+    ! Close transfer property list and dataspaces
+    call h5pclose_f(xf_id, ierr)
+    call h5sclose_f(memspace, ierr)
+    call h5sclose_f(filespace, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Close the group and file
