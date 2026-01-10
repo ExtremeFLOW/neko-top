@@ -49,8 +49,8 @@ if comm.Get_rank() == 0:
 # Read the POD inputs
 number_of_pod_fields = 3
 pod_batch_size  = 30
-pod_keep_modes  = 10
-pod_write_modes = 10
+pod_keep_modes  = 3
+pod_write_modes = 3
 dtype_string = "double"
 backend = "numpy"
 if dtype_string == "single":
@@ -172,7 +172,7 @@ for j in range(0, pod_write_modes):
         fld.add_field(comm, field_name = "u", field = u_mode, dtype = dtype)
         fld.add_field(comm, field_name = "v", field = v_mode, dtype = dtype)
         fld.add_field(comm, field_name = "w", field = w_mode, dtype = dtype)
-        pynekwrite(f"./modes0.f{str(j).zfill(5)}", comm=comm, msh=msh, fld=fld, wdsz=4, istep = j) 
+        pynekwrite(f"./modes0.f{str(j).zfill(5)}", comm=comm, msh=msh, fld=fld, wdsz=4, istep = j)
         
 #=========================================
 # Write out singular values and right 
@@ -191,3 +191,28 @@ end_time = MPI.Wtime()
 # Print the time
 if comm.Get_rank() == 0:
     print("Time to complete: ", end_time - start_time)
+
+if comm.Get_rank() == 0:
+    print("Python - insitu - Sending data back")
+
+# Initialize the streamer
+ds_back = DataStreamer(comm)
+
+if comm.Get_rank() == 0:
+    print("Python - insitu - Initializing objects")
+
+for j in range(0, pod_write_modes):
+
+    if (j+1) < pod.u_1t.shape[1]:
+
+        ## Split the snapshots into the proper fields
+        field_list1d = ioh.split_narray_to_1dfields(pod.u_1t[:,j])
+        u_mode = get_fld_from_ndarray(field_list1d[0], msh.lx, msh.ly, msh.lz, msh.nelv) 
+        v_mode = get_fld_from_ndarray(field_list1d[1], msh.lx, msh.ly, msh.lz, msh.nelv) 
+        w_mode = get_fld_from_ndarray(field_list1d[2], msh.lx, msh.ly, msh.lz, msh.nelv)
+
+        ds_back.stream(u_mode)
+        ds_back.stream(v_mode)
+        ds_back.stream(w_mode)
+
+ds_back.finalize()

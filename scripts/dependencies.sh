@@ -359,6 +359,18 @@ function find_adios2() {
             -DCMAKE_CXX_COMPILER=${MPICXX:-${CXX:-c++}}
         )
 
+        # Tie ADIOS2 to the same HDF5 that Neko uses
+        if [ -n "$HDF5_DIR" ]; then
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=ON
+                -DHDF5_ROOT=$HDF5_DIR
+            )
+        else
+            cmake_args+=(
+                -DADIOS2_USE_HDF5=OFF
+            )
+        fi
+
         if [ "$ADIOS2_ENABLE_BZIP2" == "ON" ]; then
             cmake_args+=(
                 -DADIOS2_USE_BZip2=ON

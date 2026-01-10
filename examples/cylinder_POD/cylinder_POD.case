@@ -8,10 +8,10 @@
         "checkpoint_control": "simulationtime",
         "checkpoint_value": 5,
         "time": {
-            "end_time": 100,
+            "end_time": 4,
             "timestep": 7.5e-3
         },
-        "istream": 25, // Used for data-streaming only
+        "istream": 1, // Used for data-streaming only
         "numerics": {
             "time_order": 3,
             "polynomial_order": 5,
