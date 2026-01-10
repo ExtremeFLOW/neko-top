@@ -1,3 +1,37 @@
+!> @file mma_optimizer.f90
+!! @copyright
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+
 module mma_optimizer
   use optimizer, only: optimizer_t
   use mma, only: mma_t
@@ -83,7 +117,7 @@ contains
     type(json_file) :: solver_parameters
     logical :: enable_output
     integer :: max_iterations
-    real(kind=rp) :: tolerance
+    real(kind=rp) :: tolerance, max_runtime
 
     ! Read the solver properties from the JSON file
     call json_get(parameters, 'optimization.solver', solver_parameters)
@@ -93,15 +127,18 @@ contains
          tolerance, 1.0e-3_rp)
     call json_get_or_default(solver_parameters, 'enable_output', &
          enable_output, .true.)
+    call json_get_or_default(solver_parameters, 'max_runtime', &
+         max_runtime, -1.0_rp)
 
     call this%init_from_components(problem, design, max_iterations, tolerance, &
-         enable_output, solver_parameters, simulation)
+         enable_output, solver_parameters, simulation, max_runtime)
 
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
-       max_iterations, tolerance, enable_output, solver_parameters, simulation)
+       max_iterations, tolerance, enable_output, &
+       solver_parameters, simulation, max_runtime)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
@@ -110,6 +147,7 @@ contains
     logical, intent(in) :: enable_output
     type(json_file), intent(inout), optional :: solver_parameters
     type(simulation_t), intent(in), optional :: simulation
+    real(kind=rp), intent(in), optional :: max_runtime
 
     ! Local variables
     type(vector_t), pointer :: x
@@ -159,7 +197,7 @@ contains
        call this%csv_log%set_header(trim(header))
     end if
 
-    call this%init_base(max_iterations, tolerance)
+    call this%init_base(max_iterations, tolerance, max_runtime)
 
     call neko_log%end_section()
 
