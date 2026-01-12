@@ -16,7 +16,7 @@ module io_hdf5
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
   use vector_math, only: vector_glsc2
-  use comm, only:
+  use math, only: cfill
 
   implicit none
 
@@ -73,7 +73,7 @@ contains
     integer(hid_t) :: plist_id, file_id, attr_id, dset_id, filespace, memspace
     integer(hid_t) :: xf_id
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: read_n_global, read_m
+    integer :: read_n(pe_size), read_n_global, read_m
     integer :: read_max_iter
     real(kind=rp) :: read_asyinit, read_asyincr, read_asydecr, read_epsimin
     real(kind=rp) :: read_a0
@@ -136,6 +136,7 @@ contains
     ! Read back the data
 
     ! Initialize reader values
+    read_n(:) = -1
     read_n_global = -1
     read_m = -1
     read_max_iter = -1
@@ -148,6 +149,9 @@ contains
     read_subsolver = ''
 
     allocate(read_a(m), read_c(m), read_d(m))
+    call cfill(read_a, -1.0_rp, m)
+    call cfill(read_c, -1.0_rp, m)
+    call cfill(read_d, -1.0_rp, m)
 
     call read_xold1%init(n)
     call read_xold2%init(n)
@@ -158,8 +162,7 @@ contains
     ! Open file and prepare reading
     call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
-    call h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD, &
-         MPI_INFO_NULL, ierr)
+    call h5pset_fapl_mpio_f(plist_id, NEKO_COMM%mpi_val, MPI_INFO_NULL, ierr)
     call h5fopen_f(trim(fname), H5F_ACC_RDONLY_F, file_id, ierr, &
          access_prp = plist_id)
 
@@ -216,6 +219,13 @@ contains
     call h5aclose_f(attr_id, ierr)
 
     call h5tclose_f(str_type, ierr)
+
+    ! Read Array parameter types
+
+    ddim(1) = pe_size
+    call h5aopen_by_name_f(file_id, group_name, 'n', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
 
     ! Read penalty parameters
     ddim(1) = 1
@@ -282,6 +292,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Check the values read from file
 
+    @assertEqual(n, read_n(pe_rank + 1), message = "n")
     @assertEqual(n_global, read_n_global, message = "n_global")
     @assertEqual(m, read_m, message = "m")
     @assertEqual(max_iter, read_max_iter, message = "max_iter")
@@ -319,12 +330,6 @@ contains
     call read_xold2%free()
     call obj%free()
     deallocate(a, c, d, xmin, xmax)
-
-    ! Delete the file if it exists
-    if (pe_rank .eq. 0) then
-       open(newunit=file_unit, file=fname, status='old', action='write')
-       close(file_unit, status='delete')
-    end if
 
     call neko_log%end_section()
   end subroutine save_checkpoint

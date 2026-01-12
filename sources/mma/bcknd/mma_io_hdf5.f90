@@ -69,6 +69,12 @@ contains
     ! Ensure device state is on host
     call this%copy_from(DEVICE_TO_HOST, sync = .true.)
 
+    ! Gather the per-rank n values
+    n_array = -1
+    n_array(pe_rank + 1) = this%n
+    call MPI_Allreduce(MPI_IN_PLACE, n_array, pe_size, MPI_INTEGER, MPI_MAX, &
+         NEKO_COMM, ierr)
+
     ! ------------------------------------------------------------------------ !
     ! Prepare the HDF5 settings for MPIO access
 
@@ -133,24 +139,11 @@ contains
          lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
          gapl_id = h5p_default_f)
 
-    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-
-    ! Size of the design space
-
-    ddim = pe_size
-    n_array = -1
-    n_array(pe_rank + 1) = this%n
-
-    call MPI_Allreduce(MPI_IN_PLACE, n_array, pe_size, MPI_INTEGER, MPI_MAX, &
-         NEKO_COMM, ierr)
-
-    call h5dcreate_f(grp_id, 'n', H5T_NATIVE_INTEGER, filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
-    call h5dclose_f(dset_id, ierr)
-
     ! Integer-valued attributes
 
     ddim = 1
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
+
     call h5acreate_f(grp_id, 'n_global', H5T_NATIVE_INTEGER, filespace, &
          attr_id, ierr, h5p_default_f, h5p_default_f)
     call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%n_global, ddim, ierr)
@@ -211,8 +204,22 @@ contains
     ! Close the string type
     call h5tclose_f(str_type, ierr)
 
-    ! Close the filespace and Parameters group
+    ! Close the scalar filespace
     call h5sclose_f(filespace, ierr)
+
+    ! Array-valued attributes
+
+    drank = 1
+    ddim = pe_size
+    call h5screate_simple_f(drank, ddim, filespace, ierr)
+
+    call h5acreate_f(grp_id, 'n', H5T_NATIVE_INTEGER, filespace, attr_id, ierr)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5sclose_f(filespace, ierr)
+
+    ! Close the Parameters group
     call h5gclose_f(grp_id, ierr)
 
     ! ------------------------------------------------------------------------ !
@@ -336,10 +343,9 @@ contains
          attr_id, grp_id, str_type, filespace, memspace, xf_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
-    integer :: ierr
-    integer :: n, n_global, m, max_iter, n_accum
+    integer :: ierr, info, mpi_comm
+    integer :: n, n_global, m, max_iter, n_accum, n_array(pe_size)
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
-    integer, dimension(pe_size) :: n_array
 
     character(len=12) :: bcknd, subsolver
 
@@ -358,8 +364,9 @@ contains
     ! Open file and prepare reading
     call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
-    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, &
-         MPI_INFO_NULL%mpi_val, ierr)
+    info = MPI_INFO_NULL%mpi_val
+    mpi_comm = NEKO_COMM%mpi_val
+    call h5pset_fapl_mpio_f(fapl_id, mpi_comm, info, ierr)
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
          access_prp = fapl_id)
 
@@ -378,40 +385,7 @@ contains
 
     call h5gopen_f(file_id, 'MMA/Parameters', grp_id, ierr)
 
-    ddim = pe_size
-    n_array = -1
-
-    call h5dopen_f(grp_id, 'n', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
-    call h5dclose_f(dset_id, ierr)
-
-    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
-    if (pe_rank .eq. 0) write (*,*) 'MMA checkpoint read:'
-
-    do n = 0, pe_size-1
-       if (pe_rank .eq. n) then
-          write(*,*) pe_rank, n_array
-       end if
-       call sleep(1)
-       call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
-    end do
-
-    call MPI_Allreduce(MPI_IN_PLACE, n_array, pe_size, MPI_INTEGER, MPI_MAX, &
-         NEKO_COMM, ierr)
-
-    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
-    if (pe_rank .eq. 0) write (*,*) 'MPI_Allreduce result:'
-
-    do n = 0, pe_size-1
-       if (pe_rank .eq. n) then
-          write(*,*) pe_rank, n_array
-       end if
-       call sleep(1)
-       call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
-    end do
-
-    if (pe_rank .eq. 0) write(*,*) '-------------------------------------------'
-
+    ! Read scalar attributes
     ddim(1) = 1
     call h5aopen_f(grp_id, 'n_global', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_global, ddim, ierr)
@@ -453,11 +427,19 @@ contains
     call h5aclose_f(attr_id, ierr)
 
     call h5tclose_f(str_type, ierr)
+
+    ! Read array attribute n
+    ddim(1) = pe_size
+    n_array = -1
+
+    call h5aopen_f(grp_id, 'n', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
     call h5gclose_f(grp_id, ierr)
 
     ! Ensure the MMA object is allocated with the same configuration as the file
-    if (n_array(pe_rank+1) .ne. this%n) then
-       write(*,*) pe_rank, n_array, this%n
+    if (n_array(pe_rank + 1) .ne. this%n) then
        call neko_error('mma: mismatch in n during HDF5 read')
     end if
     if (n_global .ne. this%n_global) then
