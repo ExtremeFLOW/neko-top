@@ -110,11 +110,6 @@ module simple_design
      !> Write the design
      procedure, pass(this) :: write => design_simple_write
 
-     !> Save checkpoint
-     procedure, pass(this) :: save_checkpoint => design_simple_save_checkpoint
-     !> Load checkpoint
-     procedure, pass(this) :: load_checkpoint => design_simple_load_checkpoint
-
      !> Destructor
      procedure, pass(this) :: free => design_simple_free
 
@@ -348,20 +343,5 @@ contains
 
     close(funit)
   end subroutine design_simple_write
-
-  subroutine design_simple_save_checkpoint(this, filename, overwrite)
-    class(simple_design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-
-    call neko_error('design_simple_save_checkpoint not implemented yet.')
-  end subroutine design_simple_save_checkpoint
-
-  subroutine design_simple_load_checkpoint(this, filename)
-    class(simple_design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-
-    call neko_error('design_simple_load_checkpoint not implemented yet.')
-  end subroutine design_simple_load_checkpoint
 
 end module simple_design

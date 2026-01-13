@@ -94,11 +94,6 @@ module design_3dto1d
      !> Destructor
      procedure, pass(this) :: free => design_3dto1d_free
 
-     !> Save checkpoint
-     procedure, pass(this) :: save_checkpoint => design_3dto1d_save_checkpoint
-     !> Load checkpoint
-     procedure, pass(this) :: load_checkpoint => design_3dto1d_load_checkpoint
-
      !> map (this will include everything from mapping
      procedure, pass(this) :: map_forward => design_3dto1d_map_forward
      !> this will contain chain rule for going backwards
@@ -246,20 +241,5 @@ contains
        deallocate(global_values, recvcounts, displs)
     endif
   end subroutine design_3dto1d_write
-
-  subroutine design_3dto1d_save_checkpoint(this, filename, overwrite)
-    class(design_3dto1d_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-
-    call neko_error('Checkpointing not implemented for design_3dto1d_t yet.')
-  end subroutine design_3dto1d_save_checkpoint
-
-  subroutine design_3dto1d_load_checkpoint(this, filename)
-    class(design_3dto1d_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-
-    call neko_error('Checkpointing not implemented for design_3dto1d_t yet.')
-  end subroutine design_3dto1d_load_checkpoint
 
 end module design_3dto1d

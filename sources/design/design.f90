@@ -117,11 +117,9 @@ module design
      procedure(design_write), public, pass(this), deferred :: write
 
      !> Save the design to a checkpoint file
-     procedure(design_save_checkpoint), public, pass(this), deferred :: &
-          save_checkpoint
+     procedure, public, pass(this) :: save_checkpoint => design_save_checkpoint
      !> Load the design from a checkpoint file
-     procedure(design_load_checkpoint), public, pass(this), deferred :: &
-          load_checkpoint
+     procedure, public, pass(this) :: load_checkpoint => design_load_checkpoint
 
      ! ----------------------------------------------------------------------- !
      ! Methods
@@ -173,7 +171,6 @@ module design
      end subroutine design_factory
   end interface design_factory
 
-
   ! ========================================================================== !
   ! Public interface for the deferred methods
 
@@ -211,16 +208,28 @@ module design
        class(design_t), intent(inout) :: this
        integer, intent(in) :: idx
      end subroutine design_write
+  end interface
 
-     subroutine design_save_checkpoint(this, filename, overwrite)
-       import design_t, json_file
-       class(design_t), intent(inout) :: this
+  ! ========================================================================== !
+  ! Module subroutine implementations
+
+  !> Save the design to a checkpoint file
+  !! @param this The design object.
+  !! @param filename The filename to save the checkpoint to.
+  !! @param overwrite Whether to overwrite the file if it exists.
+  interface
+     module subroutine design_save_checkpoint(this, filename, overwrite)
+       class(design_t), intent(in) :: this
        character(len=*), intent(in) :: filename
        logical, intent(in), optional :: overwrite
      end subroutine design_save_checkpoint
+  end interface
 
-     subroutine design_load_checkpoint(this, filename)
-       import design_t, json_file
+  !> Load the design from a checkpoint file
+  !! @param this The design object.
+  !! @param filename The filename to load the checkpoint from.
+  interface
+     module subroutine design_load_checkpoint(this, filename)
        class(design_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
      end subroutine design_load_checkpoint

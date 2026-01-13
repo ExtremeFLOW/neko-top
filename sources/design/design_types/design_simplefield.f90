@@ -110,11 +110,6 @@ module simplefield_design
      !> Write the design
      procedure, pass(this) :: write => design_simple_write
 
-     !> Save checkpoint
-     procedure, pass(this) :: save_checkpoint => design_simple_save_checkpoint
-     !> Load checkpoint
-     procedure, pass(this) :: load_checkpoint => design_simple_load_checkpoint
-
      !> Destructor
      procedure, pass(this) :: free => design_simple_free
 
@@ -235,20 +230,5 @@ contains
     integer, intent(in) :: idx
     call this%output%sample(real(idx, kind=rp))
   end subroutine design_simple_write
-
-  subroutine design_simple_save_checkpoint(this, filename, overwrite)
-    class(simplefield_design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-
-    call neko_error("design_simple_save_checkpoint not implemented yet")
-  end subroutine design_simple_save_checkpoint
-
-  subroutine design_simple_load_checkpoint(this, filename)
-    class(simplefield_design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-
-    call neko_error("design_simple_load_checkpoint not implemented yet")
-  end subroutine design_simple_load_checkpoint
 
 end module simplefield_design
