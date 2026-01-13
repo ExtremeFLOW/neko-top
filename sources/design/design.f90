@@ -116,6 +116,13 @@ module design
      !> Write the design
      procedure(design_write), public, pass(this), deferred :: write
 
+     !> Save the design to a checkpoint file
+     procedure(design_save_checkpoint), public, pass(this), deferred :: &
+          save_checkpoint
+     !> Load the design from a checkpoint file
+     procedure(design_load_checkpoint), public, pass(this), deferred :: &
+          load_checkpoint
+
      ! ----------------------------------------------------------------------- !
      ! Methods
 
@@ -123,6 +130,9 @@ module design
      procedure, pass(this) :: init_base => design_init_base
      !> Free the base design
      procedure, pass(this) :: free_base => design_free_base
+
+     !> Get the name of the design.
+     procedure, public, pass(this) :: get_name => design_get_name
      !> Return the number of design variables
      procedure, public, pass(this) :: size => design_size
      !> Return the number of global design variables
@@ -140,6 +150,7 @@ module design
      procedure, pass(this) :: design_get_z
      !> Getter of i'th element of z
      procedure, pass(this) :: design_get_z_i
+
   end type design_t
 
   ! ========================================================================== !
@@ -200,6 +211,19 @@ module design
        class(design_t), intent(inout) :: this
        integer, intent(in) :: idx
      end subroutine design_write
+
+     subroutine design_save_checkpoint(this, filename, overwrite)
+       import design_t, json_file
+       class(design_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+       logical, intent(in), optional :: overwrite
+     end subroutine design_save_checkpoint
+
+     subroutine design_load_checkpoint(this, filename)
+       import design_t, json_file
+       class(design_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+     end subroutine design_load_checkpoint
   end interface
 
   public :: design_t, design_factory
@@ -253,6 +277,15 @@ contains
     this%n = 0
     this%n_global = 0
   end subroutine design_free_base
+
+  !> Get the name of the design.
+  !! @param this The design object.
+  !! @return The name of the design.
+  function design_get_name(this) result(name)
+    class(design_t), intent(in) :: this
+    character(len=:), allocatable :: name
+    name = this%name
+  end function design_get_name
 
   !> Return the number of design variables
   !! @param this The design object.

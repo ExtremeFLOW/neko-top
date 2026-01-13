@@ -240,6 +240,11 @@ module brinkman_design
      ! but it would make sense to have it in here so you provide it
      ! with dF/d_design_indicator and it updates itself.
      ! procedure, pass(this) :: update => brinkman_design_update_design
+
+     !> Save checkpoint
+     procedure, pass(this) :: save_checkpoint => brinkman_design_save_checkpoint
+     !> Load checkpoint
+     procedure, pass(this) :: load_checkpoint => brinkman_design_load_checkpoint
   end type brinkman_design_t
 
 contains
@@ -627,5 +632,21 @@ contains
     call this%output%sample(real(idx, kind=rp))
 
   end subroutine brinkman_design_write
+
+  subroutine brinkman_design_save_checkpoint(this, filename, overwrite)
+    class(brinkman_design_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    call neko_error('design_brinkman_save_checkpoint not implemented yet.')
+
+  end subroutine brinkman_design_save_checkpoint
+
+  subroutine brinkman_design_load_checkpoint(this, filename)
+    class(brinkman_design_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+
+    call neko_error('design_brinkman_load_checkpoint not implemented yet.')
+
+  end subroutine brinkman_design_load_checkpoint
 
 end module brinkman_design
