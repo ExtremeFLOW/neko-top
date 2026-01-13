@@ -429,7 +429,6 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Ensure the MMA object is allocated with the same configuration as the file
-
     if (n_array(pe_rank + 1) .ne. this%n) then
        call neko_error('mma: mismatch in n during HDF5 read')
     end if
