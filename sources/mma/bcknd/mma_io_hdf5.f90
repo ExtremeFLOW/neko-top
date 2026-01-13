@@ -62,6 +62,8 @@ contains
     integer :: ierr, info, drank
     logical :: file_exists, mma_exists, overwrite_flag
     integer :: n_accum, n_array(pe_size)
+    character(len=:), allocatable :: h5_group
+    h5_group = 'MMA/checkpoint'
 
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
@@ -86,7 +88,6 @@ contains
     ! Handle overwriting if the file exists
     file_exists = .false.
     inquire(file=trim(filename), exist=file_exists)
-
     if (.not. file_exists) then
        call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
             access_prp = fapl_id)
@@ -119,6 +120,7 @@ contains
                   'already contains MMA group; use overwrite option to replace')
           end if
        end if
+
     end if
 
     ! Assign the correct HDF5 data type based on the neko real kind
@@ -338,6 +340,7 @@ contains
     integer :: n, n_global, m, max_iter, n_accum, n_array(pe_size)
     real(kind=rp) :: asyinit, asyincr, asydecr, epsimin
 
+    character(len=*), parameter :: h5_group = '/MMA/checkpoint'
     character(len=12) :: bcknd, subsolver
 
     ! Initialize reader values
@@ -362,7 +365,7 @@ contains
     call h5pset_fapl_mpio_f(fapl_id, mpi_comm, info, ierr)
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
          access_prp = fapl_id)
-    call h5gopen_f(file_id, '/MMA/checkpoint', grp_id, ierr)
+    call h5gopen_f(file_id, h5_group, grp_id, ierr)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)

@@ -345,7 +345,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), intent(in), allocatable :: bcknd, subsolver
+    character(len=*), intent(in), optional :: bcknd, subsolver
     character(len=256) :: log_msg
     integer :: i, ierr
 
@@ -415,13 +415,24 @@ contains
 
     ! Based on the Cpp Code by Niels
     if (.not. present(max_iter)) this%max_iter = 100
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + &
-         this%n_global, rp))
+    if (.not. present(epsimin)) then
+       this%epsimin = 1.0e-9_rp * sqrt(real(this%m + this%n_global, rp))
+    end if
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
+
+    ! Set default backend based on NEKO_BCKND_DEVICE
+    if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 0) then
+       this%bcknd = "cpu"
+    else if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 1) then
+       this%bcknd = "device"
+    end if
+
+    ! Set default subsolver
+    if (.not. present(subsolver)) this%subsolver = "dip"
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -429,8 +440,8 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-    this%bcknd = bcknd
-    this%subsolver = subsolver
+    if (present(bcknd)) this%bcknd = bcknd
+    if (present(subsolver)) this%subsolver = subsolver
 
     call neko_log%section('MMA Parameters')
 
@@ -439,7 +450,7 @@ contains
     write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
     call neko_log%message(log_msg)
 
-    write(log_msg, '(A10,1X,I0)') 'n         ', this%n
+    write(log_msg, '(A10,1X,I0)') 'n         ', this%n_global
     call neko_log%message(log_msg)
     write(log_msg, '(A10,1X,I0)') 'm         ', this%m
     call neko_log%message(log_msg)
