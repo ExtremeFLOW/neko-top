@@ -352,14 +352,17 @@ contains
     bcknd = ''
     subsolver = ''
 
+    ! MPI interfaces
+    info = MPI_INFO_NULL%mpi_val
+    mpi_comm = NEKO_COMM%mpi_val
+
     ! Open file and prepare reading
     call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
-    info = MPI_INFO_NULL%mpi_val
-    mpi_comm = NEKO_COMM%mpi_val
     call h5pset_fapl_mpio_f(fapl_id, mpi_comm, info, ierr)
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
          access_prp = fapl_id)
+    call h5gopen_f(file_id, '/MMA/checkpoint', grp_id, ierr)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -373,8 +376,6 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Read basic Parameters attributes
-
-    call h5gopen_f(file_id, '/MMA/checkpoint', grp_id, ierr)
 
     ! Read scalar attributes
     ddim(1) = 1
