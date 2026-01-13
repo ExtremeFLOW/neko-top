@@ -55,6 +55,9 @@ contains
   !! vectors and matrices, then perform the write. Currently the low-level
   !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
   !! available at link time a runtime error will be raised.
+  !! @param this The MMA object to save.
+  !! @param filename The HDF5 file to write to.
+  !! @param overwrite Logical flag to allow overwriting existing files.
   module subroutine mma_save_checkpoint(this, filename, overwrite)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
@@ -331,11 +334,13 @@ contains
   !> Read the MMA object from an HDF5 file (parallel-aware).
   !! This routine will perform the read and then ensure device-host
   !! synchronization for all vectors and matrices.
+  !! @param this The MMA object to load data into.
+  !! @param filename The HDF5 file to read from.
   module subroutine mma_load_checkpoint(this, filename)
     class(mma_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
-    integer(hid_t) :: fapl_id, file_id, dset_id, &
-         attr_id, grp_id, str_type, filespace, memspace, xf_id
+    integer(hid_t) :: fapl_id, file_id, dset_id, attr_id, grp_id
+    integer(hid_t) :: str_type, filespace, memspace, xf_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, mpi_comm
