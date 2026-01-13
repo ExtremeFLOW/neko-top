@@ -66,8 +66,6 @@ contains
     integer :: ierr, info, drank
     logical :: file_exists, mma_exists, overwrite_flag
     integer :: n_accum, n_array(pe_size)
-    character(len=:), allocatable :: h5_group
-    h5_group = 'MMA/checkpoint'
 
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
