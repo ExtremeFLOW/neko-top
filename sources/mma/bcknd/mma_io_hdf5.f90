@@ -1,4 +1,8 @@
-!> @file mma.f90
+!> @file mma_io_hdf5.f90
+!! @brief HDF5 IO submodule for the mma object.
+!! @details
+!! This submodule provides routines for saving and loading the mma
+!! optimization object to and from HDF5 files in a parallel-aware manner.
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
