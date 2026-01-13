@@ -823,10 +823,92 @@ contains
   end subroutine brinkman_design_save_checkpoint
 
   subroutine brinkman_design_load_checkpoint(this, filename)
+    use hdf5
     class(brinkman_design_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
 
-    call neko_error('design_brinkman_load_checkpoint not implemented yet.')
+    ! ------------------------------------------------------------------------ !
+    ! Open HDF5 environment and file
+
+    call h5open_f(ierr)
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, &
+         MPI_INFO_NULL%mpi_val, ierr)
+    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
+         access_prp = fapl_id)
+
+    ! Open the design checkpoint group
+    group_name = "Checkpoint/Design"
+    call h5gopen_f(file_id, group_name, group_id, ierr)
+
+    ! Assign the correct HDF5 data type based on the neko real kind
+    select case (rp)
+    case (dp)
+       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
+    case (sp)
+       H5T_NEKO_REAL = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma: unsupported real kind for HDF5')
+    end select
+
+    ! ------------------------------------------------------------------------ !
+    ! Read global information and verify compatibility
+
+    ! Open parameters group
+    call h5gopen_f(group_id, "Parameters", params_group_id, ierr)
+
+    ! Read design type
+    call h5aopen_f(params_group_id, 'type', attr_id, ierr)
+    call h5aget_type_f(attr_id, str_type, ierr)
+    call h5aread_f(attr_id, str_type, design_type, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read the design name
+    call h5aopen_f(params_group_id, 'name', attr_id, ierr)
+    call h5aget_type_f(attr_id, str_type, ierr)
+    call h5aread_f(attr_id, str_type, design_name, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read design size
+    call h5aopen_f(params_group_id, 'n', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_local, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read global size
+    call h5aopen_f(params_group_id, 'n_global', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_global, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Close hdf5 objects
+    call h5tclose_f(str_type, ierr)
+    call h5gclose_f(params_group_id, ierr)
+
+    ! Verify compatibility
+    if (trim(design_type) .ne. 'brinkman') then
+       call neko_error('Design type mismatch when loading checkpoint: ' // &
+            'expected "brinkman", got "' // trim(design_type) // '"')
+    end if
+    if (trim(design_name) .ne. trim(this%get_name())) then
+       call neko_error('Design name mismatch when loading checkpoint: ' // &
+            'expected "' // trim(this%get_name()) // &
+            '", got "' // trim(design_name) // '"')
+    end if
+    if (n_local .ne. this%size()) then
+       call neko_error('Design size mismatch when loading checkpoint: ' // &
+            'expected ' // trim(adjustl(itoa(this%size()))) // &
+            ', got ' // trim(adjustl(itoa(n_local))))
+    end if
+    if (n_global .ne. this%size_global()) then
+       call neko_error('Design global size mismatch when loading ' // &
+            'checkpoint: expected ' // trim(adjustl(itoa(this%size_global()))) // &
+            ', got ' // trim(adjustl(itoa(n_global))))
+    end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Read the Brinkman specific fields (design_indicator should be sufficient)
+
+    ! Prepare dataspace variables
+
 
   end subroutine brinkman_design_load_checkpoint
 
