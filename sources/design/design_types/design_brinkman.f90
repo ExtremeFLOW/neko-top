@@ -34,7 +34,7 @@
 
 ! Implements the `brinkman_design_t` type.
 module brinkman_design
-  use num_types, only: rp, sp
+  use num_types, only: rp, sp, dp
   use field, only: field_t
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
@@ -61,6 +61,7 @@ module brinkman_design
   use field_math, only: field_rzero
   use json_utils, only: json_get, json_get_or_default, json_get
   use utils, only: neko_error
+  use comm, only: NEKO_COMM
   implicit none
   private
 
@@ -634,10 +635,190 @@ contains
   end subroutine brinkman_design_write
 
   subroutine brinkman_design_save_checkpoint(this, filename, overwrite)
+    use hdf5
+    use mpi_f08, only: MPI_INFO_NULL, MPI_Scan, MPI_INTEGER8, MPI_SUM
     class(brinkman_design_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
-    call neko_error('design_brinkman_save_checkpoint not implemented yet.')
+    logical :: overwrite_flag
+
+    ! HDF5 related variables
+    character(len=128) :: group_name
+    integer(HID_T) :: file_id, fapl_id, group_id, params_group_id, xf_id
+    integer(HID_T) :: filespace, memspace, attr_id, str_type, dset_id
+    integer(hid_t) :: H5T_NEKO_REAL
+    integer(HSIZE_T), dimension(1) :: ddim, dcount, doffset
+    integer :: ierr, info
+    logical :: file_exists, group_exists
+    integer(kind=8) :: local_n8, global_n8, offset_n8
+
+    ! ------------------------------------------------------------------------ !
+    ! Synchronize the variables to host.
+
+    overwrite_flag = .false.
+    group_name = "Checkpoint/Design"
+
+    if (present(overwrite)) overwrite_flag = overwrite
+
+    call this%design_indicator%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    ! ------------------------------------------------------------------------ !
+    ! Initialize the HDF5 environment and file.
+
+    ! Start environment
+    call h5open_f(ierr)
+
+    ! Prepare the HDF5 settings for MPIO access
+    info = MPI_INFO_NULL%mpi_val
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
+
+    ! Handle overwriting if the file exists
+    file_exists = .false.
+    inquire(file=trim(filename), exist=file_exists)
+    if (file_exists) then
+
+       ! Check for existing group
+       group_exists = .false.
+       call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
+            access_prp = fapl_id)
+       call h5lexists_f(file_id, group_name, group_exists, ierr)
+
+       call h5fclose_f(file_id, ierr)
+
+       if (group_exists .and. overwrite_flag) then
+
+          call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
+               access_prp = fapl_id)
+          call h5gunlink_f(file_id, group_name, ierr)
+          call h5fclose_f(file_id, ierr)
+
+       else if (group_exists .and. .not. overwrite_flag) then
+          call neko_error('HDF5 file "' // trim(filename) // &
+               '" already contains "' // group_name // &
+               '"; use overwrite option to replace')
+       end if
+    end if
+
+    ! Open or create the file
+    if (file_exists) then
+       call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
+            access_prp = fapl_id)
+    else
+       call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
+            access_prp = fapl_id)
+    end if
+
+    ! Create group for the Brinkman design checkpoint
+    call h5gcreate_f(file_id, group_name, group_id, ierr, &
+         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
+         gapl_id = h5p_default_f)
+
+    ! ------------------------------------------------------------------------ !
+    ! Write the global information, name and size.
+
+    ! Create a parameters group and filespace
+    call h5gcreate_f(group_id, "Parameters", params_group_id, ierr, &
+         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
+         gapl_id = h5p_default_f)
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
+
+    ! Create the string type
+    call h5tcopy_f(H5T_FORTRAN_S1, str_type, ierr)
+    call h5tset_strpad_f(str_type, H5T_STR_SPACEPAD_F, ierr)
+
+    ! Save the design type
+    ddim(1) = 8
+    call h5tset_size_f(str_type, ddim(1), ierr)
+    call h5acreate_f(params_group_id, 'type', str_type, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, str_type, "brinkman", ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Save the design name
+    ddim(1) = len_trim(this%get_name())
+    call h5tset_size_f(str_type, ddim(1), ierr)
+    call h5acreate_f(params_group_id, 'name', str_type, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, str_type, trim(this%get_name()), ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Close the string type
+    call h5tclose_f(str_type, ierr)
+
+    ! Save the design size
+    ddim(1) = 1
+    call h5acreate_f(params_group_id, 'n', H5T_NATIVE_INTEGER, filespace, &
+         attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%size(), ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Save the global size
+    ddim(1) = 1
+    call h5acreate_f(params_group_id, 'n_global', H5T_NATIVE_INTEGER, &
+         filespace, attr_id, ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, this%size_global(), ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Close the spaces
+    call h5sclose_f(filespace, ierr)
+    call h5gclose_f(params_group_id, ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! Write the Brinkman specific fields (design_indicator should be sufficient)
+
+    ! Prepare dataspace variables
+    local_n8 = int(this%size(), 8)
+    global_n8 = int(this%size_global(), 8)
+    call MPI_Scan(local_n8, offset_n8, 1, MPI_INTEGER8, MPI_SUM, &
+         NEKO_COMM, ierr)
+
+    dcount(1) = local_n8
+    doffset(1) = offset_n8 - local_n8
+    ddim(1) = global_n8
+
+    ! Assign the correct HDF5 data type based on the neko real kind
+    select case (rp)
+    case (dp)
+       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
+    case (sp)
+       H5T_NEKO_REAL = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma: unsupported real kind for HDF5')
+    end select
+
+    ! Create file and memory dataspaces
+    call h5screate_simple_f(1, ddim, filespace, ierr)
+    call h5screate_simple_f(1, dcount, memspace, ierr)
+
+    ! Dataset transfer property list: collective
+    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
+    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+
+    ! Select hyperslab in the file space
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
+         ierr)
+
+    ! Write design_indicator
+    call h5dcreate_f(group_id, 'design_indicator', H5T_NEKO_REAL, &
+         filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%design_indicator%x(1,1,1,1), &
+         ddim, ierr, file_space_id = filespace, mem_space_id = memspace, &
+         xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Close the dataspaces and property lists
+    call h5sclose_f(filespace, ierr)
+    call h5sclose_f(memspace, ierr)
+    call h5pclose_f(xf_id, ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! Finalize the HDF5 environment and cleanup.
+
+    call h5gclose_f(group_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
+    call h5close_f(ierr)
 
   end subroutine brinkman_design_save_checkpoint
 
