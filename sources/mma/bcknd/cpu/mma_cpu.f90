@@ -715,17 +715,15 @@ contains
              res = lambda * s - epsi
 
              ! Compute squared norms for the residuals
-             residual_small = [rey, rez, relambda, remu, rezeta, res]
-             re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2 + &
-                  norm2(residual_small)**2
+             re_sq_norm = norm2(rex)**2 + norm2(rexsi)**2 + norm2(reeta)**2
+             call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, &
+                  1, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
-             call MPI_Allreduce(MPI_IN_PLACE, re_sq_norm, 1, &
-                  mpi_real_precision, mpi_sum, neko_comm, ierr)
-             new_residual = sqrt(re_sq_norm)
+             residual_small = [rey, rez, relambda, remu, rezeta, res]
+             new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
 
              steg = steg / 2.0_rp
           end do
-
           steg = 2.0_rp * steg ! Correction for the final division by 2
 
           residual = [rex, rey, rez, relambda, rexsi, reeta, remu, rezeta, res]
@@ -733,7 +731,6 @@ contains
           ! Update the maximum and norm of the residuals
           residual_norm = new_residual
           residual_max = maxval(abs(residual))
-
           call MPI_Allreduce(MPI_IN_PLACE, residual_max, 1, &
                mpi_real_precision, MPI_MAX, neko_comm, ierr)
        end do
@@ -1028,7 +1025,7 @@ contains
             ! Comput the value of y that minimizes L_y for the current λ
             ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
             ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-            do i = 1, this%m
+            do i=1, this%m
                if (abs(d(i)) < NEKO_EPS) then
                   ! to avoid devision by zero in case d=0
                   y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))

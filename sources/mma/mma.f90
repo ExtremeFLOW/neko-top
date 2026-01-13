@@ -427,7 +427,7 @@ contains
     ! Set default backend based on NEKO_BCKND_DEVICE
     if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 0) then
        this%bcknd = "cpu"
-    else if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 1) then
+    else if (.not. present(bcknd)) then
        this%bcknd = "device"
     end if
 
