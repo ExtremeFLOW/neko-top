@@ -84,13 +84,13 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     add_pfunit_ctest(${test_name}
         TEST_SOURCES ${pf_file}
         LINK_LIBRARIES Neko-TOP::neko-top
-        MAX_PES 1
+        MAX_PES 2
     )
 
     # Disable treating unused-variable as error for pfunit tests
     if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
         target_compile_options(${test_name} PRIVATE
-            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-error=unused-variable>
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
         )
     endif()
 
@@ -100,6 +100,7 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     set_tests_properties(${test_name} PROPERTIES
         LABELS "unit"
         ENVIRONMENT "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/${test_name}.log"
+        TIMEOUT 60
     )
     add_dependencies(Unit ${test_name})
 endforeach()
