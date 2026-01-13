@@ -70,8 +70,8 @@ contains
     logical :: file_exists
     integer :: file_unit
     integer(hid_t) :: H5T_NEKO_REAL, str_type, hdferr
-    integer(hid_t) :: plist_id, file_id, attr_id, dset_id, filespace, memspace
-    integer(hid_t) :: xf_id
+    integer(hid_t) :: fapl_id, file_id, attr_id, dset_id, filespace, memspace
+    integer(hid_t) :: xf_id, grp_id
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: read_n(pe_size), read_n_global, read_m
     integer :: read_max_iter
@@ -126,6 +126,7 @@ contains
     call obj%init_from_components(x, n, m, a0, a, c, d, xmin, xmax, &
          max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
 
+    group_name = '/MMA/checkpoint'
     fname = 'mma_test_write.h5'
 
     call neko_log%message("Writing MMA object to HDF5 file: " // trim(fname))
@@ -161,10 +162,11 @@ contains
 
     ! Open file and prepare reading
     call h5open_f(ierr)
-    call h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, ierr)
-    call h5pset_fapl_mpio_f(plist_id, NEKO_COMM%mpi_val, MPI_INFO_NULL, ierr)
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, MPI_INFO_NULL, ierr)
     call h5fopen_f(trim(fname), H5F_ACC_RDONLY_F, file_id, ierr, &
-         access_prp = plist_id)
+         access_prp = fapl_id)
+    call h5gopen_f(file_id, group_name, grp_id, ierr)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -178,42 +180,41 @@ contains
 
     ! Read attributes
     ddim(1) = 1
-    group_name = '/MMA/Parameters'
-    call h5aopen_by_name_f(file_id, group_name, 'n_global', attr_id, ierr)
+    call h5aopen_f(grp_id, 'n_global', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n_global, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'm', attr_id, ierr)
+    call h5aopen_f(grp_id, 'm', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_m, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'max_iter', attr_id, ierr)
+    call h5aopen_f(grp_id, 'max_iter', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_max_iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'asyinit', attr_id, ierr)
+    call h5aopen_f(grp_id, 'asyinit', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, read_asyinit, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'asyincr', attr_id, ierr)
+    call h5aopen_f(grp_id, 'asyincr', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, read_asyincr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'asydecr', attr_id, ierr)
+    call h5aopen_f(grp_id, 'asydecr', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, read_asydecr, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'epsimin', attr_id, ierr)
+    call h5aopen_f(grp_id, 'epsimin', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NEKO_REAL, read_epsimin, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! Read strings
-    call h5aopen_by_name_f(file_id, group_name, 'bcknd', attr_id, ierr)
+    call h5aopen_f(grp_id, 'bcknd', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, read_bcknd, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5aopen_by_name_f(file_id, group_name, 'subsolver', attr_id, ierr)
+    call h5aopen_f(grp_id, 'subsolver', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, read_subsolver, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
@@ -223,26 +224,26 @@ contains
     ! Read Array parameter types
 
     ddim(1) = pe_size
-    call h5aopen_by_name_f(file_id, group_name, 'n', attr_id, ierr)
+    call h5aopen_f(grp_id, 'n', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, read_n, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
     ! Read penalty parameters
     ddim(1) = 1
-    call h5dopen_f(file_id, '/MMA/a0', dset_id, ierr)
+    call h5dopen_f(grp_id, 'a0', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
     ddim(1) = m
-    call h5dopen_f(file_id, '/MMA/a', dset_id, ierr)
+    call h5dopen_f(grp_id, 'a', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_a, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/c', dset_id, ierr)
+    call h5dopen_f(grp_id, 'c', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_c, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/d', dset_id, ierr)
+    call h5dopen_f(grp_id, 'd', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_d, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
@@ -268,13 +269,13 @@ contains
          ierr)
 
     ! Read xold1
-    call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xold1', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold1%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Read xold2
-    call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xold2', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, read_xold2%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
@@ -285,8 +286,9 @@ contains
     call h5sclose_f(filespace, ierr)
 
     ! Close file and property list
+    call h5gclose_f(grp_id, ierr)
     call h5fclose_f(file_id, ierr)
-    call h5pclose_f(plist_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
     ! ------------------------------------------------------------------------ !
@@ -471,7 +473,7 @@ contains
   subroutine restart_mma(this)
     class(test_io_hdf5_case), intent(inout) :: this
 
-    type(vector_t) :: x, x_init, x_50, x_after
+    type(vector_t) :: x, x_init, x_50, x_ref
 
     real(kind=rp) :: f
     type(vector_t) :: df, g
@@ -484,6 +486,7 @@ contains
     integer :: max_iter
 
     character(len=:), allocatable :: bcknd, subsolver, fname
+    character(len=256) :: msg
     logical :: file_exists
     integer :: file_unit, ierr
 
@@ -500,7 +503,7 @@ contains
     call x%init(n)
     call x_50%init(n)
     call x_init%init(n)
-    call x_after%init(n)
+    call x_ref%init(n)
 
     if (pe_rank .eq. 0) then
        x_init%x = [0.9_rp, 1.0_rp, 1.1_rp, 1.2_rp]
@@ -552,7 +555,7 @@ contains
     end do
 
     ! Store result after solving all iterations
-    x_after = x
+    x_ref = x
 
     call optimizer%free()
 
@@ -574,16 +577,17 @@ contains
 
     ! Check that the result matches the one after 10 iterations
     call x%copy_from(DEVICE_TO_HOST, sync = .false.)
-    call x_after%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call x_ref%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     do i = 1, n
-       @assertEqual(x%x(i), x_after%x(i), 1.0e-16_rp)
+       write(msg, '(A,I0,A)') "X at index (", i, ")"
+       @assertEqual(x_ref%x(i), x%x(i), 1.0e-16_rp, message = trim(msg))
     end do
 
     call x%free()
     call x_50%free()
     call x_init%free()
-    call x_after%free()
+    call x_ref%free()
 
     call df%free()
     call g%free()

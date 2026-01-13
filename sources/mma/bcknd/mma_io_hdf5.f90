@@ -56,7 +56,7 @@ contains
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
     integer(hid_t) :: fapl_id, xf_id, file_id, dset_id, filespace, memspace, &
-         attr_id, grp_id, mma_grp_id, str_type
+         attr_id, grp_id, str_type, mma_grp_id
     integer(hid_t) :: H5T_NEKO_REAL
     integer(hsize_t), dimension(1) :: ddim, dcount, doffset
     integer :: ierr, info, drank
@@ -76,7 +76,7 @@ contains
          NEKO_COMM, ierr)
 
     ! ------------------------------------------------------------------------ !
-    ! Prepare the HDF5 settings for MPIO access
+    ! Prepare the HDF5 file, settings for MPIO access and groups
 
     call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
@@ -86,41 +86,40 @@ contains
     ! Handle overwriting if the file exists
     file_exists = .false.
     inquire(file=trim(filename), exist=file_exists)
-    if (file_exists) then
+
+    if (.not. file_exists) then
+       call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
+            access_prp = fapl_id)
+
+       ! Create the MMA/checkpoint group
+       call h5gcreate_f(file_id, "MMA", mma_grp_id, ierr)
+       call h5gcreate_f(mma_grp_id, "checkpoint", grp_id, ierr)
+
+    else
+       call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, fapl_id)
 
        ! Check for existing MMA group
        mma_exists = .false.
-       call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
-            access_prp = fapl_id)
-       call h5lexists_f(file_id, "MMA", mma_exists, ierr)
+       call h5lexists_f(file_id, '/MMA', mma_exists, ierr)
 
-       call h5fclose_f(file_id, ierr)
+       if (.not. mma_exists) then
+          ! Create the MMA/checkpoint group
+          call h5gcreate_f(file_id, "MMA", mma_grp_id, ierr)
+          call h5gcreate_f(mma_grp_id, "checkpoint", grp_id, ierr)
+       else
+          ! Open the existing "MMA" group
+          call h5gopen_f(file_id, 'MMA', mma_grp_id, ierr)
+          call h5lexists_f(mma_grp_id, 'checkpoint', mma_exists, ierr)
 
-       if (mma_exists .and. overwrite_flag) then
-
-          call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
-               access_prp = fapl_id)
-          call h5gunlink_f(file_id, "MMA", ierr)
-          call h5fclose_f(file_id, ierr)
-
-       else if (mma_exists .and. .not. overwrite_flag) then
-          call neko_error('mma: HDF5 file "' // trim(filename) // &
-               '" already contains MMA group; use overwrite option to replace')
+          if (mma_exists .and. overwrite_flag) then
+             call h5gunlink_f(mma_grp_id, "checkpoint", ierr)
+             call h5gcreate_f(mma_grp_id, "checkpoint", grp_id, ierr)
+          else
+             call neko_error('mma: HDF5 file "' // trim(filename) // '" ' // &
+                  'already contains MMA group; use overwrite option to replace')
+          end if
        end if
     end if
-
-    ! Open or create the file
-    if (file_exists) then
-       call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, &
-            access_prp = fapl_id)
-    else
-       call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
-            access_prp = fapl_id)
-    end if
-
-    call h5gcreate_f(file_id, "MMA", mma_grp_id, ierr, &
-         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
-         gapl_id = h5p_default_f)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -135,12 +134,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Write basic Parameters attributes
 
-    call h5gcreate_f(mma_grp_id, "Parameters", grp_id, ierr, &
-         lcpl_id = h5p_default_f, gcpl_id = h5p_default_f, &
-         gapl_id = h5p_default_f)
-
     ! Integer-valued attributes
-
     ddim = 1
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
 
@@ -208,7 +202,6 @@ contains
     call h5sclose_f(filespace, ierr)
 
     ! Array-valued attributes
-
     drank = 1
     ddim = pe_size
     call h5screate_simple_f(drank, ddim, filespace, ierr)
@@ -219,16 +212,13 @@ contains
 
     call h5sclose_f(filespace, ierr)
 
-    ! Close the Parameters group
-    call h5gclose_f(grp_id, ierr)
-
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
     ddim(1) = 1
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dcreate_f(grp_id, 'a0', H5T_NEKO_REAL, filespace, dset_id, ierr)
     call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
@@ -238,16 +228,16 @@ contains
 
     call h5screate_simple_f(drank, ddim, filespace, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a%x(1), ddim, ierr)
+    call h5dcreate_f(grp_id, 'a', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%a%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%c%x(1), ddim, ierr)
+    call h5dcreate_f(grp_id, 'c', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%c%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dcreate_f(mma_grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%d%x(1), ddim, ierr)
+    call h5dcreate_f(grp_id, 'd', H5T_NEKO_REAL, filespace, dset_id, ierr)
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%d%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
     ! Close the filespace and group
@@ -277,44 +267,44 @@ contains
          ierr)
 
     ! Write xmin
-    call h5dcreate_f(mma_grp_id, 'xmin', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'xmin', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmin%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmin%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Write xmax
-    call h5dcreate_f(mma_grp_id, 'xmax', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'xmax', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmax%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xmax%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Write xold1
-    call h5dcreate_f(mma_grp_id, 'xold1', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'xold1', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold1%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold1%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Write xold2
-    call h5dcreate_f(mma_grp_id, 'xold2', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'xold2', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold2%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%xold2%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Write low
-    call h5dcreate_f(mma_grp_id, 'low', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'low', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%low%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%low%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
     ! Write upp
-    call h5dcreate_f(mma_grp_id, 'upp', H5T_NEKO_REAL, &
+    call h5dcreate_f(grp_id, 'upp', H5T_NEKO_REAL, &
          filespace, dset_id, ierr)
-    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%upp%x(1), ddim, ierr, &
+    call h5dwrite_f(dset_id, H5T_NEKO_REAL, this%upp%x, ddim, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
@@ -326,6 +316,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Close the group and file
 
+    call h5gclose_f(grp_id, ierr)
     call h5gclose_f(mma_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
@@ -383,7 +374,7 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Read basic Parameters attributes
 
-    call h5gopen_f(file_id, 'MMA/Parameters', grp_id, ierr)
+    call h5gopen_f(file_id, '/MMA/checkpoint', grp_id, ierr)
 
     ! Read scalar attributes
     ddim(1) = 1
@@ -436,9 +427,9 @@ contains
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, n_array, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
 
-    call h5gclose_f(grp_id, ierr)
-
+    ! ------------------------------------------------------------------------ !
     ! Ensure the MMA object is allocated with the same configuration as the file
+
     if (n_array(pe_rank + 1) .ne. this%n) then
        call neko_error('mma: mismatch in n during HDF5 read')
     end if
@@ -473,25 +464,23 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Global arrays datasets
 
-    call h5gopen_f(file_id, 'MMA', grp_id, ierr)
-
     ! Read penalty parameters
     ddim(1) = 1
-    call h5dopen_f(file_id, '/MMA/a0', dset_id, ierr)
+    call h5dopen_f(grp_id, 'a0', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%a0, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
     ddim(1) = m
-    call h5dopen_f(file_id, '/MMA/a', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%a%x(1), ddim, ierr)
+    call h5dopen_f(grp_id, 'a', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%a%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/c', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%c%x(1), ddim, ierr)
+    call h5dopen_f(grp_id, 'c', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%c%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/d', dset_id, ierr)
-    call h5dread_f(dset_id, H5T_NEKO_REAL, this%d%x(1), ddim, ierr)
+    call h5dopen_f(grp_id, 'd', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, this%d%x, ddim, ierr)
     call h5dclose_f(dset_id, ierr)
 
     ! ------------------------------------------------------------------------ !
@@ -518,32 +507,32 @@ contains
     call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
          ierr)
 
-    call h5dopen_f(file_id, '/MMA/xmin', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xmin', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmin%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/xmax', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xmax', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%xmax%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/xold1', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xold1', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold1%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/xold2', dset_id, ierr)
+    call h5dopen_f(grp_id, 'xold2', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%xold2%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/low', dset_id, ierr)
+    call h5dopen_f(grp_id, 'low', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%low%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
 
-    call h5dopen_f(file_id, '/MMA/upp', dset_id, ierr)
+    call h5dopen_f(grp_id, 'upp', dset_id, ierr)
     call h5dread_f(dset_id, H5T_NEKO_REAL, this%upp%x, dcount, ierr, &
          file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
     call h5dclose_f(dset_id, ierr)
