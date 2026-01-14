@@ -534,7 +534,8 @@ contains
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
-    call this%mma%write(trim(filename))
+    call this%mma%save_checkpoint(trim(filename), overwrite)
+    call design%save_checkpoint(trim(filename), overwrite)
 
   end subroutine mma_optimizer_save_checkpoint
 
@@ -583,7 +584,8 @@ contains
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
-    call this%mma%read(trim(filename))
+    call this%mma%load_checkpoint(trim(filename))
+    call design%load_checkpoint(trim(filename))
 
   end subroutine mma_optimizer_restore_checkpoint
 end module mma_optimizer
