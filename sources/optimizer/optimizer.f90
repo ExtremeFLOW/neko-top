@@ -167,11 +167,12 @@ module optimizer
      end subroutine optimizer_write
 
      !> Interface for writing a checkpoint
-     subroutine optimizer_save_checkpoint(this, filename, iter)
+     subroutine optimizer_save_checkpoint(this, filename, iter, overwrite)
        import optimizer_t
        class(optimizer_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
        integer, intent(in) :: iter
+       logical, intent(in), optional :: overwrite
      end subroutine optimizer_save_checkpoint
 
      !> Interface for reading a checkpoint
@@ -261,23 +262,33 @@ contains
     real(kind=rp) :: start_time, elapsed_time
     real(kind=rp) :: iteration_start_time, iteration_end_time
     real(kind=rp) :: iteration_average_time
-    logical :: converged
+    logical :: converged, file_exists
     integer :: iter, stop_flag
+
+    ! Initialize variables
+    iter = 0
+    stop_flag = 1
+    converged = .false.
+    iteration_average_time = 0.0_rp
+
+    ! Read run time checkpoint if present
+    inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
+    if (file_exists) then
+       call this%restore_checkpoint('optimizer_rt_checkpoint.hdf5', iter)
+       write(*, *) 'Resuming optimizer from checkpoint at iteration ', iter
+    end if
 
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
-    call this%write(0, problem)
-    call design%write(0)
+
+    call this%write(iter, problem)
+    call design%write(iter)
 
     call neko_log%section('Optimization Loop')
 
-    stop_flag = 1
-    converged = .false.
     start_time = MPI_Wtime()
-    iteration_average_time = 0.0_rp
-    do iter = 1, this%max_iterations
-       call this%save_checkpoint('optimizer_checkpoint.hdf5', iter)
-
+    do while (iter .lt. this%max_iterations)
+       iter = iter + 1
        call profiler_start_region('Optimizer iteration')
        iteration_start_time = MPI_Wtime()
 
@@ -311,6 +322,10 @@ contains
           end if
        end if
     end do
+
+    if (stop_flag .eq. 2) then
+       call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', iter, .true.)
+    end if
 
     ! Check that the final design is valid
     call this%validate(problem, design)

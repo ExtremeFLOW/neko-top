@@ -57,7 +57,6 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
-  use utils, only: filename_split
   implicit none
   private
 
@@ -469,23 +468,120 @@ contains
   ! Checkpointing methods for the MMA optimizer
 
   subroutine mma_optimizer_save_checkpoint(this, filename, iter, overwrite)
+    use hdf5
+    use mpi_f08, only: MPI_INFO_NULL
+    use comm, only: NEKO_COMM
+    implicit none
+
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer, intent(in) :: iter
     logical, intent(in), optional :: overwrite
-    logical :: overwrite_flag
+    logical :: overwrite_flag, file_exists
+    integer :: file_unit
+
+    ! HDF5 variables
+    integer(hid_t) :: file_id, fapl_id, grp_id, attr_id, filespace
+    integer :: ierr
+    integer :: info
+    character(len=256) :: grp_name
+    integer(hsize_t) :: ddim(1)
 
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
 
+    ! Remove the existing file if overwrite is true
+    inquire(file=filename, exist=file_exists)
+    if (file_exists .and. overwrite_flag) then
+       open(newunit=file_unit, file=filename, status='old')
+       close(file_unit, status='delete')
+    else if (file_exists .and. .not. overwrite_flag) then
+       call neko_error('Checkpoint file ' // trim(filename) // &
+            ' already exists. Set overwrite=true to overwrite the existing file.')
+    end if
 
+    ! ------------------------------------------------------------------------ !
+    ! Open the HDF5 context and write identification parameters
+
+    call h5open_f(ierr)
+
+    ! Prepare the HDF5 settings for MPIO access
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    info = MPI_INFO_NULL%mpi_val
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
+
+    ! Create or open the HDF5 file
+    call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
+         access_prp = fapl_id)
+
+    ! Set the parameters for identification
+    grp_name = 'mma_optimizer_checkpoint'
+    call h5gcreate_f(file_id, trim(grp_name), grp_id, ierr)
+
+    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
+    ddim = 1
+
+    ! Save the current iteration
+    call h5acreate_f(grp_id, 'iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5gclose_f(grp_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
+    call h5close_f(ierr)
+
+    call this%mma%write(trim(filename))
 
   end subroutine mma_optimizer_save_checkpoint
 
   subroutine mma_optimizer_restore_checkpoint(this, filename, iter)
+    use hdf5
+    use mpi_f08, only: MPI_INFO_NULL
+    use comm, only: NEKO_COMM
+    implicit none
+
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer, intent(out) :: iter
+
+    ! HDF5 variables
+    integer(hid_t) :: file_id, fapl_id, grp_id, attr_id
+    integer :: ierr, info
+    integer(hsize_t) :: ddim(1)
+
+    ! ------------------------------------------------------------------------ !
+    ! Open the HDF5 context and read identification parameters
+
+    call h5open_f(ierr)
+
+    ! Prepare the HDF5 settings for MPIO access
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    info = MPI_INFO_NULL%mpi_val
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
+
+    ! Open the HDF5 file
+    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
+         access_prp = fapl_id)
+
+    ! Open the MMA optimizer checkpoint group
+    call h5gopen_f(file_id, 'mma_optimizer_checkpoint', grp_id, ierr)
+
+    ddim(1) = 1
+
+    call h5aopen_f(grp_id, 'iter', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read the current iteration
+    call h5gclose_f(grp_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
+    call h5close_f(ierr)
+
+    call this%mma%read(trim(filename))
+
   end subroutine mma_optimizer_restore_checkpoint
 end module mma_optimizer
 
