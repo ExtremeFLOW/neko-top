@@ -113,8 +113,7 @@ program optimizer_checkpointing
      call opt%write(iter, prob)
 
      if (iter .eq. max_iter / 2 ) then
-        call opt%save_checkpoint('optimizer_checkpoint.h5', iter, .true.)
-        call des%get_values(x_half)
+        call opt%save_checkpoint('optimizer_checkpoint.h5', iter, des, .true.)
      end if
   end do
 
@@ -123,8 +122,7 @@ program optimizer_checkpointing
   ! -------------------------------------------------------------------------- !
   ! Restore from checkpoint and verify
 
-  call des%update_design(x_half)
-  call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0)
+  call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
 
   call opt%initialize(prob, des, sim)
   call opt%write(iter0, prob)

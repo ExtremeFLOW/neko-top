@@ -467,7 +467,8 @@ contains
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the MMA optimizer
 
-  subroutine mma_optimizer_save_checkpoint(this, filename, iter, overwrite)
+  subroutine mma_optimizer_save_checkpoint(this, filename, iter, design, &
+       overwrite)
     use hdf5
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
@@ -476,6 +477,7 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer, intent(in) :: iter
+    class(design_t), intent(inout) :: design
     logical, intent(in), optional :: overwrite
     logical :: overwrite_flag, file_exists
     integer :: file_unit
@@ -536,7 +538,7 @@ contains
 
   end subroutine mma_optimizer_save_checkpoint
 
-  subroutine mma_optimizer_restore_checkpoint(this, filename, iter)
+  subroutine mma_optimizer_restore_checkpoint(this, filename, iter, design)
     use hdf5
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
@@ -545,6 +547,7 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer, intent(out) :: iter
+    class(design_t), intent(inout) :: design
 
     ! HDF5 variables
     integer(hid_t) :: file_id, fapl_id, grp_id, attr_id

@@ -167,20 +167,23 @@ module optimizer
      end subroutine optimizer_write
 
      !> Interface for writing a checkpoint
-     subroutine optimizer_save_checkpoint(this, filename, iter, overwrite)
-       import optimizer_t
+     subroutine optimizer_save_checkpoint(this, filename, iter, design, &
+          overwrite)
+       import optimizer_t, design_t
        class(optimizer_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
        integer, intent(in) :: iter
+       class(design_t), intent(inout) :: design
        logical, intent(in), optional :: overwrite
      end subroutine optimizer_save_checkpoint
 
      !> Interface for reading a checkpoint
-     subroutine optimizer_restore_checkpoint(this, filename, iter)
-       import optimizer_t
+     subroutine optimizer_restore_checkpoint(this, filename, iter, design)
+       import optimizer_t, design_t
        class(optimizer_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
        integer, intent(out) :: iter
+       class(design_t), intent(inout) :: design
      end subroutine optimizer_restore_checkpoint
   end interface
 
@@ -274,7 +277,8 @@ contains
     ! Read run time checkpoint if present
     inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
     if (file_exists) then
-       call this%restore_checkpoint('optimizer_rt_checkpoint.hdf5', iter)
+       call this%restore_checkpoint('optimizer_rt_checkpoint.hdf5', iter, &
+            design)
        write(*, *) 'Resuming optimizer from checkpoint at iteration ', iter
     end if
 
@@ -324,7 +328,8 @@ contains
     end do
 
     if (stop_flag .eq. 2) then
-       call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', iter, .true.)
+       call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', iter, design, &
+            .true.)
     end if
 
     ! Check that the final design is valid
