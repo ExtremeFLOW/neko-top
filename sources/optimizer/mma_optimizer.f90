@@ -468,19 +468,17 @@ contains
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the MMA optimizer
 
-  subroutine mma_optimizer_save_checkpoint(this, filename, iter)
+  subroutine mma_optimizer_save_checkpoint(this, filename, iter, overwrite)
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
     integer, intent(in) :: iter
-    character(len=256) :: path, fname, extension, full_filename
+    logical, intent(in), optional :: overwrite
+    logical :: overwrite_flag
 
-    ! Determine the file extension
-    call filename_split(filename, path, fname, extension)
+    overwrite_flag = .false.
+    if (present(overwrite)) overwrite_flag = overwrite
 
-    write(full_filename, '(A,A,A,I5.5,A)') trim(path), trim(fname), "_", iter, &
-         trim(extension)
 
-    call neko_error('Writing to: "' // trim(full_filename) // '"')
 
   end subroutine mma_optimizer_save_checkpoint
 
