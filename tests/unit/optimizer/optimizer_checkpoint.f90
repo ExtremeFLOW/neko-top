@@ -114,15 +114,44 @@ program optimizer_checkpointing
 
      if (iter .eq. max_iter / 2 ) then
         call opt%save_checkpoint('optimizer_checkpoint.h5', iter, des, .true.)
+        call des%get_values(x_half)
      end if
   end do
 
   call des%get_values(x)
 
+  ! Free the objects before restoring
+  call opt%free()
+  call prob%free()
+  call des%free()
+  call sim%free()
+
   ! -------------------------------------------------------------------------- !
   ! Restore from checkpoint and verify
 
+  call sim%init(parameters)
+  call design_factory(des, design_parameters, sim)
+  call prob%init(parameters, des, sim)
+  call optimizer_factory(opt, parameters, prob, des, sim)
+
   call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
+
+  if (iter0 .ne. max_iter / 2) then
+     write(error_unit, *) 'Restored iteration: ', iter0, &
+          ' Expected iteration: ', max_iter / 2
+     call neko_error('Restored iteration does not match expected iteration')
+  end if
+
+  call des%get_values(x_restored)
+  call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+  if (rmse(x_half, x_restored) .gt. 1.0e-12_rp) then
+     write(error_unit, *) 'RMSE between original and restored design: ', &
+          rmse(x, x_restored)
+     call neko_error('Restored design does not match original design')
+  end if
+
+  ! -------------------------------------------------------------------------- !
+  ! Continue optimization from restored state
 
   call opt%initialize(prob, des, sim)
   call opt%write(iter0, prob)
@@ -136,13 +165,10 @@ program optimizer_checkpointing
   ! -------------------------------------------------------------------------- !
   ! Verify that the restored design matches the original one
 
-  call x%copy_from(DEVICE_TO_HOST, sync = .false.)
-  call x_restored%copy_from(DEVICE_TO_HOST, sync = .true.)
-
   if (rmse(x, x_restored) .gt. 1.0e-12_rp) then
      write(error_unit, *) 'RMSE between original and restored design: ', &
           rmse(x, x_restored)
-     call neko_error('Restored design does not match original design')
+     call neko_error('Final design does not match original design')
   end if
 
 

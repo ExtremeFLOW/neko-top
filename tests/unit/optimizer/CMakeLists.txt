@@ -83,5 +83,5 @@ add_test(NAME optimizer_checkpoint_test
 set_tests_properties(optimizer_checkpoint_test PROPERTIES
     ENVIRONMENT "NEKO_LOG_FILE=neko.log"
     LABELS "unit;optimizer_checkpoint"
-    TIMEOUT 1200
+    TIMEOUT 60
 )
