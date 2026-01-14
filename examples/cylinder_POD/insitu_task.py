@@ -10,6 +10,7 @@ os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
 os.environ["NUMEXPR_NUM_THREADS"] = "1"
 # Import MPI
 from mpi4py import MPI #equivalent to the use of MPI_init() in C
+import time
 
 # Split communicator for MPI - MPMD
 worldcomm = MPI.COMM_WORLD
@@ -137,6 +138,9 @@ while stream_data:
 # Finilize the streamer
 ds.finalize()
 
+# Initialize the next streamer (from nek = false, going backwards)
+ds_back = DataStreamer(comm, from_nek=False)
+
 # Check if there is information in the buffer that should be taken in case the loop exit without flushing
 if ioh.buffer_index > ioh.buffer_max_index:
     ioh.log.write("info","All snapshots where properly included in the updates")
@@ -186,6 +190,22 @@ if comm.Get_rank() == 0:
     np.save("right_singular_vectors", pod.vt_1t)
     print("Wrote right signular values")
 
+# write them in a way that fortran can read
+A = (pod.d_1t[:pod_write_modes, None] * pod.vt_1t[:pod_write_modes, :]).T  # (nsnaps, n_modes)
+
+# Build time vector
+t = np.arange(A.shape[0], dtype=np.float64)  # or actual time array
+
+out = np.column_stack([t, A])  # (nsnaps, 1+n_modes)
+
+header = "t," + ",".join([f"a{i+1}" for i in range(A.shape[1])])
+if comm.rank == 0:
+    np.savetxt("pod_time_coeffs.csv", out, delimiter=",", header=header, comments="")
+
+# make sure filesystem write is done before you move on (within Python ranks)
+comm.Barrier()
+
+
 # End time
 end_time = MPI.Wtime()
 # Print the time
@@ -195,24 +215,33 @@ if comm.Get_rank() == 0:
 if comm.Get_rank() == 0:
     print("Python - insitu - Sending data back")
 
-# Initialize the streamer
-ds_back = DataStreamer(comm)
 
 if comm.Get_rank() == 0:
     print("Python - insitu - Initializing objects")
 
+stream_dtype = x.dtype
+
 for j in range(0, pod_write_modes):
+    if comm.Get_rank() == 0:
+        print("Sending mode: ", j)
 
-    if (j+1) < pod.u_1t.shape[1]:
+    field_list1d = ioh.split_narray_to_1dfields(pod.u_1t[:, j])
 
-        ## Split the snapshots into the proper fields
-        field_list1d = ioh.split_narray_to_1dfields(pod.u_1t[:,j])
-        u_mode = get_fld_from_ndarray(field_list1d[0], msh.lx, msh.ly, msh.lz, msh.nelv) 
-        v_mode = get_fld_from_ndarray(field_list1d[1], msh.lx, msh.ly, msh.lz, msh.nelv) 
-        w_mode = get_fld_from_ndarray(field_list1d[2], msh.lx, msh.ly, msh.lz, msh.nelv)
+    # Send 1D buffers (no reshaping needed; already 1D)
+    u = field_list1d[0].astype(stream_dtype, copy=False)
+    print("sending u size", u.shape)
+    v = field_list1d[1].astype(stream_dtype, copy=False)
+    print("sending v size", v.shape)
+    w = field_list1d[2].astype(stream_dtype, copy=False)
+    print("sending w size", w.shape)
+    ds_back.stream(u.flatten())
+    ds_back.stream(v.flatten())
+    ds_back.stream(w.flatten())
 
-        ds_back.stream(u_mode)
-        ds_back.stream(v_mode)
-        ds_back.stream(w_mode)
+time.sleep(300)
 
-ds_back.finalize()
+if comm.Get_rank() == 0:
+    print("About to finalize")
+# ds_back.finalize()
+if comm.Get_rank() == 0:
+    print("finalized")
