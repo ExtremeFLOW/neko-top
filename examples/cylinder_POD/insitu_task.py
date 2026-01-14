@@ -3,6 +3,8 @@
 #========================================
 import sys
 import os
+import json
+import re
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -49,15 +51,47 @@ if comm.Get_rank() == 0:
 
 # Read the POD inputs
 number_of_pod_fields = 3
-pod_batch_size  = 30
-pod_keep_modes  = 3
 pod_write_modes = 3
-dtype_string = "double"
+
+def load_case_config(case_path):
+    with open(case_path, "r", encoding="utf-8") as handle:
+        raw = handle.read()
+    # Allow trailing commas in .case files.
+    cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
+    return json.loads(cleaned)
+
+default_case_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cylinder_POD.case")
+case_path = sys.argv[1] if len(sys.argv) > 1 else default_case_path
+case_path = os.path.abspath(case_path)
+case_config = load_case_config(case_path)
+pod_config = case_config.get("POD", {})
+missing = [key for key in ("batch_size", "n_modes", "dtype", "i_stream") if key not in pod_config]
+if missing:
+    raise KeyError(f"Missing POD settings in {case_path}: {', '.join(missing)}")
+
+pod_batch_size = int(pod_config["batch_size"])
+pod_keep_modes = int(pod_config["n_modes"])
+pod_i_stream = int(pod_config["i_stream"])
+dtype_string = str(pod_config["dtype"]).strip().lower()
+
+case_time = case_config.get("case", {}).get("time", {})
+missing_time = [key for key in ("timestep", "end_time") if key not in case_time]
+if missing_time:
+    raise KeyError(f"Missing time settings in {case_path}: {', '.join(missing_time)}")
+
+case_timestep = float(case_time["timestep"])
+case_end_time = float(case_time["end_time"])
+snapshot_dt = case_timestep * pod_i_stream
+if snapshot_dt <= 0.0:
+    raise ValueError(f"Invalid snapshot dt from case settings in {case_path}")
+
 backend = "numpy"
 if dtype_string == "single":
     dtype = np.float32
-else:
+elif dtype_string == "double":
     dtype = np.float64
+else:
+    raise ValueError(f"Unsupported POD.dtype '{dtype_string}' in {case_path}")
 
 # Start time
 start_time = MPI.Wtime()
@@ -194,7 +228,16 @@ if comm.Get_rank() == 0:
 A = (pod.d_1t[:pod_write_modes, None] * pod.vt_1t[:pod_write_modes, :]).T  # (nsnaps, n_modes)
 
 # Build time vector
-t = np.arange(A.shape[0], dtype=np.float64)  # or actual time array
+nsnaps = A.shape[0]
+t_from_zero = np.arange(nsnaps, dtype=np.float64) * snapshot_dt
+if nsnaps == 0:
+    t = t_from_zero
+else:
+    t_from_dt = t_from_zero + snapshot_dt
+    if abs(case_end_time - t_from_dt[-1]) <= abs(case_end_time - t_from_zero[-1]):
+        t = t_from_dt
+    else:
+        t = t_from_zero
 
 out = np.column_stack([t, A])  # (nsnaps, 1+n_modes)
 

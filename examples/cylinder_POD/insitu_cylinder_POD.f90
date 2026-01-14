@@ -42,7 +42,7 @@ contains
   subroutine startup(params)
     type(json_file), intent(inout) :: params
 
-    call json_get(params, "case.istream", ipostproc)
+    call json_get(params, "POD.i_stream", ipostproc)
   end subroutine startup
 
   ! User-defined initialization called just before time loop starts
@@ -189,7 +189,7 @@ integer :: ctr
         call field_add2s2(w, w_list(j), a_time%x(i, j+1))
       end do
       !if (mod(time%tstep, ipostproc) .eq. 0) then
-      call output_reconstruct%sample(real(i, kind=rp))
+      call output_reconstruct%sample(a_time%x(i, 1))
       !end if
     end do
 
