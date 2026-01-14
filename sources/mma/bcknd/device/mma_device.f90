@@ -711,6 +711,9 @@ contains
                   device_norm(res%x_d, this%m) + &
                   re_sq_norm)
 
+             call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
+                  mpi_real_precision, mpi_sum, neko_comm, ierr)
+
              steg = steg / 2.0_rp
 
           end do

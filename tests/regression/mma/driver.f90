@@ -73,6 +73,7 @@ program usrneko
   !> For getting objectives and constraints values though getters in problem_t
   type(vector_t) :: all_objectives, constraint_value
   real(rp) :: objective_value
+
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
 
@@ -174,6 +175,8 @@ program usrneko
   call prob%update_constraints(des)
   call prob%update_constraint_sensitivities(des)
 
+  call all_objectives%init(prob%get_n_objectives())
+  call constraint_value%init(prob%get_n_constraints())
 
   call prob%get_objective_value(objective_value)
   call prob%get_all_objective_values(all_objectives)
