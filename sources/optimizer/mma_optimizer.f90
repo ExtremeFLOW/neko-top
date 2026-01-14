@@ -57,6 +57,7 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
+  use utils, only: filename_split
   implicit none
   private
 
@@ -96,6 +97,11 @@ module mma_optimizer
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
      procedure, pass(this) :: free => mma_optimizer_free
+
+     procedure, pass(this) :: save_checkpoint => &
+          mma_optimizer_save_checkpoint
+     procedure, pass(this) :: restore_checkpoint => &
+          mma_optimizer_restore_checkpoint
 
   end type mma_optimizer_t
 
@@ -459,5 +465,29 @@ contains
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
 
+  ! -------------------------------------------------------------------------- !
+  ! Checkpointing methods for the MMA optimizer
+
+  subroutine mma_optimizer_save_checkpoint(this, filename, iter)
+    class(mma_optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: iter
+    character(len=256) :: path, fname, extension, full_filename
+
+    ! Determine the file extension
+    call filename_split(filename, path, fname, extension)
+
+    write(full_filename, '(A,A,A,I5.5,A)') trim(path), trim(fname), "_", iter, &
+         trim(extension)
+
+    call neko_error('Writing to: "' // trim(full_filename) // '"')
+
+  end subroutine mma_optimizer_save_checkpoint
+
+  subroutine mma_optimizer_restore_checkpoint(this, filename, iter)
+    class(mma_optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(out) :: iter
+  end subroutine mma_optimizer_restore_checkpoint
 end module mma_optimizer
 

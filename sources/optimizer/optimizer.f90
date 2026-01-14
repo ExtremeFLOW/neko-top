@@ -83,6 +83,13 @@ module optimizer
      !> Write the progress of the optimizer to the log file
      procedure(optimizer_write), pass(this), public, deferred :: write
 
+     !> Save a checkpoint of the optimizer state
+     procedure(optimizer_save_checkpoint), pass(this), deferred :: &
+          save_checkpoint
+     !> Restore the optimizer state from a checkpoint
+     procedure(optimizer_restore_checkpoint), pass(this), deferred :: &
+          restore_checkpoint
+
      ! ----------------------------------------------------------------------- !
      ! Public procedures
 
@@ -127,6 +134,12 @@ module optimizer
        type(simulation_t), optional, intent(inout) :: simulation
      end subroutine optimizer_initialize
 
+     !> Interface for freeing resources
+     subroutine optimizer_free(this)
+       import optimizer_t
+       class(optimizer_t), intent(inout) :: this
+     end subroutine optimizer_free
+
      !> Interface for running an optimization step
      logical function optimizer_step(this, iter, problem, design, simulation)
        import optimizer_t, simulation_t, problem_t, design_t
@@ -137,6 +150,14 @@ module optimizer
        type(simulation_t), optional, intent(inout) :: simulation
      end function optimizer_step
 
+     !> Interface for validating the solution
+     subroutine optimizer_validate(this, problem, design)
+       import optimizer_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       class(problem_t), intent(in) :: problem
+       class(design_t), intent(in) :: design
+     end subroutine optimizer_validate
+
      !> Interface for writing the optimizer progress
      subroutine optimizer_write(this, iter, problem)
        import optimizer_t, simulation_t, problem_t, design_t
@@ -145,19 +166,21 @@ module optimizer
        class(problem_t), intent(in) :: problem
      end subroutine optimizer_write
 
-     !> Interface for freeing resources
-     subroutine optimizer_free(this)
+     !> Interface for writing a checkpoint
+     subroutine optimizer_save_checkpoint(this, filename, iter)
        import optimizer_t
        class(optimizer_t), intent(inout) :: this
-     end subroutine optimizer_free
+       character(len=*), intent(in) :: filename
+       integer, intent(in) :: iter
+     end subroutine optimizer_save_checkpoint
 
-     !> Interface for validating the solution
-     subroutine optimizer_validate(this, problem, design)
-       import optimizer_t, problem_t, design_t
+     !> Interface for reading a checkpoint
+     subroutine optimizer_restore_checkpoint(this, filename, iter)
+       import optimizer_t
        class(optimizer_t), intent(inout) :: this
-       class(problem_t), intent(in) :: problem
-       class(design_t), intent(in) :: design
-     end subroutine optimizer_validate
+       character(len=*), intent(in) :: filename
+       integer, intent(out) :: iter
+     end subroutine optimizer_restore_checkpoint
   end interface
 
   ! -------------------------------------------------------------------------- !
@@ -253,6 +276,7 @@ contains
     start_time = MPI_Wtime()
     iteration_average_time = 0.0_rp
     do iter = 1, this%max_iterations
+       call this%save_checkpoint('optimizer_checkpoint.hdf5', iter)
 
        call profiler_start_region('Optimizer iteration')
        iteration_start_time = MPI_Wtime()
