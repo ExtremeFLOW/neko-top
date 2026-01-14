@@ -130,11 +130,8 @@ module mma
      procedure, pass(this) :: KKT_cpu => mma_KKT_cpu
      procedure, pass(this) :: KKT_device => mma_KKT_device
 
-     generic :: write => write_hdf5
-     procedure, pass(this) :: write_hdf5 => mma_write_hdf5
-
-     generic :: read => read_hdf5
-     procedure, pass(this) :: read_hdf5 => mma_read_hdf5
+     procedure, pass(this) :: save_checkpoint => mma_save_checkpoint
+     procedure, pass(this) :: load_checkpoint => mma_load_checkpoint
 
      ! Private utilities
      procedure, pass(this) :: copy_from => mma_copy_from
@@ -183,16 +180,16 @@ module mma
      ! ======================================================================= !
      ! Interface for IO routines
 
-     module subroutine mma_write_hdf5(this, filename, overwrite)
+     module subroutine mma_save_checkpoint(this, filename, overwrite)
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
        logical, intent(in), optional :: overwrite
-     end subroutine mma_write_hdf5
+     end subroutine mma_save_checkpoint
 
-     module subroutine mma_read_hdf5(this, filename)
+     module subroutine mma_load_checkpoint(this, filename)
        class(mma_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
-     end subroutine mma_read_hdf5
+     end subroutine mma_load_checkpoint
   end interface
 
 contains
@@ -348,7 +345,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), intent(in), allocatable :: bcknd, subsolver
+    character(len=*), intent(in), optional :: bcknd, subsolver
     character(len=256) :: log_msg
     integer :: i, ierr
 
@@ -409,17 +406,33 @@ contains
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
+    ! Sync parameters across MPI
+    call MPI_Allreduce(n, this%n_global, 1, MPI_INTEGER, MPI_SUM, neko_comm, &
+         ierr)
+
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
     ! Based on the Cpp Code by Niels
     if (.not. present(max_iter)) this%max_iter = 100
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
+    if (.not. present(epsimin)) then
+       this%epsimin = 1.0e-9_rp * sqrt(real(this%m + this%n_global, rp))
+    end if
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
+
+    ! Set default backend based on NEKO_BCKND_DEVICE
+    if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 0) then
+       this%bcknd = "cpu"
+    else if (.not. present(bcknd)) then
+       this%bcknd = "device"
+    end if
+
+    ! Set default subsolver
+    if (.not. present(subsolver)) this%subsolver = "dip"
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -427,12 +440,8 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-    this%bcknd = bcknd
-    this%subsolver = subsolver
-
-    ! Sync parameters across MPI
-    call MPI_Allreduce(this%n, this%n_global, 1, &
-         MPI_INTEGER, MPI_SUM, neko_comm, ierr)
+    if (present(bcknd)) this%bcknd = bcknd
+    if (present(subsolver)) this%subsolver = subsolver
 
     call neko_log%section('MMA Parameters')
 
@@ -441,7 +450,7 @@ contains
     write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
     call neko_log%message(log_msg)
 
-    write(log_msg, '(A10,1X,I0)') 'n         ', this%n
+    write(log_msg, '(A10,1X,I0)') 'n         ', this%n_global
     call neko_log%message(log_msg)
     write(log_msg, '(A10,1X,I0)') 'm         ', this%m
     call neko_log%message(log_msg)
@@ -494,20 +503,16 @@ contains
     select case (this%bcknd)
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
-               sync = .true.)
+          call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
        end if
 
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
+          call x%copy_from(HOST_TO_DEVICE, sync = .true.)
        end if
 
     case ("device")
