@@ -256,6 +256,8 @@ contains
 
     ! Initialize reader values
     n = -1
+    n_global = -1
+    name = ''
 
     ! MPI interfaces
     info = MPI_INFO_NULL%mpi_val
@@ -314,7 +316,8 @@ contains
        call neko_error('design: mismatch in n_global during HDF5 read')
     end if
     if (trim(name) .ne. trim(this%name)) then
-       call neko_error('design: mismatch in name during HDF5 read')
+       call neko_error('design: mismatch in name during HDF5 read' // &
+            ' (file: ' // trim(name) // ', object: ' // trim(this%name) // ')')
     end if
 
     ! ------------------------------------------------------------------------ !
