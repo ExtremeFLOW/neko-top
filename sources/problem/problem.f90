@@ -60,6 +60,7 @@ module problem
   use simulation, only: simulation_init, simulation_step, simulation_finalize
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
+  use utils, only: neko_error
 
   implicit none
   private
@@ -479,7 +480,10 @@ contains
        ! accumulate objective value
        call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
        ! save a checkpoint
-       call simulation%checkpoint%save(simulation%neko_case, &
+       if (.not. allocated(simulation%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call simulation%state_recover%save(simulation%neko_case, &
             simulation%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
@@ -535,7 +539,10 @@ contains
        ! restore primal field
        time = simulation%neko_case%time
        time%tstep = i
-       call simulation%checkpoint%restore(simulation%neko_case, time)
+       if (.not. allocated(simulation%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call simulation%state_recover%restore(simulation%neko_case, time)
        ! accumulate objective sensitivity
        call this%accumulate_objective_sensitivities(design, &
             simulation%adjoint_case%time%dt)

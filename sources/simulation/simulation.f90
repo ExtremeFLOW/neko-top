@@ -72,7 +72,8 @@ module simulation_m
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
-  use simulation_checkpoint, only: simulation_checkpoint_t
+  use state_recover, only: state_recover_t
+  use state_recover_factory, only: state_recover_create
   implicit none
   private
 
@@ -103,10 +104,10 @@ module simulation_m
      integer :: n_timesteps = 0
 
      ! ----------------------------------------------------------------------- !
-     ! Checkpoint system
+     ! State recovery system
 
-     !> The checkpoint system data
-     type(simulation_checkpoint_t) :: checkpoint
+     !> The state recovery system data
+     class(state_recover_t), allocatable :: state_recover
 
    contains
      !> Initialize the simulation
@@ -228,7 +229,8 @@ contains
 
     if ("checkpoints" .in. parameters) then
        call json_get(parameters, 'checkpoints', checkpoint_params)
-       call this%checkpoint%init(this%neko_case, checkpoint_params)
+       call state_recover_create(this%state_recover, this%neko_case, &
+            checkpoint_params)
     end if
 
   end subroutine simulation_initialize
@@ -240,7 +242,10 @@ contains
     ! Stop the profiler
     call profiler_stop
 
-    call this%checkpoint%free()
+    if (allocated(this%state_recover)) then
+       call this%state_recover%free()
+       deallocate(this%state_recover)
+    end if
     call adjoint_free(this%adjoint_case)
     call neko_finalize(this%neko_case)
 
@@ -264,7 +269,10 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       call this%checkpoint%save(this%neko_case, this%neko_case%time)
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call this%state_recover%save(this%neko_case, this%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
 
@@ -291,7 +299,10 @@ contains
     do i = this%n_timesteps, 1, -1
        time = this%neko_case%time
        time%tstep = i
-       call this%checkpoint%restore(this%neko_case, time)
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call this%state_recover%restore(this%neko_case, time)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -308,7 +319,10 @@ contains
 
     call reset(this%neko_case)
     call reset_adjoint(this%adjoint_case, this%neko_case)
-    call this%checkpoint%reset()
+    if (.not. allocated(this%state_recover)) then
+       call neko_error("State recovery not initialized.")
+    end if
+    call this%state_recover%reset()
 
   end subroutine simulation_reset
 
