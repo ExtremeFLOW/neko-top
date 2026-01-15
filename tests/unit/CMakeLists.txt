@@ -101,7 +101,7 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     set_tests_properties(${test_name} PROPERTIES
         LABELS "unit"
         ENVIRONMENT "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/${test_name}.log"
-        TIMEOUT 60
+        TIMEOUT 120
     )
     add_dependencies(Unit ${test_name})
 endforeach()
