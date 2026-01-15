@@ -31,6 +31,7 @@ program checkpointing_test
   use json_utils, only: json_get
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
+  use time_state, only: time_state_t
   use time_step_controller, only: time_step_controller_t
   use field, only: field_t
   use field_math, only: field_copy, field_glsubnorm, field_glsc2
@@ -57,6 +58,7 @@ program checkpointing_test
   type(problem_t) :: prob
   !> The simulation checkpointing object
   type(simulation_checkpoint_t) :: chkp
+  type(time_state_t) :: time
 
   ! Parameters for the checkpointing
   integer :: n_saves_memory = 10
@@ -145,8 +147,8 @@ program checkpointing_test
      write(*, '(A)') repeat('-', 80)
   end if
 
-  call chkp%init(sim%neko_case, algorithm, n_saves_memory, filename, fmt, &
-       keep_checkpoints)
+  call chkp%init_from_components(sim%neko_case, algorithm, n_saves_memory, &
+       filename, fmt, keep_checkpoints)
 
   ! -------------------------------------------------------------------------- !
   ! Run the forward simulation and save the resulting u fields in a list
@@ -164,7 +166,7 @@ program checkpointing_test
      call field_copy(v_fields(i), v)
      call field_copy(w_fields(i), w)
 
-     call chkp%save(sim%neko_case)
+     call chkp%save(sim%neko_case, sim%neko_case%time)
   end do
 
   call simulation_finalize(sim%neko_case)
@@ -182,7 +184,9 @@ program checkpointing_test
   error = .false.
 
   do i = n_timesteps, 1, -1
-     call chkp%restore(sim%neko_case, i)
+     time = sim%neko_case%time
+     time%tstep = i
+     call chkp%restore(sim%neko_case, time)
 
      !  Compute the RMSE between the current fields and the saved ones
      error_p = rmse(p_fields(i), p)
