@@ -8,16 +8,13 @@ program usrneko
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
 
-  use mpi_f08, only: MPI_Init
+  use neko, only: neko_init, neko_finalize
   implicit none
 
   ! JSON related arguments
   integer :: argc
   type(json_file) :: parameters
   character(len=256) :: parameter_file
-
-  ! MPI parameters
-  integer :: ierr
 
   !> The simulation we are working with
   type(simulation_t) :: sim
@@ -29,9 +26,9 @@ program usrneko
   class(optimizer_t), allocatable :: opt
 
   ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
+  ! Initialize the Neko environment
 
-  call MPI_Init(ierr)
+  call neko_init()
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -67,4 +64,6 @@ program usrneko
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)
 
+  ! Finalize the Neko environment
+  call neko_finalize()
 end program usrneko
