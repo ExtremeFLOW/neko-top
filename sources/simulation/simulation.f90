@@ -36,7 +36,7 @@
 ! Here, we simply march forward to steady state solutions
 module simulation_m
   use case, only: case_t
-  use neko, only: neko_init, neko_finalize, neko_solve
+  use neko, only: neko_solve
   use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
@@ -73,6 +73,7 @@ module simulation_m
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
   use simulation_checkpoint, only: simulation_checkpoint_t
+  use runtime_stats, only: neko_rt_stats
   implicit none
   private
 
@@ -138,8 +139,11 @@ contains
     integer :: i, n_scalars, unsteady_support
     logical :: unsteady
 
-    ! initialize the primal
-    call neko_init(this%neko_case)
+    ! initialize the primal Neko objects
+    call this%neko_case%init(parameters)
+    call neko_rt_stats%init(parameters)
+    call neko_simcomps%init(this%neko_case)
+
     ! initialize the adjoint
     call adjoint_init(this%adjoint_case, this%neko_case)
 
@@ -242,7 +246,10 @@ contains
 
     call this%checkpoint%free()
     call adjoint_free(this%adjoint_case)
-    call neko_finalize(this%neko_case)
+
+    call neko_simcomps%free()
+    call neko_rt_stats%free()
+    call this%neko_case%free()
 
   end subroutine simulation_free
 
