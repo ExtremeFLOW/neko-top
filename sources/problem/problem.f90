@@ -54,6 +54,7 @@ module problem
   use math, only: copy
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
+  use time_state, only: time_state_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
@@ -478,7 +479,8 @@ contains
        ! accumulate objective value
        call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
        ! save a checkpoint
-       call simulation%checkpoint%save(simulation%neko_case)
+       call simulation%checkpoint%save(simulation%neko_case, &
+            simulation%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
 
@@ -495,6 +497,7 @@ contains
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
     real(kind=rp) :: total_time
+    type(time_state_t) :: time
     integer :: i
 
     call dt_controller%init(simulation%neko_case%params)
@@ -530,7 +533,9 @@ contains
 
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
-       call simulation%checkpoint%restore(simulation%neko_case, i)
+       time = simulation%neko_case%time
+       time%tstep = i
+       call simulation%checkpoint%restore(simulation%neko_case, time)
        ! accumulate objective sensitivity
        call this%accumulate_objective_sensitivities(design, &
             simulation%adjoint_case%time%dt)

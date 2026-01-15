@@ -45,10 +45,11 @@ module simulation_checkpoint
   use utils, only: neko_error
   use field_math, only: field_copy, field_rzero
   use profiler, only: profiler_start_region, profiler_end_region
+  use state_recover, only: state_recover_t
   implicit none
   private
 
-  type, public :: simulation_checkpoint_t
+  type, public, extends(state_recover_t) :: simulation_checkpoint_t
      private
 
      ! ----------------------------------------------------------------------- !
@@ -69,7 +70,6 @@ module simulation_checkpoint
 
      ! Internal parameters
      integer :: n_saves_disc = 0
-     integer :: n_timesteps = 0
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
 
@@ -84,9 +84,8 @@ module simulation_checkpoint
      type(field_t), dimension(:), allocatable :: s_list
 
    contains
-     !> Initialization
-     generic, public :: init => init_from_json, init_from_components
      !> Initialization from a JSON file
+     procedure, public, pass(this) :: init => checkpoint_init_from_json
      procedure, public, pass(this) :: init_from_json => &
           checkpoint_init_from_json
      !> Initialization from components
@@ -109,16 +108,17 @@ module simulation_checkpoint
 
   interface
      !> Save the current state of the simulation in a linear fashion
-     module subroutine checkpoint_save_linear(this, neko_case)
+     module subroutine checkpoint_save_linear(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), intent(inout) :: neko_case
+       type(time_state_t), intent(in) :: time
      end subroutine checkpoint_save_linear
 
      !> Restore the forward simulation state in a linear fashion
-     module subroutine checkpoint_restore_linear(this, neko_case, tstep)
+     module subroutine checkpoint_restore_linear(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
-       integer, intent(in) :: tstep
+       type(time_state_t), intent(in) :: time
      end subroutine checkpoint_restore_linear
   end interface
 
@@ -245,7 +245,7 @@ contains
 
     ! Delete the checkpoint file list
     if (.not. this%keep_checkpoints) then
-       do i = this%n_timesteps, 1, -1
+       do i = this%get_n_timesteps(), 1, -1
           call this%chkp_output%set_counter(i)
           file_name = this%chkp_output%file_%get_fname()
           inquire(file = trim(file_name), exist = exists)
@@ -266,7 +266,7 @@ contains
     this%keep_checkpoints = .true.
 
     this%n_saves_disc = 0
-    this%n_timesteps = 0
+    call this%set_n_timesteps(0)
     this%first_valid_timestep = 2
     this%loaded_checkpoint = -1
 
@@ -276,20 +276,21 @@ contains
   ! Saving and Restoring
 
   !> Save the current state of the simulation to disk
-  subroutine checkpoint_save(this, neko_case)
+  subroutine checkpoint_save(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint save")
 
     ! Update the number of recorded timesteps
-    this%n_timesteps = this%n_timesteps + 1
+    call this%set_n_timesteps(max(this%get_n_timesteps(), time%tstep))
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_save_linear(this, neko_case)
+       call checkpoint_save_linear(this, neko_case, time)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -298,25 +299,27 @@ contains
   end subroutine checkpoint_save
 
   !> Restore the forward simulation state
-  subroutine checkpoint_restore(this, neko_case, tstep)
+  subroutine checkpoint_restore(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     character(len=256) :: msg
+    integer :: tstep
 
     if (.not. this%enabled) return
 
     call profiler_start_region("Checkpoint restore")
 
-    if (tstep .lt. 1 .or. tstep .gt. this%n_timesteps) then
+    tstep = time%tstep
+    if (tstep .lt. 1 .or. tstep .gt. this%get_n_timesteps()) then
        write(msg, '(A,I0,A,I0,A)') "Requested timestep ", tstep, &
-            " is out of range [1, ", this%n_timesteps, "]"
+            " is out of range [1, ", this%get_n_timesteps(), "]"
        call neko_error(trim(msg))
     end if
 
     select case (this%algorithm)
     case ("linear")
-       call checkpoint_restore_linear(this, neko_case, tstep)
+       call checkpoint_restore_linear(this, neko_case, time)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -337,7 +340,7 @@ contains
     ! Reset our checkpoints
     this%loaded_checkpoint = -1
     this%n_saves_disc = 0
-    this%n_timesteps = 0
+    call this%set_n_timesteps(0)
 
     do i = 1, this%n_saves_memory
        call field_rzero(this%p_list(i))

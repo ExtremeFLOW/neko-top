@@ -51,19 +51,20 @@ contains
   !> Save the current state of the simulation in a linear fashion.
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
-  module subroutine checkpoint_save_linear(this, neko_case)
+  module subroutine checkpoint_save_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
     logical :: save_disc
 
     ! We save to disc only every n_saves_memory time steps
-    save_disc = modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0
+    save_disc = modulo(time%tstep, this%n_saves_memory) .eq. 0
 
     ! Sample the checkpoint if needed
-    if (save_disc .or. neko_case%time%tstep .le. this%first_valid_timestep) then
+    if (save_disc .or. time%tstep .le. this%first_valid_timestep) then
 
-       call this%chkp_output%set_counter(neko_case%time%tstep)
-       call this%chkp_output%sample(neko_case%time%t)
+       call this%chkp_output%set_counter(time%tstep)
+       call this%chkp_output%sample(time%t)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
   end subroutine checkpoint_save_linear
@@ -72,17 +73,19 @@ contains
   !! If the requested time step is not in memory, we load the nearest
   !! checkpoint from disc and then we step forward in time to fill our cache.
   !! Finally, we copy the requested time step from our cache.
-  module subroutine checkpoint_restore_linear(this, neko_case, tstep)
+  module subroutine checkpoint_restore_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    integer, intent(in) :: tstep
+    type(time_state_t), intent(in) :: time
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     integer :: j, k, previous_save, next_save
     integer :: i_scalars
     type(field_t), pointer :: u, v, w, p, s
+    integer :: tstep
 
     loop_start = MPI_WTIME()
+    tstep = time%tstep
 
     u => neko_case%fluid%u
     v => neko_case%fluid%v
@@ -117,7 +120,7 @@ contains
        this%loaded_checkpoint = neko_case%time%tstep
 
        ! Step through the simulation and store field states in memory
-       do k = previous_save, min(next_save - 1, this%n_timesteps)
+       do k = previous_save, min(next_save - 1, this%get_n_timesteps())
 
           ! Do not run simulation step on the first iteration
           if (k .ne. previous_save) then

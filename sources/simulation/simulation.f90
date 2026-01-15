@@ -264,7 +264,7 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       call this%checkpoint%save(this%neko_case)
+       call this%checkpoint%save(this%neko_case, this%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
 
@@ -278,6 +278,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
+    type(time_state_t) :: time
     integer :: i
 
     call dt_controller%init(this%neko_case%params)
@@ -288,7 +289,9 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
-       call this%checkpoint%restore(this%neko_case, i)
+       time = this%neko_case%time
+       time%tstep = i
+       call this%checkpoint%restore(this%neko_case, time)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
