@@ -26,21 +26,15 @@ program optimizer_checkpointing
   use problem, only: problem_t
   use optimizer, only: optimizer_t, optimizer_factory
 
-  use json_module, only: json_file
-  use json_utils, only: json_get
-  use utils, only: neko_error
-  use json_utils_ext, only: json_read_file
-  use neko_top, only: neko_top_register_types
 
   use json_module, only: json_file
-  use simulation_m, only: simulation_t
-  use problem, only: problem_t
-  use design, only: design_t
+  use json_utils, only: json_get
+  use json_utils_ext, only: json_read_file
+  use neko_top, only: neko_top_register_types
   use num_types, only: rp
   use profiler, only: profiler_start_region, profiler_end_region
   use utils, only: neko_error
   use vector, only: vector_t
-  use device, only: DEVICE_TO_HOST
 
   use optimizer_checkpointing_test_mod, only: rmse
 
@@ -63,7 +57,8 @@ program optimizer_checkpointing
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
-  type(vector_t) :: x, x_half, x_restored
+  real(kind=rp) :: f_ref, f_half, f_restored
+  type(vector_t) :: x_ref, x_half, x_restored
 
   ! Internal variables for the optimizer loop
   integer :: iter, iter0
@@ -97,7 +92,7 @@ program optimizer_checkpointing
   call prob%init(parameters, des, sim)
   call optimizer_factory(opt, parameters, prob, des, sim)
 
-  call x%init(des%size())
+  call x_ref%init(des%size())
   call x_half%init(des%size())
   call x_restored%init(des%size())
 
@@ -114,68 +109,77 @@ program optimizer_checkpointing
 
      if (iter .eq. max_iter / 2 ) then
         call opt%save_checkpoint('optimizer_checkpoint.h5', iter, des, .true.)
+        call prob%get_objective_value(f_half)
         call des%get_values(x_half)
      end if
   end do
 
-  call des%get_values(x)
+  call prob%get_objective_value(f_ref)
+  call des%get_values(x_ref)
 
-  ! Free the objects before restoring
-  call opt%free()
-  call prob%free()
   call des%free()
-  call sim%free()
+  call prob%free()
+  call opt%free()
+  deallocate(des, opt)
 
   ! -------------------------------------------------------------------------- !
   ! Restore from checkpoint and verify
 
-  call sim%init(parameters)
+  call sim%reset()
   call design_factory(des, design_parameters, sim)
   call prob%init(parameters, des, sim)
   call optimizer_factory(opt, parameters, prob, des, sim)
 
   call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
+  call opt%initialize(prob, des, sim)
+  call opt%write(iter0, prob)
+
+  call prob%get_objective_value(f_restored)
+  call des%get_values(x_restored)
 
   if (iter0 .ne. max_iter / 2) then
      write(error_unit, *) 'Restored iteration: ', iter0, &
           ' Expected iteration: ', max_iter / 2
      call neko_error('Restored iteration does not match expected iteration')
-  end if
-
-  call des%get_values(x_restored)
-  call x%copy_from(DEVICE_TO_HOST, sync = .true.)
-  if (rmse(x_half, x_restored) .gt. 1.0e-12_rp) then
+  else if (abs(f_half - f_restored) .gt. NEKO_EPS) then
+     write(error_unit, *) 'Objective at checkpoint: ', f_half, &
+          ' Restored objective: ', f_restored
+     call neko_error('Restored objective does not match objective at checkpoint')
+  else if (rmse(x_half, x_restored) .gt. NEKO_EPS) then
      write(error_unit, *) 'RMSE between original and restored design: ', &
-          rmse(x, x_restored)
+          rmse(x_ref, x_restored)
      call neko_error('Restored design does not match original design')
   end if
 
   ! -------------------------------------------------------------------------- !
   ! Continue optimization from restored state
 
-  call opt%initialize(prob, des, sim)
-  call opt%write(iter0, prob)
   do iter = iter0 + 1, max_iter
      converged = opt%step(iter, prob, des, sim)
      call opt%write(iter, prob)
   end do
 
+  call prob%get_objective_value(f_restored)
   call des%get_values(x_restored)
 
   ! -------------------------------------------------------------------------- !
   ! Verify that the restored design matches the original one
 
-  if (rmse(x, x_restored) .gt. 1.0e-12_rp) then
+  if (abs(f_ref - f_restored) .gt. NEKO_EPS) then
+     write(error_unit, *) 'Final objective: ', f_restored, &
+          ' Original objective: ', f_ref
+     call neko_error('Final objective does not match original objective')
+  else if (rmse(x_ref, x_restored) .gt. NEKO_EPS) then
      write(error_unit, *) 'RMSE between original and restored design: ', &
-          rmse(x, x_restored)
+          rmse(x_ref, x_restored)
      call neko_error('Final design does not match original design')
   end if
-
 
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call x%free()
+  call x_ref%free()
+  call x_half%free()
   call x_restored%free()
 
   call opt%free()
