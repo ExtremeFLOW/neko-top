@@ -78,6 +78,8 @@ contains
     character(len=1024) :: fname
     integer :: i, n_scalars
 
+    call this%free()
+
     if (present(name) .and. present(path)) then
        fname = trim(path) // trim(name) // '.fld'
     else if (present(name)) then
