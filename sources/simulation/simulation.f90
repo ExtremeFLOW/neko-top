@@ -74,6 +74,8 @@ module simulation_m
        simulation_restart
   use simulation_checkpoint, only: simulation_checkpoint_t
   use runtime_stats, only: neko_rt_stats
+  use scratch_registry, only: neko_scratch_registry
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -244,12 +246,27 @@ contains
     ! Stop the profiler
     call profiler_stop
 
-    call this%checkpoint%free()
+    ! Free the objects
+    call this%neko_case%free()
     call adjoint_free(this%adjoint_case)
+    call this%output_forward%free()
+    call this%output_adjoint%free()
+    call this%checkpoint%free()
 
+    ! Nullify pointers
+    nullify(this%fluid)
+    nullify(this%scalars)
+    nullify(this%adjoint_fluid)
+    nullify(this%adjoint_scalars)
+
+    ! Reset flags and counters
+    this%unsteady = .false.
+    this%have_scalar = .false.
+    this%n_timesteps = 0
+
+    ! Close global objects
     call neko_simcomps%free()
     call neko_rt_stats%free()
-    call this%neko_case%free()
 
   end subroutine simulation_free
 
