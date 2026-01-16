@@ -27,7 +27,6 @@ program optimizer_checkpointing
   use optimizer, only: optimizer_t, optimizer_factory
 
   use neko, only: neko_init, neko_finalize
-  ! use math, only: NEKO_EPS
   use json_module, only: json_file
   use json_utils, only: json_get
   use json_utils_ext, only: json_read_file
@@ -57,7 +56,7 @@ program optimizer_checkpointing
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
-  real(kind=rp) :: f_ref, f_half!, f_restored
+  real(kind=rp) :: f_ref, f_half, f_restored
   type(vector_t) :: x_ref, x_half, x_restored
 
   ! Internal variables for the optimizer loop
@@ -65,7 +64,8 @@ program optimizer_checkpointing
   logical :: converged
 
   ! Set test parameters
-  integer, parameter :: max_iter = 10
+  integer, parameter :: max_iter = 16
+  real(kind=rp), parameter :: tol = 1.0e-8_rp
 
   ! -------------------------------------------------------------------------- !
   ! Initialize the Neko environment
@@ -123,6 +123,7 @@ program optimizer_checkpointing
   call sim%free()
   deallocate(des, opt)
 
+  ! Free global registries
   call neko_registry%free()
   call neko_scratch_registry%free()
 
@@ -133,69 +134,69 @@ program optimizer_checkpointing
   call neko_scratch_registry%init()
 
   call sim%init(parameters)
-  ! call design_factory(des, design_parameters, sim)
-  ! call prob%init(parameters, des, sim)
-  ! call optimizer_factory(opt, parameters, prob, des, sim)
+  call design_factory(des, design_parameters, sim)
+  call prob%init(parameters, des, sim)
+  call optimizer_factory(opt, parameters, prob, des, sim)
 
-  ! call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
-  ! call opt%initialize(prob, des, sim)
-  ! call opt%write(iter0, prob)
+  call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
+  call opt%initialize(prob, des, sim)
+  call opt%write(iter0, prob)
 
-  ! call prob%get_objective_value(f_restored)
-  ! call des%get_values(x_restored)
+  call prob%get_objective_value(f_restored)
+  call des%get_values(x_restored)
 
-  ! if (iter0 .ne. max_iter / 2) then
-  !    write(error_unit, *) 'Restored iteration: ', iter0, &
-  !         ' Expected iteration: ', max_iter / 2
-  !    call neko_error('Restored iteration does not match expected iteration')
-  ! else if (abs(f_half - f_restored) .gt. NEKO_EPS) then
-  !    write(error_unit, *) 'Objective at checkpoint: ', f_half, &
-  !         ' Restored objective: ', f_restored
-  !    call neko_error('Restored objective does not match objective at checkpoint')
-  ! else if (rmse(x_half, x_restored) .gt. NEKO_EPS) then
-  !    write(error_unit, *) 'RMSE between original and restored design: ', &
-  !         rmse(x_ref, x_restored)
-  !    call neko_error('Restored design does not match original design')
-  ! end if
+  if (iter0 .ne. max_iter / 2) then
+     write(error_unit, *) 'Restored iteration: ', iter0, &
+          ' Expected iteration: ', max_iter / 2
+     call neko_error('Restored iteration does not match expected iteration')
+  else if (abs(f_half - f_restored) .gt. tol) then
+     write(error_unit, *) 'Objective at checkpoint: ', f_half, &
+          ' Restored objective: ', f_restored, ' Difference: ', abs(f_half - f_restored)
+     call neko_error('Restored objective does not match objective at checkpoint')
+  else if (rmse(x_half, x_restored) .gt. tol) then
+     write(error_unit, *) 'RMSE between original and restored design: ', &
+          rmse(x_ref, x_restored)
+     call neko_error('Restored design does not match original design')
+  end if
 
-  ! ! -------------------------------------------------------------------------- !
-  ! ! Continue optimization from restored state
+  ! -------------------------------------------------------------------------- !
+  ! Continue optimization from restored state
 
-  ! do iter = iter0 + 1, max_iter
-  !    converged = opt%step(iter, prob, des, sim)
-  !    call opt%write(iter, prob)
-  ! end do
+  do iter = iter0 + 1, max_iter
+     converged = opt%step(iter, prob, des, sim)
+     call opt%write(iter, prob)
+  end do
 
-  ! call prob%get_objective_value(f_restored)
-  ! call des%get_values(x_restored)
+  call prob%get_objective_value(f_restored)
+  call des%get_values(x_restored)
 
-  ! ! -------------------------------------------------------------------------- !
-  ! ! Verify that the restored design matches the original one
+  ! -------------------------------------------------------------------------- !
+  ! Verify that the restored design matches the original one
 
-  ! if (abs(f_ref - f_restored) .gt. NEKO_EPS) then
-  !    write(error_unit, *) 'Final objective: ', f_restored, &
-  !         ' Original objective: ', f_ref
-  !    call neko_error('Final objective does not match original objective')
-  ! else if (rmse(x_ref, x_restored) .gt. NEKO_EPS) then
-  !    write(error_unit, *) 'RMSE between original and restored design: ', &
-  !         rmse(x_ref, x_restored)
-  !    call neko_error('Final design does not match original design')
-  ! end if
+  if (abs(f_ref - f_restored) .gt. tol) then
+     write(error_unit, *) 'Final objective: ', f_restored, &
+          ' Original objective: ', f_ref, ' Difference: ', abs(f_ref - f_restored)
+     call neko_error('Final objective does not match original objective')
+  else if (rmse(x_ref, x_restored) .gt. tol) then
+     write(error_unit, *) 'RMSE between original and restored design: ', &
+          rmse(x_ref, x_restored)
+     call neko_error('Final design does not match original design')
+  end if
 
-  ! ! -------------------------------------------------------------------------- !
-  ! ! Clean up the components
+  ! -------------------------------------------------------------------------- !
+  ! Clean up the components
 
-  ! call x_ref%free()
-  ! call x_half%free()
-  ! call x_restored%free()
+  call x_ref%free()
+  call x_half%free()
+  call x_restored%free()
 
-  ! call opt%free()
-  ! call prob%free()
-  ! call des%free()
-  ! call sim%free()
+  call opt%free()
+  call prob%free()
+  call des%free()
+  call sim%free()
 
-  ! if (allocated(des)) deallocate(des)
-  ! if (allocated(opt)) deallocate(opt)
+  if (allocated(des)) deallocate(des)
+  if (allocated(opt)) deallocate(opt)
 
   ! Finalize the Neko environment
   call neko_finalize()
