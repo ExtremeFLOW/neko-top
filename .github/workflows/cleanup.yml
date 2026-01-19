@@ -47,7 +47,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pull-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.sha }}
+          BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pr-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.sha }}
 
         run: |
           echo "Fetching list of cache keys"
