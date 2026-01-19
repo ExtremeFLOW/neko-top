@@ -6,7 +6,7 @@
 name: Cleanup After Merge
 on:
   workflow_call:                       # Triggered by other workflows
-  pull_request:                        # Trigger on pull request close
+  pull_request_target:                        # Trigger on pull request close
     types: closed
 
 permissions:
@@ -23,7 +23,7 @@ jobs:
 
       - name: Remove Cache from merged Pull Request
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
 
@@ -42,7 +42,7 @@ jobs:
 
       - name: Cleanup Cache from Merge queue
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pull-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
 
