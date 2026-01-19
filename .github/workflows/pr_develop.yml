@@ -219,3 +219,9 @@ jobs:
             exit 1
           fi
           echo "All checks passed"
+
+  # Temporary cache cleanup job to remove caches associated with the PR
+  cleanup:
+    name: Cleanup Caches
+    needs: check_complete
+    uses: ./.github/workflows/cleanup.yml
