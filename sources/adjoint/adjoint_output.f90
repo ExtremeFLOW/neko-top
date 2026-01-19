@@ -62,7 +62,8 @@ contains
 
   !> Constructor.
   !! @details initialize the output.
-  !! @param[inout] precision The precision of the output fields.
+  !! @param[inout] this The output sampler.
+  !! @param[in] precision The precision of the output fields.
   !! @param[in] adjoint The adjoint fluid scheme.
   !! @param[in] adjoint_scalars The adjoint scalar schemes.
   !! @param[in] name The name of the .fld file.
@@ -70,7 +71,7 @@ contains
   subroutine adjoint_output_init(this, precision, adjoint, adjoint_scalars, &
        name, path)
     class(adjoint_output_t), intent(inout) :: this
-    integer, intent(inout) :: precision
+    integer, intent(in) :: precision
     class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
     class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalars
     character(len=*), intent(in), optional :: name
