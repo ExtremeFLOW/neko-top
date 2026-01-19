@@ -15,7 +15,8 @@ jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    permissions:
+      actions: write
     steps:
       - name: Remove Cache from merged Pull Request
         env:
