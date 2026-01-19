@@ -11,13 +11,19 @@ on:
       - develop
     types:
       - closed
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: write
+
 jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Remove Cache from merged Pull Request
         env:
           GH_TOKEN: ${{ github.token }}
