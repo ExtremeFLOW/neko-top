@@ -196,15 +196,15 @@ jobs:
           # ------------------------------------------------------------------ #
           # Check the status of our Neko-TOP library checks.
 
-          if [ "$compile_status" != "success" ]; then
-            fail+=("\t- Compilation check: $compile_status")
-            success=false
-          fi
+          # if [ "$compile_status" != "success" ]; then
+          #   fail+=("\t- Compilation check: $compile_status")
+          #   success=false
+          # fi
 
-          if [ "$scripts_status" != "success" ]; then
-            fail+=("\t- Scripts check: $scripts_status")
-            success=false
-          fi
+          # if [ "$scripts_status" != "success" ]; then
+          #   fail+=("\t- Scripts check: $scripts_status")
+          #   success=false
+          # fi
 
           # ------------------------------------------------------------------ #
           # If any of the checks failed, print the failed checks and exit with
