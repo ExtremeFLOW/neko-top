@@ -379,10 +379,10 @@ contains
     !
     call this%output_controller%init(this%time%end_time)
     if (this%have_scalar) then
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             this%adjoint_scalars, path = trim(neko_case%output_directory))
     else
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
     end if
 
