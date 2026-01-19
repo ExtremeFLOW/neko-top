@@ -31,30 +31,38 @@ jobs:
           echo "Fetching list of cache keys"
           cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
 
-          ## Setting this to not fail the workflow while deleting cache keys.
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForPR
-          do
-              echo "Deleting cache with key: $cacheKey"
-              gh cache delete $cacheKey
-          done
+          if [ -z "$cacheKeysForPR" ]; then
+            echo "No caches found for this ref"
+          else
+            echo "Deleting caches..."
+            for cacheKey in $cacheKeysForPR
+            do
+                echo "Deleting cache with key: $cacheKey"
+                gh cache delete $cacheKey
+            done
+          fi
           echo "Done"
 
       - name: Cleanup Cache from Merge queue
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pull-${{ github.event.pull_request.number }}-${{ github.event.pull_request.head.sha }}
+          BRANCH: refs/heads/gh-readonly-queue/${{ github.event.pull_request.base.ref }}/pull-${{ github.event.pull_request.number }}-${{ github.event.pull_request.base.sha }}
 
         run: |
           echo "Fetching list of cache keys"
           cacheKeysForMergeQueue=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
-          echo "Deleting caches..."
-          for cacheKey in $cacheKeysForMergeQueue
-          do
-              echo "Deleting cache with key: $cacheKey"
-              gh cache delete $cacheKey
-          done
+
+          if [ -z "$cacheKeysForMergeQueue" ]; then
+            echo "No caches found for this ref"
+          else
+            echo "Deleting caches..."
+            for cacheKey in $cacheKeysForMergeQueue
+            do
+                echo "Deleting cache with key: $cacheKey"
+                gh cache delete $cacheKey
+            done
+          fi
           echo "Done"
 
 
