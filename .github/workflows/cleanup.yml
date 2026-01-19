@@ -1,11 +1,12 @@
 # Cleanup.yml
-# -------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
 # Cleanup workflow upon merge. Remove stored cache and temporary files.
-# -------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
 
 name: Cleanup After Merge
 on:
-  pull_request:
+  workflow_dispatch:                   # Manual trigger
+  pull_request:                        # Trigger on pull request close
     branches:
       - main
       - develop
@@ -13,9 +14,9 @@ on:
       - closed
 
 permissions:
-  contents: read
-  pull-requests: read
-  actions: write
+  contents: read                       # Minimum permission for actions/checkout
+  pull-requests: read                  # To read PR info
+  actions: write                       # To delete caches
 
 jobs:
   cleanup:
