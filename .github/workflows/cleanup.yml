@@ -6,7 +6,7 @@
 name: Cleanup After Merge
 on:
   workflow_call:                       # Triggered by other workflows
-  pull_request_target:                        # Trigger on pull request close
+  pull_request_target:                 # Trigger on pull request close
     types: closed
 
 permissions:
