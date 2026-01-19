@@ -1,23 +1,26 @@
 # Cleanup.yml
-# -------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
 # Cleanup workflow upon merge. Remove stored cache and temporary files.
-# -------------------------------------------------------------------------- #
+# ---------------------------------------------------------------------------- #
 
 name: Cleanup After Merge
 on:
-  pull_request:
-    branches:
-      - main
-      - develop
-    types:
-      - closed
+  workflow_call:                       # Triggered by other workflows
+  pull_request_target:                 # Trigger on pull request close
+    types: closed
+
+permissions:
+  contents: read                       # Minimum permission for actions/checkout
+  pull-requests: read                  # To read PR info
+  actions: write                       # To delete caches
+
 jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
-    permissions:
-      actions: write
     steps:
+      - uses: actions/checkout@v4
+
       - name: Remove Cache from merged Pull Request
         env:
           GH_TOKEN: ${{ github.token }}
@@ -29,7 +32,6 @@ jobs:
           cacheKeysForPR=$(gh cache list --ref $BRANCH --limit 100 --json id --jq '.[].id')
 
           ## Setting this to not fail the workflow while deleting cache keys.
-          set +e
           echo "Deleting caches..."
           for cacheKey in $cacheKeysForPR
           do
