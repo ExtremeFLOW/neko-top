@@ -539,6 +539,7 @@ contains
        ! restore primal field
        time = simulation%neko_case%time
        time%tstep = i
+       time%t = time%start_time + real(i, rp) * time%dt
        if (.not. allocated(simulation%state_recover)) then
           call neko_error("State recovery not initialized.")
        end if

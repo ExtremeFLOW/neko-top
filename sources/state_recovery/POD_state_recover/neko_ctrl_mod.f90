@@ -21,7 +21,7 @@ module neko_ctrl_mod
 
   type, public :: ctrl_stream_t
      logical :: inited = .false.
-     logical :: debug = .true.
+     logical :: debug = .false.
      integer(c_int) :: comm_int = 0_c_int
    contains
      procedure, pass(this) :: init => ctrl_stream_init

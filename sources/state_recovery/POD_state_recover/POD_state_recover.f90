@@ -55,6 +55,13 @@ module simulation_POD_state_recover
 
      ! optional output
      type(fld_file_output_t) :: output
+     logical :: write_modes = .false.
+     logical :: output_reconstruction = .false.
+     type(fld_file_output_t) :: recon_output
+     character(len=16) :: recon_output_control = "never"
+     real(kind=rp) :: recon_output_value = 0.0_rp
+     real(kind=rp) :: recon_time_interval = 0.0_rp
+     integer :: recon_nsteps = 0
 
      ! Control state
      type(ctrl_stream_t) :: ctrl
@@ -80,14 +87,27 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), target, intent(inout) :: params
     integer :: i_stream, n_modes
+    logical :: write_modes
+    logical :: debug
+    logical :: output_reconstruction
+    character(len=:), allocatable :: output_precision
+    character(len=:), allocatable :: output_control
+    real(kind=rp) :: output_value
+    integer :: output_prec
     character(len=:), allocatable :: dtype
 
     call json_get(params, "i_stream", i_stream)
     call json_get(params, "n_modes", n_modes)
     call json_get_or_default(params, "dtype", dtype, "double")
+    call json_get_or_default(params, "write_modes", write_modes, .false.)
+    call json_get_or_default(params, "debug", debug, .false.)
+    call json_get_or_default(params, "output_reconstruction", &
+         output_reconstruction, .false.)
 
-    call this%init_from_components(neko_case, i_stream, n_modes)
+    call this%init_from_components(neko_case, i_stream, n_modes, debug)
     this%dtype = adjustl(dtype)
+    this%write_modes = write_modes
+    this%output_reconstruction = output_reconstruction
 
     select case (trim(this%dtype))
     case ("single", "SINGLE", "Single")
@@ -97,13 +117,67 @@ contains
     case default
        call neko_error("Unsupported POD dtype: " // trim(this%dtype))
     end select
+
+    if (this%output_reconstruction) then
+       call json_get_or_default(neko_case%params, 'case.output_precision', &
+            output_precision, 'single')
+       if (trim(output_precision) .eq. 'double') then
+          output_prec = dp
+       else
+          output_prec = sp
+       end if
+
+       call this%recon_output%init(output_prec, 'pod_reconstruction', &
+            this%n_flds, path = trim(neko_case%output_directory))
+       call this%recon_output%fields%assign_to_field(1, neko_case%fluid%u)
+       call this%recon_output%fields%assign_to_field(2, neko_case%fluid%v)
+       call this%recon_output%fields%assign_to_field(3, neko_case%fluid%w)
+
+       call json_get_or_default(neko_case%params, 'case.fluid.output_control', &
+            output_control, 'org')
+       this%recon_output_control = trim(lower_string(output_control))
+
+       select case (this%recon_output_control)
+       case ('org')
+          call json_get(neko_case%params, 'case.nsamples', output_value)
+          this%recon_output_control = 'nsamples'
+          this%recon_output_value = output_value
+          if (output_value .gt. 0.0_rp) then
+             this%recon_time_interval = (neko_case%time%end_time - &
+                  neko_case%time%start_time) / output_value
+          end if
+       case ('nsamples')
+          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          this%recon_output_value = output_value
+          if (output_value .gt. 0.0_rp) then
+             this%recon_time_interval = (neko_case%time%end_time - &
+                  neko_case%time%start_time) / output_value
+          end if
+       case ('simulationtime')
+          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          this%recon_output_value = output_value
+          this%recon_time_interval = output_value
+       case ('tsteps')
+          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          this%recon_output_value = output_value
+          this%recon_nsteps = int(output_value)
+       case ('never')
+          call json_get_or_default(neko_case%params, 'case.fluid.output_value', &
+               output_value, 0.0_rp)
+          this%recon_output_value = output_value
+       case default
+          call neko_error('Unsupported output_control for reconstruction: ' // &
+               trim(output_control))
+       end select
+    end if
   end subroutine POD_state_recover_init_from_json
 
 
-  subroutine POD_state_recover_init_from_components(this, neko_case, i_stream, n_modes)
+  subroutine POD_state_recover_init_from_components(this, neko_case, i_stream, n_modes, debug)
     class(POD_state_recover_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: i_stream, n_modes
+    logical, intent(in), optional :: debug
     integer :: i
     character(len=80) :: str
 
@@ -142,6 +216,9 @@ contains
     call this%dstream%stream(this%coef%dof%z)
 
     ! Control init (use neko_comm%mpi_val – your working pattern)
+    if (present(debug)) then
+       this%ctrl%debug = debug
+    end if
     call this%ctrl%init(int(neko_comm%mpi_val, c_int))
 
     ! Fire an init tick (python might miss it; harmless)
@@ -200,6 +277,7 @@ contains
        call field_rzero(this%v_modes(i))
        call field_rzero(this%w_modes(i))
     end do
+
   end subroutine POD_state_recover_reset
 
 
@@ -245,6 +323,7 @@ contains
     type(time_state_t), intent(in) :: time
     integer :: i, ierr, n_lines, nrows, ncols
     integer(c_int) :: mode_cmd, phase_cmd
+    type(time_state_t) :: time_out
 
     if (.not. this%enabled) return
 
@@ -275,6 +354,10 @@ contains
           call this%dstream%recieve(this%w_modes(i)%x)
        end do
 
+       if (this%write_modes) then
+          call this%output%sample(0.0_rp)
+       end if
+
        ! Read CSV once
        n_lines = csv_file_count_lines(this%csv_reader)
        nrows = n_lines - 1
@@ -298,8 +381,58 @@ contains
     call profiler_start_region("POD restore")
     call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, time%t)
     call reconstruct_from_coeffs(this, neko_case, this%a_interp)
+    if (this%output_reconstruction) then
+       if (recon_should_output(this, time, time_out)) then
+          call this%recon_output%sample(time_out%t)
+       end if
+    end if
     call profiler_end_region("POD restore")
   end subroutine POD_state_recover_restore
+
+  logical function recon_should_output(this, time, time_out)
+    class(POD_state_recover_t), intent(in) :: this
+    type(time_state_t), intent(in) :: time
+    type(time_state_t), intent(out) :: time_out
+    real(kind=rp) :: t_rel, tol, interval
+
+    recon_should_output = .false.
+    time_out = time
+    time_out%t = time%start_time + real(time%tstep, rp) * time%dt
+
+    select case (this%recon_output_control)
+    case ('tsteps')
+       if (this%recon_nsteps .gt. 0) then
+          recon_should_output = mod(time%tstep, this%recon_nsteps) .eq. 0
+       end if
+    case ('simulationtime', 'nsamples')
+       interval = this%recon_time_interval
+       if (interval .gt. 0.0_rp) then
+          t_rel = time_out%t - time%start_time
+          tol = 0.1_rp * abs(time%dt)
+          recon_should_output = abs(t_rel - nint(t_rel / interval) * interval) &
+               .le. tol
+       end if
+    case ('never')
+       recon_should_output = .false.
+    case default
+       recon_should_output = .false.
+    end select
+  end function recon_should_output
+
+  pure function lower_string(str) result(out)
+    character(len=*), intent(in) :: str
+    character(len=len(str)) :: out
+    integer :: i, c
+
+    do i = 1, len(str)
+       c = iachar(str(i:i))
+       if (c >= iachar('A') .and. c <= iachar('Z')) then
+          out(i:i) = achar(c + 32)
+       else
+          out(i:i) = str(i:i)
+       end if
+    end do
+  end function lower_string
 
 
   function csv_file_count_lines(file_in) result(n)
