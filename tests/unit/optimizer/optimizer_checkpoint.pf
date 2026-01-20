@@ -82,8 +82,8 @@ contains
     character(len=256) :: msg
 
     ! Set test parameters
-    integer, parameter :: max_iter = 16
-    real(kind=rp), parameter :: tol = 1.0e-8_rp
+    integer, parameter :: max_iter = 4
+    real(kind=rp), parameter :: tol = 1.0e-12_rp
 
 
     ! ------------------------------------------------------------------------ !
