@@ -53,7 +53,7 @@ module optimizer
 
   !> Abstract optimizer class.
   type, abstract, public :: optimizer_t
-     character(len=64), private :: type_name = 'optimizer_t'
+     character(len=64) :: optimizer_type = ''
 
      !> The maximum number of iterations
      integer, public :: max_iterations = 0
@@ -216,15 +216,19 @@ contains
 
   !> Base initializer for the optimizer
   !! @param this The optimizer object.
+  !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
   !! @param tolerance The tolerance for the optimization loop.
   !! @param max_runtime The maximum runtime in seconds.
-  subroutine optimizer_init_base(this, max_iterations, tolerance, max_runtime)
+  subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
+       tolerance, max_runtime)
     class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     real(kind=rp), intent(in), optional :: max_runtime
 
+    this%optimizer_type = optimizer_type
     this%max_iterations = max_iterations
     this%max_runtime = max_runtime
     this%tolerance = tolerance

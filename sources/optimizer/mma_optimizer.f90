@@ -205,7 +205,7 @@ contains
        call this%csv_log%set_header(trim(header))
     end if
 
-    call this%init_base(max_iterations, tolerance, max_runtime)
+    call this%init_base('MMA', max_iterations, tolerance, max_runtime)
 
     call neko_log%end_section()
 
@@ -485,7 +485,7 @@ contains
     logical :: overwrite_flag, file_exists
 
     ! HDF5 variables
-    integer(hid_t) :: file_id, fapl_id, filespace
+    integer(hid_t) :: file_id, fapl_id, filespace, str_type
     integer(hid_t) :: grp_id, optimizer_grp_id, attr_id
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
@@ -518,7 +518,7 @@ contains
 
        ! Check for existing Optimizer group
        optimizer_exists = .false.
-       call h5lexists_f(file_id, '/Optimizer', optimizer_exists, ierr)
+       call h5lexists_f(file_id, 'Optimizer', optimizer_exists, ierr)
 
        if (.not. optimizer_exists) then
           ! Create the Optimizer/checkpoint group
@@ -543,9 +543,22 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Write the MMA optimizer checkpoint group
 
+    ! Create the dataspace for attributes
     call h5screate_f(H5S_SCALAR_F, filespace, ierr)
 
-    ! Save the current iteration
+    ! Save the optimizer type
+    call h5tcopy_f(H5T_FORTRAN_S1, str_type, ierr)
+    call h5tset_strpad_f(str_type, H5T_STR_SPACEPAD_F, ierr)
+
+    ddim(1) = 3
+    call h5tset_size_f(str_type, ddim(1), ierr)
+    call h5acreate_f(grp_id, 'type', str_type, filespace, attr_id, &
+         ierr, h5p_default_f, h5p_default_f)
+    call h5awrite_f(attr_id, str_type, this%optimizer_type, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+    call h5tclose_f(str_type, ierr)
+
+    ! Save the current iteration number
     ddim = 1
     call h5acreate_f(grp_id, 'iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
@@ -554,6 +567,7 @@ contains
 
     ! ------------------------------------------------------------------------ !
     ! Close HDF5 objects
+    call h5sclose_f(filespace, ierr)
     call h5gclose_f(grp_id, ierr)
     call h5gclose_f(optimizer_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
@@ -578,8 +592,8 @@ contains
     class(design_t), intent(inout) :: design
 
     ! HDF5 variables
-    integer(hid_t) :: file_id, fapl_id
-    integer(hid_t) :: grp_id, attr_id
+    character(len=64) :: type_name
+    integer(hid_t) :: file_id, fapl_id, grp_id, attr_id, str_type
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
 
@@ -600,8 +614,21 @@ contains
     ! Open the MMA optimizer checkpoint group
     call h5gopen_f(file_id, 'Optimizer/checkpoint', grp_id, ierr)
 
-    ddim(1) = 1
+    ! Read the optimizer type and verify
+    call h5aopen_f(grp_id, 'type', attr_id, ierr)
+    call h5aget_type_f(attr_id, str_type, ierr)
+    call h5aread_f(attr_id, str_type, type_name, ddim, ierr)
+    call h5tclose_f(str_type, ierr)
+    call h5aclose_f(attr_id, ierr)
 
+    ! Verify that the type is MMA
+    if (trim(type_name) .ne. this%optimizer_type) then
+       call neko_error('optimizer: HDF5 file "' // trim(filename) // &
+            '" does not contain an MMA optimizer checkpoint')
+    end if
+
+    ! Read the current optimizer iteration
+    ddim(1) = 1
     call h5aopen_f(grp_id, 'iter', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
