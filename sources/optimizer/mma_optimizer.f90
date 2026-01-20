@@ -57,6 +57,9 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
+  use comm, only: pe_rank, NEKO_COMM
+  use mpi_f08, only: MPI_Barrier
+
   implicit none
   private
 
@@ -494,13 +497,14 @@ contains
 
     ! Remove the existing file if overwrite is true
     inquire(file=filename, exist=file_exists)
-    if (file_exists .and. overwrite_flag) then
+    if (file_exists .and. overwrite_flag .and. pe_rank .eq. 0) then
        open(newunit=file_unit, file=filename, status='old')
        close(file_unit, status='delete')
     else if (file_exists .and. .not. overwrite_flag) then
        call neko_error('Checkpoint file ' // trim(filename) // &
             ' already exists. Set overwrite=true to overwrite the existing file.')
     end if
+    call MPI_Barrier(NEKO_COMM, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Open the HDF5 context and write identification parameters
