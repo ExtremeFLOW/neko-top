@@ -135,8 +135,8 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-    type(json_file) :: checkpoint_params
-    integer :: i, n_scalars, unsteady_support
+    type(json_file) :: state_recovery_params
+    integer :: i, n_scalars
     logical :: unsteady
 
     ! initialize the primal
@@ -210,28 +210,18 @@ contains
     this%unsteady = unsteady
 
     ! Ensure there is a means to deal with unsteadiness
-    if (this%unsteady) then
-       unsteady_support = 0
-       if ("checkpoints" .in. parameters) then
-          unsteady_support = unsteady_support + 1
-       end if
-
-       if (unsteady_support .eq. 0) then
-          call neko_error("No support for unsteady simulation provided, \\ &
-          & \\ current options include enabling checkpoints.")
-       end if
-
-       if (unsteady_support .gt. 1) then
-          call neko_error("Too many supports for unsteady simulation \\ &
-          & \\ provided, please select one.")
-       end if
+    if (this%unsteady .and. .not. ("state_recovery" .in. parameters)) then
+       call neko_error("please provide a means of recovering the forward \\ &
+       & state under state_recovery. Current options include checkpoint or \\ &
+       & POD.")
     end if
 
-    if ("checkpoints" .in. parameters) then
-       call json_get(parameters, 'checkpoints', checkpoint_params)
+    if ("state_recovery" .in. parameters) then
+       call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_create(this%state_recover, this%neko_case, &
-            checkpoint_params)
+            state_recovery_params)
     end if
+
 
   end subroutine simulation_initialize
 

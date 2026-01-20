@@ -50,6 +50,7 @@ add_subdirectory(${EXAMPLES_DIR}/thermal_mix_channel)
 add_subdirectory(${EXAMPLES_DIR}/1d_beam)
 add_subdirectory(${EXAMPLES_DIR}/static_mixer)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_rugby_ball)
+add_subdirectory(${EXAMPLES_DIR}/POD_rugby_ball)
 add_subdirectory(${EXAMPLES_DIR}/cylinder_POD)
 
 # If the benchmark_mixer folder exists, add it as well

@@ -51,11 +51,6 @@ EOF
 rea2nbin newton.re2 ext_cyl.nmsh
 
 # Coupled run: Neko + Python in-situ
-# mpirun -n 5 python3 mpi_test.py
-# mpirun -n 5 python3 insitu_task.py
-
-
-# mpirun -n 4 python3 insitu_task.py cylinder_POD.case > python.log : -n 4 ./neko cylinder_POD.case
 mpirun -n 4 python3 insitu_task.py "$CASE_FILE" > python.log &
 sleep 3
 mpirun -n 4 ./neko "$CASE_FILE" > neko.log
