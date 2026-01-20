@@ -452,7 +452,7 @@ contains
     this%chkp => chkp
     ! This is probably scheme specific
     ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
     this%chkp%abx1 => this%abx1
     this%chkp%abx2 => this%abx2
