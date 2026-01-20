@@ -22,7 +22,7 @@ module simulation_POD_state_recover
   use vector, only: vector_t
   use field_math, only: field_add2s2, field_rzero
 
-  use neko_ctrl_mod, only: ctrl_init, ctrl_finalize, ctrl_put, ctrl_wait_cmd, &
+  use neko_ctrl_mod, only: ctrl_stream_t, &
        MODE_IDLE, MODE_FORWARD, MODE_ADJOINT, MODE_STOP, &
        PHASE_INIT, PHASE_FWD_RUNNING, PHASE_FWD_DONE, PHASE_ADJ_RUNNING, PHASE_ADJ_DONE
   use, intrinsic :: iso_c_binding, only: c_int, c_double
@@ -57,8 +57,7 @@ module simulation_POD_state_recover
      type(fld_file_output_t) :: output
 
      ! Control state
-     integer(c_int) :: comm_int = 0_c_int
-     logical :: ctrl_inited = .false.
+     type(ctrl_stream_t) :: ctrl
 
      logical :: have_received_modes = .false.
      logical :: adjoint_started = .false.
@@ -143,12 +142,10 @@ contains
     call this%dstream%stream(this%coef%dof%z)
 
     ! Control init (use neko_comm%mpi_val – your working pattern)
-    this%comm_int = int(neko_comm%mpi_val, c_int)
-    call ctrl_init(this%comm_int)
-    this%ctrl_inited = .true.
+    call this%ctrl%init(int(neko_comm%mpi_val, c_int))
 
     ! Fire an init tick (python might miss it; harmless)
-    call ctrl_put(this%comm_int, MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
+    call this%ctrl%put(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
 
   end subroutine POD_state_recover_init_from_components
 
@@ -175,10 +172,7 @@ contains
     call this%a_interp%free()
     nullify(this%coef)
 
-    if (this%ctrl_inited) then
-       call ctrl_finalize()
-       this%ctrl_inited = .false.
-    end if
+    call this%ctrl%free()
 
     this%enabled = .false.
   end subroutine POD_state_recover_free
@@ -191,8 +185,8 @@ contains
     if (.not. this%enabled) return
 
     ! If we were in adjoint previously, emit ADJ_DONE once on reset
-    if (this%ctrl_inited .and. this%adjoint_started) then
-       call ctrl_put(this%comm_int, MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, 0.0_c_double)
+    if (this%ctrl%inited .and. this%adjoint_started) then
+       call this%ctrl%put(MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, 0.0_c_double)
     end if
 
     this%have_received_modes = .false.
@@ -226,8 +220,8 @@ contains
 
     call profiler_start_region("POD save")
 
-    if (this%ctrl_inited) then
-       call ctrl_put(this%comm_int, MODE_FORWARD, PHASE_FWD_RUNNING, &
+    if (this%ctrl%inited) then
+       call this%ctrl%put(MODE_FORWARD, PHASE_FWD_RUNNING, &
             int(time%tstep, c_int), real(time%t, c_double))
     end if
 
@@ -257,15 +251,15 @@ contains
     ! First restore() call is the phase boundary forward->adjoint
     if (.not. this%have_received_modes) then
 
-       if (this%ctrl_inited) then
-          call ctrl_put(this%comm_int, MODE_FORWARD, PHASE_FWD_DONE, &
+       if (this%ctrl%inited) then
+          call this%ctrl%put(MODE_FORWARD, PHASE_FWD_DONE, &
                int(time%tstep, c_int), real(time%t, c_double))
 
           mode_cmd  = MODE_FORWARD
           phase_cmd = PHASE_FWD_DONE
 
           ! BLOCK until Python says "go adjoint"
-          call ctrl_wait_cmd(this%comm_int, mode_cmd, phase_cmd)
+          call this%ctrl%wait_cmd(mode_cmd, phase_cmd)
 
           if (mode_cmd /= MODE_ADJOINT) then
              call neko_error("Expected MODE_ADJOINT from Python at forward->adjoint boundary.")
@@ -295,8 +289,8 @@ contains
     end if
 
     ! Emit ADJ_RUNNING only once (avoid flooding SST)
-    if (this%ctrl_inited .and. .not. this%adj_running_sent) then
-       call ctrl_put(this%comm_int, MODE_ADJOINT, PHASE_ADJ_RUNNING, &
+    if (this%ctrl%inited .and. .not. this%adj_running_sent) then
+       call this%ctrl%put(MODE_ADJOINT, PHASE_ADJ_RUNNING, &
             int(time%tstep, c_int), real(time%t, c_double))
        this%adj_running_sent = .true.
     end if

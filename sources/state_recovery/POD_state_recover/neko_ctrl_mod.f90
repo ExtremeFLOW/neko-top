@@ -19,9 +19,16 @@ module neko_ctrl_mod
   integer(c_int), public, parameter :: PHASE_ADJ_RUNNING = 20_c_int
   integer(c_int), public, parameter :: PHASE_ADJ_DONE    = 21_c_int
 
-  public :: ctrl_init, ctrl_finalize, ctrl_put, ctrl_wait_cmd
-
-  logical, save :: dbg = .true.
+  type, public :: ctrl_stream_t
+     logical :: inited = .false.
+     logical :: debug = .true.
+     integer(c_int) :: comm_int = 0_c_int
+   contains
+     procedure, pass(this) :: init => ctrl_stream_init
+     procedure, pass(this) :: free => ctrl_stream_free
+     procedure, pass(this) :: put => ctrl_stream_put
+     procedure, pass(this) :: wait_cmd => ctrl_stream_wait_cmd
+  end type ctrl_stream_t
 
   interface
     subroutine adios2_ctrl_initialize_(comm_int) bind(C, name="adios2_ctrl_initialize_")
@@ -46,15 +53,15 @@ module neko_ctrl_mod
 
 contains
 
-  subroutine dbg_print(msg)
+  subroutine ctrl_dbg_print(this, msg)
+    class(ctrl_stream_t), intent(in) :: this
     character(len=*), intent(in) :: msg
     integer :: r, s, ierr
-    if (.not. dbg) return
+    if (.not. this%debug) return
     call MPI_Comm_rank(neko_comm, r, ierr)
     call MPI_Comm_size(neko_comm, s, ierr)
     write(*,'(A,I0,A,I0,A,A)') '[neko_ctrl r=', r, '/', s, '] ', trim(msg)
-    ! flush(output_unit)
-  end subroutine dbg_print
+  end subroutine ctrl_dbg_print
 
   function mode_name(m) result(nm)
     integer(c_int), intent(in) :: m
@@ -81,62 +88,68 @@ contains
     end select
   end function phase_name
 
-  subroutine ctrl_init(comm_int)
+  subroutine ctrl_stream_init(this, comm_int)
+    class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(in) :: comm_int
-    call dbg_print('ctrl_init: calling adios2_ctrl_initialize_')
+    if (this%inited) return
+    this%comm_int = comm_int
+    call ctrl_dbg_print(this, 'ctrl_init: calling adios2_ctrl_initialize_')
     call adios2_ctrl_initialize_(comm_int)
-    call dbg_print('ctrl_init: returned from adios2_ctrl_initialize_')
-  end subroutine ctrl_init
+    call ctrl_dbg_print(this, 'ctrl_init: returned from adios2_ctrl_initialize_')
+    this%inited = .true.
+  end subroutine ctrl_stream_init
 
-  subroutine ctrl_finalize()
-    call dbg_print('ctrl_finalize: calling adios2_ctrl_finalize_')
+  subroutine ctrl_stream_free(this)
+    class(ctrl_stream_t), intent(inout) :: this
+    if (.not. this%inited) return
+    call ctrl_dbg_print(this, 'ctrl_finalize: calling adios2_ctrl_finalize_')
     call adios2_ctrl_finalize_()
-    call dbg_print('ctrl_finalize: returned from adios2_ctrl_finalize_')
-  end subroutine ctrl_finalize
+    call ctrl_dbg_print(this, 'ctrl_finalize: returned from adios2_ctrl_finalize_')
+    this%inited = .false.
+  end subroutine ctrl_stream_free
 
-  subroutine ctrl_put(comm_int, mode, phase, step, time)
-    integer(c_int), intent(in) :: comm_int
+  subroutine ctrl_stream_put(this, mode, phase, step, time)
+    class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(in) :: mode, phase, step
     real(c_double), intent(in) :: time
     character(len=128) :: msg
-
+    if (.not. this%inited) return
     write(msg,'(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_put: mode=', trim(mode_name(mode)), &
-         ' phase=', trim(phase_name(phase)), ' step=', int(step), ' t=', real(time,kind=8)
-    call dbg_print(msg)
-
+         ' phase=', trim(phase_name(phase)), ' step=', int(step), ' t=', real(time, kind=c_double)
+    call ctrl_dbg_print(this, msg)
     call adios2_ctrl_put_state_(mode, phase, step, time)
+    call ctrl_dbg_print(this, 'ctrl_put: returned from adios2_ctrl_put_state_')
+  end subroutine ctrl_stream_put
 
-    call dbg_print('ctrl_put: returned from adios2_ctrl_put_state_')
-  end subroutine ctrl_put
-
-  subroutine ctrl_wait_cmd(comm_int, mode_cmd, phase_cmd)
-    integer(c_int), intent(in)    :: comm_int
+  subroutine ctrl_stream_wait_cmd(this, mode_cmd, phase_cmd)
+    class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(inout) :: mode_cmd, phase_cmd
     integer :: ierr, rank
     integer :: mode_i, phase_i
     character(len=128) :: msg
+    if (.not. this%inited) return
 
     call MPI_Comm_rank(neko_comm, rank, ierr)
 
     write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: enter with defaults mode=', trim(mode_name(mode_cmd)), &
          ' phase=', trim(phase_name(phase_cmd))
-    call dbg_print(msg)
+    call ctrl_dbg_print(this, msg)
 
     if (rank == 0) then
-       call dbg_print('ctrl_wait_cmd: rank0 calling C++ adios2_ctrl_wait_cmd_ (BLOCKING)')
+       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 calling C++ adios2_ctrl_wait_cmd_ (BLOCKING)')
        call adios2_ctrl_wait_cmd_(mode_cmd, phase_cmd)
-       call dbg_print('ctrl_wait_cmd: rank0 returned from C++ wait_cmd')
+       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 returned from C++ wait_cmd')
        mode_i  = int(mode_cmd)
        phase_i = int(phase_cmd)
     else
-       call dbg_print('ctrl_wait_cmd: non-root waiting for Bcast from rank0')
+       call ctrl_dbg_print(this, 'ctrl_wait_cmd: non-root waiting for Bcast from rank0')
        mode_i  = 0
        phase_i = 0
     end if
 
-    call dbg_print('ctrl_wait_cmd: MPI_Bcast(mode)')
+    call ctrl_dbg_print(this, 'ctrl_wait_cmd: MPI_Bcast(mode)')
     call MPI_Bcast(mode_i,  1, MPI_INTEGER, 0, neko_comm, ierr)
-    call dbg_print('ctrl_wait_cmd: MPI_Bcast(phase)')
+    call ctrl_dbg_print(this, 'ctrl_wait_cmd: MPI_Bcast(phase)')
     call MPI_Bcast(phase_i, 1, MPI_INTEGER, 0, neko_comm, ierr)
 
     mode_cmd  = int(mode_i,  c_int)
@@ -144,7 +157,7 @@ contains
 
     write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: exit with mode=', trim(mode_name(mode_cmd)), &
          ' phase=', trim(phase_name(phase_cmd))
-    call dbg_print(msg)
-  end subroutine ctrl_wait_cmd
+    call ctrl_dbg_print(this, msg)
+  end subroutine ctrl_stream_wait_cmd
 
 end module neko_ctrl_mod
