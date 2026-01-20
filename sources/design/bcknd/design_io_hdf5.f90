@@ -374,7 +374,7 @@ contains
 #else
 
   module subroutine design_save_checkpoint(this, filename, overwrite)
-    class(design_t), intent(inout) :: this
+    class(design_t), intent(in) :: this
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
     call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
