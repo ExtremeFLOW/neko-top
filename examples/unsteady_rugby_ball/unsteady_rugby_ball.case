@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0,
-            "timestep": 1e-3
+            "end_time": 3.0,
+            "timestep": 1.5e-3
         },
         "numerics": {
             "time_order": 1,
@@ -16,10 +16,10 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 20,
+            "Re": 200,
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": [ 1.0, 0.1, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -27,7 +27,7 @@
                     "type": "jacobi"
                 },
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 80
             },
             "pressure_solver": {
                 "type": "gmres",
@@ -35,11 +35,12 @@
                     "type": "hsmg"
                 },
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 80
             },
             "boundary_conditions": [
                 {
-                    "type": "user_velocity",
+                    "type": "velocity_value",
+                    "value": [ 1, 0, 0 ],
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -47,7 +48,8 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "tsteps",
+            "output_value": 100,
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -89,7 +91,7 @@
                 "geometry": "cylinder",
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
-                "radius": 0.25
+                "radius": 0.1
             },
         ]
     },
@@ -150,7 +152,7 @@
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
-                "limit": 0.2,
+                "limit": 0.02,
                 "is_max": false
             }
         ],
