@@ -275,6 +275,9 @@ contains
 
     ! Reset the time step counter
     call adjoint_case%output_controller%set_counter(adjoint_case%time)
+    if (adjoint_case%norm_output_enabled) then
+       call adjoint_case%norm_output_ctrl%set_counter(adjoint_case%time)
+    end if
 
     ! Reset the external BDF coefficients
     do i = 1, size(adjoint_case%time%dtlag)
