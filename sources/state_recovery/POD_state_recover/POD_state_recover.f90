@@ -1,0 +1,421 @@
+module simulation_POD_state_recover
+  use num_types, only: rp, sp, dp
+  use case, only: case_t
+  use json_file_module, only: json_file
+  use json_utils, only: json_get, json_get_or_default
+  use field, only: field_t
+  use file, only: file_t
+  use matrix, only: matrix_t
+  use fld_file_output, only: fld_file_output_t
+  use coefs, only: coef_t
+  use data_streamer, only: data_streamer_t
+  use profiler, only: profiler_start_region, profiler_end_region
+  use state_recover, only: state_recover_t
+  use time_state, only: time_state_t
+
+  use comm, only: neko_comm, mpi_real_precision
+  use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
+
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: DEVICE_TO_HOST, device_memcpy
+  use utils, only: neko_error
+  use vector, only: vector_t
+  use field_math, only: field_add2s2, field_rzero
+
+  use neko_ctrl_mod, only: ctrl_init, ctrl_finalize, ctrl_put, ctrl_wait_cmd, &
+       MODE_IDLE, MODE_FORWARD, MODE_ADJOINT, MODE_STOP, &
+       PHASE_INIT, PHASE_FWD_RUNNING, PHASE_FWD_DONE, PHASE_ADJ_RUNNING, PHASE_ADJ_DONE
+  use, intrinsic :: iso_c_binding, only: c_int, c_double
+
+  implicit none
+  private
+
+  type, public, extends(state_recover_t) :: POD_state_recover_t
+     private
+
+     logical :: enabled = .true.
+
+     integer :: i_stream
+     integer :: n_modes
+     integer :: n_flds = 3
+     character(len=16) :: dtype = "double"
+
+     type(coef_t), pointer :: coef => null()
+
+     ! SINGLE lifetime streamer (both directions)
+     type(data_streamer_t) :: dstream
+
+     ! POD mode storage
+     type(field_t), allocatable :: u_modes(:), v_modes(:), w_modes(:)
+
+     ! CSV coeffs
+     type(file_t)   :: csv_reader
+     type(matrix_t) :: time_coefs
+     type(vector_t) :: a_interp
+
+     ! optional output
+     type(fld_file_output_t) :: output
+
+     ! Control state
+     integer(c_int) :: comm_int = 0_c_int
+     logical :: ctrl_inited = .false.
+
+     logical :: have_received_modes = .false.
+     logical :: adjoint_started = .false.
+     logical :: adj_running_sent = .false.
+
+   contains
+     procedure, public, pass(this) :: init => POD_state_recover_init_from_json
+     procedure, public, pass(this) :: init_from_json => POD_state_recover_init_from_json
+     procedure, public, pass(this) :: init_from_components => POD_state_recover_init_from_components
+     procedure, public, pass(this) :: free => POD_state_recover_free
+     procedure, public, pass(this) :: reset => POD_state_recover_reset
+     procedure, public, pass(this) :: save => POD_state_recover_save
+     procedure, public, pass(this) :: restore => POD_state_recover_restore
+  end type POD_state_recover_t
+
+contains
+
+  subroutine POD_state_recover_init_from_json(this, neko_case, params)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), target, intent(inout) :: neko_case
+    type(json_file), target, intent(inout) :: params
+    integer :: i_stream, n_modes
+    character(len=:), allocatable :: dtype
+
+    call json_get(params, "i_stream", i_stream)
+    call json_get(params, "n_modes", n_modes)
+    call json_get_or_default(params, "dtype", dtype, "double")
+
+    call this%init_from_components(neko_case, i_stream, n_modes)
+    this%dtype = adjustl(dtype)
+
+    select case (trim(this%dtype))
+    case ("single", "SINGLE", "Single")
+       if (rp .ne. sp) call neko_error("POD dtype single but code not single precision.")
+    case ("double", "DOUBLE", "Double")
+       if (rp .ne. dp) call neko_error("POD dtype double but code not double precision.")
+    case default
+       call neko_error("Unsupported POD dtype: " // trim(this%dtype))
+    end select
+  end subroutine POD_state_recover_init_from_json
+
+
+  subroutine POD_state_recover_init_from_components(this, neko_case, i_stream, n_modes)
+    class(POD_state_recover_t), intent(inout), target :: this
+    class(case_t), target, intent(inout) :: neko_case
+    integer, intent(in) :: i_stream, n_modes
+    integer :: i
+    character(len=80) :: str
+
+    this%i_stream = i_stream
+    this%n_modes  = n_modes
+    this%coef => neko_case%fluid%c_Xh
+
+    allocate(this%u_modes(this%n_modes))
+    allocate(this%v_modes(this%n_modes))
+    allocate(this%w_modes(this%n_modes))
+
+    call this%output%init(sp, 'POD_modes', this%n_flds * this%n_modes)
+    do i = 1, this%n_modes
+       write(str, '(A,I0)') "u_mode_", i
+       call this%u_modes(i)%init(this%coef%dof, trim(str))
+       call this%output%fields%assign(this%n_flds*(i-1) + 1, this%u_modes(i))
+
+       write(str, '(A,I0)') "v_mode_", i
+       call this%v_modes(i)%init(this%coef%dof, trim(str))
+       call this%output%fields%assign(this%n_flds*(i-1) + 2, this%v_modes(i))
+
+       write(str, '(A,I0)') "w_mode_", i
+       call this%w_modes(i)%init(this%coef%dof, trim(str))
+       call this%output%fields%assign(this%n_flds*(i-1) + 3, this%w_modes(i))
+    end do
+
+    call this%a_interp%init(this%n_modes)
+    call this%csv_reader%init('pod_time_coeffs.csv')
+
+    ! Single lifetime streamer: init once, keep open
+    call this%dstream%init(this%coef)
+
+    ! Send mesh once
+    call this%dstream%stream(this%coef%dof%x)
+    call this%dstream%stream(this%coef%dof%y)
+    call this%dstream%stream(this%coef%dof%z)
+
+    ! Control init (use neko_comm%mpi_val – your working pattern)
+    this%comm_int = int(neko_comm%mpi_val, c_int)
+    call ctrl_init(this%comm_int)
+    this%ctrl_inited = .true.
+
+    ! Fire an init tick (python might miss it; harmless)
+    call ctrl_put(this%comm_int, MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
+
+  end subroutine POD_state_recover_init_from_components
+
+
+  subroutine POD_state_recover_free(this)
+    class(POD_state_recover_t), intent(inout) :: this
+    integer :: i
+
+    if (allocated(this%u_modes)) then
+       do i = 1, size(this%u_modes); call this%u_modes(i)%free(); end do
+       deallocate(this%u_modes)
+    end if
+    if (allocated(this%v_modes)) then
+       do i = 1, size(this%v_modes); call this%v_modes(i)%free(); end do
+       deallocate(this%v_modes)
+    end if
+    if (allocated(this%w_modes)) then
+       do i = 1, size(this%w_modes); call this%w_modes(i)%free(); end do
+       deallocate(this%w_modes)
+    end if
+
+    call this%dstream%free()
+    call this%csv_reader%free()
+    call this%a_interp%free()
+    nullify(this%coef)
+
+    if (this%ctrl_inited) then
+       call ctrl_finalize()
+       this%ctrl_inited = .false.
+    end if
+
+    this%enabled = .false.
+  end subroutine POD_state_recover_free
+
+
+  subroutine POD_state_recover_reset(this)
+    class(POD_state_recover_t), intent(inout) :: this
+    integer :: i
+
+    if (.not. this%enabled) return
+
+    ! If we were in adjoint previously, emit ADJ_DONE once on reset
+    if (this%ctrl_inited .and. this%adjoint_started) then
+       call ctrl_put(this%comm_int, MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, 0.0_c_double)
+    end if
+
+    this%have_received_modes = .false.
+    this%adjoint_started = .false.
+    this%adj_running_sent = .false.
+
+    call this%set_n_timesteps(0)
+
+    do i = 1, this%n_modes
+       call field_rzero(this%u_modes(i))
+       call field_rzero(this%v_modes(i))
+       call field_rzero(this%w_modes(i))
+    end do
+  end subroutine POD_state_recover_reset
+
+
+  subroutine POD_state_recover_save(this, neko_case, time)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
+    type(field_t), pointer :: u, v, w
+    integer :: n
+
+    if (.not. this%enabled) return
+    if (mod(time%tstep, this%i_stream) .ne. 0) return
+
+    u => neko_case%fluid%u
+    v => neko_case%fluid%v
+    w => neko_case%fluid%w
+    n = u%dof%size()
+
+    call profiler_start_region("POD save")
+
+    if (this%ctrl_inited) then
+       call ctrl_put(this%comm_int, MODE_FORWARD, PHASE_FWD_RUNNING, &
+            int(time%tstep, c_int), real(time%t, c_double))
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+    end if
+
+    call this%dstream%stream(u%x)
+    call this%dstream%stream(v%x)
+    call this%dstream%stream(w%x)
+
+    call profiler_end_region("POD save")
+  end subroutine POD_state_recover_save
+
+
+  subroutine POD_state_recover_restore(this, neko_case, time)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), target, intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
+    integer :: i, ierr, n_lines, nrows, ncols
+    integer(c_int) :: mode_cmd, phase_cmd
+
+    if (.not. this%enabled) return
+
+    ! First restore() call is the phase boundary forward->adjoint
+    if (.not. this%have_received_modes) then
+
+       if (this%ctrl_inited) then
+          call ctrl_put(this%comm_int, MODE_FORWARD, PHASE_FWD_DONE, &
+               int(time%tstep, c_int), real(time%t, c_double))
+
+          mode_cmd  = MODE_FORWARD
+          phase_cmd = PHASE_FWD_DONE
+
+          ! BLOCK until Python says "go adjoint"
+          call ctrl_wait_cmd(this%comm_int, mode_cmd, phase_cmd)
+
+          if (mode_cmd /= MODE_ADJOINT) then
+             call neko_error("Expected MODE_ADJOINT from Python at forward->adjoint boundary.")
+          end if
+       end if
+
+       this%adjoint_started = .true.
+
+       ! Receive modes (Python streams after sending cmd)
+       do i = 1, this%n_modes
+          call this%dstream%recieve(this%u_modes(i)%x)
+          call this%dstream%recieve(this%v_modes(i)%x)
+          call this%dstream%recieve(this%w_modes(i)%x)
+       end do
+
+       ! Read CSV once
+       n_lines = csv_file_count_lines(this%csv_reader)
+       nrows = n_lines - 1
+       ncols = 1 + this%n_modes
+       call this%time_coefs%init(nrows, ncols)
+       call this%csv_reader%read(this%time_coefs)
+
+       call MPI_Allreduce(MPI_IN_PLACE, this%time_coefs%x, &
+            this%time_coefs%size(), mpi_real_precision, MPI_SUM, neko_comm, ierr)
+
+       this%have_received_modes = .true.
+    end if
+
+    ! Emit ADJ_RUNNING only once (avoid flooding SST)
+    if (this%ctrl_inited .and. .not. this%adj_running_sent) then
+       call ctrl_put(this%comm_int, MODE_ADJOINT, PHASE_ADJ_RUNNING, &
+            int(time%tstep, c_int), real(time%t, c_double))
+       this%adj_running_sent = .true.
+    end if
+
+    call profiler_start_region("POD restore")
+    call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, time%t)
+    call reconstruct_from_coeffs(this, neko_case, this%a_interp)
+    call profiler_end_region("POD restore")
+  end subroutine POD_state_recover_restore
+
+
+  function csv_file_count_lines(file_in) result(n)
+    class(file_t), intent(in) :: file_in
+    integer :: n
+    integer :: ierr, file_unit
+
+    open(file = trim(file_in%get_fname()), status='old', newunit=file_unit, iostat=ierr)
+    if (ierr .ne. 0) call neko_error("Error opening " // trim(file_in%get_fname()))
+    rewind(file_unit)
+
+    n = 0
+    do
+       read(file_unit, *, iostat=ierr)
+       if (ierr .ne. 0) exit
+       n = n + 1
+    end do
+
+    close(unit=file_unit)
+  end function csv_file_count_lines
+
+
+  subroutine find_bracket_time(i0, i1, time_coefs, tq)
+    integer, intent(out)       :: i0, i1
+    type(matrix_t), intent(in) :: time_coefs
+    real(kind=rp), intent(in)  :: tq
+    integer :: lo, hi, mid
+    real(kind=rp) :: tm
+
+    lo = 1
+    hi = time_coefs%get_nrows()
+
+    do while (hi - lo > 1)
+       mid = (lo + hi) / 2
+       tm = time_coefs%x(mid, 1)
+       if (tm <= tq) then
+          lo = mid
+       else
+          hi = mid
+       end if
+    end do
+
+    i0 = lo
+    i1 = lo + 1
+  end subroutine find_bracket_time
+
+
+  subroutine interpolate_time_coeffs_vec(a_out, time_coefs, tq)
+    type(vector_t), intent(inout) :: a_out
+    type(matrix_t), intent(in)    :: time_coefs
+    real(kind=rp), intent(in)     :: tq
+    integer :: nrows, ncols, j, i0, i1
+    real(kind=rp) :: t0, t1, w
+
+    nrows = time_coefs%get_nrows()
+    ncols = time_coefs%get_ncols()
+
+    if (ncols < 2) call neko_error("time_coefs must have (t + coeffs) columns")
+    if (size(a_out%x) /= ncols-1) call neko_error("a_out wrong size")
+
+    if (tq <= time_coefs%x(1,1)) then
+       do j = 1, ncols-1
+          a_out%x(j) = time_coefs%x(1, j+1)
+       end do
+       return
+    end if
+
+    if (tq >= time_coefs%x(nrows,1)) then
+       do j = 1, ncols-1
+          a_out%x(j) = time_coefs%x(nrows, j+1)
+       end do
+       return
+    end if
+
+    call find_bracket_time(i0, i1, time_coefs, tq)
+    t0 = time_coefs%x(i0,1)
+    t1 = time_coefs%x(i1,1)
+
+    if (abs(t1 - t0) < tiny(1.0_rp)) then
+       w = 0.0_rp
+    else
+       w = (tq - t0) / (t1 - t0)
+    end if
+
+    do j = 1, ncols-1
+       a_out%x(j) = (1.0_rp - w) * time_coefs%x(i0, j+1) + w * time_coefs%x(i1, j+1)
+    end do
+  end subroutine interpolate_time_coeffs_vec
+
+
+  subroutine reconstruct_from_coeffs(this, neko_case, a)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), intent(inout)              :: neko_case
+    type(vector_t), intent(in)                :: a
+    integer :: j
+    type(field_t), pointer :: u, v, w
+
+    u => neko_case%fluid%u
+    v => neko_case%fluid%v
+    w => neko_case%fluid%w
+
+    call field_rzero(u)
+    call field_rzero(v)
+    call field_rzero(w)
+
+    do j = 1, this%n_modes
+       call field_add2s2(u, this%u_modes(j), a%x(j))
+       call field_add2s2(v, this%v_modes(j), a%x(j))
+       call field_add2s2(w, this%w_modes(j), a%x(j))
+    end do
+  end subroutine reconstruct_from_coeffs
+
+end module simulation_POD_state_recover
