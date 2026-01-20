@@ -1,0 +1,210 @@
+module optimizer_checkpoint
+  use mpi
+  use pfunit
+
+  use json_module, only: json_file
+  use json_utils, only: json_get
+  use json_utils_ext, only: json_read_file
+  use simulation_m, only: simulation_t
+  use design, only: design_t, design_factory
+  use problem, only: problem_t
+  use optimizer, only: optimizer_t, optimizer_factory
+  use neko, only: neko_init, neko_finalize
+  use neko_top, only: neko_top_register_types
+  use vector, only: vector_t
+  use vector_math, only: vector_glsubnorm
+  use num_types, only: rp
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_optimizer_checkpoint
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_optimizer_checkpoint
+
+  logical :: initialized_lock = .false.
+contains
+
+  subroutine setUp(this)
+    class(test_optimizer_checkpoint), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+
+    call neko_init()
+    call neko_top_register_types()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_optimizer_checkpoint), intent(inout) :: this
+
+  end subroutine tearDown
+
+  @after
+  subroutine finalize_test(this)
+    class(test_optimizer_checkpoint), intent(inout) :: this
+
+    if (.not. initialized_lock) return
+    initialized_lock = .false.
+
+    call neko_finalize()
+
+  end subroutine finalize_test
+
+  ! ========================================================================== !
+  ! Test writing the MMA object to HDF5 file.
+
+  @test(npes=[2])
+  subroutine save_checkpoint(this)
+    class(test_optimizer_checkpoint), intent(inout) :: this
+    type(json_file) :: parameters, design_parameters
+
+    !> The simulation we are working with
+    type(simulation_t) :: sim
+    !> The design type
+    class(design_t), allocatable :: des
+    !> The problem type
+    type(problem_t) :: prob
+    !> The optimizer (in this case mma)
+    class(optimizer_t), allocatable :: opt
+
+    ! Reference and restored objective and design variables
+    real(kind=rp) :: f_ref, f_half, f_restored
+    type(vector_t) :: x_ref, x_half, x_restored
+
+    ! Internal variables for the optimizer loop
+    integer :: iter, iter0
+    logical :: converged
+    character(len=256) :: msg
+
+    ! Set test parameters
+    integer, parameter :: max_iter = 16
+    real(kind=rp), parameter :: tol = 1.0e-8_rp
+
+
+    ! ------------------------------------------------------------------------ !
+    ! Read the parameters file as the first terminal argument
+
+    ! Read the parameters file
+    parameters = json_read_file("checkpoint.case")
+    call json_get(parameters, 'optimization.design', design_parameters)
+
+    ! ------------------------------------------------------------------------ !
+    ! Initialization of the components
+
+    call sim%init(parameters)
+    call design_factory(des, design_parameters, sim)
+    call prob%init(parameters, des, sim)
+    call optimizer_factory(opt, parameters, prob, des, sim)
+
+    call x_ref%init(des%size())
+    call x_half%init(des%size())
+    call x_restored%init(des%size())
+
+    ! ------------------------------------------------------------------------ !
+    ! Run the optimization and save a checkpoint halfway
+
+    iter0 = 0
+    call opt%initialize(prob, des, sim)
+
+    do iter = iter0 + 1, max_iter
+       converged = opt%step(iter, prob, des, sim)
+
+       if (iter .eq. max_iter / 2 ) then
+          call opt%save_checkpoint('optimizer_checkpoint.h5', iter, des, .true.)
+          call prob%get_objective_value(f_half)
+          call des%get_values(x_half)
+       end if
+    end do
+
+    call prob%get_objective_value(f_ref)
+    call des%get_values(x_ref)
+
+    call opt%free()
+    call prob%free()
+    call des%free()
+    call sim%free()
+    deallocate(des, opt)
+
+    ! Reset the registries
+    call neko_registry%free()
+    call neko_scratch_registry%free()
+
+    call neko_registry%init()
+    call neko_scratch_registry%init()
+
+    ! ------------------------------------------------------------------------ !
+    ! Restore from checkpoint
+
+    call sim%init(parameters)
+    call design_factory(des, design_parameters, sim)
+    call prob%init(parameters, des, sim)
+    call optimizer_factory(opt, parameters, prob, des, sim)
+
+    call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
+    call opt%initialize(prob, des, sim)
+
+    call prob%get_objective_value(f_restored)
+    call des%get_values(x_restored)
+
+    ! ------------------------------------------------------------------------ !
+    ! Verify that the restored state matches the saved checkpoint
+
+    write(msg, *) "Restored iteration does not match expected iteration"
+    @assertEqual(max_iter / 2, iter0, trim(msg))
+    write(msg, *) "Restored objective does not match objective at checkpoint"
+    @assertEqual(f_half, f_restored, tol, trim(msg))
+    write(msg, *) "Restored design does not match original design"
+    @assertEqual(0.0_rp, rmse(x_half, x_restored), tol, trim(msg))
+
+    ! ------------------------------------------------------------------------ !
+    ! Continue optimization from restored state
+
+    do iter = iter0 + 1, max_iter
+       converged = opt%step(iter, prob, des, sim)
+    end do
+
+    call prob%get_objective_value(f_restored)
+    call des%get_values(x_restored)
+
+    ! ------------------------------------------------------------------------ !
+    ! Verify that the restored design matches the original one
+
+    write(msg, *) "Final objective does not match original objective"
+    @assertEqual(f_ref, f_restored, tol, trim(msg))
+    write(msg, *) "Final design does not match original design"
+    @assertEqual(0.0_rp, rmse(x_ref, x_restored), tol, trim(msg))
+
+    ! ------------------------------------------------------------------------ !
+    ! Clean up the components
+
+    call x_ref%free()
+    call x_half%free()
+    call x_restored%free()
+
+    call opt%free()
+    call prob%free()
+    call des%free()
+    call sim%free()
+
+    if (allocated(des)) deallocate(des)
+    if (allocated(opt)) deallocate(opt)
+
+  end subroutine save_checkpoint
+
+  ! ========================================================================== !
+  ! Utility function to compute RMSE between two vectors
+
+  function rmse(v1, v2) result(result)
+    type(vector_t), intent(in) :: v1, v2
+    real(kind=rp) :: result
+
+    result = sqrt(vector_glsubnorm(v1, v2)**2 / real(v1%size(), rp))
+
+  end function rmse
+
+end module optimizer_checkpoint

@@ -28,6 +28,9 @@ else()
     return()
 endif()
 
+# Find the pFUnit package. This is required to build the unit tests.
+find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
+
 add_custom_target(Unit COMMENT "Build all unit tests.")
 set_target_properties(Unit PROPERTIES
     FOLDER "Tests/Unit"
@@ -44,19 +47,11 @@ add_subdirectory(optimizer)
 # Add the listed tests to the CMake project.
 
 # Create a file list of the pFUnit test sources. These should be relative paths.
-set(PFUNIT_TEST_SOURCES)
+set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
 
 if (hdf5_FOUND)
     list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
 endif()
-
-if (NOT PFUNIT_TEST_SOURCES)
-    return()
-endif()
-
-
-# Find the pFUnit package. This is required to build the unit tests.
-find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
 
 foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Ensure the path is relative to the tests/unit directory.
