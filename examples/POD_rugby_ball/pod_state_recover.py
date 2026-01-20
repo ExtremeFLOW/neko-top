@@ -48,13 +48,19 @@ PHASE_ADJ_DONE    = 21
 # -------------------------
 # Logging helpers
 # -------------------------
+DEBUG = False
+
 def log(comm: MPI.Comm, msg: str) -> None:
+    if not DEBUG:
+        return
     r = comm.Get_rank()
     s = comm.Get_size()
     print(f"[py r={r}/{s}] {msg}", flush=True)
 
 
 def log0(msg: str) -> None:
+    if not DEBUG:
+        return
     print(f"[py ctrl r=0/1] {msg}", flush=True)
 
 
@@ -64,6 +70,19 @@ def load_case_config(case_path: str) -> dict:
     # Allow trailing commas in .case files
     cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
     return json.loads(cleaned)
+
+
+def rotate_time_coeffs(path: str) -> Optional[str]:
+    if not os.path.exists(path):
+        return None
+    base, ext = os.path.splitext(path)
+    idx = 1
+    while True:
+        candidate = f"{base}_{idx:03d}{ext}"
+        if not os.path.exists(candidate):
+            os.rename(path, candidate)
+            return candidate
+        idx += 1
 
 
 def wait_for_sst_contact(stem: str, timeout: float = 120.0, poll: float = 0.05) -> str:
@@ -237,6 +256,7 @@ def make_pod(comm: MPI.Comm, bm: np.ndarray, n_fields: int, batch_size: int, kee
 # Main
 # -------------------------
 def main() -> None:
+    global DEBUG
     world = MPI.COMM_WORLD
     # keep your original "split for MPMD" approach (col=1)
     comm = world.Split(1, world.Get_rank())
@@ -250,10 +270,22 @@ def main() -> None:
     if not isinstance(sr, dict):
         raise KeyError("case['state_recovery'] must be a dict")
 
+    debug = sr.get("debug", False)
+    if isinstance(debug, str):
+        debug = debug.strip().lower() in ("1", "true", "yes", "y", "t")
+    else:
+        debug = bool(debug)
+    DEBUG = debug
+
     batch_size = int(sr["batch_size"])
     keep_modes = int(sr["n_modes"])
     i_stream = int(sr["i_stream"])
     dtype_str = str(sr["dtype"]).strip().lower()
+    write_modes = sr.get("write_modes", False)
+    if isinstance(write_modes, str):
+        write_modes = write_modes.strip().lower() in ("1", "true", "yes", "y", "t")
+    else:
+        write_modes = bool(write_modes)
 
     # time settings (used for CSV)
     dt = float(case["case"]["time"]["timestep"])
@@ -283,7 +315,7 @@ def main() -> None:
     pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
 
     # Rank0 control client only (COMM_SELF)
-    ctrl = CtrlClient(debug=True) if rank == 0 else None
+    ctrl = CtrlClient(debug=DEBUG) if rank == 0 else None
 
     log(comm, "Python: Barrier after ctrl init")
     comm.Barrier()
@@ -355,6 +387,10 @@ def main() -> None:
                 header = "t," + ",".join([f"a{i+1}" for i in range(keep_modes)])
 
                 if rank == 0:
+                    if write_modes:
+                        rotated = rotate_time_coeffs("pod_time_coeffs.csv")
+                        if rotated:
+                            log(comm, f"Rank0: archived pod_time_coeffs.csv -> {rotated}")
                     log(comm, "Rank0: writing pod_time_coeffs.csv")
                     np.savetxt("pod_time_coeffs.csv", out, delimiter=",", header=header, comments="")
 
