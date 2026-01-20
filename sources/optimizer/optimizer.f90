@@ -53,7 +53,7 @@ module optimizer
 
   !> Abstract optimizer class.
   type, abstract, public :: optimizer_t
-     private
+     character(len=64), private :: type_name = 'optimizer_t'
 
      !> The maximum number of iterations
      integer, public :: max_iterations = 0
