@@ -252,6 +252,7 @@ contains
     call this%output_forward%free()
     call this%output_adjoint%free()
     call this%checkpoint%free()
+    call this%adjoint_case%free()
 
     ! Nullify pointers
     nullify(this%fluid)
