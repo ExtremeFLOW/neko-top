@@ -83,7 +83,8 @@ module adjoint_fluid_pnpn
   use field_math, only: field_add2, field_copy
   use bc, only: bc_t
   use file, only: file_t
-  ! use operators, only: ortho
+  use operators, only: ortho
+  use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
   use blasius, only: blasius_t
