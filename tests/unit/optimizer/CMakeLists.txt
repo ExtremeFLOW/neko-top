@@ -1,3 +1,11 @@
+# CMakeLists.txt for optimizer_checkpoint unit test
+# This file requires HDF5 support to be enabled.
+
+if (NOT hdf5_FOUND)
+    message(STATUS "Skipping optimizer_checkpoint test since HDF5 is not found")
+    return()
+endif()
+
 # Define the CTest for optimizer_checkpoint
 set(CMAKE_FOLDER "Tests/Unit/OptimizerCheckpoint")
 
