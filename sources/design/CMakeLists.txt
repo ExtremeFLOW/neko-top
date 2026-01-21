@@ -10,7 +10,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/design_factory.f90
 
         # Utility modules for the design objects
-        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/design_io_hdf5.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/set_optimization_ic.f90
 
         # Specific design types

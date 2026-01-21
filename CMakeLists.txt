@@ -140,7 +140,7 @@ set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
 
 pkg_check_modules(hdf5 QUIET IMPORTED_TARGET hdf5)
 if (hdf5_FOUND)
-    add_compile_definitions(HAVE_HDF5)
+    add_compile_definitions(HAVE_HDF5=1)
 endif()
 
 # ............................................................................ #
