@@ -43,6 +43,15 @@ done
 tests=($(find -L $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
 for ((i = 0; i < ${#tests[@]}; i++)); do tests[$i]="${tests[$i]#$LPATH/}"; done
 
+# Trim tests called `run_*` which are not actual tests
+filtered_tests=()
+for test in ${tests[@]}; do
+    if [[ ! $(basename $test) == run_* ]]; then
+        filtered_tests+=("$test")
+    fi
+done
+tests=("${filtered_tests[@]}")
+
 if [ ${#tests[@]} -eq 0 ]; then
     printf "No tests found.\n"
     exit 0
