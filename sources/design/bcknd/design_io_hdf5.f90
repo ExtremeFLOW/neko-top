@@ -126,6 +126,7 @@ contains
                   // 'use overwrite option to replace')
           end if
        end if
+
     end if
 
     ! Assign the correct HDF5 data type based on the neko real kind
@@ -293,8 +294,9 @@ contains
     call h5aopen_f(grp_id, 'name', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, name, ddim, ierr)
-    call h5tclose_f(str_type, ierr)
     call h5aclose_f(attr_id, ierr)
+
+    call h5tclose_f(str_type, ierr)
 
     ! Read array attribute n
     ddim(1) = pe_size
