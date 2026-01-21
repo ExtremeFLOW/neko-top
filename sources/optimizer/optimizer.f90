@@ -37,7 +37,6 @@
 !! optimization methods. Specific optimizers should extend this type and
 !! implement the deferred methods.
 module optimizer
-
   use json_module, only: json_file
   use simulation_m, only: simulation_t
   use problem, only: problem_t
@@ -46,15 +45,16 @@ module optimizer
   use logger, only: neko_log
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime
-  use utils, only: neko_error
+  use utils, only: neko_error, filename_suffix
 
   implicit none
   private
 
   !> Abstract optimizer class.
   type, abstract, public :: optimizer_t
-     private
 
+     !> The type of the optimizer
+     character(len=64) :: optimizer_type = ''
      !> The maximum number of iterations
      integer, public :: max_iterations = 0
      !> The tolerance for the optimization loop
@@ -82,6 +82,17 @@ module optimizer
 
      !> Write the progress of the optimizer to the log file
      procedure(optimizer_write), pass(this), public, deferred :: write
+     !> Save optimizer-specific components to checkpoint
+     procedure(optimizer_save_checkpoint_components), pass(this), deferred :: &
+          save_checkpoint_components
+     !> Load optimizer-specific components from checkpoint
+     procedure(optimizer_load_checkpoint_components), pass(this), deferred :: &
+          load_checkpoint_components
+
+     !> Save a checkpoint of the optimizer state
+     procedure, pass(this) :: save_checkpoint => optimizer_save_checkpoint
+     !> Restore the optimizer state from a checkpoint
+     procedure, pass(this) :: load_checkpoint => optimizer_load_checkpoint
 
      ! ----------------------------------------------------------------------- !
      ! Public procedures
@@ -127,6 +138,12 @@ module optimizer
        type(simulation_t), optional, intent(inout) :: simulation
      end subroutine optimizer_initialize
 
+     !> Interface for freeing resources
+     subroutine optimizer_free(this)
+       import optimizer_t
+       class(optimizer_t), intent(inout) :: this
+     end subroutine optimizer_free
+
      !> Interface for running an optimization step
      logical function optimizer_step(this, iter, problem, design, simulation)
        import optimizer_t, simulation_t, problem_t, design_t
@@ -137,6 +154,14 @@ module optimizer
        type(simulation_t), optional, intent(inout) :: simulation
      end function optimizer_step
 
+     !> Interface for validating the solution
+     subroutine optimizer_validate(this, problem, design)
+       import optimizer_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       class(problem_t), intent(in) :: problem
+       class(design_t), intent(in) :: design
+     end subroutine optimizer_validate
+
      !> Interface for writing the optimizer progress
      subroutine optimizer_write(this, iter, problem)
        import optimizer_t, simulation_t, problem_t, design_t
@@ -145,19 +170,21 @@ module optimizer
        class(problem_t), intent(in) :: problem
      end subroutine optimizer_write
 
-     !> Interface for freeing resources
-     subroutine optimizer_free(this)
+     !> Interface for saving optimizer-specific components to checkpoint
+     subroutine optimizer_save_checkpoint_components(this, filename, overwrite)
        import optimizer_t
        class(optimizer_t), intent(inout) :: this
-     end subroutine optimizer_free
+       character(len=*), intent(in) :: filename
+       logical, intent(in), optional :: overwrite
+     end subroutine optimizer_save_checkpoint_components
 
-     !> Interface for validating the solution
-     subroutine optimizer_validate(this, problem, design)
-       import optimizer_t, problem_t, design_t
+     !> Interface for loading optimizer-specific components from checkpoint
+     subroutine optimizer_load_checkpoint_components(this, filename)
+       import optimizer_t
        class(optimizer_t), intent(inout) :: this
-       class(problem_t), intent(in) :: problem
-       class(design_t), intent(in) :: design
-     end subroutine optimizer_validate
+       character(len=*), intent(in) :: filename
+     end subroutine optimizer_load_checkpoint_components
+
   end interface
 
   ! -------------------------------------------------------------------------- !
@@ -180,6 +207,27 @@ module optimizer
      end subroutine optimizer_factory
   end interface optimizer_factory
 
+  ! -------------------------------------------------------------------------- !
+  ! IO routines for HDF5 checkpoints
+
+  interface
+     !> Interface for writing a checkpoint
+     module subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, &
+          overwrite)
+       class(optimizer_t), intent(inout) :: object
+       character(len=*), intent(in) :: filename
+       integer, intent(in) :: iter
+       logical, intent(in), optional :: overwrite
+     end subroutine optimizer_save_checkpoint_hdf5
+
+     !> Interface for reading a checkpoint
+     module subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+       class(optimizer_t), intent(inout) :: object
+       character(len=*), intent(in) :: filename
+       integer, intent(out) :: iter
+     end subroutine optimizer_load_checkpoint_hdf5
+  end interface
+
   public :: optimizer_factory
 
 contains
@@ -189,15 +237,19 @@ contains
 
   !> Base initializer for the optimizer
   !! @param this The optimizer object.
+  !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
   !! @param tolerance The tolerance for the optimization loop.
   !! @param max_runtime The maximum runtime in seconds.
-  subroutine optimizer_init_base(this, max_iterations, tolerance, max_runtime)
+  subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
+       tolerance, max_runtime)
     class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in) :: tolerance
     real(kind=rp), intent(in), optional :: max_runtime
 
+    this%optimizer_type = optimizer_type
     this%max_iterations = max_iterations
     this%max_runtime = max_runtime
     this%tolerance = tolerance
@@ -209,6 +261,7 @@ contains
   subroutine optimizer_free_base(this)
     class(optimizer_t), intent(inout) :: this
 
+    this%optimizer_type = ''
     this%max_iterations = 0
     this%tolerance = 0.0_rp
     this%max_runtime = -1.0_rp
@@ -238,22 +291,34 @@ contains
     real(kind=rp) :: start_time, elapsed_time
     real(kind=rp) :: iteration_start_time, iteration_end_time
     real(kind=rp) :: iteration_average_time
-    logical :: converged
+    logical :: converged, file_exists
     integer :: iter, stop_flag
+
+    ! Initialize variables
+    iter = 0
+    stop_flag = 1
+    converged = .false.
+    iteration_average_time = 0.0_rp
+
+    ! Read run time checkpoint if present
+    inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
+    if (file_exists) then
+       call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', iter, &
+            design)
+       write(*, *) 'Resuming optimizer from checkpoint at iteration ', iter
+    end if
 
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
-    call this%write(0, problem)
-    call design%write(0)
+
+    call this%write(iter, problem)
+    call design%write(iter)
 
     call neko_log%section('Optimization Loop')
 
-    stop_flag = 1
-    converged = .false.
     start_time = MPI_Wtime()
-    iteration_average_time = 0.0_rp
-    do iter = 1, this%max_iterations
-
+    do while (iter .lt. this%max_iterations)
+       iter = iter + 1
        call profiler_start_region('Optimizer iteration')
        iteration_start_time = MPI_Wtime()
 
@@ -287,6 +352,11 @@ contains
           end if
        end if
     end do
+
+    if (stop_flag .eq. 2) then
+       call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', iter, design, &
+            .true.)
+    end if
 
     ! Check that the final design is valid
     call this%validate(problem, design)
@@ -330,5 +400,89 @@ contains
        call neko_error(msg)
     end select
   end subroutine optimizer_print_status
+
+  ! ========================================================================== !
+  ! IO Functions
+
+  !> Save the optimizer checkpoint to a file based on file suffix.
+  !! @param this The optimizer object.
+  !! @param filename The name of the file to save the checkpoint.
+  !! @param iter The current iteration number.
+  !! @param design The design object.
+  !! @param overwrite Whether to overwrite the file if it exists.
+  subroutine optimizer_save_checkpoint(this, filename, iter, design, overwrite)
+    class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: iter
+    class(design_t), intent(inout) :: design
+    logical, intent(in), optional :: overwrite
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call optimizer_save_checkpoint_hdf5(this, filename, iter, overwrite)
+    case default
+       call neko_error('optimizer: Unsupported checkpoint format: ' // &
+            trim(file_ext))
+    end select
+
+    call this%save_checkpoint_components(filename, overwrite)
+    call design%save_checkpoint(filename, overwrite)
+
+  end subroutine optimizer_save_checkpoint
+
+  !> Load the optimizer checkpoint from a file based on file suffix.
+  !! @param this The optimizer object.
+  !! @param filename The name of the file to load the checkpoint from.
+  !! @param iter The current iteration number.
+  !! @param design The design object.
+  subroutine optimizer_load_checkpoint(this, filename, iter, design)
+    class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(out) :: iter
+    class(design_t), intent(inout) :: design
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call optimizer_load_checkpoint_hdf5(this, filename, iter)
+    case default
+       call neko_error('optimizer: Unsupported checkpoint format: ' // &
+            trim(file_ext))
+    end select
+
+    call this%load_checkpoint_components(filename)
+    call design%load_checkpoint(filename)
+
+  end subroutine optimizer_load_checkpoint
+
+  ! ========================================================================== !
+  ! Dummy implementations for module procedures
+
+#if !HAVE_HDF5
+  module subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, &
+       overwrite)
+    class(optimizer_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: iter
+    logical, intent(in), optional :: overwrite
+    call neko_error('optimizer: HDF5 support not enabled rebuild with ' // &
+         'HAVE_HDF5')
+  end subroutine optimizer_save_checkpoint_hdf5
+
+  module subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+    class(optimizer_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    integer, intent(out) :: iter
+    call neko_error('optimizer: HDF5 support not enabled rebuild with ' // &
+         'HAVE_HDF5')
+  end subroutine optimizer_load_checkpoint_hdf5
+#endif
 
 end module optimizer

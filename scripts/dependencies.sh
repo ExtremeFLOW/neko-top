@@ -244,7 +244,7 @@ function find_hdf5() {
     if [[ $# -ge 1 ]]; then
         HDF5_DIR="$1"
     elif [ -z "$HDF5_DIR" ]; then
-        HDF5_DIR="hdf5"
+        return
     fi
 
     if [[ "${HDF5_DIR:0:1}" != "/" && "${HDF5_DIR:0:1}" != "~" ]]; then

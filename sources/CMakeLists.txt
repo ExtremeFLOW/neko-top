@@ -41,6 +41,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
 
 target_sources(neko-top
     PRIVATE
