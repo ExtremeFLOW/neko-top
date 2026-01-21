@@ -1,8 +1,8 @@
-!> @file design_io_hdf5.f90
+!> @file design_hdf5_checkpoint.f90
 !! @brief HDF5 IO submodule for the design object.
 !! @details
 !! This submodule provides routines for saving and loading the design
-!! optimization object to and from HDF5 files in a parallel-aware manner.
+!! object to and from HDF5 files in a parallel-aware manner.
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -37,10 +37,8 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Submodule for handling HDF5 IO for the design object.
-submodule (design) design_io_hdf5
-#ifdef HAVE_HDF5
+submodule (design) design_hdf5_io
   use hdf5
-#endif
   use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8, MPI_MAX, MPI_MIN, &
        MPI_IN_PLACE
   use math, only: abscmp
@@ -51,14 +49,12 @@ submodule (design) design_io_hdf5
 
 contains
 
-#ifdef HAVE_HDF5
-
   !> Write the Design object to an HDF5 file (parallel-aware).
   !! This routine will first ensure device-host synchronization for all
   !! vectors and matrices, then perform the write. Currently the low-level
   !! HDF5 write is delegated to the project's I/O layer. If no I/O layer is
   !! available at link time a runtime error will be raised.
-  module subroutine design_save_checkpoint(this, filename, overwrite)
+  module subroutine design_save_checkpoint_hdf5(this, filename, overwrite)
     class(design_t), intent(in) :: this
     character(len=*), intent(in) :: filename
     logical, intent(in), optional :: overwrite
@@ -126,8 +122,8 @@ contains
                   // 'use overwrite option to replace')
           end if
        end if
-
     end if
+    call h5gclose_f(design_grp_id, ierr)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -227,17 +223,16 @@ contains
     ! Close the group and file
 
     call h5gclose_f(grp_id, ierr)
-    call h5gclose_f(design_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
-  end subroutine design_save_checkpoint
+  end subroutine design_save_checkpoint_hdf5
 
   !> Read the Design object from an HDF5 file (parallel-aware).
   !! This routine will perform the read and then ensure device-host
   !! synchronization for all vectors and matrices.
-  module subroutine design_load_checkpoint(this, filename)
+  module subroutine design_load_checkpoint_hdf5(this, filename)
     class(design_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
 
@@ -271,6 +266,11 @@ contains
          access_prp = fapl_id)
     call h5gopen_f(file_id, h5_group, grp_id, ierr)
 
+    if (ierr .ne. 0) then
+       call neko_error('design: unable to open HDF5 file "' // &
+            trim(filename) // '" or group "' // trim(h5_group) // '".')
+    end if
+
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
     case (dp)
@@ -294,9 +294,8 @@ contains
     call h5aopen_f(grp_id, 'name', attr_id, ierr)
     call h5aget_type_f(attr_id, str_type, ierr)
     call h5aread_f(attr_id, str_type, name, ddim, ierr)
-    call h5aclose_f(attr_id, ierr)
-
     call h5tclose_f(str_type, ierr)
+    call h5aclose_f(attr_id, ierr)
 
     ! Read array attribute n
     ddim(1) = pe_size
@@ -369,22 +368,6 @@ contains
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
 
-  end subroutine design_load_checkpoint
+  end subroutine design_load_checkpoint_hdf5
 
-#else
-
-  module subroutine design_save_checkpoint(this, filename, overwrite)
-    class(design_t), intent(in) :: this
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine design_save_checkpoint
-
-  module subroutine design_load_checkpoint(this, filename)
-    class(design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine design_load_checkpoint
-#endif
-
-end submodule design_io_hdf5
+end submodule design_hdf5_io
