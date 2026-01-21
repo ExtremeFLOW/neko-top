@@ -472,7 +472,9 @@ contains
 
   subroutine mma_optimizer_save_checkpoint(this, filename, iter, design, &
        overwrite)
+#if HAVE_HDF5
     use hdf5
+#endif
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
     implicit none
@@ -484,19 +486,20 @@ contains
     logical, intent(in), optional :: overwrite
     logical :: overwrite_flag, file_exists
 
+#if HAVE_HDF5
     ! HDF5 variables
     integer(hid_t) :: file_id, fapl_id, filespace, str_type
     integer(hid_t) :: grp_id, optimizer_grp_id, attr_id
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
     logical :: optimizer_exists
-
+#endif
     overwrite_flag = .false.
     if (present(overwrite)) overwrite_flag = overwrite
 
     ! ------------------------------------------------------------------------ !
     ! Prepare the HDF5 file, settings for MPIO access and groups
-
+#if HAVE_HDF5
     call h5open_f(ierr)
     call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
     info = MPI_INFO_NULL%mpi_val
@@ -573,7 +576,7 @@ contains
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
-
+#endif
     ! Save the MMA-specific checkpoint data
     call this%mma%save_checkpoint(filename, overwrite)
     call design%save_checkpoint(filename, overwrite)
@@ -581,7 +584,9 @@ contains
   end subroutine mma_optimizer_save_checkpoint
 
   subroutine mma_optimizer_restore_checkpoint(this, filename, iter, design)
+#if HAVE_HDF5
     use hdf5
+#endif
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
     implicit none
@@ -590,7 +595,7 @@ contains
     character(len=*), intent(in) :: filename
     integer, intent(out) :: iter
     class(design_t), intent(inout) :: design
-
+#if HAVE_HDF5
     ! HDF5 variables
     character(len=64) :: type_name
     integer(hid_t) :: file_id, fapl_id, grp_id, attr_id, str_type
@@ -638,7 +643,7 @@ contains
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
-
+#endif
     call this%mma%load_checkpoint(trim(filename))
     call design%load_checkpoint(trim(filename))
 
