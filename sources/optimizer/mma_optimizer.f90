@@ -474,9 +474,9 @@ contains
        overwrite)
 #if HAVE_HDF5
     use hdf5
-#endif
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
+#endif
     implicit none
 
     class(mma_optimizer_t), intent(inout) :: this
@@ -586,9 +586,9 @@ contains
   subroutine mma_optimizer_restore_checkpoint(this, filename, iter, design)
 #if HAVE_HDF5
     use hdf5
-#endif
     use mpi_f08, only: MPI_INFO_NULL
     use comm, only: NEKO_COMM
+#endif
     implicit none
 
     class(mma_optimizer_t), intent(inout) :: this
