@@ -109,6 +109,7 @@ contains
           end if
        end if
     end if
+    call h5gclose_f(optimizer_grp_id, ierr)
 
     ! ------------------------------------------------------------------------ !
     ! Write the optimizer optimizer checkpoint group
@@ -139,7 +140,6 @@ contains
     ! Close HDF5 objects
     call h5sclose_f(filespace, ierr)
     call h5gclose_f(grp_id, ierr)
-    call h5gclose_f(optimizer_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
@@ -157,6 +157,7 @@ contains
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
     character(len=256) :: msg
+    character(len=*), parameter :: h5_group = "Optimizer/checkpoint"
 
     ! Initialize reader variables
     type_name = ''
@@ -177,7 +178,12 @@ contains
          access_prp = fapl_id)
 
     ! Open the optimizer optimizer checkpoint group
-    call h5gopen_f(file_id, 'Optimizer/checkpoint', grp_id, ierr)
+    call h5gopen_f(file_id, h5_group, grp_id, ierr)
+
+    if (ierr .ne. 0) then
+       call neko_error('optimizer: unable to open HDF5 file "' // &
+            trim(filename) // '" or group "' // trim(h5_group) // '".')
+    end if
 
     ! Read the optimizer type and verify
     call h5aopen_f(grp_id, 'type', attr_id, ierr)

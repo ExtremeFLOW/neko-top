@@ -123,6 +123,7 @@ contains
           end if
        end if
     end if
+    call h5gclose_f(design_grp_id, ierr)
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
@@ -222,7 +223,6 @@ contains
     ! Close the group and file
 
     call h5gclose_f(grp_id, ierr)
-    call h5gclose_f(design_grp_id, ierr)
     call h5fclose_f(file_id, ierr)
     call h5pclose_f(fapl_id, ierr)
     call h5close_f(ierr)
@@ -265,6 +265,11 @@ contains
     call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
          access_prp = fapl_id)
     call h5gopen_f(file_id, h5_group, grp_id, ierr)
+
+    if (ierr .ne. 0) then
+       call neko_error('design: unable to open HDF5 file "' // &
+            trim(filename) // '" or group "' // trim(h5_group) // '".')
+    end if
 
     ! Assign the correct HDF5 data type based on the neko real kind
     select case (rp)
