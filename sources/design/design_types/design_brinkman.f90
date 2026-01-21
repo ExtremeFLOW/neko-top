@@ -34,7 +34,7 @@
 
 ! Implements the `brinkman_design_t` type.
 module brinkman_design
-  use num_types, only: rp, sp
+  use num_types, only: rp, sp, dp
   use field, only: field_t
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
@@ -61,6 +61,7 @@ module brinkman_design
   use field_math, only: field_rzero
   use json_utils, only: json_get, json_get_or_default, json_get
   use utils, only: neko_error
+  use comm, only: NEKO_COMM
   implicit none
   private
 

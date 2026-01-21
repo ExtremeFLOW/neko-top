@@ -94,7 +94,6 @@ module design_3dto1d
      !> Destructor
      procedure, pass(this) :: free => design_3dto1d_free
 
-
      !> map (this will include everything from mapping
      procedure, pass(this) :: map_forward => design_3dto1d_map_forward
      !> this will contain chain rule for going backwards
