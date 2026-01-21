@@ -61,8 +61,8 @@
 ! note that based on eq(3.5) there should be r0 in the approximated problem !
 ! however since it is just a constant added to a minimization problem, it   !
 ! is ignored.                                                               !
-! A primal-dual algorithm is then employed to solve the aproximated problem !
-! using interior point method.                                              !
+! A primal-dual algorithm is then employed to solve the approximated        !
+! problem using interior point method.                                      !
 !===========================================================================!
 
 !> MMA module
@@ -74,7 +74,7 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
-  use utils, only: neko_error
+  use utils, only: neko_error, filename_suffix
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
@@ -135,6 +135,7 @@ module mma
 
      ! Private utilities
      procedure, pass(this) :: copy_from => mma_copy_from
+
   end type mma_t
 
   ! ========================================================================== !
@@ -177,22 +178,28 @@ module mma
        type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
      end subroutine mma_KKT_device
 
-     ! ======================================================================= !
-     ! Interface for IO routines
+  end interface
 
-     module subroutine mma_save_checkpoint(this, filename, overwrite)
-       class(mma_t), intent(inout) :: this
+  ! ========================================================================== !
+  ! Interface for IO routines
+
+  interface
+     module subroutine mma_save_checkpoint_hdf5(object, filename, overwrite)
+       class(mma_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
        logical, intent(in), optional :: overwrite
-     end subroutine mma_save_checkpoint
+     end subroutine mma_save_checkpoint_hdf5
 
-     module subroutine mma_load_checkpoint(this, filename)
-       class(mma_t), intent(inout) :: this
+     module subroutine mma_load_checkpoint_hdf5(object, filename)
+       class(mma_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
-     end subroutine mma_load_checkpoint
+     end subroutine mma_load_checkpoint_hdf5
   end interface
 
 contains
+
+  ! ========================================================================== !
+  ! Initializers and destructors
 
   !> Read attributes from the case file, and calling the init function
   subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale)
@@ -491,6 +498,9 @@ contains
     this%is_initialized = .true.
   end subroutine mma_init_from_components
 
+  ! ========================================================================== !
+  ! Updator and KKT checker
+
   !> Call the update function based on the backend
   subroutine mma_update_vector(this, iter, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
@@ -546,6 +556,52 @@ contains
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
   end subroutine mma_KKT_vector
+
+  ! ========================================================================== !
+  ! IO Functions
+
+  !> Save the mma checkpoint to a file based on file suffix.
+  !! @param this The mma object.
+  !! @param filename The name of the file to save the checkpoint.
+  !! @param overwrite Whether to overwrite the file if it exists.
+  subroutine mma_save_checkpoint(this, filename, overwrite)
+    class(mma_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call mma_save_checkpoint_hdf5(this, filename, overwrite)
+    case default
+       call neko_error('mma_save_checkpoint: Unsupported file format: ' // &
+            trim(file_ext))
+    end select
+
+  end subroutine mma_save_checkpoint
+
+  !> Load the mma checkpoint from a file based on file suffix.
+  !! @param this The mma object.
+  !! @param filename The name of the file to load the checkpoint from.
+  subroutine mma_load_checkpoint(this, filename)
+    class(mma_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call mma_load_checkpoint_hdf5(this, filename)
+    case default
+       call neko_error('mma_load_checkpoint: Unsupported file format: ' // &
+            trim(file_ext))
+    end select
+  end subroutine mma_load_checkpoint
 
   ! ========================================================================== !
   ! Getters and setters
