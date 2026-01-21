@@ -16,6 +16,9 @@ module optimizer_checkpoint
   use num_types, only: rp
   use registry, only: neko_registry
   use scratch_registry, only: neko_scratch_registry
+  use math, only: NEKO_EPS
+  use device, only: DEVICE_TO_HOST
+
   implicit none
 
   @TestCase
@@ -72,15 +75,16 @@ contains
     class(optimizer_t), allocatable :: opt
 
     ! Reference and restored objective and design variables
-    real(kind=rp) :: f_ref, f_half, f_restored
-    type(vector_t) :: x_ref, x_half, x_restored
+    real(kind=rp) :: f, f_ref, f_half
+    type(vector_t) :: x, x_ref, x_half
 
     ! Internal variables for the optimizer loop
     integer :: iter, iter0
     logical :: converged
-    character(len=256) :: msg
 
     ! Set test parameters
+    integer :: i
+    character(len=256) :: msg
     integer, parameter :: max_iter = 12
     real(kind=rp), parameter :: tol = 1.0e-8_rp
 
@@ -99,9 +103,9 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
+    call x%init(des%size())
     call x_ref%init(des%size())
     call x_half%init(des%size())
-    call x_restored%init(des%size())
 
     ! ------------------------------------------------------------------------ !
     ! Run the optimization and save a checkpoint halfway
@@ -146,18 +150,24 @@ contains
     call opt%load_checkpoint('optimizer_checkpoint.h5', iter0, des)
     call opt%initialize(prob, des, sim)
 
-    call prob%get_objective_value(f_restored)
-    call des%get_values(x_restored)
-
     ! ------------------------------------------------------------------------ !
     ! Verify that the restored state matches the saved checkpoint
+    ! up to numerical precision
 
-    write(msg, *) "Restored iteration does not match expected iteration"
+    call prob%get_objective_value(f)
+    call des%get_values(x)
+    call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call x_half%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    write(msg, *) "Loaded iteration does not match"
     @assertEqual(max_iter / 2, iter0, trim(msg))
-    write(msg, *) "Restored objective does not match objective at checkpoint"
-    @assertEqual(0.0_rp, abs((f_half - f_restored) / f_half), tol, trim(msg))
-    write(msg, *) "Restored design does not match original design"
-    @assertEqual(0.0_rp, rmse(x_half, x_restored), tol, trim(msg))
+    write(msg, *) "Loaded objective does not match"
+    @assertEqual(f_half, f, NEKO_EPS, trim(msg))
+
+    do i = 1, des%size()
+       write(msg, '(A,I0)') "Loaded design does not match at index ", i
+       @assertEqual(x_half%x(i), x%x(i), NEKO_EPS, trim(msg))
+    end do
 
     ! ------------------------------------------------------------------------ !
     ! Continue optimization from restored state
@@ -166,23 +176,24 @@ contains
        converged = opt%step(iter, prob, des, sim)
     end do
 
-    call prob%get_objective_value(f_restored)
-    call des%get_values(x_restored)
-
     ! ------------------------------------------------------------------------ !
     ! Verify that the restored design matches the original one
+    ! up to slightly looser tolerance
+
+    call prob%get_objective_value(f)
+    call des%get_values(x)
 
     write(msg, *) "Final objective does not match original objective"
-    @assertEqual(0.0_rp, abs((f_ref - f_restored) / f_ref), tol, trim(msg))
+    @assertEqual(0.0_rp, abs((f_ref - f) / f_ref), tol, trim(msg))
     write(msg, *) "Final design does not match original design"
-    @assertEqual(0.0_rp, rmse(x_ref, x_restored), tol, trim(msg))
+    @assertEqual(0.0_rp, rmse(x_ref, x), tol, trim(msg))
 
     ! ------------------------------------------------------------------------ !
     ! Clean up the components
 
+    call x%free()
     call x_ref%free()
     call x_half%free()
-    call x_restored%free()
 
     call opt%free()
     call prob%free()
