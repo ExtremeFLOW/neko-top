@@ -157,7 +157,7 @@ contains
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
     character(len=256) :: msg
-    character(len=*), parameter :: h5_group = "Optimizer/checkpoint"
+    character(len=*), parameter :: h5_group = "/Optimizer/checkpoint"
 
     ! Initialize reader variables
     type_name = ''
