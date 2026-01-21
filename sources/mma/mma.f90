@@ -698,4 +698,23 @@ contains
     call this%eta%copy_from(direction, sync = sync)
 
   end subroutine mma_copy_from
+
+  ! ========================================================================== !
+  ! Dummy implementations for module procedures
+
+#if !HAVE_HDF5
+  module subroutine mma_save_checkpoint_hdf5(object, filename, overwrite)
+    class(mma_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine mma_save_checkpoint_hdf5
+
+  module subroutine mma_load_checkpoint_hdf5(object, filename)
+    class(mma_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine mma_load_checkpoint_hdf5
+#endif
+
 end module mma

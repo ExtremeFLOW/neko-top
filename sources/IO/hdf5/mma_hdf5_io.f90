@@ -37,18 +37,14 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Submodule for handling HDF5 IO for the mma object.
-submodule (mma) mma_hdf5_checkpoint
-#if HAVE_HDF5
+submodule (mma) mma_hdf5_io
   use hdf5
-#endif
   use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8, MPI_MAX, MPI_MIN, &
        MPI_IN_PLACE
   use math, only: abscmp
   use comm, only: pe_size
 
 contains
-
-#if HAVE_HDF5
 
   !> Write the MMA object to an HDF5 file (parallel-aware).
   !! This routine will first ensure device-host synchronization for all
@@ -566,20 +562,4 @@ contains
 
   end subroutine mma_load_checkpoint_hdf5
 
-#else
-
-  module subroutine mma_save_checkpoint_hdf5(object, filename, overwrite)
-    class(mma_t), intent(inout) :: object
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine mma_save_checkpoint_hdf5
-
-  module subroutine mma_load_checkpoint_hdf5(object, filename)
-    class(mma_t), intent(inout) :: object
-    character(len=*), intent(in) :: filename
-    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine mma_load_checkpoint_hdf5
-#endif
-
-end submodule mma_hdf5_checkpoint
+end submodule mma_hdf5_io

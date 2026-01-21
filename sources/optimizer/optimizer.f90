@@ -212,17 +212,17 @@ module optimizer
 
   interface
      !> Interface for writing a checkpoint
-     module subroutine optimizer_save_checkpoint_hdf5(this, filename, iter, &
+     module subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, &
           overwrite)
-       class(optimizer_t), intent(inout) :: this
+       class(optimizer_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
        integer, intent(in) :: iter
        logical, intent(in), optional :: overwrite
      end subroutine optimizer_save_checkpoint_hdf5
 
      !> Interface for reading a checkpoint
-     module subroutine optimizer_load_checkpoint_hdf5(this, filename, iter)
-       class(optimizer_t), intent(inout) :: this
+     module subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+       class(optimizer_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
        integer, intent(out) :: iter
      end subroutine optimizer_load_checkpoint_hdf5
@@ -461,5 +461,28 @@ contains
     call design%load_checkpoint(filename)
 
   end subroutine optimizer_load_checkpoint
+
+  ! ========================================================================== !
+  ! Dummy implementations for module procedures
+
+#if !HAVE_HDF5
+  module subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, &
+       overwrite)
+    class(optimizer_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: iter
+    logical, intent(in), optional :: overwrite
+    call neko_error('optimizer: HDF5 support not enabled rebuild with ' // &
+         'HAVE_HDF5')
+  end subroutine optimizer_save_checkpoint_hdf5
+
+  module subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+    class(optimizer_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    integer, intent(out) :: iter
+    call neko_error('optimizer: HDF5 support not enabled rebuild with ' // &
+         'HAVE_HDF5')
+  end subroutine optimizer_load_checkpoint_hdf5
+#endif
 
 end module optimizer

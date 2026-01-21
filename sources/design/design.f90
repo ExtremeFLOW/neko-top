@@ -399,4 +399,22 @@ contains
     call neko_error("Design type does not support z retrieval")
   end function design_get_z_i
 
+  ! ========================================================================= !
+  ! Dummy implementations for module procedures
+
+#if !HAVE_HDF5
+  module subroutine design_save_checkpoint_hdf5(this, filename, overwrite)
+    class(design_t), intent(in) :: this
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine design_save_checkpoint_hdf5
+
+  module subroutine design_load_checkpoint_hdf5(this, filename)
+    class(design_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine design_load_checkpoint_hdf5
+#endif
+
 end module design

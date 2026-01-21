@@ -2,7 +2,7 @@
 !! @brief HDF5 IO submodule for the optimizer object.
 !! @details
 !! This submodule provides routines for saving and loading the optimizer
-!! optimization object to and from HDF5 files in a parallel-aware manner.
+!! object to and from HDF5 files in a parallel-aware manner.
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -37,22 +37,18 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Submodule for handling HDF5 IO for the optimizer object.
-submodule (optimizer) optimizer_hdf5_checkpoint
-#if HAVE_HDF5
+submodule (optimizer) optimizer_hdf5_io
   use hdf5
-#endif
   use mpi_f08, only: MPI_INFO_NULL
   use comm, only: NEKO_COMM
 
 contains
 
-#if HAVE_HDF5
-
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the optimizer optimizer
 
-  subroutine optimizer_save_checkpoint_hdf5(this, filename, iter, overwrite)
-    class(optimizer_t), intent(inout) :: this
+  subroutine optimizer_save_checkpoint_hdf5(object, filename, iter, overwrite)
+    class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
     integer, intent(in) :: iter
     logical, intent(in), optional :: overwrite
@@ -128,7 +124,7 @@ contains
     call h5tset_size_f(str_type, ddim(1), ierr)
     call h5acreate_f(grp_id, 'type', str_type, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, str_type, this%optimizer_type, ddim, ierr)
+    call h5awrite_f(attr_id, str_type, object%optimizer_type, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
     call h5tclose_f(str_type, ierr)
 
@@ -150,8 +146,8 @@ contains
 
   end subroutine optimizer_save_checkpoint_hdf5
 
-  subroutine optimizer_load_checkpoint_hdf5(this, filename, iter)
-    class(optimizer_t), intent(inout) :: this
+  subroutine optimizer_load_checkpoint_hdf5(object, filename, iter)
+    class(optimizer_t), intent(inout) :: object
     character(len=*), intent(in) :: filename
     integer, intent(out) :: iter
 
@@ -186,7 +182,7 @@ contains
     call h5aclose_f(attr_id, ierr)
 
     ! Verify that the type is optimizer
-    if (trim(type_name) .ne. this%optimizer_type) then
+    if (trim(type_name) .ne. object%optimizer_type) then
        call neko_error('optimizer: HDF5 file "' // trim(filename) // &
             '" does not contain an optimizer optimizer checkpoint')
     end if
@@ -205,20 +201,4 @@ contains
 
   end subroutine optimizer_load_checkpoint_hdf5
 
-#else
-
-  module subroutine optimizer_save_checkpoint_hdf5(object, filename, overwrite)
-    class(optimizer_t), intent(inout) :: object
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-    call neko_error('optimizer: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine optimizer_save_checkpoint_hdf5
-
-  module subroutine optimizer_load_checkpoint_hdf5(object, filename)
-    class(optimizer_t), intent(inout) :: object
-    character(len=*), intent(in) :: filename
-    call neko_error('optimizer: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine optimizer_load_checkpoint_hdf5
-#endif
-
-end submodule optimizer_hdf5_checkpoint
+end submodule optimizer_hdf5_io

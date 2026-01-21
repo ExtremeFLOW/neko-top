@@ -2,7 +2,7 @@
 !! @brief HDF5 IO submodule for the design object.
 !! @details
 !! This submodule provides routines for saving and loading the design
-!! optimization object to and from HDF5 files in a parallel-aware manner.
+!! object to and from HDF5 files in a parallel-aware manner.
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -37,10 +37,8 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 !> Submodule for handling HDF5 IO for the design object.
-submodule (design) design_hdf5_checkpoint
-#if HAVE_HDF5
+submodule (design) design_hdf5_io
   use hdf5
-#endif
   use mpi_f08, only: MPI_Scan, MPI_INFO_NULL, MPI_INTEGER8, MPI_MAX, MPI_MIN, &
        MPI_IN_PLACE
   use math, only: abscmp
@@ -50,8 +48,6 @@ submodule (design) design_hdf5_checkpoint
   use scratch_registry, only: neko_scratch_registry
 
 contains
-
-#if HAVE_HDF5
 
   !> Write the Design object to an HDF5 file (parallel-aware).
   !! This routine will first ensure device-host synchronization for all
@@ -369,20 +365,4 @@ contains
 
   end subroutine design_load_checkpoint_hdf5
 
-#else
-
-  module subroutine design_save_checkpoint_hdf5(this, filename, overwrite)
-    class(design_t), intent(in) :: this
-    character(len=*), intent(in) :: filename
-    logical, intent(in), optional :: overwrite
-    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine design_save_checkpoint_hdf5
-
-  module subroutine design_load_checkpoint_hdf5(this, filename)
-    class(design_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
-    call neko_error('design: HDF5 support not enabled rebuild with HAVE_HDF5')
-  end subroutine design_load_checkpoint_hdf5
-#endif
-
-end submodule design_hdf5_checkpoint
+end submodule design_hdf5_io
