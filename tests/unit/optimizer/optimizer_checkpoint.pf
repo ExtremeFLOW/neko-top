@@ -143,7 +143,7 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%restore_checkpoint('optimizer_checkpoint.h5', iter0, des)
+    call opt%load_checkpoint('optimizer_checkpoint.h5', iter0, des)
     call opt%initialize(prob, des, sim)
 
     call prob%get_objective_value(f_restored)

@@ -100,10 +100,10 @@ module mma_optimizer
      procedure, pass(this) :: write => mma_optimizer_write
      procedure, pass(this) :: free => mma_optimizer_free
 
-     procedure, pass(this) :: save_checkpoint => &
-          mma_optimizer_save_checkpoint
-     procedure, pass(this) :: restore_checkpoint => &
-          mma_optimizer_restore_checkpoint
+     procedure, pass(this) :: save_checkpoint_components => &
+          mma_optimizer_save_checkpoint_components
+     procedure, pass(this) :: load_checkpoint_components => &
+          mma_optimizer_load_checkpoint_components
 
   end type mma_optimizer_t
 
@@ -470,173 +470,22 @@ contains
   ! -------------------------------------------------------------------------- !
   ! Checkpointing methods for the MMA optimizer
 
-  subroutine mma_optimizer_save_checkpoint(this, filename, iter, design, &
-       overwrite)
-    use hdf5
-    use mpi_f08, only: MPI_INFO_NULL
-    use comm, only: NEKO_COMM
-    implicit none
-
+  !> Save the MMA optimizer-specific checkpoint data
+  subroutine mma_optimizer_save_checkpoint_components(this, filename, overwrite)
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
-    integer, intent(in) :: iter
-    class(design_t), intent(inout) :: design
     logical, intent(in), optional :: overwrite
-    logical :: overwrite_flag, file_exists
 
-    ! HDF5 variables
-    integer(hid_t) :: file_id, fapl_id, filespace, str_type
-    integer(hid_t) :: grp_id, optimizer_grp_id, attr_id
-    integer :: ierr, info
-    integer(hsize_t) :: ddim(1)
-    logical :: optimizer_exists
-    overwrite_flag = .false.
-    if (present(overwrite)) overwrite_flag = overwrite
-
-    ! ------------------------------------------------------------------------ !
-    ! Prepare the HDF5 file, settings for MPIO access and groups
-    call h5open_f(ierr)
-    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
-    info = MPI_INFO_NULL%mpi_val
-    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
-
-    ! Handle overwriting if the file exists
-    file_exists = .false.
-    inquire(file=trim(filename), exist=file_exists)
-    if (.not. file_exists) then
-       call h5fcreate_f(trim(filename), H5F_ACC_TRUNC_F, file_id, ierr, &
-            access_prp = fapl_id)
-
-       ! Create the Optimizer/checkpoint group
-       call h5gcreate_f(file_id, "Optimizer", optimizer_grp_id, ierr)
-       call h5gcreate_f(optimizer_grp_id, "checkpoint", grp_id, ierr)
-
-    else
-       call h5fopen_f(trim(filename), H5F_ACC_RDWR_F, file_id, ierr, fapl_id)
-
-       ! Check for existing Optimizer group
-       optimizer_exists = .false.
-       call h5lexists_f(file_id, 'Optimizer', optimizer_exists, ierr)
-
-       if (.not. optimizer_exists) then
-          ! Create the Optimizer/checkpoint group
-          call h5gcreate_f(file_id, "Optimizer", optimizer_grp_id, ierr)
-          call h5gcreate_f(optimizer_grp_id, "checkpoint", grp_id, ierr)
-       else
-          ! Open the existing "Optimizer" group
-          call h5gopen_f(file_id, 'Optimizer', optimizer_grp_id, ierr)
-          call h5lexists_f(optimizer_grp_id, 'checkpoint', optimizer_exists, ierr)
-
-          if (optimizer_exists .and. overwrite_flag) then
-             call h5gunlink_f(optimizer_grp_id, "checkpoint", ierr)
-             call h5gcreate_f(optimizer_grp_id, "checkpoint", grp_id, ierr)
-          else
-             call neko_error('optimizer: HDF5 file "' // trim(filename) // '" ' &
-                  // 'already contains Optimizer group; ' &
-                  // 'use overwrite option to replace')
-          end if
-       end if
-    end if
-
-    ! ------------------------------------------------------------------------ !
-    ! Write the MMA optimizer checkpoint group
-
-    ! Create the dataspace for attributes
-    call h5screate_f(H5S_SCALAR_F, filespace, ierr)
-
-    ! Save the optimizer type
-    call h5tcopy_f(H5T_FORTRAN_S1, str_type, ierr)
-    call h5tset_strpad_f(str_type, H5T_STR_SPACEPAD_F, ierr)
-
-    ddim(1) = 3
-    call h5tset_size_f(str_type, ddim(1), ierr)
-    call h5acreate_f(grp_id, 'type', str_type, filespace, attr_id, &
-         ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, str_type, this%optimizer_type, ddim, ierr)
-    call h5aclose_f(attr_id, ierr)
-    call h5tclose_f(str_type, ierr)
-
-    ! Save the current iteration number
-    ddim = 1
-    call h5acreate_f(grp_id, 'iter', H5T_NATIVE_INTEGER, filespace, attr_id, &
-         ierr, h5p_default_f, h5p_default_f)
-    call h5awrite_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
-    call h5aclose_f(attr_id, ierr)
-
-    ! ------------------------------------------------------------------------ !
-    ! Close HDF5 objects
-    call h5sclose_f(filespace, ierr)
-    call h5gclose_f(grp_id, ierr)
-    call h5gclose_f(optimizer_grp_id, ierr)
-    call h5fclose_f(file_id, ierr)
-    call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
-    ! Save the MMA-specific checkpoint data
     call this%mma%save_checkpoint(filename, overwrite)
-    call design%save_checkpoint(filename, overwrite)
+  end subroutine mma_optimizer_save_checkpoint_components
 
-  end subroutine mma_optimizer_save_checkpoint
-
-  subroutine mma_optimizer_restore_checkpoint(this, filename, iter, design)
-    use hdf5
-    use mpi_f08, only: MPI_INFO_NULL
-    use comm, only: NEKO_COMM
-    implicit none
-
+  !> Restore the MMA optimizer-specific checkpoint data
+  subroutine mma_optimizer_load_checkpoint_components(this, filename)
     class(mma_optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: filename
-    integer, intent(out) :: iter
-    class(design_t), intent(inout) :: design
-    ! HDF5 variables
-    character(len=64) :: type_name
-    integer(hid_t) :: file_id, fapl_id, grp_id, attr_id, str_type
-    integer :: ierr, info
-    integer(hsize_t) :: ddim(1)
 
-    ! ------------------------------------------------------------------------ !
-    ! Open the HDF5 context and read identification parameters
+    call this%mma%load_checkpoint(filename)
+  end subroutine mma_optimizer_load_checkpoint_components
 
-    call h5open_f(ierr)
-
-    ! Prepare the HDF5 settings for MPIO access
-    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
-    info = MPI_INFO_NULL%mpi_val
-    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, info, ierr)
-
-    ! Open the HDF5 file
-    call h5fopen_f(trim(filename), H5F_ACC_RDONLY_F, file_id, ierr, &
-         access_prp = fapl_id)
-
-    ! Open the MMA optimizer checkpoint group
-    call h5gopen_f(file_id, 'Optimizer/checkpoint', grp_id, ierr)
-
-    ! Read the optimizer type and verify
-    call h5aopen_f(grp_id, 'type', attr_id, ierr)
-    call h5aget_type_f(attr_id, str_type, ierr)
-    call h5aread_f(attr_id, str_type, type_name, ddim, ierr)
-    call h5tclose_f(str_type, ierr)
-    call h5aclose_f(attr_id, ierr)
-
-    ! Verify that the type is MMA
-    if (trim(type_name) .ne. this%optimizer_type) then
-       call neko_error('optimizer: HDF5 file "' // trim(filename) // &
-            '" does not contain an MMA optimizer checkpoint')
-    end if
-
-    ! Read the current optimizer iteration
-    ddim(1) = 1
-    call h5aopen_f(grp_id, 'iter', attr_id, ierr)
-    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
-    call h5aclose_f(attr_id, ierr)
-
-    ! Read the current iteration
-    call h5gclose_f(grp_id, ierr)
-    call h5fclose_f(file_id, ierr)
-    call h5pclose_f(fapl_id, ierr)
-    call h5close_f(ierr)
-    call this%mma%load_checkpoint(trim(filename))
-    call design%load_checkpoint(trim(filename))
-
-  end subroutine mma_optimizer_restore_checkpoint
 end module mma_optimizer
 

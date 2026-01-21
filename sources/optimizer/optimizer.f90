@@ -37,7 +37,6 @@
 !! optimization methods. Specific optimizers should extend this type and
 !! implement the deferred methods.
 module optimizer
-
   use json_module, only: json_file
   use simulation_m, only: simulation_t
   use problem, only: problem_t
@@ -46,15 +45,16 @@ module optimizer
   use logger, only: neko_log
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime
-  use utils, only: neko_error
+  use utils, only: neko_error, filename_suffix
 
   implicit none
   private
 
   !> Abstract optimizer class.
   type, abstract, public :: optimizer_t
-     character(len=64) :: optimizer_type = ''
 
+     !> The type of the optimizer
+     character(len=64) :: optimizer_type = ''
      !> The maximum number of iterations
      integer, public :: max_iterations = 0
      !> The tolerance for the optimization loop
@@ -82,13 +82,17 @@ module optimizer
 
      !> Write the progress of the optimizer to the log file
      procedure(optimizer_write), pass(this), public, deferred :: write
+     !> Save optimizer-specific components to checkpoint
+     procedure(optimizer_save_checkpoint_components), pass(this), deferred :: &
+          save_checkpoint_components
+     !> Load optimizer-specific components from checkpoint
+     procedure(optimizer_load_checkpoint_components), pass(this), deferred :: &
+          load_checkpoint_components
 
      !> Save a checkpoint of the optimizer state
-     procedure(optimizer_save_checkpoint), pass(this), deferred :: &
-          save_checkpoint
+     procedure, pass(this) :: save_checkpoint => optimizer_save_checkpoint
      !> Restore the optimizer state from a checkpoint
-     procedure(optimizer_restore_checkpoint), pass(this), deferred :: &
-          restore_checkpoint
+     procedure, pass(this) :: load_checkpoint => optimizer_load_checkpoint
 
      ! ----------------------------------------------------------------------- !
      ! Public procedures
@@ -166,25 +170,21 @@ module optimizer
        class(problem_t), intent(in) :: problem
      end subroutine optimizer_write
 
-     !> Interface for writing a checkpoint
-     subroutine optimizer_save_checkpoint(this, filename, iter, design, &
-          overwrite)
-       import optimizer_t, design_t
+     !> Interface for saving optimizer-specific components to checkpoint
+     subroutine optimizer_save_checkpoint_components(this, filename, overwrite)
+       import optimizer_t
        class(optimizer_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
-       integer, intent(in) :: iter
-       class(design_t), intent(inout) :: design
        logical, intent(in), optional :: overwrite
-     end subroutine optimizer_save_checkpoint
+     end subroutine optimizer_save_checkpoint_components
 
-     !> Interface for reading a checkpoint
-     subroutine optimizer_restore_checkpoint(this, filename, iter, design)
-       import optimizer_t, design_t
+     !> Interface for loading optimizer-specific components from checkpoint
+     subroutine optimizer_load_checkpoint_components(this, filename)
+       import optimizer_t
        class(optimizer_t), intent(inout) :: this
        character(len=*), intent(in) :: filename
-       integer, intent(out) :: iter
-       class(design_t), intent(inout) :: design
-     end subroutine optimizer_restore_checkpoint
+     end subroutine optimizer_load_checkpoint_components
+
   end interface
 
   ! -------------------------------------------------------------------------- !
@@ -206,6 +206,27 @@ module optimizer
        type(simulation_t), optional, intent(in) :: simulation
      end subroutine optimizer_factory
   end interface optimizer_factory
+
+  ! -------------------------------------------------------------------------- !
+  ! IO routines for HDF5 checkpoints
+
+  interface
+     !> Interface for writing a checkpoint
+     module subroutine optimizer_save_checkpoint_hdf5(this, filename, iter, &
+          overwrite)
+       class(optimizer_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+       integer, intent(in) :: iter
+       logical, intent(in), optional :: overwrite
+     end subroutine optimizer_save_checkpoint_hdf5
+
+     !> Interface for reading a checkpoint
+     module subroutine optimizer_load_checkpoint_hdf5(this, filename, iter)
+       class(optimizer_t), intent(inout) :: this
+       character(len=*), intent(in) :: filename
+       integer, intent(out) :: iter
+     end subroutine optimizer_load_checkpoint_hdf5
+  end interface
 
   public :: optimizer_factory
 
@@ -240,6 +261,7 @@ contains
   subroutine optimizer_free_base(this)
     class(optimizer_t), intent(inout) :: this
 
+    this%optimizer_type = ''
     this%max_iterations = 0
     this%tolerance = 0.0_rp
     this%max_runtime = -1.0_rp
@@ -281,7 +303,7 @@ contains
     ! Read run time checkpoint if present
     inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
     if (file_exists) then
-       call this%restore_checkpoint('optimizer_rt_checkpoint.hdf5', iter, &
+       call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', iter, &
             design)
        write(*, *) 'Resuming optimizer from checkpoint at iteration ', iter
     end if
@@ -378,5 +400,66 @@ contains
        call neko_error(msg)
     end select
   end subroutine optimizer_print_status
+
+  ! ========================================================================== !
+  ! IO Functions
+
+  !> Save the optimizer checkpoint to a file based on file suffix.
+  !! @param this The optimizer object.
+  !! @param filename The name of the file to save the checkpoint.
+  !! @param iter The current iteration number.
+  !! @param design The design object.
+  !! @param overwrite Whether to overwrite the file if it exists.
+  subroutine optimizer_save_checkpoint(this, filename, iter, design, overwrite)
+    class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(in) :: iter
+    class(design_t), intent(inout) :: design
+    logical, intent(in), optional :: overwrite
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call optimizer_save_checkpoint_hdf5(this, filename, iter, overwrite)
+    case default
+       call neko_error('optimizer: Unsupported checkpoint format: ' // &
+            trim(file_ext))
+    end select
+
+    call this%save_checkpoint_components(filename, overwrite)
+    call design%save_checkpoint(filename, overwrite)
+
+  end subroutine optimizer_save_checkpoint
+
+  !> Load the optimizer checkpoint from a file based on file suffix.
+  !! @param this The optimizer object.
+  !! @param filename The name of the file to load the checkpoint from.
+  !! @param iter The current iteration number.
+  !! @param design The design object.
+  subroutine optimizer_load_checkpoint(this, filename, iter, design)
+    class(optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    integer, intent(out) :: iter
+    class(design_t), intent(inout) :: design
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call optimizer_load_checkpoint_hdf5(this, filename, iter)
+    case default
+       call neko_error('optimizer: Unsupported checkpoint format: ' // &
+            trim(file_ext))
+    end select
+
+    call this%load_checkpoint_components(filename)
+    call design%load_checkpoint(filename)
+
+  end subroutine optimizer_load_checkpoint
 
 end module optimizer
