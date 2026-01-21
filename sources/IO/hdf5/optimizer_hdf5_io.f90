@@ -120,7 +120,7 @@ contains
     call h5tcopy_f(H5T_FORTRAN_S1, str_type, ierr)
     call h5tset_strpad_f(str_type, H5T_STR_SPACEPAD_F, ierr)
 
-    ddim(1) = 3
+    ddim(1) = len_trim(object%optimizer_type)
     call h5tset_size_f(str_type, ddim(1), ierr)
     call h5acreate_f(grp_id, 'type', str_type, filespace, attr_id, &
          ierr, h5p_default_f, h5p_default_f)
@@ -156,6 +156,11 @@ contains
     integer(hid_t) :: file_id, fapl_id, grp_id, attr_id, str_type
     integer :: ierr, info
     integer(hsize_t) :: ddim(1)
+    character(len=256) :: msg
+
+    ! Initialize reader variables
+    type_name = ''
+    iter = -1
 
     ! ------------------------------------------------------------------------ !
     ! Open the HDF5 context and read identification parameters
@@ -182,9 +187,11 @@ contains
     call h5aclose_f(attr_id, ierr)
 
     ! Verify that the type is optimizer
-    if (trim(type_name) .ne. object%optimizer_type) then
-       call neko_error('optimizer: HDF5 file "' // trim(filename) // &
-            '" does not contain an optimizer optimizer checkpoint')
+    if (trim(type_name) .ne. trim(object%optimizer_type)) then
+       write(msg, '(A,A,A,A,A)') 'optimizer: HDF5 file "', trim(filename), &
+            '" contains optimizer of type "', trim(type_name), &
+            '", but expected type "', trim(object%optimizer_type), '"'
+       call neko_error(trim(msg))
     end if
 
     ! Read the current optimizer iteration
@@ -192,6 +199,12 @@ contains
     call h5aopen_f(grp_id, 'iter', attr_id, ierr)
     call h5aread_f(attr_id, H5T_NATIVE_INTEGER, iter, ddim, ierr)
     call h5aclose_f(attr_id, ierr)
+
+    if (iter .lt. 0) then
+       write(msg, '(A,A,A,I0)') 'optimizer: HDF5 file "', trim(filename), &
+            '" contains invalid optimizer iteration ', iter
+       call neko_error(trim(msg))
+    end if
 
     ! Read the current iteration
     call h5gclose_f(grp_id, ierr)
