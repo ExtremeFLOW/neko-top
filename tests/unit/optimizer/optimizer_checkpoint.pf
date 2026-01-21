@@ -162,7 +162,7 @@ contains
     write(msg, *) "Loaded iteration does not match"
     @assertEqual(max_iter / 2, iter0, trim(msg))
     write(msg, *) "Loaded objective does not match"
-    @assertEqual(f_half, f, NEKO_EPS, trim(msg))
+    @assertEqual(f_half, f, tol, trim(msg))
 
     do i = 1, des%size()
        write(msg, '(A,I0)') "Loaded design does not match at index ", i
