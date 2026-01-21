@@ -485,8 +485,7 @@ contains
     !
     ! Setup checkpoint structure (if everything is fine)
     !
-    call this%chkp%init()
-    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
   end subroutine adjoint_fluid_scheme_validate
 
