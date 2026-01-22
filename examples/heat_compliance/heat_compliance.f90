@@ -91,6 +91,7 @@ module heat_compliance
      type(field_t) :: thermal_conductivity
      type(mapping_handler_t) :: mapping
      integer :: ksp_n, n, i
+     real(kind=rp) :: writting_counter
      type(fld_file_output_t), private :: output
    contains
      procedure, public :: init_from_attributes => heat_compliance_init
@@ -158,6 +159,7 @@ contains
 
     call this%init_base(name, design%size(), 1.0_rp)
     this%coef => coef
+    this%writting_counter = 1.0_rp
 
     ! Design-to-conductivity mapping
     call this%mapping%init_base(coef)
@@ -417,8 +419,8 @@ contains
     end select
 
     call neko_scratch_registry%relinquish_field(temp_indices)
-
-    call this%output%sample(1.0_rp)
+    call this%output%sample(this%writting_counter)
+    this%writting_counter = this%writting_counter + 1
   end subroutine heat_compliance_update_sensitivity
 
   !=========================================================================!
@@ -483,7 +485,7 @@ contains
 
     call this%init_base(name, this%design_indicator%dof%size())
 
-    call field_cfill(this%design_indicator, 1.0_rp)
+    call field_cfill(this%design_indicator, 0.15_rp)
   end subroutine thermal_conductivity_design_init
 
   !=========================================================================!
@@ -616,7 +618,6 @@ contains
           call cmult(this%sensitivity%x, -1.0_rp, n)
        end if
     end if
-
   end subroutine thermal_volume_constraint_init
 
   subroutine thermal_volume_constraint_free(this)

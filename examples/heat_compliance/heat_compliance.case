@@ -55,22 +55,22 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 500,
+            "max_iterations": 100,
             "tolerance": 1.0e-6,
             "enable_output": true,
             "mma": {
-                "max_iter": 1000,
+                "max_iter": 100,
                 "subsolver": "dip",
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 10.0,
+                "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "a0": 1.0,
                 "a": 0.0,
-                "c": 1000.0,
+                "c": 10000.0,
                 "d": 10.0
             }
         },
@@ -78,7 +78,7 @@
     "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.05
+                    "r": 0.04
                 },
                 {
                     "type": "SIMP",
