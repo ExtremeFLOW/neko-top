@@ -6,6 +6,7 @@ name: Test Examples
 # This workflow is only defined here. It is triggered from other workflows.
 on:
   workflow_call:
+  workflow_dispatch:
   merge_group:
     types: [checks_requested]
 
