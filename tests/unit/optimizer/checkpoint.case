@@ -17,9 +17,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -30,7 +28,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -54,11 +52,11 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "never"
         },
         "simulation_components": [
             {
@@ -96,8 +94,8 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
-                    "q": 3,
+                    "f_max": 100.0,
+                    "q": 3.0,
                     "convex_up": true
                 }
             ],
@@ -150,7 +148,6 @@
                 "limit": 0.2,
                 "is_max": false
             }
-        ],
-    },
-
+        ]
+    }
 }

@@ -17,9 +17,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -30,7 +28,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -84,12 +82,12 @@
         },
         "design": {
             "type": "brinkman",
-             "mapping": [
-             {
-                 "type": "RAMP",
-                 "f_max": 1000
-             }
-             ],
+            "mapping": [
+                {
+                    "type": "RAMP",
+                    "f_max": 1000.0
+                }
+            ],
             "initial_distribution": {
                 "type": "point_zone",
                 "base_value": 0.0,

@@ -98,7 +98,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 100.0,
-                    "q": 3,
+                    "q": 3.0,
                     "convex_up": true
                 }
             ],
