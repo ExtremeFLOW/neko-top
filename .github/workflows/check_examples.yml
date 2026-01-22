@@ -1,14 +1,10 @@
 # Description: This file defines the workflow that will be run when a new
 #              merge group is created. The workflow will run the automated
 #              setup and example execution scripts.
-name: Test Scripts
+name: Test Examples
 
 # This workflow is only defined here. It is triggered from other workflows.
 on:
-  # push:
-  #   branches:
-  #     - test/*
-  #     - cicd/*
   workflow_call:
   merge_group:
     types: [checks_requested]
@@ -53,14 +49,18 @@ jobs:
         run: |
           ./setup.sh
 
-      - name: Adjust end time for examples
+      - name: Adjust end time and timestep for examples
         run: |
-          sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' examples/easy-E/easy-E_1.case
-          sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' examples/rugby_ball/rugby_ball.case
+          find examples/ -type f -name "*.case" -exec sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' {} \;
+          find examples/ -type f -name "*.case" -exec sed -i -r 's/"timestep": [[0-9]+.*[0-9]*|1e-\d+],/"timestep": 1e-4,/g' {} \;
 
-      - name: Run a gauntlet of examples
+      - name: Run all gauntlet of examples
         run: |
-          ./run.sh -rc easy-E/easy-E_1 rugby_ball
+          ./run.sh -rca
+
+      - name: Display logs on failure
+        if: failure()
+        run: |
           if [ -d logs ]; then
             LOGS=$(find logs/ -type f -name "*.log")
             for log in ${LOGS[@]}; do
