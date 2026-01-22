@@ -17,9 +17,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -30,7 +28,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -54,7 +52,7 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1, 2 ]
                 }
             ],
@@ -73,18 +71,9 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "y_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "initial_ball",
@@ -105,7 +94,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100.0
                 }
             ],
             "initial_distribution": {
@@ -128,7 +117,6 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "m": 1,
                 "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
@@ -157,7 +145,6 @@
                 "limit": 0.2,
                 "is_max": false
             }
-        ],
-    },
-
+        ]
+    }
 }
