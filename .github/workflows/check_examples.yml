@@ -52,8 +52,12 @@ jobs:
 
       - name: Adjust end time and timestep for examples
         run: |
-          find examples/ -type f -name "*.case" -exec sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' {} \;
-          find examples/ -type f -name "*.case" -exec sed -i -r 's/"timestep": [[0-9]+.*[0-9]*|1e-\d+],/"timestep": 1e-4,/g' {} \;
+          find examples/ -type f -name "*.case" -exec \
+            sed -i -r 's/"end_time": [[0-9]+.*[0-9]*|1e-\d+],/"end_time": 1e-3,/g' \
+            {} \;
+          find examples/ -type f -name "*.case" -exec \
+            sed -i -r 's/"timestep": [[0-9]+.*[0-9]*|1e-\d+],/"timestep": 1e-4,/g' \
+            {} \;
 
       - name: Run all gauntlet of examples
         run: |
