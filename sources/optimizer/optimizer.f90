@@ -63,7 +63,7 @@ module optimizer
      ! ----------------------------------------------------------------------- !
      ! Restart related members
 
-     !> Start time of the optimization
+     ! Variables for the runtime-based stopping criteria
      integer, private :: current_iteration = 0
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
@@ -405,7 +405,6 @@ contains
   !! @param step_time The time taken for the latest iteration.
   !! @return out_of_time Logical indicating if we are out of time.
   function optimizer_out_of_time(this, step_time) result(out_of_time)
-    use comm, only: pe_rank
     class(optimizer_t), intent(inout) :: this
     real(kind=rp), intent(in) :: step_time
     logical :: out_of_time
