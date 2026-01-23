@@ -246,7 +246,6 @@ contains
   !! @param this The optimizer object.
   !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
-  !! @param tolerance The tolerance for the optimization loop.
   !! @param max_runtime The maximum runtime in seconds.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
        max_runtime)
