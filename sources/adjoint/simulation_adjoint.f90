@@ -184,7 +184,7 @@ contains
     if (present(final_time)) then
        time_forward%t = t_bkp
     end if
-    call simulation_adjoint_norm_output(C, time_forward)
+    call simulation_adjoint_norm_output(C, time_forward, C%time)
 
     call neko_log%end_section()
 
@@ -311,15 +311,17 @@ contains
 
   end subroutine simulation_adjoint_joblimit_chkp
 
-  subroutine simulation_adjoint_norm_output(C, time_forward)
+  subroutine simulation_adjoint_norm_output(C, time_ctrl, time_out)
     type(adjoint_case_t), intent(inout) :: C
-    type(time_state_t), intent(in) :: time_forward
+    type(time_state_t), intent(in) :: time_ctrl
+    type(time_state_t), intent(in), optional :: time_out
     type(vector_t) :: data_line
     real(kind=rp) :: norm_l2
+    real(kind=rp) :: t_out
     integer :: n
 
     if (.not. C%norm_output_enabled) return
-    if (.not. C%norm_output_ctrl%check(time_forward)) return
+    if (.not. C%norm_output_ctrl%check(time_ctrl)) return
 
     n = C%fluid_adj%c_Xh%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -341,10 +343,15 @@ contains
     call mpi_allreduce(MPI_IN_PLACE, norm_l2, 1, MPI_REAL_PRECISION, &
          MPI_SUM, NEKO_COMM)
     norm_l2 = sqrt(norm_l2 / C%fluid_adj%c_Xh%volume)
+    if (present(time_out)) then
+       t_out = time_out%t
+    else
+       t_out = time_ctrl%t
+    end if
 
     call data_line%init(1)
     data_line%x = [norm_l2]
-    call C%norm_output_file%write(data_line, time_forward%t)
+    call C%norm_output_file%write(data_line, t_out)
     call data_line%free()
     call C%norm_output_ctrl%register_execution()
   end subroutine simulation_adjoint_norm_output

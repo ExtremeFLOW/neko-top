@@ -64,11 +64,57 @@ def log0(msg: str) -> None:
     print(f"[py ctrl r=0/1] {msg}", flush=True)
 
 
+def strip_json_comments(text: str) -> str:
+    """Remove // and /* */ comments from JSON-like text (ignores comment markers in strings)."""
+    out = []
+    i = 0
+    n = len(text)
+    in_str = False
+    escape = False
+    while i < n:
+        ch = text[i]
+        if in_str:
+            out.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+
+        if ch == "/" and i + 1 < n:
+            nxt = text[i + 1]
+            if nxt == "/":
+                i += 2
+                while i < n and text[i] != "\n":
+                    i += 1
+                continue
+            if nxt == "*":
+                i += 2
+                while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                    i += 1
+                i += 2
+                continue
+
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 def load_case_config(case_path: str) -> dict:
     with open(case_path, "r", encoding="utf-8") as handle:
         raw = handle.read()
+    cleaned = strip_json_comments(raw)
     # Allow trailing commas in .case files
-    cleaned = re.sub(r",\s*([}\]])", r"\1", raw)
+    cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
     return json.loads(cleaned)
 
 
@@ -313,6 +359,9 @@ def main() -> None:
 
     n_fields = 3
     pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
+    times = []
+    total_snapshot_energy = 0.0
+    snapshot_count = 0
 
     # Rank0 control client only (COMM_SELF)
     ctrl = CtrlClient(debug=DEBUG) if rank == 0 else None
@@ -353,19 +402,33 @@ def main() -> None:
                 u = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
                 v = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
                 w = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+                if tcur is not None:
+                    times.append(float(tcur))
+
+                local_energy = (
+                    np.sum(u * u * bm, dtype=np.float64)
+                    + np.sum(v * v * bm, dtype=np.float64)
+                    + np.sum(w * w * bm, dtype=np.float64)
+                )
+                snapshot_energy = comm.allreduce(local_energy, op=MPI.SUM)
+                total_snapshot_energy += float(snapshot_energy)
+                snapshot_count += 1
 
                 ioh.copy_fieldlist_to_xi([u, v, w])
                 ioh.load_buffer(scale_snapshot=True)
                 if ioh.update_from_buffer:
                     log(comm, f"POD.update(buff) with buffer_index={ioh.buffer_index}")
                     pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
+                    ioh.buffer_index = 0
+                    ioh.update_from_buffer = False
                 continue
 
             # ---- forward finished: compute/write + send modes back + tell neko to switch ----
             if mode == MODE_FORWARD and phase == PHASE_FWD_DONE:
                 log(comm, "Forward done: flush buffer -> update POD")
-                if ioh.buffer_index > 0:
+                if ioh.buffer_index > 0 and not ioh.update_from_buffer:
                     pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
+                    ioh.buffer_index = 0
 
                 log(comm, "Forward done: scale/rotate modes")
                 pod.scale_modes(comm, bm1sqrt=ioh.bm1sqrt, op="div")
@@ -379,13 +442,22 @@ def main() -> None:
                     A = np.zeros((0, 0), dtype=np.float64)
 
                 nsnaps = A.shape[0]
-                tvec = np.arange(nsnaps, dtype=np.float64) * snapshot_dt
+                if len(times) == nsnaps:
+                    tvec = np.asarray(times, dtype=np.float64)
+                else:
+                    if len(times) > 0:
+                        log(comm, f"Time list length {len(times)} != nsnaps {nsnaps}, falling back to dt.")
+                    # First snapshot arrives at dt * i_stream (no t=0 snapshot).
+                    tvec = (np.arange(nsnaps, dtype=np.float64) + 1.0) * snapshot_dt
                 # pad to keep_modes columns
                 if A.shape[1] < keep_modes:
                     A = np.hstack([A, np.zeros((nsnaps, keep_modes - A.shape[1]), dtype=A.dtype)])
                 out = np.column_stack([tvec, A])
                 header = "t," + ",".join([f"a{i+1}" for i in range(keep_modes)])
 
+                print(pod.d_1t.shape)
+                print(pod.vt_1t.shape)
+                print(" TIME COEFS ")
                 if rank == 0:
                     if write_modes:
                         rotated = rotate_time_coeffs("pod_time_coeffs.csv")
@@ -393,6 +465,22 @@ def main() -> None:
                             log(comm, f"Rank0: archived pod_time_coeffs.csv -> {rotated}")
                     log(comm, "Rank0: writing pod_time_coeffs.csv")
                     np.savetxt("pod_time_coeffs.csv", out, delimiter=",", header=header, comments="")
+
+                    if total_snapshot_energy <= 0.0 or snapshot_count == 0:
+                        print("POD energy capture: no snapshot energy available.", flush=True)
+                    elif getattr(pod, "d_1t", None) is None or pod.d_1t.size == 0:
+                        print("POD energy capture: no singular values available.", flush=True)
+                    else:
+                        energies = np.asarray(pod.d_1t, dtype=np.float64) ** 2
+                        fractions = 100.0 * energies / total_snapshot_energy
+                        n_report = min(keep_modes, fractions.size)
+                        print("POD energy capture (% of snapshot energy):", flush=True)
+                        for i in range(n_report):
+                            print(f"  mode {i + 1}: {fractions[i]:.6f}%", flush=True)
+                        print(
+                            f"  sum first {n_report}: {np.sum(fractions[:n_report]):.6f}%",
+                            flush=True,
+                        )
 
                 log(comm, "Barrier after CSV write")
                 comm.Barrier()
@@ -429,6 +517,9 @@ def main() -> None:
             if mode == MODE_ADJOINT and phase == PHASE_ADJ_DONE:
                 log(comm, "Adjoint done: reset POD/ioh")
                 pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
+                times = []
+                total_snapshot_energy = 0.0
+                snapshot_count = 0
                 continue
 
             # if we get here, we're in an unhandled state

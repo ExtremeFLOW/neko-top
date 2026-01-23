@@ -25,7 +25,7 @@ function help() {
 
 # Handle options
 N=10
-Lx=3
+Lx=2
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -40,7 +40,7 @@ for arg in "$@"; do
         esac
     fi
 done
-Nx=$((N*3))
+Nx=$((N*Lx))
 Ny=$N
 Nz=1
 

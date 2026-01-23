@@ -57,7 +57,7 @@ module simulation_checkpoint
 
      !> Whether checkpointing is enabled
      logical :: enabled = .false.
-     !> The checkpointing algorithm to use
+     !> The checkpointing algorithm to use ("linear" or "ram")
      character(len=256) :: algorithm = "linear"
      !> The name of the checkpoint file
      character(len=256) :: filename = "checkpoint"
@@ -120,6 +120,20 @@ module simulation_checkpoint
        class(case_t), target, intent(inout) :: neko_case
        type(time_state_t), intent(in) :: time
      end subroutine checkpoint_restore_linear
+
+     !> Save the current state of the simulation in RAM only
+     module subroutine checkpoint_save_ram(this, neko_case, time)
+       class(simulation_checkpoint_t), intent(inout) :: this
+       class(case_t), intent(inout) :: neko_case
+       type(time_state_t), intent(in) :: time
+     end subroutine checkpoint_save_ram
+
+     !> Restore the forward simulation state from RAM only
+     module subroutine checkpoint_restore_ram(this, neko_case, time)
+       class(simulation_checkpoint_t), intent(inout) :: this
+       class(case_t), target, intent(inout) :: neko_case
+       type(time_state_t), intent(in) :: time
+     end subroutine checkpoint_restore_ram
   end interface
 
 contains
@@ -223,12 +237,26 @@ contains
     integer :: stat, unit
 
     ! Free the RAM Checkpoints
-    do i = 1, this%n_saves_memory
-       if (allocated(this%p_list)) call this%p_list(i)%free()
-       if (allocated(this%u_list)) call this%u_list(i)%free()
-       if (allocated(this%v_list)) call this%v_list(i)%free()
-       if (allocated(this%w_list)) call this%w_list(i)%free()
-    end do
+    if (allocated(this%p_list)) then
+       do i = 1, size(this%p_list)
+          call this%p_list(i)%free()
+       end do
+    end if
+    if (allocated(this%u_list)) then
+       do i = 1, size(this%u_list)
+          call this%u_list(i)%free()
+       end do
+    end if
+    if (allocated(this%v_list)) then
+       do i = 1, size(this%v_list)
+          call this%v_list(i)%free()
+       end do
+    end if
+    if (allocated(this%w_list)) then
+       do i = 1, size(this%w_list)
+          call this%w_list(i)%free()
+       end do
+    end if
 
     if (allocated(this%s_list)) then
        do i = 1, size(this%s_list)
@@ -291,6 +319,8 @@ contains
     select case (this%algorithm)
     case ("linear")
        call checkpoint_save_linear(this, neko_case, time)
+    case ("ram", "memory")
+       call checkpoint_save_ram(this, neko_case, time)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -320,6 +350,8 @@ contains
     select case (this%algorithm)
     case ("linear")
        call checkpoint_restore_linear(this, neko_case, time)
+    case ("ram", "memory")
+       call checkpoint_restore_ram(this, neko_case, time)
     case default
        call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
     end select
@@ -342,12 +374,14 @@ contains
     this%n_saves_disc = 0
     call this%set_n_timesteps(0)
 
-    do i = 1, this%n_saves_memory
-       call field_rzero(this%p_list(i))
-       call field_rzero(this%u_list(i))
-       call field_rzero(this%v_list(i))
-       call field_rzero(this%w_list(i))
-    end do
+    if (allocated(this%p_list)) then
+       do i = 1, size(this%p_list)
+          call field_rzero(this%p_list(i))
+          call field_rzero(this%u_list(i))
+          call field_rzero(this%v_list(i))
+          call field_rzero(this%w_list(i))
+       end do
+    end if
 
     if (allocated(this%s_list)) then
        do i = 1, size(this%s_list)

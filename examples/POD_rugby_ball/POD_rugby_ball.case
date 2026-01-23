@@ -4,15 +4,15 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": true,
+        "output_boundary": false,
         "time": {
             "end_time": 3.0,
-            "timestep": 1.5e-3
+            "timestep": 2.5e-3
         },
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
-            "dealias": false
+            "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
@@ -48,8 +48,9 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "tsteps",
-            "output_value": 100,
+            "output_control": "never",
+            //"output_control": "tsteps",
+            //"output_value": 200,
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -68,6 +69,9 @@
                     "zone_indices": [ 2 ]
                 }
             ],
+            "norm_output_control": "tsteps",
+            "norm_output_value": 100,
+            "norm_output_file": "adjoint_norm.csv"
         },
         "point_zones": [
             {
@@ -87,11 +91,27 @@
                 ],
             },
             {
+                "name": "objective_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    1.0,
+                    2.5,
+                ],
+                "y_bounds": [
+                    -0.1,
+                    1.1,
+                ],
+                "z_bounds": [
+                    -1.0,
+                    1.0,
+                ],
+            },
+            {
                 "name": "initial_ball",
                 "geometry": "cylinder",
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
-                "radius": 0.1
+                "radius": 0.15
             },
         ]
     },
@@ -136,19 +156,26 @@
             "max_iterations": 50,
             "tolerance": 1.0e-12,
             "mma": {
+                "asyinit": 0.05,
+                "asyincr": 1.02,
+                "asydecr": 0.98,
+                "scale": 1.0,
+                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
-                "c": 1000.0,
-                "d": 10.0
+                "c": 10.0,
+                "d": 100.0
             }
         },
         "objectives": [
             {
                 "type": "minimum_dissipation",
+                "mask_name": "objective_domain",
                 "weight": 1.0
             },
             {
                 "type": "lube_term",
+                "mask_name": "optimization_domain",
                 "weight": 1.0
             }
         ],
@@ -156,7 +183,7 @@
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
-                "limit": 0.02,
+                "limit": 0.1,
                 "is_max": false
             }
         ],

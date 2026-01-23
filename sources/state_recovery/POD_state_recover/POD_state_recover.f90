@@ -12,7 +12,7 @@ module simulation_POD_state_recover
   use profiler, only: profiler_start_region, profiler_end_region
   use state_recover, only: state_recover_t
   use time_state, only: time_state_t
-
+  use logger, only : neko_log
   use comm, only: neko_comm, mpi_real_precision
   use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
 
@@ -290,6 +290,12 @@ contains
 
     if (.not. this%enabled) return
     if (mod(time%tstep, this%i_stream) .ne. 0) return
+
+    call neko_log%message(" ")
+    call neko_log%message("----------------")
+    call neko_log%message("Streaming fields")
+    call neko_log%message("----------------")
+    call neko_log%message(" ")
 
     u => neko_case%fluid%u
     v => neko_case%fluid%v
