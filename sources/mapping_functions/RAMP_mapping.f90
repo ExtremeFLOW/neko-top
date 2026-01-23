@@ -45,6 +45,7 @@ module RAMP_mapping
        device_convex_up_RAMP_mapping_apply, &
        device_convex_up_RAMP_mapping_apply_backward
   use json_utils, only: json_get, json_get_or_default
+  use logger, only: neko_log
   implicit none
   private
 
@@ -129,11 +130,26 @@ contains
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: f_min, f_max, q
     logical, intent(in) :: convex_up
+    character(len=256) :: msg
 
     this%f_min = f_min
     this%f_max = f_max
     this%q = q
     this%convex_up = convex_up
+
+    call neko_log%section('RAMP Mapping')
+    write(msg, '(A,F8.4)') '  f_min: ', this%f_min
+    call neko_log%message(msg)
+    write(msg, '(A,F8.4)') '  f_max: ', this%f_max
+    call neko_log%message(msg)
+    write(msg, '(A,F8.4)') '  q:     ', this%q
+    call neko_log%message(msg)
+    if (this%convex_up .eqv. .true.) then
+       call neko_log%message('  convexity: up (Borrvall & Peterson)')
+    else
+       call neko_log%message('  convexity: down (standard RAMP)')
+    end if
+    call neko_log%end_section()
 
   end subroutine RAMP_mapping_init_from_attributes
 

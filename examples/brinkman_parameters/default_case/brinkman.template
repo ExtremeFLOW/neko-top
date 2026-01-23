@@ -18,7 +18,7 @@
             "scheme": "pnpn",
             "Re": 200.0,
             "initial_condition": {
-                "type": "user",
+                "type": "user"
             },
             "velocity_solver": {
                 "type": "cg",
@@ -41,17 +41,17 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1.0, 0.0, 0.0],
-                    "zone_indices": [ 1 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1 ]
                 },
                 {
                     "type": "outflow+dong",
-                    "zone_indices": [ 2 ],
+                    "zone_indices": [ 2 ]
                 },
                 {
                     "type": "normal_outflow",
-                    "value": [ 1.0, 0.0, 0.0],
-                    "zone_indices": [ 3, 4 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 3, 4 ]
                 }
             ],
             "source_terms": [
@@ -75,7 +75,7 @@
                     ],
                     "brinkman": {
                         "limits": [ 0.0, 100.0 ],
-                        "penalty": 1.0,
+                        "penalty": 1.0
                     },
                     "filter": {
                         "type": "PDE",
@@ -88,16 +88,8 @@
             {
                 "name": "cylinder",
                 "geometry": "cylinder",
-                "start": [
-                    0.0,
-                    0.0,
-                    0.0
-                ],
-                "end": [
-                    0.0,
-                    0.0,
-                    1.0
-                ],
+                "start": [ 0.0, 0.0, 0.0 ],
+                "end": [ 0.0, 0.0, 1.0 ],
                 "radius": 0.5
             }
         ],
@@ -147,7 +139,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_45.csv",
                 "compute_control": "simulationtime",
@@ -173,7 +165,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_30.csv",
                 "compute_control": "simulationtime",
@@ -199,7 +191,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "BL_60.csv",
                 "compute_control": "simulationtime",
@@ -225,7 +217,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_048.csv",
                 "compute_control": "simulationtime",
@@ -253,7 +245,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_050.csv",
                 "compute_control": "simulationtime",
@@ -280,7 +272,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0501.csv",
                 "compute_control": "simulationtime",
@@ -307,7 +299,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0502.csv",
                 "compute_control": "simulationtime",
@@ -334,7 +326,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_0505.csv",
                 "compute_control": "simulationtime",
@@ -361,7 +353,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_051.csv",
                 "compute_control": "simulationtime",
@@ -377,6 +369,7 @@
                     }
                 ]
             },
+
             // circles 0.52
             {
                 "type": "probes",
@@ -388,7 +381,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_052.csv",
                 "compute_control": "simulationtime",
@@ -416,7 +409,7 @@
                     "du_dx",
                     "du_dy",
                     "dv_dx",
-                    "dv_dy",
+                    "dv_dy"
                 ],
                 "output_file": "circ_055.csv",
                 "compute_control": "simulationtime",
@@ -431,7 +424,7 @@
                         "amount": 720
                     }
                 ]
-            },
+            }
         ]
     }
 }
