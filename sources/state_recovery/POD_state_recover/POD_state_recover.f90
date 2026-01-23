@@ -215,6 +215,27 @@ contains
     call this%dstream%stream(this%coef%dof%y)
     call this%dstream%stream(this%coef%dof%z)
 
+    ! Stream initial condition once (t=0 snapshot)
+    block
+      type(field_t), pointer :: u, v, w
+      integer :: n
+
+      u => neko_case%fluid%u
+      v => neko_case%fluid%v
+      w => neko_case%fluid%w
+      n = u%dof%size()
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
+         call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
+         call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+      end if
+
+      call this%dstream%stream(u%x)
+      call this%dstream%stream(v%x)
+      call this%dstream%stream(w%x)
+    end block
+
     ! Control init (use neko_comm%mpi_val – your working pattern)
     if (present(debug)) then
        this%ctrl%debug = debug

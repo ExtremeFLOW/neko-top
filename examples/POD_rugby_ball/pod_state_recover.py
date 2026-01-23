@@ -298,6 +298,37 @@ def make_pod(comm: MPI.Comm, bm: np.ndarray, n_fields: int, batch_size: int, kee
     return pod, ioh
 
 
+def add_snapshot(comm: MPI.Comm,
+                 pod: POD,
+                 ioh: IoHelp,
+                 bm: np.ndarray,
+                 u: np.ndarray,
+                 v: np.ndarray,
+                 w: np.ndarray,
+                 tcur: Optional[float],
+                 times: list,
+                 energy_state: dict) -> None:
+    if tcur is not None:
+        times.append(float(tcur))
+
+    local_energy = (
+        np.sum(u * u * bm, dtype=np.float64)
+        + np.sum(v * v * bm, dtype=np.float64)
+        + np.sum(w * w * bm, dtype=np.float64)
+    )
+    snapshot_energy = comm.allreduce(local_energy, op=MPI.SUM)
+    energy_state["total"] += float(snapshot_energy)
+    energy_state["count"] += 1
+
+    ioh.copy_fieldlist_to_xi([u, v, w])
+    ioh.load_buffer(scale_snapshot=True)
+    if ioh.update_from_buffer:
+        log(comm, f"POD.update(buff) with buffer_index={ioh.buffer_index}")
+        pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
+        ioh.buffer_index = 0
+        ioh.update_from_buffer = False
+
+
 # -------------------------
 # Main
 # -------------------------
@@ -352,6 +383,11 @@ def main() -> None:
     y = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
     z = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
 
+    log(comm, "Python: receive initial u,v,w snapshot")
+    u0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+    v0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+    w0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+
     # Build mesh/coefs on all python ranks (pySEMTools expects this)
     msh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
     coef = Coef(msh, comm)
@@ -360,8 +396,10 @@ def main() -> None:
     n_fields = 3
     pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
     times = []
-    total_snapshot_energy = 0.0
-    snapshot_count = 0
+    energy_state = {"total": 0.0, "count": 0}
+
+    log(comm, "Python: add initial snapshot at t=0")
+    add_snapshot(comm, pod, ioh, bm, u0, v0, w0, 0.0, times, energy_state)
 
     # Rank0 control client only (COMM_SELF)
     ctrl = CtrlClient(debug=DEBUG) if rank == 0 else None
@@ -402,25 +440,7 @@ def main() -> None:
                 u = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
                 v = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
                 w = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-                if tcur is not None:
-                    times.append(float(tcur))
-
-                local_energy = (
-                    np.sum(u * u * bm, dtype=np.float64)
-                    + np.sum(v * v * bm, dtype=np.float64)
-                    + np.sum(w * w * bm, dtype=np.float64)
-                )
-                snapshot_energy = comm.allreduce(local_energy, op=MPI.SUM)
-                total_snapshot_energy += float(snapshot_energy)
-                snapshot_count += 1
-
-                ioh.copy_fieldlist_to_xi([u, v, w])
-                ioh.load_buffer(scale_snapshot=True)
-                if ioh.update_from_buffer:
-                    log(comm, f"POD.update(buff) with buffer_index={ioh.buffer_index}")
-                    pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
-                    ioh.buffer_index = 0
-                    ioh.update_from_buffer = False
+                add_snapshot(comm, pod, ioh, bm, u, v, w, tcur, times, energy_state)
                 continue
 
             # ---- forward finished: compute/write + send modes back + tell neko to switch ----
@@ -447,8 +467,8 @@ def main() -> None:
                 else:
                     if len(times) > 0:
                         log(comm, f"Time list length {len(times)} != nsnaps {nsnaps}, falling back to dt.")
-                    # First snapshot arrives at dt * i_stream (no t=0 snapshot).
-                    tvec = (np.arange(nsnaps, dtype=np.float64) + 1.0) * snapshot_dt
+                    # Snapshots start at t=0 (initial condition).
+                    tvec = np.arange(nsnaps, dtype=np.float64) * snapshot_dt
                 # pad to keep_modes columns
                 if A.shape[1] < keep_modes:
                     A = np.hstack([A, np.zeros((nsnaps, keep_modes - A.shape[1]), dtype=A.dtype)])
@@ -466,13 +486,13 @@ def main() -> None:
                     log(comm, "Rank0: writing pod_time_coeffs.csv")
                     np.savetxt("pod_time_coeffs.csv", out, delimiter=",", header=header, comments="")
 
-                    if total_snapshot_energy <= 0.0 or snapshot_count == 0:
+                    if energy_state["total"] <= 0.0 or energy_state["count"] == 0:
                         print("POD energy capture: no snapshot energy available.", flush=True)
                     elif getattr(pod, "d_1t", None) is None or pod.d_1t.size == 0:
                         print("POD energy capture: no singular values available.", flush=True)
                     else:
                         energies = np.asarray(pod.d_1t, dtype=np.float64) ** 2
-                        fractions = 100.0 * energies / total_snapshot_energy
+                        fractions = 100.0 * energies / energy_state["total"]
                         n_report = min(keep_modes, fractions.size)
                         print("POD energy capture (% of snapshot energy):", flush=True)
                         for i in range(n_report):
@@ -518,8 +538,9 @@ def main() -> None:
                 log(comm, "Adjoint done: reset POD/ioh")
                 pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
                 times = []
-                total_snapshot_energy = 0.0
-                snapshot_count = 0
+                energy_state = {"total": 0.0, "count": 0}
+                log(comm, "Adjoint done: add initial snapshot at t=0")
+                add_snapshot(comm, pod, ioh, bm, u0, v0, w0, 0.0, times, energy_state)
                 continue
 
             # if we get here, we're in an unhandled state
