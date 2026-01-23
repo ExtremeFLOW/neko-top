@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -74,7 +74,7 @@
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
             ]
@@ -84,12 +84,12 @@
             "boundary_conditions": [
                 {
                     "type": "dirichlet",
-                    "value": 0,
+                    "value": 0.0,
                     "zone_indices": [ 1 ]
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
             ],
@@ -126,34 +126,16 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    1.5,
-                    4.5
-                ],
-                "y_bounds": [
-                    -1.0,
-                    3.0
-                ],
-                "z_bounds": [
-                    -1.0,
-                    3.0
-                ]
+                "x_bounds": [ 1.5, 4.5 ],
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "objective_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    5.0,
-                    6.0
-                ],
-                "y_bounds": [
-                    -1.0,
-                    3.0
-                ],
-                "z_bounds": [
-                    -1.0,
-                    3.0
-                ]
+                "x_bounds": [ 5.0, 6.0 ],
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             }
         ]
     },
@@ -168,7 +150,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100.0
                 }
             ],
             "initial_distribution": {
@@ -205,6 +187,6 @@
                 "limit": 0.05,
                 "is_max": false
             }
-        ],
+        ]
     }
 }

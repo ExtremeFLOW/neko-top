@@ -20,11 +20,7 @@
             "Re": 2000.0,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    1.0,
-                    0.0,
-                    0.0
-                ]
+                "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -73,10 +69,7 @@
                         }
                     ],
                     "brinkman": {
-                        "limits": [
-                            0.0,
-                            1500.0
-                        ],
+                        "limits": [ 0.0, 1500.0 ],
                         "penalty": 1.0
                     }
                 }

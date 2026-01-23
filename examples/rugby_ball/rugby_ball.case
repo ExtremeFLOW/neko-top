@@ -17,25 +17,18 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
                     "type": "no_slip",
                     "zone_indices": [ 1, 2 ]
-                },
-                // {
-                //     "type": "velocity_value",
-                //     "value": [ 0, 0, 0 ],
-                //     "zone_indices": [ 2 ]
-                // }
-            ],
+                }
+            ]
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 2,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -59,11 +52,11 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1, 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "never"
         },
         "simulation_components": [
             {
@@ -77,18 +70,9 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "y_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "initial_ball",
@@ -96,7 +80,7 @@
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
-            },
+            }
         ]
     },
     "optimization": {
@@ -110,8 +94,8 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
-                    "q": 3,
+                    "f_max": 100.0,
+                    "q": 3.0,
                     "convex_up": true
                 }
             ],
@@ -164,7 +148,6 @@
                 "limit": 0.2,
                 "is_max": false
             }
-        ],
-    },
-
+        ]
+    }
 }
