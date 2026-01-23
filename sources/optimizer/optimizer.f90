@@ -57,14 +57,13 @@ module optimizer
      character(len=64), private :: optimizer_type = ''
      !> The maximum number of iterations
      integer, private :: max_iterations = 0
-     !> Maximum runtime in seconds
-     real(kind=rp), private :: max_runtime = -1.0_rp
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
 
      ! Variables for the runtime-based stopping criteria
      integer, private :: current_iteration = 0
+     real(kind=rp), private :: max_runtime = -1.0_rp
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
      real(kind=rp), private :: step_count = 0.0_rp
@@ -256,6 +255,7 @@ contains
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in), optional :: max_runtime
 
+    ! Mandatory settings
     this%optimizer_type = optimizer_type
     this%max_iterations = max_iterations
 
@@ -309,13 +309,16 @@ contains
     stop_flag = 1
     converged = .false.
 
-    ! Read run time checkpoint if present
-    inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
-    if (file_exists) then
-       call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', &
-            this%current_iteration, design)
-       write(*, '(A,I0)') 'Resuming optimizer from checkpoint at iteration ', &
-            this%current_iteration
+    ! Restart from checkpoint if available
+    if (this%max_runtime .gt. 0.0_rp) then
+       inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
+       if (file_exists) then
+          call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', &
+               this%current_iteration, design)
+
+          write(*, '(A,I0)') 'Loaded runtime checkpoint: ', &
+               this%current_iteration
+       end if
     end if
 
     ! Prepare the problem state before starting the optimization
@@ -400,7 +403,9 @@ contains
     end select
   end subroutine optimizer_print_status
 
-  !> Estimate if we are out of time
+  !> Estimate if we are out of time.
+  !! This function uses a cumulative average of iteration times to
+  !! estimate if the next iteration would exceed the maximum runtime.
   !! @param this The optimizer object.
   !! @param step_time The time taken for the latest iteration.
   !! @return out_of_time Logical indicating if we are out of time.
