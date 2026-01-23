@@ -362,6 +362,9 @@ contains
 
   end subroutine optimizer_run
 
+  ! ========================================================================== !
+  ! Helper routines
+
   !> Print status message
   !! Supported flags:
   !! 0: Converged successfully             (SUCCESS)
