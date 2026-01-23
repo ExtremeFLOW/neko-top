@@ -334,7 +334,8 @@ contains
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
 
-       converged = this%step(this%current_iteration, problem, design, simulation)
+       converged = this%step(this%current_iteration, problem, design, &
+            simulation)
 
        iteration_time = MPI_Wtime() - iteration_time
        call profiler_end_region('Optimizer iteration')
