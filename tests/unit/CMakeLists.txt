@@ -21,12 +21,15 @@
 # In addition to the simple unit tests using PFUnit, this file also includes
 # the subdirectory for sensitivity tests and other more complex tests.
 
+# Ensure that the BUILD_TESTING option is enabled.
 if (BUILD_TESTING)
-    # Ensure that the BUILD_TESTING option is enabled.
     message(STATUS "Building Neko-TOP unit tests.")
 else()
     return()
 endif()
+
+# Find the pFUnit package. This is required to build the unit tests.
+find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
 
 add_custom_target(Unit COMMENT "Build all unit tests.")
 set_target_properties(Unit PROPERTIES
@@ -35,25 +38,20 @@ set_target_properties(Unit PROPERTIES
 )
 add_dependencies(Tests Unit)
 
-# Create a file list of the pFUnit test sources. These should be relative paths.
-set(PFUNIT_TEST_SOURCES
-    # Add the .pf unit test files here.
-)
-
 # Add the more complex tests that require additional setup or dependencies.
 add_subdirectory(sensitivity)
 add_subdirectory(checkpointing)
+add_subdirectory(optimizer)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.
 
-if (NOT PFUNIT_TEST_SOURCES)
-    return()
+# Create a file list of the pFUnit test sources. These should be relative paths.
+set(PFUNIT_TEST_SOURCES "" CACHE INTERNAL "List of pFUnit test source files.")
+
+if (hdf5_FOUND)
+    list(APPEND PFUNIT_TEST_SOURCES mma/io_hdf5.pf)
 endif()
-
-
-# Find the pFUnit package. This is required to build the unit tests.
-find_package(PFUNIT REQUIRED HINTS ${PFUNIT_DIR})
 
 foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Ensure the path is relative to the tests/unit directory.
@@ -81,13 +79,24 @@ foreach(pf_file ${PFUNIT_TEST_SOURCES})
     # Add the test to the CMake project.
     add_pfunit_ctest(${test_name}
         TEST_SOURCES ${pf_file}
-        LINK_LIBRARIES PkgConfig::neko MPI::MPI_Fortran neko-top-a
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 2
     )
+
+    # Disable treating unused-variable as error for pfunit tests
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(${test_name} PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+
     set_target_properties(${test_name} PROPERTIES
         FOLDER "Tests/Unit"
     )
     set_tests_properties(${test_name} PROPERTIES
         LABELS "unit"
+        ENVIRONMENT "NEKO_LOG_FILE=${CMAKE_BINARY_DIR}/tests/unit/${test_name}.log"
+        TIMEOUT 120
     )
     add_dependencies(Unit ${test_name})
 endforeach()

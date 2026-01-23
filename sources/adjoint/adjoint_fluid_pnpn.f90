@@ -1,34 +1,36 @@
-! Copyright (c) 2025, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_fluid_pnpn.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint Pn/Pn formulation.
 module adjoint_fluid_pnpn
@@ -82,6 +84,7 @@ module adjoint_fluid_pnpn
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
+  use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
   use blasius, only: blasius_t
@@ -450,7 +453,7 @@ contains
     this%chkp => chkp
     ! This is probably scheme specific
     ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
     this%chkp%abx1 => this%abx1
     this%chkp%abx2 => this%abx2
@@ -768,7 +771,11 @@ contains
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
-      if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p_res%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p_res%x, this%glb_n_points, n)
+      end if
 
       call gs_Xh%op(p_res, GS_OP_ADD, event)
       call device_event_sync(event)
@@ -800,7 +807,11 @@ contains
 
       ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
-      if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p%x, this%glb_n_points, n)
+      end if
 
       ! Compute velocity residual.
       call profiler_start_region('Adjoint_velocity_residual')

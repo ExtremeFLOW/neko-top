@@ -1,34 +1,36 @@
-! Copyright (c) 2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_case.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 
 ! Implements the `adjoint_case_t` type.
 module adjoint_case
@@ -57,7 +59,7 @@ module adjoint_case
   use adjoint_scalars, only: adjoint_scalars_t
   implicit none
   private
-  public :: adjoint_case_t, adjoint_init, adjoint_free
+  public :: adjoint_case_t
 
   !> Adjoint case type.
   !! Todo: This should Ideally be a subclass of case_t, however, that is not yet
@@ -76,17 +78,15 @@ module adjoint_case
      type(chkp_output_t) :: chkp_out
 
      ! Fields
-     real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
      type(output_controller_t) :: output_controller
 
      logical :: have_scalar = .false.
 
+   contains
+     procedure, pass(this) :: init => adjoint_init_from_json
+     procedure, pass(this) :: free => adjoint_free
   end type adjoint_case_t
-
-  interface adjoint_init
-     module procedure adjoint_init_from_json ! todo, init from file
-  end interface adjoint_init
 
 contains
 
@@ -127,6 +127,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
 
+    call this%chkp%init()
     this%chkp%tlag => this%time%tlag
     this%chkp%dtlag => this%time%dtlag
 
@@ -377,10 +378,10 @@ contains
     !
     call this%output_controller%init(this%time%end_time)
     if (this%have_scalar) then
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             this%adjoint_scalars, path = trim(neko_case%output_directory))
     else
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
     end if
 
@@ -432,17 +433,32 @@ contains
   subroutine adjoint_free(this)
     class(adjoint_case_t), intent(inout) :: this
 
-    nullify(this%case)
+    if (allocated(this%fluid_adj)) then
+       call this%fluid_adj%free()
+       deallocate(this%fluid_adj)
+    end if
+
     if (allocated(this%adjoint_scalars)) then
        call this%adjoint_scalars%free()
        deallocate(this%adjoint_scalars)
     end if
 
-    if (allocated(this%fluid_adj)) then
-       call this%fluid_adj%free()
-       deallocate(this%fluid_adj)
+    if (allocated(this%adjoint_convection_term)) then
+       call this%adjoint_convection_term%free()
+       deallocate(this%adjoint_convection_term)
     end if
+
+    nullify(this%case)
+
+    ! call this%time%free()
+    call this%chkp%free()
+    call this%chkp_out%free()
+
+    ! Fields
+    call this%f_out%free()
     call this%output_controller%free()
+
+    this%have_scalar = .false.
 
   end subroutine adjoint_free
 

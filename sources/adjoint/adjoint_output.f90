@@ -1,34 +1,36 @@
-! Copyright (c) 2020-2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_output.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Defines an output for a adjoint
 module adjoint_output
@@ -48,32 +50,36 @@ module adjoint_output
   type, public, extends(output_t) :: adjoint_output_t
      type(field_list_t) :: adjoint
    contains
+     !> Constructor
+     procedure, pass(this) :: init => adjoint_output_init
+     !> Destructor
+     procedure, pass(this) :: free => adjoint_output_free
+     !> Sample, i.e. extract the values of the fields and write.
      procedure, pass(this) :: sample => adjoint_output_sample
   end type adjoint_output_t
-
-  interface adjoint_output_t
-     module procedure adjoint_output_init
-  end interface adjoint_output_t
 
 contains
 
   !> Constructor.
   !! @details initialize the output.
-  !! @param[inout] precision The precision of the output fields.
+  !! @param[inout] this The output sampler.
+  !! @param[in] precision The precision of the output fields.
   !! @param[in] adjoint The adjoint fluid scheme.
   !! @param[in] adjoint_scalars The adjoint scalar schemes.
   !! @param[in] name The name of the .fld file.
   !! @param[in] path The path to save the .fld files.
-  function adjoint_output_init(precision, adjoint, adjoint_scalars, &
-       name, path) result(this)
-    integer, intent(inout) :: precision
+  subroutine adjoint_output_init(this, precision, adjoint, adjoint_scalars, &
+       name, path)
+    class(adjoint_output_t), intent(inout) :: this
+    integer, intent(in) :: precision
     class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
     class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalars
     character(len=*), intent(in), optional :: name
     character(len=*), intent(in), optional :: path
-    type(adjoint_output_t) :: this
     character(len=1024) :: fname
     integer :: i, n_scalars
+
+    call this%free()
 
     if (present(name) .and. present(path)) then
        fname = trim(path) // trim(name) // '.fld'
@@ -109,7 +115,16 @@ contains
        end do
     end if
 
-  end function adjoint_output_init
+  end subroutine adjoint_output_init
+
+  !> Destructor
+  subroutine adjoint_output_free(this)
+    class(adjoint_output_t), intent(inout) :: this
+
+    call this%free_base()
+    call this%adjoint%free()
+
+  end subroutine adjoint_output_free
 
   !> Sample a adjoint solution at time @a t
   !! @param[inout] this The output sampler.

@@ -127,10 +127,31 @@ pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
+# HDF5 Support
+
+if (DEFINED ENV{HDF5_DIR})
+    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING "Path to the HDF5 installation")
+else()
+    set(HDF5_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5
+        CACHE STRING "Path to the HDF5 installation")
+endif()
+
+set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+
+pkg_check_modules(hdf5 QUIET IMPORTED_TARGET hdf5)
+if (hdf5_FOUND)
+    add_compile_definitions(HAVE_HDF5=1)
+endif()
+
+# ............................................................................ #
 # Setup PFUnit
 
-set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
+if (DEFINED ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING "Path to the pFUnit installation")
+else()
+    set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pfunit
+        CACHE STRING "Path to the pFUnit installation")
+endif()
 
 # ============================================================================ #
 # Setup compiler specific options
@@ -195,8 +216,9 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "")
     message(STATUS "External dependencies:")
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
-    message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
-    message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
+    message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
+    message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
+    message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
     message(STATUS ${BARRIER})
     message(STATUS "")
 
