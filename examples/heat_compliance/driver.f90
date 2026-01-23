@@ -50,7 +50,7 @@ program usrneko
 
   !> The problem type
   type(problem_t) :: prob
-  class(objective_t), allocatable :: heat_compliance
+  class(objective_t), allocatable :: heat_obj
   class(constraint_t), allocatable :: volume_constraint
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
@@ -103,11 +103,11 @@ program usrneko
   ! initialize the problem
   call prob%init(parameters, des)
 
-  allocate(heat_compliance_t :: heat_compliance)
+  allocate(heat_compliance_t :: heat_obj)
 
-  select type(heat_compliance)
+  select type(heat_obj)
   type is (heat_compliance_t)
-     call heat_compliance%init_from_attributes(des, neko_case%fluid%c_Xh, parameters)
+     call heat_obj%init_from_attributes(des, neko_case%fluid%c_Xh, parameters)
   class default
      call neko_error("??!")
   end select
@@ -128,7 +128,7 @@ program usrneko
 !    call neko_error("done")
 !   ! -------------------------------------------------------------------------- !
   ! Add objectives to the problem
-  call prob%add_objective(heat_compliance)
+  call prob%add_objective(heat_obj)
 
   allocate(thermal_volume_constraint_t :: volume_constraint)
 
