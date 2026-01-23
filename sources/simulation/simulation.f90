@@ -338,8 +338,8 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output_forward%sample(real(idx, kind=rp))
-    call this%output_adjoint%sample(real(idx, kind=rp))
+    call this%write_forward(idx)
+    call this%write_adjoint(idx)
 
   end subroutine simulation_write
 
@@ -348,6 +348,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
+    call this%output_forward%set_counter(idx)
     call this%output_forward%sample(real(idx, kind=rp))
 
   end subroutine simulation_write_forward
@@ -357,6 +358,7 @@ contains
     class(simulation_t), intent(inout) :: this
     integer, intent(in) :: idx
 
+    call this%output_adjoint%set_counter(idx)
     call this%output_adjoint%sample(real(idx, kind=rp))
 
   end subroutine simulation_write_adjoint

@@ -52,11 +52,11 @@ function run {
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
-        if [ ! -z "$NPROCS" ]; then
+        if [ -n "$NPROCS" ]; then
             ncores=$NPROCS
-        elif [ ! -z "$CUDA_VISIBLE_DEVICES" ]; then
+        elif [ -n "$CUDA_VISIBLE_DEVICES" ]; then
             ncores=$(echo $CUDA_VISIBLE_DEVICES | tr "," "\n" | wc -l)
-        elif [ ! -z "$LSB_DJOB_NUMPROC" ]; then
+        elif [ -n "$LSB_DJOB_NUMPROC" ]; then
             ncores=$LSB_DJOB_NUMPROC
         else
             nsockets="$(lscpu | grep "Socket(s)" | awk '{print $2}')"
@@ -68,11 +68,11 @@ function run {
             ncores=1
         fi
 
-        mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+        mpirun -n $ncores $neko $casefile 2>error.log
 
-        # Remove all lines printed from mpi rank > 0 and remove the mpi tag
-        sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
-        sed -i 's/\[1,0\]<stderr>://g' error.log
+        # # Remove all lines printed from mpi rank > 0 and remove the mpi tag
+        # sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
+        # sed -i 's/\[1,0\]<stderr>://g' error.log
 
     else
         $neko $casefile 2>error.log
@@ -112,7 +112,7 @@ function prepare {
     # ------------------------------------------------------------------------ #
     # Report the Job environment if it exists
 
-    if [ ! -z "$SLURM_JOB_NAME" ]; then
+    if [ -n "$SLURM_JOB_NAME" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "SLURM Job: %s\n" $SLURM_JOB_NAME
         printf "=%.0s" {1..80} && printf "\n"
@@ -132,7 +132,7 @@ function prepare {
         printf "Job Output File: %s\n" $SLURM_JOB_NAME
         printf "Job Error File: %s\n" $SLURM_JOB_NAME
 
-    elif [ ! -z "$LSB_JOBNAME" ]; then
+    elif [ -n "$LSB_JOBNAME" ]; then
         printf "=%.0s" {1..80} && printf "\n"
         printf "LSF10 Job: %s\n" $LSB_JOBNAME
         printf "=%.0s" {1..80} && printf "\n"
@@ -142,7 +142,7 @@ function prepare {
     fi
 
     [ -f $MAIN_DIR/prepare.env ] && source $MAIN_DIR/prepare.env
-    if [ ! -z "$(which module 2>>/dev/null)" ]; then
+    if [ -n "$(which module 2>>/dev/null)" ]; then
         printf "\nModules:\n"
         module list 2>&1
     fi
@@ -182,7 +182,7 @@ function prepare {
         printf "Using user provided Neko executable.\n"
         neko=$(realpath ./neko)
 
-    elif [ ! -z "$(ls *.f90 2>>/dev/null)" ]; then
+    elif [ -n "$(ls *.f90 2>>/dev/null)" ]; then
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 

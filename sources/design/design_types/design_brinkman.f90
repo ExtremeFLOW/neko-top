@@ -625,6 +625,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
+    call this%output%set_counter(idx)
     call this%output%sample(real(idx, kind=rp))
 
   end subroutine brinkman_design_write
