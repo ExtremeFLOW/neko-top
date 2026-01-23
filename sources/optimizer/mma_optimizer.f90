@@ -79,6 +79,7 @@ module mma_optimizer
      real(kind=rp), private :: scale = 1.0_rp
      real(kind=rp), private :: scaling_factor = 1.0_rp
      logical, private :: auto_scale = .false.
+     real(kind=rp) :: tolerance = 0.0_rp
 
      ! Set to flags to remove logging for optimal performance
      logical, private :: unconstrained_problem = .false.
@@ -194,6 +195,7 @@ contains
     !set the enable_output flag
     this%enable_output = enable_output
     this%scaling_factor = this%scale
+    this%tolerance = tolerance
 
     ! Initialize the logger
     if (this%enable_output) then
@@ -205,7 +207,7 @@ contains
        call this%csv_log%set_header(trim(header))
     end if
 
-    call this%init_base('MMA', max_iterations, tolerance, max_runtime)
+    call this%init_base('MMA', max_iterations, max_runtime)
 
     call neko_log%end_section()
 

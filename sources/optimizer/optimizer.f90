@@ -54,13 +54,20 @@ module optimizer
   type, abstract, public :: optimizer_t
 
      !> The type of the optimizer
-     character(len=64) :: optimizer_type = ''
+     character(len=64), private :: optimizer_type = ''
      !> The maximum number of iterations
-     integer, public :: max_iterations = 0
-     !> The tolerance for the optimization loop
-     real(kind=rp), public :: tolerance = 0.0_rp
+     integer, private :: max_iterations = 0
      !> Maximum runtime in seconds
-     real(kind=rp), public :: max_runtime = -1.0_rp
+     real(kind=rp), private :: max_runtime = -1.0_rp
+
+     ! ----------------------------------------------------------------------- !
+     ! Restart related members
+
+     !> Start time of the optimization
+     integer, private :: current_iteration = 0
+     real(kind=rp), private :: start_time = 0.0_rp
+     real(kind=rp), private :: average_time = 0.0_rp
+     real(kind=rp), private :: step_count = 0.0_rp
 
    contains
 
@@ -109,7 +116,8 @@ module optimizer
      procedure, pass(this) :: free_base => optimizer_free_base
      !> Print status message
      procedure, pass(this) :: print_status => optimizer_print_status
-
+     !> Estimate if we are out of time
+     procedure, pass(this) :: out_of_time => optimizer_out_of_time
   end type optimizer_t
 
   ! -------------------------------------------------------------------------- !
@@ -147,8 +155,8 @@ module optimizer
      !> Interface for running an optimization step
      logical function optimizer_step(this, iter, problem, design, simulation)
        import optimizer_t, simulation_t, problem_t, design_t
-       integer, intent(in) :: iter
        class(optimizer_t), intent(inout) :: this
+       integer, intent(in) :: iter
        class(problem_t), intent(inout) :: problem
        class(design_t), intent(inout) :: design
        type(simulation_t), optional, intent(inout) :: simulation
@@ -242,17 +250,20 @@ contains
   !! @param tolerance The tolerance for the optimization loop.
   !! @param max_runtime The maximum runtime in seconds.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
-       tolerance, max_runtime)
+       max_runtime)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
-    real(kind=rp), intent(in) :: tolerance
     real(kind=rp), intent(in), optional :: max_runtime
 
     this%optimizer_type = optimizer_type
     this%max_iterations = max_iterations
-    this%max_runtime = max_runtime
-    this%tolerance = tolerance
+
+    ! Optional settings
+    if (present(max_runtime)) this%max_runtime = max_runtime
+
+    ! Initialize internals
+    this%start_time = MPI_Wtime()
 
   end subroutine optimizer_init_base
 
@@ -263,8 +274,10 @@ contains
 
     this%optimizer_type = ''
     this%max_iterations = 0
-    this%tolerance = 0.0_rp
     this%max_runtime = -1.0_rp
+
+    this%start_time = 0.0_rp
+    this%current_iteration = 0
 
   end subroutine optimizer_free_base
 
@@ -288,48 +301,44 @@ contains
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(inout) :: design
     type(simulation_t), optional, intent(inout) :: simulation
-    real(kind=rp) :: start_time, elapsed_time
-    real(kind=rp) :: iteration_start_time, iteration_end_time
-    real(kind=rp) :: iteration_average_time
+    real(kind=rp) :: iteration_time
     logical :: converged, file_exists
-    integer :: iter, stop_flag
+    integer :: stop_flag
 
     ! Initialize variables
-    iter = 0
     stop_flag = 1
     converged = .false.
-    iteration_average_time = 0.0_rp
 
     ! Read run time checkpoint if present
     inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
     if (file_exists) then
-       call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', iter, &
-            design)
-       write(*, *) 'Resuming optimizer from checkpoint at iteration ', iter
+       call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', &
+            this%current_iteration, design)
+       write(*, '(A,I0)') 'Resuming optimizer from checkpoint at iteration ', &
+            this%current_iteration
     end if
 
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
 
-    call this%write(iter, problem)
-    call design%write(iter)
+    call this%write(this%current_iteration, problem)
+    call design%write(this%current_iteration)
 
     call neko_log%section('Optimization Loop')
 
-    start_time = MPI_Wtime()
-    do while (iter .lt. this%max_iterations)
-       iter = iter + 1
+    do while (this%current_iteration .lt. this%max_iterations)
+       this%current_iteration = this%current_iteration + 1
        call profiler_start_region('Optimizer iteration')
-       iteration_start_time = MPI_Wtime()
+       iteration_time = MPI_Wtime()
 
-       converged = this%step(iter, problem, design, simulation)
+       converged = this%step(this%current_iteration, problem, design, simulation)
 
-       iteration_end_time = MPI_Wtime()
+       iteration_time = MPI_Wtime() - iteration_time
        call profiler_end_region('Optimizer iteration')
 
        ! Log the progress and outputs
-       call this%write(iter, problem)
-       call design%write(iter)
+       call this%write(this%current_iteration, problem)
+       call design%write(this%current_iteration)
 
        ! --------------------------------------------------------------------- !
        ! Check stopping criteria
@@ -337,30 +346,17 @@ contains
        if (converged) then
           stop_flag = 0
           exit
-       else if (this%max_runtime .gt. 0.0_rp) then
-          elapsed_time = MPI_Wtime() - start_time
-
-          ! Estimate Cumulative Average iteration time
-          iteration_average_time = iteration_average_time * &
-               (real(iter, kind=rp) / real(iter + 1, kind=rp)) + &
-               (iteration_end_time - iteration_start_time) / &
-               real(iter + 1, kind=rp)
-
-          if (elapsed_time + iteration_average_time .gt. this%max_runtime) then
-             stop_flag = 2
-             exit
-          end if
+       else if (this%out_of_time(iteration_time)) then
+          call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', &
+               this%current_iteration, design, .true.)
+          stop_flag = 2
+          exit
        end if
     end do
 
-    if (stop_flag .eq. 2) then
-       call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', iter, design, &
-            .true.)
-    end if
-
     ! Check that the final design is valid
     call this%validate(problem, design)
-    call this%print_status(stop_flag, iter)
+    call this%print_status(stop_flag, this%current_iteration)
 
     call neko_log%end_section()
 
@@ -400,6 +396,36 @@ contains
        call neko_error(msg)
     end select
   end subroutine optimizer_print_status
+
+  !> Estimate if we are out of time
+  !! @param this The optimizer object.
+  !! @param step_time The time taken for the latest iteration.
+  !! @return out_of_time Logical indicating if we are out of time.
+  function optimizer_out_of_time(this, step_time) result(out_of_time)
+    use comm, only: pe_rank
+    class(optimizer_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: step_time
+    logical :: out_of_time
+    real(kind=rp) :: elapsed_time, old_avg_weight
+
+    out_of_time = .false.
+
+    if (this%max_runtime .lt. 0.0_rp) then
+       return
+    end if
+
+    elapsed_time = MPI_Wtime() - this%start_time
+    this%step_count = this%step_count + 1.0_rp
+    old_avg_weight = (this%step_count - 1) / this%step_count
+
+    ! Estimate Cumulative Average iteration time
+    this%average_time = step_time / this%step_count + &
+         this%average_time * old_avg_weight
+
+    ! Determine if next iteration would exceed max runtime
+    out_of_time = (elapsed_time + this%average_time) .gt. this%max_runtime
+
+  end function optimizer_out_of_time
 
   ! ========================================================================== !
   ! IO Functions
