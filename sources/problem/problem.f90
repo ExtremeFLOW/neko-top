@@ -486,7 +486,7 @@ contains
        call simulation%state_recover%save(simulation%neko_case, &
             simulation%neko_case%time)
     end do
-    call profiler_end_region("Forward simulation")
+    call profiler_end_region("Adjoint simulation")
 
     call simulation_finalize(simulation%neko_case)
 
