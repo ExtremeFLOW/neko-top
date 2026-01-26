@@ -1,8 +1,22 @@
 #!/bin/bash
 set -euo pipefail
 
-CASE_FILE=${1:-POD_rugby_ball.case}
-PY_SCRIPT=${2:-pod_state_recover.py}
+if [ $# -ge 1 ]; then
+    CASE_FILE="$1"
+else
+    case_files=( *.case )
+    if [ ${#case_files[@]} -eq 1 ]; then
+        CASE_FILE="${case_files[0]}"
+    elif [ ${#case_files[@]} -eq 0 ]; then
+        echo "Error: no .case file found in $(pwd)" >&2
+        exit 1
+    else
+        echo "Error: multiple .case files found in $(pwd): ${case_files[*]}" >&2
+        exit 1
+    fi
+fi
+
+PY_SCRIPT=${2:-../../sources/state_recovery/POD_state_recover/pod_state_recover.py}
 
 NEKO_RANKS=${NEKO_RANKS:-10}
 PY_RANKS=${PY_RANKS:-4}

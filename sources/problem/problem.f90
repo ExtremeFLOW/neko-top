@@ -518,23 +518,6 @@ contains
 
     call profiler_start_region("Adjoint simulation")
 
-    ! TODO. IC's need to be handled rather carefully, we should take a
-    ! checkpoint at i = 0. However, 99% of the time we use an initial condition
-    ! for the fluid of u=0, so this doesn't matter. Then we use u_adj = 0 on
-    ! the other end.
-    !
-    ! we have:
-    !  - n    time steps to compute
-    !  - n+1  fields to consider
-    !  - n-1  non-zero contributions to u * u_adj
-    !
-    !              non-zero
-    !             |--------|
-    !  primal  o--x--x--x--x--x
-    !          x--x--x--x--x--o  adjoint
-    !          ^              ^
-    !         u=0          u_adj=0
-
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        time = simulation%neko_case%time

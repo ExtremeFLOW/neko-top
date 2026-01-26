@@ -270,7 +270,7 @@ contains
          this%ksp_filt%solve(this%Ax, d_X_out, RHS%x, n, this%coef, &
          this%bclst_filt, this%coef%gs_h)
 
-    call profiler_end_region
+    call profiler_end_region('filter solve')
 
     ! add result
     call field_add3(X_out, X_in, d_X_out)
@@ -372,7 +372,7 @@ contains
     ! add result
     call field_add3(sens_out, sens_in, delta)
 
-    call profiler_end_region
+    call profiler_end_region('filter solve')
 
     ! update preconditioner (needed?)
     call this%pc_filt%update()

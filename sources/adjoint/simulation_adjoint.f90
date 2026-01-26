@@ -200,7 +200,7 @@ contains
 
     call neko_log%end_section()
     call neko_log%end()
-    call profiler_end_region
+    call profiler_end_region('Time-Step Adjoint')
 
     if (present(final_time)) then
        C%time%t = t_bkp

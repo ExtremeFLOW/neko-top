@@ -433,10 +433,12 @@ for case in ${example_list[@]}; do
     mkdir -p $log
     touch $log/output.log $log/error.log
 
-    # Copy the case files to the log folder
+    # Copy the case files to the log folder (preserve subfolder structure)
     if [ ${case: -6} == "run.sh" ]; then
-        find $EPATH/$case_dir \( -name "*.case" -or -name "*.json" \) \
-            -exec cp -ft $log {} +
+        (cd "$EPATH/$case_dir" && \
+            rsync -a --prune-empty-dirs \
+                --include '*/' --include '*.case' --include '*.json' \
+                --exclude '*' ./ "$log"/)
     elif [ ${case: -5} == ".case" ]; then
         cp -ft $log $EPATH/$case
     elif [ ${case: -5} == ".json" ]; then
