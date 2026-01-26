@@ -356,6 +356,7 @@ contains
 
     ! First restore() call is the phase boundary forward->adjoint
     if (.not. this%have_received_modes) then
+       call profiler_start_region("POD recieve modes")
 
        if (this%ctrl%inited) then
           call this%ctrl%put(MODE_FORWARD, PHASE_FWD_DONE, &
@@ -381,6 +382,18 @@ contains
           call this%dstream%recieve(this%w_modes(i)%x)
        end do
 
+       ! Move modes back to GPU
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+       do i = 1, this%n_modes
+          call device_memcpy(this%u_modes(i)%x, this%u_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+          call device_memcpy(this%v_modes(i)%x, this%v_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+          call device_memcpy(this%w_modes(i)%x, this%w_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+       end do
+       end if
+
        if (this%write_modes) then
           call this%output%sample(0.0_rp)
        end if
@@ -396,6 +409,7 @@ contains
             this%time_coefs%size(), mpi_real_precision, MPI_SUM, neko_comm, ierr)
 
        this%have_received_modes = .true.
+       call profiler_end_region("POD recieve modes")
     end if
 
     ! Emit ADJ_RUNNING only once (avoid flooding SST)
