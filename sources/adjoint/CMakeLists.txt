@@ -22,5 +22,24 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_pnpn_res_fctry.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/adjoint_pnpn_res_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/adjoint_pnpn_res_device.F90
         ${CMAKE_CURRENT_SOURCE_DIR}/normal_vec_bcs.f90
 )
+
+if(DEVICE_TYPE STREQUAL "CUDA")
+    target_sources(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/adjoint_pnpn_res.cu
+    )
+
+    target_include_directories(neko-top
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda)
+elseif(DEVICE_TYPE STREQUAL "HIP")
+    target_sources(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/adjoint_pnpn_res.hip
+    )
+
+    target_include_directories(neko-top
+        PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip)
+endif()

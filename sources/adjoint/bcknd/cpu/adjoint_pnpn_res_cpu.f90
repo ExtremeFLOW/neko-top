@@ -99,6 +99,8 @@ contains
             + wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1)) 
     end do
 
+   ! This is commented out because I don't think it applies any more... but
+   ! sym BCs haven't been tested thoroughly.
    !  !
    !  ! Surface velocity terms
    !  !

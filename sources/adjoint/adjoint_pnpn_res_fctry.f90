@@ -34,6 +34,8 @@
 submodule (adjoint_pnpn_residual) adjoint_pnpn_res_fctry
   use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX
   use adjoint_pnpn_res_cpu, only : adjoint_pnpn_prs_res_cpu_t, adjoint_pnpn_vel_res_cpu_t
+  use adjoint_pnpn_res_device, only : adjoint_pnpn_prs_res_device_t, &
+       adjoint_pnpn_vel_res_device_t
   use utils, only: neko_error
   implicit none
 
@@ -54,7 +56,7 @@ contains
     if (NEKO_BCKND_SX .eq. 1) then
        call neko_error("not implemented")
     else if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error("not implemented")
+       allocate(adjoint_pnpn_prs_res_device_t::object)
     else
        allocate(adjoint_pnpn_prs_res_cpu_t::object)
     end if
@@ -75,7 +77,7 @@ contains
     if (NEKO_BCKND_SX .eq. 1) then
        call neko_error("not implemented")
     else if (NEKO_BCKND_DEVICE .eq. 1) then
-       call neko_error("not implemented")
+       allocate(adjoint_pnpn_vel_res_device_t::object)
     else
        allocate(adjoint_pnpn_vel_res_cpu_t::object)
     end if
