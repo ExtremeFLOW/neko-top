@@ -52,12 +52,12 @@ contains
     integer :: temp_indices(6)
     real(kind=rp) :: fld_norm
 
-    call neko_scratch_registry%request_field(ta1, temp_indices(1))
-    call neko_scratch_registry%request_field(ta2, temp_indices(2))
-    call neko_scratch_registry%request_field(ta3, temp_indices(3))
-    call neko_scratch_registry%request_field(wa1, temp_indices(4))
-    call neko_scratch_registry%request_field(wa2, temp_indices(5))
-    call neko_scratch_registry%request_field(wa3, temp_indices(6))
+    call neko_scratch_registry%request_field(ta1, temp_indices(1), .false.)
+    call neko_scratch_registry%request_field(ta2, temp_indices(2), .false.)
+    call neko_scratch_registry%request_field(ta3, temp_indices(3), .false.)
+    call neko_scratch_registry%request_field(wa1, temp_indices(4), .false.)
+    call neko_scratch_registry%request_field(wa2, temp_indices(5), .false.)
+    call neko_scratch_registry%request_field(wa3, temp_indices(6), .false.)
 
     n = c_Xh%dof%size()
 

@@ -766,14 +766,14 @@ contains
       call this%bc_apply_prs(time)
 
       ! Now we need the surface contribution of the curl curl BC. (explicit in p)
-      call neko_scratch_registry%request_field(dx_p_adj, big_temp_indices(1))
-      call neko_scratch_registry%request_field(dy_p_adj, big_temp_indices(2))
-      call neko_scratch_registry%request_field(dz_p_adj, big_temp_indices(3))
-      call neko_scratch_registry%request_field(nx1, big_temp_indices(4))
-      call neko_scratch_registry%request_field(nx2, big_temp_indices(5))
-      call neko_scratch_registry%request_field(nx3, big_temp_indices(6))
-      call neko_scratch_registry%request_field(work1, big_temp_indices(7))
-      call neko_scratch_registry%request_field(work2, big_temp_indices(8))
+      call neko_scratch_registry%request_field(dx_p_adj, big_temp_indices(1), .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, big_temp_indices(2), .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, big_temp_indices(3), .false.)
+      call neko_scratch_registry%request_field(nx1, big_temp_indices(4), .false.)
+      call neko_scratch_registry%request_field(nx2, big_temp_indices(5), .false.)
+      call neko_scratch_registry%request_field(nx3, big_temp_indices(6), .false.)
+      call neko_scratch_registry%request_field(work1, big_temp_indices(7), .false.)
+      call neko_scratch_registry%request_field(work2, big_temp_indices(8), .false.)
 
       ! zero interior
       call field_rzero(nx1)
@@ -937,9 +937,9 @@ contains
 
       !------------------------------------------------------------------------!
       ! correct the velocity with the pressure
-      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1))
-      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2))
-      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3))
+      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1), .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2), .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3), .false.)
 
       ! gradient of adjoint pressure (explicit)
       call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
