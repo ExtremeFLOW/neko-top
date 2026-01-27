@@ -187,3 +187,76 @@ be found in [Mapping cascade](@ref mapping_cascade).
 of the theory guide. This will tie together all aspects from the mapping, to
 how these terms arise etc. For now we are simply documenting the equations
 being solved.
+
+## Time integration
+This section summarizes the discrete adjoint for the pressure-correction
+time integration used in `neko-top`. We start from a right-handed Riemann sum
+for the objective,
+\f[
+  F \approx \Delta t \sum_{n=1}^{N} f(\mathbf{u}^n), \qquad
+  \mathrm{d}F = \Delta t \sum_{n=1}^{N}
+  \langle \nabla_{\mathbf{u}} f(\mathbf{u}^n), \delta \mathbf{u}^n \rangle.
+\f]
+
+We introduce an intermediate velocity \f$\mathbf{u}^\star\f$ and write the
+forward time step as three sub-problems:
+\f[
+  \left\langle \mathbf{v}^n, \frac{\mathbf{u}^{\star n}}{\Delta t} \right\rangle
+  =
+  \left\langle \mathbf{v}^n,
+  \frac{\mathbf{u}^{n-1}}{\Delta t}
+  - \mathcal{C}(\mathbf{u}^{n-1})\,\mathbf{u}^{n-1}
+  - \mathcal{X}\,\mathbf{u}^{n-1} \right\rangle,
+\f]
+\f[
+  \langle \nabla q^n, \nabla p^n \rangle
+  =
+  \left\langle \nabla q^n,
+  \frac{\mathbf{u}^{\star n}}{\Delta t}
+  - \nabla \times (\nabla \times \mathbf{u}^{n-1}) \right\rangle,
+\f]
+\f[
+  \left\langle \mathbf{w}^n,
+  \frac{\mathbf{u}^n}{\Delta t} + \mathcal{L}\mathbf{u}^n \right\rangle
+  =
+  \left\langle \mathbf{w}^n,
+  \frac{\mathbf{u}^{\star n}}{\Delta t} - \nabla p^n \right\rangle.
+\f]
+Here \f$\mathcal{C}\f$ denotes the discrete convection operator and
+\f$\mathcal{X}\f$ denotes any explicit linear operator (e.g. Brinkman).
+\f$\mathcal{L}\f$ is the implicit diffusion/Helmholtz operator.
+
+Perturbing these equations and collecting terms yields a discrete adjoint that
+is solved in three steps (backward in time). First, solve for the adjoint
+velocity associated with the implicit step,
+\f[
+  \frac{\mathbf{w}^{\dagger n}}{\Delta t}
+  + \mathcal{L}^\dagger \mathbf{w}^{\dagger n}
+  =
+  \nabla_{\mathbf{u}} f(\mathbf{u}^n)\,\Delta t
+  + \frac{\mathbf{v}^{\dagger (n+1)}}{\Delta t}
+  - \mathcal{C}^\dagger(\mathbf{u}^n)\,\mathbf{v}^{\dagger (n+1)}
+  - \mathcal{X}^\dagger \mathbf{v}^{\dagger (n+1)}.
+\f]
+Second, solve the adjoint pressure equation,
+\f[
+  \langle \nabla q^n, \nabla p^{\dagger n} \rangle
+  =
+  \langle -\mathbf{w}^{\dagger n}, \nabla p^{\dagger n} \rangle.
+\f]
+Finally, recover the adjoint velocity associated with the explicit step,
+\f[
+  \mathbf{v}^{\dagger n}
+  = \mathbf{w}^{\dagger n} - \nabla p^{\dagger n}.
+\f]
+
+With these adjoint variables, the discrete gradient contribution associated
+with an explicit linear operator \f$\mathcal{X}\f$ is
+\f[
+  \mathrm{d}F(\mathcal{X},\delta \mathcal{X})
+  = -\sum_{n=1}^{N} \left\langle \delta \mathcal{X},
+  \mathbf{v}^{\dagger (n+1)} \mathbf{u}^n \right\rangle.
+\f]
+The order above matches the implementation: solve the implicit adjoint step,
+then the adjoint pressure correction, then form the projection to obtain the
+adjoint velocity used in the sensitivity accumulation.

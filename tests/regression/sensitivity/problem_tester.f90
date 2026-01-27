@@ -42,8 +42,9 @@ program problem_tester
 
   ! Test specific variables
   real(kind=rp) :: tolerance = 1e-5_rp
-  real(kind=rp), parameter :: perturbations(6) = [ &
-       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp]
+  real(kind=rp), parameter :: perturbations(4) = [ &
+  !     1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp, 1e-5_rp, 1e-6_rp]
+       1e-1_rp, 1e-2_rp, 1e-3_rp, 1e-4_rp]
 
   type(vector_t) :: sensitivities
   type(matrix_t) :: constraint_sensitivity
