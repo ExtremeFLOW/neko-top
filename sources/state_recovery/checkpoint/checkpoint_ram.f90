@@ -43,6 +43,9 @@ submodule (simulation_checkpoint) checkpoint_ram
 contains
 
   !> Save the current state of the simulation in RAM only.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
   module subroutine checkpoint_save_ram(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -77,6 +80,9 @@ contains
   end subroutine checkpoint_save_ram
 
   !> Restore the forward simulation state from RAM only.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Target time state.
   module subroutine checkpoint_restore_ram(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -112,6 +118,10 @@ contains
     end do
   end subroutine checkpoint_restore_ram
 
+  !> Ensure RAM checkpoint buffers can hold the requested number of steps.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] required_steps Minimum number of time steps to hold.
   subroutine checkpoint_ensure_ram_capacity(this, neko_case, required_steps)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case

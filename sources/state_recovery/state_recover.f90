@@ -32,6 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
+!> @brief Abstract interface for state recovery strategies.
 module state_recover
   use case, only: case_t
   use json_file_module, only: json_file
@@ -39,6 +40,7 @@ module state_recover
   implicit none
   private
 
+  !> Abstract base type for state recovery implementations.
   type, abstract, public :: state_recover_t
      private
      !> number of time steps in the forward simulation
@@ -56,6 +58,10 @@ module state_recover
   end type state_recover_t
 
   abstract interface
+     !> Initialize state recovery from JSON parameters.
+     !! @param[inout] this State recovery instance.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[inout] params JSON parameters.
      subroutine state_recover_init(this, neko_case, params)
        import state_recover_t, case_t, json_file
        class(state_recover_t), intent(inout) :: this
@@ -63,16 +69,24 @@ module state_recover
        type(json_file), target, intent(inout) :: params
      end subroutine state_recover_init
 
+     !> Free state recovery resources.
+     !! @param[inout] this State recovery instance.
      subroutine state_recover_free(this)
        import state_recover_t
        class(state_recover_t), intent(inout) :: this
      end subroutine state_recover_free
 
+     !> Reset state recovery bookkeeping.
+     !! @param[inout] this State recovery instance.
      subroutine state_recover_reset(this)
        import state_recover_t
        class(state_recover_t), intent(inout) :: this
      end subroutine state_recover_reset
 
+     !> Save forward state for recovery.
+     !! @param[inout] this State recovery instance.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Current time state.
      subroutine state_recover_save(this, neko_case, time)
        import state_recover_t, case_t, time_state_t
        class(state_recover_t), intent(inout) :: this
@@ -80,6 +94,10 @@ module state_recover
        type(time_state_t), intent(in) :: time
      end subroutine state_recover_save
 
+     !> Restore forward state for adjoint.
+     !! @param[inout] this State recovery instance.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Target time state.
      subroutine state_recover_restore(this, neko_case, time)
        import state_recover_t, case_t, time_state_t
        class(state_recover_t), intent(inout) :: this
@@ -90,6 +108,8 @@ module state_recover
 
 contains
 
+  !> Get number of forward time steps.
+  !! @param[in] this State recovery instance.
   pure function state_recover_get_n_timesteps(this) result(n)
     class(state_recover_t), intent(in) :: this
     integer :: n
@@ -97,6 +117,9 @@ contains
     n = this%n_timesteps
   end function state_recover_get_n_timesteps
 
+  !> Set number of forward time steps.
+  !! @param[inout] this State recovery instance.
+  !! @param[in] n Number of time steps.
   subroutine state_recover_set_n_timesteps(this, n)
     class(state_recover_t), intent(inout) :: this
     integer, intent(in) :: n

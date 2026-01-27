@@ -32,6 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
+!> @brief Checkpoint-based state recovery for adjoint runs.
 module simulation_checkpoint
   use num_types, only: rp, sp, dp
   use case, only: case_t
@@ -108,6 +109,9 @@ module simulation_checkpoint
 
   interface
      !> Save the current state of the simulation in a linear fashion
+     !! @param[inout] this Checkpointing implementation.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Current time state.
      module subroutine checkpoint_save_linear(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), intent(inout) :: neko_case
@@ -115,6 +119,9 @@ module simulation_checkpoint
      end subroutine checkpoint_save_linear
 
      !> Restore the forward simulation state in a linear fashion
+     !! @param[inout] this Checkpointing implementation.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Target time state.
      module subroutine checkpoint_restore_linear(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
@@ -122,6 +129,9 @@ module simulation_checkpoint
      end subroutine checkpoint_restore_linear
 
      !> Save the current state of the simulation in RAM only
+     !! @param[inout] this Checkpointing implementation.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Current time state.
      module subroutine checkpoint_save_ram(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), intent(inout) :: neko_case
@@ -129,6 +139,9 @@ module simulation_checkpoint
      end subroutine checkpoint_save_ram
 
      !> Restore the forward simulation state from RAM only
+     !! @param[inout] this Checkpointing implementation.
+     !! @param[inout] neko_case Case data structure.
+     !! @param[in] time Target time state.
      module subroutine checkpoint_restore_ram(this, neko_case, time)
        class(simulation_checkpoint_t), intent(inout) :: this
        class(case_t), target, intent(inout) :: neko_case
@@ -142,6 +155,9 @@ contains
   ! Initialization and deallocation
 
   !> Initialization
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[inout] params JSON parameters.
   subroutine checkpoint_init_from_json(this, neko_case, params)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -165,6 +181,13 @@ contains
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] algorithm Checkpointing algorithm identifier.
+  !! @param[in] n_saves_memory Number of checkpoints in memory.
+  !! @param[in] filename Checkpoint base filename.
+  !! @param[in] fmt Checkpoint file format.
+  !! @param[in] keep_checkpoints Whether to keep checkpoint files on disk.
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
        n_saves_memory, filename, fmt, keep_checkpoints)
     class(simulation_checkpoint_t), intent(inout), target :: this
@@ -229,6 +252,8 @@ contains
   end subroutine checkpoint_init_from_components
 
   !> Free
+  !> Free checkpointing resources.
+  !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_free(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i
@@ -304,6 +329,10 @@ contains
   ! Saving and Restoring
 
   !> Save the current state of the simulation to disk
+  !> Save forward state.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
   subroutine checkpoint_save(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -329,6 +358,10 @@ contains
   end subroutine checkpoint_save
 
   !> Restore the forward simulation state
+  !> Restore forward state for adjoint.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Target time state.
   subroutine checkpoint_restore(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -363,6 +396,8 @@ contains
   ! Meta handling
 
   !> Reset the checkpoint data
+  !> Reset checkpointing state.
+  !! @param[inout] this Checkpointing implementation.
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer :: i

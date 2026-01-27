@@ -51,6 +51,9 @@ contains
   !> Save the current state of the simulation in a linear fashion.
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
   module subroutine checkpoint_save_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -73,6 +76,9 @@ contains
   !! If the requested time step is not in memory, we load the nearest
   !! checkpoint from disc and then we step forward in time to fill our cache.
   !! Finally, we copy the requested time step from our cache.
+  !! @param[inout] this Checkpointing implementation.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Target time state.
   module subroutine checkpoint_restore_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case

@@ -1,3 +1,38 @@
+!> @file POD_state_recover.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+!
+!> @brief POD-based state recovery using in-situ streaming and reconstruction.
 module simulation_POD_state_recover
   use num_types, only: rp, sp, dp
   use case, only: case_t
@@ -30,6 +65,7 @@ module simulation_POD_state_recover
   implicit none
   private
 
+  !> POD state recovery implementation for forward/adjoint runs.
   type, public, extends(state_recover_t) :: POD_state_recover_t
      private
 
@@ -82,6 +118,10 @@ module simulation_POD_state_recover
 
 contains
 
+  !> Initialize POD state recovery from JSON parameters.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[inout] params JSON parameters.
   subroutine POD_state_recover_init_from_json(this, neko_case, params)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -173,6 +213,12 @@ contains
   end subroutine POD_state_recover_init_from_json
 
 
+  !> Initialize POD state recovery from explicit components.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] i_stream Snapshot stride.
+  !! @param[in] n_modes Number of POD modes to keep.
+  !! @param[in] debug Optional debug flag.
   subroutine POD_state_recover_init_from_components(this, neko_case, i_stream, n_modes, debug)
     class(POD_state_recover_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
@@ -248,6 +294,8 @@ contains
   end subroutine POD_state_recover_init_from_components
 
 
+  !> Release POD state recovery resources.
+  !! @param[inout] this POD state recovery instance.
   subroutine POD_state_recover_free(this)
     class(POD_state_recover_t), intent(inout) :: this
     integer :: i
@@ -276,6 +324,8 @@ contains
   end subroutine POD_state_recover_free
 
 
+  !> Reset POD state recovery to initial control state.
+  !! @param[inout] this POD state recovery instance.
   subroutine POD_state_recover_reset(this)
     class(POD_state_recover_t), intent(inout) :: this
     integer :: i
@@ -302,6 +352,10 @@ contains
   end subroutine POD_state_recover_reset
 
 
+  !> Stream forward state for POD updates.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
   subroutine POD_state_recover_save(this, neko_case, time)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
@@ -344,6 +398,10 @@ contains
   end subroutine POD_state_recover_save
 
 
+  !> Reconstruct and restore state from POD during adjoint.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Target time state.
   subroutine POD_state_recover_restore(this, neko_case, time)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case

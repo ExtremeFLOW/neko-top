@@ -32,6 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
+!> @brief Factory for state recovery implementations.
 module state_recover_factory
   use case, only: case_t
   use json_file_module, only: json_file
@@ -47,6 +48,10 @@ module state_recover_factory
 
 contains
 
+  !> Create and initialize a state recovery object from JSON parameters.
+  !! @param[inout] recover Allocatable state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[inout] params JSON parameters for state recovery.
   subroutine state_recover_create(recover, neko_case, params)
     class(state_recover_t), allocatable, intent(inout) :: recover
     class(case_t), target, intent(inout) :: neko_case
