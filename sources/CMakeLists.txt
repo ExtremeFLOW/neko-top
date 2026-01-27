@@ -40,19 +40,13 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
 
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_3dto1d.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_brinkman.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simplefield.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/set_optimization_ic.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 

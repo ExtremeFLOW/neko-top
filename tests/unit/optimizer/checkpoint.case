@@ -6,17 +6,29 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0,
-            "timestep": 1e-3
+            "end_time": 1e-3,
+            "timestep": 1e-4
         },
         "numerics": {
-            "time_order": 1,
+            "time_order": 3,
             "polynomial_order": 5,
             "dealias": false
         },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [ 0.0, 0.0, 0.0 ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1, 2 ]
+                }
+            ]
+        },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 20.0,
+            "Re": 2.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -39,32 +51,21 @@
             },
             "boundary_conditions": [
                 {
-                    "type": "user_velocity",
-                    "zone_indices": [ 1 ]
-                },
-                {
-                    "type": "outflow",
-                    "zone_indices": [ 2 ]
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 1, 2 ]
                 }
             ],
             "output_control": "never"
         },
-        "adjoint_fluid": {
-            "initial_condition": {
-                "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
-            },
-            "boundary_conditions": [
-                {
-                    "type": "no_slip",
-                    "zone_indices": [ 1 ]
-                },
-                {
-                    "type": "outflow",
-                    "zone_indices": [ 2 ]
-                }
-            ]
-        },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "tol": 1e-2,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
         "point_zones": [
             {
                 "name": "optimization_domain",
@@ -82,18 +83,14 @@
             },
         ]
     },
-    "unsteady": true,
-    "checkpoints": {
-        "enabled": true,
-        "n_memory": 100
-    },
     "optimization": {
         "design": {
             "type": "brinkman",
+            "dealias": false,
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.05
+                    "r": 0.01
                 },
                 {
                     "type": "RAMP",
@@ -115,11 +112,19 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 50,
-            "tolerance": 1.0e-12,
+            "max_iterations": 5,
+            "tolerance": 1.0e-3,
             "mma": {
+                "max_iter": 100,
+                "asyinit": 0.5,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1.0,
+                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
+                "a0": 1.0,
+                "a": 0.0,
                 "c": 1000.0,
                 "d": 10.0
             }
@@ -131,7 +136,9 @@
             },
             {
                 "type": "lube_term",
-                "weight": 1.0
+                "weight": 1.0,
+                "dealias_sensitivity": false,
+                "dealias_forcing": false
             }
         ],
         "constraints": [

@@ -10,7 +10,7 @@ program problem_tester
   use json_utils_ext, only: json_read_file
   use utils, only: neko_error
   use neko_top, only: neko_top_register_types
-  use mpi_f08, only: MPI_Init
+  use neko, only: neko_init, neko_finalize
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST
@@ -29,9 +29,6 @@ program problem_tester
   integer :: argc
   character(len=256) :: parameter_file
   type(json_file) :: parameters, design_parameters
-
-  ! MPI parameters
-  integer :: ierr
 
   !> The simulation we are working with
   type(simulation_t) :: sim
@@ -59,9 +56,9 @@ program problem_tester
   character(len=12) :: nobj_str, ncon_str
 
   ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
+  ! Initialize the Neko environment
 
-  call MPI_Init(ierr)
+  call neko_init()
   call neko_top_register_types()
 
   ! -------------------------------------------------------------------------- !
@@ -166,5 +163,8 @@ program problem_tester
   call prob%free()
   call des%free()
   call sim%free()
+
+  ! Finalize the Neko environment
+  call neko_finalize()
 
 end program problem_tester

@@ -61,8 +61,8 @@
 ! note that based on eq(3.5) there should be r0 in the approximated problem !
 ! however since it is just a constant added to a minimization problem, it   !
 ! is ignored.                                                               !
-! A primal-dual algorithm is then employed to solve the aproximated problem !
-! using interior point method.                                              !
+! A primal-dual algorithm is then employed to solve the approximated        !
+! problem using interior point method.                                      !
 !===========================================================================!
 
 !> MMA module
@@ -74,7 +74,7 @@ module mma
   use vector, only: vector_t
   use matrix, only: matrix_t
   use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
-  use utils, only: neko_error
+  use utils, only: neko_error, filename_suffix
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
@@ -130,14 +130,12 @@ module mma
      procedure, pass(this) :: KKT_cpu => mma_KKT_cpu
      procedure, pass(this) :: KKT_device => mma_KKT_device
 
-     generic :: write => write_hdf5
-     procedure, pass(this) :: write_hdf5 => mma_write_hdf5
-
-     generic :: read => read_hdf5
-     procedure, pass(this) :: read_hdf5 => mma_read_hdf5
+     procedure, pass(this) :: save_checkpoint => mma_save_checkpoint
+     procedure, pass(this) :: load_checkpoint => mma_load_checkpoint
 
      ! Private utilities
      procedure, pass(this) :: copy_from => mma_copy_from
+
   end type mma_t
 
   ! ========================================================================== !
@@ -180,22 +178,28 @@ module mma
        type(c_ptr), intent(in) :: x, df0dx, fval, dfdx
      end subroutine mma_KKT_device
 
-     ! ======================================================================= !
-     ! Interface for IO routines
+  end interface
 
-     module subroutine mma_write_hdf5(this, filename, overwrite)
-       class(mma_t), intent(inout) :: this
+  ! ========================================================================== !
+  ! Interface for IO routines
+
+  interface
+     module subroutine mma_save_checkpoint_hdf5(object, filename, overwrite)
+       class(mma_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
        logical, intent(in), optional :: overwrite
-     end subroutine mma_write_hdf5
+     end subroutine mma_save_checkpoint_hdf5
 
-     module subroutine mma_read_hdf5(this, filename)
-       class(mma_t), intent(inout) :: this
+     module subroutine mma_load_checkpoint_hdf5(object, filename)
+       class(mma_t), intent(inout) :: object
        character(len=*), intent(in) :: filename
-     end subroutine mma_read_hdf5
+     end subroutine mma_load_checkpoint_hdf5
   end interface
 
 contains
+
+  ! ========================================================================== !
+  ! Initializers and destructors
 
   !> Read attributes from the case file, and calling the init function
   subroutine mma_init_from_json(this, x, n, m, json, scale, auto_scale)
@@ -348,7 +352,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
-    character(len=:), intent(in), allocatable :: bcknd, subsolver
+    character(len=*), intent(in), optional :: bcknd, subsolver
     character(len=256) :: log_msg
     integer :: i, ierr
 
@@ -409,17 +413,33 @@ contains
     this%residumax = huge(0.0_rp)
     this%residunorm = huge(0.0_rp)
 
+    ! Sync parameters across MPI
+    call MPI_Allreduce(n, this%n_global, 1, MPI_INTEGER, MPI_SUM, neko_comm, &
+         ierr)
+
     ! ------------------------------------------------------------------------ !
     ! Assign defaults if nothing is parsed
 
     ! Based on the Cpp Code by Niels
     if (.not. present(max_iter)) this%max_iter = 100
-    if (.not. present(epsimin)) this%epsimin = 1.0e-9_rp * sqrt(real(m + n, rp))
+    if (.not. present(epsimin)) then
+       this%epsimin = 1.0e-9_rp * sqrt(real(this%m + this%n_global, rp))
+    end if
 
     ! Following parameters are set based on eq.3.8
     if (.not. present(asyinit)) this%asyinit = 0.5_rp
     if (.not. present(asyincr)) this%asyincr = 1.2_rp
     if (.not. present(asydecr)) this%asydecr = 0.7_rp
+
+    ! Set default backend based on NEKO_BCKND_DEVICE
+    if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 0) then
+       this%bcknd = "cpu"
+    else if (.not. present(bcknd)) then
+       this%bcknd = "device"
+    end if
+
+    ! Set default subsolver
+    if (.not. present(subsolver)) this%subsolver = "dip"
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -427,12 +447,8 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
-    this%bcknd = bcknd
-    this%subsolver = subsolver
-
-    ! Sync parameters across MPI
-    call MPI_Allreduce(this%n, this%n_global, 1, &
-         MPI_INTEGER, MPI_SUM, neko_comm, ierr)
+    if (present(bcknd)) this%bcknd = bcknd
+    if (present(subsolver)) this%subsolver = subsolver
 
     call neko_log%section('MMA Parameters')
 
@@ -441,7 +457,7 @@ contains
     write(log_msg, '(A10,1X,A)') 'subsolver ', trim(this%subsolver)
     call neko_log%message(log_msg)
 
-    write(log_msg, '(A10,1X,I0)') 'n         ', this%n
+    write(log_msg, '(A10,1X,I0)') 'n         ', this%n_global
     call neko_log%message(log_msg)
     write(log_msg, '(A10,1X,I0)') 'm         ', this%m
     call neko_log%message(log_msg)
@@ -482,6 +498,9 @@ contains
     this%is_initialized = .true.
   end subroutine mma_init_from_components
 
+  ! ========================================================================== !
+  ! Updator and KKT checker
+
   !> Call the update function based on the backend
   subroutine mma_update_vector(this, iter, x, df0dx, fval, dfdx)
     class(mma_t), intent(inout) :: this
@@ -494,20 +513,16 @@ contains
     select case (this%bcknd)
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(df0dx%x, df0dx%x_d, this%n, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(fval%x, fval%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .false.)
-          call device_memcpy(dfdx%x, dfdx%x_d, this%m * this%n, DEVICE_TO_HOST,&
-               sync = .true.)
+          call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
+          call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
        end if
 
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(x%x, x%x_d, this%n, HOST_TO_DEVICE, sync = .true.)
+          call x%copy_from(HOST_TO_DEVICE, sync = .true.)
        end if
 
     case ("device")
@@ -541,6 +556,52 @@ contains
        call mma_KKT_device(this, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
   end subroutine mma_KKT_vector
+
+  ! ========================================================================== !
+  ! IO Functions
+
+  !> Save the mma checkpoint to a file based on file suffix.
+  !! @param this The mma object.
+  !! @param filename The name of the file to save the checkpoint.
+  !! @param overwrite Whether to overwrite the file if it exists.
+  subroutine mma_save_checkpoint(this, filename, overwrite)
+    class(mma_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call mma_save_checkpoint_hdf5(this, filename, overwrite)
+    case default
+       call neko_error('mma_save_checkpoint: Unsupported file format: ' // &
+            trim(file_ext))
+    end select
+
+  end subroutine mma_save_checkpoint
+
+  !> Load the mma checkpoint from a file based on file suffix.
+  !! @param this The mma object.
+  !! @param filename The name of the file to load the checkpoint from.
+  subroutine mma_load_checkpoint(this, filename)
+    class(mma_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    character(len=12) :: file_ext
+
+    ! Get the file extension
+    call filename_suffix(filename, file_ext)
+
+    select case (trim(file_ext))
+    case ('h5', 'hdf5', 'hf5')
+       call mma_load_checkpoint_hdf5(this, filename)
+    case default
+       call neko_error('mma_load_checkpoint: Unsupported file format: ' // &
+            trim(file_ext))
+    end select
+  end subroutine mma_load_checkpoint
 
   ! ========================================================================== !
   ! Getters and setters
@@ -637,4 +698,23 @@ contains
     call this%eta%copy_from(direction, sync = sync)
 
   end subroutine mma_copy_from
+
+  ! ========================================================================== !
+  ! Dummy implementations for module procedures
+
+#if !HAVE_HDF5
+  module subroutine mma_save_checkpoint_hdf5(object, filename, overwrite)
+    class(mma_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine mma_save_checkpoint_hdf5
+
+  module subroutine mma_load_checkpoint_hdf5(object, filename)
+    class(mma_t), intent(inout) :: object
+    character(len=*), intent(in) :: filename
+    call neko_error('mma: HDF5 support not enabled rebuild with HAVE_HDF5')
+  end subroutine mma_load_checkpoint_hdf5
+#endif
+
 end module mma
