@@ -100,8 +100,6 @@ module simulation_checkpoint
      procedure, public, pass(this) :: save => checkpoint_save
      !> Restore the forward simulation state
      procedure, public, pass(this) :: restore => checkpoint_restore
-     !> Public getter to check if the simulation is unsteady
-     procedure, public, pass(this) :: get_enabled => checkpoint_get_enabled
 
   end type simulation_checkpoint_t
 
@@ -325,15 +323,6 @@ contains
 
     call profiler_end_region("Checkpoint restore")
   end subroutine checkpoint_restore
-
-  !> Restore the forward simulation state
-  subroutine checkpoint_get_enabled(this, enabled)
-    class(simulation_checkpoint_t), intent(inout) :: this
-    logical, intent(out) :: enabled
-
-    enabled = this%enabled
-
-  end subroutine checkpoint_get_enabled
 
   ! ========================================================================== !
   ! Meta handling

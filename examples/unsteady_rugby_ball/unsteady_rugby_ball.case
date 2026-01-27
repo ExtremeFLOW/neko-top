@@ -47,12 +47,7 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-<<<<<<< HEAD
-            "output_control": "tsteps",
-            "output_value": 50
-=======
             "output_control": "never",
->>>>>>> origin/develop
         },
         "adjoint_fluid": {
             "initial_condition": {
