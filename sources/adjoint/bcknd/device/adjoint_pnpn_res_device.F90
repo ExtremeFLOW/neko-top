@@ -30,6 +30,28 @@ module adjoint_pnpn_res_device
 
 contains
 
+  !> Compute adjoint pressure residual (device backend).
+  !! @param p Adjoint pressure field.
+  !! @param p_res Pressure residual output.
+  !! @param u Adjoint velocity x-component.
+  !! @param v Adjoint velocity y-component.
+  !! @param w Adjoint velocity z-component.
+  !! @param u_e Extrapolated adjoint velocity x-component (unused).
+  !! @param v_e Extrapolated adjoint velocity y-component (unused).
+  !! @param w_e Extrapolated adjoint velocity z-component (unused).
+  !! @param f_x Explicit forcing x-component.
+  !! @param f_y Explicit forcing y-component.
+  !! @param f_z Explicit forcing z-component.
+  !! @param c_Xh Coefficients on the pressure space.
+  !! @param gs_Xh Gather-scatter operator on the pressure space.
+  !! @param bc_prs_surface Pressure boundary surface normals.
+  !! @param bc_sym_surface Symmetry boundary surface normals.
+  !! @param Ax Helmholtz operator.
+  !! @param bd BDF coefficient for the current step.
+  !! @param dt Time-step size.
+  !! @param mu Dynamic viscosity field (assumed constant).
+  !! @param rho Density field (assumed constant).
+  !! @param event Backend event handle for gather-scatter synchronization.
   subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, u_e, v_e, w_e, f_x, &
        f_y, f_z, c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, &
        rho, event)
@@ -100,6 +122,26 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine adjoint_pnpn_prs_res_device_compute
 
+  !> Compute adjoint velocity residual (device backend).
+  !! @param Ax Helmholtz operator.
+  !! @param u Adjoint velocity x-component.
+  !! @param v Adjoint velocity y-component.
+  !! @param w Adjoint velocity z-component.
+  !! @param u_res Residual for adjoint velocity x-component.
+  !! @param v_res Residual for adjoint velocity y-component.
+  !! @param w_res Residual for adjoint velocity z-component.
+  !! @param p Adjoint pressure field.
+  !! @param f_x Explicit forcing x-component.
+  !! @param f_y Explicit forcing y-component.
+  !! @param f_z Explicit forcing z-component.
+  !! @param c_Xh Coefficients on the velocity space.
+  !! @param msh Mesh object.
+  !! @param Xh Velocity space.
+  !! @param mu Dynamic viscosity field (assumed constant).
+  !! @param rho Density field (assumed constant).
+  !! @param bd BDF coefficient for the current step.
+  !! @param dt Time-step size.
+  !! @param n Number of degrees of freedom.
   subroutine adjoint_pnpn_vel_res_device_compute(Ax, u, v, w, u_res, v_res, w_res, &
        p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
     class(ax_t), intent(in) :: Ax

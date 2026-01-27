@@ -57,6 +57,28 @@ module adjoint_pnpn_residual
   end type adjoint_pnpn_vel_res_t
 
   abstract interface
+     !> Compute adjoint pressure residual.
+     !! @param p Adjoint pressure field.
+     !! @param p_res Pressure residual output.
+     !! @param u Adjoint velocity x-component.
+     !! @param v Adjoint velocity y-component.
+     !! @param w Adjoint velocity z-component.
+     !! @param u_e Extrapolated adjoint velocity x-component.
+     !! @param v_e Extrapolated adjoint velocity y-component.
+     !! @param w_e Extrapolated adjoint velocity z-component.
+     !! @param f_x Explicit forcing x-component.
+     !! @param f_y Explicit forcing y-component.
+     !! @param f_z Explicit forcing z-component.
+     !! @param c_xh Coefficients on the pressure space.
+     !! @param gs_Xh Gather-scatter operator on the pressure space.
+     !! @param bc_prs_surface Pressure boundary surface normals.
+     !! @param bc_sym_surface Symmetry boundary surface normals.
+     !! @param Ax Helmholtz operator.
+     !! @param bd BDF coefficient for the current step.
+     !! @param dt Time-step size.
+     !! @param mu Dynamic viscosity field.
+     !! @param rho Density field.
+     !! @param event Backend event handle (optional for device backends).
      subroutine adjoint_prs_res(p, p_res, u, v, w, u_e, v_e, w_e, f_x, f_y, f_z, c_xh,&
           gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, rho, event)
        import field_t
@@ -66,25 +88,51 @@ module adjoint_pnpn_residual
        import coef_t
        import rp
        import c_ptr
-       type(field_t), intent(inout) :: p, u, v, w
-       type(field_t), intent(in) :: u_e, v_e, w_e !< time-extrapolated velocity
-       type(field_t), intent(inout) :: p_res
-       !> Momentum source terms
-       type(field_t), intent(in) :: f_x, f_y, f_z
-       type(coef_t), intent(inout) :: c_Xh
-       type(gs_t), intent(inout) :: gs_Xh
-       type(facet_normal_t), intent(in) :: bc_prs_surface
-       type(facet_normal_t), intent(in) :: bc_sym_surface
-       class(Ax_t), intent(inout) :: Ax
-       real(kind=rp), intent(in) :: bd
-       real(kind=rp), intent(in) :: dt
-       type(field_t), intent(in) :: mu
-       type(field_t), intent(in) :: rho
-       type(c_ptr), intent(inout) :: event
+       type(field_t), intent(inout) :: p        !< Adjoint pressure field.
+       type(field_t), intent(inout) :: u        !< Adjoint velocity x-component.
+       type(field_t), intent(inout) :: v        !< Adjoint velocity y-component.
+       type(field_t), intent(inout) :: w        !< Adjoint velocity z-component.
+       type(field_t), intent(in) :: u_e         !< Extrapolated adjoint velocity x-component.
+       type(field_t), intent(in) :: v_e         !< Extrapolated adjoint velocity y-component.
+       type(field_t), intent(in) :: w_e         !< Extrapolated adjoint velocity z-component.
+       type(field_t), intent(inout) :: p_res    !< Pressure residual output.
+       type(field_t), intent(in) :: f_x         !< Explicit forcing x-component.
+       type(field_t), intent(in) :: f_y         !< Explicit forcing y-component.
+       type(field_t), intent(in) :: f_z         !< Explicit forcing z-component.
+       type(coef_t), intent(inout) :: c_Xh      !< Coefficients on the pressure space.
+       type(gs_t), intent(inout) :: gs_Xh       !< Gather-scatter operator on the pressure space.
+       type(facet_normal_t), intent(in) :: bc_prs_surface !< Pressure boundary surface normals.
+       type(facet_normal_t), intent(in) :: bc_sym_surface !< Symmetry boundary surface normals.
+       class(Ax_t), intent(inout) :: Ax         !< Helmholtz operator.
+       real(kind=rp), intent(in) :: bd          !< BDF coefficient for the current step.
+       real(kind=rp), intent(in) :: dt          !< Time-step size.
+       type(field_t), intent(in) :: mu          !< Dynamic viscosity field.
+       type(field_t), intent(in) :: rho         !< Density field.
+       type(c_ptr), intent(inout) :: event      !< Backend event handle.
      end subroutine adjoint_prs_res
   end interface
 
   abstract interface
+     !> Compute adjoint velocity residual.
+     !! @param Ax Helmholtz operator.
+     !! @param u Adjoint velocity x-component.
+     !! @param v Adjoint velocity y-component.
+     !! @param w Adjoint velocity z-component.
+     !! @param u_res Residual for adjoint velocity x-component.
+     !! @param v_res Residual for adjoint velocity y-component.
+     !! @param w_res Residual for adjoint velocity z-component.
+     !! @param p Adjoint pressure field.
+     !! @param f_x Explicit forcing x-component.
+     !! @param f_y Explicit forcing y-component.
+     !! @param f_z Explicit forcing z-component.
+     !! @param c_Xh Coefficients on the velocity space.
+     !! @param msh Mesh object.
+     !! @param Xh Velocity space.
+     !! @param mu Dynamic viscosity field.
+     !! @param rho Density field.
+     !! @param bd BDF coefficient for the current step.
+     !! @param dt Time-step size.
+     !! @param n Number of degrees of freedom.
      subroutine adjoint_vel_res(Ax, u, v, w, u_res, v_res, w_res, &
           p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
        import field_t
@@ -95,18 +143,25 @@ module adjoint_pnpn_residual
        import coef_t
        import mesh_t
        import rp
-       class(ax_t), intent(in) :: Ax
-       type(mesh_t), intent(inout) :: msh
-       type(space_t), intent(inout) :: Xh
-       type(field_t), intent(inout) :: p, u, v, w
-       type(field_t), intent(inout) :: u_res, v_res, w_res
-       type(field_t), intent(in) :: f_x, f_y, f_z
-       type(coef_t), intent(inout) :: c_Xh
-       type(field_t), intent(in) :: mu
-       type(field_t), intent(in) :: rho
-       real(kind=rp), intent(in) :: bd
-       real(kind=rp), intent(in) :: dt
-       integer, intent(in) :: n
+       class(ax_t), intent(in) :: Ax            !< Helmholtz operator.
+       type(mesh_t), intent(inout) :: msh       !< Mesh object.
+       type(space_t), intent(inout) :: Xh       !< Velocity space.
+       type(field_t), intent(inout) :: p        !< Adjoint pressure field.
+       type(field_t), intent(inout) :: u        !< Adjoint velocity x-component.
+       type(field_t), intent(inout) :: v        !< Adjoint velocity y-component.
+       type(field_t), intent(inout) :: w        !< Adjoint velocity z-component.
+       type(field_t), intent(inout) :: u_res    !< Residual for adjoint velocity x-component.
+       type(field_t), intent(inout) :: v_res    !< Residual for adjoint velocity y-component.
+       type(field_t), intent(inout) :: w_res    !< Residual for adjoint velocity z-component.
+       type(field_t), intent(in) :: f_x         !< Explicit forcing x-component.
+       type(field_t), intent(in) :: f_y         !< Explicit forcing y-component.
+       type(field_t), intent(in) :: f_z         !< Explicit forcing z-component.
+       type(coef_t), intent(inout) :: c_Xh      !< Coefficients on the velocity space.
+       type(field_t), intent(in) :: mu          !< Dynamic viscosity field.
+       type(field_t), intent(in) :: rho         !< Density field.
+       real(kind=rp), intent(in) :: bd          !< BDF coefficient for the current step.
+       real(kind=rp), intent(in) :: dt          !< Time-step size.
+       integer, intent(in) :: n                 !< Number of degrees of freedom.
      end subroutine adjoint_vel_res
 
   end interface

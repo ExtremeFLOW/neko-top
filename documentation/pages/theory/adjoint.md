@@ -195,32 +195,32 @@ for the objective,
 \f[
   F \approx \Delta t \sum_{n=1}^{N} f(\mathbf{u}^n), \qquad
   \mathrm{d}F = \Delta t \sum_{n=1}^{N}
-  \langle \nabla_{\mathbf{u}} f(\mathbf{u}^n), \delta \mathbf{u}^n \rangle.
+  \int_\Omega \nabla_{\mathbf{u}} f(\mathbf{u}^n)\cdot \delta \mathbf{u}^n \, \mathrm{d}\Omega.
 \f]
 
 We introduce an intermediate velocity \f$\mathbf{u}^\star\f$ and write the
 forward time step as three sub-problems:
 \f[
-  \left\langle \mathbf{v}^n, \frac{\mathbf{u}^{\star n}}{\Delta t} \right\rangle
+  \int_\Omega \mathbf{v}^n \cdot \frac{\mathbf{u}^{\star n}}{\Delta t} \, \mathrm{d}\Omega
   =
-  \left\langle \mathbf{v}^n,
+  \int_\Omega \mathbf{v}^n \cdot
   \frac{\mathbf{u}^{n-1}}{\Delta t}
   - \mathcal{C}(\mathbf{u}^{n-1})\,\mathbf{u}^{n-1}
-  - \mathcal{X}\,\mathbf{u}^{n-1} \right\rangle,
+  - \mathcal{X}\,\mathbf{u}^{n-1} \, \mathrm{d}\Omega,
 \f]
 \f[
-  \langle \nabla q^n, \nabla p^n \rangle
+  \int_\Omega \nabla q^n \cdot \nabla p^n \, \mathrm{d}\Omega
   =
-  \left\langle \nabla q^n,
+  \int_\Omega \nabla q^n \cdot
   \frac{\mathbf{u}^{\star n}}{\Delta t}
-  - \nabla \times (\nabla \times \mathbf{u}^{n-1}) \right\rangle,
+  - \nabla \times (\nabla \times \mathbf{u}^{n-1}) \, \mathrm{d}\Omega,
 \f]
 \f[
-  \left\langle \mathbf{w}^n,
-  \frac{\mathbf{u}^n}{\Delta t} + \mathcal{L}\mathbf{u}^n \right\rangle
+  \int_\Omega \mathbf{w}^n \cdot
+  \left( \frac{\mathbf{u}^n}{\Delta t} + \mathcal{L}\mathbf{u}^n \right) \, \mathrm{d}\Omega
   =
-  \left\langle \mathbf{w}^n,
-  \frac{\mathbf{u}^{\star n}}{\Delta t} - \nabla p^n \right\rangle.
+  \int_\Omega \mathbf{w}^n \cdot
+  \left( \frac{\mathbf{u}^{\star n}}{\Delta t} - \nabla p^n \right) \, \mathrm{d}\Omega.
 \f]
 Here \f$\mathcal{C}\f$ denotes the discrete convection operator and
 \f$\mathcal{X}\f$ denotes any explicit linear operator (e.g. Brinkman).
@@ -240,9 +240,9 @@ velocity associated with the implicit step,
 \f]
 Second, solve the adjoint pressure equation,
 \f[
-  \langle \nabla q^n, \nabla p^{\dagger n} \rangle
+  \int_\Omega \nabla q^n \cdot \nabla p^{\dagger n} \, \mathrm{d}\Omega
   =
-  \langle -\mathbf{w}^{\dagger n}, \nabla p^{\dagger n} \rangle.
+  \int_\Omega -\mathbf{w}^{\dagger n} \cdot \nabla p^{\dagger n} \, \mathrm{d}\Omega.
 \f]
 Finally, recover the adjoint velocity associated with the explicit step,
 \f[
@@ -254,8 +254,8 @@ With these adjoint variables, the discrete gradient contribution associated
 with an explicit linear operator \f$\mathcal{X}\f$ is
 \f[
   \mathrm{d}F(\mathcal{X},\delta \mathcal{X})
-  = -\sum_{n=1}^{N} \left\langle \delta \mathcal{X},
-  \mathbf{v}^{\dagger (n+1)} \mathbf{u}^n \right\rangle.
+  = -\sum_{n=1}^{N} \int_\Omega \delta \mathcal{X}\,
+  \mathbf{v}^{\dagger (n+1)} \mathbf{u}^n \, \mathrm{d}\Omega.
 \f]
 The order above matches the implementation: solve the implicit adjoint step,
 then the adjoint pressure correction, then form the projection to obtain the
