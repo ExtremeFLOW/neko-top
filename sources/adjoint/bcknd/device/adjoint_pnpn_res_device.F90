@@ -9,12 +9,12 @@ module adjoint_pnpn_res_device
   use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t
   use scratch_registry, only: neko_scratch_registry
   use mesh, only : mesh_t
-  use num_types, only : rp, c_rp
+  use num_types, only : rp
   use space, only : space_t
-  use device_math, only : device_cfill, device_col2
-  use utils, only : neko_error
+  use device_math, only : device_cfill, device_cmult, device_cmult2, device_col2, &
+       device_add2
   use device, only : device_event_sync
-  use, intrinsic :: iso_c_binding, only : c_ptr, c_int
+  use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
 
@@ -29,82 +29,6 @@ module adjoint_pnpn_res_device
   end type adjoint_pnpn_vel_res_device_t
 
 contains
-
-#ifdef HAVE_HIP
-  interface
-     subroutine adjoint_prs_res_part1_hip(ta1_d, ta2_d, ta3_d, &
-          f_u_d, f_v_d, f_w_d, B_d, inv_rho, n) &
-          bind(c, name = 'adjoint_prs_res_part1_hip')
-       use, intrinsic :: iso_c_binding
-       import c_rp
-       implicit none
-       type(c_ptr), value :: ta1_d, ta2_d, ta3_d
-       type(c_ptr), value :: f_u_d, f_v_d, f_w_d
-       type(c_ptr), value :: B_d
-       real(c_rp) :: inv_rho
-       integer(c_int) :: n
-     end subroutine adjoint_prs_res_part1_hip
-  end interface
-
-  interface
-     subroutine adjoint_prs_res_part2_hip(p_res_d, wa1_d, wa2_d, wa3_d, n) &
-          bind(c, name = 'adjoint_prs_res_part2_hip')
-       use, intrinsic :: iso_c_binding
-       implicit none
-       type(c_ptr), value :: p_res_d, wa1_d, wa2_d, wa3_d
-       integer(c_int) :: n
-     end subroutine adjoint_prs_res_part2_hip
-  end interface
-
-  interface
-     subroutine adjoint_vel_res_update_hip(u_res_d, v_res_d, w_res_d, &
-          f_u_d, f_v_d, f_w_d, n) &
-          bind(c, name = 'adjoint_vel_res_update_hip')
-       use, intrinsic :: iso_c_binding
-       implicit none
-       type(c_ptr), value :: u_res_d, v_res_d, w_res_d
-       type(c_ptr), value :: f_u_d, f_v_d, f_w_d
-       integer(c_int) :: n
-     end subroutine adjoint_vel_res_update_hip
-  end interface
-#elif HAVE_CUDA
-  interface
-     subroutine adjoint_prs_res_part1_cuda(ta1_d, ta2_d, ta3_d, &
-          f_u_d, f_v_d, f_w_d, B_d, inv_rho, n) &
-          bind(c, name = 'adjoint_prs_res_part1_cuda')
-       use, intrinsic :: iso_c_binding
-       import c_rp
-       implicit none
-       type(c_ptr), value :: ta1_d, ta2_d, ta3_d
-       type(c_ptr), value :: f_u_d, f_v_d, f_w_d
-       type(c_ptr), value :: B_d
-       real(c_rp) :: inv_rho
-       integer(c_int) :: n
-     end subroutine adjoint_prs_res_part1_cuda
-  end interface
-
-  interface
-     subroutine adjoint_prs_res_part2_cuda(p_res_d, wa1_d, wa2_d, wa3_d, n) &
-          bind(c, name = 'adjoint_prs_res_part2_cuda')
-       use, intrinsic :: iso_c_binding
-       implicit none
-       type(c_ptr), value :: p_res_d, wa1_d, wa2_d, wa3_d
-       integer(c_int) :: n
-     end subroutine adjoint_prs_res_part2_cuda
-  end interface
-
-  interface
-     subroutine adjoint_vel_res_update_cuda(u_res_d, v_res_d, w_res_d, &
-          f_u_d, f_v_d, f_w_d, n) &
-          bind(c, name = 'adjoint_vel_res_update_cuda')
-       use, intrinsic :: iso_c_binding
-       implicit none
-       type(c_ptr), value :: u_res_d, v_res_d, w_res_d
-       type(c_ptr), value :: f_u_d, f_v_d, f_w_d
-       integer(c_int) :: n
-     end subroutine adjoint_vel_res_update_cuda
-  end interface
-#endif
 
   subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, u_e, v_e, w_e, f_x, &
        f_y, f_z, c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, &
@@ -145,22 +69,16 @@ contains
     call device_cfill(c_Xh%h1_d, inv_rho, n)
     call device_cfill(c_Xh%h2_d, 0.0_rp, n)
 
-#ifdef HAVE_HIP
-    call adjoint_prs_res_part1_hip(ta1%x_d, ta2%x_d, ta3%x_d, &
-         f_x%x_d, f_y%x_d, f_z%x_d, c_Xh%B_d, inv_rho, n)
-#elif HAVE_CUDA
-    call adjoint_prs_res_part1_cuda(ta1%x_d, ta2%x_d, ta3%x_d, &
-         f_x%x_d, f_y%x_d, f_z%x_d, c_Xh%B_d, inv_rho, n)
-#elif HAVE_OPENCL
-    call neko_error('adjoint_prs_res_part1_opencl not implemented')
-#else
-    call neko_error('No device backend configured')
-#endif
+    call device_cmult2(ta1%x_d, f_x%x_d, inv_rho, n)
+    call device_cmult2(ta2%x_d, f_y%x_d, inv_rho, n)
+    call device_cmult2(ta3%x_d, f_z%x_d, inv_rho, n)
+
+    call device_col2(ta1%x_d, c_Xh%B_d, n)
+    call device_col2(ta2%x_d, c_Xh%B_d, n)
+    call device_col2(ta3%x_d, c_Xh%B_d, n)
 
     call gs_Xh%op(ta1, GS_OP_ADD, event)
-    call device_event_sync(event)
     call gs_Xh%op(ta2, GS_OP_ADD, event)
-    call device_event_sync(event)
     call gs_Xh%op(ta3, GS_OP_ADD, event)
     call device_event_sync(event)
 
@@ -174,15 +92,10 @@ contains
 
     call Ax%compute(p_res%x, p%x, c_Xh, p%msh, p%Xh)
 
-#ifdef HAVE_HIP
-    call adjoint_prs_res_part2_hip(p_res%x_d, wa1%x_d, wa2%x_d, wa3%x_d, n)
-#elif HAVE_CUDA
-    call adjoint_prs_res_part2_cuda(p_res%x_d, wa1%x_d, wa2%x_d, wa3%x_d, n)
-#elif HAVE_OPENCL
-    call neko_error('adjoint_prs_res_part2_opencl not implemented')
-#else
-    call neko_error('No device backend configured')
-#endif
+    call device_cmult(p_res%x_d, -1.0_rp, n)
+    call device_add2(p_res%x_d, wa1%x_d, n)
+    call device_add2(p_res%x_d, wa2%x_d, n)
+    call device_add2(p_res%x_d, wa3%x_d, n)
 
     call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine adjoint_pnpn_prs_res_device_compute
@@ -213,17 +126,14 @@ contains
 
     call Ax%compute_vector(u_res%x, v_res%x, w_res%x, u%x, v%x, w%x, c_Xh, msh, Xh)
 
-#ifdef HAVE_HIP
-    call adjoint_vel_res_update_hip(u_res%x_d, v_res%x_d, w_res%x_d, &
-         f_x%x_d, f_y%x_d, f_z%x_d, n)
-#elif HAVE_CUDA
-    call adjoint_vel_res_update_cuda(u_res%x_d, v_res%x_d, w_res%x_d, &
-         f_x%x_d, f_y%x_d, f_z%x_d, n)
-#elif HAVE_OPENCL
-    call neko_error('adjoint_vel_res_update_opencl not implemented')
-#else
-    call neko_error('No device backend configured')
-#endif
+    call device_cmult(u_res%x_d, -1.0_rp, n)
+    call device_add2(u_res%x_d, f_x%x_d, n)
+
+    call device_cmult(v_res%x_d, -1.0_rp, n)
+    call device_add2(v_res%x_d, f_y%x_d, n)
+
+    call device_cmult(w_res%x_d, -1.0_rp, n)
+    call device_add2(w_res%x_d, f_z%x_d, n)
   end subroutine adjoint_pnpn_vel_res_device_compute
 
 end module adjoint_pnpn_res_device
