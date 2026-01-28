@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200,
+            "Re": 200.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 1.0, 0.1, 0.0 ]
@@ -40,7 +40,7 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -70,7 +70,7 @@
                 }
             ],
             "norm_output_control": "tsteps",
-            "norm_output_value": 100,
+            "norm_output_value": 100.0,
             "norm_output_file": "adjoint_norm.csv"
         },
         "point_zones": [
@@ -135,8 +135,8 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
-                    "q": 3,
+                    "f_max": 100.0,
+                    "q": 3.0,
                     "convex_up": true
                 }
             ],
@@ -149,22 +149,22 @@
             "domain": {
                 "type": "point_zone",
                 "zone_name": "optimization_domain"
-            },
+            }
         },
         "solver": {
             "type": "mma",
             "max_iterations": 50,
             "tolerance": 1.0e-12,
             "mma": {
-                "asyinit": 0.05,
+                "asyinit": 0.02,
                 "asyincr": 1.02,
                 "asydecr": 0.98,
                 "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
-                "c": 10.0,
-                "d": 100.0
+                "c": 1000.0,
+                "d": 1.0
             }
         },
         "objectives": [
@@ -186,7 +186,7 @@
                 "limit": 0.1,
                 "is_max": false
             }
-        ],
-    },
+        ]
+    }
 
 }
