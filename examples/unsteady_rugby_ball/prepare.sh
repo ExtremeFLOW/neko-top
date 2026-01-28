@@ -66,7 +66,7 @@ fi
 z=$(python3 -c "print(1.0 / $N)")
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 $Lx 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
+/scratch/nobis/POSTDOC/MULTIPHASE/neko/bin/genmeshbox 0 $Lx 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #
