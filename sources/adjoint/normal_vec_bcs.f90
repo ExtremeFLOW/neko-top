@@ -76,6 +76,7 @@ module normal_vec_bcs
 contains
 
   !> Constructor.
+  !! @param[inout] this The boundary condition object.
   !! @param[in] coef The SEM coefficients.
   !! @param[inout] json The JSON object configuring the boundary condition.
   subroutine normal_vec_bcs_init(this, coef, json)
@@ -87,6 +88,7 @@ contains
   end subroutine normal_vec_bcs_init
 
   !> Constructor from components.
+  !! @param[inout] this The boundary condition object.
   !! @param[in] coef The SEM coefficients.
   subroutine normal_vec_bcs_init_from_components(this, coef)
     class(normal_vec_bcs_t), intent(inout), target :: this
@@ -95,7 +97,12 @@ contains
     call this%init_base(coef)
   end subroutine normal_vec_bcs_init_from_components
 
-  !> No-op scalar apply
+  !> No-op scalar apply.
+  !! @param[inout] this The boundary condition object.
+  !! @param[inout] x Scalar field values.
+  !! @param[in] n Number of scalar entries.
+  !! @param[in] time Time state (unused).
+  !! @param[in] strong Strong enforcement flag (unused).
   subroutine normal_vec_bcs_apply_scalar(this, x, n, time, strong)
     class(normal_vec_bcs_t), intent(inout) :: this
     integer, intent(in) :: n
@@ -104,7 +111,12 @@ contains
     logical, intent(in), optional :: strong
   end subroutine normal_vec_bcs_apply_scalar
 
-  !> No-op scalar apply on device
+  !> No-op scalar apply on device.
+  !! @param[inout] this The boundary condition object.
+  !! @param[inout] x_d Device pointer to scalar field values.
+  !! @param[in] time Time state (unused).
+  !! @param[in] strong Strong enforcement flag (unused).
+  !! @param[inout] strm Device stream handle.
   subroutine normal_vec_bcs_apply_scalar_dev(this, x_d, time, strong, strm)
     class(normal_vec_bcs_t), intent(inout), target :: this
     type(c_ptr),intent(inout) :: x_d
@@ -114,7 +126,14 @@ contains
 
   end subroutine normal_vec_bcs_apply_scalar_dev
 
-  !> No-op vector apply on device
+  !> No-op vector apply on device.
+  !! @param[inout] this The boundary condition object.
+  !! @param[inout] x_d Device pointer to x-component.
+  !! @param[inout] y_d Device pointer to y-component.
+  !! @param[inout] z_d Device pointer to z-component.
+  !! @param[in] time Time state (unused).
+  !! @param[in] strong Strong enforcement flag (unused).
+  !! @param[inout] strm Device stream handle.
   subroutine normal_vec_bcs_apply_vector_dev(this, x_d, y_d, z_d, time, &
        strong, strm)
     class(normal_vec_bcs_t), intent(inout), target :: this
@@ -127,7 +146,14 @@ contains
 
   end subroutine normal_vec_bcs_apply_vector_dev
 
-  !> No-op vector apply
+  !> No-op vector apply.
+  !! @param[inout] this The boundary condition object.
+  !! @param[inout] x Vector x-component.
+  !! @param[inout] y Vector y-component.
+  !! @param[inout] z Vector z-component.
+  !! @param[in] n Number of entries.
+  !! @param[in] time Time state (unused).
+  !! @param[in] strong Strong enforcement flag (unused).
   subroutine normal_vec_bcs_apply_vector(this, x, y, z, n, time, strong)
     class(normal_vec_bcs_t), intent(inout) :: this
     integer, intent(in) :: n
@@ -139,6 +165,13 @@ contains
   end subroutine normal_vec_bcs_apply_vector
 
   !> Apply the dot product of a vector field with facet normal.
+  !! @param[in] this The boundary condition object.
+  !! @param[inout] f Output array for the dot product.
+  !! @param[in] u Vector x-component.
+  !! @param[in] v Vector y-component.
+  !! @param[in] w Vector z-component.
+  !! @param[in] n Number of entries.
+  !! @param[in] time Time state (unused).
   subroutine normal_vec_bcs_apply_n_dot(this, f, u, v, w, n, time)
     class(normal_vec_bcs_t), intent(in) :: this
     integer, intent(in) :: n
@@ -161,7 +194,16 @@ contains
 
   end subroutine normal_vec_bcs_apply_n_dot
 
-  !> Apply n x u
+  !> Apply n x u.
+  !! @param[in] this The boundary condition object.
+  !! @param[inout] x Output x-component of n x u.
+  !! @param[inout] y Output y-component of n x u.
+  !! @param[inout] z Output z-component of n x u.
+  !! @param[in] u Vector x-component.
+  !! @param[in] v Vector y-component.
+  !! @param[in] w Vector z-component.
+  !! @param[in] n Number of entries.
+  !! @param[in] time Time state (unused).
   subroutine normal_vec_bcs_apply_n_cross(this, x, y, z, u, v, w, n, time)
     class(normal_vec_bcs_t), intent(in) :: this
     integer, intent(in) :: n
@@ -186,7 +228,8 @@ contains
 
   end subroutine normal_vec_bcs_apply_n_cross
 
-  !> Destructor
+  !> Destructor.
+  !! @param[inout] this The boundary condition object.
   subroutine normal_vec_bcs_free(this)
     class(normal_vec_bcs_t), target, intent(inout) :: this
 
@@ -205,7 +248,9 @@ contains
 
   end subroutine normal_vec_bcs_free
 
-  !> Finalize
+  !> Finalize.
+  !! @param[inout] this The boundary condition object.
+  !! @param[in] only_facets Enforce facet-only mask handling.
   subroutine normal_vec_bcs_finalize(this, only_facets)
     class(normal_vec_bcs_t), target, intent(inout) :: this
     logical, optional, intent(in) :: only_facets
