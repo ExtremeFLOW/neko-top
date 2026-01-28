@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 100,
+            "Re": 100.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -40,7 +40,7 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -110,7 +110,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
+                    "f_max": 100.0,
                 }
             ],
             "initial_distribution": {
