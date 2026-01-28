@@ -52,7 +52,7 @@ module simulation_POD_state_recover
   use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
 
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: DEVICE_TO_HOST, device_memcpy
+  use device, only: DEVICE_TO_HOST, device_memcpy, HOST_TO_DEVICE
   use utils, only: neko_error
   use vector, only: vector_t
   use field_math, only: field_add2s2, field_rzero
@@ -406,7 +406,7 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     type(time_state_t), intent(in) :: time
-    integer :: i, ierr, n_lines, nrows, ncols
+    integer :: i, ierr, n_lines, nrows, ncols, n
     integer(c_int) :: mode_cmd, phase_cmd
     type(time_state_t) :: time_out
 
@@ -441,6 +441,7 @@ contains
        end do
 
        ! Move modes back to GPU
+       n = this%u_modes(1)%dof%size()
        if (NEKO_BCKND_DEVICE .eq. 1) then
        do i = 1, this%n_modes
           call device_memcpy(this%u_modes(i)%x, this%u_modes(i)%x_d, n, &
