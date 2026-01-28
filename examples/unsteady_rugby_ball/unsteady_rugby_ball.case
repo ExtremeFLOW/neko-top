@@ -55,9 +55,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -77,18 +75,9 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "y_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "objective_domain",
@@ -132,8 +121,8 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
-                    "q": 3,
+                    "f_max": 100.0,
+                    "q": 3.0,
                     "convex_up": true
                 }
             ],
@@ -150,7 +139,7 @@
             "domain": {
                 "type": "point_zone",
                 "zone_name": "optimization_domain"
-            },
+            }
         },
         "solver": {
             "type": "mma",
@@ -187,7 +176,6 @@
                 "limit": 0.1,
                 "is_max": false
             }
-        ],
-    },
-
+        ]
+    }
 }

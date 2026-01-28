@@ -721,6 +721,8 @@ contains
 
              residual_small = [rey, rez, relambda, remu, rezeta, res]
              new_residual = sqrt(norm2(residual_small)**2 + re_sq_norm)
+             call MPI_Allreduce(MPI_IN_PLACE, new_residual, 1, &
+                  mpi_real_precision, MPI_MIN, neko_comm, ierr)
 
              steg = steg / 2.0_rp
           end do

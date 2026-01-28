@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": true,
         "time": {
-            "end_time": 1.0e-4,
-            "timestep": 1.0e-4
+            "end_time": 1e-3,
+            "timestep": 1e-4
         },
         "numerics": {
             "time_order": 3,
@@ -58,6 +58,14 @@
             ],
             "output_control": "never"
         },
+        "simulation_components": [
+            {
+                "type": "steady",
+                "tol": 1e-2,
+                "compute_control": "tsteps",
+                "compute_value": 1
+            }
+        ],
         "point_zones": [
             {
                 "name": "optimization_domain",
@@ -72,20 +80,23 @@
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
-            }
+            },
         ]
     },
     "optimization": {
-        "domain": {
-            "type": "point_zone",
-            "zone_name": "optimization_domain"
-        },
         "design": {
             "type": "brinkman",
+            "dealias": false,
             "mapping": [
                 {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
                     "type": "RAMP",
-                    "f_max": 1000.0
+                    "f_max": 100.0,
+                    "q": 3.0,
+                    "convex_up": true
                 }
             ],
             "initial_distribution": {
@@ -93,11 +104,15 @@
                 "base_value": 0.0,
                 "zone_value": 1.0,
                 "zone_name": "initial_ball"
+            },
+            "domain": {
+                "type": "point_zone",
+                "zone_name": "optimization_domain"
             }
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 0,
+            "max_iterations": 5,
             "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
@@ -111,10 +126,20 @@
                 "a0": 1.0,
                 "a": 0.0,
                 "c": 1000.0,
-                "d": 0.0
+                "d": 10.0
             }
         },
         "objectives": [
+            {
+                "type": "minimum_dissipation",
+                "weight": 1.0
+            },
+            {
+                "type": "lube_term",
+                "weight": 1.0,
+                "dealias_sensitivity": false,
+                "dealias_forcing": false
+            }
         ],
         "constraints": [
             {

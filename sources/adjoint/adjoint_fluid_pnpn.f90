@@ -84,6 +84,7 @@ module adjoint_fluid_pnpn
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
+  use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
   use blasius, only: blasius_t
@@ -452,7 +453,7 @@ contains
     this%chkp => chkp
     ! This is probably scheme specific
     ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
     this%chkp%abx1 => this%abx1
     this%chkp%abx2 => this%abx2
@@ -770,7 +771,11 @@ contains
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
-      if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p_res%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p_res%x, this%glb_n_points, n)
+      end if
 
       call gs_Xh%op(p_res, GS_OP_ADD, event)
       call device_event_sync(event)
@@ -802,7 +807,11 @@ contains
 
       ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
-      if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p%x, this%glb_n_points, n)
+      end if
 
       ! Compute velocity residual.
       call profiler_start_region('Adjoint_velocity_residual')

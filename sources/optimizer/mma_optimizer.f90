@@ -57,6 +57,9 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
+  use comm, only: pe_rank, NEKO_COMM
+  use mpi_f08, only: MPI_Barrier
+
   implicit none
   private
 
@@ -76,6 +79,7 @@ module mma_optimizer
      real(kind=rp), private :: scale = 1.0_rp
      real(kind=rp), private :: scaling_factor = 1.0_rp
      logical, private :: auto_scale = .false.
+     real(kind=rp) :: tolerance = 0.0_rp
 
      ! Set to flags to remove logging for optimal performance
      logical, private :: unconstrained_problem = .false.
@@ -96,6 +100,11 @@ module mma_optimizer
      procedure, pass(this) :: validate => mma_optimizer_validate
      procedure, pass(this) :: write => mma_optimizer_write
      procedure, pass(this) :: free => mma_optimizer_free
+
+     procedure, pass(this) :: save_checkpoint_components => &
+          mma_optimizer_save_checkpoint_components
+     procedure, pass(this) :: load_checkpoint_components => &
+          mma_optimizer_load_checkpoint_components
 
   end type mma_optimizer_t
 
@@ -186,6 +195,7 @@ contains
     !set the enable_output flag
     this%enable_output = enable_output
     this%scaling_factor = this%scale
+    this%tolerance = tolerance
 
     ! Initialize the logger
     if (this%enable_output) then
@@ -197,7 +207,7 @@ contains
        call this%csv_log%set_header(trim(header))
     end if
 
-    call this%init_base(max_iterations, tolerance, max_runtime)
+    call this%init_base('MMA', max_iterations, max_runtime)
 
     call neko_log%end_section()
 
@@ -458,6 +468,26 @@ contains
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
+
+  ! -------------------------------------------------------------------------- !
+  ! Checkpointing methods for the MMA optimizer
+
+  !> Save the MMA optimizer-specific checkpoint data
+  subroutine mma_optimizer_save_checkpoint_components(this, filename, overwrite)
+    class(mma_optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+    logical, intent(in), optional :: overwrite
+
+    call this%mma%save_checkpoint(filename, overwrite)
+  end subroutine mma_optimizer_save_checkpoint_components
+
+  !> Restore the MMA optimizer-specific checkpoint data
+  subroutine mma_optimizer_load_checkpoint_components(this, filename)
+    class(mma_optimizer_t), intent(inout) :: this
+    character(len=*), intent(in) :: filename
+
+    call this%mma%load_checkpoint(filename)
+  end subroutine mma_optimizer_load_checkpoint_components
 
 end module mma_optimizer
 

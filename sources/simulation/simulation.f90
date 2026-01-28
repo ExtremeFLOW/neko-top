@@ -36,8 +36,8 @@
 ! Here, we simply march forward to steady state solutions
 module simulation_m
   use case, only: case_t
-  use neko, only: neko_init, neko_finalize, neko_solve
-  use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
+  use neko, only: neko_solve
+  use adjoint_case, only: adjoint_case_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
@@ -54,7 +54,6 @@ module simulation_m
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
-  use registry, only: neko_registry
   use field_math, only: field_rzero, field_copy
   use checkpoint, only: chkp_t
   use file, only: file_t
@@ -74,6 +73,10 @@ module simulation_m
        simulation_restart
   use state_recover, only: state_recover_t
   use state_recover_factory, only: state_recover_create
+  use simulation_checkpoint, only: simulation_checkpoint_t
+  use runtime_stats, only: neko_rt_stats
+  use scratch_registry, only: neko_scratch_registry
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -139,10 +142,13 @@ contains
     integer :: i, n_scalars
     logical :: unsteady
 
-    ! initialize the primal
-    call neko_init(this%neko_case)
+    ! initialize the primal Neko objects
+    call this%neko_case%init(parameters)
+    call neko_rt_stats%init(parameters)
+    call neko_simcomps%init(this%neko_case)
+
     ! initialize the adjoint
-    call adjoint_init(this%adjoint_case, this%neko_case)
+    call this%adjoint_case%init(this%neko_case)
 
     ! Start the profiler
     call profiler_start
@@ -236,8 +242,28 @@ contains
        call this%state_recover%free()
        deallocate(this%state_recover)
     end if
-    call adjoint_free(this%adjoint_case)
-    call neko_finalize(this%neko_case)
+
+    ! Free the objects
+    call this%neko_case%free()
+    call this%adjoint_case%free()
+    call this%output_forward%free()
+    call this%output_adjoint%free()
+    call this%checkpoint%free()
+
+    ! Nullify pointers
+    nullify(this%fluid)
+    nullify(this%scalars)
+    nullify(this%adjoint_fluid)
+    nullify(this%adjoint_scalars)
+
+    ! Reset flags and counters
+    this%unsteady = .false.
+    this%have_scalar = .false.
+    this%n_timesteps = 0
+
+    ! Close global objects
+    call neko_simcomps%free()
+    call neko_rt_stats%free()
 
   end subroutine simulation_free
 

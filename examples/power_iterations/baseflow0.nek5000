@@ -1,3 +1,0 @@
-filetemplate: baseflow%01d.f%05d
-firsttimestep: 0
-numtimesteps: 1
