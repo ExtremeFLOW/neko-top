@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1,
+            "Re": 1.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -80,12 +80,12 @@
             "boundary_conditions": [
                 {
                     "type": "dirichlet",
-                    "value": 0,
+                    "value": 0.0,
                     "zone_indices": [ 1 ]
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2 ]
                 }
             ],
@@ -168,7 +168,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100
+                    "f_max": 100.0
                 }
             ],
             "initial_distribution": {
