@@ -36,14 +36,6 @@ function help() {
 export CURRENT_DIR=$(pwd)
 export MAIN_DIR=$(dirname $(realpath $0))
 export EXTERNAL_DIR="$MAIN_DIR/external"
-# optional, activate a conda environment
-# Ensure 'conda' is available
-if [ -f "/scratch/nobis/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "/scratch/nobis/miniconda3/etc/profile.d/conda.sh"
-else
-    eval "$(/scratch/nobis/miniconda3/bin/conda shell.bash hook)"
-fi
-conda activate /scratch/nobis/POSTDOC/PYSEMTOOLS/miniconda3/.conda/envs/pySEMTools
 
 # ============================================================================ #
 # Parse the options

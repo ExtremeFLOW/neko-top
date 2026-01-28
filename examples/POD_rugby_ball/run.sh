@@ -22,19 +22,6 @@ NEKO_RANKS=${NEKO_RANKS:-10}
 PY_RANKS=${PY_RANKS:-4}
 PY_STARTUP_DELAY=${PY_STARTUP_DELAY:-3}
 
-if [ -x ./prepare.sh ]; then
-    ./prepare.sh
-fi
-
-# conda
-if [ -f "/scratch/nobis/miniconda3/etc/profile.d/conda.sh" ]; then
-    . "/scratch/nobis/miniconda3/etc/profile.d/conda.sh"
-else
-    eval "$(/scratch/nobis/miniconda3/bin/conda shell.bash hook)"
-fi
-
-conda activate /scratch/nobis/POSTDOC/PYSEMTOOLS/miniconda3/.conda/envs/pySEMTools
-
 # Resolve ADIOS2_PATH
 if [ -z "${ADIOS2_PATH:-}" ]; then
     if [ -n "${ADIOS2_DIR:-}" ]; then
@@ -60,7 +47,7 @@ echo "PYTHONPATH (start):${PYTHONPATH:-<unset>}"
 echo "LD_LIBRARY_PATH:   ${LD_LIBRARY_PATH:-<unset>}"
 echo "---------------------------------------------------------"
 
-
+# mpirun -n "${PY_RANKS}" python3 "${PY_SCRIPT}" "${CASE_FILE}" > python.log : -n "${NEKO_RANKS}" ./neko "${CASE_FILE}" > neko.log
 
 # Start python first
 mpirun --tag-output -n "${PY_RANKS}" python3 "${PY_SCRIPT}" "${CASE_FILE}" > python.log 2>&1 &
