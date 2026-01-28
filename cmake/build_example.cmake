@@ -9,8 +9,6 @@
 #   - neko-user:   The user module is loaded and the neko driver is used.
 #   - topopt:      The default topopt driver is used.
 #   - topopt-user: The user module is loaded and the topopt driver is used.
-#   - insitu:      The insitu driver for pySEMTools streaming is used.
-#   - insitu-user: The insitu driver with user module is used.
 #   - custom:      The user provides a driver file in the current directory.
 #
 # The function also looks at the following variables:
@@ -47,12 +45,6 @@ function(build_example)
 
     elseif(${DRIVER_TYPE} STREQUAL "topopt-user")
         set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/topopt-user.f90)
-
-    elseif(${DRIVER_TYPE} STREQUAL "insitu")
-        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/insitu.f90)
-
-    elseif(${DRIVER_TYPE} STREQUAL "insitu-user")
-        set(DRIVER ${Neko-TOP_SOURCE_DIR}/sources/drivers/insitu-user.f90)
 
     elseif (${DRIVER_TYPE} STREQUAL "custom")
         if (NOT DEFINED DRIVER)
