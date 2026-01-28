@@ -766,13 +766,16 @@ contains
     ! This implementation is based on:                                         !
     ! https://doi.org/10.1007/s00158-012-0869-2                                !
     ! Definition of the Lagrangian function:                                   !
+    ! (Note that the equation is slightly different with d(i)=1 and a quadratic!
+    ! term for z. This is done to ensure that we have quadratic terms for both !
+    ! y and z.)                                                                !
     !                                                                          !
     !     L(x, y, z, λ) =                                                      !
     !       sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i * p_{ij}) / (u_j - x_j)!
     !                   + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) / (x_j - l_j) ]!
     !       - sum_{i=1}^{m} λ_i * b_i                                          !
-    !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ]          !
-    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z                              !
+    !       + sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ]                !
+    !       + (a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2                  !
     !                                                                          !
     ! Breakdown of terms:                                                      !
     !   - Terms related to x:  L_x (the first three lines of L(x, y, z, λ))    !
@@ -863,23 +866,14 @@ contains
          ! the initial value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
-         ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
-         ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-         do i=1, this%m
-            if (abs(d(i)) < NEKO_EPS) then
-               ! to avoid devision by zero in case d=0
-               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
-               ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
-            else
-               y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
-            end if
-         end do
+         ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
+         ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
+         y = max(0.0_rp, lambda - c)
 
          ! Comput the value of z that minimizes L_z for the current λ
-         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
-         ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
          ! ensure z>=0
-         z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
+         z = max(0.0_rp,dot_product(lambda, a) - a0)
 
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
@@ -964,20 +958,21 @@ contains
                  this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
             !---------------contributions of z terms to Hess-------------------!
-            ! There is no contibution to the Hess from z terms as z terms are
-            ! linear w.r.t λ
+            ! Only for inactive constraint, we consider contributions to Hess 
+            ! based on the cpp code by Niels.
+            if (dot_product(lambda, a) .gt. 0.0_rp) then
+               do i = 1, this%m
+                    do j = 1, this%m
+                    Hess(i, j) = Hess(i, j) - a(i) * a(j)
+                    end do
+               end do
+            end if
 
             !---------------contributions of y terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess.
-            ! Note that if d(i) = 0, the y terms (just like z terms) will not
-            ! contribute to the Hessian matrix.
             do i = 1, this%m
                if (y(i) .gt. 0.0_rp) then
-                  if (abs(d(i)) < NEKO_EPS) then
-                     ! Hess(i, i) = Hess(i, i) - 1.0_rp/1.0e-8_rp
-                  else
-                     Hess(i, i) = Hess(i, i) - 1.0_rp/d(i)
-                  end if
+                  Hess(i, i) = Hess(i, i) - 1.0_rp
                end if
                ! Based on eq(10), note the term (-\Omega \Lambda)
                Hess(i, i) = Hess(i, i) - mu(i) / lambda(i)
@@ -1025,24 +1020,16 @@ contains
             ! the updated values of λ
 
             ! Comput the value of y that minimizes L_y for the current λ
-            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
-            ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-            do i=1, this%m
-               if (abs(d(i)) < NEKO_EPS) then
-                  ! to avoid devision by zero in case d=0
-                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (1.0e-8_rp))
-                  ! y(i) = merge(0.0_rp, 1.0_rp, (lambda(i) - c(i)) >= 0.0_rp)
-               else
-                  y(i) = max(0.0_rp, (lambda(i) - c(i)) / (d(i)))
-               end if
-            end do
+            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
+            ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
+            y = max(0.0_rp, lambda - c)
+
 
             ! Comput the value of z that minimizes L_z for the current λ
-            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
-            ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
             ! ensure z>=0
-            z = merge(0.0_rp, 1.0_rp, a0 - dot_product(lambda, a) >= 0.0_rp)
-
+            z = max(0.0_rp,dot_product(lambda, a) - a0)
+          
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
             ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
