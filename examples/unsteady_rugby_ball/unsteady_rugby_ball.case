@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200,
+            "Re": 200.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 1.0, 0.1, 0.0 ]
@@ -127,14 +127,10 @@
                 }
             ],
             "initial_distribution": {
-                //"type": "point_zone",
-                //"base_value": 0.0,
-                //"zone_value": 1.0,
-                //"zone_name": "initial_ball"
-                "type": "field",
-                "file_name": "design0.f00050",
-                "interpolate": "true",
-                "mesh_file_name": "design0.f00000"
+                "type": "point_zone",
+                "base_value": 0.0,
+                "zone_value": 1.0,
+                "zone_name": "initial_ball"
             },
             "domain": {
                 "type": "point_zone",
@@ -146,7 +142,7 @@
             "max_iterations": 50,
             "tolerance": 1.0e-12,
             "mma": {
-                "asyinit": 0.05,
+                "asyinit": 0.02,
                 "asyincr": 1.02,
                 "asydecr": 0.98,
                 "scale": 1.0,
