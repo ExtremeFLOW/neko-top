@@ -19,11 +19,7 @@
             "Re": 100.0,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    1.0,
-                    0.0,
-                    0.0
-                ]
+                "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
