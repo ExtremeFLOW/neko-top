@@ -92,15 +92,25 @@ endif()
 include_directories(${MPI_Fortran_INCLUDE_DIRS})
 include_directories(${MPI_Fortran_MODULE_DIR})
 
+# Set the default external directory
+if (DEFINED ENV{EXTERNAL_DIR})
+    set(EXTERNAL_DIR $ENV{EXTERNAL_DIR})
+else()
+    set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
+endif()
+
 # ............................................................................ #
 # Setup of JSON-Fortran
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
-if (DEFINED ENV{JSON_FORTRAN_DIR})
+if (DEFINED ENV{JSON_FORTRAN_DIR} AND IS_ABSOLUTE $ENV{JSON_FORTRAN_DIR})
     set(JSON_FORTRAN_DIR $ENV{JSON_FORTRAN_DIR} CACHE STRING
         "Path to the JSON-Fortran installation")
+elseif(DEFINED ENV{JSON_FORTRAN_DIR})
+    set(JSON_FORTRAN_DIR ${EXTERNAL_DIR}/$ENV{JSON_FORTRAN_DIR}
+        CACHE STRING "Path to the JSON-Fortran installation")
 else()
-    set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+    set(JSON_FORTRAN_DIR ${EXTERNAL_DIR}/json-fortran
         CACHE STRING "Path to the JSON-Fortran installation")
 endif()
 
@@ -113,10 +123,14 @@ pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 # Setup of the Neko library
 
 # Set the proper paths for the NEKO_DIR
-if (DEFINED ENV{NEKO_DIR})
-    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
+if (DEFINED ENV{NEKO_DIR} AND IS_ABSOLUTE $ENV{NEKO_DIR})
+    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING
+        "Path to the Neko installation")
+elseif(DEFINED ENV{NEKO_DIR})
+    set(NEKO_DIR ${EXTERNAL_DIR}/$ENV{NEKO_DIR}
+        CACHE STRING "Path to the Neko installation")
 else()
-    set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
+    set(NEKO_DIR ${EXTERNAL_DIR}/neko
         CACHE STRING "Path to the Neko installation")
 endif()
 
@@ -129,17 +143,18 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 # ............................................................................ #
 # HDF5 Support
 
-if (DEFINED ENV{HDF5_DIR})
-    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING "Path to the HDF5 installation")
-else()
-    set(HDF5_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/hdf5
+if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
+    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
+        "Path to the HDF5 installation")
+elseif(DEFINED ENV{HDF5_DIR})
+    set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
         CACHE STRING "Path to the HDF5 installation")
 endif()
 
-set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+if (DEFINED HDF5_DIR)
+    set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
 
-pkg_check_modules(hdf5 QUIET IMPORTED_TARGET hdf5)
-if (hdf5_FOUND)
+    pkg_check_modules(hdf5 REQUIRED IMPORTED_TARGET hdf5)
     add_compile_definitions(HAVE_HDF5=1)
 endif()
 
@@ -218,7 +233,11 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
     message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
     message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
-    message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
+    if (hdf5_FOUND)
+        message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
+    else()
+        message(STATUS "- HDF5_DIR:         Not found (HDF5 support disabled)")
+    endif()
     message(STATUS ${BARRIER})
     message(STATUS "")
 

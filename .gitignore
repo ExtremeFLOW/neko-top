@@ -25,6 +25,7 @@ __pycache__/
 .venv
 *.swp
 test_report.log
+test_report.log.tmp*
 
 # Fortran-specific files
 !*.fprettify.rc
