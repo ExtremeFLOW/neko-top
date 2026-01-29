@@ -80,7 +80,7 @@ set +e # Continue execution even if individual tests fail
 
 if [ "$UNIT_TEST" == true ]; then
     ctest -L unit -C Debug -O test_report.log --test-dir $MAIN_DIR/build \
-        --output-on-failure -j ${NP:-1} --build-and-test --no-tests=ignore
+        --output-on-failure -j ${NP:-1} --no-tests=ignore
 
     if [ $? -ne 0 ]; then
         UNIT_SUCCESS=Failure
@@ -96,7 +96,7 @@ fi
 
 if [ "$REGRESSION_TEST" == true ]; then
     ctest -L regression -C Debug -O test_report.log --test-dir $MAIN_DIR/build \
-        --output-on-failure -j ${NP:-1} --build-and-test --no-tests=ignore
+        --output-on-failure -j ${NP:-1} --no-tests=ignore
 
     if [ $? -ne 0 ]; then
         REGRESSION_SUCCESS=Failure
