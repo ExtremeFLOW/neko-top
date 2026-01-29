@@ -80,7 +80,8 @@ jobs:
       - name: Report errors
         if: failure()
         run: |
-          echo "Errors encountered during script execution. Please check the logs for details."
+          echo "Errors encountered during script execution."
+          echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log"))
 
           for file in ${logs[@]}; do
