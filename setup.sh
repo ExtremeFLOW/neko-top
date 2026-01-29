@@ -128,12 +128,11 @@ printf "Compiling the example codes and Neko-TOP\n"
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 
-# Set CMAKE_VARIABLES to pass to the cmake command
-if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
-
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
+else
+    CMAKE_VARIABLES=()
 fi
 
 # Enable desired features
@@ -144,9 +143,8 @@ fi
 # Set the variables for the compilation
 [ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 
-if [ ! -d $MAIN_DIR/build ]; then
-    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
-fi
+# Run the cmake command to configure the build
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
@@ -160,8 +158,9 @@ printf "Neko installed to:\n"
 printf "\t$NEKO_DIR\n"
 printf "Supported features:\n"
 printf "\tMPI:           YES\n"
+printf "\tDevice:        $DEVICE_TYPE\n"
 printf "\tTests:         " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tExamples:      " && [[ "$EXAMPLES" == true ]] && printf "YES\n" || printf "NO\n"
 printf "\tDocumentation: " && [[ "$DOCS" == true ]] && printf "YES\n" || printf "NO\n"
-printf "\tDevice:        $DEVICE_TYPE\n"
+printf "\tHDF5:          " && [[ -d "$HDF5_DIR" ]] && printf "YES\n" || printf "NO\n"
 printf "=%.0s" {1..80} && printf "\n"

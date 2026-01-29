@@ -1,6 +1,14 @@
 # ============================================================================ #
 # CMakeLists.txt for the Neko-TOP library
 # ============================================================================ #
-# Extend the neko-top library with the MMA module
+# HDF5 support for Neko-TOP
+# All files in this directory are only compiled if HDF5 is found. Each of them
+# should be a submodule with implementations of HDF5 specific IO routines for
+# different Neko-TOP objects.
 
-add_subdirectory(hdf5)
+target_sources(neko-top
+    PRIVATE
+        $<$<BOOL:${hdf5_FOUND}>:${CMAKE_CURRENT_SOURCE_DIR}/hdf5/design_hdf5_io.f90>
+        $<$<BOOL:${hdf5_FOUND}>:${CMAKE_CURRENT_SOURCE_DIR}/hdf5/mma_hdf5_io.f90>
+        $<$<BOOL:${hdf5_FOUND}>:${CMAKE_CURRENT_SOURCE_DIR}/hdf5/optimizer_hdf5_io.f90>
+)
