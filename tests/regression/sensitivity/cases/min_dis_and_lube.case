@@ -17,9 +17,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -30,7 +28,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1,
+            "Re": 1.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -54,7 +52,7 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1, 2 ]
                 }
             ],
@@ -137,8 +135,8 @@
             },
             {
                 "type": "lube_term",
-                "weight": 1.0,
+                "weight": 1.0
             }
-        ],
+        ]
     }
 }
