@@ -117,7 +117,7 @@ program usrneko
   call fill_constraint_indices(stress_global_indices, num_constraints, &
        num_constraint_partitions, des%size_global())
 
-  stress_sigma_max = huge(1.0_rp) ! Same max stress for all
+  stress_sigma_max = 250e6_rp ! Same max stress for all
 
   select type(beamweight)
   type is (beamweight_obj)
