@@ -48,9 +48,7 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never",
-            //"output_control": "tsteps",
-            //"output_value": 50,
+            "output_control": "never"
         },
         "adjoint_fluid": {
             "initial_condition": {
@@ -66,10 +64,7 @@
                     "type": "outflow",
                     "zone_indices": [ 2 ]
                 }
-            ],
-            "norm_output_control": "tsteps",
-            "norm_output_value": 100.0,
-            "norm_output_file": "adjoint_norm.csv"
+            ]
         },
         "point_zones": [
             {
@@ -104,7 +99,7 @@
             },
         ]
     },
-    "unsteady" : true,
+    "unsteady": true,
     "checkpoints": {
         "enabled": true,
         "n_memory": 100
