@@ -4,7 +4,7 @@
 # Define the help function
 
 function help() {
-    echo -e "prepare.sh"
+    echo -e "run.sh"
     echo -e "  Generate a box mesh for the unsteady rugby ball example."
     echo -e "  Lx is the length of the domain in the x direction."
     echo -e "  N sets the base resolution: Nx = N*Lx, Ny = N, Nz = 1."
@@ -13,7 +13,7 @@ function help() {
     echo -e "  If no input arguments are provided, the default N is 10."
     echo -e ""
     echo -e "  Example usage:"
-    echo -e "    prepare.sh -N10 -L2"
+    echo -e "    run.sh -N10 -L2"
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help  Show this help message and exit."
