@@ -143,8 +143,8 @@
             "tolerance": 1.0e-12,
             "mma": {
                 "asyinit": 0.02,
-                "asyincr": 1.02,
-                "asydecr": 0.98,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
                 "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
