@@ -161,8 +161,12 @@ endif()
 # ............................................................................ #
 # Setup PFUnit
 
-if (DEFINED ENV{PFUNIT_DIR})
-    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING "Path to the pFUnit installation")
+if (DEFINED ENV{PFUNIT_DIR} AND IS_ABSOLUTE $ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING
+        "Path to the pFUnit installation")
+elseif(DEFINED ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR ${EXTERNAL_DIR}/$ENV{PFUNIT_DIR}
+        CACHE STRING "Path to the pFUnit installation")
 else()
     set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pfunit
         CACHE STRING "Path to the pFUnit installation")
@@ -224,10 +228,10 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "")
     message(STATUS "Current configuration:")
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-    message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
-    message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
-    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
-    message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
+    message(STATUS "- DEVICE_TYPE:      ${DEVICE_TYPE}")
+    message(STATUS "- BUILD_DOCS:       ${BUILD_DOCS}")
+    message(STATUS "- BUILD_TESTING:    ${BUILD_TESTING}")
+    message(STATUS "- BUILD_EXAMPLES:   ${BUILD_EXAMPLES}")
     message(STATUS "")
     message(STATUS "External dependencies:")
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")

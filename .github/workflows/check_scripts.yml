@@ -53,12 +53,23 @@ jobs:
       - name: Setup non-cache dependencies
         run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
+      - name: Setup python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: tests/**/requirements.txt
+
+      - name: Install python dependencies
+        run: |
+          pip install -r tests/regression/mma/requirements.txt
+
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
 
       - name: Setup Neko-TOP
-        run: ./setup.sh --examples
+        run: ./setup.sh --examples --test
 
       - name: Run TGV
         run: ./run.sh -nrc tgv
@@ -71,13 +82,19 @@ jobs:
 
           ./run.sh -rc rugby_ball
 
+      - name: Run short tests
+        run: ./tests/test.sh mma unit
+
       # ---------------------------------------------------------------------- #
       # Report errors if any step fails
       # ---------------------------------------------------------------------- #
-      - name: Report errors
+
+      - name: Report example errors
         if: failure()
         run: |
-          echo "Errors encountered during script execution. Please check the logs for details."
+          if [ ! -d logs/ ]; then return; fi
+          echo "Errors encountered during script execution."
+          echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log"))
 
           for file in ${logs[@]}; do
@@ -96,3 +113,5 @@ jobs:
           name: setup-script-logs
           path: logs/**/*.log
           overwrite: true
+          if-no-files-found: ignore
+
