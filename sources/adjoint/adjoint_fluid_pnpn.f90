@@ -696,7 +696,7 @@ contains
     type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, &
          work1, work2
     integer :: temp_indices(3)
-    integer :: big_temp_indices(8)
+    integer :: cc_indices(8)
     real(kind=rp) :: rho_val, mu_val
 
     if (this%freeze) return
@@ -768,15 +768,15 @@ contains
       call this%bc_apply_vel(time, strong = .true.)
       call this%bc_apply_prs(time)
 
-      ! Now we need the surface contribution of the curl curl BC. (explicit in p)
-      call neko_scratch_registry%request_field(dx_p_adj, big_temp_indices(1), .false.)
-      call neko_scratch_registry%request_field(dy_p_adj, big_temp_indices(2), .false.)
-      call neko_scratch_registry%request_field(dz_p_adj, big_temp_indices(3), .false.)
-      call neko_scratch_registry%request_field(nx1, big_temp_indices(4), .false.)
-      call neko_scratch_registry%request_field(nx2, big_temp_indices(5), .false.)
-      call neko_scratch_registry%request_field(nx3, big_temp_indices(6), .false.)
-      call neko_scratch_registry%request_field(work1, big_temp_indices(7), .false.)
-      call neko_scratch_registry%request_field(work2, big_temp_indices(8), .false.)
+      ! Now we need the surface contribution of the curl curl BC.(explicit in p)
+      call neko_scratch_registry%request_field(dx_p_adj, cc_indices(1), .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, cc_indices(2), .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, cc_indices(3), .false.)
+      call neko_scratch_registry%request_field(nx1, cc_indices(4), .false.)
+      call neko_scratch_registry%request_field(nx2, cc_indices(5), .false.)
+      call neko_scratch_registry%request_field(nx3, cc_indices(6), .false.)
+      call neko_scratch_registry%request_field(work1, cc_indices(7), .false.)
+      call neko_scratch_registry%request_field(work2, cc_indices(8), .false.)
 
       ! zero interior
       call field_rzero(nx1)
@@ -820,7 +820,7 @@ contains
       call field_add2s2(f_y, dy_p_adj, -mu_val / rho_val)
       call field_add2s2(f_z, dz_p_adj, -mu_val / rho_val)
 
-      call neko_scratch_registry%relinquish_field(big_temp_indices)
+      call neko_scratch_registry%relinquish_field(cc_indices)
 
       ! Update material properties if necessary
       call this%update_material_properties(time)
