@@ -883,7 +883,6 @@ contains
 
       call prs_res%compute(p, p_res, &
            u, v, w, &
-           u_e, v_e, w_e, &
            f_x, f_y, f_z, &
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface, &

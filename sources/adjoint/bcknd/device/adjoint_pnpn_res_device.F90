@@ -36,9 +36,6 @@ contains
   !! @param u Adjoint velocity x-component.
   !! @param v Adjoint velocity y-component.
   !! @param w Adjoint velocity z-component.
-  !! @param u_e Extrapolated adjoint velocity x-component (unused).
-  !! @param v_e Extrapolated adjoint velocity y-component (unused).
-  !! @param w_e Extrapolated adjoint velocity z-component (unused).
   !! @param f_x Explicit forcing x-component.
   !! @param f_y Explicit forcing y-component.
   !! @param f_z Explicit forcing z-component.
@@ -52,11 +49,9 @@ contains
   !! @param mu Dynamic viscosity field (assumed constant).
   !! @param rho Density field (assumed constant).
   !! @param event Backend event handle for gather-scatter synchronization.
-  subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, u_e, v_e, w_e, f_x, &
-       f_y, f_z, c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, &
-       rho, event)
+  subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, f_x, f_y, f_z, &
+       c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, rho, event)
     type(field_t), intent(inout) :: p, u, v, w
-    type(field_t), intent(in) :: u_e, v_e, w_e
     type(field_t), intent(inout) :: p_res
     type(field_t), intent(in) :: f_x, f_y, f_z
     type(coef_t), intent(inout) :: c_Xh

@@ -63,9 +63,6 @@ module adjoint_pnpn_residual
      !! @param u Adjoint velocity x-component.
      !! @param v Adjoint velocity y-component.
      !! @param w Adjoint velocity z-component.
-     !! @param u_e Extrapolated adjoint velocity x-component.
-     !! @param v_e Extrapolated adjoint velocity y-component.
-     !! @param w_e Extrapolated adjoint velocity z-component.
      !! @param f_x Explicit forcing x-component.
      !! @param f_y Explicit forcing y-component.
      !! @param f_z Explicit forcing z-component.
@@ -79,7 +76,7 @@ module adjoint_pnpn_residual
      !! @param mu Dynamic viscosity field.
      !! @param rho Density field.
      !! @param event Backend event handle (optional for device backends).
-     subroutine adjoint_prs_res(p, p_res, u, v, w, u_e, v_e, w_e, f_x, f_y, f_z, c_xh,&
+     subroutine adjoint_prs_res(p, p_res, u, v, w, f_x, f_y, f_z, c_xh,&
           gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, rho, event)
        import field_t
        import Ax_t
@@ -92,9 +89,6 @@ module adjoint_pnpn_residual
        type(field_t), intent(inout) :: u        !< Adjoint velocity x-component.
        type(field_t), intent(inout) :: v        !< Adjoint velocity y-component.
        type(field_t), intent(inout) :: w        !< Adjoint velocity z-component.
-       type(field_t), intent(in) :: u_e         !< Extrapolated adjoint velocity x-component.
-       type(field_t), intent(in) :: v_e         !< Extrapolated adjoint velocity y-component.
-       type(field_t), intent(in) :: w_e         !< Extrapolated adjoint velocity z-component.
        type(field_t), intent(inout) :: p_res    !< Pressure residual output.
        type(field_t), intent(in) :: f_x         !< Explicit forcing x-component.
        type(field_t), intent(in) :: f_y         !< Explicit forcing y-component.
