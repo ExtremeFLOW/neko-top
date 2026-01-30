@@ -103,7 +103,11 @@ jobs:
         with:
           python-version: "3.x"
           cache: "pip"
-          cache-dependency-path: "tests/**/requirements.txt"
+          cache-dependency-path: tests/**/requirements.txt
+
+      - name: Install python dependencies
+        run: |
+          pip install -r tests/regression/mma/requirements.txt
 
       - name: Run short tests
         run: ./tests/test.sh mma unit
