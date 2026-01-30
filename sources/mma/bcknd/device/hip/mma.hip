@@ -56,6 +56,21 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 
+void mma_update_hessian_z_hip(void* Hess, void* a, int* m) {
+    const int M = m;
+    const int total = M * M;
+
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((total + 1024 - 1) / 1024, 1, 1);
+    const hipStream_t stream = (hipStream_t)glb_cmd_queue;  // same as CUDA stream
+
+    hipLaunchKernelGGL(
+        mma_update_hessian_z_kernel<real>, nblcks, nthrds, 0, stream,
+             (real*)Hess, (real*)a, M);
+    HIP_CHECK(hipGetLastError());
+  }
+
+
 void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     hipsolverDnHandle_t handle;
     hipsolverStatus_t status;
@@ -114,7 +129,7 @@ void mma_prepare_aa_matrix_hip(void* AA, void* s, void* lambda,
     HIP_CHECK(hipGetLastError());
 }
 
-void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
+void mma_prepare_hessian_hip(void* Hess, void* y,
                                        void* mu, void* lambda, int m) {
     const int M = m;
     const dim3 nthrds(1024, 1, 1);
@@ -124,7 +139,7 @@ void mma_prepare_hessian_hip(void* Hess, void* y, void* d,
     // Update diagonal elements
     hipLaunchKernelGGL(mma_update_hessian_diagonal_kernel<real>,
                       nblcks, nthrds, 0, stream,
-                      (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
+                      (real*)Hess, (real*)y, (real*)mu, (real*)lambda, M);
     HIP_CHECK(hipGetLastError());
 
     // Synchronize to ensure diagonal updates are complete

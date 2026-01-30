@@ -46,7 +46,7 @@ submodule (mma) mma_device
        device_dy, device_dxsi, device_deta, device_kkt_rex, &
        device_mma_gensub2, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_solve_linear_system, &
-       device_prepare_hessian, device_prepare_aa_matrix
+       device_prepare_hessian, device_prepare_aa_matrix, device_update_hessian_z
 
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_DEVICE_MPI
   use device, only: DEVICE_TO_HOST
@@ -816,9 +816,6 @@ contains
     call device_cfill(mu%x_d, 1.0_rp, this%m)
     z = 0.0_rp
 
-    ! dd is defined as this%d + 1.0e-8_rp, to avoid devision by 0 in computing y
-    call device_cadd2(dd%x_d, this%d%x_d, 1.0e-8_rp, this%m)
-
     ! ------------------------------------------------------------------------ !
     ! Computing the minimal epsilon and choose the most conservative one
 
@@ -843,20 +840,17 @@ contains
          ! the initial value of λ
 
          ! Comput the value of y that minimizes L_y for the current λ
-         ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
-         ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
+         ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
+         ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
          call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-         ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
-         call device_invcol2(y%x_d, dd%x_d, this%m)
          call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
          ! Comput the value of z that minimizes L_z for the current λ
-         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
-         ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+         ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
          ! ensure z>=0
          call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
          z = device_glsum(dummy_m%x_d, this%m)
-         z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
+         z = max(0.0_rp, z - a0)
 
          ! Comput the value of x that minimizes L_x for the current λ
          ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
@@ -933,15 +927,16 @@ contains
                  sync = .true.)
             call MPI_Allreduce(MPI_IN_PLACE, Hess%x, &
                  this%m*this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
-            ! No need to upload to device since we solve LSE on CPU
-            ! But now we solve LSE on GPU, so upload it:
             call device_memcpy(Hess%x, Hess%x_d, this%m*this%m, &
                  HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
-            ! There is no contibution to the Hess from z terms as z terms are
-            ! linear w.r.t λ
-
+            ! Only for inactive constraint, we consider contributions to Hess 
+            ! based on the cpp code by Niels.
+            call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
+            if (device_glsum(dummy_m%x_d, this%m) .gt. 0.0_rp) then
+               call device_update_hessian_z(Hess%x_d, a%x_d, this%m)
+            end if
 
             !---------------contributions of y terms to Hess-------------------!
             ! Only for inactive constraint, we consider contributions to Hess.
@@ -951,8 +946,8 @@ contains
             ! cuda kernel for this part
             ! Also, improve the robustness by stablizing the Hess using
             ! Levenberg-Marquardt algorithm (heuristically)
-            call device_prepare_hessian(Hess%x_d, y%x_d, this%d%x_d, &
-                 mu%x_d, lambda%x_d, this%m)
+            call device_prepare_hessian(Hess%x_d, y%x_d, mu%x_d, lambda%x_d, &
+                 this%m)
 
             ! Device solve for the linear system
             call device_solve_linear_system(Hess%x_d, gradlambda%x_d, &
@@ -986,21 +981,17 @@ contains
             ! the updated values of λ
 
             ! Comput the value of y that minimizes L_y for the current λ
-            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * d_i * y_i^2 ])
-            ! dL_y/dy =0   => y= (λ_i - c_i)/d_i, ensure y>=0
-
+            ! minimize (sum_{i=1}^{m} [ (c_i - λ_i) * y_i + 0.5 * y_i^2 ])
+            ! dL_y/dy =0   => y= (λ_i - c_i), ensure y>=0
             call device_sub3(y%x_d, lambda%x_d, c%x_d, this%m)
-            ! division by dd to avoid devision by 0 (in case this%d%x_d = 0)
-            call device_invcol2(y%x_d, dd%x_d, this%m)
             call device_pwmax2(y%x_d, zerom%x_d, this%m)
 
             ! Comput the value of z that minimizes L_z for the current λ
-            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z)
-            ! if (a_0-dot_product(lambda, a)>=0) z=0 else z= 1.0
+            ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
             ! ensure z>=0
             call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
             z = device_glsum(dummy_m%x_d, this%m)
-            z = merge(0.0_rp, 1.0_rp, a0 - z >= 0.0)
+            z = max(0.0_rp, z - a0)
 
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
