@@ -53,6 +53,17 @@ jobs:
       - name: Setup non-cache dependencies
         run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
+      - name: Setup python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: tests/**/requirements.txt
+
+      - name: Install python dependencies
+        run: |
+          pip install -r tests/regression/mma/requirements.txt
+
       # ---------------------------------------------------------------------- #
       # Build and test the code
       # ---------------------------------------------------------------------- #
@@ -71,12 +82,16 @@ jobs:
 
           ./run.sh -rc rugby_ball
 
+      - name: Run short tests
+        run: ./tests/test.sh mma unit
+
       # ---------------------------------------------------------------------- #
       # Report errors if any step fails
       # ---------------------------------------------------------------------- #
-      - name: Report errors
+      - name: Report example errors
         if: failure()
         run: |
+          if [ ! -d logs/ ]; then return; fi
           echo "Errors encountered during script execution."
           echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log"))
@@ -97,17 +112,5 @@ jobs:
           name: setup-script-logs
           path: logs/**/*.log
           overwrite: true
+          if-no-files-found: ignore
 
-      - name: Setup python environment
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
-          cache: "pip"
-          cache-dependency-path: tests/**/requirements.txt
-
-      - name: Install python dependencies
-        run: |
-          pip install -r tests/regression/mma/requirements.txt
-
-      - name: Run short tests
-        run: ./tests/test.sh mma unit
