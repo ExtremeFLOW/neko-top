@@ -153,9 +153,9 @@ module adjoint_pnpn_residual
        type(coef_t), intent(inout) :: c_Xh !< Coefficients on the velocity space.
        type(field_t), intent(in) :: mu !< Dynamic viscosity field.
        type(field_t), intent(in) :: rho !< Density field.
-       real(kind=rp), intent(in) :: bd          !< BDF coefficient for the current step.
-       real(kind=rp), intent(in) :: dt          !< Time-step size.
-       integer, intent(in) :: n                 !< Number of degrees of freedom.
+       real(kind=rp), intent(in) :: bd !< BDF coefficient for the current step.
+       real(kind=rp), intent(in) :: dt !< Time-step size.
+       integer, intent(in) :: n !< Number of degrees of freedom.
      end subroutine adjoint_vel_res
 
   end interface

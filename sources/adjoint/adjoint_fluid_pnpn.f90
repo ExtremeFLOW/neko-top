@@ -873,7 +873,6 @@ contains
       end if
       call profiler_end_region("Adjoint_velocity_solve")
 
-      ! Compute pressure residual.
       !------------------------------------------------------------------------!
       ! now the RHS of our pressure eqn is the new adjoint velocity
       ! be careful with the order of the gsops here, we will handle this in the
