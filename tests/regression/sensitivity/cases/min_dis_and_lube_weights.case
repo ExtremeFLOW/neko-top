@@ -17,9 +17,7 @@
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -137,7 +135,7 @@
             },
             {
                 "type": "lube_term",
-                "weight": 2.0,
+                "weight": 2.0
             }
         ]
     }

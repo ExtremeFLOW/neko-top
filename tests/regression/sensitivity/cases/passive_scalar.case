@@ -70,7 +70,7 @@
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2 ]
                 }
             ]
@@ -130,18 +130,9 @@
             {
                 "name": "objective_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.8,
-                    1.0
-                ],
-                "y_bounds": [
-                    -1.0,
-                    3.0
-                ],
-                "z_bounds": [
-                    -1.0,
-                    3.0
-                ]
+                "x_bounds": [ 0.8, 1.0 ],
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "initial_ball",
@@ -196,7 +187,6 @@
                 "phi_ref": 0.5,
                 "weight": 1.0
             }
-        ],
-        "constraints": [ ]
+        ]
     }
 }
