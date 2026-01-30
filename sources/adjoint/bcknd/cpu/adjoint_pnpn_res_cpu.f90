@@ -62,12 +62,11 @@ contains
     type(field_t), intent(in) :: mu
     type(field_t), intent(in) :: rho
     type(c_ptr), intent(inout) :: event
-    real(kind=rp) :: dtbd, rho_val, mu_val
+    real(kind=rp) :: rho_val, mu_val
     integer :: n
     integer :: i
-    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3, work1, work2
+    type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3
     integer :: temp_indices(6)
-    real(kind=rp) :: fld_norm
 
     call neko_scratch_registry%request_field(ta1, temp_indices(1), .false.)
     call neko_scratch_registry%request_field(ta2, temp_indices(2), .false.)
