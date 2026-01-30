@@ -10,3 +10,4 @@
 !**/CMakeLists.txt
 !**/reference_data
 !**/reference_data/*
+!**/requirements.txt
