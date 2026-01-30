@@ -24,7 +24,8 @@ function help() {
 }
 
 # Handle options
-N=20
+N=10
+Lx=2
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -39,7 +40,9 @@ for arg in "$@"; do
         esac
     fi
 done
-Nx=$N && Ny=$N && Nz=1
+Nx=$((N*Lx))
+Ny=$N
+Nz=1
 
 # ============================================================================ #
 # Ensure Neko can be found and set default mesh size
@@ -63,7 +66,7 @@ fi
 z=$(python3 -c "print(1.0 / $N)")
 
 echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 1 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
+/scratch/nobis/POSTDOC/MULTIPHASE/neko/bin/genmeshbox 0 $Lx 0 1 0 $z $Nx $Ny $Nz .false. .true. .true.
 
 # End of file
 # ============================================================================ #
