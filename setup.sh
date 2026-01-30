@@ -6,12 +6,12 @@ function help() {
     echo -e "Usage: $0 [options]"
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
-    echo -e "\t-t, --test        Run the tests after the installation"
+    echo -e "\t-t, --tests       Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
     echo -e "\t-e, --examples    Build the examples"
-    echo -e "\t    --doc         Build the documentation"
+    echo -e "\t    --docs        Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -49,7 +49,7 @@ DOCS=OFF
 EXAMPLES=OFF
 
 # List possible options
-OPTIONS=help,test,clean,clean-neko,quiet,device:,docs,examples
+OPTIONS=help,tests,clean,clean-neko,quiet,device:,docs,examples
 OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
@@ -60,11 +60,12 @@ eval set -- "$PARSED"
 while true; do
     case "$1" in
     "-h" | "--help") help && exit ;;                  # Print help
-    "-t" | "--test") TEST="ON" && shift ;;            # Build the tests
+    "-t" | "--tests") TEST="ON" && shift ;;            # Build the tests
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
     "-e" | "--examples") EXAMPLES="ON" && shift ;;    # Build the examples
+
     # Purely long settings
     "--docs") DOCS="ON" && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
@@ -138,9 +139,6 @@ fi
 CMAKE_VARIABLES+=("-DBUILD_DOCS=$DOCS")
 CMAKE_VARIABLES+=("-DBUILD_TESTING=$TEST")
 CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=$EXAMPLES")
-
-# Set the variables for the compilation
-[ "$TEST" == "ON" ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
 
 # Run the cmake command to configure the build
 cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
