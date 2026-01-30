@@ -180,8 +180,7 @@ contains
     real(kind=rp), intent(inout), dimension(n) :: v
     real(kind=rp), intent(inout), dimension(n) :: w
     type(time_state_t), intent(in), optional :: time
-    integer :: i, m, k, idx(4), facet
-    real(kind=rp) :: normal(3), area
+    integer :: i, m, k
 
     m = this%unique_mask(0)
 
@@ -214,8 +213,7 @@ contains
     real(kind=rp), intent(inout), dimension(n) :: v
     real(kind=rp), intent(inout), dimension(n) :: w
     type(time_state_t), intent(in), optional :: time
-    integer :: i, m, k, idx(4), facet
-    real(kind=rp) :: normal(3), area
+    integer :: i, m, k
 
     m = this%unique_mask(0)
 
@@ -254,7 +252,6 @@ contains
   subroutine normal_vec_bcs_finalize(this, only_facets)
     class(normal_vec_bcs_t), target, intent(inout) :: this
     logical, optional, intent(in) :: only_facets
-    logical :: only_facets_
     type(htable_i4_t) :: unique_point_idx
     integer :: htable_data, rcode, i, j, idx(4), facet
     real(kind=rp) :: area, normal(3)
