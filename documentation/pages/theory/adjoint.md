@@ -190,7 +190,7 @@ being solved.
 
 ## Time integration
 This section summarizes the discrete adjoint for the pressure-correction
-time integration used in `neko-top`. We start from a right-handed Riemann sum
+time integration used in `Neko-TOP`. We start from a right-handed Riemann sum
 for the objective,
 \f[
   F \approx \Delta t \sum_{n=1}^{N} f(\mathbf{u}_n), \qquad
@@ -198,7 +198,10 @@ for the objective,
   \int_\Omega \nabla_{\mathbf{u}_n} f(\mathbf{u}_n)\cdot \delta \mathbf{u}_n \, \mathrm{d}\Omega.
 \f]
 
-We introduce an intermediate velocity \f$\mathbf{u}_n^{\star}\f$ and write the
+The velocity-pressure splitting currently implemented `Neko` follows that of
+[Karniadakis et al. 1991](https://doi.org/10.1016/0021-9991(91)90007-8) and is commonly
+referred to as the  \f$ \mathbb{P}_N-\mathbb{P}_N\f$ formulation, whereby
+we introduce an intermediate velocity \f$\mathbf{u}_n^{\star}\f$ and write the
 forward time step as three sub-problems:
 \f[
   \int_\Omega \mathbf{v}_n \cdot \frac{\mathbf{u}_n^{\star}}{\Delta t} \, \mathrm{d}\Omega
