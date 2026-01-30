@@ -320,18 +320,18 @@ contains
 
        ! w
        if (this%gdim .eq. 3) then
-       call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
-       call field_col3(accumulate, chi_GL, fld_GL)
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call device_invcol2(work%x_d, this%coef%B_d, work%size())
-       else
-          call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
-          call invcol2(work%x, this%coef%B, work%size())
-       end if
-       call field_add2(fw, work)
+          call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call field_col3(accumulate, chi_GL, fld_GL)
+          if (NEKO_BCKND_DEVICE .eq. 1) then
+             call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+             call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+             call device_invcol2(work%x_d, this%coef%B_d, work%size())
+          else
+             call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+             call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+             call invcol2(work%x, this%coef%B, work%size())
+          end if
+          call field_add2(fw, work)
        end if
 
        call this%scratch_GL%relinquish_field(temp_indices_GL)
@@ -341,7 +341,7 @@ contains
        call field_addcol3(fu, this%u, work)
        call field_addcol3(fv, this%v, work)
        if (this%gdim .eq. 3) then
-       call field_addcol3(fw, this%w, work)
+          call field_addcol3(fw, this%w, work)
        end if
 
     end if

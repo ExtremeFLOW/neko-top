@@ -947,7 +947,7 @@ contains
       !------------------------------------------------------------------------!
       ! correct the velocity with the pressure
       call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1), &
-          .false.)
+           .false.)
       call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2), &
            .false.)
       call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3), &
