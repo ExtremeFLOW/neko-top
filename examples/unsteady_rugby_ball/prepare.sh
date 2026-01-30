@@ -4,7 +4,7 @@
 # Define the help function
 
 function help() {
-    echo -e "run.sh"
+    echo -e "run.sh case"
     echo -e "  Generate a box mesh for the unsteady rugby ball example."
     echo -e "  Lx is the length of the domain in the x direction."
     echo -e "  N sets the base resolution: Nx = N*Lx, Ny = N, Nz = 1."
