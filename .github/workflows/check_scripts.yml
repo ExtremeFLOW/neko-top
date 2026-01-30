@@ -71,9 +71,6 @@ jobs:
 
           ./run.sh -rc rugby_ball
 
-      - name: Run short tests
-        run: ./tests/test.sh mma unit
-
       # ---------------------------------------------------------------------- #
       # Report errors if any step fails
       # ---------------------------------------------------------------------- #
@@ -100,3 +97,13 @@ jobs:
           name: setup-script-logs
           path: logs/**/*.log
           overwrite: true
+
+      - name: Setup python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+          cache: "pip"
+          cache-dependency-path: "tests/**/requirements.txt"
+
+      - name: Run short tests
+        run: ./tests/test.sh mma unit
