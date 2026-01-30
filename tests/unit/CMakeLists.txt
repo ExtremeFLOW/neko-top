@@ -40,8 +40,8 @@ add_dependencies(Tests Unit)
 
 # Add the more complex tests that require additional setup or dependencies.
 add_subdirectory(sensitivity)
-#add_subdirectory(checkpointing)
-#add_subdirectory(optimizer)
+add_subdirectory(checkpointing)
+add_subdirectory(optimizer)
 
 # ============================================================================ #
 # Add the listed tests to the CMake project.

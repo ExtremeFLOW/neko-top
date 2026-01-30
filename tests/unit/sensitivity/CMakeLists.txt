@@ -100,7 +100,7 @@ foreach(case_file ${test_list})
             DEPENDS "problem_tester_sensitivity_bin;sensitivity_test_prepare"
             LABELS "sensitivity;unit"
             ENVIRONMENT "NEKO_LOG_FILE=neko.log"
-            TIMEOUT 3000
+            TIMEOUT 300
     )
 endforeach()
 
