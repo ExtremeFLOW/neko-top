@@ -292,7 +292,7 @@ contains
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
     if (this%gdim .eq. 3) then
-    call field_addcol3(work, this%w, this%w)
+       call field_addcol3(work, this%w, this%w)
     end if
     call field_col2(work, this%brinkman_amplitude)
 
@@ -348,8 +348,8 @@ contains
        call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, fld_GL)
        if (this%gdim .eq. 3) then
-       call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
-       call field_addcol3(accumulate, fld_GL, fld_GL)
+          call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call field_addcol3(accumulate, fld_GL, fld_GL)
        end if
        ! scale
        call field_cmult(accumulate, this%weight * 0.5_rp / this%volume)
@@ -371,7 +371,7 @@ contains
        call field_col3(work, this%u, this%u)
        call field_addcol3(work, this%v, this%v)
        if (this%gdim .eq. 3) then
-       call field_addcol3(work, this%w, this%w)
+          call field_addcol3(work, this%w, this%w)
        end if
        ! scale
        call field_cmult(work, this%weight * 0.5_rp / this%volume)
