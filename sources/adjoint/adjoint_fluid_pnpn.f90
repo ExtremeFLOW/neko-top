@@ -41,8 +41,9 @@ module adjoint_fluid_pnpn
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
-  use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t, &
-       adjoint_pnpn_prs_res_factory, adjoint_pnpn_vel_res_factory
+  use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
+       adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
+       adjoint_pnpn_vel_res_factory
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
@@ -692,7 +693,8 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
-    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, &
+         work1, work2
     integer :: temp_indices(3)
     integer :: big_temp_indices(8)
     real(kind=rp) :: rho_val, mu_val
@@ -811,7 +813,7 @@ contains
          call col2(dy_p_adj%x, c_Xh%mult, dx_p_adj%size())
          call col2(dz_p_adj%x, c_Xh%mult, dx_p_adj%size())
       end if
-      
+
       rho_val = rho%x(1,1,1,1)
       mu_val = mu%x(1,1,1,1)
       call field_add2s2(f_x, dx_p_adj, -mu_val / rho_val)
@@ -857,7 +859,7 @@ contains
            u_res%x, v_res%x, w_res%x, n, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
            this%ksp_vel%max_iter)
-      
+
       call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
            dt_controller)
@@ -944,9 +946,12 @@ contains
 
       !------------------------------------------------------------------------!
       ! correct the velocity with the pressure
-      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1), .false.)
-      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2), .false.)
-      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3), .false.)
+      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1), &
+          .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2), &
+           .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3), &
+           .false.)
 
       ! gradient of adjoint pressure (explicit)
       call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
@@ -973,9 +978,11 @@ contains
       end if
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, dy_p_adj%x_d, dz_p_adj%x_d, -1.0_rp, n, msh%gdim)
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, &
+              dy_p_adj%x_d, dz_p_adj%x_d, -1.0_rp, n, msh%gdim)
       else
-         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, -1.0_rp, n, msh%gdim)
+         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, &
+              -1.0_rp, n, msh%gdim)
       end if
 
       call neko_scratch_registry%relinquish_field(temp_indices)
