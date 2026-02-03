@@ -1,6 +1,5 @@
 #!/bin/bash
-set -e
-
+set -e # Exit with non-zero exit code if anything fails
 # ============================================================================ #
 # Define the help function
 
@@ -46,15 +45,18 @@ if [ $# -eq 0 ] && [ "$ALL" == false ]; then help; fi
 UNIT_TEST=false
 SENSITIVITY_TEST=false
 MMA_TEST=false
+REGRESSION_TEST=false
 
 if [ "$ALL" == true ]; then
     UNIT_TEST=true
     SENSITIVITY_TEST=true
     MMA_TEST=true
+    REGRESSION_TEST=true
 else
     for arg in "$@"; do
         case "$arg" in
             unit) UNIT_TEST=true ;;
+            regression) REGRESSION_TEST=true ;;
             sensitivity) SENSITIVITY_TEST=true ;;
             mma) MMA_TEST=true ;;
             *) echo "Invalid argument: $arg" && help ;;
@@ -67,20 +69,42 @@ fi
 
 MAIN_DIR=$(realpath $(dirname $0)/../)
 
-EXTERNAL_DIR="$MAIN_DIR/external"
+[ -f "$MAIN_DIR/prepare.env" ] && source "$MAIN_DIR/prepare.env"
+[ -z "$EXTERNAL_DIR" ] && export EXTERNAL_DIR="$MAIN_DIR/external"
 source "$MAIN_DIR/scripts/dependencies.sh"
 find_neko
 
+set +e # Continue execution even if individual tests fail
 # ============================================================================ #
 # Run the unit tests
 
 if [ "$UNIT_TEST" == true ]; then
-    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
+    ctest -L unit -C Debug -O test_report.log --test-dir $MAIN_DIR/build \
+        --output-on-failure -j ${NP:-1} --no-tests=ignore
 
     if [ $? -ne 0 ]; then
-        echo "Unit tests failed."
-        exit 1
+        UNIT_SUCCESS=Failure
+    else
+        UNIT_SUCCESS=Success
     fi
+else
+    UNIT_SUCCESS=Skipped
+fi
+
+# ============================================================================ #
+# Run the regression tests
+
+if [ "$REGRESSION_TEST" == true ]; then
+    ctest -L regression -C Debug -O test_report.log --test-dir $MAIN_DIR/build \
+        --output-on-failure -j ${NP:-1} --no-tests=ignore
+
+    if [ $? -ne 0 ]; then
+        REGRESSION_SUCCESS=Failure
+    else
+        REGRESSION_SUCCESS=Success
+    fi
+else
+    REGRESSION_SUCCESS=Skipped
 fi
 
 # ============================================================================ #
@@ -90,9 +114,12 @@ if [ "$SENSITIVITY_TEST" == true ]; then
     $MAIN_DIR/tests/regression/sensitivity/run.sh -np=$NP
 
     if [ $? -ne 0 ]; then
-        echo "Sensitivity regression tests failed."
-        exit 1
+        SENSITIVITY_SUCCESS=Failure
+    else
+        SENSITIVITY_SUCCESS=Success
     fi
+else
+    SENSITIVITY_SUCCESS=Skipped
 fi
 
 # ============================================================================ #
@@ -102,7 +129,31 @@ if [ "$MMA_TEST" == true ]; then
     $MAIN_DIR/tests/regression/mma/run.sh -np=$NP
 
     if [ $? -ne 0 ]; then
-        echo "MMA regression tests failed."
+        MMA_SUCCESS=Failure
+    else
+        MMA_SUCCESS=Success
+    fi
+else
+    MMA_SUCCESS=Skipped
+fi
+
+# ============================================================================ #
+# Summary of test results
+
+printf "\nTest Summary:\n"
+printf "=========================\n"
+printf "%-15s %s\n" "Unit:"        "${UNIT_SUCCESS}"
+printf "%-15s %s\n" "Regression:"  "${REGRESSION_SUCCESS}"
+printf "%-15s %s\n" "Sensitivity:" "${SENSITIVITY_SUCCESS}"
+printf "%-15s %s\n" "MMA:"         "${MMA_SUCCESS}"
+
+# Exit with failure if any test failed
+# Exit non-zero if any *_SUCCESS variable is "Failure"
+while IFS= read -r name; do
+    if [[ "${!name}" == "Failure" ]]; then
+        printf "\nERROR: One or more tests failed.\n" >&2
         exit 1
     fi
-fi
+done < <(compgen -v | grep '_SUCCESS$' || true)
+
+exit 0
