@@ -931,7 +931,7 @@ contains
                  HOST_TO_DEVICE, sync = .true.)
 
             !---------------contributions of z terms to Hess-------------------!
-            ! Only for inactive constraint, we consider contributions to Hess 
+            ! Only for inactive constraint, we consider contributions to Hess
             ! based on the cpp code by Niels.
             call device_col3(dummy_m%x_d, lambda%x_d, a%x_d, this%m)
             if (device_glsum(dummy_m%x_d, this%m) .gt. 0.0_rp) then

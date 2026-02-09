@@ -958,13 +958,13 @@ contains
                  this%m * this%m, mpi_real_precision, mpi_sum, neko_comm, ierr)
 
             !---------------contributions of z terms to Hess-------------------!
-            ! Only for inactive constraint, we consider contributions to Hess 
+            ! Only for inactive constraint, we consider contributions to Hess
             ! based on the cpp code by Niels.
             if (dot_product(lambda, a) .gt. 0.0_rp) then
                do i = 1, this%m
-                    do j = 1, this%m
-                    Hess(i, j) = Hess(i, j) - a(i) * a(j)
-                    end do
+                  do j = 1, this%m
+                     Hess(i, j) = Hess(i, j) - a(i) * a(j)
+                  end do
                end do
             end if
 
@@ -1029,7 +1029,7 @@ contains
             ! minimize ((a_0 - sum_{i=1}^{m} λ_i * a_i) * z + 0.5 * z^2)
             ! ensure z>=0
             z = max(0.0_rp,dot_product(lambda, a) - a0)
-          
+
             ! Comput the value of x that minimizes L_x for the current λ
             ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
             ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /

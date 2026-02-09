@@ -80,13 +80,13 @@ contains
     type(c_ptr), intent(in) :: a_d
     integer, value :: m
 #if HAVE_HIP
-  call mma_update_hessian_z_hip(Hess_d, lambda_d, a_d, m)
+    call mma_update_hessian_z_hip(Hess_d, lambda_d, a_d, m)
 #elif HAVE_CUDA
-  call mma_update_hessian_z_cuda(Hess_d, a_d, m)
+    call mma_update_hessian_z_cuda(Hess_d, a_d, m)
 #elif HAVE_OPENCL
-  call neko_error('Z-term Hessian update not implemented for OpenCL')
+    call neko_error('Z-term Hessian update not implemented for OpenCL')
 #else
-  call neko_error('No device backend configured for Z-term Hessian update')
+    call neko_error('No device backend configured for Z-term Hessian update')
 #endif
   end subroutine device_update_hessian_z
 

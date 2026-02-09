@@ -45,7 +45,7 @@ module hip_mma_math
        use iso_c_binding
        type(c_ptr), value :: Hess_d
        type(c_ptr), value :: a_d
-       integer(c_int), value  :: m
+       integer(c_int), value :: m
      end subroutine mma_update_hessian_z_hip
 
      subroutine hipSOLVER_wrapper(A_d, b_d, n, info) &
