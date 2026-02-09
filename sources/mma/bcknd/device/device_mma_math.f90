@@ -80,7 +80,7 @@ contains
     type(c_ptr), intent(in) :: a_d
     integer, value :: m
 #if HAVE_HIP
-    call mma_update_hessian_z_hip(Hess_d, lambda_d, a_d, m)
+    call mma_update_hessian_z_hip(Hess_d, a_d, m)
 #elif HAVE_CUDA
     call mma_update_hessian_z_cuda(Hess_d, a_d, m)
 #elif HAVE_OPENCL

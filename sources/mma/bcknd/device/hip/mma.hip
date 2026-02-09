@@ -56,7 +56,7 @@ int mma_red_s = 0;
 real * mma_bufred = NULL;
 real * mma_bufred_d = NULL;
 
-void mma_update_hessian_z_hip(void* Hess, void* a, int* m) {
+void mma_update_hessian_z_hip(void* Hess, void* a, int m) {
     const int M = m;
     const int total = M * M;
 
@@ -68,8 +68,7 @@ void mma_update_hessian_z_hip(void* Hess, void* a, int* m) {
         mma_update_hessian_z_kernel<real>, nblcks, nthrds, 0, stream,
              (real*)Hess, (real*)a, M);
     HIP_CHECK(hipGetLastError());
-  }
-
+}
 
 void hipSOLVER_wrapper(void* A, void* b, int n, int* jj) {
     hipsolverDnHandle_t handle;
