@@ -1,7 +1,8 @@
 # Unsteady rugby ball {#unsteady-rugby-ball}
 
 This example is an unsteady extension of the classic "rugby ball" example by
-[Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426).
+[Borrvall & Petersson 2003](https://doi.org/10.1002/fld.426) extended to the
+wake behind a 2D cylinder at Re=200.
 
 The objective is to minimize the time integral of the dissipation
 
@@ -12,11 +13,7 @@ The objective is to minimize the time integral of the dissipation
 + \chi \mathbf{u} \cdot \mathbf{u} 
 \right] d\Omega, dt
 \f]
-
-where the velocity boundary condition progressively increase from 0 to 1 over
-the course of 0.5 time units.
-
-It is also subject to a volume constraint
+downstream while subject to a volume constraint
 
 \f[
 \mathcal{C} = \frac{1}{|\Omega_\text{opt}|}\int_{\Omega_\text{opt}} \rho d\Omega.
