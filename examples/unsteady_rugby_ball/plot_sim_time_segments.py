@@ -1,8 +1,21 @@
 #!/usr/bin/env python3
-import re
-import sys
 import argparse
+import re
+from pathlib import Path
+
 import matplotlib.pyplot as plt
+
+
+def find_case_file(search_dirs):
+    for directory in search_dirs:
+        if directory is None:
+            continue
+        cases = sorted(Path(directory).glob("*.case"))
+        if len(cases) == 1:
+            return cases[0]
+        if len(cases) > 1:
+            raise SystemExit(f"Multiple .case files found in {directory}")
+    raise SystemExit("No .case file found")
 
 def parse_log(path):
     # Parse lines like: "Step =      157 t =   0.1570000E-01"
@@ -75,13 +88,20 @@ def write_csv(x, y, modes, steps, out_csv):
     print(out_csv)
 
 def main():
-    ap = argparse.ArgumentParser(description="Plot simulation time vs total steps with segment coloring by mode.")
-    ap.add_argument("log", help="Path to log file")
+    ap = argparse.ArgumentParser(
+        description="Plot simulation time vs total steps with segment coloring by mode."
+    )
     ap.add_argument("-o", "--out", default="sim_time_vs_total_steps_colored.png", help="Output PNG path")
     ap.add_argument("--csv", default="sim_time_trace.csv", help="Also write a CSV with parsed data")
     args = ap.parse_args()
 
-    x, y, modes, steps = parse_log(args.log)
+    script_dir = Path(__file__).resolve().parent
+    case_path = find_case_file([script_dir, Path.cwd()])
+    log_path = case_path.with_suffix(".log")
+    if not log_path.exists():
+        raise SystemExit(f"Log file not found: {log_path}")
+
+    x, y, modes, steps = parse_log(log_path)
     write_csv(x, y, modes, steps, args.csv)
     plot_segments(x, y, modes, args.out)
 
