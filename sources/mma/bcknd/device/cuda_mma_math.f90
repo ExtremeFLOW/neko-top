@@ -40,6 +40,15 @@ module cuda_mma_math
   public
 
   interface
+     subroutine mma_update_hessian_z_cuda(Hess_d, a_d, m) &
+          bind(C, name="mma_update_hessian_z_cuda")
+       use iso_c_binding
+       type(c_ptr), value :: Hess_d
+       type(c_ptr), value :: a_d
+       integer(c_int) :: m
+     end subroutine mma_update_hessian_z_cuda
+
+
      subroutine mma_prepare_aa_matrix_cuda(AA, s, lambda, d, mu, y, a, zeta, &
           z, m) bind(c, name="mma_prepare_aa_matrix_cuda")
        import c_rp, c_ptr, c_int
@@ -48,10 +57,10 @@ module cuda_mma_math
        integer(c_int) :: m
      end subroutine mma_prepare_aa_matrix_cuda
 
-     subroutine mma_prepare_hessian_cuda(Hess, y, d, mu, lambda, m) &
+     subroutine mma_prepare_hessian_cuda(Hess, y, mu, lambda, m) &
           bind(c, name="mma_prepare_hessian_cuda")
        import c_ptr, c_int
-       type(c_ptr), value :: Hess, y, d, mu, lambda
+       type(c_ptr), value :: Hess, y, mu, lambda
        integer(c_int) :: m
      end subroutine mma_prepare_hessian_cuda
 

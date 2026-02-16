@@ -57,6 +57,20 @@ extern "C" {
   int mma_red_s = 0;
   real* mma_bufred = NULL;
   real* mma_bufred_d = NULL;
+  
+  void mma_update_hessian_z_cuda(void* Hess, void* a, int* m) {
+    const int M = *m;
+    // This function is called ONLY if dot(lambda,a) > 0
+
+    const int total = M * M;
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks((total + 1024 - 1) / 1024, 1, 1);
+
+    mma_update_hessian_z_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
+        (real*)Hess, (real*)a, M);
+
+    CUDA_CHECK(cudaGetLastError());
+  }
 
   void mma_prepare_aa_matrix_cuda(void* AA, void* s, void* lambda,
                                void* d, void* mu, void* y,
@@ -73,7 +87,7 @@ extern "C" {
     CUDA_CHECK(cudaGetLastError());
   }
 
-  void mma_prepare_hessian_cuda(void* Hess, void* y, void* d,
+  void mma_prepare_hessian_cuda(void* Hess, void* y,
                              void* mu, void* lambda, int* m) {
     const int M = *m;
     const dim3 nthrds(1024, 1, 1);
@@ -82,7 +96,7 @@ extern "C" {
 
     // Update diagonal elements
     mma_update_hessian_diagonal_kernel<real><<<nblcks, nthrds, 0, stream>>>(
-        (real*)Hess, (real*)y, (real*)d, (real*)mu, (real*)lambda, M);
+        (real*)Hess, (real*)y, (real*)mu, (real*)lambda, M);
     CUDA_CHECK(cudaGetLastError());
 
     // Synchronize to ensure diagonal updates are complete
