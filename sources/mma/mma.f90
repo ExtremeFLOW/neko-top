@@ -361,7 +361,7 @@ contains
 
     call this%free()
     call this%mma_scratch_registry%init()
-    
+
     this%n = n
     this%m = m
 
