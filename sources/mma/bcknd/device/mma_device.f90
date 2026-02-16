@@ -53,7 +53,6 @@ submodule (mma) mma_device
   use comm, only: neko_comm, pe_rank, mpi_real_precision
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN
   use profiler, only: profiler_start_region, profiler_end_region
-  use scratch_registry, only: neko_scratch_registry
 
   implicit none
 
@@ -115,8 +114,8 @@ contains
     type(vector_t), pointer :: relambda, remu
     integer :: ind(2)
 
-    call neko_scratch_registry%request(relambda, ind(1), this%m, .false.)
-    call neko_scratch_registry%request(remu, ind(2), this%m, .false.)
+    call this%mma_scratch_registry%request(relambda, ind(1), this%m, .false.)
+    call this%mma_scratch_registry%request(remu, ind(2), this%m, .false.)
 
     ! relambda = fval - this%a%x * this%z - this%y%x + this%mu%x
     call device_add3s2(relambda%x_d, fval, this%a%x_d, 1.0_rp, -this%z, &
@@ -132,7 +131,7 @@ contains
     this%residunorm = sqrt(device_norm(relambda%x_d, this%m)+ &
          device_norm(remu%x_d, this%m))
 
-    call neko_scratch_registry%relinquish(ind)
+    call this%mma_scratch_registry%relinquish(ind)
   end subroutine mma_dip_KKT_device
 
   !> Implementation of the KKT residual computation for dual primal interior
@@ -147,14 +146,14 @@ contains
     integer :: ierr, ind(7)
     real(kind=rp) :: re_sq_norm
 
-    call neko_scratch_registry%request(rey, ind(1), this%m, .false.)
-    call neko_scratch_registry%request(relambda, ind(2), this%m, .false.)
-    call neko_scratch_registry%request(remu, ind(3), this%m, .false.)
-    call neko_scratch_registry%request(res, ind(4), this%m, .false.)
+    call this%mma_scratch_registry%request(rey, ind(1), this%m, .false.)
+    call this%mma_scratch_registry%request(relambda, ind(2), this%m, .false.)
+    call this%mma_scratch_registry%request(remu, ind(3), this%m, .false.)
+    call this%mma_scratch_registry%request(res, ind(4), this%m, .false.)
 
-    call neko_scratch_registry%request(rex, ind(5), this%n, .false.)
-    call neko_scratch_registry%request(rexsi, ind(6), this%n, .false.)
-    call neko_scratch_registry%request(reeta, ind(7), this%n, .false.)
+    call this%mma_scratch_registry%request(rex, ind(5), this%n, .false.)
+    call this%mma_scratch_registry%request(rexsi, ind(6), this%n, .false.)
+    call this%mma_scratch_registry%request(reeta, ind(7), this%n, .false.)
 
     call device_kkt_rex(rex%x_d, df0dx, dfdx, this%xsi%x_d, &
          this%eta%x_d, this%lambda%x_d, this%n, this%m)
@@ -214,7 +213,7 @@ contains
          device_norm(res%x_d, this%m) &
          ) + re_sq_norm)
 
-    call neko_scratch_registry%relinquish(ind)
+    call this%mma_scratch_registry%relinquish(ind)
   end subroutine mma_dpip_KKT_device
 
   !============================================================================!
@@ -239,7 +238,7 @@ contains
     type(vector_t), pointer :: x_diff
     integer :: ind
 
-    call neko_scratch_registry%request(x_diff, ind, this%n, .false.)
+    call this%mma_scratch_registry%request(x_diff, ind, this%n, .false.)
 
     call device_sub3(x_diff%x_d, this%xmax%x_d, this%xmin%x_d, this%n)
 
@@ -284,7 +283,7 @@ contains
     end if
     call device_sub2(this%bi%x_d, fval, this%m)
 
-    call neko_scratch_registry%relinquish(ind)
+    call this%mma_scratch_registry%relinquish(ind)
   end subroutine mma_gensub_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual-primal
@@ -314,42 +313,42 @@ contains
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
-    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
-    call neko_scratch_registry%request(s, ind(3), this%m, .false.)
-    call neko_scratch_registry%request(mu, ind(4), this%m, .false.)
-    call neko_scratch_registry%request(rey, ind(5), this%m, .false.)
-    call neko_scratch_registry%request(relambda, ind(6), this%m, .false.)
-    call neko_scratch_registry%request(remu, ind(7), this%m, .false.)
-    call neko_scratch_registry%request(res, ind(8), this%m, .false.)
-    call neko_scratch_registry%request(dely, ind(9), this%m, .false.)
-    call neko_scratch_registry%request(dellambda, ind(10), this%m, .false.)
-    call neko_scratch_registry%request(dy, ind(11), this%m, .false.)
-    call neko_scratch_registry%request(dlambda, ind(12), this%m, .false.)
-    call neko_scratch_registry%request(ds, ind(13), this%m, .false.)
-    call neko_scratch_registry%request(dmu, ind(14), this%m, .false.)
-    call neko_scratch_registry%request(yold, ind(15), this%m, .false.)
-    call neko_scratch_registry%request(lambdaold, ind(16), this%m, .false.)
-    call neko_scratch_registry%request(sold, ind(17), this%m, .false.)
-    call neko_scratch_registry%request(muold, ind(18), this%m, .false.)
-    call neko_scratch_registry%request(x, ind(19), this%n, .false.)
-    call neko_scratch_registry%request(xsi, ind(20), this%n, .false.)
-    call neko_scratch_registry%request(eta, ind(21), this%n, .false.)
-    call neko_scratch_registry%request(rex, ind(22), this%n, .false.)
-    call neko_scratch_registry%request(rexsi, ind(23), this%n, .false.)
-    call neko_scratch_registry%request(reeta, ind(24), this%n, .false.)
-    call neko_scratch_registry%request(delx, ind(25), this%n, .false.)
-    call neko_scratch_registry%request(diagx, ind(26), this%n, .false.)
-    call neko_scratch_registry%request(dx, ind(27), this%n, .false.)
-    call neko_scratch_registry%request(dxsi, ind(28), this%n, .false.)
-    call neko_scratch_registry%request(deta, ind(29), this%n, .false.)
-    call neko_scratch_registry%request(xold, ind(30), this%n, .false.)
-    call neko_scratch_registry%request(xsiold, ind(31), this%n, .false.)
-    call neko_scratch_registry%request(etaold, ind(32), this%n, .false.)
-    call neko_scratch_registry%request(bb, ind(33), this%m+1, .false.)
+    call this%mma_scratch_registry%request(y, ind(1), this%m, .false.)
+    call this%mma_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call this%mma_scratch_registry%request(s, ind(3), this%m, .false.)
+    call this%mma_scratch_registry%request(mu, ind(4), this%m, .false.)
+    call this%mma_scratch_registry%request(rey, ind(5), this%m, .false.)
+    call this%mma_scratch_registry%request(relambda, ind(6), this%m, .false.)
+    call this%mma_scratch_registry%request(remu, ind(7), this%m, .false.)
+    call this%mma_scratch_registry%request(res, ind(8), this%m, .false.)
+    call this%mma_scratch_registry%request(dely, ind(9), this%m, .false.)
+    call this%mma_scratch_registry%request(dellambda, ind(10), this%m, .false.)
+    call this%mma_scratch_registry%request(dy, ind(11), this%m, .false.)
+    call this%mma_scratch_registry%request(dlambda, ind(12), this%m, .false.)
+    call this%mma_scratch_registry%request(ds, ind(13), this%m, .false.)
+    call this%mma_scratch_registry%request(dmu, ind(14), this%m, .false.)
+    call this%mma_scratch_registry%request(yold, ind(15), this%m, .false.)
+    call this%mma_scratch_registry%request(lambdaold, ind(16), this%m, .false.)
+    call this%mma_scratch_registry%request(sold, ind(17), this%m, .false.)
+    call this%mma_scratch_registry%request(muold, ind(18), this%m, .false.)
+    call this%mma_scratch_registry%request(x, ind(19), this%n, .false.)
+    call this%mma_scratch_registry%request(xsi, ind(20), this%n, .false.)
+    call this%mma_scratch_registry%request(eta, ind(21), this%n, .false.)
+    call this%mma_scratch_registry%request(rex, ind(22), this%n, .false.)
+    call this%mma_scratch_registry%request(rexsi, ind(23), this%n, .false.)
+    call this%mma_scratch_registry%request(reeta, ind(24), this%n, .false.)
+    call this%mma_scratch_registry%request(delx, ind(25), this%n, .false.)
+    call this%mma_scratch_registry%request(diagx, ind(26), this%n, .false.)
+    call this%mma_scratch_registry%request(dx, ind(27), this%n, .false.)
+    call this%mma_scratch_registry%request(dxsi, ind(28), this%n, .false.)
+    call this%mma_scratch_registry%request(deta, ind(29), this%n, .false.)
+    call this%mma_scratch_registry%request(xold, ind(30), this%n, .false.)
+    call this%mma_scratch_registry%request(xsiold, ind(31), this%n, .false.)
+    call this%mma_scratch_registry%request(etaold, ind(32), this%n, .false.)
+    call this%mma_scratch_registry%request(bb, ind(33), this%m+1, .false.)
 
-    call neko_scratch_registry%request(GG, ind(34), this%m, this%n, .false.)
-    call neko_scratch_registry%request(AA, ind(35), this%m+1, this%m+1, .false.)
+    call this%mma_scratch_registry%request(GG, ind(34), this%m, this%n, .false.)
+    call this%mma_scratch_registry%request(AA, ind(35), this%m+1, this%m+1, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -756,7 +755,7 @@ contains
     call device_copy(this%s%x_d, s%x_d, this%m)
 
     !free all the initiated variables in this subroutine
-    call neko_scratch_registry%relinquish(ind)
+    call this%mma_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dpip_device
 
   !> solve the subproblem defined by this%pij, this%qij, etc. using dual
@@ -781,26 +780,26 @@ contains
 
     real(kind=rp) :: minimal_epsilon
 
-    call neko_scratch_registry%request(y, ind(1), this%m, .false.)
-    call neko_scratch_registry%request(lambda, ind(2), this%m, .false.)
-    call neko_scratch_registry%request(mu, ind(3), this%m, .false.)
-    call neko_scratch_registry%request(relambda, ind(4), this%m, .false.)
-    call neko_scratch_registry%request(remu, ind(5), this%m, .false.)
-    call neko_scratch_registry%request(dlambda, ind(6), this%m, .false.)
-    call neko_scratch_registry%request(dmu, ind(7), this%m, .false.)
-    call neko_scratch_registry%request(gradlambda, ind(8), this%m, .false.)
-    call neko_scratch_registry%request(zerom, ind(9), this%m, .false.)
-    call neko_scratch_registry%request(dd, ind(10), this%m, .false.)
-    call neko_scratch_registry%request(dummy_m, ind(11), this%m, .false.)
+    call this%mma_scratch_registry%request(y, ind(1), this%m, .false.)
+    call this%mma_scratch_registry%request(lambda, ind(2), this%m, .false.)
+    call this%mma_scratch_registry%request(mu, ind(3), this%m, .false.)
+    call this%mma_scratch_registry%request(relambda, ind(4), this%m, .false.)
+    call this%mma_scratch_registry%request(remu, ind(5), this%m, .false.)
+    call this%mma_scratch_registry%request(dlambda, ind(6), this%m, .false.)
+    call this%mma_scratch_registry%request(dmu, ind(7), this%m, .false.)
+    call this%mma_scratch_registry%request(gradlambda, ind(8), this%m, .false.)
+    call this%mma_scratch_registry%request(zerom, ind(9), this%m, .false.)
+    call this%mma_scratch_registry%request(dd, ind(10), this%m, .false.)
+    call this%mma_scratch_registry%request(dummy_m, ind(11), this%m, .false.)
 
-    call neko_scratch_registry%request(x, ind(12), this%n, .false.)
-    call neko_scratch_registry%request(pjlambda,ind(13), this%n, .false.)
-    call neko_scratch_registry%request(qjlambda, ind(14), this%n, .false.)
+    call this%mma_scratch_registry%request(x, ind(12), this%n, .false.)
+    call this%mma_scratch_registry%request(pjlambda,ind(13), this%n, .false.)
+    call this%mma_scratch_registry%request(qjlambda, ind(14), this%n, .false.)
 
-    call neko_scratch_registry%request(Ljjxinv, ind(15), this%n, .false.)
+    call this%mma_scratch_registry%request(Ljjxinv, ind(15), this%n, .false.)
 
-    call neko_scratch_registry%request(hijx, ind(16), this%m, this%n, .false.)
-    call neko_scratch_registry%request(Hess, ind(17), this%m, this%m, .false.)
+    call this%mma_scratch_registry%request(hijx, ind(16), this%m, this%n, .false.)
+    call this%mma_scratch_registry%request(Hess, ind(17), this%m, this%m, .false.)
 
     ! ------------------------------------------------------------------------ !
     ! initial value for the parameters in the subsolve based on
@@ -1046,7 +1045,7 @@ contains
     call device_copy(this%lambda%x_d, lambda%x_d, this%m)
     call device_copy(this%mu%x_d, mu%x_d, this%m)
 
-    call neko_scratch_registry%relinquish(ind)
+    call this%mma_scratch_registry%relinquish(ind)
   end subroutine mma_subsolve_dip_device
 
 end submodule mma_device
