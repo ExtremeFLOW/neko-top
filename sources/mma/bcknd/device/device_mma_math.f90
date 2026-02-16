@@ -46,7 +46,7 @@ module device_mma_math
        mma_gensub3_cuda, mma_gensub4_cuda, mattrans_v_mul_cuda, &
        mma_dipsolvesub1_cuda, mma_Ljjxinv_cuda, cuda_Hess, delta_1dbeam_cuda, &
        cuSOLVER_wrapper, mma_prepare_hessian_cuda, mma_prepare_aa_matrix_cuda, &
-       cuda_custom_solver
+       cuda_custom_solver, mma_update_hessian_z_cuda
   use hip_mma_math, only: hip_mma_max, hip_max2, hip_rex, hip_lcsc2, &
        hip_relambda, hip_sub2cons2, hip_maxval, hip_norm, hip_delx, &
        hip_add2inv2, hip_GG, hip_diagx, hip_bb, hip_updatebb, hip_AA, &
@@ -55,7 +55,7 @@ module device_mma_math
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
        mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip, &
        hip_custom_solver, mma_prepare_hessian_hip, &
-       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper
+       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip
 
   implicit none
   private
@@ -70,9 +70,27 @@ module device_mma_math
        device_kkt_rex, device_mattrans_v_mul, device_mma_dipsolvesub1, &
        device_mma_Ljjxinv, device_Hess, device_delta_1dbeam, &
        device_solve_linear_system, device_prepare_hessian, &
-       device_prepare_aa_matrix
+       device_prepare_aa_matrix, device_update_hessian_z
 
 contains
+  !> Update Hessian for dual solver with z-term contribution: Hess -= a * a^T
+  subroutine device_update_hessian_z(Hess_d, a_d, m)
+    use iso_c_binding
+    type(c_ptr), intent(in) :: Hess_d
+    type(c_ptr), intent(in) :: a_d
+    integer, value :: m
+#if HAVE_HIP
+    call mma_update_hessian_z_hip(Hess_d, a_d, m)
+#elif HAVE_CUDA
+    call mma_update_hessian_z_cuda(Hess_d, a_d, m)
+#elif HAVE_OPENCL
+    call neko_error('Z-term Hessian update not implemented for OpenCL')
+#else
+    call neko_error('No device backend configured for Z-term Hessian update')
+#endif
+  end subroutine device_update_hessian_z
+
+
   !> Prepare AA matrix for dual-primal solver on device
   subroutine device_prepare_aa_matrix(AA_d, s_d, lambda_d, d_d, mu_d, y_d, &
        a_d, zeta, z, m)
@@ -93,13 +111,13 @@ contains
   end subroutine device_prepare_aa_matrix
 
   !> Solve linear system Ax = b on device
-  subroutine device_prepare_hessian(Hess_d, y_d, d_d, mu_d, lambda_d, m)
-    type(c_ptr) :: Hess_d, y_d, d_d, mu_d, lambda_d
+  subroutine device_prepare_hessian(Hess_d, y_d, mu_d, lambda_d, m)
+    type(c_ptr) :: Hess_d, y_d, mu_d, lambda_d
     integer, value :: m
 #if HAVE_HIP
-    call mma_prepare_hessian_hip(Hess_d, y_d, d_d, mu_d, lambda_d, m)
+    call mma_prepare_hessian_hip(Hess_d, y_d, mu_d, lambda_d, m)
 #elif HAVE_CUDA
-    call mma_prepare_hessian_cuda(Hess_d, y_d, d_d, mu_d, lambda_d, m)
+    call mma_prepare_hessian_cuda(Hess_d, y_d, mu_d, lambda_d, m)
 #elif HAVE_OPENCL
     call neko_error('no device backend configured')
 #else
