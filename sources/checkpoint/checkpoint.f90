@@ -206,7 +206,7 @@ contains
        if (this%n_scalars .gt. 0) then
           do j = 1, this%n_scalars
              write(str, '(A,I0,A,I0)') "s_chkp_", i, "_", j
-             scalar_i => neko_case%scalars%scalar_fields(j)
+             scalar_i => neko_case%scalars%scalar_fields(j)%scalar
              call this%s_list((i - 1) * this%n_scalars + j)%init(scalar_i%s%dof, str)
           end do
        end if

@@ -135,7 +135,7 @@ contains
 
     ! Check if the scalar field is allocated
     if (this%have_scalar) then
-       call this%s_old%init(this%case%scalars%scalar_fields(1)%s%dof)
+       call this%s_old%init(this%case%scalars%scalar_fields(1)%scalar%s%dof)
     end if
 
   end subroutine steady_simcomp_init_from_attributes
@@ -189,7 +189,7 @@ contains
        if (size(this%case%scalars%scalar_fields) .gt. 1) then
           call neko_error('steady simcomp only works for a single scalar')
        end if
-       s => this%case%scalars%scalar_fields(1)%s
+       s => this%case%scalars%scalar_fields(1)%scalar%s
     else
        s => null()
     end if

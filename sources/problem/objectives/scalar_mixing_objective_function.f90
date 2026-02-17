@@ -186,7 +186,7 @@ contains
       this%phi_ref = phi_ref
 
       ! Associate forward passive scalar
-      this%phi => simulation%scalars%scalar_fields(i_scalar)%s
+      this%phi => simulation%scalars%scalar_fields(i_scalar)%scalar%s
 
       ! Initialize the scalar mixing adjoint source term
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &

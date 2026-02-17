@@ -188,7 +188,7 @@ contains
     if (allocated(this%neko_case%scalars)) then
        do i = 1, n_scalars
           call this%output_forward%fields%assign(4 + i, &
-               this%scalars%scalar_fields(i)%s)
+               this%scalars%scalar_fields(i)%scalar%s)
        end do
     end if
 
