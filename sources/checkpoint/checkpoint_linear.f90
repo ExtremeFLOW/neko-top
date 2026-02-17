@@ -54,18 +54,29 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    logical :: save_disc
+    integer :: index, i, index_s
 
     ! We save to disc only every n_saves_memory time steps
-    save_disc = modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0
+    index = modulo(neko_case%time%tstep, this%n_saves_memory)
 
     ! Sample the checkpoint if needed
-    if (save_disc .or. neko_case%time%tstep .le. this%first_valid_timestep) then
-
+    if (index .eq. 0 .or. neko_case%time%tstep .le. this%first_valid_timestep) then
+        this%loaded_checkpoint = neko_case%time%tstep
        call this%chkp_output%set_counter(neko_case%time%tstep)
        call this%chkp_output%sample(neko_case%time%t)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
+
+    ! Save the current iterates to memory
+    call field_copy(this%p_list(index + 1), neko_case%fluid%p)
+    call field_copy(this%u_list(index + 1), neko_case%fluid%u)
+    call field_copy(this%v_list(index + 1), neko_case%fluid%v)
+    call field_copy(this%w_list(index + 1), neko_case%fluid%w)
+    do i = 1, this%n_scalars
+       index_s = index * this%n_scalars + i
+       call field_copy(this%s_list(index_s), &
+            neko_case%scalars%scalar_fields(i)%scalar%s)
+    end do
   end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state in a linear fashion.
