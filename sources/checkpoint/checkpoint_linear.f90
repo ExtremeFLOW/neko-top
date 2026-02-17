@@ -132,7 +132,7 @@ contains
           call field_copy(this%w_list(local_idx), w)
           do i_scalars = 1, this%n_scalars
              j = (local_idx - 1) * this%n_scalars + i_scalars
-             s => neko_case%scalars%scalar_fields(i_scalars)%s
+             s => neko_case%scalars%scalar_fields(i_scalars)%scalar%s
              call field_copy(this%s_list(j), s)
           end do
 
@@ -146,7 +146,7 @@ contains
     call field_copy(w, this%w_list(local_idx))
     do i_scalars = 1, this%n_scalars
        j = (local_idx - 1) * this%n_scalars + i_scalars
-       s => neko_case%scalars%scalar_fields(i_scalars)%s
+       s => neko_case%scalars%scalar_fields(i_scalars)%scalar%s
        call field_copy(s, this%s_list(j))
     end do
 

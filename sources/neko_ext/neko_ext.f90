@@ -105,7 +105,7 @@ contains
     w => neko_case%fluid%w
     p => neko_case%fluid%p
     if (allocated(neko_case%scalars)) then
-       s => neko_case%scalars%scalar_fields(1)%s
+       s => neko_case%scalars%scalar_fields(1)%scalar%s
     else
        nullify(s)
     end if
@@ -190,33 +190,33 @@ contains
           call neko_error('Multiple scalars not supported')
        end if
        ! zero out RHS
-       call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
+       call field_rzero(neko_case%scalars%scalar_fields(1)%scalar%f_Xh)
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)
        call json_get(neko_case%params, &
             'case.scalar.initial_condition', json_subdict)
        if (trim(string_val) .ne. 'user') then
-          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+          if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                'temperature') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%s, &
                   neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
                   json_subdict, 0)
           else
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%s, &
                   neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
                   json_subdict, 1)
           end if
        else
-          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
-               neko_case%scalars%scalar_fields(1)%s, &
-               neko_case%scalars%scalar_fields(1)%c_Xh, &
-               neko_case%scalars%scalar_fields(1)%gs_Xh, &
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%name, &
+               neko_case%scalars%scalar_fields(1)%scalar%s, &
+               neko_case%scalars%scalar_fields(1)%scalar%c_Xh, &
+               neko_case%scalars%scalar_fields(1)%scalar%gs_Xh, &
                neko_case%user%initial_conditions)
        end if
        ! set lags to IC
-       call neko_case%scalars%scalar_fields(1)%slag%set(&
-            neko_case%scalars%scalar_fields(1)%s)
+       call neko_case%scalars%scalar_fields(1)%scalar%slag%set(&
+            neko_case%scalars%scalar_fields(1)%scalar%s)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -340,7 +340,7 @@ contains
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition', json_subdict)
        if (trim(string_val) .ne. 'user') then
-          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+          if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                'temperature') then
              call set_scalar_ic( &
                   adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
@@ -456,7 +456,7 @@ contains
     end do
 
     do i = 1, n_primal_scalars
-       if (scalars%scalar_fields(i)%name .eq. primal_name) then
+       if (scalars%scalar_fields(i)%scalar%name .eq. primal_name) then
           i_primal = i
           exit
        end if

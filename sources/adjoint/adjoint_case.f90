@@ -189,7 +189,7 @@ contains
                dealias_adjoint_scalar_convection, .true.)
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
-               this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
+               this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
                this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
                this%fluid_adj%GLL_to_GL, &
@@ -278,7 +278,7 @@ contains
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+             if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                   'temperature') then
                 call set_scalar_ic(&
                      this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
@@ -312,7 +312,7 @@ contains
                   'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
-                if (trim(neko_case%scalars%scalar_fields(i)%name) .eq. &
+                if (trim(neko_case%scalars%scalar_fields(i)%scalar%name) .eq. &
                      'temperature') then
                    call set_scalar_ic(&
                         this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
