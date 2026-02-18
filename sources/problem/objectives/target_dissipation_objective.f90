@@ -112,6 +112,12 @@ module target_dissipation_objective
           target_dissipation_get_log_headers
      procedure, public, pass(this) :: get_log_values => &
           target_dissipation_get_log_values
+     !> This is particularly tricky... We're going to overwrite the get value
+     !! to do the scaling. So the value we store in the object is the dissipation
+     !! to allow it to accumulate, but then the normalization with respect
+     !! to the initial only happens on the get value
+     procedure, pass(this) :: finalize_value => &
+          target_dissipation_finalize_value
 
   end type target_dissipation_objective_t
 
@@ -256,35 +262,45 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%current_dissipation = device_glsc2(work%x_d, this%c_xh%B_d, n)
+          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%current_dissipation = glsc2_mask(objective_field%x, this%c_Xh%b, &
+          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
                n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%current_dissipation = device_glsc2(objective_field%x_d, &
+          this%value = device_glsc2(objective_field%x_d, &
                this%c_Xh%b_d, n)
        else
-          this%current_dissipation = glsc2(objective_field%x, this%c_Xh%b, n)
+          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
        end if
     end if
 
-    this%current_dissipation = this%current_dissipation * 0.5_rp / this%volume
+    ! this is really sneaky, the value we store here is just the dissipation,
+    ! but the value we return is scaled by the initial.
+    ! see target_dissipation_finalize_value
+    this%value = this%value * 0.5_rp / this%volume
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+   
+  end subroutine target_dissipation_update_value
+
+  subroutine target_dissipation_finalize_value(this)
+    class(target_dissipation_objective_t), intent(inout) :: this
 
     ! Check if it's the first time, and if so, set the initial dissipation
     if (this%is_first_time) then
-       this%initial_dissipation = this%current_dissipation
+       this%initial_dissipation = this%value
        this%is_first_time = .false.
     end if
+    ! For clarity write the current dissipation clearly
+    this%current_dissipation = this%value
 
     ! Now compute the objective
     this%value = 0.5_rp * (this%current_dissipation / &
          (this%initial_dissipation * this%target_fraction) - 1.0_rp) ** 2
 
-    call neko_scratch_registry%relinquish_field(temp_indices)
-
-  end subroutine target_dissipation_update_value
+  end subroutine target_dissipation_finalize_value
 
   !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
   !! @param this the objective.

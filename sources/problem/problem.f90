@@ -169,6 +169,10 @@ module problem
      procedure, pass(this) :: accumulate_constraint_sensitivities => &
           problem_accumulate_constraint_sensitivities
 
+     !> Finalize the objective function.
+     procedure, pass(this) :: finalize_objectives => &
+          problem_finalize_objectives
+
      ! ----------------------------------------------------------------------- !
      ! Public Getters
 
@@ -463,6 +467,8 @@ contains
           call simulation%run_forward()
           ! Compute objective value on steady field
           call this%update_objectives(design)
+          ! finalize the objective values
+          call this%finalize_objectives()
        end if
     else
        call this%update_objectives(design)
@@ -532,6 +538,9 @@ contains
        call simulation%checkpoint%save(simulation%neko_case)
     end do
     call profiler_end_region("Forward simulation")
+
+    ! Finalize objective values
+    call this%finalize_objectives()
 
     call simulation_finalize(simulation%neko_case)
 
@@ -789,6 +798,15 @@ contains
     end do
   end subroutine problem_accumulate_constraint_sensitivities
 
+
+  subroutine problem_finalize_objectives(this)
+    class(problem_t), intent(inout) :: this
+    integer :: i
+
+    do i = 1, this%n_objectives
+       call this%objective_list(i)%objective%finalize_value()
+    end do
+  end subroutine problem_finalize_objectives
   ! ========================================================================== !
   ! Problem part getters
 
