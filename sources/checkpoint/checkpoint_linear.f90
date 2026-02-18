@@ -54,7 +54,7 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    integer :: index, tstep
+    integer :: index, tstep, counter
     real(kind=rp) :: time
 
     time = neko_case%time%t
@@ -66,7 +66,11 @@ contains
     ! Sample the checkpoint if needed
     if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
        this%loaded_checkpoint = tstep
-       call this%chkp_output%set_counter(tstep)
+
+       counter = determine_counter(tstep, this%n_saves_memory, &
+            this%first_valid_timestep)
+
+       call this%chkp_output%set_counter(counter)
        call this%chkp_output%sample(time)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
@@ -84,7 +88,7 @@ contains
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    integer :: k, previous_save, next_save, local_idx
+    integer :: k, previous_save, next_save, local_idx, counter
     type(field_t), pointer :: u, v, w, p, s
 
     loop_start = MPI_WTIME()
@@ -112,7 +116,9 @@ contains
     if (this%loaded_checkpoint .ne. previous_save) then
 
        ! Restart the simulation form the checkpoint file
-       call this%chkp_output%set_counter(previous_save)
+       counter = determine_counter(previous_save, this%n_saves_memory, &
+            this%first_valid_timestep)
+       call this%chkp_output%set_counter(counter)
        call this%chkp_output%file_%read(neko_case%chkp)
        call simulation_restart(neko_case, neko_case%chkp)
 
@@ -140,5 +146,17 @@ contains
     local_idx = modulo(tstep, this%n_saves_memory) + 1
     call this%load_data(local_idx)
   end subroutine checkpoint_restore_linear
+
+  pure function determine_counter(tstep, n_memory, first) result(counter)
+    integer, intent(in) :: tstep, n_memory, first
+    integer :: counter
+
+    if (tstep .le. first) then
+       counter = tstep
+    else
+       counter = first + tstep / n_memory
+    end if
+
+  end function determine_counter
 
 end submodule checkpoint_linear
