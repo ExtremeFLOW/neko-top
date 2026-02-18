@@ -36,18 +36,20 @@ module simulation_checkpoint
   use num_types, only: rp, sp, dp
   use case, only: case_t
   use json_file_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use scalar_scheme, only: scalar_scheme_t
   use time_state, only: time_state_t
   use chkp_output, only: chkp_output_t
   use field, only: field_t
   use field_list, only: field_list_t
+  use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use mpi_f08, only: MPI_WTIME
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -146,6 +148,10 @@ contains
     type(json_file), target, intent(inout) :: params
     integer :: n_saves_memory
     character(len=:), allocatable :: filename, algorithm, fmt
+    character(len=256), dimension(:), allocatable :: extra_field_names
+    type(field_list_t) :: extra_fields
+    type(field_t), pointer :: fi
+    integer :: i
     logical :: enabled, keep_checkpoints
 
     call json_get_or_default(params, "enabled", enabled, .false.)
@@ -158,13 +164,23 @@ contains
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
          .false.)
 
+    if ("extra_fields" .in. params) then
+       allocate(extra_field_names(0))
+       call json_get(params, "extra_fields", extra_field_names)
+       do i = 1, size(extra_field_names)
+          fi => neko_registry%get_field(extra_field_names(i))
+          call extra_fields%append(fi)
+       end do
+    end if
+
+    ! Create a field list for the extra fields
     call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-         filename, fmt, keep_checkpoints)
+         filename, fmt, keep_checkpoints, extra_fields)
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
-       n_saves_memory, filename, fmt, keep_checkpoints)
+       n_saves_memory, filename, fmt, keep_checkpoints, extra_fields)
     class(simulation_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     character(len=*), optional, intent(in) :: algorithm
@@ -172,6 +188,9 @@ contains
     character(len=*), optional, intent(in) :: filename
     character(len=*), optional, intent(in) :: fmt
     logical, optional, intent(in) :: keep_checkpoints
+    type(field_list_t), optional, intent(inout) :: extra_fields
+    type(field_t), pointer :: si
+    character(len=LOG_SIZE) :: msg
     integer :: i
 
     call this%free()
@@ -197,12 +216,47 @@ contains
     ! Assign scalar pointers
     if (allocated(neko_case%scalars)) then
        do i = 1, size(neko_case%scalars%scalar_fields)
-          call this%state_list%append(neko_case%scalars%scalar_fields(i)%scalar%s)
+          si => neko_case%scalars%scalar_fields(i)%scalar%s
+          call this%state_list%append(si)
+       end do
+    end if
+
+    ! Assign any extra fields specified by the user
+    if (present(extra_fields)) then
+       do i = 1, extra_fields%size()
+          si => extra_fields%get(i)
+          call this%state_list%append(si)
        end do
     end if
 
     ! Allocate the storage for the RAM checkpoints
     allocate(this%state_storage(this%n_saves_memory, this%state_list%size()))
+
+    ! Write a status message with the parameters set
+    call neko_log%section("Checkpointing")
+
+    write(msg, '(A, A)') "Algorithm:                    ", trim(this%algorithm)
+    call neko_log%message(trim(msg))
+    write(msg, '(A,I0)') "Number of checkpoints in RAM: ", this%n_saves_memory
+    call neko_log%message(trim(msg))
+    write(msg, '(A, A)') "Checkpoint file name:         ", trim(this%filename)
+    call neko_log%message(trim(msg))
+    write(msg, '(A, A)') "Checkpoint file format:       ", trim(this%fmt)
+    call neko_log%message(trim(msg))
+
+    if (.not. this%keep_checkpoints) then
+       call neko_log%message("Checkpoint files will be deleted.")
+    else
+       call neko_log%message("Checkpoint files will be kept.")
+    end if
+
+    call neko_log%message("Fields in checkpoint:", NEKO_LOG_DEBUG)
+    do i = 1, this%state_list%size()
+       si => this%state_list%get(i)
+       call neko_log%message("  - " // trim(si%name), NEKO_LOG_DEBUG)
+    end do
+
+    call neko_log%end_section()
 
   end subroutine checkpoint_init_from_components
 
