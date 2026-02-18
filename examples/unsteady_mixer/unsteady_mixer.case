@@ -55,7 +55,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 500.0,
+            "Pe": 200.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
