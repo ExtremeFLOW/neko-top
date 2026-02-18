@@ -182,12 +182,12 @@ module optimizer
      end subroutine optimizer_validate
 
      !> Interface for writing the optimizer progress
-    subroutine optimizer_write(this, iter, problem)
-      import optimizer_t, simulation_t, problem_t, design_t
-      class(optimizer_t), intent(inout) :: this
-      integer, intent(in) :: iter
-      class(problem_t), intent(inout) :: problem
-    end subroutine optimizer_write
+     subroutine optimizer_write(this, iter, problem)
+       import optimizer_t, simulation_t, problem_t, design_t
+       class(optimizer_t), intent(inout) :: this
+       integer, intent(in) :: iter
+       class(problem_t), intent(inout) :: problem
+     end subroutine optimizer_write
 
      !> Interface for saving optimizer-specific components to checkpoint
      subroutine optimizer_save_checkpoint_components(this, filename, overwrite)
