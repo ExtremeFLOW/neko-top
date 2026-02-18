@@ -41,10 +41,13 @@ module simulation_checkpoint
   use time_state, only: time_state_t
   use chkp_output, only: chkp_output_t
   use field, only: field_t
+  use field_list, only: field_list_t
   use mpi_f08, only: MPI_WTIME
   use utils, only: neko_error
-  use field_math, only: field_copy, field_rzero
+  use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   implicit none
   private
 
@@ -73,15 +76,22 @@ module simulation_checkpoint
      integer :: first_valid_timestep = 2
      integer :: loaded_checkpoint = -1
 
+     ! Field pointers
+     type(field_t), pointer :: p => null()
+     type(field_t), pointer :: u => null()
+     type(field_t), pointer :: v => null()
+     type(field_t), pointer :: w => null()
+     type(field_list_t) :: s
+
      ! Structures to hold the checkpoint data
      type(chkp_output_t) :: chkp_output
-     type(field_t), dimension(:), allocatable :: p_list
-     type(field_t), dimension(:), allocatable :: u_list
-     type(field_t), dimension(:), allocatable :: v_list
-     type(field_t), dimension(:), allocatable :: w_list
+     type(host_array), dimension(:), allocatable :: p_list
+     type(host_array), dimension(:), allocatable :: u_list
+     type(host_array), dimension(:), allocatable :: v_list
+     type(host_array), dimension(:), allocatable :: w_list
 
      integer :: n_scalars = 0
-     type(field_t), dimension(:), allocatable :: s_list
+     type(host_array), dimension(:,:), allocatable :: s_list
 
    contains
      !> Initialization
@@ -101,11 +111,23 @@ module simulation_checkpoint
      !> Restore the forward simulation state
      procedure, public, pass(this) :: restore => checkpoint_restore
 
+     !> Save current data to the ram checkpoint at index
+     procedure, pass(this) :: save_data => checkpoint_save_data
+     !> Restore data from the ram checkpoint at index to the current state
+     procedure, pass(this) :: load_data => checkpoint_load_data
   end type simulation_checkpoint_t
+
+  type :: host_array
+     real(kind=rp), allocatable :: data(:)
+     integer :: size = 0
+   contains
+     procedure, pass(this) :: init => host_array_init
+     procedure, pass(this) :: free => host_array_free
+     procedure, pass(this) :: is_allocated => host_array_is_allocated
+  end type host_array
 
   ! ========================================================================== !
   ! Module procedures for our algorithm implementations.
-
 
   interface
      !> Save the current state of the simulation in a linear fashion
@@ -160,14 +182,11 @@ contains
     character(len=*), optional, intent(in) :: filename
     character(len=*), optional, intent(in) :: fmt
     logical, optional, intent(in) :: keep_checkpoints
-
-    class(scalar_scheme_t), pointer :: scalar_i
-    integer :: i, j
-    character(len=80) :: str
+    integer :: i
 
     call this%free()
 
-    ! Set internal parameters
+    ! Assign parameters from arguments or defaults
     this%enabled = .true.
     if (present(algorithm)) this%algorithm = algorithm
     if (present(filename)) this%filename = filename
@@ -175,14 +194,24 @@ contains
     if (present(fmt)) this%fmt = fmt
     if (present(keep_checkpoints)) this%keep_checkpoints = keep_checkpoints
 
-    if (allocated(neko_case%scalars)) then
-       this%n_scalars = size(neko_case%scalars%scalar_fields)
-    end if
-
-
     ! Initialize the Neko checkpoint output
     call this%chkp_output%init(neko_case%chkp, this%filename, fmt = this%fmt, &
          overwrite = .true.)
+
+    ! Assign fluid pointers
+    this%p => neko_case%fluid%p
+    this%u => neko_case%fluid%u
+    this%v => neko_case%fluid%v
+    this%w => neko_case%fluid%w
+
+    ! Assign scalar pointers
+    if (allocated(neko_case%scalars)) then
+       this%n_scalars = size(neko_case%scalars%scalar_fields)
+       call this%s%init(this%n_scalars)
+       do i = 1, this%n_scalars
+          call this%s%assign(i, neko_case%scalars%scalar_fields(i)%scalar%s)
+       end do
+    end if
 
     ! Allocate the RAM Checkpoints
     allocate(this%p_list(this%n_saves_memory))
@@ -190,37 +219,24 @@ contains
     allocate(this%v_list(this%n_saves_memory))
     allocate(this%w_list(this%n_saves_memory))
     if (this%n_scalars .gt. 0) then
-       this%n_scalars = size(neko_case%scalars%scalar_fields)
-       allocate(this%s_list(this%n_saves_memory * this%n_scalars))
+       allocate(this%s_list(this%n_saves_memory, this%n_scalars))
     end if
-
-    do i = 1, this%n_saves_memory
-       write(str, '(A,I0)') "p_chkp_", i
-       call this%p_list(i)%init(neko_case%fluid%p%dof, str)
-       write(str, '(A,I0)') "u_chkp_", i
-       call this%u_list(i)%init(neko_case%fluid%u%dof, str)
-       write(str, '(A,I0)') "v_chkp_", i
-       call this%v_list(i)%init(neko_case%fluid%v%dof, str)
-       write(str, '(A,I0)') "w_chkp_", i
-       call this%w_list(i)%init(neko_case%fluid%w%dof, str)
-       if (this%n_scalars .gt. 0) then
-          do j = 1, this%n_scalars
-             write(str, '(A,I0,A,I0)') "s_chkp_", i, "_", j
-             scalar_i => neko_case%scalars%scalar_fields(j)%scalar
-             call this%s_list((i - 1) * this%n_scalars + j)%init(scalar_i%s%dof, str)
-          end do
-       end if
-    end do
 
   end subroutine checkpoint_init_from_components
 
   !> Free
   subroutine checkpoint_free(this)
     class(simulation_checkpoint_t), intent(inout) :: this
-    integer :: i
+    integer :: i, j
     character(len=1024) :: file_name
     logical :: exists
     integer :: stat, unit
+
+    if (associated(this%p)) nullify(this%p)
+    if (associated(this%u)) nullify(this%u)
+    if (associated(this%v)) nullify(this%v)
+    if (associated(this%w)) nullify(this%w)
+    call this%s%free()
 
     ! Free the RAM Checkpoints
     do i = 1, this%n_saves_memory
@@ -231,10 +247,11 @@ contains
     end do
 
     if (allocated(this%s_list)) then
-       do i = 1, size(this%s_list)
-          call this%s_list(i)%free()
+       do i = 1, size(this%s_list, 1)
+          do j = 1, size(this%s_list, 2)
+             call this%s_list(i, j)%free()
+          end do
        end do
-       this%n_scalars = 0
     end if
 
     if (allocated(this%p_list)) deallocate(this%p_list)
@@ -265,6 +282,7 @@ contains
     this%n_saves_memory = 10
     this%keep_checkpoints = .true.
 
+    this%n_scalars = 0
     this%n_saves_disc = 0
     this%n_timesteps = 0
     this%first_valid_timestep = 2
@@ -324,13 +342,130 @@ contains
     call profiler_end_region("Checkpoint restore")
   end subroutine checkpoint_restore
 
+  !> Save current data to the RAM checkpoint at the specified index.
+  !! @param this The checkpoint object.
+  !! @param index The index in the RAM checkpoint to save to.
+  subroutine checkpoint_save_data(this, index)
+    class(simulation_checkpoint_t), intent(inout) :: this
+    integer, intent(in) :: index
+    type(field_t), pointer :: si
+    integer :: i
+    character(len=1024) :: msg
+
+    if (index .lt. 1 .or. index .gt. this%n_saves_memory) then
+       write(msg, '(A,I0,A,I0,A)') "Checkpoint save index ", index, &
+            " is out of range [1, ", this%n_saves_memory, "]"
+       call neko_error(trim(msg))
+    end if
+
+    ! Allocate the RAM checkpoint if not already allocated
+    if (.not. this%p_list(index)%is_allocated()) then
+       call this%p_list(index)%init(this%p%size())
+    end if
+    if (.not. this%u_list(index)%is_allocated()) then
+       call this%u_list(index)%init(this%u%size())
+    end if
+    if (.not. this%v_list(index)%is_allocated()) then
+       call this%v_list(index)%init(this%v%size())
+    end if
+    if (.not. this%w_list(index)%is_allocated()) then
+       call this%w_list(index)%init(this%w%size())
+    end if
+
+    if (this%n_scalars .gt. 0) then
+       do i = 1, this%n_scalars
+          if (.not. this%s_list(index, i)%is_allocated()) then
+             si => this%s%get(i)
+             call this%s_list(index, i)%init(si%size())
+          end if
+       end do
+    end if
+
+    ! Save the current iterates to memory
+    if (NEKO_BCKND_DEVICE .eq. 0) then
+       call copy(this%p_list(index)%data, this%p%x, this%p%size())
+       call copy(this%u_list(index)%data, this%u%x, this%u%size())
+       call copy(this%v_list(index)%data, this%v%x, this%v%size())
+       call copy(this%w_list(index)%data, this%w%x, this%w%size())
+       if (this%n_scalars .gt. 0) then
+          do i = 1, this%n_scalars
+             si => this%s%get(i)
+             call copy(this%s_list(index, i)%data, si%x, si%size())
+          end do
+       end if
+    else
+       call device_memcpy(this%p_list(index)%data, this%p%x_d, this%p%size(), &
+            DEVICE_TO_HOST, .false.)
+       call device_memcpy(this%u_list(index)%data, this%u%x_d, this%u%size(), &
+            DEVICE_TO_HOST, .false.)
+       call device_memcpy(this%v_list(index)%data, this%v%x_d, this%v%size(), &
+            DEVICE_TO_HOST, .false.)
+       call device_memcpy(this%w_list(index)%data, this%w%x_d, this%w%size(), &
+            DEVICE_TO_HOST, this%n_scalars .eq. 0)
+       if (this%n_scalars .gt. 0) then
+          do i = 1, this%n_scalars
+             si => this%s%get(i)
+             call device_memcpy(this%s_list(index, i)%data, si%x_d, si%size(), &
+                  DEVICE_TO_HOST, this%n_scalars .eq. i)
+          end do
+       end if
+    end if
+  end subroutine checkpoint_save_data
+
+  !> Restore data from the RAM checkpoint at the specified index to the current state.
+  !! @param this The checkpoint object.
+  !! @param index The index in the RAM checkpoint to restore from.
+  subroutine checkpoint_load_data(this, index)
+    class(simulation_checkpoint_t), intent(inout) :: this
+    integer, intent(in) :: index
+    type(field_t), pointer :: si
+    character(len=1024) :: msg
+    integer :: i
+
+    if (index .lt. 1 .or. index .gt. this%n_saves_memory) then
+       write(msg, '(A,I0,A,I0,A)') "Checkpoint save index ", index, &
+            " is out of range [1, ", this%n_saves_memory, "]"
+       call neko_error(trim(msg))
+    end if
+
+    ! Save the current iterates to memory
+    if (NEKO_BCKND_DEVICE .eq. 0) then
+       call copy(this%p%x, this%p_list(index)%data, this%p%size())
+       call copy(this%u%x, this%u_list(index)%data, this%u%size())
+       call copy(this%v%x, this%v_list(index)%data, this%v%size())
+       call copy(this%w%x, this%w_list(index)%data, this%w%size())
+       if (this%n_scalars .gt. 0) then
+          do i = 1, this%n_scalars
+             si => this%s%get(i)
+             call copy(si%x, this%s_list(index, i)%data, si%size())
+          end do
+       end if
+    else
+       call device_memcpy(this%p_list(index)%data, this%p%x_d, this%p%size(), &
+            HOST_TO_DEVICE, .false.)
+       call device_memcpy(this%u_list(index)%data, this%u%x_d, this%u%size(), &
+            HOST_TO_DEVICE, .false.)
+       call device_memcpy(this%v_list(index)%data, this%v%x_d, this%v%size(), &
+            HOST_TO_DEVICE, .false.)
+       call device_memcpy(this%w_list(index)%data, this%w%x_d, this%w%size(), &
+            HOST_TO_DEVICE, this%n_scalars .eq. 0)
+       if (this%n_scalars .gt. 0) then
+          do i = 1, this%n_scalars
+             si => this%s%get(i)
+             call device_memcpy(this%s_list(index, i)%data, si%x_d, si%size(), &
+                  HOST_TO_DEVICE, this%n_scalars .eq. i)
+          end do
+       end if
+    end if
+  end subroutine checkpoint_load_data
+
   ! ========================================================================== !
   ! Meta handling
 
   !> Reset the checkpoint data
   subroutine checkpoint_reset(this)
     class(simulation_checkpoint_t), intent(inout) :: this
-    integer :: i
+    integer :: i, j
 
     if (.not. this%enabled) return
 
@@ -340,17 +475,49 @@ contains
     this%n_timesteps = 0
 
     do i = 1, this%n_saves_memory
-       call field_rzero(this%p_list(i))
-       call field_rzero(this%u_list(i))
-       call field_rzero(this%v_list(i))
-       call field_rzero(this%w_list(i))
+       call rzero(this%p_list(i)%data, this%p_list(i)%size)
+       call rzero(this%u_list(i)%data, this%u_list(i)%size)
+       call rzero(this%v_list(i)%data, this%v_list(i)%size)
+       call rzero(this%w_list(i)%data, this%w_list(i)%size)
     end do
 
     if (allocated(this%s_list)) then
-       do i = 1, size(this%s_list)
-          call field_rzero(this%s_list(i))
+       do i = 1, size(this%s_list, 1)
+          do j = 1, size(this%s_list, 2)
+             call rzero(this%s_list(i, j)%data, this%s_list(i, j)%size)
+          end do
        end do
     end if
   end subroutine checkpoint_reset
+
+  ! -------------------------------------------------------------------------- !
+  ! Host array routines
+
+  subroutine host_array_init(this, size)
+    class(host_array), intent(inout) :: this
+    integer, intent(in) :: size
+
+    call this%free()
+    this%size = size
+    allocate(this%data(size))
+    call rzero(this%data, this%size)
+
+  end subroutine host_array_init
+
+  subroutine host_array_free(this)
+    class(host_array), intent(inout) :: this
+
+    this%size = 0
+    if (allocated(this%data)) deallocate(this%data)
+
+  end subroutine host_array_free
+
+  pure function host_array_is_allocated(this) result(is_alloc)
+    class(host_array), intent(in) :: this
+    logical :: is_alloc
+
+    is_alloc = allocated(this%data)
+
+  end function host_array_is_allocated
 
 end module simulation_checkpoint
