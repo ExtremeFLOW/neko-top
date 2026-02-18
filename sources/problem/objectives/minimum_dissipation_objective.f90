@@ -303,7 +303,9 @@ contains
 
   end subroutine minimum_dissipation_update_sensitivity
 
-  !> Number of log entries
+  !> Return number of log entries for minimum dissipation objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
   function minimum_dissipation_get_log_size(this) result(n)
     class(minimum_dissipation_objective_t), intent(in) :: this
     integer :: n
@@ -311,7 +313,9 @@ contains
     n = 1
   end function minimum_dissipation_get_log_size
 
-  !> Header labels for log entries
+  !> Populate log header labels for minimum dissipation objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine minimum_dissipation_get_log_headers(this, headers)
     class(minimum_dissipation_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -322,7 +326,9 @@ contains
 
   end subroutine minimum_dissipation_get_log_headers
 
-  !> Values for log entries
+  !> Populate log values for minimum dissipation objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine minimum_dissipation_get_log_values(this, values)
     class(minimum_dissipation_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

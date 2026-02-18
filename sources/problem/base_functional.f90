@@ -188,7 +188,9 @@ contains
     sensitivity = this%sensitivity
   end subroutine functional_get_sensitivity
 
-  !> Number of log entries for this functional
+  !> Return number of log entries for this functional.
+  !! @param[in] this The functional object.
+  !! @return n Number of log entries.
   function functional_get_log_size(this) result(n)
     class(base_functional_t), intent(in) :: this
     integer :: n
@@ -196,7 +198,9 @@ contains
     n = 1
   end function functional_get_log_size
 
-  !> Header labels for this functional's log entries
+  !> Populate log header labels for this functional.
+  !! @param[in] this The functional object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine functional_get_log_headers(this, headers)
     class(base_functional_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -204,7 +208,9 @@ contains
     headers(1) = trim(this%name)
   end subroutine functional_get_log_headers
 
-  !> Values for this functional's log entries
+  !> Populate log values for this functional.
+  !! @param[in] this The functional object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine functional_get_log_values(this, values)
     class(base_functional_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

@@ -283,7 +283,9 @@ contains
 
   end subroutine augmented_lagrangian_update_sensitivity
 
-  !> Number of log entries
+  !> Return number of log entries for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
   function augmented_lagrangian_get_log_size(this) result(n)
     class(augmented_lagrangian_objective_t), intent(in) :: this
     integer :: n
@@ -291,14 +293,18 @@ contains
     n = 0
   end function augmented_lagrangian_get_log_size
 
-  !> Header labels for log entries
+  !> Populate log header labels for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine augmented_lagrangian_get_log_headers(this, headers)
     class(augmented_lagrangian_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
     return
   end subroutine augmented_lagrangian_get_log_headers
 
-  !> Values for log entries
+  !> Populate log values for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine augmented_lagrangian_get_log_values(this, values)
     class(augmented_lagrangian_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

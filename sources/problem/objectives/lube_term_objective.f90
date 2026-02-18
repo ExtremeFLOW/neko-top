@@ -384,7 +384,9 @@ contains
 
   end subroutine lube_term_update_sensitivity
 
-  !> Number of log entries
+  !> Return number of log entries for lube term objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
   function lube_term_get_log_size(this) result(n)
     class(lube_term_objective_t), intent(in) :: this
     integer :: n
@@ -392,7 +394,9 @@ contains
     n = 1
   end function lube_term_get_log_size
 
-  !> Header labels for log entries
+  !> Populate log header labels for lube term objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine lube_term_get_log_headers(this, headers)
     class(lube_term_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -403,7 +407,9 @@ contains
 
   end subroutine lube_term_get_log_headers
 
-  !> Values for log entries
+  !> Populate log values for lube term objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine lube_term_get_log_values(this, values)
     class(lube_term_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

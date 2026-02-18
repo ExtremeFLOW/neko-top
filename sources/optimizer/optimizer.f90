@@ -455,7 +455,13 @@ contains
   ! ========================================================================== !
   ! Logging helpers
 
-  !> Initialize optimization log
+  !> Initialize optimization log.
+  !! @param[inout] this The optimizer object.
+  !! @param[in] problem The problem object.
+  !! @param[in] extra_headers Comma-separated extra header labels.
+  !! @param[in] extra_size Number of extra log entries.
+  !! @param[in] include_constraints Include constraints in the log.
+  !! @param[in] filename Output filename for the log.
   subroutine optimizer_init_log(this, problem, extra_headers, extra_size, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -505,7 +511,11 @@ contains
     this%log_initialized = .true.
   end subroutine optimizer_init_log
 
-  !> Write optimization log entry
+  !> Write optimization log entry.
+  !! @param[inout] this The optimizer object.
+  !! @param[in] iter Current iteration number.
+  !! @param[in] problem The problem object.
+  !! @param[in] extra_values Extra log values appended after problem entries.
   subroutine optimizer_write_log(this, iter, problem, extra_values)
     class(optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter

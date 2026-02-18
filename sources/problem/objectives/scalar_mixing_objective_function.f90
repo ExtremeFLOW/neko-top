@@ -282,7 +282,9 @@ contains
 
   end subroutine scalar_mixing_update_sensitivity
 
-  !> Number of log entries
+  !> Return number of log entries for scalar mixing objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
   function scalar_mixing_get_log_size(this) result(n)
     class(scalar_mixing_objective_t), intent(in) :: this
     integer :: n
@@ -290,7 +292,9 @@ contains
     n = 1
   end function scalar_mixing_get_log_size
 
-  !> Header labels for log entries
+  !> Populate log header labels for scalar mixing objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine scalar_mixing_get_log_headers(this, headers)
     class(scalar_mixing_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -301,7 +305,9 @@ contains
 
   end subroutine scalar_mixing_get_log_headers
 
-  !> Values for log entries
+  !> Populate log values for scalar mixing objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine scalar_mixing_get_log_values(this, values)
     class(scalar_mixing_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

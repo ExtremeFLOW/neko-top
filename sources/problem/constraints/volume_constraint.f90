@@ -371,7 +371,9 @@ contains
 
   end function volume_brinkman_design
 
-  !> Number of log entries
+  !> Return number of log entries for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @return n Number of log entries.
   function volume_constraint_get_log_size(this) result(n)
     class(volume_constraint_t), intent(in) :: this
     integer :: n
@@ -379,7 +381,9 @@ contains
     n = 2
   end function volume_constraint_get_log_size
 
-  !> Header labels for log entries
+  !> Populate log header labels for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine volume_constraint_get_log_headers(this, headers)
     class(volume_constraint_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -391,7 +395,9 @@ contains
 
   end subroutine volume_constraint_get_log_headers
 
-  !> Values for log entries
+  !> Populate log values for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine volume_constraint_get_log_values(this, values)
     class(volume_constraint_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

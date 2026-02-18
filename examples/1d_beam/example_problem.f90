@@ -264,7 +264,9 @@ contains
     call Delta%free()
   end subroutine deflection_con_update_sensitivity
 
-  !> Log sizing and values for tip deflection constraint
+  !> Return number of log entries for tip deflection constraint.
+  !! @param[in] this The constraint object.
+  !! @return n Number of log entries.
   function deflection_con_get_log_size(this) result(n)
     class(deflection_con), intent(in) :: this
     integer :: n
@@ -272,6 +274,9 @@ contains
     n = 3
   end function deflection_con_get_log_size
 
+  !> Populate log header labels for tip deflection constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine deflection_con_get_log_headers(this, headers)
     class(deflection_con), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -284,6 +289,9 @@ contains
     headers(3) = trim(prefix) // '.max'
   end subroutine deflection_con_get_log_headers
 
+  !> Populate log values for tip deflection constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine deflection_con_get_log_values(this, values)
     class(deflection_con), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
@@ -356,7 +364,9 @@ contains
     end if
   end subroutine beamweight_update_sensitivity
 
-  !> Log sizing and values for beam weight objective
+  !> Return number of log entries for beam weight objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
   function beamweight_get_log_size(this) result(n)
     class(beamweight_obj), intent(in) :: this
     integer :: n
@@ -364,6 +374,9 @@ contains
     n = 2
   end function beamweight_get_log_size
 
+  !> Populate log header labels for beam weight objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine beamweight_get_log_headers(this, headers)
     class(beamweight_obj), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -375,6 +388,9 @@ contains
     headers(2) = trim(prefix) // '.weight'
   end subroutine beamweight_get_log_headers
 
+  !> Populate log values for beam weight objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine beamweight_get_log_values(this, values)
     class(beamweight_obj), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
@@ -540,7 +556,9 @@ contains
     deallocate(local_sensitivity)
   end subroutine stress_con_update_sensitivity
 
-  !> Log sizing and values for stress constraint
+  !> Return number of log entries for stress constraint.
+  !! @param[in] this The constraint object.
+  !! @return n Number of log entries.
   function stress_con_get_log_size(this) result(n)
     class(stress_con), intent(in) :: this
     integer :: n
@@ -548,6 +566,9 @@ contains
     n = 4
   end function stress_con_get_log_size
 
+  !> Populate log header labels for stress constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] headers Header labels for each log entry.
   subroutine stress_con_get_log_headers(this, headers)
     class(stress_con), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
@@ -561,6 +582,9 @@ contains
     headers(4) = trim(prefix) // '.element'
   end subroutine stress_con_get_log_headers
 
+  !> Populate log values for stress constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] values Values corresponding to the log headers.
   subroutine stress_con_get_log_values(this, values)
     class(stress_con), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)

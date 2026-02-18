@@ -256,6 +256,9 @@ contains
   end subroutine problem_write
 
   !> Fill optimization log values in caller-provided array.
+  !! @param[in] this The problem object.
+  !! @param[out] values Array to populate with log values.
+  !! @param[in] include_constraints Include constraints in the log values.
   subroutine problem_get_log_values(this, values, include_constraints)
     class(problem_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
@@ -915,6 +918,9 @@ contains
   end function problem_get_num_constraints
 
   !> Return the header for the problem.
+  !! @param[in] this The problem object.
+  !! @param[in] include_constraints Include constraints in the header.
+  !! @return buff Comma-separated header string.
   function problem_get_log_header(this, include_constraints) result(buff)
     class(problem_t), intent(in) :: this
     logical, intent(in), optional :: include_constraints
@@ -963,7 +969,10 @@ contains
 
   end function problem_get_log_header
 
-  !> Return the base log size (excluding iter and optimizer extras)
+  !> Return the base log size (excluding iter and optimizer extras).
+  !! @param[in] this The problem object.
+  !! @param[in] include_constraints Include constraints in the size count.
+  !! @return n Number of log entries excluding iteration and optimizer extras.
   function problem_get_log_size(this, include_constraints) result(n)
     class(problem_t), intent(in) :: this
     logical, intent(in), optional :: include_constraints
