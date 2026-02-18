@@ -77,21 +77,11 @@ module simulation_checkpoint
      integer :: loaded_checkpoint = -1
 
      ! Field pointers
-     type(field_t), pointer :: p => null()
-     type(field_t), pointer :: u => null()
-     type(field_t), pointer :: v => null()
-     type(field_t), pointer :: w => null()
-     type(field_list_t) :: s
+     type(field_list_t) :: state_list
+     type(host_array), dimension(:,:), allocatable :: state_storage
 
      ! Structures to hold the checkpoint data
      type(chkp_output_t) :: chkp_output
-     type(host_array), dimension(:), allocatable :: p_list
-     type(host_array), dimension(:), allocatable :: u_list
-     type(host_array), dimension(:), allocatable :: v_list
-     type(host_array), dimension(:), allocatable :: w_list
-
-     integer :: n_scalars = 0
-     type(host_array), dimension(:,:), allocatable :: s_list
 
    contains
      !> Initialization
@@ -166,7 +156,7 @@ contains
     call json_get_or_default(params, "filename", filename, "checkpoint")
     call json_get_or_default(params, "format", fmt, "chkp")
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
-         .true.)
+         .false.)
 
     call this%init_from_components(neko_case, algorithm, n_saves_memory, &
          filename, fmt, keep_checkpoints)
@@ -199,28 +189,20 @@ contains
          overwrite = .true.)
 
     ! Assign fluid pointers
-    this%p => neko_case%fluid%p
-    this%u => neko_case%fluid%u
-    this%v => neko_case%fluid%v
-    this%w => neko_case%fluid%w
+    call this%state_list%append(neko_case%fluid%p)
+    call this%state_list%append(neko_case%fluid%u)
+    call this%state_list%append(neko_case%fluid%v)
+    call this%state_list%append(neko_case%fluid%w)
 
     ! Assign scalar pointers
     if (allocated(neko_case%scalars)) then
-       this%n_scalars = size(neko_case%scalars%scalar_fields)
-       call this%s%init(this%n_scalars)
-       do i = 1, this%n_scalars
-          call this%s%assign(i, neko_case%scalars%scalar_fields(i)%scalar%s)
+       do i = 1, size(neko_case%scalars%scalar_fields)
+          call this%state_list%append(neko_case%scalars%scalar_fields(i)%scalar%s)
        end do
     end if
 
-    ! Allocate the RAM Checkpoints
-    allocate(this%p_list(this%n_saves_memory))
-    allocate(this%u_list(this%n_saves_memory))
-    allocate(this%v_list(this%n_saves_memory))
-    allocate(this%w_list(this%n_saves_memory))
-    if (this%n_scalars .gt. 0) then
-       allocate(this%s_list(this%n_saves_memory, this%n_scalars))
-    end if
+    ! Allocate the storage for the RAM checkpoints
+    allocate(this%state_storage(this%n_saves_memory, this%state_list%size()))
 
   end subroutine checkpoint_init_from_components
 
@@ -232,33 +214,17 @@ contains
     logical :: exists
     integer :: stat, unit
 
-    if (associated(this%p)) nullify(this%p)
-    if (associated(this%u)) nullify(this%u)
-    if (associated(this%v)) nullify(this%v)
-    if (associated(this%w)) nullify(this%w)
-    call this%s%free()
-
     ! Free the RAM Checkpoints
-    do i = 1, this%n_saves_memory
-       if (allocated(this%p_list)) call this%p_list(i)%free()
-       if (allocated(this%u_list)) call this%u_list(i)%free()
-       if (allocated(this%v_list)) call this%v_list(i)%free()
-       if (allocated(this%w_list)) call this%w_list(i)%free()
-    end do
-
-    if (allocated(this%s_list)) then
-       do i = 1, size(this%s_list, 1)
-          do j = 1, size(this%s_list, 2)
-             call this%s_list(i, j)%free()
+    if (allocated(this%state_storage)) then
+       do i = 1, this%n_saves_memory
+          do j = 1, this%state_list%size()
+             call this%state_storage(i, j)%free()
           end do
        end do
     end if
 
-    if (allocated(this%p_list)) deallocate(this%p_list)
-    if (allocated(this%u_list)) deallocate(this%u_list)
-    if (allocated(this%v_list)) deallocate(this%v_list)
-    if (allocated(this%w_list)) deallocate(this%w_list)
-    if (allocated(this%s_list)) deallocate(this%s_list)
+    call this%state_list%free()
+    if (allocated(this%state_storage)) deallocate(this%state_storage)
 
     ! Delete the checkpoint file list
     if (.not. this%keep_checkpoints) then
@@ -282,7 +248,6 @@ contains
     this%n_saves_memory = 10
     this%keep_checkpoints = .true.
 
-    this%n_scalars = 0
     this%n_saves_disc = 0
     this%n_timesteps = 0
     this%first_valid_timestep = 2
@@ -348,7 +313,7 @@ contains
   subroutine checkpoint_save_data(this, index)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: index
-    type(field_t), pointer :: si
+    type(field_t), pointer :: si !< Pointer to the i'th state field
     integer :: i
     character(len=1024) :: msg
 
@@ -359,56 +324,25 @@ contains
     end if
 
     ! Allocate the RAM checkpoint if not already allocated
-    if (.not. this%p_list(index)%is_allocated()) then
-       call this%p_list(index)%init(this%p%size())
-    end if
-    if (.not. this%u_list(index)%is_allocated()) then
-       call this%u_list(index)%init(this%u%size())
-    end if
-    if (.not. this%v_list(index)%is_allocated()) then
-       call this%v_list(index)%init(this%v%size())
-    end if
-    if (.not. this%w_list(index)%is_allocated()) then
-       call this%w_list(index)%init(this%w%size())
-    end if
-
-    if (this%n_scalars .gt. 0) then
-       do i = 1, this%n_scalars
-          if (.not. this%s_list(index, i)%is_allocated()) then
-             si => this%s%get(i)
-             call this%s_list(index, i)%init(si%size())
-          end if
-       end do
-    end if
+    do i = 1, this%state_list%size()
+       if (.not. this%state_storage(index, i)%is_allocated()) then
+          si => this%state_list%get(i)
+          call this%state_storage(index, i)%init(si%size())
+       end if
+    end do
 
     ! Save the current iterates to memory
     if (NEKO_BCKND_DEVICE .eq. 0) then
-       call copy(this%p_list(index)%data, this%p%x, this%p%size())
-       call copy(this%u_list(index)%data, this%u%x, this%u%size())
-       call copy(this%v_list(index)%data, this%v%x, this%v%size())
-       call copy(this%w_list(index)%data, this%w%x, this%w%size())
-       if (this%n_scalars .gt. 0) then
-          do i = 1, this%n_scalars
-             si => this%s%get(i)
-             call copy(this%s_list(index, i)%data, si%x, si%size())
-          end do
-       end if
+       do i = 1, this%state_list%size()
+          si => this%state_list%get(i)
+          call copy(this%state_storage(index, i)%data, si%x, si%size())
+       end do
     else
-       call device_memcpy(this%p_list(index)%data, this%p%x_d, this%p%size(), &
-            DEVICE_TO_HOST, .false.)
-       call device_memcpy(this%u_list(index)%data, this%u%x_d, this%u%size(), &
-            DEVICE_TO_HOST, .false.)
-       call device_memcpy(this%v_list(index)%data, this%v%x_d, this%v%size(), &
-            DEVICE_TO_HOST, .false.)
-       call device_memcpy(this%w_list(index)%data, this%w%x_d, this%w%size(), &
-            DEVICE_TO_HOST, this%n_scalars .eq. 0)
-       if (this%n_scalars .gt. 0) then
-          do i = 1, this%n_scalars
-             si => this%s%get(i)
-             call device_memcpy(this%s_list(index, i)%data, si%x_d, si%size(), &
-                  DEVICE_TO_HOST, this%n_scalars .eq. i)
-          end do
-       end if
+       do i = 1, this%state_list%size()
+          si => this%state_list%get(i)
+          call device_memcpy(this%state_storage(index, i)%data, si%x_d, &
+               si%size(), DEVICE_TO_HOST, this%state_list%size() .eq. i)
+       end do
     end if
   end subroutine checkpoint_save_data
 
@@ -430,32 +364,17 @@ contains
 
     ! Save the current iterates to memory
     if (NEKO_BCKND_DEVICE .eq. 0) then
-       call copy(this%p%x, this%p_list(index)%data, this%p%size())
-       call copy(this%u%x, this%u_list(index)%data, this%u%size())
-       call copy(this%v%x, this%v_list(index)%data, this%v%size())
-       call copy(this%w%x, this%w_list(index)%data, this%w%size())
-       if (this%n_scalars .gt. 0) then
-          do i = 1, this%n_scalars
-             si => this%s%get(i)
-             call copy(si%x, this%s_list(index, i)%data, si%size())
-          end do
-       end if
+       do i = 1, this%state_list%size()
+          si => this%state_list%get(i)
+          call copy(si%x, this%state_storage(index, i)%data, si%size())
+       end do
     else
-       call device_memcpy(this%p_list(index)%data, this%p%x_d, this%p%size(), &
-            HOST_TO_DEVICE, .false.)
-       call device_memcpy(this%u_list(index)%data, this%u%x_d, this%u%size(), &
-            HOST_TO_DEVICE, .false.)
-       call device_memcpy(this%v_list(index)%data, this%v%x_d, this%v%size(), &
-            HOST_TO_DEVICE, .false.)
-       call device_memcpy(this%w_list(index)%data, this%w%x_d, this%w%size(), &
-            HOST_TO_DEVICE, this%n_scalars .eq. 0)
-       if (this%n_scalars .gt. 0) then
-          do i = 1, this%n_scalars
-             si => this%s%get(i)
-             call device_memcpy(this%s_list(index, i)%data, si%x_d, si%size(), &
-                  HOST_TO_DEVICE, this%n_scalars .eq. i)
-          end do
-       end if
+       do i = 1, this%state_list%size()
+          si => this%state_list%get(i)
+          call device_memcpy(this%state_storage(index, i)%data, si%x_d, &
+               si%size(), HOST_TO_DEVICE, this%state_list%size() .eq. i)
+       end do
+
     end if
   end subroutine checkpoint_load_data
 
@@ -474,20 +393,13 @@ contains
     this%n_saves_disc = 0
     this%n_timesteps = 0
 
-    do i = 1, this%n_saves_memory
-       call rzero(this%p_list(i)%data, this%p_list(i)%size)
-       call rzero(this%u_list(i)%data, this%u_list(i)%size)
-       call rzero(this%v_list(i)%data, this%v_list(i)%size)
-       call rzero(this%w_list(i)%data, this%w_list(i)%size)
+    do i = 1, size(this%state_storage, 1)
+       do j = 1, size(this%state_storage, 2)
+          call rzero(this%state_storage(i, j)%data, &
+               this%state_storage(i, j)%size)
+       end do
     end do
 
-    if (allocated(this%s_list)) then
-       do i = 1, size(this%s_list, 1)
-          do j = 1, size(this%s_list, 2)
-             call rzero(this%s_list(i, j)%data, this%s_list(i, j)%size)
-          end do
-       end do
-    end if
   end subroutine checkpoint_reset
 
   ! -------------------------------------------------------------------------- !
