@@ -458,5 +458,4 @@ contains
 
     deallocate(local_sensitivity)
   end subroutine stress_con_update_sensitivity
-
 end module example_problem_1d_beam
