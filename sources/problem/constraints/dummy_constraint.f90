@@ -65,7 +65,6 @@ module dummy_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           dummy_constraint_update_sensitivity
-
   end type dummy_constraint_t
 
 contains
@@ -116,4 +115,5 @@ contains
     class(dummy_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
   end subroutine dummy_constraint_update_sensitivity
+
 end module dummy_constraint

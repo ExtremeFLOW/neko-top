@@ -98,6 +98,13 @@ module volume_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
+     !> Log sizing and values
+     procedure, public, pass(this) :: get_log_size => &
+          volume_constraint_get_log_size
+     procedure, public, pass(this) :: get_log_headers => &
+          volume_constraint_get_log_headers
+     procedure, public, pass(this) :: get_log_values => &
+          volume_constraint_get_log_values
 
      !> Computes the volume of the brinkman_design.
      procedure, private, pass(this) :: compute_volume
@@ -363,5 +370,48 @@ contains
     call neko_scratch_registry%relinquish(ind_value)
 
   end function volume_brinkman_design
+
+  !> Number of log entries
+  function volume_constraint_get_log_size(this) result(n)
+    class(volume_constraint_t), intent(in) :: this
+    integer :: n
+
+    n = 6
+  end function volume_constraint_get_log_size
+
+  !> Header labels for log entries
+  subroutine volume_constraint_get_log_headers(this, headers)
+    class(volume_constraint_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    prefix = trim(this%name)
+    headers(1) = prefix
+    headers(2) = trim(prefix) // '.limit'
+    headers(3) = trim(prefix) // '.vol_ratio'
+    headers(4) = trim(prefix) // '.vol_domain'
+    headers(5) = trim(prefix) // '.is_max'
+    headers(6) = trim(prefix) // '.mapped'
+  end subroutine volume_constraint_get_log_headers
+
+  !> Values for log entries
+  subroutine volume_constraint_get_log_values(this, values)
+    class(volume_constraint_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+    real(kind=rp) :: volume_ratio
+
+    if (this%is_max) then
+       volume_ratio = this%limit + this%value
+    else
+       volume_ratio = this%limit - this%value
+    end if
+
+    values(1) = this%value
+    values(2) = this%limit
+    values(3) = volume_ratio
+    values(4) = this%volume_domain
+    values(5) = merge(1.0_rp, 0.0_rp, this%is_max)
+    values(6) = merge(1.0_rp, 0.0_rp, this%if_mapping)
+  end subroutine volume_constraint_get_log_values
 
 end module volume_constraint

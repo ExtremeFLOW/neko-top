@@ -98,6 +98,12 @@ module base_functional
      procedure, pass(this) :: get_value => functional_get_value
      !> Get the sensitivity of the function
      procedure, pass(this) :: get_sensitivity => functional_get_sensitivity
+     !> Get number of log entries for this functional
+     procedure, pass(this) :: get_log_size => functional_get_log_size
+     !> Get header labels for this functional's log entries
+     procedure, pass(this) :: get_log_headers => functional_get_log_headers
+     !> Get values for this functional's log entries
+     procedure, pass(this) :: get_log_values => functional_get_log_values
      !> Set the value to zero
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
@@ -181,6 +187,30 @@ contains
 
     sensitivity = this%sensitivity
   end subroutine functional_get_sensitivity
+
+  !> Number of log entries for this functional
+  function functional_get_log_size(this) result(n)
+    class(base_functional_t), intent(in) :: this
+    integer :: n
+
+    n = 1
+  end function functional_get_log_size
+
+  !> Header labels for this functional's log entries
+  subroutine functional_get_log_headers(this, headers)
+    class(base_functional_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    headers(1) = trim(this%name)
+  end subroutine functional_get_log_headers
+
+  !> Values for this functional's log entries
+  subroutine functional_get_log_values(this, values)
+    class(base_functional_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    values(1) = this%value
+  end subroutine functional_get_log_values
 
   !> Zero value of the function
   subroutine functional_reset_value(this)

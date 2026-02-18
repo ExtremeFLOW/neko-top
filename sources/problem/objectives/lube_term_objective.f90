@@ -139,6 +139,13 @@ module lube_term_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           lube_term_update_sensitivity
+     !> Log sizing and values
+     procedure, public, pass(this) :: get_log_size => &
+          lube_term_get_log_size
+     procedure, public, pass(this) :: get_log_headers => &
+          lube_term_get_log_headers
+     procedure, public, pass(this) :: get_log_values => &
+          lube_term_get_log_values
 
   end type lube_term_objective_t
 
@@ -376,5 +383,39 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine lube_term_update_sensitivity
+
+  !> Number of log entries
+  function lube_term_get_log_size(this) result(n)
+    class(lube_term_objective_t), intent(in) :: this
+    integer :: n
+
+    n = 5
+  end function lube_term_get_log_size
+
+  !> Header labels for log entries
+  subroutine lube_term_get_log_headers(this, headers)
+    class(lube_term_objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    prefix = trim(this%name)
+    headers(1) = prefix
+    headers(2) = trim(prefix) // '.weight'
+    headers(3) = trim(prefix) // '.volume'
+    headers(4) = trim(prefix) // '.dealias_sens'
+    headers(5) = trim(prefix) // '.dealias_force'
+  end subroutine lube_term_get_log_headers
+
+  !> Values for log entries
+  subroutine lube_term_get_log_values(this, values)
+    class(lube_term_objective_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    values(1) = this%value
+    values(2) = this%weight
+    values(3) = this%volume
+    values(4) = merge(1.0_rp, 0.0_rp, this%dealias_sensitivity)
+    values(5) = merge(1.0_rp, 0.0_rp, this%dealias_forcing)
+  end subroutine lube_term_get_log_values
 
 end module lube_term_objective

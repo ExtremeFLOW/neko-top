@@ -105,6 +105,13 @@ module target_dissipation_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           target_dissipation_update_sensitivity
+     !> Log sizing and values
+     procedure, public, pass(this) :: get_log_size => &
+          target_dissipation_get_log_size
+     procedure, public, pass(this) :: get_log_headers => &
+          target_dissipation_get_log_headers
+     procedure, public, pass(this) :: get_log_values => &
+          target_dissipation_get_log_values
 
   end type target_dissipation_objective_t
 
@@ -287,5 +294,41 @@ contains
     class(design_t), intent(in) :: design
 
   end subroutine target_dissipation_update_sensitivity
+
+  !> Number of log entries
+  function target_dissipation_get_log_size(this) result(n)
+    class(target_dissipation_objective_t), intent(in) :: this
+    integer :: n
+
+    n = 6
+  end function target_dissipation_get_log_size
+
+  !> Header labels for log entries
+  subroutine target_dissipation_get_log_headers(this, headers)
+    class(target_dissipation_objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    prefix = trim(this%name)
+    headers(1) = prefix
+    headers(2) = trim(prefix) // '.weight'
+    headers(3) = trim(prefix) // '.current'
+    headers(4) = trim(prefix) // '.initial'
+    headers(5) = trim(prefix) // '.target'
+    headers(6) = trim(prefix) // '.first_time'
+  end subroutine target_dissipation_get_log_headers
+
+  !> Values for log entries
+  subroutine target_dissipation_get_log_values(this, values)
+    class(target_dissipation_objective_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    values(1) = this%value
+    values(2) = this%weight
+    values(3) = this%current_dissipation
+    values(4) = this%initial_dissipation
+    values(5) = this%target_fraction
+    values(6) = merge(1.0_rp, 0.0_rp, this%is_first_time)
+  end subroutine target_dissipation_get_log_values
 
 end module target_dissipation_objective
