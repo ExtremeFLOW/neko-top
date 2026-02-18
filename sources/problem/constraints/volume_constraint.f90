@@ -376,7 +376,7 @@ contains
     class(volume_constraint_t), intent(in) :: this
     integer :: n
 
-    n = 6
+    n = 2
   end function volume_constraint_get_log_size
 
   !> Header labels for log entries
@@ -387,11 +387,8 @@ contains
 
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.limit'
-    headers(3) = trim(prefix) // '.vol_ratio'
-    headers(4) = trim(prefix) // '.vol_domain'
-    headers(5) = trim(prefix) // '.is_max'
-    headers(6) = trim(prefix) // '.mapped'
+    headers(2) = trim(prefix) // '.volume'
+
   end subroutine volume_constraint_get_log_headers
 
   !> Values for log entries
@@ -407,11 +404,8 @@ contains
     end if
 
     values(1) = this%value
-    values(2) = this%limit
-    values(3) = volume_ratio
-    values(4) = this%volume_domain
-    values(5) = merge(1.0_rp, 0.0_rp, this%is_max)
-    values(6) = merge(1.0_rp, 0.0_rp, this%if_mapping)
+    values(2) = volume_ratio
+
   end subroutine volume_constraint_get_log_values
 
 end module volume_constraint

@@ -287,7 +287,7 @@ contains
     class(scalar_mixing_objective_t), intent(in) :: this
     integer :: n
 
-    n = 4
+    n = 1
   end function scalar_mixing_get_log_size
 
   !> Header labels for log entries
@@ -298,9 +298,7 @@ contains
 
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
-    headers(3) = trim(prefix) // '.phi_ref'
-    headers(4) = trim(prefix) // '.volume'
+
   end subroutine scalar_mixing_get_log_headers
 
   !> Values for log entries
@@ -309,9 +307,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
 
     values(1) = this%value
-    values(2) = this%weight
-    values(3) = this%phi_ref
-    values(4) = this%domain_volume
+
   end subroutine scalar_mixing_get_log_values
 
 end module scalar_mixing_objective

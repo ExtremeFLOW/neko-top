@@ -65,6 +65,13 @@ module dummy_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           dummy_constraint_update_sensitivity
+     !> Log sizing and values
+     procedure, public, pass(this) :: get_log_size => &
+          dummy_constraint_get_log_size
+     procedure, public, pass(this) :: get_log_headers => &
+          dummy_constraint_get_log_headers
+     procedure, public, pass(this) :: get_log_values => &
+          dummy_constraint_get_log_values
   end type dummy_constraint_t
 
 contains
@@ -115,5 +122,29 @@ contains
     class(dummy_constraint_t), intent(inout) :: this
     class(design_t), intent(in) :: design
   end subroutine dummy_constraint_update_sensitivity
+
+  !> Number of log entries
+  function dummy_constraint_get_log_size(this) result(n)
+    class(dummy_constraint_t), intent(in) :: this
+    integer :: n
+
+    n = 0
+  end function dummy_constraint_get_log_size
+
+  !> Header labels for log entries
+  subroutine dummy_constraint_get_log_headers(this, headers)
+    class(dummy_constraint_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    if (size(headers) .eq. 0) return
+  end subroutine dummy_constraint_get_log_headers
+
+  !> Values for log entries
+  subroutine dummy_constraint_get_log_values(this, values)
+    class(dummy_constraint_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    if (size(values) .eq. 0) return
+  end subroutine dummy_constraint_get_log_values
 
 end module dummy_constraint
