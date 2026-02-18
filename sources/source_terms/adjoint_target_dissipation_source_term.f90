@@ -54,7 +54,6 @@ module adjoint_target_dissipation_source_term
   use user_source_term, only: user_source_term_t
   use num_types, only: rp
   use field, only: field_t
-  use field_registry, only: neko_field_registry
   use math, only: rzero, copy, chsign, cfill, invcol2
   use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -234,7 +233,7 @@ contains
     v => this%v
     w => this%w
 
-    call neko_scratch_registry%request_field(result , temp_indices(1))
+    call neko_scratch_registry%request_field(result , temp_indices(1), .false.)
 
     ! compute the scaling to go in front of the forcing term
     scale_forcing = (this%current_dissipation / &
