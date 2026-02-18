@@ -316,7 +316,7 @@ contains
     class(target_dissipation_objective_t), intent(in) :: this
     integer :: n
 
-    n = 3
+    n = 4
   end function target_dissipation_get_log_size
 
   !> Header labels for log entries
@@ -332,6 +332,8 @@ contains
     headers(2) = trim(prefix) // '.current'
     if (size(headers) .lt. 3) return
     headers(3) = trim(prefix) // '.initial'
+    if (size(headers) .lt. 4) return
+    headers(4) = trim(prefix) // '.ratio'
 
   end subroutine target_dissipation_get_log_headers
 
@@ -346,6 +348,8 @@ contains
     values(2) = this%current_dissipation
     if (size(values) .lt. 3) return
     values(3) = this%initial_dissipation
+    if (size(values) .lt. 4) return
+    values(4) = this%current_dissipation / this%initial_dissipation
 
   end subroutine target_dissipation_get_log_values
 
