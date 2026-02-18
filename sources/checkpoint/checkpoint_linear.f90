@@ -54,16 +54,20 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    integer :: index, i, index_s
+    integer :: index, i, index_s, tstep
+    real(kind=rp) :: time
+
+    time = neko_case%time%t
+    tstep = neko_case%time%tstep
 
     ! We save to disc only every n_saves_memory time steps
-    index = modulo(neko_case%time%tstep, this%n_saves_memory)
+    index = modulo(tstep, this%n_saves_memory)
 
     ! Sample the checkpoint if needed
-    if (index .eq. 0 .or. neko_case%time%tstep .le. this%first_valid_timestep) then
-        this%loaded_checkpoint = neko_case%time%tstep
-       call this%chkp_output%set_counter(neko_case%time%tstep)
-       call this%chkp_output%sample(neko_case%time%t)
+    if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
+       this%loaded_checkpoint = tstep
+       call this%chkp_output%set_counter(tstep)
+       call this%chkp_output%sample(time)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
