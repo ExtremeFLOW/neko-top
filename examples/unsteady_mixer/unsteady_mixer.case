@@ -191,7 +191,7 @@
                 "type": "target_dissipation",
                 "mask_name": "optimization_domain",
                 "target": 1.5,
-                "weight": 0.1
+                "weight": 0.2
             },
         ]
     }
