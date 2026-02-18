@@ -271,7 +271,7 @@ contains
     class(deflection_con), intent(in) :: this
     integer :: n
 
-    n = 3
+    n = 2
   end function deflection_con_get_log_size
 
   !> Populate log header labels for tip deflection constraint.
@@ -286,7 +286,6 @@ contains
     prefix = trim(this%name)
     headers(1) = prefix
     headers(2) = trim(prefix) // '.tip'
-    headers(3) = trim(prefix) // '.max'
   end subroutine deflection_con_get_log_headers
 
   !> Populate log values for tip deflection constraint.
@@ -301,7 +300,6 @@ contains
     u_tip = (this%value + 1.0_rp) * u_tip_max
     values(1) = this%value
     values(2) = u_tip
-    values(3) = u_tip_max
   end subroutine deflection_con_get_log_values
 
   ! ========================================================================== !
@@ -371,7 +369,7 @@ contains
     class(beamweight_obj), intent(in) :: this
     integer :: n
 
-    n = 2
+    n = 1
   end function beamweight_get_log_size
 
   !> Populate log header labels for beam weight objective.
@@ -385,7 +383,6 @@ contains
     if (size(headers) .eq. 0) return
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
   end subroutine beamweight_get_log_headers
 
   !> Populate log values for beam weight objective.
@@ -397,7 +394,6 @@ contains
 
     if (size(values) .eq. 0) return
     values(1) = this%value
-    values(2) = this%weight
   end subroutine beamweight_get_log_values
 
   ! ========================================================================== !
@@ -563,7 +559,7 @@ contains
     class(stress_con), intent(in) :: this
     integer :: n
 
-    n = 4
+    n = 1
   end function stress_con_get_log_size
 
   !> Populate log header labels for stress constraint.
@@ -577,9 +573,6 @@ contains
     if (size(headers) .eq. 0) return
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.sigma'
-    headers(3) = trim(prefix) // '.sigma_max'
-    headers(4) = trim(prefix) // '.element'
   end subroutine stress_con_get_log_headers
 
   !> Populate log values for stress constraint.
@@ -593,8 +586,5 @@ contains
     if (size(values) .eq. 0) return
     sigma = (this%value + 1.0_rp) * this%sigma_max
     values(1) = this%value
-    values(2) = sigma
-    values(3) = this%sigma_max
-    values(4) = real(this%global_element_index, kind=rp)
   end subroutine stress_con_get_log_values
 end module example_problem_1d_beam
