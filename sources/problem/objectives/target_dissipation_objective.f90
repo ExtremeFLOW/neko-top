@@ -309,9 +309,12 @@ contains
     character(len=*), intent(out) :: headers(:)
     character(len=64) :: prefix
 
+    if (size(headers) .lt. 1) return
     prefix = trim(this%name)
     headers(1) = prefix
+    if (size(headers) .lt. 2) return
     headers(2) = trim(prefix) // '.current'
+    if (size(headers) .lt. 3) return
     headers(3) = trim(prefix) // '.initial'
 
   end subroutine target_dissipation_get_log_headers
@@ -321,8 +324,11 @@ contains
     class(target_dissipation_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
 
+    if (size(values) .lt. 1) return
     values(1) = this%value
+    if (size(values) .lt. 2) return
     values(2) = this%current_dissipation
+    if (size(values) .lt. 3) return
     values(3) = this%initial_dissipation
 
   end subroutine target_dissipation_get_log_values
