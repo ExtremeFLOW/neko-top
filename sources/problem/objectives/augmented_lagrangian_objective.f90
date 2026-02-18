@@ -288,19 +288,14 @@ contains
     class(augmented_lagrangian_objective_t), intent(in) :: this
     integer :: n
 
-    n = 3
+    n = 0
   end function augmented_lagrangian_get_log_size
 
   !> Header labels for log entries
   subroutine augmented_lagrangian_get_log_headers(this, headers)
     class(augmented_lagrangian_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
-
-    prefix = trim(this%name)
-    headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
-    headers(3) = trim(prefix) // '.dealias'
+    return
   end subroutine augmented_lagrangian_get_log_headers
 
   !> Values for log entries
@@ -308,9 +303,7 @@ contains
     class(augmented_lagrangian_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
 
-    values(1) = this%value
-    values(2) = this%weight
-    values(3) = merge(1.0_rp, 0.0_rp, this%dealias)
+    return
   end subroutine augmented_lagrangian_get_log_values
 
 end module augmented_lagrangian_objective

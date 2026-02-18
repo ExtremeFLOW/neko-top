@@ -278,21 +278,25 @@ contains
     offset = 2
     do i = 1, this%n_objectives
        n = this%objective_list(i)%objective%get_log_size()
-       allocate(tmp(n))
-       call this%objective_list(i)%objective%get_log_values(tmp)
-       values(offset:offset + n - 1) = tmp
-       offset = offset + n
-       deallocate(tmp)
+       if (n .gt. 0) then
+          allocate(tmp(n))
+          call this%objective_list(i)%objective%get_log_values(tmp)
+          values(offset:offset + n - 1) = tmp
+          offset = offset + n
+          deallocate(tmp)
+       end if
     end do
 
     if (do_constraints) then
        do i = 1, this%n_constraints
           n = this%constraint_list(i)%constraint%get_log_size()
-          allocate(tmp(n))
-          call this%constraint_list(i)%constraint%get_log_values(tmp)
-          values(offset:offset + n - 1) = tmp
-          offset = offset + n
-          deallocate(tmp)
+          if (n .gt. 0) then
+             allocate(tmp(n))
+             call this%constraint_list(i)%constraint%get_log_values(tmp)
+             values(offset:offset + n - 1) = tmp
+             offset = offset + n
+             deallocate(tmp)
+          end if
        end do
     end if
   end subroutine problem_get_log_values
@@ -929,27 +933,31 @@ contains
 
     do i = 1, this%get_n_objectives()
        n = this%objective_list(i)%objective%get_log_size()
-       allocate(headers(n))
-       call this%objective_list(i)%objective%get_log_headers(headers)
-       do j = 1, n
-          mini_buff = ""
-          write(mini_buff, '(", ", A)') trim(headers(j))
-          buff = trim(buff) // trim(mini_buff)
-       end do
-       deallocate(headers)
-    end do
-
-    if (do_constraints) then
-       do i = 1, this%get_n_constraints()
-          n = this%constraint_list(i)%constraint%get_log_size()
+       if (n .gt. 0) then
           allocate(headers(n))
-          call this%constraint_list(i)%constraint%get_log_headers(headers)
+          call this%objective_list(i)%objective%get_log_headers(headers)
           do j = 1, n
              mini_buff = ""
              write(mini_buff, '(", ", A)') trim(headers(j))
              buff = trim(buff) // trim(mini_buff)
           end do
           deallocate(headers)
+       end if
+    end do
+
+    if (do_constraints) then
+       do i = 1, this%get_n_constraints()
+          n = this%constraint_list(i)%constraint%get_log_size()
+          if (n .gt. 0) then
+             allocate(headers(n))
+             call this%constraint_list(i)%constraint%get_log_headers(headers)
+             do j = 1, n
+                mini_buff = ""
+                write(mini_buff, '(", ", A)') trim(headers(j))
+                buff = trim(buff) // trim(mini_buff)
+             end do
+             deallocate(headers)
+          end if
        end do
     end if
 

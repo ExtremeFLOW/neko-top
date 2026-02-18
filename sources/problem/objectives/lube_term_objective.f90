@@ -389,7 +389,7 @@ contains
     class(lube_term_objective_t), intent(in) :: this
     integer :: n
 
-    n = 5
+    n = 1
   end function lube_term_get_log_size
 
   !> Header labels for log entries
@@ -400,10 +400,7 @@ contains
 
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
-    headers(3) = trim(prefix) // '.volume'
-    headers(4) = trim(prefix) // '.dealias_sens'
-    headers(5) = trim(prefix) // '.dealias_force'
+
   end subroutine lube_term_get_log_headers
 
   !> Values for log entries
@@ -412,10 +409,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
 
     values(1) = this%value
-    values(2) = this%weight
-    values(3) = this%volume
-    values(4) = merge(1.0_rp, 0.0_rp, this%dealias_sensitivity)
-    values(5) = merge(1.0_rp, 0.0_rp, this%dealias_forcing)
+
   end subroutine lube_term_get_log_values
 
 end module lube_term_objective

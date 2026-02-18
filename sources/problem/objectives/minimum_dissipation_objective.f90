@@ -308,7 +308,7 @@ contains
     class(minimum_dissipation_objective_t), intent(in) :: this
     integer :: n
 
-    n = 3
+    n = 1
   end function minimum_dissipation_get_log_size
 
   !> Header labels for log entries
@@ -319,8 +319,7 @@ contains
 
     prefix = trim(this%name)
     headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
-    headers(3) = trim(prefix) // '.volume'
+
   end subroutine minimum_dissipation_get_log_headers
 
   !> Values for log entries
@@ -329,8 +328,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
 
     values(1) = this%value
-    values(2) = this%weight
-    values(3) = this%volume
+
   end subroutine minimum_dissipation_get_log_values
 
 end module minimum_dissipation_objective
