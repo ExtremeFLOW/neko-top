@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-module example_problem
+module example_problem_mma
   use num_types, only: rp
 
   use objective, only: objective_t
@@ -43,6 +43,8 @@ module example_problem
   use device, only: device_memcpy, DEVICE_TO_HOST
   use neko_config, only: NEKO_BCKND_DEVICE
   use vector_math, only: vector_sub2, vector_col2, vector_glsum, vector_cmult
+
+  use scratch_registry, only: neko_scratch_registry
 
   implicit none
   private
@@ -99,8 +101,15 @@ contains
   subroutine mma_obj_update_value(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: difference
-    type(vector_t) :: x_coordinate
+
+    type(vector_t), pointer :: difference
+    type(vector_t), pointer :: x_coordinate
+    integer :: ind(2)
+
+    call neko_scratch_registry%request(x_coordinate, ind(1), design%size(), &
+         .false.)
+    call neko_scratch_registry%request(difference, ind(2), design%size(), &
+         .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)
@@ -110,13 +119,22 @@ contains
 
     this%value = vector_glsum(difference, design%size()) / &
          real(design%size_global(), kind=rp)
+
+    call neko_scratch_registry%relinquish_vector(ind)
   end subroutine mma_obj_update_value
 
   subroutine mma_obj_update_sensitivity(this, design)
     class(mma_obj), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(vector_t) :: difference
-    type(vector_t) :: x_coordinate
+
+    type(vector_t), pointer :: difference
+    type(vector_t), pointer :: x_coordinate
+    integer :: ind(2)
+
+    call neko_scratch_registry%request(x_coordinate, ind(1), design%size(), &
+         .false.)
+    call neko_scratch_registry%request(difference, ind(2), design%size(), &
+         .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)
@@ -126,6 +144,7 @@ contains
          real(design%size_global(), kind=rp), design%size())
     this%sensitivity = difference
 
+    call neko_scratch_registry%relinquish_vector(ind)
   end subroutine mma_obj_update_sensitivity
 
-end module example_problem
+end module example_problem_mma

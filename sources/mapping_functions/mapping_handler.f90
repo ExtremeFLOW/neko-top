@@ -1,35 +1,36 @@
-
-! Copyright (c) 2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in mapping and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of mapping code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file mapping_handler.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `mapping_handler_t` type.
 module mapping_handler
@@ -50,6 +51,7 @@ module mapping_handler
   use utils, only: neko_warning
   use vector, only:vector_t
   use neko_ext, only: field_to_vector, vector_to_field
+  use gather_scatter, only : gs_op_add
   implicit none
   private
 
@@ -91,6 +93,8 @@ module mapping_handler
      !> Read from the json file and initialize the mapping_cascade.
      procedure, pass(this) :: add_json_mappings => &
           mapping_handler_add_json_mappings
+     !> Force a field to be continuous.
+     procedure, pass(this) :: make_cts => mapping_handler_make_cts
   end type mapping_handler_t
 
 contains
@@ -133,12 +137,17 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     ! Start by copying the first X_in into the tmp_fld_out to begin the
     ! cascade.
     call field_copy(tmp_fld_out, X_in)
+
+    ! enforce continuity in the field
+    call this%make_cts(tmp_fld_out)
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
@@ -172,8 +181,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     call vector_to_field(tmp_fld_in, X_in)
     call mapping_handler_apply_forward_field(this, tmp_fld_out, tmp_fld_in)
@@ -198,12 +209,17 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     ! Start by copying the first sens_in into the tmp_fld_out to begin the
     ! cascade.
     call field_copy(tmp_fld_out, sens_in)
+
+    ! enforce continuity in the field
+    call this%make_cts(tmp_fld_out)
 
     ! We enter the cascade
     if (allocated(this%mapping_cascade)) then
@@ -250,8 +266,10 @@ contains
     type(field_t), pointer :: tmp_fld_in, tmp_fld_out
     integer :: temp_indices(2)
 
-    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1))
-    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2))
+    call neko_scratch_registry%request_field(tmp_fld_in, temp_indices(1), &
+         .false.)
+    call neko_scratch_registry%request_field(tmp_fld_out, temp_indices(2), &
+         .false.)
 
     call vector_to_field(tmp_fld_in, X_in)
     call mapping_handler_apply_backward_field(this, tmp_fld_out, tmp_fld_in)
@@ -334,4 +352,21 @@ contains
     this%mapping_cascade(n_mappings + 1)%mapping = mapping
 
   end subroutine mapping_handler_add_mapping
+
+  !> Force a field to be continuous.
+  !! This can be done in many ways, here it is a simple average.
+  !! @param this The handler object
+  !! @param fld The field to be made continuous.
+  subroutine mapping_handler_make_cts(this, fld)
+    class(mapping_handler_t), intent(inout) :: this
+    type(field_t), intent(inout) :: fld
+
+    call this%coef%gs_h%op(fld, gs_op_add)
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(fld%x_d, this%coef%mult_d, fld%size())
+    else
+       call col2(fld%x, this%coef%mult, fld%size())
+    end if
+
+  end subroutine mapping_handler_make_cts
 end module mapping_handler

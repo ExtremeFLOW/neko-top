@@ -30,7 +30,7 @@
 ! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 ! POSSIBILITY OF SUCH DAMAGE.
 
-module example_problem
+module example_problem_1d_beam
   use num_types, only: rp
 
   use objective, only: objective_t
@@ -126,8 +126,9 @@ contains
     real(rp) :: Le, u_global
 
     ! Local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
 
     ! Project design variables to physical height h = (h_max - h_min)*x + h_min
     call vector_cmult(h, (h_max - h_min), n)
@@ -192,8 +193,9 @@ contains
     integer :: ierr, n, offset, k
 
     ! Local design values
-    call design%get_values(h)
     n = design%size()
+    call h%init(n)
+    call design%get_values(h)
     call sensitivity%init(n)
 
     ! Project design variables to physical height
@@ -266,8 +268,9 @@ contains
     real(rp) :: Le, global_mass
 
     ! Get local design values
-    call design%get_values(design_values)
     n = design%size()
+    call design_values%init(n)
+    call design%get_values(design_values)
 
     ! Project design variables to physical height !h = (h_max-h_min) x + h_min
     call vector_cmult(design_values, (h_max - h_min) )
@@ -347,37 +350,41 @@ contains
     ! Initialize to safe value
     this%value = 0.0_rp
 
-    ! This element is on our rank
-    ! Fetch the local design values
-    call design%get_values(h)
-    n = design%size()
-
-    ! Project design variables to physical height
-    call vector_cmult(h, (h_max - h_min), n)
-    call vector_cadd(h, h_min, n)
-
-    ! Global element length
-    Le = L_total / real(design%size_global(), kind=rp)
-
-    ! Start coordinate of this element
-    x_e = Le * real(this%global_element_index - 1, rp)
-
-    ! Section properties
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
-    end if
-    I_e = b * h%x(this%local_index)**3 / 12.0_rp
-    c_e = h%x(this%local_index) / 2.0_rp
-
-    ! Bending moment at this element
-    M_e = P * (L_total - x_e)
-
-    ! Stress in this element
-    sigma_e = M_e * c_e / I_e
-
     if (this%is_local) then
+
+       ! This element is on our rank
+       ! Fetch the local design values
+       n = design%size()
+       call h%init(n)
+       call design%get_values(h)
+
+       ! Project design variables to physical height
+       call vector_cmult(h, (h_max - h_min), n)
+       call vector_cadd(h, h_min, n)
+
+       ! Global element length
+       Le = L_total / real(design%size_global(), kind=rp)
+
+       ! Start coordinate of this element
+       x_e = Le * real(this%global_element_index - 1, rp)
+
+       ! Section properties
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       end if
+       I_e = b * h%x(this%local_index)**3 / 12.0_rp
+       c_e = h%x(this%local_index) / 2.0_rp
+
+       ! Bending moment at this element
+       M_e = P * (L_total - x_e)
+
+       ! Stress in this element
+       sigma_e = M_e * c_e / I_e
+
        ! Constraint value: stress <= sigma_max
        this%value = sigma_e / this%sigma_max - 1.0_rp
+
+       call h%free()
     end if
 
     ! Sum across all MPI ranks (only one rank will have non-zero value)
@@ -401,38 +408,42 @@ contains
     allocate(local_sensitivity(design%size()))
     local_sensitivity = 0.0_rp
 
-    ! This element is on our rank
-    ! Local design values
-    call design%get_values(h)
-    n = design%size()
-
-    ! Project design variables to physical height
-    call vector_cmult(h, (h_max - h_min), n)
-    call vector_cadd(h, h_min, n)
-
-    ! Global element length
-    Le = L_total / real(design%size_global(), kind=rp)
-
-    ! Start coordinate of this element
-    x_e = Le * real(this%global_element_index - 1, rp)
-
-    ! Section properties
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
-    end if
-    I_e = b * h%x(this%local_index)**3 / 12.0_rp
-    c_e = h%x(this%local_index) / 2.0_rp
-
-    ! Bending moment at this element
-    M_e = P * (L_total - x_e)
-    ! Sensitivity wrt h
-    dsigma_dh = M_e * ( (1.0_rp / (2.0_rp * I_e)) - &
-         (c_e * 3.0_rp * b * h%x(this%local_index)**2 / 12.0_rp) / (I_e**2) )
-
     if (this%is_local) then
+
+       ! This element is on our rank
+       ! Local design values
+       n = design%size()
+       call h%init(n)
+       call design%get_values(h)
+
+       ! Project design variables to physical height
+       call vector_cmult(h, (h_max - h_min), n)
+       call vector_cadd(h, h_min, n)
+
+       ! Global element length
+       Le = L_total / real(design%size_global(), kind=rp)
+
+       ! Start coordinate of this element
+       x_e = Le * real(this%global_element_index - 1, rp)
+
+       ! Section properties
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_memcpy(h%x, h%x_d, n, DEVICE_TO_HOST, sync = .false.)
+       end if
+       I_e = b * h%x(this%local_index)**3 / 12.0_rp
+       c_e = h%x(this%local_index) / 2.0_rp
+
+       ! Bending moment at this element
+       M_e = P * (L_total - x_e)
+       ! Sensitivity wrt h
+       dsigma_dh = M_e * ( (1.0_rp / (2.0_rp * I_e)) - &
+            (c_e * 3.0_rp * b * h%x(this%local_index)**2 / 12.0_rp) / (I_e**2) )
+
        ! Chain rule for normalized variable
        local_sensitivity(this%local_index) = dsigma_dh * &
             (h_max - h_min) / this%sigma_max
+
+       call h%free()
     endif
 
     ! If the constraint is not local we dont need its sensitivity on the
@@ -447,4 +458,4 @@ contains
 
     deallocate(local_sensitivity)
   end subroutine stress_con_update_sensitivity
-end module example_problem
+end module example_problem_1d_beam

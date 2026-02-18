@@ -13,11 +13,14 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules
 if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
+    find_package(CUDAToolkit REQUIRED)
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
+    enable_language(C)
     add_compile_definitions(HAVE_HIP=1)
-
     add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+    find_package(hipblas REQUIRED)
+    find_package(hipsolver REQUIRED)
 
 elseif(NOT ${DEVICE_TYPE} STREQUAL "CPU")
     message(FATAL_ERROR "Unsupported device type: ${DEVICE_TYPE}")
@@ -35,54 +38,21 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adjoint)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/source_terms)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/simulation_components)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/checkpoint)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/problem)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/mma)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/design)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/IO)
 
 target_sources(neko-top
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/neko_top.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/user_modules/initial_conditions.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/topology_optimization/user_module.f90
-
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_3dto1d.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_brinkman.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simple.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/design_simplefield.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/designs/set_optimization_ic.f90
 
         ${CMAKE_CURRENT_SOURCE_DIR}/simulation/simulation.f90
 
-        # Problem setup
-        # Components for the objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/problem.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/base_functional.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objective_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraint_factory.f90
-
-        # List of specific problems, objectives and constraints
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/lube_term_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/minimum_dissipation_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/target_dissipation_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/scalar_mixing_objective_function.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/objectives/augmented_lagrangian_objective.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/volume_constraint.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/problems/constraints/dummy_constraint.f90
-
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
-        # ${CMAKE_CURRENT_SOURCE_DIR}/mma/bcknd/mma_vector.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/cpu/mma_cpu.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/mma_device.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/device_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/cuda/mma.cu
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip_mma_math.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/bcknd/device/hip/mma.hip
 )
 
 # ============================================================================ #
@@ -98,12 +68,17 @@ target_include_directories(neko-top PUBLIC
 # ............................................................................ #
 # Link to the required libraries.
 
-target_link_libraries(neko-top
+target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
     MPI::MPI_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
+    $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
+    $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
+    $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
+    $<$<BOOL:${HDF5_FOUND}>:PkgConfig::hdf5>
 )
 
 # ============================================================================ #

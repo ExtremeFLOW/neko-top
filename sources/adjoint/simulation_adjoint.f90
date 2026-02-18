@@ -1,34 +1,36 @@
-! Copyright (c) 2020-2021, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file simulation_adjoint.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint simulation driver
 module simulation_adjoint
@@ -105,11 +107,14 @@ contains
   end subroutine simulation_adjoint_finalize
 
   !> Compute a single time-step of an adjoint case
-  subroutine simulation_adjoint_step(C, dt_controller, cfl, tstep_loop_start_time)
+  subroutine simulation_adjoint_step(C, dt_controller, cfl, &
+       tstep_loop_start_time, final_time)
     type(adjoint_case_t), intent(inout) :: C
     real(kind=rp), intent(inout) :: cfl
     type(time_step_controller_t), intent(inout) :: dt_controller
     real(kind=dp), intent(in) :: tstep_loop_start_time
+    real(kind=rp), optional, intent(in) :: final_time
+    real(kind=rp) :: t_bkp
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
@@ -131,6 +136,11 @@ contains
 
     ! Advance time step from t to t+dt and print the status
     call simulation_settime(C%time, C%fluid_adj%ext_bdf)
+    ! for cosmetic reasons we want the simulation to run backwards
+    if (present(final_time)) then
+       t_bkp = C%time%t
+       C%time%t = final_time - t_bkp
+    end if
     call C%time%status()
     call neko_log%begin()
 
@@ -179,6 +189,10 @@ contains
     call neko_log%end_section()
     call neko_log%end()
     call profiler_end_region
+
+    if (present(final_time)) then
+       C%time%t = t_bkp
+    end if
 
   end subroutine simulation_adjoint_step
 

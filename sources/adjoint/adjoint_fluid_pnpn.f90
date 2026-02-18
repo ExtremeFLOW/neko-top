@@ -1,41 +1,43 @@
-! Copyright (c) 2025, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_fluid_pnpn.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint Pn/Pn formulation.
 module adjoint_fluid_pnpn
   use, intrinsic :: iso_fortran_env, only: error_unit
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
@@ -51,6 +53,7 @@ module adjoint_fluid_pnpn
   use device_mathops, only: device_opcolv, device_opadd2cm
   use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
+  use scratch_registry, only: neko_scratch_registry
   use projection, only: projection_t
   use projection_vel, only: projection_vel_t
   use device, only: device_memcpy, HOST_TO_DEVICE, device_event_sync, &
@@ -81,6 +84,7 @@ module adjoint_fluid_pnpn
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
+  use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
   use blasius, only: blasius_t
@@ -304,8 +308,8 @@ contains
 
     ! Add pressure field to the registry. For this scheme it is in the same
     ! Xh as the velocity
-    call neko_field_registry%add_field(this%dm_Xh, 'p_adj')
-    this%p_adj => neko_field_registry%get_field('p_adj')
+    call neko_registry%add_field(this%dm_Xh, 'p_adj')
+    this%p_adj => neko_registry%get_field('p_adj')
 
     !
     ! Select governing equations via associated residual and Ax types
@@ -449,7 +453,7 @@ contains
     this%chkp => chkp
     ! This is probably scheme specific
     ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
     this%chkp%abx1 => this%abx1
     this%chkp%abx2 => this%abx2
@@ -470,14 +474,14 @@ contains
 
     ! The baseflow is the solution to the forward.
     ! Userdefined baseflows can be invoked via setting initial conditions
-    ! call neko_field_registry%add_field(this%dm_Xh, 'u')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'v')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'w')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'p')
-    this%u_b => neko_field_registry%get_field('u')
-    this%v_b => neko_field_registry%get_field('v')
-    this%w_b => neko_field_registry%get_field('w')
-    this%p_b => neko_field_registry%get_field('p')
+    ! call neko_registry%add_field(this%dm_Xh, 'u')
+    ! call neko_registry%add_field(this%dm_Xh, 'v')
+    ! call neko_registry%add_field(this%dm_Xh, 'w')
+    ! call neko_registry%add_field(this%dm_Xh, 'p')
+    this%u_b => neko_registry%get_field('u')
+    this%v_b => neko_registry%get_field('v')
+    this%w_b => neko_registry%get_field('w')
+    this%p_b => neko_registry%get_field('p')
 
     ! Read the json file
     call json_get_or_default(params, 'norm_target', &
@@ -767,7 +771,11 @@ contains
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
-      if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p_res%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p_res%x, this%glb_n_points, n)
+      end if
 
       call gs_Xh%op(p_res, GS_OP_ADD, event)
       call device_event_sync(event)
@@ -799,7 +807,11 @@ contains
 
       ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
-      if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p%x, this%glb_n_points, n)
+      end if
 
       ! Compute velocity residual.
       call profiler_start_region('Adjoint_velocity_residual')
@@ -1130,8 +1142,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call this%scratch%request_field(bdry_field, temp_index)
-    bdry_field = 0.0_rp
+    call neko_scratch_registry%request_field(bdry_field, temp_index, .true.)
 
 
 
@@ -1217,7 +1228,7 @@ contains
     call bdry_file%init('boundary_adjoint.fld')
     call bdry_file%write(bdry_field)
 
-    call this%scratch%relinquish_field(temp_index)
+    call neko_scratch_registry%relinquish_field(temp_index)
   end subroutine adjoint_fluid_pnpn_write_boundary_conditions
 
   ! End of section to verify
