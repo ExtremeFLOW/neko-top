@@ -182,21 +182,12 @@ module optimizer
      end subroutine optimizer_validate
 
      !> Interface for writing the optimizer progress
-<<<<<<< HEAD
-    subroutine optimizer_write(this, iter, problem)
-      import optimizer_t, simulation_t, problem_t, design_t
-      class(optimizer_t), intent(inout) :: this
-      integer, intent(in) :: iter
-      class(problem_t), intent(inout) :: problem
-    end subroutine optimizer_write
-=======
      subroutine optimizer_write(this, iter, problem)
        import optimizer_t, simulation_t, problem_t, design_t
        class(optimizer_t), intent(inout) :: this
        integer, intent(in) :: iter
        class(problem_t), intent(inout) :: problem
      end subroutine optimizer_write
->>>>>>> logging
 
      !> Interface for saving optimizer-specific components to checkpoint
      subroutine optimizer_save_checkpoint_components(this, filename, overwrite)
@@ -464,9 +455,6 @@ contains
   ! ========================================================================== !
   ! Logging helpers
 
-<<<<<<< HEAD
-  !> Initialize optimization log
-=======
   !> Initialize optimization log.
   !! @param[inout] this The optimizer object.
   !! @param[in] problem The problem object.
@@ -474,7 +462,6 @@ contains
   !! @param[in] extra_size Number of extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
->>>>>>> logging
   subroutine optimizer_init_log(this, problem, extra_headers, extra_size, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -524,15 +511,11 @@ contains
     this%log_initialized = .true.
   end subroutine optimizer_init_log
 
-<<<<<<< HEAD
-  !> Write optimization log entry
-=======
   !> Write optimization log entry.
   !! @param[inout] this The optimizer object.
   !! @param[in] iter Current iteration number.
   !! @param[in] problem The problem object.
   !! @param[in] extra_values Extra log values appended after problem entries.
->>>>>>> logging
   subroutine optimizer_write_log(this, iter, problem, extra_values)
     class(optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter

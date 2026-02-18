@@ -123,13 +123,9 @@ contains
     class(design_t), intent(in) :: design
   end subroutine dummy_constraint_update_sensitivity
 
-<<<<<<< HEAD
-  !> Number of log entries
-=======
   !> Return number of log entries for dummy constraint.
   !! @param[in] this The constraint object.
   !! @return n Number of log entries.
->>>>>>> logging
   function dummy_constraint_get_log_size(this) result(n)
     class(dummy_constraint_t), intent(in) :: this
     integer :: n
@@ -137,39 +133,26 @@ contains
     n = 0
   end function dummy_constraint_get_log_size
 
-<<<<<<< HEAD
-  !> Header labels for log entries
-=======
   !> Populate log header labels for dummy constraint.
   !! @param[in] this The constraint object.
   !! @param[out] headers Header labels for each log entry.
->>>>>>> logging
   subroutine dummy_constraint_get_log_headers(this, headers)
     class(dummy_constraint_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
 
     if (size(headers) .eq. 0) return
-<<<<<<< HEAD
-  end subroutine dummy_constraint_get_log_headers
-
-  !> Values for log entries
-=======
     headers = ""
   end subroutine dummy_constraint_get_log_headers
 
   !> Populate log values for dummy constraint.
   !! @param[in] this The constraint object.
   !! @param[out] values Values corresponding to the log headers.
->>>>>>> logging
   subroutine dummy_constraint_get_log_values(this, values)
     class(dummy_constraint_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
 
     if (size(values) .eq. 0) return
-<<<<<<< HEAD
-=======
     values = 0.0_rp
->>>>>>> logging
   end subroutine dummy_constraint_get_log_values
 
 end module dummy_constraint
