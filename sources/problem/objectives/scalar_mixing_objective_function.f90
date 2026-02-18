@@ -98,13 +98,6 @@ module scalar_mixing_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           scalar_mixing_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          scalar_mixing_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          scalar_mixing_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          scalar_mixing_get_log_values
 
   end type scalar_mixing_objective_t
 
@@ -281,39 +274,5 @@ contains
     class(design_t), intent(in) :: design
 
   end subroutine scalar_mixing_update_sensitivity
-
-  !> Return number of log entries for scalar mixing objective.
-  !! @param[in] this The objective object.
-  !! @return n Number of log entries.
-  function scalar_mixing_get_log_size(this) result(n)
-    class(scalar_mixing_objective_t), intent(in) :: this
-    integer :: n
-
-    n = 1
-  end function scalar_mixing_get_log_size
-
-  !> Populate log header labels for scalar mixing objective.
-  !! @param[in] this The objective object.
-  !! @param[out] headers Header labels for each log entry.
-  subroutine scalar_mixing_get_log_headers(this, headers)
-    class(scalar_mixing_objective_t), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=96) :: prefix
-
-    prefix = trim(this%name)
-    headers(1) = prefix
-
-  end subroutine scalar_mixing_get_log_headers
-
-  !> Populate log values for scalar mixing objective.
-  !! @param[in] this The objective object.
-  !! @param[out] values Values corresponding to the log headers.
-  subroutine scalar_mixing_get_log_values(this, values)
-    class(scalar_mixing_objective_t), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-
-    values(1) = this%value
-
-  end subroutine scalar_mixing_get_log_values
 
 end module scalar_mixing_objective

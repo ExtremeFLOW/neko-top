@@ -205,6 +205,7 @@ contains
     class(base_functional_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
 
+    if (size(headers) .eq. 0) return
     headers(1) = trim(this%name)
   end subroutine functional_get_log_headers
 
@@ -215,6 +216,7 @@ contains
     class(base_functional_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
 
+    if (size(values) .eq. 0) return
     values(1) = this%value
   end subroutine functional_get_log_values
 

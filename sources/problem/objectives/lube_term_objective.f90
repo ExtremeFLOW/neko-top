@@ -139,13 +139,6 @@ module lube_term_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           lube_term_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          lube_term_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          lube_term_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          lube_term_get_log_values
 
   end type lube_term_objective_t
 
@@ -383,39 +376,5 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine lube_term_update_sensitivity
-
-  !> Return number of log entries for lube term objective.
-  !! @param[in] this The objective object.
-  !! @return n Number of log entries.
-  function lube_term_get_log_size(this) result(n)
-    class(lube_term_objective_t), intent(in) :: this
-    integer :: n
-
-    n = 1
-  end function lube_term_get_log_size
-
-  !> Populate log header labels for lube term objective.
-  !! @param[in] this The objective object.
-  !! @param[out] headers Header labels for each log entry.
-  subroutine lube_term_get_log_headers(this, headers)
-    class(lube_term_objective_t), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
-
-    prefix = trim(this%name)
-    headers(1) = prefix
-
-  end subroutine lube_term_get_log_headers
-
-  !> Populate log values for lube term objective.
-  !! @param[in] this The objective object.
-  !! @param[out] values Values corresponding to the log headers.
-  subroutine lube_term_get_log_values(this, values)
-    class(lube_term_objective_t), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-
-    values(1) = this%value
-
-  end subroutine lube_term_get_log_values
 
 end module lube_term_objective

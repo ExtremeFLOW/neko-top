@@ -389,8 +389,10 @@ contains
     character(len=*), intent(out) :: headers(:)
     character(len=64) :: prefix
 
+    if (size(headers) .lt. 1) return
     prefix = trim(this%name)
     headers(1) = prefix
+    if (size(headers) .lt. 2) return
     headers(2) = trim(prefix) // '.volume'
 
   end subroutine volume_constraint_get_log_headers
@@ -403,6 +405,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
     real(kind=rp) :: volume_ratio
 
+    if (size(values) .lt. 1) return
     if (this%is_max) then
        volume_ratio = this%limit + this%value
     else
@@ -410,6 +413,7 @@ contains
     end if
 
     values(1) = this%value
+    if (size(values) .lt. 2) return
     values(2) = volume_ratio
 
   end subroutine volume_constraint_get_log_values

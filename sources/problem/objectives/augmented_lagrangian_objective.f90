@@ -299,7 +299,9 @@ contains
   subroutine augmented_lagrangian_get_log_headers(this, headers)
     class(augmented_lagrangian_objective_t), intent(in) :: this
     character(len=*), intent(out) :: headers(:)
-    return
+
+    if (size(headers) .eq. 0) return
+    headers = ""
   end subroutine augmented_lagrangian_get_log_headers
 
   !> Populate log values for augmented lagrangian objective.
@@ -309,7 +311,8 @@ contains
     class(augmented_lagrangian_objective_t), intent(in) :: this
     real(kind=rp), intent(out) :: values(:)
 
-    return
+    if (size(values) .eq. 0) return
+    values = 0.0_rp
   end subroutine augmented_lagrangian_get_log_values
 
 end module augmented_lagrangian_objective

@@ -141,6 +141,7 @@ contains
     character(len=*), intent(out) :: headers(:)
 
     if (size(headers) .eq. 0) return
+    headers = ""
   end subroutine dummy_constraint_get_log_headers
 
   !> Populate log values for dummy constraint.
@@ -151,6 +152,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
 
     if (size(values) .eq. 0) return
+    values = 0.0_rp
   end subroutine dummy_constraint_get_log_values
 
 end module dummy_constraint
