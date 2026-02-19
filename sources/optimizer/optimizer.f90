@@ -69,7 +69,7 @@ module optimizer
      character(len=256), private :: checkpoint_file = ''
 
      ! Checkpoint related information
-     character(len=256), private :: checkpoint_path = ''
+     character(len=256), private :: checkpoint_path = './checkpoints/'
      character(len=256), private :: checkpoint_base = 'optimizer_checkpoint'
      character(len=256), private :: checkpoint_format = 'h5'
      integer, private :: checkpoint_interval = -1
@@ -308,7 +308,7 @@ contains
     this%max_iterations = 0
     this%max_runtime = -1.0_rp
     this%checkpoint_file = ''
-    this%checkpoint_path = ''
+    this%checkpoint_path = './checkpoints/'
     this%checkpoint_base = 'optimizer_checkpoint'
     this%checkpoint_format = 'h5'
     this%checkpoint_interval = -1
@@ -534,6 +534,7 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: extension
     character(len=256) :: file_path, file_base, file_ext, file_full
+    logical :: exist
 
     ! Set default behaviour, read from object if not provided
     if (.not. present(path)) file_path = trim(this%checkpoint_path)
@@ -543,6 +544,18 @@ contains
     if (present(path)) file_path = trim(path)
     if (present(basename)) file_base = trim(basename)
     if (present(extension)) file_ext = trim(extension)
+
+    ! Make sure path is valid and exists
+    if (len_trim(file_path) .eq. 0) then
+       file_path = './'
+    else if (file_path(len_trim(file_path):len_trim(file_path)) .ne. '/') then
+       file_path = trim(file_path) // '/'
+    end if
+
+    inquire(file=file_path, exist=exist)
+    if (.not. exist) then
+       call system('mkdir -p ' // trim(file_path))
+    end if
 
     ! Construct the full filename based on overwrite flag
     if (overwrite) then
