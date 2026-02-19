@@ -282,8 +282,8 @@ contains
        call neko_error('optimizer: max_iterations must be positive.')
     end if
 
-    if (.not. (len_trim(this%checkpoint_file) .ne. 0 .and. &
-         this%checkpoint_interval .gt. 0)) then
+    if (trim(this%checkpoint_file) .ne. '' .neqv. &
+         this%checkpoint_interval .gt. 0) then
        call neko_error('optimizer: checkpoint_file must be specified when ' // &
             'checkpoint_interval is greater than zero.')
     end if
