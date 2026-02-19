@@ -24,7 +24,7 @@
 # - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
 # - NEKO_VERSION: The version of Neko to use.
 
-name: "Nightly: Neko develop"
+name: "Nightly: Develop branch"
 on:
   # Run nightly at 2 AM UTC on the develop branch
   workflow_dispatch:

@@ -1,7 +1,8 @@
 # Neko-TOP (Topology Optimization in Neko)
 
 [![Documentation](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml/badge.svg?branch=develop&event=push)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml)
-[![Nightly: Neko develop](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly.yml)
+[![Nightly: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly_neko_top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly_neko_top.yml)
+[![Nightly: Develop branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly_develop.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly_develop.yml)
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
