@@ -2,11 +2,6 @@
 
 [![Documentation](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml/badge.svg?branch=develop&event=push)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml)
 
-Neko compatibility:
-- [![Neko: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml)
-- [![Neko: Develop branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml)
-- [![Neko: Master branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml)
-
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
 optimization problems using an immersed boundary method. The library is written
@@ -21,14 +16,14 @@ The Neko-TOP library is dependent on the following libraries:
 
 - Fortran 2008  
     We assume gfortran, use `FC` environment variable to override.
-- MPI  
-    We tested with OpenMPI 3.1.
-- [Neko](https://github.com/ExtremeFlow/Neko) 
-    build automated in `setup.sh`.
-- [JSON-Fortran](https://github.com/jacobwilliams/json-fortran) 
-    build automated in `setup.sh`.
-- CUDA
-    Optional for GPU acceleration in Neko.
+- MPI: We tested with OpenMPI 3.1.
+- [Neko](https://github.com/ExtremeFlow/Neko)
+    - [![Neko: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml)
+    - [![Neko: Develop branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml)
+    - [![Neko: Master branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml)
+
+- [JSON-Fortran](https://github.com/jacobwilliams/json-fortran).
+- CUDA; Optional for GPU acceleration in Neko.
 
 The Neko-TOP library is also dependent on the following libraries for testing:
 
