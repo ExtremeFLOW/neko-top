@@ -1,0 +1,200 @@
+# File: nightly.yml
+# Date: 2026-02-19
+# ---------------------------------------------------------------------------- #
+# Workflow Overview
+# ---------------------------------------------------------------------------- #
+# This file contains the workflow that runs nightly tests for the develop branch.
+# It checks for linting, formatting, and compilation. The workflow is triggered
+# nightly at 2 AM UTC.
+
+# The workflow is split into multiple jobs:
+# - Prepare: Checks if the PR is a draft and stores global environment variables.
+# - Linting: Lints the PR for any changes.
+# - Formatting: Formats the PR for any changes.
+# - Compilation: Compiles the PR for any changes.
+# - Complete: Checks if all previous jobs passed.
+
+# The jobs are run in a sequence, where the Prepare job is run first. The Linting,
+# Formatting, and Compilation jobs run in parallel, and the Complete job runs last.
+
+# The workflow uses the following environment variables:
+# - FLINT_GLOBAL_MINIMUM: The minimum global linting score.
+# - FLINT_CHANGED_FILES_MINIMUM: The minimum linting score for changed files.
+# - PFUNIT_VERSION: The version of pFUnit to use.
+# - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
+# - NEKO_VERSION: The version of Neko to use.
+
+name: "Neko: Develop branch"
+on:
+  # Run nightly at 2 AM UTC on the develop branch
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * *'
+
+# ---------------------------------------------------------------------------- #
+# Define the global environment variables, these control versioning and other
+# useful settings in a unified way. Due to limitations in the GitHub Actions
+# environment, we cannot pass these as inputs to the jobs, so the prepare job
+# will store them in a file that the other jobs can read.
+
+env:
+  PFUNIT_VERSION: v4.12.0
+  JSON_FORTRAN_VERSION: master
+  NEKO_VERSION: develop
+  HDF5_VERSION: hdf5_1_14_6
+
+# ---------------------------------------------------------------------------- #
+# Allow only one concurrent deployment, skipping runs queued between the run
+# in-progress and latest queued. We do not wish to waste time on old runs if a
+# newer one is available.
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+# ---------------------------------------------------------------------------- #
+# Define the jobs that will be run in this workflow. The jobs are run in a
+# sequence, where the Prepare job is run first. The Linting, Formatting, and
+# Compilation jobs run in parallel, and the Complete job runs last.
+
+jobs:
+  prepare:
+    name: Prepare the environment
+    runs-on: ubuntu-latest
+    outputs:
+      pfunit-version: ${{ steps.store.outputs.pfunit-version }}
+      json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
+      neko-version: ${{ steps.store.outputs.neko-version }}
+      hdf5-version: ${{ steps.store.outputs.hdf5-version }}
+
+    steps:
+      - name: Store environment variables
+        id: store
+        run: |
+          echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
+          echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
+          echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
+
+  # -------------------------------------------------------------------------- #
+  # Code style and documentation checks.
+
+  check_lint:
+    name: Linting
+    needs: prepare
+    uses: ./.github/workflows/check_linting.yml
+
+  check_format:
+    name: Formatting
+    needs: prepare
+    uses: ./.github/workflows/check_formatting.yml
+
+  check_documentation:
+    name: Documentation
+    needs: prepare
+    uses: ./.github/workflows/documentation.yml
+
+  # -------------------------------------------------------------------------- #
+  # Define the checks to run for the Neko-TOP library.
+
+  check_compile:
+    name: Compilation
+    needs: prepare
+    uses: ./.github/workflows/check_compile.yml
+    with:
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
+  check_scripts:
+    name: Scripting
+    needs: prepare
+    uses: ./.github/workflows/check_scripts.yml
+    with:
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+      neko-top-version: ${{ github.head_ref || github.ref_name }}
+
+  # -------------------------------------------------------------------------- #
+  # Check if all previous jobs passed. If any of the previous jobs failed, the
+  # Complete job will fail and print out the failed jobs.
+
+  check_complete:
+    if: ${{ always() }}
+    name: Develop PR Ready
+    needs:
+      - prepare
+      # Code style and documentation checks
+      - check_lint
+      - check_format
+      - check_documentation
+      # Neko-TOP library checks
+      - check_compile
+      - check_scripts
+
+    runs-on: ubuntu-latest
+    env:
+      draft_status: ${{ needs.prepare.result }}
+      lint_status: ${{ needs.check_lint.result }}
+      format_status: ${{ needs.check_format.result }}
+      documentation_status: ${{ needs.check_documentation.result }}
+      compile_status: ${{ needs.check_compile.result }}
+      scripts_status: ${{ needs.check_scripts.result }}
+
+    steps:
+      - name: Check status of previous jobs
+        run: |
+          success=true
+          fail=()
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Code style and documentation checks.
+
+          if [ "$draft_status" != "success" ]; then
+            fail+=("\t- Draft check: $draft_status")
+            success=false
+          fi
+
+          if [ "$lint_status" != "success" ]; then
+            fail+=("\t- Linting check: $lint_status")
+            success=false
+          fi
+
+          if [ "$format_status" != "success" ]; then
+            fail+=("\t- Formatting check: $format_status")
+            success=false
+          fi
+
+          if [ "$documentation_status" != "success" ]; then
+            fail+=("\t- Documentation check: $documentation_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # Check the status of our Neko-TOP library checks.
+
+          if [ "$compile_status" != "success" ]; then
+            fail+=("\t- Compilation check: $compile_status")
+            success=false
+          fi
+
+          if [ "$scripts_status" != "success" ]; then
+            fail+=("\t- Scripts check: $scripts_status")
+            success=false
+          fi
+
+          # ------------------------------------------------------------------ #
+          # If any of the checks failed, print the failed checks and exit with
+          # a non-zero status code. If all checks passed, print a success
+          # message.
+
+          if [ "$success" == false ]; then
+            >&2 echo "The following checks did not succeed:"
+            for i in "${fail[@]}"; do
+              >&2 printf "$i\n"
+            done
+            exit 1
+          fi
+          echo "All checks passed"
