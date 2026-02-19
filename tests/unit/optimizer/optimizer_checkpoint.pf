@@ -61,7 +61,7 @@ contains
   ! Test writing the MMA object to HDF5 file.
 
   @test(npes=[2])
-  subroutine save_checkpoint(this)
+  subroutine manual_checkpoint(this)
     class(test_optimizer_checkpoint), intent(inout) :: this
     type(json_file) :: parameters, design_parameters
 
@@ -117,7 +117,7 @@ contains
        converged = opt%step(iter, prob, des, sim)
 
        if (iter .eq. max_iter / 2 ) then
-          call opt%save_checkpoint('optimizer_checkpoint.h5', iter, des, .true.)
+          call opt%save_checkpoint(iter, des, .true.)
           call prob%get_objective_value(f_half)
           call des%get_values(x_half)
        end if
@@ -203,7 +203,7 @@ contains
     if (allocated(des)) deallocate(des)
     if (allocated(opt)) deallocate(opt)
 
-  end subroutine save_checkpoint
+  end subroutine manual_checkpoint
 
   ! ========================================================================== !
   ! Utility function to compute RMSE between two vectors

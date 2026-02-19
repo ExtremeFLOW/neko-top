@@ -242,13 +242,6 @@ function cleanup {
     done
     printf "\n"
 
-    # Move all the Checkpoint files to the results folder.
-    printf "Archiving chkp files.\n"
-    if [ -n "$(find ./ -name "*.chkp" -or -name "*.h5" -print)" ]; then
-        mkdir -p checkpoints
-        find ./ -name "*.chkp" -or -name "*.h5" -execdir mv {} checkpoints/ \;
-    fi
-
     if [ -s ./error.log ]; then
         printf >&2 "ERROR: An error occurred during archiving.\n"
         return 1

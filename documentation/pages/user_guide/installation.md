@@ -94,9 +94,8 @@ export NEKO_DIR=$HOME/neko
 ```
 
 Additional examples of the preparation script for specific systems can be seen
-bellow in the section on clusters.
+in the section on clusters: \subpage clusters.
 
-- [LUMI](#lumi)
 
 ### Notes on linking against CUDA on WSL.
 
@@ -110,3 +109,4 @@ Link 1 is the microsoft description of getting started with WSL 2. Link 2 is the
 NVidia guideline to how to correctly use WSL and CUDA together. Link 3 is the
 link to download instructions for CUDA toolkit and drivers to WSL. Remember to
 update NVidia graphics drivers on the windows side as well.
+
