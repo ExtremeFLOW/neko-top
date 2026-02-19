@@ -68,6 +68,10 @@ module optimizer
      real(kind=rp), private :: average_time = 0.0_rp
      real(kind=rp), private :: step_count = 0.0_rp
 
+     ! Checkpoint related information
+     character(len=256), private :: checkpoint_file = ''
+     integer, private :: checkpoint_interval = -1
+
    contains
 
      !  ---------------------------------------------------------------------- !
@@ -248,11 +252,13 @@ contains
   !! @param max_iterations The maximum number of iterations.
   !! @param max_runtime The maximum runtime in seconds.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
-       max_runtime)
+       max_runtime, checkpoint_file, checkpoint_interval)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in), optional :: max_runtime
+    character(len=*), intent(in), optional :: checkpoint_file
+    integer, intent(in), optional :: checkpoint_interval
 
     ! Mandatory settings
     this%optimizer_type = optimizer_type
@@ -260,9 +266,27 @@ contains
 
     ! Optional settings
     if (present(max_runtime)) this%max_runtime = max_runtime
+    if (present(checkpoint_file)) this%checkpoint_file = checkpoint_file
+    if (present(checkpoint_interval)) then
+       this%checkpoint_interval = checkpoint_interval
+    end if
 
     ! Initialize internals
     this%start_time = MPI_Wtime()
+
+    if (len_trim(this%optimizer_type) == 0) then
+       call neko_error('optimizer: Optimizer type must be specified.')
+    end if
+
+    if (this%max_iterations <= 0) then
+       call neko_error('optimizer: max_iterations must be positive.')
+    end if
+
+    if (.not. (len_trim(this%checkpoint_file) .ne. 0 .and. &
+         this%checkpoint_interval .gt. 0)) then
+       call neko_error('optimizer: checkpoint_file must be specified when ' // &
+            'checkpoint_interval is greater than zero.')
+    end if
 
   end subroutine optimizer_init_base
 
@@ -274,6 +298,8 @@ contains
     this%optimizer_type = ''
     this%max_iterations = 0
     this%max_runtime = -1.0_rp
+    this%checkpoint_file = ''
+    this%checkpoint_interval = -1
 
     this%start_time = 0.0_rp
     this%current_iteration = 0
@@ -318,6 +344,18 @@ contains
           write(*, '(A,I0)') 'Loaded runtime checkpoint: ', &
                this%current_iteration
        end if
+
+    else if (this%checkpoint_interval .gt. 0) then
+       inquire(file = this%checkpoint_file, exist = file_exists)
+       if (file_exists) then
+          call this%load_checkpoint(this%checkpoint_file, &
+               this%current_iteration, design)
+
+          write(*, '(A,I0,A)') &
+               'Resuming optimizer from checkpoint file ', &
+               trim(this%checkpoint_file), &
+               ' at iteration ', this%current_iteration
+       end if
     end if
 
     ! Prepare the problem state before starting the optimization
@@ -342,6 +380,13 @@ contains
        ! Log the progress and outputs
        call this%write(this%current_iteration, problem)
        call design%write(this%current_iteration)
+
+       ! Save checkpoint if enabled
+       if (this%checkpoint_interval .gt. 0 .and. &
+            mod(this%current_iteration, this%checkpoint_interval) == 0) then
+          call this%save_checkpoint(this%checkpoint_file, &
+               this%current_iteration, design, .true.)
+       end if
 
        ! --------------------------------------------------------------------- !
        ! Check stopping criteria
