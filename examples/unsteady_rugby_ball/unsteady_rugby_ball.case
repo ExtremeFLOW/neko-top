@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 1e-3,
-            "timestep": 1e-4
+            "end_time": 3.0,
+            "timestep": 2.5e-3
         },
         "numerics": {
             "time_order": 1,
@@ -102,7 +102,7 @@
     "unsteady": true,
     "checkpoints": {
         "enabled": true,
-        "n_memory": 5
+        "n_memory": 100
     },
     "optimization": {
         "design": {
@@ -143,10 +143,8 @@
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "c": 1000.0,
-                "d": 10.0
-            },
-            "checkpoint_file": "optimizer_checkpoint.hdf5",
-            "checkpoint_interval": 2
+                "d": 1.0
+            }
         },
         "objectives": [
             {
