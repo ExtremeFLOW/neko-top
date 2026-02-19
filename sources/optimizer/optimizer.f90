@@ -32,7 +32,8 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 
-!> Defines the abstract type `optimizer`
+!> Defines the abstract type `optimizer`.
+!! @details
 !! The optimizer type is defined to provide a generic interface to underlying
 !! optimization methods. Specific optimizers should extend this type and
 !! implement the deferred methods.
@@ -46,7 +47,8 @@ module optimizer
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime
   use utils, only: neko_error, filename_suffix
-
+  use json_utils, only: json_get_or_default
+  use comm, only: pe_rank
   implicit none
   private
 
@@ -57,12 +59,22 @@ module optimizer
      character(len=64), private :: optimizer_type = ''
      !> The maximum number of iterations
      integer, private :: max_iterations = 0
+     !> The current iteration number
+     integer, private :: current_iteration = 0
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
 
+     !> Checkpoint file to be restarted from.
+     character(len=256), private :: checkpoint_file = ''
+
+     ! Checkpoint related information
+     character(len=256), private :: checkpoint_path = './checkpoints/'
+     character(len=256), private :: checkpoint_base = 'optimizer_checkpoint'
+     character(len=256), private :: checkpoint_format = 'h5'
+     integer, private :: checkpoint_interval = -1
+
      ! Variables for the runtime-based stopping criteria
-     integer, private :: current_iteration = 0
      real(kind=rp), private :: max_runtime = -1.0_rp
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
@@ -113,6 +125,8 @@ module optimizer
      procedure, pass(this) :: init_base => optimizer_init_base
      !> Free base resources.
      procedure, pass(this) :: free_base => optimizer_free_base
+     !> Read settings from JSON parameters file
+     procedure, pass(this) :: read_base_settings => optimizer_read_base_settings
      !> Print status message
      procedure, pass(this) :: print_status => optimizer_print_status
      !> Estimate if we are out of time
@@ -247,12 +261,24 @@ contains
   !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
   !! @param max_runtime The maximum runtime in seconds.
+  !! @param checkpoint_file The checkpoint file to restart from.
+  !! @param checkpoint_path The path for saving checkpoint files.
+  !! @param checkpoint_base The base name for checkpoint files.
+  !! @param checkpoint_format The file format for checkpoint files.
+  !! @param checkpoint_interval The interval for saving checkpoints in
+  !!        iterations.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
-       max_runtime)
+       max_runtime, checkpoint_file, checkpoint_path, checkpoint_base, &
+       checkpoint_format, checkpoint_interval)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in), optional :: max_runtime
+    character(len=*), intent(in), optional :: checkpoint_file
+    character(len=*), intent(in), optional :: checkpoint_path
+    character(len=*), intent(in), optional :: checkpoint_base
+    character(len=*), intent(in), optional :: checkpoint_format
+    integer, intent(in), optional :: checkpoint_interval
 
     ! Mandatory settings
     this%optimizer_type = optimizer_type
@@ -260,6 +286,13 @@ contains
 
     ! Optional settings
     if (present(max_runtime)) this%max_runtime = max_runtime
+    if (present(checkpoint_file)) this%checkpoint_file = checkpoint_file
+    if (present(checkpoint_path)) this%checkpoint_path = checkpoint_path
+    if (present(checkpoint_base)) this%checkpoint_base = checkpoint_base
+    if (present(checkpoint_format)) this%checkpoint_format = checkpoint_format
+    if (present(checkpoint_interval)) then
+       this%checkpoint_interval = checkpoint_interval
+    end if
 
     ! Initialize internals
     this%start_time = MPI_Wtime()
@@ -274,11 +307,49 @@ contains
     this%optimizer_type = ''
     this%max_iterations = 0
     this%max_runtime = -1.0_rp
+    this%checkpoint_file = ''
+    this%checkpoint_path = './checkpoints/'
+    this%checkpoint_base = 'optimizer_checkpoint'
+    this%checkpoint_format = 'h5'
+    this%checkpoint_interval = -1
 
     this%start_time = 0.0_rp
     this%current_iteration = 0
 
   end subroutine optimizer_free_base
+
+  !> Read settings from JSON parameters file.
+  !! @param this The optimizer object.
+  !! @param solver_params The JSON file containing the optimizer parameters.
+  subroutine optimizer_read_base_settings(this, solver_params)
+    class(optimizer_t), intent(inout) :: this
+    type(json_file), intent(inout) :: solver_params
+    integer :: read_int
+    real(kind=rp) :: read_real
+    character(len=:), allocatable :: read_str
+
+    call json_get_or_default(solver_params, 'max_runtime', read_real, &
+         this%max_runtime)
+    this%max_runtime = read_real
+
+    call json_get_or_default(solver_params, 'checkpoint.file', read_str, &
+         this%checkpoint_file)
+    this%checkpoint_file = read_str
+    call json_get_or_default(solver_params, 'checkpoint.path', read_str, &
+         this%checkpoint_path)
+    this%checkpoint_path = read_str
+    call json_get_or_default(solver_params, 'checkpoint.base', read_str, &
+         this%checkpoint_base)
+    this%checkpoint_base = read_str
+    call json_get_or_default(solver_params, 'checkpoint.format', read_str, &
+         this%checkpoint_format)
+    this%checkpoint_format = read_str
+    call json_get_or_default(solver_params, 'checkpoint.interval', read_int, &
+         this%checkpoint_interval)
+    this%checkpoint_interval = read_int
+
+  end subroutine optimizer_read_base_settings
+
 
   ! -------------------------------------------------------------------------- !
   ! Optimization loop routine
@@ -309,14 +380,16 @@ contains
     converged = .false.
 
     ! Restart from checkpoint if available
-    if (this%max_runtime .gt. 0.0_rp) then
-       inquire(file = 'optimizer_rt_checkpoint.hdf5', exist = file_exists)
+    inquire(file = this%checkpoint_file, exist = file_exists)
+    if (file_exists) then
+       call this%load_checkpoint(this%checkpoint_file, this%current_iteration, &
+            design)
+    else
+       inquire(file = 'optimizer_rt_checkpoint.' // this%checkpoint_format, &
+            exist = file_exists)
        if (file_exists) then
-          call this%load_checkpoint('optimizer_rt_checkpoint.hdf5', &
-               this%current_iteration, design)
-
-          write(*, '(A,I0)') 'Loaded runtime checkpoint: ', &
-               this%current_iteration
+          call this%load_checkpoint('optimizer_rt_checkpoint.' // &
+               this%checkpoint_format, this%current_iteration, design)
        end if
     end if
 
@@ -343,6 +416,12 @@ contains
        call this%write(this%current_iteration, problem)
        call design%write(this%current_iteration)
 
+       ! Save checkpoint if enabled
+       if (this%checkpoint_interval .gt. 0 .and. &
+            mod(this%current_iteration, this%checkpoint_interval) == 0) then
+          call this%save_checkpoint(this%current_iteration, design, .false.)
+       end if
+
        ! --------------------------------------------------------------------- !
        ! Check stopping criteria
 
@@ -350,8 +429,8 @@ contains
           stop_flag = 0
           exit
        else if (this%out_of_time(iteration_time)) then
-          call this%save_checkpoint('optimizer_rt_checkpoint.hdf5', &
-               this%current_iteration, design, .true.)
+          call this%save_checkpoint(this%current_iteration, design, .true., &
+               basename = 'optimizer_rt_checkpoint')
           stop_flag = 2
           exit
        end if
@@ -437,40 +516,73 @@ contains
   ! ========================================================================== !
   ! IO Functions
 
-  !> Save the optimizer checkpoint to a file based on file suffix.
+  !> Save the optimizer checkpoint to a file.
   !! @param this The optimizer object.
-  !! @param filename The name of the file to save the checkpoint.
   !! @param iter The current iteration number.
   !! @param design The design object.
   !! @param overwrite Whether to overwrite the file if it exists.
-  subroutine optimizer_save_checkpoint(this, filename, iter, design, overwrite)
+  !! @param path The path where the checkpoint file will be saved.
+  !! @param basename The base name of the file to save the checkpoint.
+  !! @param extension The file extension to use for the checkpoint file.
+  subroutine optimizer_save_checkpoint(this, iter, design, overwrite, &
+       path, basename, extension)
     class(optimizer_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
     integer, intent(in) :: iter
     class(design_t), intent(inout) :: design
-    logical, intent(in), optional :: overwrite
-    character(len=12) :: file_ext
+    logical, intent(in) :: overwrite
+    character(len=*), intent(in), optional :: path
+    character(len=*), intent(in), optional :: basename
+    character(len=*), intent(in), optional :: extension
+    character(len=256) :: file_path, file_base, file_ext, file_full
+    logical :: exist
 
-    ! Get the file extension
-    call filename_suffix(filename, file_ext)
+    ! Set default behaviour, read from object if not provided
+    if (.not. present(path)) file_path = trim(this%checkpoint_path)
+    if (.not. present(basename)) file_base = trim(this%checkpoint_base)
+    if (.not. present(extension)) file_ext = trim(this%checkpoint_format)
+
+    if (present(path)) file_path = trim(path)
+    if (present(basename)) file_base = trim(basename)
+    if (present(extension)) file_ext = trim(extension)
+
+    ! Make sure path is valid and exists
+    if (len_trim(file_path) .eq. 0) then
+       file_path = './'
+    else if (file_path(len_trim(file_path):len_trim(file_path)) .ne. '/') then
+       file_path = trim(file_path) // '/'
+    end if
+
+    inquire(file=file_path, exist=exist)
+    if (.not. exist) then
+       call system('mkdir -p ' // trim(file_path))
+    end if
+
+    ! Construct the full filename based on overwrite flag
+    if (overwrite) then
+       write(file_full, '(4A)') &
+            trim(file_path), trim(file_base), ".", trim(file_ext)
+    else
+       write(file_full, '(3A,I5.5,2A)') &
+            trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
+    end if
 
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')
-       call optimizer_save_checkpoint_hdf5(this, filename, iter, overwrite)
+       call optimizer_save_checkpoint_hdf5(this, file_full, iter, overwrite)
     case default
-       call neko_error('optimizer: Unsupported checkpoint format: ' // &
-            trim(file_ext))
+       call neko_error('optimizer: Unsupported checkpoint format: "' // &
+            trim(file_ext) // '"')
     end select
 
-    call this%save_checkpoint_components(filename, overwrite)
-    call design%save_checkpoint(filename, overwrite)
+    call this%save_checkpoint_components(file_full, overwrite)
+    call design%save_checkpoint(file_full, overwrite)
 
   end subroutine optimizer_save_checkpoint
 
   !> Load the optimizer checkpoint from a file based on file suffix.
   !! @param this The optimizer object.
   !! @param filename The name of the file to load the checkpoint from.
-  !! @param iter The current iteration number.
+  !! @param iter The iteration number read from the checkpoint.
   !! @param design The design object.
   subroutine optimizer_load_checkpoint(this, filename, iter, design)
     class(optimizer_t), intent(inout) :: this
@@ -486,12 +598,21 @@ contains
     case ('h5', 'hdf5', 'hf5')
        call optimizer_load_checkpoint_hdf5(this, filename, iter)
     case default
-       call neko_error('optimizer: Unsupported checkpoint format: ' // &
-            trim(file_ext))
+       call neko_error('optimizer: Unsupported checkpoint format: "' // &
+            trim(file_ext) // '"')
     end select
 
     call this%load_checkpoint_components(filename)
     call design%load_checkpoint(filename)
+
+    ! Set the current iteration to the loaded iteration
+    this%current_iteration = iter
+
+    if (pe_rank .eq. 0) then
+       write(*,*) 'Restarted simulation from checkpoint.'
+       write(*,*) '    Checkpoint file: "', trim(filename), '"'
+       write(*,*) '    Iteration      : ', this%current_iteration
+    end if
 
   end subroutine optimizer_load_checkpoint
 
