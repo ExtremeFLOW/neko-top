@@ -28,6 +28,7 @@ name: Nightly tests for develop branch
 on:
   # Run nightly at 2 AM UTC on the develop branch
   workflow_dispatch:
+  push:
   schedule:
     - cron: '0 2 * * *'
 
