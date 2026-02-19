@@ -18,7 +18,7 @@ The Neko-TOP library is dependent on the following libraries:
     We assume gfortran, use `FC` environment variable to override.
 - MPI: We tested with OpenMPI 3.1.
 - [Neko](https://github.com/ExtremeFlow/Neko)
-    - [![Neko: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko_top.yml)
+    - [![Neko: Neko-TOP branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko-top.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_neko-top.yml)
     - [![Neko: Develop branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_develop.yml)
     - [![Neko: Master branch](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml/badge.svg?event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/neko_master.yml)
 
