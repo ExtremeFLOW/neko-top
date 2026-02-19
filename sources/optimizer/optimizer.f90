@@ -32,7 +32,8 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 
-!> Defines the abstract type `optimizer`
+!> Defines the abstract type `optimizer`.
+!! @details
 !! The optimizer type is defined to provide a generic interface to underlying
 !! optimization methods. Specific optimizers should extend this type and
 !! implement the deferred methods.
@@ -260,13 +261,18 @@ contains
   !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
   !! @param max_runtime The maximum runtime in seconds.
-  subroutine optimizer_init_base(this, optimizer_type, max_iterations, params, &
+  !! @param checkpoint_file The checkpoint file to restart from.
+  !! @param checkpoint_path The path for saving checkpoint files.
+  !! @param checkpoint_base The base name for checkpoint files.
+  !! @param checkpoint_format The file format for checkpoint files.
+  !! @param checkpoint_interval The interval for saving checkpoints in
+  !!        iterations.
+  subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
        max_runtime, checkpoint_file, checkpoint_path, checkpoint_base, &
        checkpoint_format, checkpoint_interval)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
-    type(json_file), intent(inout), optional :: params
     real(kind=rp), intent(in), optional :: max_runtime
     character(len=*), intent(in), optional :: checkpoint_file
     character(len=*), intent(in), optional :: checkpoint_path
@@ -312,8 +318,8 @@ contains
 
   end subroutine optimizer_free_base
 
-  !> Read settings from JSON parameters file
-  !! @this The optimizer object.
+  !> Read settings from JSON parameters file.
+  !! @param this The optimizer object.
   !! @param solver_params The JSON file containing the optimizer parameters.
   subroutine optimizer_read_base_settings(this, solver_params)
     class(optimizer_t), intent(inout) :: this
