@@ -1,6 +1,7 @@
 # Neko-TOP (Topology Optimization in Neko)
 
 [![Documentation](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml/badge.svg?branch=develop&event=push)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/documentation.yml)
+[![Nightly: Neko develop](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly.yml/badge.svg?branch=develop&event=schedule)](https://github.com/ExtremeFLOW/neko-top/actions/workflows/nightly.yml)
 
 The Neko-TOP library is an extension of the Neko library, which is a high-order
 spectral element solver. The Neko-TOP library is designed to solve topology
@@ -18,12 +19,10 @@ The Neko-TOP library is dependent on the following libraries:
     We assume gfortran, use `FC` environment variable to override.
 - MPI  
     We tested with OpenMPI 3.1.
-- [Neko](https://github.com/ExtremeFlow/Neko)  
-    Included as a submodule, build automated in `setup.sh`.
-- [JSON-Fortran](https://github.com/jacobwilliams/json-fortran)  
-    Included as a submodule, build automated in `setup.sh`.
-- [Nek5000](https://github.com/Nek5000/Nek5000)  
-    Included as a submodule, build automated in `setup.sh`.
+- [Neko](https://github.com/ExtremeFlow/Neko) 
+    build automated in `setup.sh`.
+- [JSON-Fortran](https://github.com/jacobwilliams/json-fortran) 
+    build automated in `setup.sh`.
 - CUDA
     Optional for GPU acceleration in Neko.
 
@@ -39,7 +38,7 @@ the Neko-TOP library. The script will also compile all the advanced examples and
 run the unit tests if desired.
 
 ```sh
-git clone --recursive https://github.com/ExtremeFlow/Neko-TOP.git neko-top
+git clone https://github.com/ExtremeFlow/Neko-TOP.git neko-top
 cd neko-top
 ./setup.sh
 ```

@@ -1,11 +1,11 @@
-# File: pr_develop.yml
-# Date: 2024-08-13
+# File: nightly.yml
+# Date: 2026-02-19
 # ---------------------------------------------------------------------------- #
 # Workflow Overview
 # ---------------------------------------------------------------------------- #
-# This file contains the workflow that checks PRs for the develop branch. It
-# checks for linting, formatting, and compilation. The workflow is triggered
-# when a PR is opened, synchronized, reopened, or ready for review.
+# This file contains the workflow that runs nightly tests for the develop branch.
+# It checks for linting, formatting, and compilation. The workflow is triggered
+# nightly at 2 AM UTC.
 
 # The workflow is split into multiple jobs:
 # - Prepare: Checks if the PR is a draft and stores global environment variables.
@@ -24,11 +24,10 @@
 # - JSON_FORTRAN_VERSION: The version of JSON-Fortran to use.
 # - NEKO_VERSION: The version of Neko to use.
 
-name: Nightly tests for develop branch
+name: "Nightly: Neko develop"
 on:
   # Run nightly at 2 AM UTC on the develop branch
   workflow_dispatch:
-  push:
   schedule:
     - cron: '0 2 * * *'
 
