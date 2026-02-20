@@ -95,7 +95,7 @@ module mma
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
-     type(scratch_registry_t) :: mma_scratch_registry
+     type(scratch_registry_t) :: scratch
      character(len=:), allocatable :: subsolver, bcknd
 
      ! Internal dummy variables for MMA
@@ -320,7 +320,7 @@ contains
     ! Deallocate the internal dummy matrices
     call this%pij%free()
     call this%qij%free()
-    call this%mma_scratch_registry%free()
+    call this%scratch%free()
 
     this%is_initialized = .false.
     this%is_updated = .false.
@@ -360,7 +360,7 @@ contains
     integer :: i, ierr
 
     call this%free()
-    call this%mma_scratch_registry%init()
+    call this%scratch%init()
 
     this%n = n
     this%m = m
