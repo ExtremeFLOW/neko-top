@@ -266,7 +266,6 @@ contains
 
     ! Close global objects
     call neko_simcomps%free()
-    call neko_rt_stats%free()
 
   end subroutine simulation_free
 
