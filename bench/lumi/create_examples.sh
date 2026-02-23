@@ -18,7 +18,7 @@ export mesh_pattern="mixer"
 
 export hpc_path="${MAIN_DIR}/scripts/jobscripts"
 export data_path="${MAIN_DIR}/data_local/static_mixer"
-export root_path="${MAIN_DIR}/bench/mixer"
+export root_path="${MAIN_DIR}/bench/lumi"
 export example_path="${MAIN_DIR}/examples/benchmark/lumi"
 export template_path="${root_path}/templates"
 
