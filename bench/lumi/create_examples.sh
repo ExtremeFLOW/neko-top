@@ -18,8 +18,8 @@ export mesh_pattern="mixer"
 
 export hpc_path="${MAIN_DIR}/scripts/jobscripts"
 export data_path="${MAIN_DIR}/data_local/static_mixer"
-export root_path="${MAIN_DIR}/bench/mixer"
-export example_path="${MAIN_DIR}/examples/benchmark_mixer"
+export root_path="${MAIN_DIR}/bench/lumi"
+export example_path="${MAIN_DIR}/examples/benchmark/lumi"
 export template_path="${root_path}/templates"
 
 export experiment_path="${root_path}/experiments"
@@ -63,7 +63,7 @@ function create_case() {
     # Set file names
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
     local case_file="${example_path}/${case_name}.case"
-    local job_path="${hpc_path}/${cluster}/benchmark_mixer"
+    local job_path="${hpc_path}/${cluster}/benchmark/lumi"
 
     # Create the mesh if it does not exist
     if [[ ! -f "${mesh_file}" && "$MESH" == "true" ]]; then
@@ -115,8 +115,8 @@ fi
 if [ -d "${experiment_path}" ]; then
     find "${experiment_path}" -type f -name "*.csv" -delete
 fi
-if [ -d "${hpc_path}/${cluster}/benchmark_mixer" ]; then
-    find "${hpc_path}/${cluster}/benchmark_mixer" -type f -name "*.sh" -delete
+if [ -d "${hpc_path}/${cluster}/benchmark/lumi" ]; then
+    find "${hpc_path}/${cluster}/benchmark/lumi" -type f -name "*.sh" -delete
 fi
 
 if [ ! -f "${example_path}/.gitignore" ]; then
