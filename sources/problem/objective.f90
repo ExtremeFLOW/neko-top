@@ -47,7 +47,7 @@ module objective
 
   !> The abstract objective type.
   !!
-  !! This is the base class for objectives, which is a type of base objective.
+  !! This is the base class for objectives, which is a type of base functional.
   !! Each objective contain a weight that is used to scale the objective value.
   type, abstract, extends(base_functional_t) :: objective_t
      !> Weight of the objective in the overall cost function
