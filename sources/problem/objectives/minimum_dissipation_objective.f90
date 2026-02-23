@@ -128,13 +128,6 @@ module minimum_dissipation_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           minimum_dissipation_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          minimum_dissipation_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          minimum_dissipation_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          minimum_dissipation_get_log_values
 
   end type minimum_dissipation_objective_t
 
@@ -302,33 +295,5 @@ contains
     class(design_t), intent(in) :: design
 
   end subroutine minimum_dissipation_update_sensitivity
-
-  !> Number of log entries
-  function minimum_dissipation_get_log_size(this) result(n)
-    class(minimum_dissipation_objective_t), intent(in) :: this
-    integer :: n
-
-    n = 1
-  end function minimum_dissipation_get_log_size
-
-  !> Header labels for log entries
-  subroutine minimum_dissipation_get_log_headers(this, headers)
-    class(minimum_dissipation_objective_t), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=64) :: prefix
-
-    prefix = trim(this%name)
-    headers(1) = prefix
-
-  end subroutine minimum_dissipation_get_log_headers
-
-  !> Values for log entries
-  subroutine minimum_dissipation_get_log_values(this, values)
-    class(minimum_dissipation_objective_t), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-
-    values(1) = this%value
-
-  end subroutine minimum_dissipation_get_log_values
 
 end module minimum_dissipation_objective

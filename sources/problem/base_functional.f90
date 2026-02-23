@@ -104,6 +104,8 @@ module base_functional
      procedure, pass(this) :: get_log_headers => functional_get_log_headers
      !> Get values for this functional's log entries
      procedure, pass(this) :: get_log_values => functional_get_log_values
+     !> Finalize the value after time integration
+     procedure, pass(this) :: finalize_value => functional_finalize_value
      !> Set the value to zero
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
@@ -113,8 +115,6 @@ module base_functional
      !> Accumulate the sensitivity
      procedure, pass(this) :: accumulate_sensitivity => &
           functional_accumulate_sensitivity
-     !> Finalize the value at the end of time integration (can be overwritten)
-     procedure, pass(this) :: finalize_value => functional_finalize_value
 
   end type base_functional_t
 
@@ -219,7 +219,7 @@ contains
     real(kind=rp), intent(out) :: values(:)
 
     if (size(values) .eq. 0) return
-    values(1) = this%get_value()
+    values(1) = this%value
   end subroutine functional_get_log_values
 
   !> Zero value of the function
@@ -228,6 +228,12 @@ contains
 
     this%value = 0.0_rp
   end subroutine functional_reset_value
+
+  !> Finalize value of the function
+  subroutine functional_finalize_value(this)
+    class(base_functional_t), intent(inout) :: this
+
+  end subroutine functional_finalize_value
 
   !> Zero sensitivity of the function
   subroutine functional_reset_sensitivity(this)
@@ -249,16 +255,6 @@ contains
     ! should suffice
     this%value = this%value_old + this%value * dt
   end subroutine functional_accumulate_value
-
-  !> Finalize the value of the function at the end of time integration
-  subroutine functional_finalize_value(this)
-    class(base_functional_t), intent(inout) :: this
-
-    ! this is a dummy, can be redirected if sophisticated operations need to be
-    ! done after time integration
-
-
-  end subroutine functional_finalize_value
 
   !> Accumulate the value of the function
   subroutine functional_accumulate_sensitivity(this, design, dt)
