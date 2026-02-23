@@ -69,7 +69,7 @@ module optimizer
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
      real(kind=rp), private :: step_count = 0.0_rp
-     !> Logging state
+     ! Logging state
      logical, private :: log_initialized = .false.
      logical, private :: log_include_constraints = .true.
      integer, private :: log_extra_size = 0
