@@ -70,7 +70,7 @@ module simulation_checkpoint
      !> Number of checkpoints to keep in memory
      integer :: n_saves_memory = 10
      !> Whether to keep the checkpoint files on disk after the simulation ends
-     logical :: keep_checkpoints = .true.
+     logical :: keep_checkpoints = .false.
 
      ! Internal parameters
      integer :: n_saves_disc = 0
@@ -300,7 +300,7 @@ contains
     this%fmt = "chkp"
     this%algorithm = "linear"
     this%n_saves_memory = 10
-    this%keep_checkpoints = .true.
+    this%keep_checkpoints = .false.
 
     this%n_saves_disc = 0
     this%n_timesteps = 0
