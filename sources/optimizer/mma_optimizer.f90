@@ -157,7 +157,8 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=256) :: extra_header
+    character(len=512) :: extra_header
+    character(len=:), allocatable :: backend_subsolver
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -195,7 +196,12 @@ contains
 
     ! Initialize the logger
     if (this%enable_output) then
+       backend_subsolver = this%mma%get_backend_and_subsolver()
        extra_header = 'KKTmax, KKTnorm2, scaling factor'
+       if (trim(backend_subsolver) .ne. '') then
+          ! Keep backend/subsolver as header-only metadata columns.
+          extra_header = trim(extra_header) // ', ' // trim(backend_subsolver)
+       end if
        call this%init_log(problem, extra_headers = trim(extra_header), &
             extra_size = 3, &
             include_constraints = .not. this%unconstrained_problem, &
