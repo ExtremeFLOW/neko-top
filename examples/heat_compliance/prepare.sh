@@ -46,6 +46,10 @@ done
 
 GEO_FILE="cube_mesh.geo"
 
+if [ -f "box.nmsh" ]; then
+    exit 0
+fi
+
 echo "Generating mesh with N = $N (bottom has (3N)x(3N) cells)..."
 gmsh -0 "${GEO_FILE}" -setnumber N "${N}"
 
