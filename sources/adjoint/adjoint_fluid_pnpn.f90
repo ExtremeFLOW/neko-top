@@ -47,12 +47,10 @@ module adjoint_fluid_pnpn
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_scheme_incompressible, only: &
        adjoint_fluid_scheme_incompressible_t
   use device_mathops, only: device_opadd2cm
   use fluid_aux, only: fluid_step_info
-  use time_scheme_controller, only: time_scheme_controller_t
   use scratch_registry, only: neko_scratch_registry
   use projection, only: projection_t
   use projection_vel, only: projection_vel_t
@@ -78,8 +76,8 @@ module adjoint_fluid_pnpn
   use mathops, only: opadd2cm
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
-  use utils, only: neko_error, neko_type_error
-  use field_math, only: field_add2, field_copy, field_sub2, field_rzero, &
+  use utils, only: neko_error
+  use field_math, only: field_add2, field_copy, &
        field_add2s2
   use bc, only: bc_t
   use file, only: file_t
@@ -94,7 +92,6 @@ module adjoint_fluid_pnpn
   use vector, only: vector_t
   use device_math, only: device_vlsc3, device_cmult, device_col2
   use math, only: vlsc3, cmult, col2
-  use json_utils_ext, only: json_key_fallback
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
