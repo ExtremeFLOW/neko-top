@@ -41,6 +41,8 @@ module SIMP_mapping
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_SIMP_mapping, only: device_SIMP_mapping_apply, &
        device_SIMP_mapping_apply_backward
+  use SIMP_mapping_cpu, only: SIMP_mapping_apply_cpu, &
+       SIMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
   implicit none
   private
@@ -117,17 +119,15 @@ contains
     class(SIMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_SIMP_mapping_apply(this%f_min, this%f_max, this%p, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
-               (X_in%x(i,1,1,1) ) ** this%p
-       end do
+       call SIMP_mapping_apply_cpu(this%f_min, this%f_max, this%p, &
+            X_out%x(:,1,1,1), X_in%x(:,1,1,1), n)
     end if
 
   end subroutine SIMP_forward_mapping
@@ -143,17 +143,15 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_SIMP_mapping_apply_backward(this%f_min, this%f_max, this%p, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = sens_in%x(i,1,1,1) * (this%f_max - this%f_min) &
-               * this%p * (X_in%x(i,1,1,1)) ** (this%p - 1.0_rp)
-       end do
+       call SIMP_mapping_apply_backward_cpu(this%f_min, this%f_max, this%p, &
+            sens_out%x(:,1,1,1), sens_in%x(:,1,1,1), X_in%x(:,1,1,1), n)
     end if
 
   end subroutine SIMP_backward_mapping
