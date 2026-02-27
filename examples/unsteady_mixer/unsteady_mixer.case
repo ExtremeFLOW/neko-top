@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 6.0,
+            "end_time": 4.0,
             "timestep": 5e-3
         },
         "numerics": {
@@ -118,14 +118,14 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [ 0.5, 5.5 ],
+                "x_bounds": [ 0.5, 3.5 ],
                 "y_bounds": [ -1.0, 3.0 ],
                 "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "objective_domain",
                 "geometry": "box",
-                "x_bounds": [ 5.5, 6.5 ],
+                "x_bounds": [ 3.5, 6.5 ],
                 "y_bounds": [ -1.0, 3.0 ],
                 "z_bounds": [ -1.0, 3.0 ]
             },
@@ -189,16 +189,8 @@
             },
             {
                 "type": "target_dissipation",
-                "mask_name": "optimization_domain",
                 "target": 1.5,
                 "weight": 1.0
-            },
-            {
-                "type": "lube_term",
-                "weight": 0.01,
-                "dealias_sensitivity": false,
-                "dealias_forcing": false,
-                "mask_name": "optimization_domain"
             }
         ]
     }
