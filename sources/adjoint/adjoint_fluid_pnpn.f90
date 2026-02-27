@@ -771,16 +771,14 @@ contains
       call neko_scratch_registry%request_field(dx_p_adj, cc_indices(1), .false.)
       call neko_scratch_registry%request_field(dy_p_adj, cc_indices(2), .false.)
       call neko_scratch_registry%request_field(dz_p_adj, cc_indices(3), .false.)
+
+      ! Note: zero interior
       call neko_scratch_registry%request_field(nx1, cc_indices(4), .true.)
       call neko_scratch_registry%request_field(nx2, cc_indices(5), .true.)
       call neko_scratch_registry%request_field(nx3, cc_indices(6), .true.)
+      
       call neko_scratch_registry%request_field(work1, cc_indices(7), .false.)
       call neko_scratch_registry%request_field(work2, cc_indices(8), .false.)
-
-      ! zero interior
-      call field_rzero(nx1)
-      call field_rzero(nx2)
-      call field_rzero(nx3)
 
       ! gradient of adjoint pressure (explicit)
       call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
