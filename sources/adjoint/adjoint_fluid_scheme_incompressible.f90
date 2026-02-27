@@ -1,34 +1,36 @@
-! Copyright (c) 2020-2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_fluid_scheme_incompressible.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Fluid formulations
 module adjoint_fluid_scheme_incompressible
@@ -54,7 +56,7 @@ module adjoint_fluid_scheme_incompressible
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBLS, NEKO_MSH_MAX_ZLBL_LEN
   use operators, only: cfl
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use json_utils, only: json_get, json_get_or_default
   use json_module, only: json_file
   use user_intf, only: user_t, dummy_user_material_properties, &
@@ -205,12 +207,12 @@ contains
     call neko_log%message(log_buf)
 
     ! Assign velocity fields
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj')
-    this%u_adj => neko_field_registry%get_field('u_adj')
-    this%v_adj => neko_field_registry%get_field('v_adj')
-    this%w_adj => neko_field_registry%get_field('w_adj')
+    call neko_registry%add_field(this%dm_Xh, 'u_adj')
+    call neko_registry%add_field(this%dm_Xh, 'v_adj')
+    call neko_registry%add_field(this%dm_Xh, 'w_adj')
+    this%u_adj => neko_registry%get_field('u_adj')
+    this%v_adj => neko_registry%get_field('v_adj')
+    this%w_adj => neko_registry%get_field('w_adj')
 
     !
     ! Material properties
@@ -367,12 +369,12 @@ contains
     call this%vlag%init(this%v_adj, 2)
     call this%wlag%init(this%w_adj, 2)
 
-    call neko_field_registry%add_field(this%dm_Xh, 'u_adj_e')
-    call neko_field_registry%add_field(this%dm_Xh, 'v_adj_e')
-    call neko_field_registry%add_field(this%dm_Xh, 'w_adj_e')
-    this%u_adj_e => neko_field_registry%get_field('u_adj_e')
-    this%v_adj_e => neko_field_registry%get_field('v_adj_e')
-    this%w_adj_e => neko_field_registry%get_field('w_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'u_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'v_adj_e')
+    call neko_registry%add_field(this%dm_Xh, 'w_adj_e')
+    this%u_adj_e => neko_registry%get_field('u_adj_e')
+    this%v_adj_e => neko_registry%get_field('v_adj_e')
+    this%w_adj_e => neko_registry%get_field('w_adj_e')
 
     ! Initialize the source term
     call this%source_term%init(this%f_adj_x, this%f_adj_y, this%f_adj_z, &
@@ -483,7 +485,8 @@ contains
     !
     ! Setup checkpoint structure (if everything is fine)
     !
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%init()
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
   end subroutine adjoint_fluid_scheme_validate
 
@@ -637,7 +640,7 @@ contains
          this%material_properties, time)
 
     if (len(trim(this%nut_field_name)) > 0) then
-       nut => neko_field_registry%get_field(this%nut_field_name)
+       nut => neko_registry%get_field(this%nut_field_name)
        call field_addcol3(this%mu, nut, this%rho)
     end if
 

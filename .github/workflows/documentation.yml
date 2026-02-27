@@ -5,14 +5,7 @@ name: Documentation
 # documentation is only built and deployed when a pull request is merged.
 on:
   workflow_call:
-  push:
-    branches: [develop]
-
-# Set workflow concurrency to prevent multiple runs from being triggered
-# simultaneously for the same branch.
-concurrency:
-  group: "documentation-${{ github.ref }}"
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
 

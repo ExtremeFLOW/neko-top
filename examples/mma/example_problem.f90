@@ -106,10 +106,10 @@ contains
     type(vector_t), pointer :: x_coordinate
     integer :: ind(2)
 
-    call neko_scratch_registry%request_vector(design%size(), &
-         x_coordinate, ind(1), .false.)
-    call neko_scratch_registry%request_vector(design%size(), &
-         difference, ind(2), .false.)
+    call neko_scratch_registry%request(x_coordinate, ind(1), design%size(), &
+         .false.)
+    call neko_scratch_registry%request(difference, ind(2), design%size(), &
+         .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)
@@ -131,10 +131,10 @@ contains
     type(vector_t), pointer :: x_coordinate
     integer :: ind(2)
 
-    call neko_scratch_registry%request_vector(design%size(), &
-         x_coordinate, ind(1), .false.)
-    call neko_scratch_registry%request_vector(design%size(), &
-         difference, ind(2), .false.)
+    call neko_scratch_registry%request(x_coordinate, ind(1), design%size(), &
+         .false.)
+    call neko_scratch_registry%request(difference, ind(2), design%size(), &
+         .false.)
 
     call design%get_x(x_coordinate)
     call design%get_values(difference)

@@ -1,34 +1,36 @@
-! Copyright (c) 2022-2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_scalar_pnpn.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Contains the `adjoint_scalar_pnpn_t` type.
 
@@ -53,7 +55,6 @@ module adjoint_scalar_pnpn
   use facet_normal, only : facet_normal_t
   use krylov, only : ksp_monitor_t
   use device_math, only : device_add2s2, device_col2
-  use scalar_aux, only : scalar_step_info
   use time_scheme_controller, only : time_scheme_controller_t
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
@@ -346,15 +347,17 @@ contains
 
   end subroutine adjoint_scalar_pnpn_free
 
-  subroutine adjoint_scalar_pnpn_step(this, time, ext_bdf, dt_controller)
+  subroutine adjoint_scalar_pnpn_step(this, time, ext_bdf, dt_controller, &
+       ksp_results)
     class(adjoint_scalar_pnpn_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(time_scheme_controller_t), intent(in) :: ext_bdf
     type(time_step_controller_t), intent(in) :: dt_controller
+    type(ksp_monitor_t), intent(inout) :: ksp_results
     ! Number of degrees of freedom
     integer :: n
-    ! Linear solver results monitor
-    type(ksp_monitor_t) :: ksp_results(1)
+
+    if (this%freeze) return
 
     n = this%dm_Xh%size()
 
@@ -434,11 +437,11 @@ contains
 
       call this%pc%update()
       call profiler_start_region('Adjoint_scalar_solve')
-      ksp_results(1) = this%ksp%solve(Ax, ds_adj, s_adj_res%x, n, &
+      ksp_results = this%ksp%solve(Ax, ds_adj, s_adj_res%x, n, &
            c_Xh, this%bclst_ds, gs_Xh)
       call profiler_end_region('Adjoint_scalar_solve')
 
-      ksp_results(1)%name = 'Adjoint Scalar'
+      ksp_results%name = 'Adjoint Scalar'
 
       call this%proj_s%post_solving(ds_adj%x, Ax, c_Xh, this%bclst_ds, gs_Xh, &
            n, tstep, dt_controller)
@@ -449,8 +452,6 @@ contains
       else
          call add2s2(s_adj%x, ds_adj%x, 1.0_rp, n)
       end if
-
-      call scalar_step_info(time, ksp_results)
 
     end associate
     call profiler_end_region('Adjoint Scalar')

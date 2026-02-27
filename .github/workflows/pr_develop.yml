@@ -29,14 +29,20 @@ on:
   pull_request:
     branches:
       - develop
-      - sensitivity
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
   merge_group:
-    types: [checks_requested]
+    types:
+      - checks_requested
+
+  # This allow us to cache parts which can be used by PR checks
+  push:
+    branches:
+      - develop
+      - main
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other
@@ -213,3 +219,11 @@ jobs:
             exit 1
           fi
           echo "All checks passed"
+
+  # Merge group branches produce caches which are not useable by anyone else.
+  # Therefore we remove all of them after the run have completed.
+  cleanup:
+    if: ${{ github.event_name == 'merge_group' && always() }}
+    name: Cleanup merge group caches
+    needs: check_complete
+    uses: ./.github/workflows/cleanup.yml

@@ -10,6 +10,7 @@ module sensitivity
   use problem, only : problem_t
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   use csv_file, only : csv_file_t
+  use comm, only: pe_rank
   implicit none
 
   interface compute_sensitivity
@@ -43,6 +44,10 @@ contains
     type(csv_file_t) :: logger
     integer :: n
 
+    ! Initialize the vectors
+    call design_vector%init(des%size())
+    call constraint_vec%init(problem%get_n_constraints())
+
     ! Get the design vector for reference
     ! This is the design vector we will perturb
     call des%get_values(design_vector)
@@ -72,7 +77,7 @@ contains
     end if
     target_sensitivity_i = glsum(work_arr, 1)
 
-    if (i .ge. 0) then
+    if (i .ge. 0 .and. pe_rank .eq. 0) then
        write(*, '(I0,1X,A,F10.6,1X,A,F10.6,F10.6,F10.6,A)') &
             i, 'Design variable ', design_vector%x(i), &
             'Location [', des%x(i), des%y(i), des%z(i), ']'
@@ -129,14 +134,22 @@ contains
 
        fd_error = relative_error(fd_estimate, target_sensitivity_i)
 
-       write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, fd_error
-
+       if (pe_rank .eq. 0) then
+          write(*, fmt_data) perturb, perturbed_constraint, fd_estimate, &
+               fd_error
+       end if
        log_data%x(1) = perturb
        log_data%x(2) = perturbed_constraint
        log_data%x(3) = fd_estimate
        log_data%x(4) = fd_error
        call logger%write(log_data)
     end do
+
+    ! Free the internal vectors
+    call design_vector%free()
+    call design_perturbed%free()
+    call constraint_vec%free()
+    call log_data%free()
 
   end subroutine compute_sensitivity_i
 
