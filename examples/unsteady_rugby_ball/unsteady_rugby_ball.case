@@ -4,22 +4,22 @@
         "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
-        "output_boundary": true,
+        "output_boundary": false,
         "time": {
-            "end_time": 1.0,
-            "timestep": 1e-3
+            "end_time": 3.0,
+            "timestep": 2.5e-3
         },
         "numerics": {
             "time_order": 1,
             "polynomial_order": 5,
-            "dealias": false
+            "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 20.0,
+            "Re": 200.0,
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": [ 1.0, 0.1, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -27,7 +27,7 @@
                     "type": "jacobi"
                 },
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 80
             },
             "pressure_solver": {
                 "type": "gmres",
@@ -35,11 +35,12 @@
                     "type": "hsmg"
                 },
                 "absolute_tolerance": 1e-4,
-                "max_iterations": 800
+                "max_iterations": 80
             },
             "boundary_conditions": [
                 {
-                    "type": "user_velocity",
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -74,11 +75,27 @@
                 "z_bounds": [ -1.0, 1.0 ]
             },
             {
+                "name": "objective_domain",
+                "geometry": "box",
+                "x_bounds": [
+                    1.0,
+                    2.5,
+                ],
+                "y_bounds": [
+                    -0.1,
+                    1.1,
+                ],
+                "z_bounds": [
+                    -1.0,
+                    1.0,
+                ],
+            },
+            {
                 "name": "initial_ball",
                 "geometry": "cylinder",
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
-                "radius": 0.25
+                "radius": 0.15
             },
         ]
     },
@@ -118,19 +135,26 @@
             "max_iterations": 50,
             "tolerance": 1.0e-12,
             "mma": {
+                "asyinit": 0.02,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
+                "scale": 1.0,
+                "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
                 "c": 1000.0,
-                "d": 10.0
+                "d": 1.0
             }
         },
         "objectives": [
             {
                 "type": "minimum_dissipation",
+                "mask_name": "objective_domain",
                 "weight": 1.0
             },
             {
                 "type": "lube_term",
+                "mask_name": "optimization_domain",
                 "weight": 1.0
             }
         ],
@@ -138,7 +162,7 @@
             {
                 "type": "volume",
                 "mask_name": "optimization_domain",
-                "limit": 0.2,
+                "limit": 0.1,
                 "is_max": false
             }
         ]
