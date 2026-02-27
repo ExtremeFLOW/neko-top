@@ -9,7 +9,7 @@
 # Possible extensions include
 # - exponential
 # - SIMP
-# - sigmoid/heavyside step
+# - sigmoid/heaviside step
 
 target_sources(neko-top
     PRIVATE
@@ -19,6 +19,8 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/PDE_filter_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/heaviside_projection_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_heaviside_projection_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 
@@ -26,6 +28,7 @@ if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping.cu
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/heaviside_projection_mapping.cu
     )
 
     target_include_directories(neko-top
@@ -37,6 +40,7 @@ elseif(DEVICE_TYPE STREQUAL "HIP")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/heaviside_projection_mapping.hip
     )
 
     target_include_directories(neko-top

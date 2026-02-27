@@ -61,6 +61,7 @@ The following mappings are currently implemented in `Neko-top`.
 1. [PDE filter](@ref mapping_PDE_filter)
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
+4. [Heaviside projection](@ref mapping_heaviside_projection)
 
 ## PDE based filter {#mapping_PDE_filter}
 A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.1002/nme.3072)
@@ -122,3 +123,20 @@ following input parameters:
 | `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
 | `q` | \f$q\f$ in the above equation. | Real | `1.0`|
 | `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
+
+## Heaviside projection {#mapping_heaviside_projection}
+A smooth Heaviside projection mapping commonly used in density-based topology
+optimization,
+\f[
+    X_\text{out} =
+    \frac{\tanh(\beta \eta) + \tanh(\beta (X_\text{in} - \eta))}
+         {\tanh(\beta \eta) + \tanh(\beta (1-\eta))}.
+\f]
+
+The mapping can be selected by prescribing `"type": "heaviside_projection"` and
+has the following input parameters:
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `beta` | Projection sharpness parameter \f$\beta\f$. | Real, `> 0` | `8.0` |
+| `eta` | Projection threshold parameter \f$\eta\f$. | Real in `[0,1]` | `0.5` |
