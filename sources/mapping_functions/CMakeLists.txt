@@ -21,6 +21,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/heaviside_projection_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_heaviside_projection_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/heaviside_projection_mapping_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
 )
 

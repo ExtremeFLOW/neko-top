@@ -43,6 +43,9 @@ module heaviside_projection_mapping
   use device_heaviside_projection_mapping, only: &
        device_heaviside_projection_mapping_apply, &
        device_heaviside_projection_mapping_apply_backward
+  use heaviside_projection_mapping_cpu, only: &
+       heaviside_projection_mapping_apply_cpu, &
+       heaviside_projection_mapping_apply_backward_cpu
   use json_utils, only: json_get_or_default
   use utils, only: neko_error
   implicit none
@@ -146,7 +149,7 @@ contains
     real(kind=rp), intent(in) :: beta, eta
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: i, n
+    integer :: n
     real(kind=rp) :: den, beta_eta
 
     beta_eta = beta * eta
@@ -161,10 +164,8 @@ contains
       call device_heaviside_projection_mapping_apply(beta, eta, &
            X_out%x_d, X_in%x_d, n)
     else
-      do i = 1, n
-        X_out%x(i, 1, 1, 1) = (tanh(beta_eta) + &
-             tanh(beta * (X_in%x(i, 1, 1, 1) - eta))) / den
-      end do
+      call heaviside_projection_mapping_apply_cpu(beta, eta, &
+           X_out%x(:,1,1,1), X_in%x(:,1,1,1), n)
     end if
   end subroutine heaviside_projection_apply
 
@@ -180,8 +181,8 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: i, n
-    real(kind=rp) :: den, beta_eta, arg
+    integer :: n
+    real(kind=rp) :: den, beta_eta
 
     beta_eta = beta * eta
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
@@ -195,11 +196,8 @@ contains
       call device_heaviside_projection_mapping_apply_backward(beta, eta, &
            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-      do i = 1, n
-        arg = beta * (X_in%x(i, 1, 1, 1) - eta)
-        sens_out%x(i, 1, 1, 1) = beta * (1.0_rp - tanh(arg)**2) / den * &
-             sens_in%x(i, 1, 1, 1)
-      end do
+      call heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
+           sens_out%x(:,1,1,1), sens_in%x(:,1,1,1), X_in%x(:,1,1,1), n)
     end if
   end subroutine heaviside_projection_apply_backward
 
