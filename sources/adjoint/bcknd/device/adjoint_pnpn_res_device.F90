@@ -1,3 +1,37 @@
+!> @file adjoint_pnpn_res_device.F90
+!! @copyright
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+!
 !> Residuals in the Pn-Pn formulation (device backend)
 module adjoint_pnpn_res_device
   use gather_scatter, only : gs_t, GS_OP_ADD
@@ -6,13 +40,14 @@ module adjoint_pnpn_res_device
   use ax_product, only : ax_t
   use coefs, only : coef_t
   use facet_normal, only : facet_normal_t
-  use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t
+  use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, &
+       adjoint_pnpn_vel_res_t
   use scratch_registry, only: neko_scratch_registry
   use mesh, only : mesh_t
   use num_types, only : rp
   use space, only : space_t
-  use device_math, only : device_cfill, device_cmult, device_cmult2, device_col2, &
-       device_add2
+  use device_math, only : device_cfill, device_cmult, device_cmult2, &
+       device_col2, device_add2
   use device, only : device_event_sync
   use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
@@ -49,8 +84,9 @@ contains
   !! @param mu Dynamic viscosity field (assumed constant).
   !! @param rho Density field (assumed constant).
   !! @param event Backend event handle for gather-scatter synchronization.
-  subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, f_x, f_y, f_z, &
-       c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, rho, event)
+  subroutine adjoint_pnpn_prs_res_device_compute(p, p_res, u, v, w, &
+       f_x, f_y, f_z, c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, &
+       Ax, bd, dt, mu, rho, event)
     type(field_t), intent(inout) :: p, u, v, w
     type(field_t), intent(inout) :: p_res
     type(field_t), intent(in) :: f_x, f_y, f_z
@@ -137,8 +173,8 @@ contains
   !! @param bd BDF coefficient for the current step.
   !! @param dt Time-step size.
   !! @param n Number of degrees of freedom.
-  subroutine adjoint_pnpn_vel_res_device_compute(Ax, u, v, w, u_res, v_res, w_res, &
-       p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
+  subroutine adjoint_pnpn_vel_res_device_compute(Ax, u, v, w, u_res, &
+       v_res, w_res, p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
     class(ax_t), intent(in) :: Ax
     type(mesh_t), intent(inout) :: msh
     type(space_t), intent(inout) :: Xh
@@ -161,7 +197,8 @@ contains
     call device_cfill(c_Xh%h2_d, rho_val * (bd / dt), n)
     c_Xh%ifh2 = .true.
 
-    call Ax%compute_vector(u_res%x, v_res%x, w_res%x, u%x, v%x, w%x, c_Xh, msh, Xh)
+    call Ax%compute_vector(u_res%x, v_res%x, w_res%x, u%x, v%x, w%x, c_Xh, &
+         msh, Xh)
 
     call device_cmult(u_res%x_d, -1.0_rp, n)
     call device_add2(u_res%x_d, f_x%x_d, n)

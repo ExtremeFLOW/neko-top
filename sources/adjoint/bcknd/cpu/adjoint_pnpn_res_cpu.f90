@@ -1,17 +1,51 @@
+!> @file adjoint_pnpn_res_cpu.f90
+!! @copyright
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
+!
 !> Residuals in the Pn-Pn formulation (CPU version)
 module adjoint_pnpn_res_cpu
   use gather_scatter, only : gs_t, GS_OP_ADD
-  use operators, only : opgrad, curl, cdtp
+  use operators, only : cdtp
   use field, only : field_t
   use ax_product, only : ax_t
   use coefs, only : coef_t
   use facet_normal, only : facet_normal_t
-  use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, adjoint_pnpn_vel_res_t
+  use adjoint_pnpn_residual, only : adjoint_pnpn_prs_res_t, &
+       adjoint_pnpn_vel_res_t
   use scratch_registry, only: neko_scratch_registry
   use mesh, only : mesh_t
   use num_types, only : rp
   use space, only : space_t
-  use math, only : copy, cmult2, invers2, rzero, glsc3
   use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
@@ -47,8 +81,9 @@ contains
   !! @param mu Dynamic viscosity field (assumed constant).
   !! @param rho Density field (assumed constant).
   !! @param event Backend event handle (unused on CPU).
-  subroutine adjoint_pnpn_prs_res_cpu_compute(p, p_res, u, v, w, f_x, f_y, f_z, &
-       c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, Ax, bd, dt, mu, rho, event)
+  subroutine adjoint_pnpn_prs_res_cpu_compute(p, p_res, u, v, w, &
+       f_x, f_y, f_z, c_Xh, gs_Xh, bc_prs_surface, bc_sym_surface, &
+       Ax, bd, dt, mu, rho, event)
     type(field_t), intent(inout) :: p, u, v, w
     type(field_t), intent(inout) :: p_res
     type(field_t), intent(in) :: f_x, f_y, f_z
@@ -126,7 +161,8 @@ contains
     !     wa3%x(i,1,1,1) = 0.0_rp
     !  end do
 
-    !  call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, ta3%x,&
+    !  call bc_sym_surface%apply_surfvec(wa1%x, wa2%x, wa3%x, ta1%x, ta2%x, &
+    !                                    ta3%x,&
     !                                    n)
 
     !  dtbd = bd / dt
@@ -168,8 +204,8 @@ contains
   !! @param bd BDF coefficient for the current step.
   !! @param dt Time-step size.
   !! @param n Number of degrees of freedom.
-  subroutine adjoint_pnpn_vel_res_cpu_compute(Ax, u, v, w, u_res, v_res, w_res, &
-       p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
+  subroutine adjoint_pnpn_vel_res_cpu_compute(Ax, u, v, w, u_res, &
+       v_res, w_res, p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
     class(ax_t), intent(in) :: Ax
     type(mesh_t), intent(inout) :: msh
     type(space_t), intent(inout) :: Xh

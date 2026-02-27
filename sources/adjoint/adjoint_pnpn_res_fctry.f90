@@ -1,6 +1,6 @@
 !> @file adjoint_pnpn_res_fctry.f90
 !! @copyright
-!! Copyright (c) 2026, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -35,7 +35,8 @@
 !! Defines Pressure residual factory for the Pn-Pn formulation
 submodule (adjoint_pnpn_residual) adjoint_pnpn_res_fctry
   use neko_config, only : NEKO_BCKND_DEVICE, NEKO_BCKND_SX
-  use adjoint_pnpn_res_cpu, only : adjoint_pnpn_prs_res_cpu_t, adjoint_pnpn_vel_res_cpu_t
+  use adjoint_pnpn_res_cpu, only : adjoint_pnpn_prs_res_cpu_t, &
+       adjoint_pnpn_vel_res_cpu_t
   use adjoint_pnpn_res_device, only : adjoint_pnpn_prs_res_device_t, &
        adjoint_pnpn_vel_res_device_t
   use utils, only: neko_error

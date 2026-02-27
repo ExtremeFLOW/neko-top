@@ -1,6 +1,6 @@
 !> @file adjoint_fluid_pnpn.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@ module adjoint_fluid_pnpn
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_scheme_incompressible, only: &
        adjoint_fluid_scheme_incompressible_t
-  use device_mathops, only: device_opcolv, device_opadd2cm
+  use device_mathops, only: device_opadd2cm
   use fluid_aux, only: fluid_step_info
   use time_scheme_controller, only: time_scheme_controller_t
   use scratch_registry, only: neko_scratch_registry
@@ -62,7 +62,6 @@ module adjoint_fluid_pnpn
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
   use json_utils, only: json_get, json_get_or_default, json_extract_item
-  use json_module, only: json_file
   use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
   use dirichlet, only: dirichlet_t
@@ -76,7 +75,7 @@ module adjoint_fluid_pnpn
   use time_step_controller, only: time_step_controller_t
   use gs_ops, only: GS_OP_ADD
   use neko_config, only: NEKO_BCKND_DEVICE
-  use mathops, only: opadd2cm, opcolv
+  use mathops, only: opadd2cm
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error, neko_type_error
@@ -100,15 +99,14 @@ module adjoint_fluid_pnpn
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
-  use scratch_registry, only: neko_scratch_registry
   use operators, only : opgrad, curl, grad
-  use gather_scatter, only : gs_t, GS_OP_ADD
   use normal_vec_bcs, only: normal_vec_bcs_t
 
   implicit none
   private
 
-  type, public, extends(adjoint_fluid_scheme_incompressible_t) :: adjoint_fluid_pnpn_t
+  type, public, extends(adjoint_fluid_scheme_incompressible_t) :: &
+       adjoint_fluid_pnpn_t
 
      !> The right-hand sides in the linear solves.
      type(field_t) :: p_res, u_res, v_res, w_res

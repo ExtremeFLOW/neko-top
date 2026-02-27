@@ -1,6 +1,6 @@
 !> @file adjoint_pnpn_res.f90
 !! @copyright
-!! Copyright (c) 2026, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -93,10 +93,14 @@ module adjoint_pnpn_residual
        type(field_t), intent(in) :: f_x !< Explicit forcing x-component.
        type(field_t), intent(in) :: f_y !< Explicit forcing y-component.
        type(field_t), intent(in) :: f_z !< Explicit forcing z-component.
-       type(coef_t), intent(inout) :: c_Xh !< Coefficients on the pressure space.
-       type(gs_t), intent(inout) :: gs_Xh !< Gather-scatter operator on the pressure space.
-       type(facet_normal_t), intent(in) :: bc_prs_surface !< Pressure boundary surface normals.
-       type(facet_normal_t), intent(in) :: bc_sym_surface !< Symmetry boundary surface normals.
+       type(coef_t), intent(inout) :: c_Xh
+       !< Coefficients on the pressure space.
+       type(gs_t), intent(inout) :: gs_Xh
+       !< Gather-scatter operator on the pressure space.
+       type(facet_normal_t), intent(in) :: bc_prs_surface
+       !< Pressure boundary surface normals.
+       type(facet_normal_t), intent(in) :: bc_sym_surface
+       !< Symmetry boundary surface normals.
        class(Ax_t), intent(inout) :: Ax !< Helmholtz operator.
        real(kind=rp), intent(in) :: bd !< BDF coefficient for the current step.
        real(kind=rp), intent(in) :: dt !< Time-step size.
@@ -131,8 +135,6 @@ module adjoint_pnpn_residual
           p, f_x, f_y, f_z, c_Xh, msh, Xh, mu, rho, bd, dt, n)
        import field_t
        import Ax_t
-       import gs_t
-       import facet_normal_t
        import space_t
        import coef_t
        import mesh_t
@@ -144,13 +146,17 @@ module adjoint_pnpn_residual
        type(field_t), intent(inout) :: u !< Adjoint velocity x-component.
        type(field_t), intent(inout) :: v !< Adjoint velocity y-component.
        type(field_t), intent(inout) :: w !< Adjoint velocity z-component.
-       type(field_t), intent(inout) :: u_res !< Residual for adjoint velocity x-component.
-       type(field_t), intent(inout) :: v_res !< Residual for adjoint velocity y-component.
-       type(field_t), intent(inout) :: w_res !< Residual for adjoint velocity z-component.
+       type(field_t), intent(inout) :: u_res
+       !< Residual for adjoint velocity x-component.
+       type(field_t), intent(inout) :: v_res
+       !< Residual for adjoint velocity y-component.
+       type(field_t), intent(inout) :: w_res
+       !< Residual for adjoint velocity z-component.
        type(field_t), intent(in) :: f_x !< Explicit forcing x-component.
        type(field_t), intent(in) :: f_y !< Explicit forcing y-component.
        type(field_t), intent(in) :: f_z !< Explicit forcing z-component.
-       type(coef_t), intent(inout) :: c_Xh !< Coefficients on the velocity space.
+       type(coef_t), intent(inout) :: c_Xh
+       !< Coefficients on the velocity space.
        type(field_t), intent(in) :: mu !< Dynamic viscosity field.
        type(field_t), intent(in) :: rho !< Density field.
        real(kind=rp), intent(in) :: bd !< BDF coefficient for the current step.

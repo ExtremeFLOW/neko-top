@@ -1,6 +1,6 @@
 !> @file normal_vec_bcs.f90
 !! @copyright
-!! Copyright (c) 2026, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -35,9 +35,6 @@
 module normal_vec_bcs
   use num_types, only : rp
   use neko_config, only : NEKO_BCKND_DEVICE
-  use math, only: cfill_mask
-  use device_math, only : device_col2, device_masked_gather_copy_0, &
-       device_masked_scatter_copy_0
   use vector, only : vector_t
   use coefs, only : coef_t
   use bc, only : bc_t
@@ -46,7 +43,7 @@ module normal_vec_bcs
   use, intrinsic :: iso_c_binding, only : c_ptr, c_null_ptr, c_associated
   use htable, only : htable_i4_t
   use device, only : device_map, device_memcpy, device_free, &
-       HOST_TO_DEVICE, DEVICE_TO_HOST, glb_cmd_queue
+       HOST_TO_DEVICE
   use time_state, only : time_state_t
   implicit none
   private
@@ -58,9 +55,11 @@ module normal_vec_bcs
      type(vector_t) :: nx, ny, nz, work
    contains
      procedure, pass(this) :: apply_scalar => normal_vec_bcs_apply_scalar
-     procedure, pass(this) :: apply_scalar_dev => normal_vec_bcs_apply_scalar_dev
+     procedure, pass(this) :: apply_scalar_dev => &
+          normal_vec_bcs_apply_scalar_dev
      procedure, pass(this) :: apply_vector => normal_vec_bcs_apply_vector
-     procedure, pass(this) :: apply_vector_dev => normal_vec_bcs_apply_vector_dev
+     procedure, pass(this) :: apply_vector_dev => &
+          normal_vec_bcs_apply_vector_dev
      procedure, pass(this) :: apply_n_dot => normal_vec_bcs_apply_n_dot
      procedure, pass(this) :: apply_n_cross => normal_vec_bcs_apply_n_cross
      !> Constructor.
