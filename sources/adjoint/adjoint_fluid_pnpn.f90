@@ -771,9 +771,9 @@ contains
       call neko_scratch_registry%request_field(dx_p_adj, cc_indices(1), .false.)
       call neko_scratch_registry%request_field(dy_p_adj, cc_indices(2), .false.)
       call neko_scratch_registry%request_field(dz_p_adj, cc_indices(3), .false.)
-      call neko_scratch_registry%request_field(nx1, cc_indices(4), .false.)
-      call neko_scratch_registry%request_field(nx2, cc_indices(5), .false.)
-      call neko_scratch_registry%request_field(nx3, cc_indices(6), .false.)
+      call neko_scratch_registry%request_field(nx1, cc_indices(4), .true.)
+      call neko_scratch_registry%request_field(nx2, cc_indices(5), .true.)
+      call neko_scratch_registry%request_field(nx3, cc_indices(6), .true.)
       call neko_scratch_registry%request_field(work1, cc_indices(7), .false.)
       call neko_scratch_registry%request_field(work2, cc_indices(8), .false.)
 
