@@ -127,7 +127,7 @@ contains
             X_out%x_d, X_in%x_d, n)
     else
        call SIMP_mapping_apply_cpu(this%f_min, this%f_max, this%p, &
-            X_out%x(:,1,1,1), X_in%x(:,1,1,1), n)
+            X_out%x, X_in%x, n)
     end if
 
   end subroutine SIMP_forward_mapping
