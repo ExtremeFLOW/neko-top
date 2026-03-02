@@ -199,7 +199,8 @@ contains
             this%sensitivity_out)
     else
        call this%sensitivity_output%init(sp, 'sensitivity', 1)
-       call this%sensitivity_output%fields%assign_to_field(1, this%sensitivity_out)
+       call this%sensitivity_output%fields%assign_to_field(1, &
+            this%sensitivity_out)
     end if
 
     this%outputs_initialized = .true.
@@ -358,8 +359,8 @@ contains
           call this%mapping_cascade(i)%mapping%apply_backward(tmp_fld_out, &
                tmp_fld_in)
           if (allocated(this%sensitivity_stages)) then
-             call field_copy(this%sensitivity_stages(size(this%mapping_cascade) - &
-                  i + 2), tmp_fld_out)
+             call field_copy(this%sensitivity_stages( &
+                  size(this%mapping_cascade) - i + 2), tmp_fld_out)
           end if
 
        end do
