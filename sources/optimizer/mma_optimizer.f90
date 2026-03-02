@@ -52,7 +52,6 @@ module mma_optimizer
   use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
@@ -86,7 +85,6 @@ module mma_optimizer
 
      !> A file writer to document the convergence history
      logical, private :: enable_output = .true.
-     type(csv_file_t), private :: csv_log
    contains
 
      ! Override the deferred methods
@@ -159,7 +157,8 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=1024) :: header
+    character(len=512) :: extra_header
+    character(len=:), allocatable :: backend_subsolver
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -197,12 +196,16 @@ contains
 
     ! Initialize the logger
     if (this%enable_output) then
-       call this%csv_log%init('optimization_data.csv')
-       header = 'iter, ' // trim(problem%get_log_header()) // &
-            ', KKTmax, KKTnorm2, scaling factor, ' // &
-            trim(this%mma%get_backend_and_subsolver())
-
-       call this%csv_log%set_header(trim(header))
+       backend_subsolver = this%mma%get_backend_and_subsolver()
+       extra_header = 'KKTmax, KKTnorm2, scaling factor'
+       if (trim(backend_subsolver) .ne. '') then
+          ! Keep backend/subsolver as header-only metadata columns.
+          extra_header = trim(extra_header) // ', ' // trim(backend_subsolver)
+       end if
+       call this%init_log(problem, extra_headers = trim(extra_header), &
+            extra_size = 3, &
+            include_constraints = .not. this%unconstrained_problem, &
+            filename = 'optimization_data.csv')
     end if
 
     call this%init_base('MMA', max_iterations)
@@ -399,70 +402,22 @@ contains
   subroutine mma_optimizer_write(this, iter, problem)
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter
-    class(problem_t), intent(in) :: problem
-
-    type(vector_t), pointer :: log_data
-    type(vector_t), pointer :: all_objectives
-    type(vector_t), pointer :: constraint_value
-    real(kind=rp) :: objective_value
-
-    integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
+    class(problem_t), intent(inout) :: problem
+    real(kind=rp) :: extras(3)
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
 
-    n = problem%get_n_objectives()
-    m = problem%get_n_constraints()
-    if (this%unconstrained_problem) then
-       log_size = 5 + n
-    else
-       log_size = 5 + n + m
-    endif
-
-    call neko_scratch_registry%request(log_data, ind(1), log_size, .false.)
-    call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
-
-    ! Prepare data for logging
-    call problem%get_objective_value(objective_value)
-    call problem%get_all_objective_values(all_objectives)
-    call problem%get_constraint_values(constraint_value)
-
-    call all_objectives%copy_from(DEVICE_TO_HOST, sync = .true.)
-    call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
-
-    ! Assemble the log data
-    log_data%x(1) = real(iter, kind=rp)
-
-    ! total objective
-    log_data%x(2) = objective_value
-
-    ! individual objectives
-    i_tmp1 = 3
-    i_tmp2 = i_tmp1 + n - 1
-    log_data%x(i_tmp1 : i_tmp2) = all_objectives%x
-
-    ! constraints
-    if (.not. this%unconstrained_problem) then
-       i_tmp1 = i_tmp2 + 1
-       i_tmp2 = i_tmp1 + m - 1
-       log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
-    end if
-
-    ! convergence stuff
     if (iter .eq. 0) then
-       log_data%x(i_tmp2 + 1) = 0.0_rp
-       log_data%x(i_tmp2 + 2) = 0.0_rp
+       extras(1) = 0.0_rp
+       extras(2) = 0.0_rp
     else
-       log_data%x(i_tmp2 + 1) = this%mma%get_residumax()
-       log_data%x(i_tmp2 + 2) = this%mma%get_residunorm()
+       extras(1) = this%mma%get_residumax()
+       extras(2) = this%mma%get_residunorm()
     end if
-    log_data%x(i_tmp2 + 3) = this%scaling_factor
+    extras(3) = this%scaling_factor
 
-    call this%csv_log%write(log_data)
-
-    ! Free local resources
-    call neko_scratch_registry%relinquish(ind)
+    call this%write_log(iter, problem, extras)
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write
@@ -488,4 +443,3 @@ contains
   end subroutine mma_optimizer_load_checkpoint_components
 
 end module mma_optimizer
-
