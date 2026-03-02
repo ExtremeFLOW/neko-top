@@ -145,61 +145,61 @@ contains
     call this%sensitivity_output%free()
 
     if (allocated(this%sensitivity_stages)) then
-      do i = 1, size(this%sensitivity_stages)
-        call this%sensitivity_stages(i)%free()
-      end do
-      deallocate(this%sensitivity_stages)
+       do i = 1, size(this%sensitivity_stages)
+          call this%sensitivity_stages(i)%free()
+       end do
+       deallocate(this%sensitivity_stages)
     end if
 
     n_mappings = 0
     if (allocated(this%mapping_cascade)) n_mappings = size(this%mapping_cascade)
 
     if (this%verbose_design) then
-      ! all mapping inputs + mapped output
-      n_fields = n_mappings + 1
-      if (n_fields .le. 0) n_fields = 1
+       ! all mapping inputs + mapped output
+       n_fields = n_mappings + 1
+       if (n_fields .le. 0) n_fields = 1
     else
-      ! only first unmapped stage and mapped output
-      if (n_mappings .gt. 0) then
-        n_fields = 2
-      else
-        n_fields = 1
-      end if
+       ! only first unmapped stage and mapped output
+       if (n_mappings .gt. 0) then
+          n_fields = 2
+       else
+          n_fields = 1
+       end if
     end if
 
     call this%design_output%init(sp, 'design', n_fields)
     if (this%verbose_design .and. n_mappings .gt. 0) then
-      do i = 1, n_mappings
-        call this%design_output%fields%assign_to_field(i, &
-             this%mapping_cascade(i)%mapping%X_in)
-      end do
-      call this%design_output%fields%assign_to_field(n_fields, this%design_out)
+       do i = 1, n_mappings
+          call this%design_output%fields%assign_to_field(i, &
+               this%mapping_cascade(i)%mapping%X_in)
+       end do
+       call this%design_output%fields%assign_to_field(n_fields, this%design_out)
     else if (n_mappings .gt. 0) then
-      call this%design_output%fields%assign_to_field(1, &
-           this%mapping_cascade(1)%mapping%X_in)
-      call this%design_output%fields%assign_to_field(2, this%design_out)
+       call this%design_output%fields%assign_to_field(1, &
+            this%mapping_cascade(1)%mapping%X_in)
+       call this%design_output%fields%assign_to_field(2, this%design_out)
     else
-      call this%design_output%fields%assign_to_field(1, this%design_out)
+       call this%design_output%fields%assign_to_field(1, this%design_out)
     end if
 
     if (this%verbose_sensitivity) then
-      ! sensitivity_in + chain-rule stages + final sensitivity
-      n_fields = n_mappings + 2
-      allocate(this%sensitivity_stages(n_mappings + 1))
-      do i = 1, n_mappings + 1
-        call this%sensitivity_stages(i)%init(this%coef%dof)
-      end do
+       ! sensitivity_in + chain-rule stages + final sensitivity
+       n_fields = n_mappings + 2
+       allocate(this%sensitivity_stages(n_mappings + 1))
+       do i = 1, n_mappings + 1
+          call this%sensitivity_stages(i)%init(this%coef%dof)
+       end do
 
-      call this%sensitivity_output%init(sp, 'sensitivity', n_fields)
-      do i = 1, n_mappings + 1
-        call this%sensitivity_output%fields%assign_to_field(i, &
-             this%sensitivity_stages(i))
-      end do
-      call this%sensitivity_output%fields%assign_to_field(n_fields, &
-           this%sensitivity_out)
+       call this%sensitivity_output%init(sp, 'sensitivity', n_fields)
+       do i = 1, n_mappings + 1
+          call this%sensitivity_output%fields%assign_to_field(i, &
+               this%sensitivity_stages(i))
+       end do
+       call this%sensitivity_output%fields%assign_to_field(n_fields, &
+            this%sensitivity_out)
     else
-      call this%sensitivity_output%init(sp, 'sensitivity', 1)
-      call this%sensitivity_output%fields%assign_to_field(1, this%sensitivity_out)
+       call this%sensitivity_output%init(sp, 'sensitivity', 1)
+       call this%sensitivity_output%fields%assign_to_field(1, this%sensitivity_out)
     end if
 
     this%outputs_initialized = .true.
@@ -340,7 +340,7 @@ contains
     ! cascade.
     call field_copy(tmp_fld_out, sens_in)
     if (allocated(this%sensitivity_stages)) then
-      call field_copy(this%sensitivity_stages(1), sens_in)
+       call field_copy(this%sensitivity_stages(1), sens_in)
     end if
 
     ! enforce continuity in the field
