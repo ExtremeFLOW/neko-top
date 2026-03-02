@@ -34,14 +34,13 @@
 
 ! Implements the `brinkman_design_t` type.
 module brinkman_design
-  use num_types, only: rp, sp, dp
+  use num_types, only: rp
   use field, only: field_t
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
   use coefs, only: coef_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
-  use fld_file_output, only: fld_file_output_t
   use point_zone_registry, only: neko_point_zone_registry
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
@@ -179,9 +178,6 @@ module brinkman_design
      ! you also had logicals for convergence etc,
      ! I feel they should live in "problem"
 
-     ! afield writer would be nice too
-     type(fld_file_output_t), private :: output
-
    contains
 
      ! ----------------------------------------------------------------------- !
@@ -252,11 +248,15 @@ contains
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
-    logical :: dealias
+    logical :: dealias, verbose_design, verbose_sensitivity
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
     call json_get_or_default(parameters, 'dealias', dealias, .true.)
+    call json_get_or_default(parameters, 'verbose_design', verbose_design, &
+         .false.)
+    call json_get_or_default(parameters, 'verbose_sensitivity', &
+         verbose_sensitivity, .false.)
 
     select case (trim(domain_type))
     case ('full')
@@ -283,6 +283,8 @@ contains
       if ('mapping' .in. parameters) then
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
+         call this%mapping%init_output_fields(this%brinkman_amplitude, &
+              this%sensitivity, verbose_design, verbose_sensitivity)
       end if
 
       if ('initial_distribution' .in. parameters) then
@@ -371,20 +373,6 @@ contains
        call mask_exterior_const(this%design_indicator, &
             this%optimization_domain, 0.0_rp)
     end if
-
-    ! a field writer would be nice to output
-    ! - design indicator (\rho)
-    ! - mapped design (\chi)
-    ! - sensitivity (dF/d\chi)
-    ! TODO
-    ! do this properly with JSON
-    ! TODO
-    ! obviously when we do the mappings properly, to many coeficients,
-    ! we'll also have to modify this
-    call this%output%init(sp, 'design', 3)
-    call this%output%fields%assign_to_field(1, this%design_indicator)
-    call this%output%fields%assign_to_field(2, this%brinkman_amplitude)
-    call this%output%fields%assign_to_field(3, this%sensitivity)
 
     n = this%design_indicator%dof%size()
     call this%init_base(name, n)
@@ -625,7 +613,8 @@ contains
     class(brinkman_design_t), intent(inout) :: this
     integer, intent(in) :: idx
 
-    call this%output%sample(real(idx, kind=rp))
+    call this%mapping%write_design(idx)
+    call this%mapping%write_sensitivity(idx)
 
   end subroutine brinkman_design_write
 
