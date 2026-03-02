@@ -125,10 +125,8 @@ contains
        call device_SIMP_mapping_apply(this%f_min, this%f_max, this%p, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = this%f_min + (this%f_max - this%f_min) * &
-               (X_in%x(i,1,1,1) ) ** this%p
-       end do
+        X_out%x = this%f_min + (this%f_max - this%f_min) * &
+              (X_in%x ) ** this%p
     end if
 
   end subroutine SIMP_forward_mapping
