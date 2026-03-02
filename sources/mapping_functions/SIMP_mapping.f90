@@ -151,7 +151,7 @@ contains
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
        call SIMP_mapping_apply_backward_cpu(this%f_min, this%f_max, this%p, &
-            sens_out%x(:,1,1,1), sens_in%x(:,1,1,1), X_in%x(:,1,1,1), n)
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine SIMP_backward_mapping
