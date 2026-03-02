@@ -123,6 +123,7 @@ module mapping_handler
 contains
 
   !> Setup output objects after mappings are known.
+  !! @param this The handler object.
   subroutine mapping_handler_setup_outputs(this)
     class(mapping_handler_t), intent(inout) :: this
     integer :: i, n_mappings, n_fields
@@ -484,6 +485,11 @@ contains
   end subroutine mapping_handler_add_mapping
 
   !> Configure fields used by design/sensitivity output writers.
+  !! @param this The handler object.
+  !! @param design_out Final mapped design field.
+  !! @param sensitivity_out Final backward-mapped sensitivity field.
+  !! @param[in] verbose_design If true, output all forward cascade stages.
+  !! @param[in] verbose_sensitivity If true, output all backward stages.
   subroutine mapping_handler_init_output_fields(this, design_out, &
        sensitivity_out, verbose_design, verbose_sensitivity)
     class(mapping_handler_t), intent(inout) :: this
@@ -504,6 +510,8 @@ contains
   end subroutine mapping_handler_init_output_fields
 
   !> Write design-related output fields.
+  !! @param this The handler object.
+  !! @param[in] idx Output sample index.
   subroutine mapping_handler_write_design(this, idx)
     class(mapping_handler_t), intent(inout) :: this
     integer, intent(in) :: idx
@@ -516,6 +524,8 @@ contains
   end subroutine mapping_handler_write_design
 
   !> Write sensitivity-related output fields.
+  !! @param this The handler object.
+  !! @param[in] idx Output sample index.
   subroutine mapping_handler_write_sensitivity(this, idx)
     class(mapping_handler_t), intent(inout) :: this
     integer, intent(in) :: idx
