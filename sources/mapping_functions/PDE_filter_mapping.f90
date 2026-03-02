@@ -61,6 +61,7 @@ module PDE_filter
   use sx_jacobi, only: sx_jacobi_t
   use utils, only: neko_error
   use device_math, only: device_cfill, device_subcol3, device_cmult
+  use math, only: subcol3, cmult
   use json_utils, only: json_get, json_get_or_default
   implicit none
   private
@@ -251,11 +252,8 @@ contains
        call device_subcol3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
-       do i = 1, n
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = X_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-               - RHS%x(i,1,1,1)
-       end do
+       call subcol3(RHS%x, X_in%x, this%coef%B, n)
+       call cmult(RHS%x, -1.0_rp, n)
     end if
 
     ! gather scatter
@@ -350,11 +348,8 @@ contains
        call device_subcol3(RHS%x_d, sens_in%x_d, this%coef%B_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
-       do i = 1, n
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = sens_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-               - RHS%x(i,1,1,1)
-       end do
+       call subcol3(RHS%x, sens_in%x, this%coef%B, n)
+       call cmult(RHS%x, -1.0_rp, n)
     end if
 
     ! gather scatter
