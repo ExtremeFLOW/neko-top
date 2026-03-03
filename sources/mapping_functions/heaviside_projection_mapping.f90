@@ -156,7 +156,7 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-      call neko_error('heaviside_projection: invalid denominator; adjust beta/eta')
+      call neko_error('heaviside_projection: invalid denominator')
     end if
 
     n = X_in%dof%size()
@@ -165,7 +165,7 @@ contains
            X_out%x_d, X_in%x_d, n)
     else
       call heaviside_projection_mapping_apply_cpu(beta, eta, &
-           X_out%x(:,1,1,1), X_in%x(:,1,1,1), n)
+           X_out%x, X_in%x, n)
     end if
   end subroutine heaviside_projection_apply
 
@@ -188,7 +188,7 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-      call neko_error('heaviside_projection: invalid denominator; adjust beta/eta')
+      call neko_error('heaviside_projection: invalid denominator')
     end if
 
     n = X_in%dof%size()
@@ -197,7 +197,7 @@ contains
            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
       call heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
-           sens_out%x(:,1,1,1), sens_in%x(:,1,1,1), X_in%x(:,1,1,1), n)
+           sens_out%x, sens_in%x, X_in%x, n)
     end if
   end subroutine heaviside_projection_apply_backward
 
