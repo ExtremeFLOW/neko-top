@@ -42,6 +42,7 @@ module SIMP_mapping
   use device_SIMP_mapping, only: device_SIMP_mapping_apply, &
        device_SIMP_mapping_apply_backward
   use json_utils, only: json_get, json_get_or_default
+  use math, only: col2
   implicit none
   private
 
@@ -149,10 +150,9 @@ contains
        call device_SIMP_mapping_apply_backward(this%f_min, this%f_max, this%p, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = sens_in%x(i,1,1,1) * (this%f_max - this%f_min) &
-               * this%p * (X_in%x(i,1,1,1)) ** (this%p - 1.0_rp)
-       end do
+       sens_out%x = (this%f_max - this%f_min) * this%p &
+               * (X_in%x) ** (this%p - 1.0_rp)
+       call col2(sens_out%x, sens_in%x, n)
     end if
 
   end subroutine SIMP_backward_mapping
