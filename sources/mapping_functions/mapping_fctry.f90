@@ -39,6 +39,7 @@ submodule (mapping) mapping_fctry
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
   use heaviside_projection_mapping, only: heaviside_projection_mapping_t
+  use SIMP_mapping, only: SIMP_mapping_t
   use json_utils, only : json_get
   use utils, only : concat_string_array, neko_error
   implicit none
@@ -48,6 +49,7 @@ submodule (mapping) mapping_fctry
        "linear", &
        "PDE_filter", &
        "RAMP", &
+       "SIMP", &
        "heaviside_projection"]
 
 contains
@@ -70,6 +72,8 @@ contains
        allocate(PDE_filter_t::object)
     case ("RAMP")
        allocate(RAMP_mapping_t::object)
+    case ("SIMP")
+       allocate(SIMP_mapping_t::object)
     case ("heaviside_projection")
        allocate(heaviside_projection_mapping_t::object)
     case default
