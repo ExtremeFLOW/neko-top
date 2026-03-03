@@ -104,11 +104,11 @@ contains
     real(kind=rp), intent(in) :: eta
 
     if (beta .le. 0.0_rp) then
-      call neko_error('heaviside_projection: "beta" must be > 0')
+       call neko_error('heaviside_projection: "beta" must be > 0')
     end if
 
     if (eta .lt. 0.0_rp .or. eta .gt. 1.0_rp) then
-      call neko_error('heaviside_projection: "eta" must be in [0, 1]')
+       call neko_error('heaviside_projection: "eta" must be in [0, 1]')
     end if
 
     this%beta = beta
@@ -156,16 +156,16 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-      call neko_error('heaviside_projection: invalid denominator')
+       call neko_error('heaviside_projection: invalid denominator')
     end if
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      call device_heaviside_projection_mapping_apply(beta, eta, &
-           X_out%x_d, X_in%x_d, n)
+       call device_heaviside_projection_mapping_apply(beta, eta, &
+            X_out%x_d, X_in%x_d, n)
     else
-      call heaviside_projection_mapping_apply_cpu(beta, eta, &
-           X_out%x, X_in%x, n)
+       call heaviside_projection_mapping_apply_cpu(beta, eta, &
+            X_out%x, X_in%x, n)
     end if
   end subroutine heaviside_projection_apply
 
@@ -188,16 +188,16 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-      call neko_error('heaviside_projection: invalid denominator')
+       call neko_error('heaviside_projection: invalid denominator')
     end if
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-      call device_heaviside_projection_mapping_apply_backward(beta, eta, &
-           sens_out%x_d, sens_in%x_d, X_in%x_d, n)
+       call device_heaviside_projection_mapping_apply_backward(beta, eta, &
+            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-      call heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
-           sens_out%x, sens_in%x, X_in%x, n)
+       call heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
   end subroutine heaviside_projection_apply_backward
 
