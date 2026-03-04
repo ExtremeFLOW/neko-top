@@ -78,6 +78,7 @@ module mma
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device_math, only: device_col2
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
@@ -690,8 +691,8 @@ contains
     this%xmax%x = this%xmax%x * weights%x
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call this%xmax%copy_from(HOST_TO_DEVICE, sync = .false.)
-       call this%xmin%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call device_col2(this%xmin%x_d, weights%x_d, this%n)
+       call device_col2(this%xmax%x_d, weights%x_d, this%n)
     end if
   end subroutine mma_scale_variable_bounds
 
