@@ -78,6 +78,7 @@ module mma
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device_math, only: device_col2
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
@@ -121,6 +122,8 @@ module mma
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
      procedure, public, pass(this) :: get_backend_and_subsolver => &
           mma_get_backend_and_subsolver
+     procedure, public, pass(this) :: scale_variable_bounds => &
+          mma_scale_variable_bounds
 
      generic, public :: update => update_vector, update_cpu, update_device
      procedure, pass(this) :: update_vector => mma_update_vector
@@ -664,6 +667,34 @@ contains
     backend_subsolver = 'backend:' // trim(backend) // ', subsolver:' // &
          trim(this%subsolver)
   end function mma_get_backend_and_subsolver
+
+  !> Scale variable bounds with a per-variable weight vector.
+  !! This updates the MMA internal bounds to match transformed variables
+  !! (`x_mma = weights * x_internal`), so `xmin/xmax` are interpreted in the
+  !! same space as the optimization variable passed to MMA.
+  !! @param[inout] this The MMA object.
+  !! @param[in] weights Positive per-variable scaling weights.
+  subroutine mma_scale_variable_bounds(this, weights)
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(in) :: weights
+
+    if (.not. this%is_initialized) then
+      call neko_error('mma_scale_variable_bounds: MMA object is not initialized')
+    end if
+
+    if (weights%size() .ne. this%n) then
+      call neko_error('mma_scale_variable_bounds: weight size does not match ' // &
+           'number of design variables')
+    end if
+
+    this%xmin%x = this%xmin%x * weights%x
+    this%xmax%x = this%xmax%x * weights%x
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(this%xmin%x_d, weights%x_d, this%n)
+       call device_col2(this%xmax%x_d, weights%x_d, this%n)
+    end if
+  end subroutine mma_scale_variable_bounds
 
   ! ========================================================================== !
   ! Private utilities

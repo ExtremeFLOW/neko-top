@@ -133,4 +133,36 @@ __global__ void sub3_mask_kernel(
     }
 }
 
+/**
+ * Device kernel for in-place square root.
+ */
+template <typename T>
+__global__ void sqrt_inplace_kernel(T* __restrict__ a, const int size) {
+
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < size; i += str) {
+        a[i] = sqrt(a[i]);
+    }
+}
+
+/**
+ * Device kernel for column-wise matrix scaling.
+ * Matrix is stored in Fortran column-major order.
+ */
+template <typename T>
+__global__ void scale_matrix_cols_kernel(
+    T* __restrict__ a, T* __restrict__ w, const int nrows, const int ncols) {
+
+    const int size = nrows * ncols;
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int str = blockDim.x * gridDim.x;
+
+    for (int i = idx; i < size; i += str) {
+        const int col = i / nrows;
+        a[i] = a[i] * w[col];
+    }
+}
+
 #endif // __NEKO_CUDA_MATH_EXT_KERNELS__
