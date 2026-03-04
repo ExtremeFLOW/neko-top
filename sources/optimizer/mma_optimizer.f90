@@ -56,7 +56,10 @@ module mma_optimizer
   use csv_file, only: csv_file_t
   use vector_math, only: vector_cmult, vector_col2, vector_invcol2
   use matrix_math, only: matrix_cmult
-  use device, only: DEVICE_TO_HOST, HOST_TO_DEVICE
+  use device, only: DEVICE_TO_HOST
+  use device_math, only: device_copy, device_cfill, device_cmult, device_col2, &
+       device_invcol1, device_glsum
+  use device_math_ext, only: device_sqrt_inplace, device_scale_matrix_cols
   use scratch_registry, only: neko_scratch_registry
 
   implicit none
@@ -399,7 +402,7 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), optional, intent(in) :: simulation
     integer :: n, i, n_coef
-    real(kind=rp) :: local_sum, global_sum, weight_avg, global_count
+    real(kind=rp) :: global_sum, weight_avg, global_count
     real(kind=rp) :: local_count(1)
 
     n = design%size()
@@ -407,20 +410,30 @@ contains
     call this%mma_inv_weight_sq%init(n)
     this%mma_weights = 1.0_rp
     this%mma_inv_weight_sq = 1.0_rp
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_cfill(this%mma_weights%x_d, 1.0_rp, n)
+       call device_cfill(this%mma_inv_weight_sq%x_d, 1.0_rp, n)
+    end if
 
     if (present(simulation)) then
       n_coef = simulation%fluid%c_Xh%dof%size()
       if (n_coef .eq. n) then
-         call copy(this%mma_weights%x, simulation%fluid%c_Xh%B, n)
-         do i = 1, n
-            if (this%mma_weights%x(i) .le. 0.0_rp) then
-               call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
-                    'encountered when building variable weights')
-            end if
-            this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
-         end do
+         if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_copy(this%mma_weights%x_d, simulation%fluid%c_Xh%B_d, n)
+            call device_sqrt_inplace(this%mma_weights%x_d, n)
+            global_sum = device_glsum(this%mma_weights%x_d, n)
+         else
+            call copy(this%mma_weights%x, simulation%fluid%c_Xh%B, n)
+            do i = 1, n
+               if (this%mma_weights%x(i) .le. 0.0_rp) then
+                  call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
+                       'encountered when building variable weights')
+               end if
+               this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
+            end do
+            global_sum = glsum(this%mma_weights%x, n)
+         end if
 
-         global_sum = glsum(this%mma_weights%x, n)
          local_count(1) = real(n, rp)
          global_count = glsum(local_count, 1)
 
@@ -430,20 +443,25 @@ contains
          end if
 
          weight_avg = global_sum / global_count
-         if (weight_avg .le. 0.0_rp) then
+         if (weight_avg .ne. weight_avg .or. weight_avg .le. 0.0_rp) then
             call neko_error('mma_optimizer: non-positive average weight ' // &
                  'encountered when normalizing variable weights')
          end if
 
-         !------- DELETE -------------
-         ! weight_avg = 1.0_rp
-         !----------------------------
-         this%mma_weights%x = this%mma_weights%x / weight_avg
-         this%mma_inv_weight_sq%x = 1.0_rp / &
-              (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
-         !------ DELETE -------------
-         ! this%mma_weights%x = 1.0_rp
-         !---------------------------
+         if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_cmult(this%mma_weights%x_d, 1.0_rp / weight_avg, n)
+            call device_copy(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+            call device_invcol1(this%mma_inv_weight_sq%x_d, n)
+
+            call this%mma_weights%copy_from(DEVICE_TO_HOST, .false.)
+            call this%mma_inv_weight_sq%copy_from(DEVICE_TO_HOST, .true.)
+         else
+            this%mma_weights%x = this%mma_weights%x / weight_avg
+            this%mma_inv_weight_sq%x = 1.0_rp / &
+                 (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
+         end if
       else
          call neko_log%message('mma_optimizer: design size and coefficient ' // &
               'size differ; using identity variable weights.')
@@ -451,11 +469,6 @@ contains
     else
       call neko_log%message('mma_optimizer: simulation not present; using ' // &
            'identity variable weights.')
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call this%mma_weights%copy_from(HOST_TO_DEVICE, .true.)
-       call this%mma_inv_weight_sq%copy_from(HOST_TO_DEVICE, .true.)
     end if
   end subroutine mma_optimizer_init_variable_weights
 
@@ -487,7 +500,7 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     type(vector_t), intent(inout) :: objective_sensitivities
     type(matrix_t), intent(inout) :: constraint_sensitivities
-    integer :: j, n
+    integer :: j, m, n
 
     call vector_col2(objective_sensitivities, this%mma_inv_weight_sq)
 
@@ -498,16 +511,14 @@ contains
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call constraint_sensitivities%copy_from(DEVICE_TO_HOST, .true.)
-    end if
-
-    do j = 1, n
-       constraint_sensitivities%x(:, j) = constraint_sensitivities%x(:, j) * &
-            this%mma_inv_weight_sq%x(j)
-    end do
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call constraint_sensitivities%copy_from(HOST_TO_DEVICE, .true.)
+       m = constraint_sensitivities%get_nrows()
+       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
+            this%mma_inv_weight_sq%x_d, m, n)
+    else
+       do j = 1, n
+          constraint_sensitivities%x(:, j) = constraint_sensitivities%x(:, j) * &
+               this%mma_inv_weight_sq%x(j)
+       end do
     end if
   end subroutine mma_optimizer_transform_sensitivities
 
@@ -527,8 +538,8 @@ contains
     call constraint_values%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
-       !call neko_error('MMA optimizer validation failed: ' // &
-       !     'Constraints are not satisfied.')
+       call neko_error('MMA optimizer validation failed: ' // &
+            'Constraints are not satisfied.')
     end if
 
     ! Free local resources
