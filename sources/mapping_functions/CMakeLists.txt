@@ -22,6 +22,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_SIMP_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/RAMP_mapping_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/SIMP_mapping_cpu.f90
 )
 
