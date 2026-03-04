@@ -42,6 +42,7 @@ module mma_optimizer
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
+  use neko_config, only: NEKO_BCKND_DEVICE
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
 
@@ -49,13 +50,13 @@ module mma_optimizer
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp
+  use math, only: abscmp, copy
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
-  use vector_math, only: vector_cmult
+  use vector_math, only: vector_cmult, vector_col2, vector_invcol2
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST, HOST_TO_DEVICE
   use scratch_registry, only: neko_scratch_registry
   use comm, only: pe_rank, NEKO_COMM
   use mpi_f08, only: MPI_Barrier
@@ -87,6 +88,10 @@ module mma_optimizer
      !> A file writer to document the convergence history
      logical, private :: enable_output = .true.
      type(csv_file_t), private :: csv_log
+     !> MMA variable transform weights (z = w * x).
+     type(vector_t), private :: mma_weights
+     !> Inverse squared weights (1 / w^2), used for sensitivity transform.
+     type(vector_t), private :: mma_inv_weight_sq
    contains
 
      ! Override the deferred methods
@@ -105,6 +110,12 @@ module mma_optimizer
           mma_optimizer_save_checkpoint_components
      procedure, pass(this) :: load_checkpoint_components => &
           mma_optimizer_load_checkpoint_components
+     procedure, pass(this), private :: init_variable_weights => &
+          mma_optimizer_init_variable_weights
+     procedure, pass(this), private :: transform_variables => &
+          mma_optimizer_transform_variables
+     procedure, pass(this), private :: transform_sensitivities => &
+          mma_optimizer_transform_sensitivities
 
   end type mma_optimizer_t
 
@@ -184,7 +195,10 @@ contains
     ! problems in mma_optimizer_run()
     call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
+    call this%init_variable_weights(design, simulation)
+
     call design%get_values(x)
+    call this%transform_variables(x, .true.)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
 
@@ -218,6 +232,8 @@ contains
     ! Free MMA-specific data
     call this%free_base()
     call this%mma%free()
+    call this%mma_weights%free()
+    call this%mma_inv_weight_sq%free()
   end subroutine mma_optimizer_free
 
   ! -------------------------------------------------------------------------- !
@@ -254,6 +270,7 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
+    call this%transform_variables(x, .true.)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -264,6 +281,8 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%transform_sensitivities(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -303,6 +322,7 @@ contains
 
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
+    call this%transform_variables(x, .true.)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -313,6 +333,8 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%transform_sensitivities(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -328,7 +350,9 @@ contains
     ! Update the design variable
     call this%mma%update(iter, x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
+    call this%transform_variables(x, .false.)
     call design%update_design(x)
+    call this%transform_variables(x, .true.)
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
@@ -351,6 +375,8 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%transform_sensitivities(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -361,6 +387,104 @@ contains
     call neko_scratch_registry%relinquish(indices)
 
   end function mma_optimizer_step
+
+  !> Initialize MMA variable transform weights and inverse-squared weights.
+  !! Uses identity weights by default and, when available, sets
+  !! `weights = sqrt(B)` from the simulation mass-matrix coefficients.
+  !! @param[inout] this The MMA optimizer.
+  !! @param[in] design The design object used to determine vector size.
+  !! @param[in] simulation Optional simulation with coefficient data.
+  subroutine mma_optimizer_init_variable_weights(this, design, simulation)
+    class(mma_optimizer_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    type(simulation_t), optional, intent(in) :: simulation
+    integer :: n, i, n_coef
+
+    n = design%size()
+    call this%mma_weights%init(n)
+    call this%mma_inv_weight_sq%init(n)
+    this%mma_weights = 1.0_rp
+    this%mma_inv_weight_sq = 1.0_rp
+
+    if (present(simulation)) then
+      n_coef = simulation%fluid%c_Xh%dof%size()
+      if (n_coef .eq. n) then
+         call copy(this%mma_weights%x, simulation%fluid%c_Xh%B, n)
+         do i = 1, n
+            if (this%mma_weights%x(i) .le. 0.0_rp) then
+               call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
+                    'encountered when building variable weights')
+            end if
+            this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
+            this%mma_inv_weight_sq%x(i) = 1.0_rp / &
+                 (this%mma_weights%x(i) * this%mma_weights%x(i))
+         end do
+      else
+         call neko_log%message('mma_optimizer: design size and coefficient ' // &
+              'size differ; using identity variable weights.')
+      end if
+    else
+      call neko_log%message('mma_optimizer: simulation not present; using ' // &
+           'identity variable weights.')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call this%mma_weights%copy_from(HOST_TO_DEVICE, .true.)
+       call this%mma_inv_weight_sq%copy_from(HOST_TO_DEVICE, .true.)
+    end if
+  end subroutine mma_optimizer_init_variable_weights
+
+  !> Transform design variables between internal and MMA spaces.
+  !! Applies `x = w*x` when `multiply=.true.` and `x = x/w` otherwise.
+  !! @param[inout] this The MMA optimizer.
+  !! @param[inout] x The variable vector to transform.
+  !! @param[in] multiply Whether to multiply (`.true.`) or divide (`.false.`).
+  subroutine mma_optimizer_transform_variables(this, x, multiply)
+    class(mma_optimizer_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: x
+    logical, intent(in) :: multiply
+
+    if (multiply) then
+       call vector_col2(x, this%mma_weights)
+    else
+       call vector_invcol2(x, this%mma_weights)
+    end if
+  end subroutine mma_optimizer_transform_variables
+
+  !> Transform objective and constraint sensitivities for MMA-space variables.
+  !! Applies elementwise weighting with `1/w^2` (equivalent to `B^-1` for
+  !! `w=sqrt(B)`).
+  !! @param[inout] this The MMA optimizer.
+  !! @param[inout] objective_sensitivities Objective sensitivity vector.
+  !! @param[inout] constraint_sensitivities Constraint sensitivity matrix.
+  subroutine mma_optimizer_transform_sensitivities(this, objective_sensitivities, &
+       constraint_sensitivities)
+    class(mma_optimizer_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: objective_sensitivities
+    type(matrix_t), intent(inout) :: constraint_sensitivities
+    integer :: j, n
+
+    call vector_col2(objective_sensitivities, this%mma_inv_weight_sq)
+
+    n = constraint_sensitivities%get_ncols()
+    if (n .ne. this%mma_inv_weight_sq%size()) then
+       call neko_error('mma_optimizer: constraint sensitivity width does not ' // &
+            'match weight vector size')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call constraint_sensitivities%copy_from(DEVICE_TO_HOST, .true.)
+    end if
+
+    do j = 1, n
+       constraint_sensitivities%x(:, j) = constraint_sensitivities%x(:, j) * &
+            this%mma_inv_weight_sq%x(j)
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call constraint_sensitivities%copy_from(HOST_TO_DEVICE, .true.)
+    end if
+  end subroutine mma_optimizer_transform_sensitivities
 
   !> Validate the solution for the MMA optimizer
   subroutine mma_optimizer_validate(this, problem, design)
@@ -488,4 +612,3 @@ contains
   end subroutine mma_optimizer_load_checkpoint_components
 
 end module mma_optimizer
-
