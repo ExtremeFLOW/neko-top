@@ -50,7 +50,7 @@ module mma_optimizer
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, copy
+  use math, only: abscmp, copy, glsum
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
   use csv_file, only: csv_file_t
@@ -58,8 +58,6 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: DEVICE_TO_HOST, HOST_TO_DEVICE
   use scratch_registry, only: neko_scratch_registry
-  use comm, only: pe_rank, NEKO_COMM
-  use mpi_f08, only: MPI_Barrier
 
   implicit none
   private
@@ -201,6 +199,7 @@ contains
     call this%transform_variables(x, .true.)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
+    call this%mma%scale_variable_bounds(this%mma_weights)
 
     call neko_scratch_registry%relinquish(ind)
 
@@ -390,7 +389,8 @@ contains
 
   !> Initialize MMA variable transform weights and inverse-squared weights.
   !! Uses identity weights by default and, when available, sets
-  !! `weights = sqrt(B)` from the simulation mass-matrix coefficients.
+  !! `weights = sqrt(B) / avg(sqrt(B))` from the simulation mass-matrix
+  !! coefficients.
   !! @param[inout] this The MMA optimizer.
   !! @param[in] design The design object used to determine vector size.
   !! @param[in] simulation Optional simulation with coefficient data.
@@ -399,6 +399,8 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), optional, intent(in) :: simulation
     integer :: n, i, n_coef
+    real(kind=rp) :: local_sum, global_sum, weight_avg, global_count
+    real(kind=rp) :: local_count(1)
 
     n = design%size()
     call this%mma_weights%init(n)
@@ -416,9 +418,26 @@ contains
                     'encountered when building variable weights')
             end if
             this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
-            this%mma_inv_weight_sq%x(i) = 1.0_rp / &
-                 (this%mma_weights%x(i) * this%mma_weights%x(i))
          end do
+
+         global_sum = glsum(this%mma_weights%x, n)
+         local_count(1) = real(n, rp)
+         global_count = glsum(local_count, 1)
+
+         if (global_count .le. 0.0_rp) then
+            call neko_error('mma_optimizer: invalid global design size when ' // &
+                 'normalizing variable weights')
+         end if
+
+         weight_avg = global_sum / global_count
+         if (weight_avg .le. 0.0_rp) then
+            call neko_error('mma_optimizer: non-positive average weight ' // &
+                 'encountered when normalizing variable weights')
+         end if
+
+         this%mma_weights%x = this%mma_weights%x / weight_avg
+         this%mma_inv_weight_sq%x = 1.0_rp / &
+              (this%mma_weights%x * this%mma_weights%x)
       else
          call neko_log%message('mma_optimizer: design size and coefficient ' // &
               'size differ; using identity variable weights.')
