@@ -48,18 +48,16 @@ module brinkman_design
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
-  use math, only: rzero
   use simulation_m, only: simulation_t
-  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
-  use math, only: copy
-  use device_math, only: device_copy
+  use math, only: copy, col2, invcol2
+  use device_math, only: device_copy, device_col2, device_invcol2
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_get
+  use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
   use comm, only: NEKO_COMM
   implicit none
@@ -174,6 +172,10 @@ module brinkman_design
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain
      logical :: has_mask
+     !> Optional MMA variable transform (x_mma = sqrt(B) * x_internal)
+     logical :: mma_change_of_variables = .false.
+     !> Coefficients used for MMA variable/sensitivity transforms
+     type(coef_t), pointer :: coef => null()
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -257,6 +259,8 @@ contains
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
     call json_get_or_default(parameters, 'dealias', dealias, .true.)
+    call json_get_or_default(parameters, 'mma_change_of_variables', &
+         this%mma_change_of_variables, .false.)
 
     select case (trim(domain_type))
     case ('full')
@@ -307,6 +311,7 @@ contains
     nullify(this%brinkman_amplitude)
     nullify(this%design_indicator)
     nullify(this%sensitivity)
+    nullify(this%coef)
 
   end subroutine brinkman_design_free
 
@@ -330,6 +335,7 @@ contains
     this%design_indicator => neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => neko_registry%get_field("sensitivity")
+    this%coef => simulation%fluid%c_Xh
 
     ! TODO
     ! this is where we steal basically everything in
@@ -458,6 +464,9 @@ contains
     else
        call copy(values%x, this%design_indicator%x, n)
     end if
+    if (this%mma_change_of_variables) then
+       call brinkman_design_apply_sqrt_mass_vector(this, values, .true.)
+    end if
 
   end subroutine brinkman_design_get_design
 
@@ -475,6 +484,9 @@ contains
        call device_copy(values%x_d, this%sensitivity%x_d, n)
     else
        call copy(values%x, this%sensitivity%x, n)
+    end if
+    if (this%mma_change_of_variables) then
+       call brinkman_design_apply_inv_mass_vector(this, values)
     end if
 
   end subroutine brinkman_design_get_sensitivity
@@ -584,6 +596,11 @@ contains
     integer :: n
 
     n = this%size()
+
+    if (this%mma_change_of_variables) then
+       call brinkman_design_apply_sqrt_mass_vector(this, values, .false.)
+    end if
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%design_indicator%x_d, values%x_d, n)
     else
@@ -598,7 +615,73 @@ contains
        call copy(values%x, this%design_indicator%x, n)
     end if
 
+    if (this%mma_change_of_variables) then
+       call brinkman_design_apply_sqrt_mass_vector(this, values, .true.)
+    end if
+
   end subroutine brinkman_design_update_design
+
+  subroutine brinkman_design_apply_sqrt_mass_vector(this, values, multiply)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+    logical, intent(in) :: multiply
+    type(field_t), pointer :: sqrt_B
+    integer :: temp_indices(1), n, i
+
+    if (.not. associated(this%coef)) then
+       call neko_error('brinkman_design_apply_sqrt_mass_vector: coefficient ' // &
+            'pointer is not associated')
+    end if
+
+    n = values%size()
+    call neko_scratch_registry%request_field(sqrt_B, temp_indices(1), .false.)
+    call copy(sqrt_B%x, this%coef%B, n)
+    do i = 1, n
+       sqrt_B%x(i,1,1,1) = sqrt(sqrt_B%x(i,1,1,1))
+    end do
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(sqrt_B%x, sqrt_B%x_d, n, HOST_TO_DEVICE, .true.)
+       if (multiply) then
+          call device_col2(values%x_d, sqrt_B%x_d, n)
+       else
+          call device_invcol2(values%x_d, sqrt_B%x_d, n)
+       end if
+    else
+       if (multiply) then
+          call col2(values%x, sqrt_B%x, n)
+       else
+          call invcol2(values%x, sqrt_B%x, n)
+       end if
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+  end subroutine brinkman_design_apply_sqrt_mass_vector
+
+  subroutine brinkman_design_apply_inv_mass_vector(this, values)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: values
+    type(field_t), pointer :: mass_B
+    integer :: temp_indices(1), n
+
+    if (.not. associated(this%coef)) then
+       call neko_error('brinkman_design_apply_inv_mass_vector: coefficient ' // &
+            'pointer is not associated')
+    end if
+
+    n = values%size()
+    call neko_scratch_registry%request_field(mass_B, temp_indices(1), .false.)
+    call copy(mass_B%x, this%coef%B, n)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(mass_B%x, mass_B%x_d, n, HOST_TO_DEVICE, .true.)
+       call device_invcol2(values%x_d, mass_B%x_d, n)
+    else
+       call invcol2(values%x, mass_B%x, n)
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
+  end subroutine brinkman_design_apply_inv_mass_vector
 
   subroutine brinkman_design_map_backward(this, sensitivity)
     class(brinkman_design_t), intent(inout) :: this
