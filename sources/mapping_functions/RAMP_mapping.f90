@@ -44,6 +44,10 @@ module RAMP_mapping
        device_convex_down_RAMP_mapping_apply_backward, &
        device_convex_up_RAMP_mapping_apply, &
        device_convex_up_RAMP_mapping_apply_backward
+  use RAMP_mapping_cpu, only: convex_down_RAMP_mapping_apply_cpu, &
+       convex_down_RAMP_mapping_apply_backward_cpu, &
+       convex_up_RAMP_mapping_apply_cpu, &
+       convex_up_RAMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
   use logger, only: neko_log
   implicit none
@@ -212,7 +216,7 @@ contains
     real(kind=rp), intent(in) :: q, f_min, f_max
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) )
 
@@ -221,10 +225,8 @@ contains
        call device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-               X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
-       end do
+       call convex_down_RAMP_mapping_apply_cpu(f_min, f_max, q, &
+            X_out%x, X_in%x, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply
@@ -243,7 +245,7 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
@@ -255,11 +257,8 @@ contains
        call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
-               ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-               sens_in%x(i,1,1,1)
-       end do
+       call convex_down_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply_backward
@@ -274,7 +273,7 @@ contains
     real(kind=rp), intent(in) :: f_min, f_max, q
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q)
 
@@ -284,10 +283,8 @@ contains
        call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-               X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
-       end do
+       call convex_up_RAMP_mapping_apply_cpu(f_min, f_max, q, &
+            X_out%x, X_in%x, n)
     end if
 
 
@@ -307,7 +304,7 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
@@ -319,11 +316,8 @@ contains
        call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) * q / &
-               ( (X_in%x(i,1,1,1) + q)**2) * &
-               sens_in%x(i,1,1,1)
-       end do
+       call convex_up_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine convex_up_RAMP_mapping_apply_backward
