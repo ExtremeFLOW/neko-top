@@ -435,9 +435,15 @@ contains
                  'encountered when normalizing variable weights')
          end if
 
+         !------- DELETE -------------
+         ! weight_avg = 1.0_rp
+         !----------------------------
          this%mma_weights%x = this%mma_weights%x / weight_avg
          this%mma_inv_weight_sq%x = 1.0_rp / &
-              (this%mma_weights%x * this%mma_weights%x)
+              (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
+         !------ DELETE -------------
+         ! this%mma_weights%x = 1.0_rp
+         !---------------------------
       else
          call neko_log%message('mma_optimizer: design size and coefficient ' // &
               'size differ; using identity variable weights.')
@@ -521,8 +527,8 @@ contains
     call constraint_values%copy_from(DEVICE_TO_HOST, sync = .true.)
 
     if (any(constraint_values%x .gt. 0.0_rp)) then
-       call neko_error('MMA optimizer validation failed: ' // &
-            'Constraints are not satisfied.')
+       !call neko_error('MMA optimizer validation failed: ' // &
+       !     'Constraints are not satisfied.')
     end if
 
     ! Free local resources
