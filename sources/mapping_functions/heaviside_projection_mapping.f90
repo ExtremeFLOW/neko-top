@@ -104,11 +104,11 @@ contains
     real(kind=rp), intent(in) :: eta
 
     if (beta .le. 0.0_rp) then
-       call neko_error('heaviside_projection: "beta" must be > 0')
+       call neko_error('"beta" must be > 0 in heaviside projection')
     end if
 
     if (eta .lt. 0.0_rp .or. eta .gt. 1.0_rp) then
-       call neko_error('heaviside_projection: "eta" must be in [0, 1]')
+       call neko_error('"eta" must be in [0, 1] in heaviside projection')
     end if
 
     this%beta = beta
@@ -156,7 +156,7 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-       call neko_error('heaviside_projection: invalid denominator')
+       call neko_error('invalid denominator in heaviside projection')
     end if
 
     n = X_in%dof%size()
@@ -188,7 +188,7 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-       call neko_error('heaviside_projection: invalid denominator')
+       call neko_error('invalid denominator in heaviside projection')
     end if
 
     n = X_in%dof%size()
