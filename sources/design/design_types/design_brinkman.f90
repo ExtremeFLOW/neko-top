@@ -48,9 +48,7 @@ module brinkman_design
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
-  use math, only: rzero
   use simulation_m, only: simulation_t
-  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
@@ -59,7 +57,7 @@ module brinkman_design
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_get
+  use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
   use comm, only: NEKO_COMM
   implicit none
@@ -584,6 +582,7 @@ contains
     integer :: n
 
     n = this%size()
+
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_copy(this%design_indicator%x_d, values%x_d, n)
     else
