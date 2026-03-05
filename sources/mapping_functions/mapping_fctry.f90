@@ -38,17 +38,19 @@ submodule (mapping) mapping_fctry
   use linear_mapping, only : linear_mapping_t
   use PDE_filter, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
+  use heaviside_projection_mapping, only: heaviside_projection_mapping_t
   use SIMP_mapping, only: SIMP_mapping_t
   use json_utils, only : json_get
   use utils, only : concat_string_array, neko_error
   implicit none
 
   ! List of all possible types created by the factory routine
-  character(len=20) :: MAPPING_KNOWN_TYPES(4) = [character(len=20) :: &
+  character(len=20) :: MAPPING_KNOWN_TYPES(5) = [character(len=20) :: &
        "linear", &
        "PDE_filter", &
        "RAMP", &
-       "SIMP"]
+       "SIMP", &
+       "heaviside_projection"]
 
 contains
 
@@ -72,6 +74,8 @@ contains
        allocate(RAMP_mapping_t::object)
     case ("SIMP")
        allocate(SIMP_mapping_t::object)
+    case ("heaviside_projection")
+       allocate(heaviside_projection_mapping_t::object)
     case default
        call neko_type_error("Mapping function", type_name, MAPPING_KNOWN_TYPES)
     end select

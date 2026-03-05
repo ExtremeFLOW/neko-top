@@ -41,8 +41,9 @@ module SIMP_mapping
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_SIMP_mapping, only: device_SIMP_mapping_apply, &
        device_SIMP_mapping_apply_backward
+  use SIMP_mapping_cpu, only: SIMP_mapping_apply_cpu, &
+       SIMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
-  use math, only: col2
   implicit none
   private
 
@@ -80,7 +81,6 @@ contains
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
     real(kind=rp) :: f_min, f_max, p
-    logical :: convex_up
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
     call json_get(json, 'f_max', f_max)
@@ -119,15 +119,15 @@ contains
     class(SIMP_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_SIMP_mapping_apply(this%f_min, this%f_max, this%p, &
             X_out%x_d, X_in%x_d, n)
     else
-        X_out%x = this%f_min + (this%f_max - this%f_min) * &
-              (X_in%x ) ** this%p
+       call SIMP_mapping_apply_cpu(this%f_min, this%f_max, this%p, &
+            X_out%x, X_in%x, n)
     end if
 
   end subroutine SIMP_forward_mapping
@@ -143,16 +143,15 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_SIMP_mapping_apply_backward(this%f_min, this%f_max, this%p, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       sens_out%x = (this%f_max - this%f_min) * this%p &
-               * (X_in%x) ** (this%p - 1.0_rp)
-       call col2(sens_out%x, sens_in%x, n)
+       call SIMP_mapping_apply_backward_cpu(this%f_min, this%f_max, this%p, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine SIMP_backward_mapping
