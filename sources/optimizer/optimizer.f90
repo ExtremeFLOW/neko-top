@@ -613,9 +613,6 @@ contains
        if (this%log_extra_size .eq. 0) then
           call neko_error('got extra values but no headers')
        end if
-       if (size(extra_values) .ne. this%log_extra_size) then
-          call neko_error('# of extra values does not match # of extra headers')
-       end if
        this%log_data%x(offset:offset + size(extra_values) - 1) = extra_values
     end if
 
