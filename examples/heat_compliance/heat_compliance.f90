@@ -33,7 +33,7 @@
 module heat_compliance
   use num_types, only: rp, sp
   use objective, only: objective_t
-  use design, only: design_t
+  use design, only: design_t, design_sem_t
   use constraint, only: constraint_t
   use vector, only: vector_t
   use field, only: field_t
@@ -103,13 +103,12 @@ module heat_compliance
           heat_compliance_update_sensitivity
   end type heat_compliance_t
 
-  type, extends(design_t), public :: thermal_conductivity_design_t
+  type, extends(design_sem_t), public :: thermal_conductivity_design_t
      private
      type(field_t), pointer :: design_indicator
      type(field_t), pointer :: sensitivity
      class(point_zone_t), pointer :: optimization_domain
      logical :: has_mask
-     type(coef_t), pointer :: coef
    contains
      procedure, pass(this) :: get_values      => thermal_conductivity_design_get_design
      procedure, pass(this) :: get_sensitivity => thermal_conductivity_design_get_sensitivity
@@ -495,6 +494,7 @@ contains
     class(thermal_conductivity_design_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%coef)
     call this%design_indicator%free()
     call this%sensitivity%free()
   end subroutine thermal_conductivity_design_free

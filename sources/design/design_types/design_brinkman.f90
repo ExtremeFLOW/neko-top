@@ -38,7 +38,6 @@ module brinkman_design
   use field, only: field_t
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
-  use coefs, only: coef_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
   use fld_file_output, only: fld_file_output_t
@@ -47,7 +46,7 @@ module brinkman_design
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use design, only: design_t
+  use design, only: design_sem_t
   use simulation_m, only: simulation_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
@@ -64,7 +63,7 @@ module brinkman_design
   private
 
   !> A topology optimization design variable
-  type, extends(design_t), public :: brinkman_design_t
+  type, extends(design_sem_t), public :: brinkman_design_t
      private
 
      ! TODO
@@ -279,7 +278,6 @@ contains
          gs => simulation%neko_case%fluid%gs_Xh)
 
       if ('mapping' .in. parameters) then
-         call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
       end if
 
@@ -302,6 +300,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
+    nullify(this%coef)
     nullify(this%brinkman_amplitude)
     nullify(this%design_indicator)
     nullify(this%sensitivity)
@@ -316,6 +315,9 @@ contains
     logical, intent(in) :: dealias
     integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
+
+    call this%mapping%init_base(simulation%neko_case%fluid%c_Xh)
+    this%coef => this%mapping%coef
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 

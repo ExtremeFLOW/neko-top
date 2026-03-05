@@ -37,6 +37,7 @@ module design
   use json_module, only: json_file
   use simulation_m, only: simulation_t
   use num_types, only: rp
+  use coefs, only: coef_t
   use vector, only: vector_t
   use utils, only: neko_error, filename_suffix
   use point_zone, only: point_zone_t
@@ -151,6 +152,16 @@ module design
 
   end type design_t
 
+  !> Abstract SEM-backed design type.
+  !!
+  !! @details
+  !! Extends `design_t` with an associated SEM coefficient object so optimizer
+  !! backends can perform SEM-specific scaling when available.
+  type, abstract, extends(design_t) :: design_sem_t
+     !> SEM coefficients associated with this design.
+     type(coef_t), pointer :: coef => null()
+  end type design_sem_t
+
   ! ========================================================================== !
   ! Interface for the factory function
 
@@ -226,7 +237,7 @@ module design
      end subroutine design_load_checkpoint_hdf5
   end interface
 
-  public :: design_t, design_factory
+  public :: design_t, design_sem_t, design_factory
 
 contains
 

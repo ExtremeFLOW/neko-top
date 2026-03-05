@@ -40,7 +40,8 @@ module mma_optimizer
   use utils, only: neko_error
   use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
-  use design, only: design_t
+  use design, only: design_t, design_sem_t
+  use coefs, only: coef_t
   use brinkman_design, only: brinkman_design_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use constraint, only: constraint_t
@@ -196,7 +197,7 @@ contains
     ! problems in mma_optimizer_run()
     call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
-    call this%init_variable_weights(design, simulation)
+    call this%init_variable_weights(design)
 
     call design%get_values(x)
     call this%transform_variables(x, .true.)
@@ -392,15 +393,14 @@ contains
 
   !> Initialize MMA variable transform weights and inverse-squared weights.
   !! Uses identity weights by default and, when available, sets
-  !! `weights = sqrt(B) / avg(sqrt(B))` from the simulation mass-matrix
+  !! `weights = sqrt(B) / avg(sqrt(B))` from SEM design mass-matrix
   !! coefficients.
   !! @param[inout] this The MMA optimizer.
   !! @param[in] design The design object used to determine vector size.
-  !! @param[in] simulation Optional simulation with coefficient data.
-  subroutine mma_optimizer_init_variable_weights(this, design, simulation)
+  subroutine mma_optimizer_init_variable_weights(this, design)
     class(mma_optimizer_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    type(simulation_t), optional, intent(in) :: simulation
+    type(coef_t), pointer :: coef
     integer :: n, i, n_coef
     real(kind=rp) :: global_sum, weight_avg, global_count
     real(kind=rp) :: local_count(1)
@@ -415,60 +415,67 @@ contains
        call device_cfill(this%mma_inv_weight_sq%x_d, 1.0_rp, n)
     end if
 
-    if (present(simulation)) then
-      n_coef = simulation%fluid%c_Xh%dof%size()
-      if (n_coef .eq. n) then
-         if (NEKO_BCKND_DEVICE .eq. 1) then
-            call device_copy(this%mma_weights%x_d, simulation%fluid%c_Xh%B_d, n)
-            call device_sqrt_inplace(this%mma_weights%x_d, n)
-            global_sum = device_glsum(this%mma_weights%x_d, n)
-         else
-            call copy(this%mma_weights%x, simulation%fluid%c_Xh%B, n)
-            do i = 1, n
-               if (this%mma_weights%x(i) .le. 0.0_rp) then
-                  call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
-                       'encountered when building variable weights')
-               end if
-               this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
-            end do
-            global_sum = glsum(this%mma_weights%x, n)
-         end if
+    nullify(coef)
+    select type (sem_design => design)
+    class is (design_sem_t)
+       if (associated(sem_design%coef)) coef => sem_design%coef
+    end select
 
-         local_count(1) = real(n, rp)
-         global_count = glsum(local_count, 1)
+    if (.not. associated(coef)) then
+       call neko_log%message('mma_optimizer: design is not SEM-backed or has no ' // &
+            'associated coefficients; using identity variable weights.')
+       return
+    end if
 
-         if (global_count .le. 0.0_rp) then
-            call neko_error('mma_optimizer: invalid global design size when ' // &
-                 'normalizing variable weights')
-         end if
+    n_coef = coef%dof%size()
+    if (n_coef .eq. n) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_copy(this%mma_weights%x_d, coef%B_d, n)
+          call device_sqrt_inplace(this%mma_weights%x_d, n)
+          global_sum = device_glsum(this%mma_weights%x_d, n)
+       else
+          call copy(this%mma_weights%x, coef%B, n)
+          do i = 1, n
+             if (this%mma_weights%x(i) .le. 0.0_rp) then
+                call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
+                     'encountered when building variable weights')
+             end if
+             this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
+          end do
+          global_sum = glsum(this%mma_weights%x, n)
+       end if
 
-         weight_avg = global_sum / global_count
-         if (weight_avg .ne. weight_avg .or. weight_avg .le. 0.0_rp) then
-            call neko_error('mma_optimizer: non-positive average weight ' // &
-                 'encountered when normalizing variable weights')
-         end if
+       local_count(1) = real(n, rp)
+       global_count = glsum(local_count, 1)
 
-         if (NEKO_BCKND_DEVICE .eq. 1) then
-            call device_cmult(this%mma_weights%x_d, 1.0_rp / weight_avg, n)
-            call device_copy(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_invcol1(this%mma_inv_weight_sq%x_d, n)
+       if (global_count .le. 0.0_rp) then
+          call neko_error('mma_optimizer: invalid global design size when ' // &
+               'normalizing variable weights')
+       end if
 
-            call this%mma_weights%copy_from(DEVICE_TO_HOST, .false.)
-            call this%mma_inv_weight_sq%copy_from(DEVICE_TO_HOST, .true.)
-         else
-            this%mma_weights%x = this%mma_weights%x / weight_avg
-            this%mma_inv_weight_sq%x = 1.0_rp / &
-                 (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
-         end if
-      else
-         call neko_log%message('mma_optimizer: design size and coefficient ' // &
-              'size differ; using identity variable weights.')
-      end if
+       weight_avg = global_sum / global_count
+       if (weight_avg .ne. weight_avg .or. weight_avg .le. 0.0_rp) then
+          call neko_error('mma_optimizer: non-positive average weight ' // &
+               'encountered when normalizing variable weights')
+       end if
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_cmult(this%mma_weights%x_d, 1.0_rp / weight_avg, n)
+          call device_copy(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+          call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+          call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
+          call device_invcol1(this%mma_inv_weight_sq%x_d, n)
+
+          call this%mma_weights%copy_from(DEVICE_TO_HOST, .false.)
+          call this%mma_inv_weight_sq%copy_from(DEVICE_TO_HOST, .true.)
+       else
+          this%mma_weights%x = this%mma_weights%x / weight_avg
+          this%mma_inv_weight_sq%x = 1.0_rp / &
+               (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
+       end if
     else
-      call neko_log%message('mma_optimizer: simulation not present; using ' // &
-           'identity variable weights.')
+       call neko_log%message('mma_optimizer: design size and coefficient ' // &
+            'size differ; using identity variable weights.')
     end if
   end subroutine mma_optimizer_init_variable_weights
 
