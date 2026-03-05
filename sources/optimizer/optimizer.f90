@@ -551,7 +551,7 @@ contains
     character(len=256) :: log_name
 
     if (present(include_constraints)) then
-        this%log_include_constraints = include_constraints
+       this%log_include_constraints = include_constraints
     end if
 
     base_size = problem%get_log_size(this%log_include_constraints)
