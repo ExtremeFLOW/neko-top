@@ -327,9 +327,7 @@ contains
 
     this%start_time = 0.0_rp
     this%current_iteration = 0
-    if (this%log_initialized) then
-       call this%log_data%free()
-    end if
+    call this%log_data%free()
     this%log_initialized = .false.
     this%log_extra_size = 0
     this%log_include_constraints = .true.
@@ -538,15 +536,13 @@ contains
   !! @param[inout] this The optimizer object.
   !! @param[in] problem The problem object.
   !! @param[in] extra_headers Comma-separated extra header labels.
-  !! @param[in] extra_size Number of extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
-  subroutine optimizer_init_log(this, problem, extra_headers, extra_size, &
+  subroutine optimizer_init_log(this, problem, extra_headers, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
     class(problem_t), intent(in) :: problem
     character(len=*), intent(in), optional :: extra_headers
-    integer, intent(in), optional :: extra_size
     logical, intent(in), optional :: include_constraints
     character(len=*), intent(in), optional :: filename
 
@@ -556,16 +552,11 @@ contains
 
     if (present(include_constraints)) then
        this%log_include_constraints = include_constraints
-    else
-       this%log_include_constraints = .true.
     end if
 
-    base_size = problem%get_log_size(include_constraints = &
-         this%log_include_constraints)
+    base_size = problem%get_log_size(this%log_include_constraints)
 
-    extra_n = 0
-    if (present(extra_size)) extra_n = extra_size
-    this%log_extra_size = extra_n
+    if (present(extra_size)) this%log_extra_size = extra_size
 
     total_size = 1 + base_size + this%log_extra_size
     call this%log_data%init(total_size)
@@ -581,9 +572,10 @@ contains
     header = 'iter, ' // trim(problem%get_log_header( &
          include_constraints = this%log_include_constraints))
     if (present(extra_headers)) then
-       if (trim(extra_headers) .ne. '' .and. extra_n .gt. 0) then
-          header = trim(header) // ', ' // trim(extra_headers)
+       if (trim(extra_headers) .eq. '') then
+          call neko_error("Some headers are empty")
        end if
+       header = trim(header) // ', ' // trim(extra_headers)
     end if
 
     call this%log_file%set_header(trim(header))
@@ -604,22 +596,18 @@ contains
 
     if (.not. this%log_initialized) return
 
-    base_size = problem%get_log_size(include_constraints = &
-         this%log_include_constraints)
+    base_size = problem%get_log_size(this%log_include_constraints)
     this%log_data%x = 0.0_rp
     this%log_data%x(1) = real(iter, kind=rp)
 
     call problem%get_log_values( &
          this%log_data%x(2:1 + base_size), &
-         include_constraints = this%log_include_constraints)
+         this%log_include_constraints)
 
     offset = 2 + base_size
     if (this%log_extra_size .gt. 0) then
        if (present(extra_values)) then
-          if (size(extra_values) .eq. this%log_extra_size) then
-             this%log_data%x(offset:offset + this%log_extra_size - 1) = &
-                  extra_values
-          else
+          this%log_data%x(offset:offset + size(extra_values) - 1) = extra_values
              do j = 0, this%log_extra_size - 1
                 this%log_data%x(offset + j) = 0.0_rp
              end do
