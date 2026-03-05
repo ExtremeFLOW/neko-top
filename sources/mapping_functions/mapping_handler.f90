@@ -496,6 +496,7 @@ contains
   !! @param sensitivity_out Final backward-mapped sensitivity field.
   !! @param[in] verbose_design If true, output all forward cascade stages.
   !! @param[in] verbose_sensitivity If true, output all backward stages.
+  !! @param[in] output_precision Output precision (sp or dp).
   subroutine mapping_handler_init_output_fields(this, design_out, &
        sensitivity_out, verbose_design, verbose_sensitivity, output_precision)
     class(mapping_handler_t), intent(inout) :: this
