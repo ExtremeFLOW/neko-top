@@ -65,11 +65,13 @@ module dummy_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           dummy_constraint_update_sensitivity
-     !> Log sizing and values
+     !> Get number of log entries
      procedure, public, pass(this) :: get_log_size => &
           dummy_constraint_get_log_size
+     !> Get header labels for log entries
      procedure, public, pass(this) :: get_log_headers => &
           dummy_constraint_get_log_headers
+     !> Get values for log entries
      procedure, public, pass(this) :: get_log_values => &
           dummy_constraint_get_log_values
   end type dummy_constraint_t

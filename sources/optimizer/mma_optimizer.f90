@@ -124,7 +124,7 @@ contains
     type(json_file) :: solver_parameters
     logical :: enable_output
     integer :: max_iterations
-    real(kind=rp) :: tolerance, max_runtime
+    real(kind=rp) :: tolerance
 
     ! Read the solver properties from the JSON file
     call json_get(parameters, 'optimization.solver', solver_parameters)
@@ -134,18 +134,17 @@ contains
          tolerance, 1.0e-3_rp)
     call json_get_or_default(solver_parameters, 'enable_output', &
          enable_output, .true.)
-    call json_get_or_default(solver_parameters, 'max_runtime', &
-         max_runtime, -1.0_rp)
+    call this%read_base_settings(solver_parameters)
 
     call this%init_from_components(problem, design, max_iterations, tolerance, &
-         enable_output, solver_parameters, simulation, max_runtime)
+         enable_output, solver_parameters, simulation)
 
   end subroutine mma_optimizer_init_from_json
 
   !> Initialize the MMA optimizer from JSON file
   subroutine mma_optimizer_init_from_components(this, problem, design, &
        max_iterations, tolerance, enable_output, &
-       solver_parameters, simulation, max_runtime)
+       solver_parameters, simulation)
     class(mma_optimizer_t), intent(inout) :: this
     class(problem_t), intent(inout) :: problem
     class(design_t), intent(in) :: design
@@ -154,12 +153,11 @@ contains
     logical, intent(in) :: enable_output
     type(json_file), intent(inout), optional :: solver_parameters
     type(simulation_t), intent(in), optional :: simulation
-    real(kind=rp), intent(in), optional :: max_runtime
 
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=256) :: extra_header
+    character(len=32) :: extra_headers(4)
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -197,14 +195,16 @@ contains
 
     ! Initialize the logger
     if (this%enable_output) then
-       extra_header = 'KKTmax, KKTnorm2, scaling factor'
-       call this%init_log(problem, extra_headers = trim(extra_header), &
-            extra_size = 3, &
+       extra_headers(1) = 'KKTmax'
+       extra_headers(2) = 'KKTnorm2'
+       extra_headers(3) = 'scaling factor'
+       extra_headers(4) = this%mma%get_backend_and_subsolver()
+       call this%init_log(problem, extra_headers = extra_headers, &
             include_constraints = .not. this%unconstrained_problem, &
             filename = 'optimization_data.csv')
     end if
 
-    call this%init_base('MMA', max_iterations, max_runtime)
+    call this%init_base('MMA', max_iterations)
 
     call neko_log%end_section()
 

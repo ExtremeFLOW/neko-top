@@ -994,8 +994,7 @@ contains
   function problem_get_log_size(this, include_constraints) result(n)
     class(problem_t), intent(in) :: this
     logical, intent(in), optional :: include_constraints
-    integer :: n
-    integer :: i
+    integer :: n, i
     logical :: do_constraints
 
     n = 1

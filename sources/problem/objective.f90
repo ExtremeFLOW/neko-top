@@ -169,7 +169,7 @@ contains
     prefix = trim(this%name)
     headers(1) = prefix
     if (size(headers) .lt. 2) return
-    headers(2) = trim(prefix) // '.scaled'
+    headers(2) = trim(prefix) // '.weight'
   end subroutine objective_get_log_headers
 
   !> Populate log values for this objective.
@@ -182,7 +182,7 @@ contains
     if (size(values) .lt. 1) return
     values(1) = this%value
     if (size(values) .lt. 2) return
-    values(2) = this%value * this%weight
+    values(2) = this%weight
   end subroutine objective_get_log_values
 
   ! -------------------------------------------------------------------------- !

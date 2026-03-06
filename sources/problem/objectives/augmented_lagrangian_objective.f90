@@ -104,11 +104,13 @@ module augmented_lagrangian_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           augmented_lagrangian_update_sensitivity
-     !> Log sizing and values
+     !> Get number of log entries
      procedure, public, pass(this) :: get_log_size => &
           augmented_lagrangian_get_log_size
+     !> Get header labels for log entries
      procedure, public, pass(this) :: get_log_headers => &
           augmented_lagrangian_get_log_headers
+     !> Get values for log entries
      procedure, public, pass(this) :: get_log_values => &
           augmented_lagrangian_get_log_values
 
