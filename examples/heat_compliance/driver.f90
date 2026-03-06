@@ -91,7 +91,7 @@ program usrneko
   allocate(thermal_conductivity_design_t :: des)
   select type(des)
   type is (thermal_conductivity_design_t)
-     call des%init(parameters, neko_case%fluid%c_Xh)
+     call des%init(parameters, neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh)
   class default
      call neko_error("??!")
   end select
@@ -161,6 +161,7 @@ program usrneko
   ! Execute the optimization
   call optimizer_factory(opt, parameters, prob, des)
 
+
   call MPI_Barrier(MPI_COMM_WORLD, ierr)
   t_start = MPI_Wtime()
   call opt%run(prob, des)
@@ -223,7 +224,7 @@ subroutine finite_difference_validation(des, k_test, delta, coef, parameters)
   sensitivities = obj%sensitivity%x
 
   ! Create perturbed design
-  call pert_design%init(parameters, coef)
+ !   call pert_design%init(parameters, coef)
   call designvec%init(n)
   call des%get_values(designvec)
   if (pe_rank == 0) then !only have one rank perturb
