@@ -452,10 +452,11 @@ contains
   !=========================================================================!
   !  Design: init
   !=========================================================================!
-  subroutine thermal_conductivity_design_init(this, parameters, coef)
+  subroutine thermal_conductivity_design_init(this, parameters, coef, gs)
     class(thermal_conductivity_design_t), intent(inout) :: this
     type(json_file),                      intent(inout) :: parameters
     type(coef_t),              target,    intent(in)    :: coef
+    type(gs_t),    target,      intent(inout)         :: gs
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
 
@@ -484,7 +485,13 @@ contains
 
     call this%init_base(name, this%design_indicator%dof%size())
 
-    call field_cfill(this%design_indicator, 0.15_rp)
+    if ('initial_distribution' .in. parameters) then
+       call json_get(parameters, 'initial_distribution', json_subdict)
+       call set_optimization_ic(this%design_indicator, coef, gs, &
+             json_subdict)
+    else
+       call field_cfill(this%design_indicator, 1.0_rp)
+    end if
   end subroutine thermal_conductivity_design_init
 
   !=========================================================================!
