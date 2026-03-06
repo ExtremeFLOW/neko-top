@@ -234,7 +234,7 @@ contains
     call neko_scratch_registry%request_field(wo2, temp_indices(2), .false.)
     call neko_scratch_registry%request_field(wo3, temp_indices(3), .false.)
     call neko_scratch_registry%request_field(objective_field, temp_indices(4), &
-       .false.)
+         .false.)
     call neko_scratch_registry%request_field(work, temp_indices(5), .false.)
 
     ! Compute the current dissipation
