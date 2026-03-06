@@ -282,7 +282,7 @@ contains
     this%value = this%value * 0.5_rp / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
-   
+
   end subroutine target_dissipation_update_value
 
   subroutine target_dissipation_finalize_value(this)
@@ -302,7 +302,8 @@ contains
 
   end subroutine target_dissipation_finalize_value
 
-  !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
+  !> update_value the sensitivity of the objective function with respect to
+  !! \f\f$\chi\f\f$
   !! @param this the objective.
   !! @param design the design.
   subroutine target_dissipation_update_sensitivity(this, design)
@@ -329,7 +330,7 @@ contains
     prefix = trim(this%name)
     headers(1) = prefix
     if (size(headers) .lt. 2) return
-    headers(2) = trim(prefix) // '.scaled'
+    headers(2) = trim(prefix) // '.weight'
     if (size(headers) .lt. 3) return
     headers(3) = trim(prefix) // '.current'
     if (size(headers) .lt. 4) return
@@ -347,7 +348,7 @@ contains
     if (size(values) .lt. 1) return
     values(1) = this%value
     if (size(values) .lt. 2) return
-    values(2) = this%value * this%weight
+    values(2) = this%weight
     if (size(values) .lt. 3) return
     values(3) = this%current_dissipation
     if (size(values) .lt. 4) return
