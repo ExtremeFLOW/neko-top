@@ -270,7 +270,7 @@ contains
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: duzb, dvzb, dwzb
 
     real(kind=rp), dimension(this%Xh_GLL%lxyz) :: tempx, tempy, tempz
-    integer :: e, i, idx, nel, n_GL
+    integer :: e, i, nel, n_GL
 
     nel = coef%msh%nelv
     n_GL = nel * this%Xh_GL%lxyz
@@ -401,10 +401,9 @@ contains
             call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
 
             ! accumulate
-            idx = (e-1)*this%Xh_GLL%lxyz+1
-            call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
-            call sub2(fy%x(idx, 1, 1, 1), tempy, this%Xh_GLL%lxyz)
-            call sub2(fz%x(idx, 1, 1, 1), tempz, this%Xh_GLL%lxyz)
+            call sub2(fx%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
+            call sub2(fy%x(1, 1, 1, e), tempy, this%Xh_GLL%lxyz)
+            call sub2(fz%x(1, 1, 1, e), tempz, this%Xh_GLL%lxyz)
 
             ! (x)
             do i = 1, this%Xh_GL%lxyz
@@ -425,7 +424,7 @@ contains
 
             ! map back to GLL
             call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
+            call sub2(fx%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
 
             ! (y)
             do i = 1, this%Xh_GL%lxyz
@@ -446,7 +445,7 @@ contains
 
             ! map back to GLL
             call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call sub2(fy%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
+            call sub2(fy%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
 
             ! (z)
             do i = 1, this%Xh_GL%lxyz
@@ -466,7 +465,7 @@ contains
 
             ! map back to GLL
             call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call sub2(fz%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
+            call sub2(fz%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
 
          end do
 
@@ -508,7 +507,7 @@ contains
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: vr, vs, vt
     real(kind=rp), dimension(this%Xh_GLL%lxyz) :: tempx, tempy, tempz
 
-    integer :: e, i, idx, nel, n_GL
+    integer :: e, i, nel, n_GL
     nel = coef%msh%nelv
     n_GL = nel * this%Xh_GL%lxyz
 
@@ -648,10 +647,9 @@ contains
             call this%GLL_to_GL%map(tempy, tfy, 1, this%Xh_GLL)
             call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
 
-            idx = (e-1)*this%Xh_GLL%lxyz+1
-            call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
-            call sub2(fy%x(idx, 1, 1, 1), tempy, this%Xh_GLL%lxyz)
-            call sub2(fz%x(idx, 1, 1, 1), tempz, this%Xh_GLL%lxyz)
+            call sub2(fx%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
+            call sub2(fy%x(1, 1, 1, e), tempy, this%Xh_GLL%lxyz)
+            call sub2(fz%x(1, 1, 1, e), tempz, this%Xh_GLL%lxyz)
 
             ! U.grad u'
             call opgrad(vr, vs, vt, tx, c_GL, e, e)
@@ -673,10 +671,9 @@ contains
             call this%GLL_to_GL%map(tempy, tfy, 1, this%Xh_GLL)
             call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
 
-            idx = (e-1)*this%Xh_GLL%lxyz+1
-            call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
-            call sub2(fy%x(idx, 1, 1, 1), tempy, this%Xh_GLL%lxyz)
-            call sub2(fz%x(idx, 1, 1, 1), tempz, this%Xh_GLL%lxyz)
+            call sub2(fx%x(1, 1, 1, e), tempx, this%Xh_GLL%lxyz)
+            call sub2(fy%x(1, 1, 1, e), tempy, this%Xh_GLL%lxyz)
+            call sub2(fz%x(1, 1, 1, e), tempz, this%Xh_GLL%lxyz)
          end do
       end if
     end associate
@@ -711,7 +708,7 @@ contains
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: work1, work2, work3
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: w1, w2, w3
     real(kind=rp), dimension(this%Xh_GL%lxyz) :: f_GL
-    integer :: e, i, idx, nel, n_GL
+    integer :: e, i, nel, n_GL
     real(kind=rp), dimension(this%Xh_GLL%lxyz) :: temp
 
     nel = coef%msh%nelv
@@ -777,9 +774,8 @@ contains
             end do
 
             ! map back to GLL
-            idx = (e-1)*this%Xh_GLL%lxyz+1
             call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
-            call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
+            call sub2(fs%x(1, 1, 1, e), temp, this%Xh_GLL%lxyz)
 
          end do
 

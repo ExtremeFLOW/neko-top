@@ -60,6 +60,7 @@ module PDE_filter
   use device_jacobi, only: device_jacobi_t
   use sx_jacobi, only: sx_jacobi_t
   use utils, only: neko_error
+  use math, only: subcol3, cmult
   use device_math, only: device_cfill, device_subcol3, device_cmult
   use json_utils, only: json_get, json_get_or_default
   implicit none
@@ -209,7 +210,7 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
     type(field_t), pointer :: RHS, d_X_out
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(2)
@@ -251,11 +252,8 @@ contains
        call device_subcol3(RHS%x_d, X_in%x_d, this%coef%B_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
-       do i = 1, n
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = X_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-               - RHS%x(i,1,1,1)
-       end do
+       call subcol3(RHS%x, X_in%x, this%coef%B, n)
+       call cmult(RHS%x, -1.0_rp, n)
     end if
 
     ! gather scatter
@@ -317,7 +315,7 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
     type(field_t), pointer :: RHS, delta ! I'm so sorry for this notation..
     integer :: temp_indices(2)
     character(len=LOG_SIZE) :: log_buf
@@ -350,11 +348,8 @@ contains
        call device_subcol3(RHS%x_d, sens_in%x_d, this%coef%B_d, n)
        call device_cmult(RHS%x_d, -1.0_rp, n)
     else
-       do i = 1, n
-          ! mass matrix should be included here
-          RHS%x(i,1,1,1) = sens_in%x(i,1,1,1) * this%coef%B(i,1,1,1) &
-               - RHS%x(i,1,1,1)
-       end do
+       call subcol3(RHS%x, sens_in%x, this%coef%B, n)
+       call cmult(RHS%x, -1.0_rp, n)
     end if
 
     ! gather scatter

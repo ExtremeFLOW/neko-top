@@ -58,22 +58,33 @@ contains
     real(kind=rp), intent(in) :: split_value
     real(kind=rp), intent(in) :: value_below, value_above
 
-    real(kind=rp) :: z_value
-    integer :: i
+    integer :: n
 
-    do i = 1, s%dof%size()
-       z_value = s%dof%z(i, 1, 1, 1)
-
-       if (z_value .gt. split_value) then
-          s%x(i, 1, 1, 1) = value_above
-       else
-          s%x(i, 1, 1, 1) = value_below
-       end if
-
-    end do
+    n = s%dof%size()
+    call scalar_z_split_ic_cpu(s%x(1,1,1,1), s%dof%z(1,1,1,1), &
+         split_value, value_below, value_above, n)
 
     call s%copy_from(HOST_TO_DEVICE, .true.)
 
   end subroutine scalar_z_split_ic
+
+  !> CPU kernel for setting a split initial condition using linear indexing.
+  subroutine scalar_z_split_ic_cpu(s_values, z_values, split_value, &
+       value_below, value_above, n)
+    integer, intent(in) :: n
+    real(kind=rp), intent(inout) :: s_values(*)
+    real(kind=rp), intent(in) :: z_values(*)
+    real(kind=rp), intent(in) :: split_value
+    real(kind=rp), intent(in) :: value_below, value_above
+    integer :: i
+
+    do i = 1, n
+       if (z_values(i) .gt. split_value) then
+          s_values(i) = value_above
+       else
+          s_values(i) = value_below
+       end if
+    end do
+  end subroutine scalar_z_split_ic_cpu
 
 end module user_initial_conditions

@@ -148,7 +148,7 @@ contains
     real(kind=rp), dimension(Xh%lxyz) :: duyb, dvyb, dwyb
     real(kind=rp), dimension(Xh%lxyz) :: duzb, dvzb, dwzb
     ! temporary arrays
-    integer :: e, i, idx, idxx
+    integer :: e, i
 
 
     type(field_t), pointer :: tduxb, tdvxb, tdwxb, tduyb, tdvyb, tdwyb, tduzb, &
@@ -224,20 +224,18 @@ contains
           call opgrad(dwxb, dwyb, dwzb, vzb%x, coef, e, e)
 
           ! traspose and multiply
-          idx = (e - 1)*Xh%lxyz + 1
           do i = 1, Xh%lxyz
-             idxx = idx + i
-             fx%x(idxx, 1, 1, 1) = fx%x(idxx, 1, 1, 1) - ( &
+             fx%x(i, 1, 1, e) = fx%x(i, 1, 1, e) - ( &
                   vx%x(i,1,1,e)*duxb(i) + &
                   vy%x(i,1,1,e)*dvxb(i) + &
                   vz%x(i,1,1,e)*dwxb(i) )
 
-             fy%x(idxx, 1, 1, 1) = fy%x(idxx, 1, 1, 1) - ( &
+             fy%x(i, 1, 1, e) = fy%x(i, 1, 1, e) - ( &
                   vx%x(i,1,1,e)*duyb(i) + &
                   vy%x(i,1,1,e)*dvyb(i) + &
                   vz%x(i,1,1,e)*dwyb(i))
 
-             fz%x(idxx, 1, 1, 1) = fz%x(idxx, 1, 1, 1) - ( &
+             fz%x(i, 1, 1, e) = fz%x(i, 1, 1, e) - ( &
                   vx%x(i,1,1,e)*duzb(i) + &
                   vy%x(i,1,1,e)*dvzb(i) + &
                   vz%x(i,1,1,e)*dwzb(i))

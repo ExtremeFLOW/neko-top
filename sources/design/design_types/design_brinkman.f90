@@ -508,7 +508,7 @@ contains
        call neko_error('brinkman_design_get_x_i: index out of bounds')
     end if
 
-    x_i = this%design_indicator%dof%x(i,1,1,1)
+    x_i = linear_value_at(this%design_indicator%dof%x(1,1,1,1), i)
 
   end function brinkman_design_get_x_i
 
@@ -541,7 +541,7 @@ contains
        call neko_error('brinkman_design_get_y_i: index out of bounds')
     end if
 
-    y_i = this%design_indicator%dof%y(i,1,1,1)
+    y_i = linear_value_at(this%design_indicator%dof%y(1,1,1,1), i)
 
   end function brinkman_design_get_y_i
 
@@ -574,7 +574,7 @@ contains
        call neko_error('brinkman_design_get_z_i: index out of bounds')
     end if
 
-    z_i = this%design_indicator%dof%z(i,1,1,1)
+    z_i = linear_value_at(this%design_indicator%dof%z(1,1,1,1), i)
 
   end function brinkman_design_get_z_i
 
@@ -628,5 +628,14 @@ contains
     call this%output%sample(real(idx, kind=rp))
 
   end subroutine brinkman_design_write
+
+  !> Read a scalar from a contiguous array using linear indexing.
+  function linear_value_at(values, idx) result(value)
+    real(kind=rp), intent(in) :: values(*)
+    integer, intent(in) :: idx
+    real(kind=rp) :: value
+
+    value = values(idx)
+  end function linear_value_at
 
 end module brinkman_design
