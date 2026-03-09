@@ -81,7 +81,9 @@ module mapping_handler
      !> Flags controlling output initialization.
      logical :: output_fields_set = .false.
      logical :: outputs_initialized = .false.
+     !> Flag controlling output verbose design output (default = false).
      logical :: verbose_design = .false.
+     !> Flag controlling output verbose sensitivity output (default = false).
      logical :: verbose_sensitivity = .false.
 
    contains
