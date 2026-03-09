@@ -35,7 +35,7 @@
 !> Implements the `mapping_handler_t` type.
 module mapping_handler
   use neko_config, only: NEKO_BCKND_DEVICE
-  use num_types, only: rp, sp
+  use num_types, only: rp, sp, dp
   use mapping, only: mapping_wrapper_t, mapping_t, &
        mapping_factory
   use field, only: field_t
@@ -85,6 +85,8 @@ module mapping_handler
      logical :: verbose_design = .false.
      !> Flag controlling output verbose sensitivity output (default = false).
      logical :: verbose_sensitivity = .false.
+     !> Precision used for design/sensitivity fld outputs.
+     integer :: output_precision = sp
 
    contains
      !> Constructor.
@@ -169,7 +171,7 @@ contains
        end if
     end if
 
-    call this%design_output%init(sp, 'design', n_fields)
+    call this%design_output%init(this%output_precision, 'design', n_fields)
     if (this%verbose_design .and. n_mappings .gt. 0) then
        do i = 1, n_mappings
           call this%design_output%fields%assign_to_field(i, &
@@ -192,7 +194,8 @@ contains
           call this%sensitivity_stages(i)%init(this%coef%dof)
        end do
 
-       call this%sensitivity_output%init(sp, 'sensitivity', n_fields)
+       call this%sensitivity_output%init(this%output_precision, &
+            'sensitivity', n_fields)
        do i = 1, n_mappings + 1
           call this%sensitivity_output%fields%assign_to_field(i, &
                this%sensitivity_stages(i))
@@ -200,7 +203,8 @@ contains
        call this%sensitivity_output%fields%assign_to_field(n_fields, &
             this%sensitivity_out)
     else
-       call this%sensitivity_output%init(sp, 'sensitivity', 1)
+       call this%sensitivity_output%init(this%output_precision, &
+            'sensitivity', 1)
        call this%sensitivity_output%fields%assign_to_field(1, &
             this%sensitivity_out)
     end if
@@ -244,6 +248,7 @@ contains
     end if
     this%outputs_initialized = .false.
     this%output_fields_set = .false.
+    this%output_precision = sp
     nullify(this%design_out)
     nullify(this%sensitivity_out)
     nullify(this%coef)
@@ -493,19 +498,27 @@ contains
   !! @param sensitivity_out Final backward-mapped sensitivity field.
   !! @param[in] verbose_design If true, output all forward cascade stages.
   !! @param[in] verbose_sensitivity If true, output all backward stages.
+  !! @param[in] output_precision Output precision (sp or dp).
   subroutine mapping_handler_init_output_fields(this, design_out, &
-       sensitivity_out, verbose_design, verbose_sensitivity)
+       sensitivity_out, verbose_design, verbose_sensitivity, output_precision)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), target, intent(inout) :: design_out
     type(field_t), target, intent(inout) :: sensitivity_out
     logical, intent(in), optional :: verbose_design
     logical, intent(in), optional :: verbose_sensitivity
+    integer, intent(in), optional :: output_precision
 
     this%design_out => design_out
     this%sensitivity_out => sensitivity_out
     if (present(verbose_design)) this%verbose_design = verbose_design
     if (present(verbose_sensitivity)) this%verbose_sensitivity = &
          verbose_sensitivity
+    if (present(output_precision)) then
+       if (output_precision .ne. sp .and. output_precision .ne. dp) then
+          call neko_error('output_precision must be either sp or dp')
+       end if
+       this%output_precision = output_precision
+    end if
     this%output_fields_set = .true.
 
     call mapping_handler_setup_outputs(this)

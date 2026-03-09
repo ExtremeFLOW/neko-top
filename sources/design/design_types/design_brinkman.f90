@@ -34,7 +34,7 @@
 
 ! Implements the `brinkman_design_t` type.
 module brinkman_design
-  use num_types, only: rp
+  use num_types, only: rp, sp, dp
   use field, only: field_t
   use json_module, only: json_file
   use mapping_handler, only: mapping_handler_t
@@ -248,7 +248,9 @@ contains
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
+    character(len=:), allocatable :: output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
+    integer :: output_precision
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
@@ -257,6 +259,18 @@ contains
          .false.)
     call json_get_or_default(parameters, 'verbose_sensitivity', &
          verbose_sensitivity, .false.)
+    call json_get_or_default(parameters, 'output_precision', &
+         output_precision_str, 'sp')
+
+    select case (trim(output_precision_str))
+    case ('sp', 'SP')
+       output_precision = sp
+    case ('dp', 'DP')
+       output_precision = dp
+    case default
+       call neko_error('Invalid output_precision in design.brinkman. ' // &
+            'Expected ''sp'' or ''dp''.')
+    end select
 
     select case (trim(domain_type))
     case ('full')
@@ -284,7 +298,8 @@ contains
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
          call this%mapping%init_output_fields(this%brinkman_amplitude, &
-              this%sensitivity, verbose_design, verbose_sensitivity)
+              this%sensitivity, verbose_design, verbose_sensitivity, &
+              output_precision)
       end if
 
       if ('initial_distribution' .in. parameters) then

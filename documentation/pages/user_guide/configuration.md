@@ -68,6 +68,7 @@ section of the case file.
 The individual components are described in greater detail in the linked
 sections.
 
+- \subpage design_types
 - \subpage mapping_cascade
 - \subpage objectives_and_constraints
 - \subpage simulation_components
