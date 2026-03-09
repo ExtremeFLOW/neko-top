@@ -249,9 +249,9 @@ contains
     this%outputs_initialized = .false.
     this%output_fields_set = .false.
     this%output_precision = sp
-    nullify(this%design_out)
-    nullify(this%sensitivity_out)
-    nullify(this%coef)
+    if (associated(this%design_out)) nullify(this%design_out)
+    if (associated(this%sensitivity_out)) nullify(this%sensitivity_out)
+    if (associated(this%coef)) nullify(this%coef)
 
   end subroutine mapping_handler_free
 
