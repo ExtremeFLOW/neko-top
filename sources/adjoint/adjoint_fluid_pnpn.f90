@@ -505,7 +505,7 @@ contains
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(chkp_t), intent(inout) :: chkp
     real(kind=rp) :: dtlag(10), tlag(10)
-    integer :: i, j, n
+    integer :: i, n
 
     dtlag = chkp%dtlag
     tlag = chkp%tlag
@@ -516,21 +516,14 @@ contains
        associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
             p => this%p_adj, c_Xh => this%c_Xh, ulag => this%ulag, &
             vlag => this%vlag, wlag => this%wlag)
-         do concurrent (j = 1:n)
-            u%x(j,1,1,1) = u%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            v%x(j,1,1,1) = v%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            w%x(j,1,1,1) = w%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            p%x(j,1,1,1) = p%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-         end do
+         call col2(u%x, c_Xh%mult, n)
+         call col2(v%x, c_Xh%mult, n)
+         call col2(w%x, c_Xh%mult, n)
+         call col2(p%x, c_Xh%mult, n)
          do i = 1, this%ulag%size()
-            do concurrent (j = 1:n)
-               ulag%lf(i)%x(j,1,1,1) = ulag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-               vlag%lf(i)%x(j,1,1,1) = vlag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-               wlag%lf(i)%x(j,1,1,1) = wlag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-            end do
+            call col2(ulag%lf(i)%x, c_Xh%mult, n)
+            call col2(vlag%lf(i)%x, c_Xh%mult, n)
+            call col2(wlag%lf(i)%x, c_Xh%mult, n)
          end do
        end associate
     end if

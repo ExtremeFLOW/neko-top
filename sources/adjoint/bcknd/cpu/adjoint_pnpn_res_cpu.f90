@@ -46,6 +46,7 @@ module adjoint_pnpn_res_cpu
   use mesh, only : mesh_t
   use num_types, only : rp
   use space, only : space_t
+  use math, only : cfill, col3, cmult, col2, chsign, add2
   use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
@@ -97,9 +98,8 @@ contains
     type(field_t), intent(in) :: mu
     type(field_t), intent(in) :: rho
     type(c_ptr), intent(inout) :: event
-    real(kind=rp) :: rho_val, mu_val
+    real(kind=rp) :: rho_val
     integer :: n
-    integer :: i
     type(field_t), pointer :: ta1, ta2, ta3, wa1, wa2, wa3
     integer :: temp_indices(6)
 
@@ -114,28 +114,24 @@ contains
 
     ! We assume the material properties are constant
     rho_val = rho%x(1,1,1,1)
-    mu_val = mu%x(1,1,1,1)
-    do i = 1, n
-       c_Xh%h1(i,1,1,1) = 1.0_rp / rho_val
-       c_Xh%h2(i,1,1,1) = 0.0_rp
-    end do
+    call cfill(c_Xh%h1, 1.0_rp / rho_val, n)
+    call cfill(c_Xh%h2, 0.0_rp, n)
     c_Xh%ifh2 = .false.
 
-    do concurrent (i = 1:n)
-       ta1%x(i,1,1,1) = f_x%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
-       ta2%x(i,1,1,1) = f_y%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
-       ta3%x(i,1,1,1) = f_z%x(i,1,1,1) / rho_val * c_Xh%B(i,1,1,1)
-    end do
+    call col3(ta1%x, f_x%x, c_Xh%B, n)
+    call col3(ta2%x, f_y%x, c_Xh%B, n)
+    call col3(ta3%x, f_z%x, c_Xh%B, n)
+    call cmult(ta1%x, 1.0_rp / rho_val, n)
+    call cmult(ta2%x, 1.0_rp / rho_val, n)
+    call cmult(ta3%x, 1.0_rp / rho_val, n)
 
     call gs_Xh%op(ta1, GS_OP_ADD)
     call gs_Xh%op(ta2, GS_OP_ADD)
     call gs_Xh%op(ta3, GS_OP_ADD)
 
-    do concurrent (i = 1:n)
-       ta1%x(i,1,1,1) = ta1%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-       ta2%x(i,1,1,1) = ta2%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-       ta3%x(i,1,1,1) = ta3%x(i,1,1,1) * c_Xh%Binv(i,1,1,1)
-    end do
+    call col2(ta1%x, c_Xh%Binv, n)
+    call col2(ta2%x, c_Xh%Binv, n)
+    call col2(ta3%x, c_Xh%Binv, n)
 
     call cdtp(wa1%x, ta1%x, c_Xh%drdx, c_Xh%dsdx, c_Xh%dtdx, c_Xh)
     call cdtp(wa2%x, ta2%x, c_Xh%drdy, c_Xh%dsdy, c_Xh%dtdy, c_Xh)
@@ -145,10 +141,10 @@ contains
 
     call Ax%compute(p_res%x, p%x, c_Xh, p%msh, p%Xh)
 
-    do concurrent (i = 1:n)
-       p_res%x(i,1,1,1) = ((-p_res%x(i,1,1,1)) &
-            + wa1%x(i,1,1,1) + wa2%x(i,1,1,1) + wa3%x(i,1,1,1))
-    end do
+    call chsign(p_res%x, n)
+    call add2(p_res%x, wa1%x, n)
+    call add2(p_res%x, wa2%x, n)
+    call add2(p_res%x, wa3%x, n)
 
     ! This is commented out because I don't think it applies any more... but
     ! sym BCs haven't been tested thoroughly.
@@ -219,27 +215,24 @@ contains
     real(kind=rp), intent(in) :: dt
     integer, intent(in) :: n
     real(kind=rp) :: rho_val, mu_val
-    integer :: i
-
     ! We assume the material properties are constant
     rho_val = rho%x(1,1,1,1)
     mu_val = mu%x(1,1,1,1)
 
-    do concurrent (i = 1:n)
-       c_Xh%h1(i,1,1,1) = mu_val
-       c_Xh%h2(i,1,1,1) = rho_val * bd / dt
-    end do
+    call cfill(c_Xh%h1, mu_val, n)
+    call cfill(c_Xh%h2, rho_val * bd / dt, n)
     c_Xh%ifh2 = .true.
 
     call Ax%compute(u_res%x, u%x, c_Xh, msh, Xh)
     call Ax%compute(v_res%x, v%x, c_Xh, msh, Xh)
     call Ax%compute(w_res%x, w%x, c_Xh, msh, Xh)
 
-    do concurrent (i = 1:n)
-       u_res%x(i,1,1,1) = (-u_res%x(i,1,1,1)) + f_x%x(i,1,1,1)
-       v_res%x(i,1,1,1) = (-v_res%x(i,1,1,1)) + f_y%x(i,1,1,1)
-       w_res%x(i,1,1,1) = (-w_res%x(i,1,1,1)) + f_z%x(i,1,1,1)
-    end do
+    call chsign(u_res%x, n)
+    call chsign(v_res%x, n)
+    call chsign(w_res%x, n)
+    call add2(u_res%x, f_x%x, n)
+    call add2(v_res%x, f_y%x, n)
+    call add2(w_res%x, f_z%x, n)
 
   end subroutine adjoint_pnpn_vel_res_cpu_compute
 
