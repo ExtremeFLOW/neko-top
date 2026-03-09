@@ -270,17 +270,13 @@ contains
     call device_mma_gensub4(x, this%low%x_d, this%upp%x_d, this%pij%x_d, &
          this%qij%x_d, this%n, this%m, this%bi%x_d)
 
-    if (NEKO_DEVICE_MPI) then
-       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x_d, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-    else
-       call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
-            sync = .true.)
-       call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
-            mpi_real_precision, mpi_sum, neko_comm, ierr)
-       call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
-            sync = .true.)
-    end if
+    call device_memcpy(this%bi%x, this%bi%x_d, this%m, DEVICE_TO_HOST, &
+         sync = .true.)
+    call MPI_Allreduce(MPI_IN_PLACE, this%bi%x, this%m, &
+         mpi_real_precision, mpi_sum, neko_comm, ierr)
+    call device_memcpy(this%bi%x, this%bi%x_d, this%m, HOST_TO_DEVICE, &
+         sync = .true.)
+
     call device_sub2(this%bi%x_d, fval, this%m)
 
     call this%scratch%relinquish(ind)
@@ -410,17 +406,12 @@ contains
        ! Computing the norm of the residuals
 
        ! Complete the computations of lambda residuals
-       if (NEKO_DEVICE_MPI) then
-          call MPI_Allreduce(MPI_IN_PLACE, relambda%x_d, this%m, &
-               mpi_real_precision, mpi_sum, neko_comm, ierr)
-       else
-          call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
-               sync = .true.)
-          call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
-               mpi_real_precision, mpi_sum, neko_comm, ierr)
-          call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
-               sync = .true.)
-       end if
+       call device_memcpy(relambda%x, relambda%x_d, this%m, DEVICE_TO_HOST, &
+            sync = .true.)
+       call MPI_Allreduce(MPI_IN_PLACE, relambda%x, this%m, &
+            mpi_real_precision, mpi_sum, neko_comm, ierr)
+       call device_memcpy(relambda%x, relambda%x_d, this%m, HOST_TO_DEVICE, &
+            sync = .true.)
 
        call device_add2s2(relambda%x_d, this%a%x_d, -z, this%m)
        call device_sub2(relambda%x_d, y%x_d, this%m)
