@@ -61,6 +61,12 @@ module objective
      procedure, pass(this) :: free_base => objective_free_base
      !> Get the weight of the objective
      procedure, pass(this) :: get_weight => objective_get_weight
+     !> Get number of log entries for this objective
+     procedure, pass(this) :: get_log_size => objective_get_log_size
+     !> Get header labels for this objective's log entries
+     procedure, pass(this) :: get_log_headers => objective_get_log_headers
+     !> Get values for this objective's log entries
+     procedure, pass(this) :: get_log_values => objective_get_log_values
 
   end type objective_t
 
@@ -140,6 +146,44 @@ contains
     if (associated(this%mask)) nullify(this%mask)
 
   end subroutine objective_free_base
+
+  !> Return number of log entries for this objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
+  function objective_get_log_size(this) result(n)
+    class(objective_t), intent(in) :: this
+    integer :: n
+
+    n = 2
+  end function objective_get_log_size
+
+  !> Populate log header labels for this objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
+  subroutine objective_get_log_headers(this, headers)
+    class(objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    if (size(headers) .lt. 1) return
+    prefix = trim(this%name)
+    headers(1) = prefix
+    if (size(headers) .lt. 2) return
+    headers(2) = trim(prefix) // '.weight'
+  end subroutine objective_get_log_headers
+
+  !> Populate log values for this objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
+  subroutine objective_get_log_values(this, values)
+    class(objective_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    if (size(values) .lt. 1) return
+    values(1) = this%value
+    if (size(values) .lt. 2) return
+    values(2) = this%weight
+  end subroutine objective_get_log_values
 
   ! -------------------------------------------------------------------------- !
   ! Implementations for the wrapper

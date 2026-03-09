@@ -104,6 +104,15 @@ module augmented_lagrangian_objective
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           augmented_lagrangian_update_sensitivity
+     !> Get number of log entries
+     procedure, public, pass(this) :: get_log_size => &
+          augmented_lagrangian_get_log_size
+     !> Get header labels for log entries
+     procedure, public, pass(this) :: get_log_headers => &
+          augmented_lagrangian_get_log_headers
+     !> Get values for log entries
+     procedure, public, pass(this) :: get_log_values => &
+          augmented_lagrangian_get_log_values
 
   end type augmented_lagrangian_objective_t
 
@@ -275,5 +284,37 @@ contains
     call neko_scratch_registry%relinquish_field(temp_indices)
 
   end subroutine augmented_lagrangian_update_sensitivity
+
+  !> Return number of log entries for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @return n Number of log entries.
+  function augmented_lagrangian_get_log_size(this) result(n)
+    class(augmented_lagrangian_objective_t), intent(in) :: this
+    integer :: n
+
+    n = 0
+  end function augmented_lagrangian_get_log_size
+
+  !> Populate log header labels for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @param[out] headers Header labels for each log entry.
+  subroutine augmented_lagrangian_get_log_headers(this, headers)
+    class(augmented_lagrangian_objective_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    if (size(headers) .eq. 0) return
+    headers = ""
+  end subroutine augmented_lagrangian_get_log_headers
+
+  !> Populate log values for augmented lagrangian objective.
+  !! @param[in] this The objective object.
+  !! @param[out] values Values corresponding to the log headers.
+  subroutine augmented_lagrangian_get_log_values(this, values)
+    class(augmented_lagrangian_objective_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    if (size(values) .eq. 0) return
+    values = 0.0_rp
+  end subroutine augmented_lagrangian_get_log_values
 
 end module augmented_lagrangian_objective
