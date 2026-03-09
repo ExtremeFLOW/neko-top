@@ -98,6 +98,12 @@ module base_functional
      procedure, pass(this) :: get_value => functional_get_value
      !> Get the sensitivity of the function
      procedure, pass(this) :: get_sensitivity => functional_get_sensitivity
+     !> Get number of log entries for this functional
+     procedure, pass(this) :: get_log_size => functional_get_log_size
+     !> Get header labels for this functional's log entries
+     procedure, pass(this) :: get_log_headers => functional_get_log_headers
+     !> Get values for this functional's log entries
+     procedure, pass(this) :: get_log_values => functional_get_log_values
      !> Set the value to zero
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
@@ -181,6 +187,38 @@ contains
 
     sensitivity = this%sensitivity
   end subroutine functional_get_sensitivity
+
+  !> Return number of log entries for this functional.
+  !! @param[in] this The functional object.
+  !! @return n Number of log entries.
+  function functional_get_log_size(this) result(n)
+    class(base_functional_t), intent(in) :: this
+    integer :: n
+
+    n = 1
+  end function functional_get_log_size
+
+  !> Populate log header labels for this functional.
+  !! @param[in] this The functional object.
+  !! @param[out] headers Header labels for each log entry.
+  subroutine functional_get_log_headers(this, headers)
+    class(base_functional_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+
+    if (size(headers) .eq. 0) return
+    headers(1) = trim(this%name)
+  end subroutine functional_get_log_headers
+
+  !> Populate log values for this functional.
+  !! @param[in] this The functional object.
+  !! @param[out] values Values corresponding to the log headers.
+  subroutine functional_get_log_values(this, values)
+    class(base_functional_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+
+    if (size(values) .eq. 0) return
+    values(1) = this%value
+  end subroutine functional_get_log_values
 
   !> Zero value of the function
   subroutine functional_reset_value(this)
