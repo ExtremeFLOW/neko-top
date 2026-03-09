@@ -74,13 +74,6 @@ module example_problem_1d_beam
           deflection_con_update_value
      procedure, public, pass(this) :: update_sensitivity => &
           deflection_con_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          deflection_con_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          deflection_con_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          deflection_con_get_log_values
   end type deflection_con
   ! ========================================================================== !
   ! Objective: beam weight
@@ -91,13 +84,6 @@ module example_problem_1d_beam
      procedure, public, pass(this) :: update_value => beamweight_update_value
      procedure, public, pass(this) :: update_sensitivity => &
           beamweight_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          beamweight_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          beamweight_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          beamweight_get_log_values
   end type beamweight_obj
 
   ! ========================================================================== !
@@ -113,13 +99,6 @@ module example_problem_1d_beam
      procedure, public, pass(this) :: update_value => stress_con_update_value
      procedure, public, pass(this) :: update_sensitivity => &
           stress_con_update_sensitivity
-     !> Log sizing and values
-     procedure, public, pass(this) :: get_log_size => &
-          stress_con_get_log_size
-     procedure, public, pass(this) :: get_log_headers => &
-          stress_con_get_log_headers
-     procedure, public, pass(this) :: get_log_values => &
-          stress_con_get_log_values
   end type stress_con
 
 contains
@@ -264,38 +243,6 @@ contains
     call Delta%free()
   end subroutine deflection_con_update_sensitivity
 
-  !> Log sizing and values for tip deflection constraint
-  function deflection_con_get_log_size(this) result(n)
-    class(deflection_con), intent(in) :: this
-    integer :: n
-
-    n = 3
-  end function deflection_con_get_log_size
-
-  subroutine deflection_con_get_log_headers(this, headers)
-    class(deflection_con), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=256) :: prefix
-
-    if (size(headers) .eq. 0) return
-    prefix = trim(this%name)
-    headers(1) = prefix
-    headers(2) = trim(prefix) // '.tip'
-    headers(3) = trim(prefix) // '.max'
-  end subroutine deflection_con_get_log_headers
-
-  subroutine deflection_con_get_log_values(this, values)
-    class(deflection_con), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-    real(kind=rp) :: u_tip
-
-    if (size(values) .eq. 0) return
-    u_tip = (this%value + 1.0_rp) * u_tip_max
-    values(1) = this%value
-    values(2) = u_tip
-    values(3) = u_tip_max
-  end subroutine deflection_con_get_log_values
-
   ! ========================================================================== !
   ! Methods for the Beam Weight Objective
 
@@ -355,34 +302,6 @@ contains
             HOST_TO_DEVICE, sync = .false.)
     end if
   end subroutine beamweight_update_sensitivity
-
-  !> Log sizing and values for beam weight objective
-  function beamweight_get_log_size(this) result(n)
-    class(beamweight_obj), intent(in) :: this
-    integer :: n
-
-    n = 2
-  end function beamweight_get_log_size
-
-  subroutine beamweight_get_log_headers(this, headers)
-    class(beamweight_obj), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=256) :: prefix
-
-    if (size(headers) .eq. 0) return
-    prefix = trim(this%name)
-    headers(1) = prefix
-    headers(2) = trim(prefix) // '.weight'
-  end subroutine beamweight_get_log_headers
-
-  subroutine beamweight_get_log_values(this, values)
-    class(beamweight_obj), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-
-    if (size(values) .eq. 0) return
-    values(1) = this%value
-    values(2) = this%weight
-  end subroutine beamweight_get_log_values
 
   ! ========================================================================== !
   ! Methods for the Constraint Function
@@ -539,38 +458,4 @@ contains
 
     deallocate(local_sensitivity)
   end subroutine stress_con_update_sensitivity
-
-  !> Log sizing and values for stress constraint
-  function stress_con_get_log_size(this) result(n)
-    class(stress_con), intent(in) :: this
-    integer :: n
-
-    n = 4
-  end function stress_con_get_log_size
-
-  subroutine stress_con_get_log_headers(this, headers)
-    class(stress_con), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
-    character(len=256) :: prefix
-
-    if (size(headers) .eq. 0) return
-    prefix = trim(this%name)
-    headers(1) = prefix
-    headers(2) = trim(prefix) // '.sigma'
-    headers(3) = trim(prefix) // '.sigma_max'
-    headers(4) = trim(prefix) // '.element'
-  end subroutine stress_con_get_log_headers
-
-  subroutine stress_con_get_log_values(this, values)
-    class(stress_con), intent(in) :: this
-    real(kind=rp), intent(out) :: values(:)
-    real(kind=rp) :: sigma
-
-    if (size(values) .eq. 0) return
-    sigma = (this%value + 1.0_rp) * this%sigma_max
-    values(1) = this%value
-    values(2) = sigma
-    values(3) = this%sigma_max
-    values(4) = real(this%global_element_index, kind=rp)
-  end subroutine stress_con_get_log_values
 end module example_problem_1d_beam
