@@ -1,5 +1,5 @@
 /**
- * @file heaviside_projection_mapping.cu
+ * @file heaviside_mapping.hip
  * @copyright
  * Copyright (c) 2026, The Neko-TOP Authors
  * All rights reserved.
@@ -39,45 +39,45 @@
 #include <stdlib.h>
 
 // Device includes
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 // Neko includes
-#include <neko/device/cuda/check.h>
 #include <neko/device/device_config.h>
+#include <neko/device/hip/check.h>
 
 // Local includes
-#include "heaviside_projection_mapping_kernel.h"
+#include "heaviside_mapping_kernel.h"
 
 extern "C" {
 
 /**
- * Fortran wrapper for smooth Heaviside projection mapping.
+ * Fortran wrapper for smooth Heaviside mapping.
  */
-void cuda_heaviside_projection_mapping_apply(real* beta, real* eta,
+void hip_heaviside_mapping_apply(real* beta, real* eta,
     void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    heaviside_projection_mapping_apply_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*beta, *eta, (real*)X_out_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    hipLaunchKernelGGL(heaviside_mapping_apply_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *beta, *eta, (real*)X_out_d, (real*)X_in_d, *n);
+    HIP_CHECK(hipGetLastError());
 }
 
 /**
- * Fortran wrapper for smooth Heaviside projection chain rule.
+ * Fortran wrapper for smooth Heaviside mapping chain rule.
  */
-void cuda_heaviside_projection_mapping_apply_backward(real* beta, real* eta,
+void hip_heaviside_mapping_apply_backward(real* beta, real* eta,
     void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    heaviside_projection_mapping_apply_backward_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*beta, *eta, (real*)sens_out_d, (real*)sens_in_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    hipLaunchKernelGGL(heaviside_mapping_apply_backward_kernel<real>,
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *beta, *eta, (real*)sens_out_d, (real*)sens_in_d, (real*)X_in_d, *n);
+    HIP_CHECK(hipGetLastError());
 }
 
 }

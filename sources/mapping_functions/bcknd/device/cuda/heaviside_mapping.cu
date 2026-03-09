@@ -1,5 +1,5 @@
 /**
- * @file heaviside_projection_mapping_kernel.h
+ * @file heaviside_mapping.cu
  * @copyright
  * Copyright (c) 2026, The Neko-TOP Authors
  * All rights reserved.
@@ -34,47 +34,50 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __NEKO_CUDA_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
-#define __NEKO_CUDA_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
+// System includes
+#include <stdio.h>
+#include <stdlib.h>
 
-#include <math.h>
+// Device includes
+#include <cuda_runtime.h>
+
+// Neko includes
+#include <neko/device/cuda/check.h>
+#include <neko/device/device_config.h>
+
+// Local includes
+#include "heaviside_mapping_kernel.h"
+
+extern "C" {
 
 /**
- * Device kernel for smooth Heaviside projection mapping.
+ * Fortran wrapper for smooth Heaviside mapping.
  */
-template <typename T>
-__global__ void heaviside_projection_mapping_apply_kernel(
-    const T beta, const T eta, T* __restrict__ X_out_d,
-    T* __restrict__ X_in_d, const int n) {
+void cuda_heaviside_mapping_apply(real* beta, real* eta,
+    void* X_out_d, void* X_in_d, int* n) {
 
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int str = blockDim.x * gridDim.x;
-    const T den = tanh(beta * eta) + tanh(beta * (1.0 - eta));
-    const T tanh_beta_eta = tanh(beta * eta);
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    for (int i = idx; i < n; i += str) {
-        X_out_d[i] = (tanh_beta_eta + tanh(beta * (X_in_d[i] - eta))) / den;
-    }
+    heaviside_mapping_apply_kernel<real>
+        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+        (*beta, *eta, (real*)X_out_d, (real*)X_in_d, *n);
+    CUDA_CHECK(cudaGetLastError());
 }
 
 /**
- * Device kernel for smooth Heaviside projection chain rule.
+ * Fortran wrapper for smooth Heaviside mapping chain rule.
  */
-template <typename T>
-__global__ void heaviside_projection_mapping_apply_backward_kernel(
-    const T beta, const T eta, T* __restrict__ sens_out_d,
-    T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
+void cuda_heaviside_mapping_apply_backward(real* beta, real* eta,
+    void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int str = blockDim.x * gridDim.x;
-    const T den = tanh(beta * eta) + tanh(beta * (1.0 - eta));
+    const dim3 nthrds(1024, 1, 1);
+    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    for (int i = idx; i < n; i += str) {
-        const T arg = beta * (X_in_d[i] - eta);
-        const T tanh_arg = tanh(arg);
-        const T dproj = beta * (1.0 - tanh_arg * tanh_arg) / den;
-        sens_out_d[i] = dproj * sens_in_d[i];
-    }
+    heaviside_mapping_apply_backward_kernel<real>
+        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
+        (*beta, *eta, (real*)sens_out_d, (real*)sens_in_d, (real*)X_in_d, *n);
+    CUDA_CHECK(cudaGetLastError());
 }
 
-#endif // __NEKO_CUDA_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
+}

@@ -6,7 +6,7 @@
 # - RAMP (both convexities)
 # - PDE filter
 # - SIMP
-# - Heaviside projection
+# - Heaviside mapping
 #
 # Possible extensions include
 # - exponential
@@ -23,9 +23,9 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/SIMP_mapping_cpu.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/heaviside_projection_mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_heaviside_projection_mapping.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/heaviside_projection_mapping_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/heaviside_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_heaviside_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/heaviside_mapping_cpu.f90
 )
 
 if(DEVICE_TYPE STREQUAL "CUDA")
@@ -33,7 +33,7 @@ if(DEVICE_TYPE STREQUAL "CUDA")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping.cu
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/SIMP_mapping.cu
-            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/heaviside_projection_mapping.cu
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/heaviside_mapping.cu
     )
 
     target_include_directories(neko-top
@@ -46,7 +46,7 @@ elseif(DEVICE_TYPE STREQUAL "HIP")
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/SIMP_mapping.hip
-            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/heaviside_projection_mapping.hip
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/heaviside_mapping.hip
     )
 
     target_include_directories(neko-top

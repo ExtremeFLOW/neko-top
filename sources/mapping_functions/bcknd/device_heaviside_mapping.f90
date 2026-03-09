@@ -1,4 +1,4 @@
-!> @file device_heaviside_projection_mapping.f90
+!> @file device_heaviside_mapping.f90
 !! @copyright
 !! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,35 +32,35 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-module device_heaviside_projection_mapping
+module device_heaviside_mapping
   use utils, only: neko_error
   use num_types, only: rp, c_rp
   use, intrinsic :: iso_c_binding, only: c_ptr, c_int
   implicit none
   private
 
-  public :: device_heaviside_projection_mapping_apply, &
-       device_heaviside_projection_mapping_apply_backward
+  public :: device_heaviside_mapping_apply, &
+       device_heaviside_mapping_apply_backward
 
 #if HAVE_HIP
   interface
-     !> HIP kernel launcher for forward Heaviside projection mapping.
-     subroutine hip_heaviside_projection_mapping_apply(beta, eta, X_out_d, &
-          X_in_d, n) bind(c, name = 'hip_heaviside_projection_mapping_apply')
+     !> HIP kernel launcher for forward Heaviside mapping.
+     subroutine hip_heaviside_mapping_apply(beta, eta, X_out_d, &
+          X_in_d, n) bind(c, name = 'hip_heaviside_mapping_apply')
        import c_rp, c_ptr, c_int
        real(c_rp) :: beta
        real(c_rp) :: eta
        type(c_ptr), value :: X_out_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine hip_heaviside_projection_mapping_apply
+     end subroutine hip_heaviside_mapping_apply
   end interface
 
   interface
-     !> HIP kernel launcher for Heaviside projection chain rule.
-     subroutine hip_heaviside_projection_mapping_apply_backward(beta, eta, &
+     !> HIP kernel launcher for Heaviside mapping chain rule.
+     subroutine hip_heaviside_mapping_apply_backward(beta, eta, &
           sens_out_d, sens_in_d, X_in_d, n) &
-          bind(c, name = 'hip_heaviside_projection_mapping_apply_backward')
+          bind(c, name = 'hip_heaviside_mapping_apply_backward')
        import c_rp, c_ptr, c_int
        real(c_rp) :: beta
        real(c_rp) :: eta
@@ -68,27 +68,27 @@ module device_heaviside_projection_mapping
        type(c_ptr), value :: sens_in_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine hip_heaviside_projection_mapping_apply_backward
+     end subroutine hip_heaviside_mapping_apply_backward
   end interface
 #elif HAVE_CUDA
   interface
-     !> CUDA kernel launcher for forward Heaviside projection mapping.
-     subroutine cuda_heaviside_projection_mapping_apply(beta, eta, X_out_d, &
-          X_in_d, n) bind(c, name = 'cuda_heaviside_projection_mapping_apply')
+     !> CUDA kernel launcher for forward Heaviside mapping.
+     subroutine cuda_heaviside_mapping_apply(beta, eta, X_out_d, &
+          X_in_d, n) bind(c, name = 'cuda_heaviside_mapping_apply')
        import c_rp, c_ptr, c_int
        real(c_rp) :: beta
        real(c_rp) :: eta
        type(c_ptr), value :: X_out_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine cuda_heaviside_projection_mapping_apply
+     end subroutine cuda_heaviside_mapping_apply
   end interface
 
   interface
-     !> CUDA kernel launcher for Heaviside projection chain rule.
-     subroutine cuda_heaviside_projection_mapping_apply_backward(beta, eta, &
+     !> CUDA kernel launcher for Heaviside mapping chain rule.
+     subroutine cuda_heaviside_mapping_apply_backward(beta, eta, &
           sens_out_d, sens_in_d, X_in_d, n) &
-          bind(c, name = 'cuda_heaviside_projection_mapping_apply_backward')
+          bind(c, name = 'cuda_heaviside_mapping_apply_backward')
        import c_rp, c_ptr, c_int
        real(c_rp) :: beta
        real(c_rp) :: eta
@@ -96,20 +96,20 @@ module device_heaviside_projection_mapping
        type(c_ptr), value :: sens_in_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine cuda_heaviside_projection_mapping_apply_backward
+     end subroutine cuda_heaviside_mapping_apply_backward
   end interface
 #elif HAVE_OPENCL
 #endif
 
 contains
 
-  !> Dispatch forward Heaviside projection mapping to active device backend.
+  !> Dispatch forward Heaviside mapping to active device backend.
   !! @param beta Projection sharpness parameter.
   !! @param eta Projection threshold parameter.
   !! @param X_out_d Output field on device.
   !! @param X_in_d Input field on device.
   !! @param n Number of dofs.
-  subroutine device_heaviside_projection_mapping_apply(beta, eta, X_out_d, &
+  subroutine device_heaviside_mapping_apply(beta, eta, X_out_d, &
        X_in_d, n)
     real(kind=rp), intent(in) :: beta
     real(kind=rp), intent(in) :: eta
@@ -117,22 +117,22 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_HIP
-    call hip_heaviside_projection_mapping_apply(beta, eta, X_out_d, X_in_d, n)
+    call hip_heaviside_mapping_apply(beta, eta, X_out_d, X_in_d, n)
 #elif HAVE_CUDA
-    call cuda_heaviside_projection_mapping_apply(beta, eta, X_out_d, X_in_d, n)
+    call cuda_heaviside_mapping_apply(beta, eta, X_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured')
 #endif
-  end subroutine device_heaviside_projection_mapping_apply
+  end subroutine device_heaviside_mapping_apply
 
-  !> Dispatch Heaviside projection chain rule to active device backend.
+  !> Dispatch Heaviside mapping chain rule to active device backend.
   !! @param beta Projection sharpness parameter.
   !! @param eta Projection threshold parameter.
   !! @param sens_out_d Output sensitivity on device.
   !! @param sens_in_d Input sensitivity on device.
   !! @param X_in_d Input field on device.
   !! @param n Number of dofs.
-  subroutine device_heaviside_projection_mapping_apply_backward(beta, eta, &
+  subroutine device_heaviside_mapping_apply_backward(beta, eta, &
        sens_out_d, sens_in_d, X_in_d, n)
     real(kind=rp), intent(in) :: beta
     real(kind=rp), intent(in) :: eta
@@ -141,14 +141,14 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_HIP
-    call hip_heaviside_projection_mapping_apply_backward(beta, eta, sens_out_d, &
+    call hip_heaviside_mapping_apply_backward(beta, eta, sens_out_d, &
          sens_in_d, X_in_d, n)
 #elif HAVE_CUDA
-    call cuda_heaviside_projection_mapping_apply_backward(beta, eta, sens_out_d, &
+    call cuda_heaviside_mapping_apply_backward(beta, eta, sens_out_d, &
          sens_in_d, X_in_d, n)
 #else
     call neko_error('No device backend configured')
 #endif
-  end subroutine device_heaviside_projection_mapping_apply_backward
+  end subroutine device_heaviside_mapping_apply_backward
 
-end module device_heaviside_projection_mapping
+end module device_heaviside_mapping

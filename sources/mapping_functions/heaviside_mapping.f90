@@ -1,4 +1,4 @@
-!> @file heaviside_projection_mapping.f90
+!> @file heaviside_mapping.f90
 !! @copyright
 !! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,26 +32,26 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Smooth Heaviside projection mapping
-module heaviside_projection_mapping
+!> Smooth Heaviside mapping
+module heaviside_mapping
   use num_types, only: rp
   use mapping, only: mapping_t
   use json_module, only: json_file
   use field, only: field_t
   use coefs, only: coef_t
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device_heaviside_projection_mapping, only: &
-       device_heaviside_projection_mapping_apply, &
-       device_heaviside_projection_mapping_apply_backward
-  use heaviside_projection_mapping_cpu, only: &
-       heaviside_projection_mapping_apply_cpu, &
-       heaviside_projection_mapping_apply_backward_cpu
+  use device_heaviside_mapping, only: &
+       device_heaviside_mapping_apply, &
+       device_heaviside_mapping_apply_backward
+  use heaviside_mapping_cpu, only: &
+       heaviside_mapping_apply_cpu, &
+       heaviside_mapping_apply_backward_cpu
   use json_utils, only: json_get_or_default
   use utils, only: neko_error
   implicit none
   private
 
-  !> Smooth Heaviside projection mapping
+  !> Smooth Heaviside mapping
   !!
   !! \f[
   !! X_\mathrm{out} =
@@ -60,7 +60,7 @@ module heaviside_projection_mapping
   !! \f]
   !!
   !! with \f$\beta > 0\f$ and \f$\eta \in [0,1]\f$.
-  type, public, extends(mapping_t) :: heaviside_projection_mapping_t
+  type, public, extends(mapping_t) :: heaviside_mapping_t
      !> Projection sharpness parameter
      real(kind=rp) :: beta
      !> Threshold parameter
@@ -68,23 +68,23 @@ module heaviside_projection_mapping
 
    contains
      !> Constructor from json.
-     procedure, pass(this) :: init => heaviside_projection_init_from_json
+     procedure, pass(this) :: init => heaviside_mapping_init_from_json
      !> Constructor from attributes.
      procedure, pass(this) :: init_from_attributes => &
-          heaviside_projection_init_from_attributes
+          heaviside_mapping_init_from_attributes
      !> Destructor.
-     procedure, pass(this) :: free => heaviside_projection_free
+     procedure, pass(this) :: free => heaviside_mapping_free
      !> Apply the forward mapping.
-     procedure, pass(this) :: forward_mapping => heaviside_projection_forward
+     procedure, pass(this) :: forward_mapping => heaviside_mapping_forward
      !> Apply the chain-rule mapping.
-     procedure, pass(this) :: backward_mapping => heaviside_projection_backward
-  end type heaviside_projection_mapping_t
+     procedure, pass(this) :: backward_mapping => heaviside_mapping_backward
+  end type heaviside_mapping_t
 
 contains
 
   !> Constructor from json.
-  subroutine heaviside_projection_init_from_json(this, json, coef)
-    class(heaviside_projection_mapping_t), intent(inout) :: this
+  subroutine heaviside_mapping_init_from_json(this, json, coef)
+    class(heaviside_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
     real(kind=rp) :: beta, eta
@@ -94,58 +94,58 @@ contains
 
     call this%init_base(json, coef)
     call this%init_from_attributes(coef, beta, eta)
-  end subroutine heaviside_projection_init_from_json
+  end subroutine heaviside_mapping_init_from_json
 
   !> Constructor from attributes.
-  subroutine heaviside_projection_init_from_attributes(this, coef, beta, eta)
-    class(heaviside_projection_mapping_t), intent(inout) :: this
+  subroutine heaviside_mapping_init_from_attributes(this, coef, beta, eta)
+    class(heaviside_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: beta
     real(kind=rp), intent(in) :: eta
 
     if (beta .le. 0.0_rp) then
-       call neko_error('"beta" must be > 0 in heaviside projection')
+       call neko_error('"beta" must be > 0 in heaviside mapping')
     end if
 
     if (eta .lt. 0.0_rp .or. eta .gt. 1.0_rp) then
-       call neko_error('"eta" must be in [0, 1] in heaviside projection')
+       call neko_error('"eta" must be in [0, 1] in heaviside mapping')
     end if
 
     this%beta = beta
     this%eta = eta
-  end subroutine heaviside_projection_init_from_attributes
+  end subroutine heaviside_mapping_init_from_attributes
 
   !> Destructor.
-  subroutine heaviside_projection_free(this)
-    class(heaviside_projection_mapping_t), intent(inout) :: this
+  subroutine heaviside_mapping_free(this)
+    class(heaviside_mapping_t), intent(inout) :: this
 
     call this%free_base()
-  end subroutine heaviside_projection_free
+  end subroutine heaviside_mapping_free
 
   !> Apply the forward mapping.
-  subroutine heaviside_projection_forward(this, X_out, X_in)
-    class(heaviside_projection_mapping_t), intent(inout) :: this
+  subroutine heaviside_mapping_forward(this, X_out, X_in)
+    class(heaviside_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    call heaviside_projection_apply(this%beta, this%eta, X_out, X_in)
-  end subroutine heaviside_projection_forward
+    call heaviside_mapping_apply(this%beta, this%eta, X_out, X_in)
+  end subroutine heaviside_mapping_forward
 
   !> Apply the chain rule.
-  subroutine heaviside_projection_backward(this, sens_out, sens_in, X_in)
-    class(heaviside_projection_mapping_t), intent(inout) :: this
+  subroutine heaviside_mapping_backward(this, sens_out, sens_in, X_in)
+    class(heaviside_mapping_t), intent(inout) :: this
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    call heaviside_projection_apply_backward(this%beta, this%eta, &
+    call heaviside_mapping_apply_backward(this%beta, this%eta, &
          sens_out, sens_in, X_in)
-  end subroutine heaviside_projection_backward
+  end subroutine heaviside_mapping_backward
 
-  !> Apply smooth Heaviside projection.
+  !> Apply smooth Heaviside mapping.
   !! @param beta Projection sharpness parameter.
   !! @param eta Projection threshold parameter.
   !! @param X_out Mapped field.
   !! @param X_in Unmapped field.
-  subroutine heaviside_projection_apply(beta, eta, X_out, X_in)
+  subroutine heaviside_mapping_apply(beta, eta, X_out, X_in)
     real(kind=rp), intent(in) :: beta, eta
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
@@ -156,26 +156,26 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-       call neko_error('invalid denominator in heaviside projection')
+       call neko_error('invalid denominator in heaviside mapping')
     end if
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_heaviside_projection_mapping_apply(beta, eta, &
+       call device_heaviside_mapping_apply(beta, eta, &
             X_out%x_d, X_in%x_d, n)
     else
-       call heaviside_projection_mapping_apply_cpu(beta, eta, &
+       call heaviside_mapping_apply_cpu(beta, eta, &
             X_out%x, X_in%x, n)
     end if
-  end subroutine heaviside_projection_apply
+  end subroutine heaviside_mapping_apply
 
-  !> Apply chain rule for smooth Heaviside projection.
+  !> Apply chain rule for smooth Heaviside mapping.
   !! @param beta Projection sharpness parameter.
   !! @param eta Projection threshold parameter.
   !! @param sens_out Sensitivity with respect to unprojected field.
   !! @param sens_in Sensitivity with respect to projected field.
   !! @param X_in Unprojected field.
-  subroutine heaviside_projection_apply_backward(beta, eta, sens_out, sens_in, &
+  subroutine heaviside_mapping_apply_backward(beta, eta, sens_out, sens_in, &
        X_in)
     real(kind=rp), intent(in) :: beta, eta
     type(field_t), intent(in) :: X_in
@@ -188,17 +188,17 @@ contains
     den = tanh(beta_eta) + tanh(beta * (1.0_rp - eta))
 
     if (abs(den) .le. tiny(den)) then
-       call neko_error('invalid denominator in heaviside projection')
+       call neko_error('invalid denominator in heaviside mapping')
     end if
 
     n = X_in%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_heaviside_projection_mapping_apply_backward(beta, eta, &
+       call device_heaviside_mapping_apply_backward(beta, eta, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       call heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
+       call heaviside_mapping_apply_backward_cpu(beta, eta, &
             sens_out%x, sens_in%x, X_in%x, n)
     end if
-  end subroutine heaviside_projection_apply_backward
+  end subroutine heaviside_mapping_apply_backward
 
-end module heaviside_projection_mapping
+end module heaviside_mapping

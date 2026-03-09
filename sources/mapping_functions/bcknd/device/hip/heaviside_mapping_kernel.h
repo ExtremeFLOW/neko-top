@@ -1,5 +1,5 @@
 /**
- * @file heaviside_projection_mapping_kernel.h
+ * @file heaviside_mapping_kernel.h
  * @copyright
  * Copyright (c) 2026, The Neko-TOP Authors
  * All rights reserved.
@@ -34,16 +34,16 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __NEKO_HIP_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
-#define __NEKO_HIP_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
+#ifndef __NEKO_HIP_HEAVISIDE_MAPPING_KERNELS__
+#define __NEKO_HIP_HEAVISIDE_MAPPING_KERNELS__
 
 #include <math.h>
 
 /**
- * Device kernel for smooth Heaviside projection mapping.
+ * Device kernel for smooth Heaviside mapping.
  */
 template <typename T>
-__global__ void heaviside_projection_mapping_apply_kernel(
+__global__ void heaviside_mapping_apply_kernel(
     const T beta, const T eta, T* __restrict__ X_out_d,
     T* __restrict__ X_in_d, const int n) {
 
@@ -58,10 +58,10 @@ __global__ void heaviside_projection_mapping_apply_kernel(
 }
 
 /**
- * Device kernel for smooth Heaviside projection chain rule.
+ * Device kernel for smooth Heaviside mapping chain rule.
  */
 template <typename T>
-__global__ void heaviside_projection_mapping_apply_backward_kernel(
+__global__ void heaviside_mapping_apply_backward_kernel(
     const T beta, const T eta, T* __restrict__ sens_out_d,
     T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
 
@@ -77,4 +77,4 @@ __global__ void heaviside_projection_mapping_apply_backward_kernel(
     }
 }
 
-#endif // __NEKO_HIP_HEAVISIDE_PROJECTION_MAPPING_KERNELS__
+#endif // __NEKO_HIP_HEAVISIDE_MAPPING_KERNELS__

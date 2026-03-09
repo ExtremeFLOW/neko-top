@@ -1,4 +1,4 @@
-!> @file heaviside_projection_mapping_cpu.f90
+!> @file heaviside_mapping_cpu.f90
 !! @copyright
 !! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,24 +32,24 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> CPU backend for smooth Heaviside projection mapping operations.
-module heaviside_projection_mapping_cpu
+!> CPU backend for smooth Heaviside mapping operations.
+module heaviside_mapping_cpu
   use num_types, only: rp
   implicit none
   private
 
-  public :: heaviside_projection_mapping_apply_cpu, &
-       heaviside_projection_mapping_apply_backward_cpu
+  public :: heaviside_mapping_apply_cpu, &
+       heaviside_mapping_apply_backward_cpu
 
 contains
 
-  !> @brief Apply smooth Heaviside projection mapping on CPU.
+  !> @brief Apply smooth Heaviside mapping on CPU.
   !! @param[in] beta Projection sharpness parameter.
   !! @param[in] eta Projection threshold parameter.
   !! @param[out] X_out Mapped field values.
   !! @param[in] X_in Unmapped field values.
   !! @param[in] n Number of degrees of freedom.
-  subroutine heaviside_projection_mapping_apply_cpu(beta, eta, X_out, X_in, n)
+  subroutine heaviside_mapping_apply_cpu(beta, eta, X_out, X_in, n)
     integer, intent(in) :: n
     real(kind=rp), intent(in) :: beta, eta
     real(kind=rp), dimension(n), intent(out) :: X_out
@@ -59,18 +59,18 @@ contains
     tanh_beta_eta = tanh(beta * eta)
     den = tanh_beta_eta + tanh(beta * (1.0_rp - eta))
 
-    X_out = heaviside_projection_kernel(beta, eta, den, tanh_beta_eta, X_in)
+    X_out = heaviside_mapping_kernel(beta, eta, den, tanh_beta_eta, X_in)
 
-  end subroutine heaviside_projection_mapping_apply_cpu
+  end subroutine heaviside_mapping_apply_cpu
 
-  !> @brief Apply smooth Heaviside projection chain rule on CPU.
+  !> @brief Apply smooth Heaviside mapping chain rule on CPU.
   !! @param[in] beta Projection sharpness parameter.
   !! @param[in] eta Projection threshold parameter.
   !! @param[out] sens_out Sensitivity with respect to unprojected field.
   !! @param[in] sens_in Sensitivity with respect to projected field.
   !! @param[in] X_in Unprojected field values.
   !! @param[in] n Number of degrees of freedom.
-  subroutine heaviside_projection_mapping_apply_backward_cpu(beta, eta, &
+  subroutine heaviside_mapping_apply_backward_cpu(beta, eta, &
        sens_out, sens_in, X_in, n)
     integer, intent(in) :: n
     real(kind=rp), intent(in) :: beta, eta
@@ -81,19 +81,19 @@ contains
 
     den = tanh(beta * eta) + tanh(beta * (1.0_rp - eta))
 
-    sens_out = heaviside_projection_backward_kernel(beta, eta, den, &
+    sens_out = heaviside_mapping_backward_kernel(beta, eta, den, &
          sens_in, X_in)
 
-  end subroutine heaviside_projection_mapping_apply_backward_cpu
+  end subroutine heaviside_mapping_apply_backward_cpu
 
-  !> @brief Elemental kernel for smooth Heaviside projection mapping.
+  !> @brief Elemental kernel for smooth Heaviside mapping.
   !! @param[in] beta Projection sharpness parameter.
   !! @param[in] eta Projection threshold parameter.
   !! @param[in] den Projection denominator.
   !! @param[in] tanh_beta_eta Precomputed \f$\tanh(\beta\eta)\f$.
   !! @param[in] X_in Unmapped scalar value.
   !! @return Mapped scalar value.
-  elemental function heaviside_projection_kernel(beta, eta, den, &
+  elemental function heaviside_mapping_kernel(beta, eta, den, &
        tanh_beta_eta, X_in) result(X_out)
     real(kind=rp), intent(in) :: beta, eta, den, tanh_beta_eta
     real(kind=rp), intent(in) :: X_in
@@ -101,16 +101,16 @@ contains
 
     X_out = (tanh_beta_eta + tanh(beta * (X_in - eta))) / den
 
-  end function heaviside_projection_kernel
+  end function heaviside_mapping_kernel
 
-  !> @brief Elemental kernel for smooth Heaviside projection chain rule.
+  !> @brief Elemental kernel for smooth Heaviside mapping chain rule.
   !! @param[in] beta Projection sharpness parameter.
   !! @param[in] eta Projection threshold parameter.
   !! @param[in] den Projection denominator.
   !! @param[in] sens_in Sensitivity with respect to projected scalar value.
   !! @param[in] X_in Unprojected scalar value.
   !! @return Sensitivity with respect to unprojected scalar value.
-  elemental function heaviside_projection_backward_kernel(beta, eta, den, &
+  elemental function heaviside_mapping_backward_kernel(beta, eta, den, &
        sens_in, X_in) result(sens_out)
     real(kind=rp), intent(in) :: beta, eta, den
     real(kind=rp), intent(in) :: sens_in, X_in
@@ -120,6 +120,6 @@ contains
     tanh_arg = tanh(arg)
     sens_out = beta * (1.0_rp - tanh_arg * tanh_arg) / den * sens_in
 
-  end function heaviside_projection_backward_kernel
+  end function heaviside_mapping_backward_kernel
 
-end module heaviside_projection_mapping_cpu
+end module heaviside_mapping_cpu
