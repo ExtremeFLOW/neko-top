@@ -98,6 +98,15 @@ module volume_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
+     !> Get number of log entries
+     procedure, public, pass(this) :: get_log_size => &
+          volume_constraint_get_log_size
+     !> Get header labels for log entries
+     procedure, public, pass(this) :: get_log_headers => &
+          volume_constraint_get_log_headers
+     !> Get values for log entries
+     procedure, public, pass(this) :: get_log_values => &
+          volume_constraint_get_log_values
 
      !> Computes the volume of the brinkman_design.
      procedure, private, pass(this) :: compute_volume
@@ -363,5 +372,52 @@ contains
     call neko_scratch_registry%relinquish(ind_value)
 
   end function volume_brinkman_design
+
+  !> Return number of log entries for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @return n Number of log entries.
+  function volume_constraint_get_log_size(this) result(n)
+    class(volume_constraint_t), intent(in) :: this
+    integer :: n
+
+    n = 2
+  end function volume_constraint_get_log_size
+
+  !> Populate log header labels for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] headers Header labels for each log entry.
+  subroutine volume_constraint_get_log_headers(this, headers)
+    class(volume_constraint_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    if (size(headers) .lt. 1) return
+    prefix = trim(this%name)
+    headers(1) = prefix
+    if (size(headers) .lt. 2) return
+    headers(2) = trim(prefix) // '.volume'
+
+  end subroutine volume_constraint_get_log_headers
+
+  !> Populate log values for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] values Values corresponding to the log headers.
+  subroutine volume_constraint_get_log_values(this, values)
+    class(volume_constraint_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+    real(kind=rp) :: volume_ratio
+
+    if (size(values) .lt. 1) return
+    if (this%is_max) then
+       volume_ratio = this%limit + this%value
+    else
+       volume_ratio = this%limit - this%value
+    end if
+
+    values(1) = this%value
+    if (size(values) .lt. 2) return
+    values(2) = volume_ratio
+
+  end subroutine volume_constraint_get_log_values
 
 end module volume_constraint
