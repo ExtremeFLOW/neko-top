@@ -13,6 +13,7 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/set_optimization_ic.f90
 
         # Specific design types
+        ${CMAKE_CURRENT_SOURCE_DIR}/design_types/design_sem.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/design_types/design_brinkman.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/design_types/design_simple.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/design_types/design_simplefield.f90

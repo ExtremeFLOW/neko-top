@@ -73,12 +73,14 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
+  use math, only: col2, cmult
   use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use utils, only: neko_error, filename_suffix
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use device_math, only: device_col2
+  use device_math, only: device_copy, device_col2, device_invcol1
+  use device_math_ext, only: device_scale_matrix_cols
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
@@ -108,6 +110,9 @@ module mma
      real(kind=rp) :: z, zeta
      type(vector_t) :: y, lambda, s, mu
      type(vector_t) :: xsi, eta
+     logical :: has_variable_map = .false.
+     type(vector_t) :: variable_map
+     type(vector_t) :: variable_map_inv
    contains
      !> Interface for initializing the MMA object
      generic, public :: init => init_from_json, init_from_components
@@ -122,6 +127,16 @@ module mma
      procedure, public, pass(this) :: get_max_iter => mma_get_max_iter
      procedure, public, pass(this) :: get_backend_and_subsolver => &
           mma_get_backend_and_subsolver
+     procedure, public, pass(this) :: set_variable_map => &
+          mma_set_variable_map
+     procedure, public, pass(this) :: clear_variable_map => &
+          mma_clear_variable_map
+     procedure, public, pass(this) :: map_variables_to_mma_space => &
+          mma_map_variables_to_mma_space
+     procedure, public, pass(this) :: map_variables_from_mma_space => &
+          mma_map_variables_from_mma_space
+     procedure, public, pass(this) :: map_sensitivities_to_mma_space => &
+          mma_map_sensitivities_to_mma_space
      procedure, public, pass(this) :: scale_variable_bounds => &
           mma_scale_variable_bounds
 
@@ -166,7 +181,7 @@ module mma
        real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
      end subroutine mma_KKT_cpu
 
-     ! ========================================================================== !
+     ! ===================================================================== !
      ! interface for device backend module subroutines
 
      ! Device update function, runs one iteration of MMA
@@ -324,6 +339,7 @@ contains
     call this%pij%free()
     call this%qij%free()
     call this%scratch%free()
+    call this%clear_variable_map()
 
     this%is_initialized = .false.
     this%is_updated = .false.
@@ -367,6 +383,13 @@ contains
 
     this%n = n
     this%m = m
+
+    if (this%has_variable_map) then
+       if (this%variable_map%size() .ne. this%n) then
+          call neko_error('mma_init_from_components: variable map size ' // &
+               'does not match number of design variables')
+       end if
+    end if
 
     call this%xold1%init(n)
     call this%xold2%init(n)
@@ -668,31 +691,162 @@ contains
          trim(this%subsolver)
   end function mma_get_backend_and_subsolver
 
-  !> Scale variable bounds with a per-variable weight vector.
-  !! This updates the MMA internal bounds to match transformed variables
-  !! (`x_mma = weights * x_internal`), so `xmin/xmax` are interpreted in the
-  !! same space as the optimization variable passed to MMA.
+  !> Set a diagonal variable map `y = A*x` used internally by MMA.
   !! @param[inout] this The MMA object.
-  !! @param[in] weights Positive per-variable scaling weights.
-  subroutine mma_scale_variable_bounds(this, weights)
+  !! @param[in] map Diagonal entries of `A`, all strictly positive.
+  subroutine mma_set_variable_map(this, map)
     class(mma_t), intent(inout) :: this
-    type(vector_t), intent(in) :: weights
+    type(vector_t), intent(in) :: map
+    integer :: i, n
+    real(kind=rp) :: map_value
 
-    if (.not. this%is_initialized) then
-      call neko_error('mma_scale_variable_bounds: MMA object is not initialized')
+    n = map%size()
+    if (n .le. 0) then
+       call neko_error('mma_set_variable_map: map is empty')
     end if
 
-    if (weights%size() .ne. this%n) then
-      call neko_error('mma_scale_variable_bounds: weight size does not match ' // &
-           'number of design variables')
+    if (this%is_initialized .and. n .ne. this%n) then
+       call neko_error('mma_set_variable_map: map size does not match MMA n')
     end if
 
-    this%xmin%x = this%xmin%x * weights%x
-    this%xmax%x = this%xmax%x * weights%x
+    call this%clear_variable_map()
+    call this%variable_map%init(n)
+    call this%variable_map_inv%init(n)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(this%xmin%x_d, weights%x_d, this%n)
-       call device_col2(this%xmax%x_d, weights%x_d, this%n)
+       call device_copy(this%variable_map%x_d, map%x_d, n)
+       call device_copy(this%variable_map_inv%x_d, map%x_d, n)
+       call device_invcol1(this%variable_map_inv%x_d, n)
+    else
+       do i = 1, n
+          map_value = map%x(i)
+          if (map_value .le. 0.0_rp .or. map_value .ne. map_value) then
+             call neko_error('mma_set_variable_map: map must be positive')
+          end if
+          this%variable_map%x(i) = map_value
+          this%variable_map_inv%x(i) = 1.0_rp / map_value
+       end do
+    end if
+
+    this%has_variable_map = .true.
+  end subroutine mma_set_variable_map
+
+  !> Clear the MMA variable map.
+  !! @param[inout] this The MMA object.
+  subroutine mma_clear_variable_map(this)
+    class(mma_t), intent(inout) :: this
+
+    call this%variable_map%free()
+    call this%variable_map_inv%free()
+    this%has_variable_map = .false.
+  end subroutine mma_clear_variable_map
+
+  !> Transform variables from design space to MMA space (`y = A*x`).
+  !! @param[inout] this The MMA object.
+  !! @param[inout] x Variables to transform in-place.
+  subroutine mma_map_variables_to_mma_space(this, x)
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: x
+    integer :: n
+
+    if (.not. this%has_variable_map) return
+
+    n = x%size()
+    if (this%variable_map%size() .ne. n) then
+       call neko_error('mma_map_variables_to_mma_space: size mismatch')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(x%x_d, this%variable_map%x_d, n)
+    else
+       call col2(x%x, this%variable_map%x, n)
+    end if
+  end subroutine mma_map_variables_to_mma_space
+
+  !> Transform variables from MMA space to design space (`x = A^{-1}*y`).
+  !! @param[inout] this The MMA object.
+  !! @param[inout] x Variables to transform in-place.
+  subroutine mma_map_variables_from_mma_space(this, x)
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: x
+    integer :: n
+
+    if (.not. this%has_variable_map) return
+
+    n = x%size()
+    if (this%variable_map_inv%size() .ne. n) then
+       call neko_error('mma_map_variables_from_mma_space: size mismatch')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(x%x_d, this%variable_map_inv%x_d, n)
+    else
+       call col2(x%x, this%variable_map_inv%x, n)
+    end if
+  end subroutine mma_map_variables_from_mma_space
+
+  !> Transform sensitivities from design to MMA space (`g_y = A^{-T}*g_x`).
+  !! @param[inout] this The MMA object.
+  !! @param[inout] objective_sensitivities Objective sensitivities.
+  !! @param[inout] constraint_sensitivities Constraint sensitivities.
+  subroutine mma_map_sensitivities_to_mma_space(this, objective_sensitivities, &
+       constraint_sensitivities)
+    class(mma_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: objective_sensitivities
+    type(matrix_t), intent(inout) :: constraint_sensitivities
+    integer :: j, m, n
+
+    if (.not. this%has_variable_map) return
+
+    n = objective_sensitivities%size()
+    if (this%variable_map_inv%size() .ne. n) then
+       call neko_error('mma_map_sensitivities_to_mma_space: size mismatch')
+    end if
+
+    if (constraint_sensitivities%get_ncols() .ne. n) then
+       call neko_error('mma_map_sensitivities_to_mma_space: matrix width ' // &
+            'does not match sensitivity size')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       m = constraint_sensitivities%get_nrows()
+       call device_col2(objective_sensitivities%x_d, &
+            this%variable_map_inv%x_d, n)
+       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
+            this%variable_map_inv%x_d, m, n)
+    else
+       m = constraint_sensitivities%get_nrows()
+       call col2(objective_sensitivities%x, this%variable_map_inv%x, n)
+       do j = 1, n
+          call cmult(constraint_sensitivities%x(:, j), &
+               this%variable_map_inv%x(j), m)
+       end do
+    end if
+  end subroutine mma_map_sensitivities_to_mma_space
+
+  !> Scale variable bounds to MMA space using the active map.
+  !! @param[inout] this The MMA object.
+  subroutine mma_scale_variable_bounds(this)
+    class(mma_t), intent(inout) :: this
+
+    if (.not. this%is_initialized) then
+       call neko_error('mma_scale_variable_bounds: MMA object is not ' // &
+            'initialized')
+    end if
+
+    if (.not. this%has_variable_map) return
+
+    if (this%variable_map%size() .ne. this%n) then
+       call neko_error('mma_scale_variable_bounds: map size does not ' // &
+            'match number of design variables')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(this%xmin%x_d, this%variable_map%x_d, this%n)
+       call device_col2(this%xmax%x_d, this%variable_map%x_d, this%n)
+    else
+       call col2(this%xmin%x, this%variable_map%x, this%n)
+       call col2(this%xmax%x, this%variable_map%x, this%n)
     end if
   end subroutine mma_scale_variable_bounds
 
@@ -730,7 +884,14 @@ contains
     call this%lambda%copy_from(direction, sync = .false.)
     call this%mu%copy_from(direction, sync = .false.)
     call this%xsi%copy_from(direction, sync = .false.)
-    call this%eta%copy_from(direction, sync = sync)
+
+    if (this%has_variable_map) then
+       call this%eta%copy_from(direction, sync = .false.)
+       call this%variable_map%copy_from(direction, sync = .false.)
+       call this%variable_map_inv%copy_from(direction, sync = sync)
+    else
+       call this%eta%copy_from(direction, sync = sync)
+    end if
 
   end subroutine mma_copy_from
 

@@ -52,8 +52,8 @@ module volume_constraint
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
-  use math, only: glsc2, copy, cmult
-  use device_math, only: device_glsc2, device_copy, device_cmult
+  use math, only: glsc2, copy, cmult, rone
+  use device_math, only: device_glsc2, device_copy, device_cmult, device_rone
   use vector_math, only: vector_cmult
   use math_ext, only: glsc2_mask
   use field_math, only: field_rone, field_copy, field_cmult, field_cfill
@@ -201,7 +201,7 @@ contains
     ! Initialize the sensitivity value
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, this%c_xh%B_d, design%size())
+       call device_rone(this%sensitivity%x_d, design%size())
        call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, &
             design%size())
 
@@ -209,7 +209,7 @@ contains
           call device_cmult(this%sensitivity%x_d, -1.0_rp, design%size())
        end if
     else
-       call copy(this%sensitivity%x, this%c_Xh%B, design%size())
+       call rone(this%sensitivity%x, design%size())
        call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, &
             design%size())
 
@@ -265,7 +265,6 @@ contains
             .false.)
        call neko_scratch_registry%request(mapped, temp_indices(2), &
             .false.)
-       ! The mapping will handle the mass matrix
        call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
           call field_cmult(unmapped, -1.0_rp)
