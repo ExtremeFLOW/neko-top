@@ -157,7 +157,7 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     type(vector_t) :: mma_map
-    real(kind=rp) :: scale_c
+    real(kind=rp) :: scale_c, scale_gradient
     logical :: has_mma_map
     integer :: ind
     character(len=1024) :: header
@@ -188,7 +188,7 @@ contains
     has_mma_map = .false.
     select type (des => design)
     class is (design_sem_t)
-       call des%get_mma_variable_map(mma_map, scale_c)
+       call des%get_mma_variable_map(mma_map, scale_c, scale_gradient)
        has_mma_map = .true.
     class default
     end select
@@ -202,7 +202,7 @@ contains
          solver_parameters, this%scale, this%auto_scale)
 
     if (has_mma_map) then
-       call this%mma%set_variable_map(mma_map, scale_c)
+       call this%mma%set_variable_map(mma_map, scale_c, scale_gradient)
        call this%mma%scale_variable_bounds()
        call mma_map%free()
     end if

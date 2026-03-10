@@ -118,6 +118,8 @@ module mma
      type(vector_t) :: variable_map
      ! scale c
      real(kind=rp) :: scale_c
+     ! scale gradient
+     real(kind=rp) :: scale_gradient
    contains
      !> Interface for initializing the MMA object
      generic, public :: init => init_from_json, init_from_components
@@ -703,10 +705,10 @@ contains
   !! @param[inout] this The MMA object.
   !! @param[in] map Diagonal entries of `A`, all strictly positive.
   !! @param[in] scale scaling factor `c`.
-  subroutine mma_set_variable_map(this, map, scale_c)
+  subroutine mma_set_variable_map(this, map, scale_c, scale_gradient)
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: map
-    real(kind=rp), intent(in) :: scale_c
+    real(kind=rp), intent(in) :: scale_c, scale_gradient
     integer :: i, n
     real(kind=rp) :: map_value
 
@@ -724,6 +726,7 @@ contains
 
     call vector_copy(this%variable_map, map)
     this%scale_c = scale_c
+    this%scale_gradient = scale_gradient
 
     this%has_variable_map = .true.
   end subroutine mma_set_variable_map
@@ -780,9 +783,12 @@ contains
     n = objective_sensitivities%size()
 
     call variable_map_inv%init(n)
+    ! Here we do chain rule for the MMA reparametrization
     call vector_copy(variable_map_inv, this%variable_map)
     call vector_invcol1(variable_map_inv)
     call vector_cmult(variable_map_inv, 1.0_rp / this%scale_c)
+    ! Here we simply scale the gradients
+    call vector_cmult(variable_map_inv, this%scale_gradient)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        m = constraint_sensitivities%get_nrows()
