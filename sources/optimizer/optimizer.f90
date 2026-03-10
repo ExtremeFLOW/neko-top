@@ -51,6 +51,8 @@ module optimizer
   use vector, only: vector_t
   use json_utils, only: json_get_or_default
   use comm, only: pe_rank
+  use continuation_scheduler, only: nekotop_continuation
+
   implicit none
   private
 
@@ -422,6 +424,9 @@ contains
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
 
+       ! Update the parameters in continuation scheduler
+       call nekotop_continuation%update(this%current_iteration)
+       
        converged = this%step(this%current_iteration, problem, design, &
             simulation)
 
