@@ -52,9 +52,9 @@ module volume_constraint
   use scratch_registry, only: neko_scratch_registry
   use neko_config, only: NEKO_BCKND_DEVICE
   use mask_ops, only: mask_exterior_const
-  use math, only: glsc2, copy, cmult, rone
-  use device_math, only: device_glsc2, device_copy, device_cmult, device_rone
-  use vector_math, only: vector_cmult
+  use math, only: glsc2, copy, cmult
+  use device_math, only: device_glsc2, device_copy, device_cmult
+  use vector_math, only: vector_cmult, vector_rone
   use math_ext, only: glsc2_mask
   use field_math, only: field_rone, field_copy, field_cmult, field_cfill
   use utils, only: neko_error
@@ -98,6 +98,15 @@ module volume_constraint
      !> Computes the source term and adds the result to `fields`.
      procedure, public, pass(this) :: update_sensitivity => &
           volume_constraint_update_sensitivity
+     !> Get number of log entries
+     procedure, public, pass(this) :: get_log_size => &
+          volume_constraint_get_log_size
+     !> Get header labels for log entries
+     procedure, public, pass(this) :: get_log_headers => &
+          volume_constraint_get_log_headers
+     !> Get values for log entries
+     procedure, public, pass(this) :: get_log_values => &
+          volume_constraint_get_log_values
 
      !> Computes the volume of the brinkman_design.
      procedure, private, pass(this) :: compute_volume
@@ -200,8 +209,9 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Initialize the sensitivity value
 
+    call vector_rone(this%sensitivity)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_rone(this%sensitivity%x_d, design%size())
+       ! call device_copy(this%sensitivity%x_d, this%c_xh%B_d, design%size())
        call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, &
             design%size())
 
@@ -209,7 +219,7 @@ contains
           call device_cmult(this%sensitivity%x_d, -1.0_rp, design%size())
        end if
     else
-       call rone(this%sensitivity%x, design%size())
+       ! call copy(this%sensitivity%x, this%c_Xh%B, design%size())
        call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, &
             design%size())
 
@@ -265,6 +275,7 @@ contains
             .false.)
        call neko_scratch_registry%request(mapped, temp_indices(2), &
             .false.)
+       ! The mapping will handle the mass matrix
        call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
           call field_cmult(unmapped, -1.0_rp)
@@ -362,5 +373,52 @@ contains
     call neko_scratch_registry%relinquish(ind_value)
 
   end function volume_brinkman_design
+
+  !> Return number of log entries for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @return n Number of log entries.
+  function volume_constraint_get_log_size(this) result(n)
+    class(volume_constraint_t), intent(in) :: this
+    integer :: n
+
+    n = 2
+  end function volume_constraint_get_log_size
+
+  !> Populate log header labels for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] headers Header labels for each log entry.
+  subroutine volume_constraint_get_log_headers(this, headers)
+    class(volume_constraint_t), intent(in) :: this
+    character(len=*), intent(out) :: headers(:)
+    character(len=64) :: prefix
+
+    if (size(headers) .lt. 1) return
+    prefix = trim(this%name)
+    headers(1) = prefix
+    if (size(headers) .lt. 2) return
+    headers(2) = trim(prefix) // '.volume'
+
+  end subroutine volume_constraint_get_log_headers
+
+  !> Populate log values for volume constraint.
+  !! @param[in] this The constraint object.
+  !! @param[out] values Values corresponding to the log headers.
+  subroutine volume_constraint_get_log_values(this, values)
+    class(volume_constraint_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+    real(kind=rp) :: volume_ratio
+
+    if (size(values) .lt. 1) return
+    if (this%is_max) then
+       volume_ratio = this%limit + this%value
+    else
+       volume_ratio = this%limit - this%value
+    end if
+
+    values(1) = this%value
+    if (size(values) .lt. 2) return
+    values(2) = volume_ratio
+
+  end subroutine volume_constraint_get_log_values
 
 end module volume_constraint
