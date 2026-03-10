@@ -89,7 +89,7 @@ contains
     type(coef_t), intent(inout) :: coef
     real(kind=rp) :: beta, eta
 
-    call json_get_or_default(json, 'beta', beta, 8.0_rp)
+    call json_get(json, 'beta', beta)
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
     call this%init_base(json, coef)
