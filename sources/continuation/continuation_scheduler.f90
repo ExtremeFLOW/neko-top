@@ -46,11 +46,11 @@ module continuation_scheduler
   ! Continuation parameter
   !------------------------------------------------------------------
   type continuation_parameter_t
-     character(len=:), allocatable :: name      ! Parameter name
-     real(rp), pointer :: target => null()      ! Parameter to update
-     real(rp), allocatable :: values(:)         ! Values to step through
-     integer :: iterations_per_value = 0        ! How many iterations per value
-  contains
+     character(len=:), allocatable :: name ! Parameter name
+     real(rp), pointer :: target => null() ! Parameter to update
+     real(rp), allocatable :: values(:) ! Values to step through
+     integer :: iterations_per_value = 0 ! How many iterations per value
+   contains
      procedure :: update => continuation_parameter_update
   end type continuation_parameter_t
 
@@ -60,7 +60,7 @@ module continuation_scheduler
   type continuation_scheduler_t
      type(continuation_parameter_t), allocatable :: params(:)
      integer :: default_iterations = 1
-  contains
+   contains
      procedure :: init
      procedure :: register_parameter
      procedure :: update
@@ -80,7 +80,7 @@ contains
     class(continuation_scheduler_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     integer :: n_default
-    
+
     call json_get_or_default(json, &
          'optimization.solver.continuation_iterations', n_default, 1)
 
