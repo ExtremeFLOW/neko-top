@@ -62,6 +62,7 @@ The following mappings are currently implemented in `Neko-top`.
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
 4. [SIMP mapping](@ref mapping_SIMP)
+5. [Heaviside mapping](@ref mapping_heaviside_mapping)
 
 ## PDE based filter {#mapping_PDE_filter}
 A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.1002/nme.3072)
@@ -144,3 +145,21 @@ following input parameters:
 | `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
 | `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
 | `p` | \f$p\f$ in the above equation. | Real | `1.0`|
+
+## Heaviside mapping {#mapping_heaviside_mapping}
+A smooth Heaviside mapping taking the form,
+\f[
+    X_\text{out} =
+    \frac{\tanh(\beta \eta) + \tanh(\beta (X_\text{in} - \eta))}
+         {\tanh(\beta \eta) + \tanh(\beta (1-\eta))},
+\f]
+where \f$\beta>0\f$ controls the steepness and \f$\eta\in[0,1]\f$ describes
+the threshold.
+
+The mapping can be selected by prescribing `"type": "heaviside_mapping"` and
+has the following input parameters:
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `beta` | Projection sharpness parameter \f$\beta\f$. | Real, `> 0` | `8.0` |
+| `eta` | Projection threshold parameter \f$\eta\f$. | Real in `[0,1]` | `0.5` |
