@@ -80,7 +80,7 @@ program topopt
 
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
-  
+
   ! initialize the global continuation_scheduler object (nekotop_continuation)
   call nekotop_continuation%init(parameters)
 

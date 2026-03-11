@@ -193,7 +193,7 @@ contains
     this%enable_output = enable_output
     this%scaling_factor = this%scale
     this%tolerance = tolerance
-    
+
     n_cont = nekotop_continuation%get_n_params()
     allocate(extra_headers(4 + n_cont))
     ! Initialize the logger

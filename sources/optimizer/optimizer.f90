@@ -426,7 +426,7 @@ contains
 
        ! Update the parameters in continuation scheduler
        call nekotop_continuation%update(this%current_iteration)
-       
+
        converged = this%step(this%current_iteration, problem, design, &
             simulation)
 

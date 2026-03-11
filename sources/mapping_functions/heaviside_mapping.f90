@@ -100,11 +100,11 @@ contains
     if (.not. found) then
        allocate(beta_values(1))
        beta_values = 1.0_rp
-    else if (var_type == 6) then   ! scalar real
+    else if (var_type == 6) then ! scalar real
        call json_get_or_default(json, 'beta', beta_single, 1.0_rp)
        allocate(beta_values(1))
        beta_values(1) = beta_single
-    else if (var_type == 3) then   ! array
+    else if (var_type == 3) then ! array
        call json_get_or_lookup(json, 'beta', beta_values)
     else
        call neko_error("beta must be real or real array")
