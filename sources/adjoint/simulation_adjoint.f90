@@ -1,6 +1,6 @@
 !> @file simulation_adjoint.f90
 !! @copyright
-!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -35,15 +35,11 @@
 !> Adjoint simulation driver
 module simulation_adjoint
   use mpi_f08, only: MPI_WTIME
-  use case, only: case_t
   use num_types, only: rp, dp
   use time_scheme_controller, only: time_scheme_controller_t
   use file, only: file_t
   use logger, only: LOG_SIZE, neko_log
-  use jobctrl, only: jobctrl_time_limit
-  use field, only: field_t
-  use profiler, only: profiler_start, profiler_stop, &
-       profiler_start_region, profiler_end_region
+  use profiler, only: profiler_start_region, profiler_end_region
   use json_utils, only: json_get_or_default
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
@@ -142,6 +138,9 @@ contains
        C%time%t = final_time - t_bkp
     end if
     call C%time%status()
+    if (present(final_time)) then
+       C%time%t = t_bkp
+    end if
     call neko_log%begin()
 
     write(log_buf, '(A,E15.7,1x,A,E15.7)') 'CFL:', cfl, 'dt:', C%time%dt
@@ -180,7 +179,8 @@ contains
     end_time = MPI_WTIME()
     call neko_log%section('Step summary')
     write(log_buf, '(A,I8,A,E15.7)') &
-         'Total time for step ', C%time%tstep, ' (s): ', end_time-tstep_start_time
+         'Total time for step ', C%time%tstep, ' (s): ', &
+         end_time - tstep_start_time
     call neko_log%message(log_buf)
     write(log_buf, '(A,E15.7)') &
          'Total elapsed time (s):           ', end_time-tstep_loop_start_time
