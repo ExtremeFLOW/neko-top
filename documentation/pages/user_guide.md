@@ -11,6 +11,7 @@ writing JSON files, and the PFUnit library, which is used for unit testing.
   - [Cluster Guides](@ref clusters)
 - \subpage configuration
   - [Case file structure](@ref configuration-case-file)
+  - [Design types](@ref design_types)
 - \subpage examples
   - [Running the examples](@ref examples-running)
   - [Creating a new case](@ref examples-new)
