@@ -231,7 +231,7 @@ contains
        call vector_copy(this%gradient_scale, B_inv)
        call vector_copy(this%mma_map, sqrtB)
        call vector_cmult(this%mma_map, 1.0_rp / (sum_B_half / global_count))
-       call vector_cmult(this%mma_map, (sum_B_half / global_count) ** 2)
+       call vector_cmult(this%gradient_scale, (sum_B_half / global_count) ** 2)
        this%match_gradient_norm = .false.
 
     else
