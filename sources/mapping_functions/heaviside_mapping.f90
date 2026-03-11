@@ -119,8 +119,8 @@ contains
        ! Read optional iterations per beta step
        call json_get_or_default(json, 'beta_iterations', beta_iter, &
             nekotop_continuation%default_iterations)
-       call nekotop_continuation%register_parameter(this%beta, beta_values, &
-            beta_iter)
+       call nekotop_continuation%register_parameter("beta", this%beta, &
+            beta_values, beta_iter)
     end if
 
   end subroutine heaviside_mapping_init_from_json

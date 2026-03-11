@@ -58,6 +58,7 @@ module mma_optimizer
   use scratch_registry, only: neko_scratch_registry
   use comm, only: pe_rank, NEKO_COMM
   use mpi_f08, only: MPI_Barrier
+  use continuation_scheduler, only: nekotop_continuation
 
   implicit none
   private
@@ -156,8 +157,8 @@ contains
 
     ! Local variables
     type(vector_t), pointer :: x
-    integer :: ind
-    character(len=32) :: extra_headers(4)
+    integer :: ind, n_cont, i
+    character(len=64), allocatable :: extra_headers(:)
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -192,13 +193,19 @@ contains
     this%enable_output = enable_output
     this%scaling_factor = this%scale
     this%tolerance = tolerance
-
+    
+    n_cont = nekotop_continuation%get_n_params()
+    allocate(extra_headers(4 + n_cont))
     ! Initialize the logger
     if (this%enable_output) then
        extra_headers(1) = 'KKTmax'
        extra_headers(2) = 'KKTnorm2'
        extra_headers(3) = 'scaling factor'
-       extra_headers(4) = this%mma%get_backend_and_subsolver()
+       ! continuation parameters
+       do i = 1, n_cont
+          extra_headers(3 + i) = nekotop_continuation%get_param_name(i)
+       end do
+       extra_headers(4 + n_cont) = this%mma%get_backend_and_subsolver()
        call this%init_log(problem, extra_headers = extra_headers, &
             include_constraints = .not. this%unconstrained_problem, &
             filename = 'optimization_data.csv')
@@ -399,10 +406,16 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter
     class(problem_t), intent(inout) :: problem
-    real(kind=rp) :: extras(3)
+    real(kind=rp), allocatable :: extras(:)
+    integer :: n_cont, i
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
+
+    ! Number of continuation parameters
+    n_cont = nekotop_continuation%get_n_params()
+    ! Allocate extras
+    allocate(extras(3 + n_cont))
 
     if (iter .eq. 0) then
        extras(1) = 0.0_rp
@@ -412,6 +425,11 @@ contains
        extras(2) = this%mma%get_residunorm()
     end if
     extras(3) = this%scaling_factor
+
+    ! Continuation parameter values
+    do i = 1, n_cont
+       extras(3 + i) = nekotop_continuation%params(i)%target
+    end do
 
     call this%write_log(iter, problem, extras)
 
