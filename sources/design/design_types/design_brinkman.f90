@@ -248,7 +248,7 @@ contains
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
-    integer :: output_precision
+    integer :: output_precision, sem_map_option
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
@@ -259,6 +259,7 @@ contains
          verbose_sensitivity, .false.)
     call json_get_or_default(parameters, 'output_precision', &
          output_precision_str, 'sp')
+    call json_get_or_default(parameters, 'sem_map_option', sem_map_option, 2)
 
     select case (trim(output_precision_str))
     case ('sp', 'SP')
@@ -286,6 +287,7 @@ contains
     end select
 
     ! Initialize and inject into the simulation
+    call this%set_sem_map_option(sem_map_option)
     call this%init_from_components(name, simulation, dealias)
 
     ! Initialize the mapper

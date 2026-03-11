@@ -39,7 +39,7 @@ module design_sem
   use vector, only: vector_t
   use num_types, only: rp
   use math, only: copy, glsum, invcol1
-  use device_math, only: device_copy, device_glsum
+  use device_math, only: device_copy, device_glsum, device_invcol1
   use device_math_ext, only: device_sqrt_inplace
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error
@@ -55,11 +55,15 @@ module design_sem
      type(vector_t) :: gradient_scale
      !> Whether to match norms of the gradient
      logical :: match_gradient_norm
+     !> SEM MMA scaling option.
+     integer :: sem_map_option = 2
    contains
      !> Initialize base design data and SEM-derived MMA map.
      procedure, pass(this) :: init_sem_base
      !> Free SEM base resources.
      procedure, pass(this) :: free_sem_base
+     !> Set SEM MMA scaling option.
+     procedure, pass(this) :: set_sem_map_option
      !> Provide MMA variable map.
      procedure, pass(this) :: get_mma_variable_map
      !> Build SEM map from coefficients.
@@ -99,8 +103,21 @@ contains
     call this%free_base()
   end subroutine free_sem_base
 
+  !> Set SEM map/scaling strategy.
+  subroutine set_sem_map_option(this, option)
+    class(design_sem_t), intent(inout) :: this
+    integer, intent(in) :: option
+
+    if (option .lt. 0 .or. option .gt. 6) then
+      call neko_error('design_sem_t: sem_map_option must be in [0, 6]')
+    end if
+
+    this%sem_map_option = option
+  end subroutine set_sem_map_option
+
   !> Return the SEM MMA map.
-  subroutine get_mma_variable_map(this, map, gradient_scale, match_gradient_norm)
+  subroutine get_mma_variable_map(this, map, gradient_scale, &
+       match_gradient_norm)
     class(design_sem_t), intent(in) :: this
     type(vector_t), intent(inout) :: map
     type(vector_t), intent(inout) :: gradient_scale
@@ -123,7 +140,7 @@ contains
     class(design_sem_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     integer :: n, i
-    real(kind=rp) :: sum_B_half, sum_B, global_count
+    real(kind=rp) :: sum_B_half, global_count
     real(kind=rp) :: local_count(1)
     type(vector_t) :: sqrtB, B_inv
     integer :: option
@@ -152,24 +169,23 @@ contains
     else
        call copy(B_inv%x, coef%B, n)
        call invcol1(B_inv%x, n)
+       call copy(sqrtB%x, coef%B, n)
        do i = 1, n
-          sqrtB%x(i) = sqrt(coef%B(i, 1, 1, 1))
+          sqrtB%x(i) = sqrt(sqrtB%x(i))
        end do
     end if
 
     ! Some totals
     if (NEKO_BCKND_DEVICE .eq. 1) then
        sum_B_half = device_glsum(sqrtB%x_d, n)
-       sum_B = device_glsum(coef%B_d, n)
     else
        sum_B_half = glsum(sqrtB%x, n)
-       sum_B = glsum(coef%B, n)
     end if
     local_count(1) = real(n, rp)
     global_count = glsum(local_count, 1)
 
     ! Decision for scaling strategy.
-    option = 2
+    option = this%sem_map_option
 
     if (option .eq. 0) then
        ! do nothing (what we have originally)
@@ -202,14 +218,16 @@ contains
        this%match_gradient_norm = .true.
 
     else if (option .eq. 5) then
-       ! remove mass matrix, map MMA, constant scale of 1 / avg(sqrt(B)) (in MMA only)
+       ! remove mass matrix, map MMA, constant scale of
+       ! 1 / avg(sqrt(B)) (in MMA only)
        call vector_copy(this%gradient_scale, B_inv)
        call vector_copy(this%mma_map, sqrtB)
        call vector_cmult(this%mma_map, 1.0_rp / (sum_B_half / global_count))
        this%match_gradient_norm = .false.
 
     else if (option .eq. 6) then
-       ! remove mass matrix, map MMA, constant scale of 1 / avg(sqrt(B)) (in MMA and squared in gradient)
+       ! remove mass matrix, map MMA, constant scale of
+       ! 1 / avg(sqrt(B)) (in MMA and squared in gradient)
        call vector_copy(this%gradient_scale, B_inv)
        call vector_copy(this%mma_map, sqrtB)
        call vector_cmult(this%mma_map, 1.0_rp / (sum_B_half / global_count))

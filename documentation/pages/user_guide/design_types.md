@@ -38,6 +38,7 @@ Brinkman source-term coupling.
 | `verbose_design` | bool | No | `false` | Write all forward mapping stages |
 | `verbose_sensitivity` | bool | No | `false` | Write all backward sensitivity stages |
 | `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity fld output |
+| `sem_map_option` | integer | No | `2` | SEM MMA map/scaling option (`0` to `6`) |
 | `mapping` | array | No | omitted | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
 | `initial_distribution` | object | No | omitted | Initial design field setup (details below) |
 
