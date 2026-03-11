@@ -46,7 +46,7 @@ module heaviside_mapping
   use heaviside_mapping_cpu, only: &
        heaviside_mapping_apply_cpu, &
        heaviside_mapping_apply_backward_cpu
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
   implicit none
   private
