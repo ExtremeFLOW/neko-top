@@ -73,14 +73,16 @@ module mma
   use json_utils, only: json_get_or_default
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: col2, cmult
+  use math, only: col2, cmult, glsc2
   use comm, only: pe_rank, NEKO_COMM, pe_size, MPI_REAL_PRECISION
   use utils, only: neko_error, filename_suffix
   use neko_config, only: NEKO_BCKND_DEVICE, NEKO_BCKND_CUDA, NEKO_BCKND_HIP, &
        NEKO_BCKND_OPENCL
   use device, only: device_memcpy, HOST_TO_DEVICE, DEVICE_TO_HOST
-  use vector_math, only: vector_copy, vector_invcol1, vector_glsc2, vector_invcol2, vector_col2, vector_cmult
-  use device_math, only: device_copy, device_col2, device_invcol1
+  use vector_math, only: vector_copy, vector_invcol1, vector_invcol2, &
+       vector_col2
+  use device_math, only: device_copy, device_col2, device_invcol1, &
+       device_cmult, device_glsc2, device_invcol2
   use device_math_ext, only: device_scale_matrix_cols
   use, intrinsic :: iso_c_binding, only: c_ptr
   use logger, only: neko_log
@@ -112,14 +114,14 @@ module mma
      type(vector_t) :: y, lambda, s, mu
      type(vector_t) :: xsi, eta
 
-     ! reparameterizing y = cAx
+     ! reparameterizing y = Ax
      logical :: has_variable_map = .false.
      ! map A
      type(vector_t) :: variable_map
-     ! scale c
-     real(kind=rp) :: scale_c
-     ! scale gradient
-     real(kind=rp) :: scale_gradient
+     ! scaling of MMA-space gradients
+     type(vector_t) :: gradient_scale
+     ! whether to match gradient norms
+     logical :: match_gradient_norm
    contains
      !> Interface for initializing the MMA object
      generic, public :: init => init_from_json, init_from_components
@@ -701,16 +703,17 @@ contains
          trim(this%subsolver)
   end function mma_get_backend_and_subsolver
 
-  !> Set a diagonal variable map `y = cA*x` used internally by MMA.
+  !> Set a diagonal variable map `y = A*x` used internally by MMA.
   !! @param[inout] this The MMA object.
   !! @param[in] map Diagonal entries of `A`, all strictly positive.
-  !! @param[in] scale scaling factor `c`.
-  subroutine mma_set_variable_map(this, map, scale_c, scale_gradient)
+  !! @param[in] gradient_scale Gradient scaling in MMA space.
+  subroutine mma_set_variable_map(this, map, gradient_scale, &
+       match_gradient_norm)
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(in) :: map
-    real(kind=rp), intent(in) :: scale_c, scale_gradient
-    integer :: i, n
-    real(kind=rp) :: map_value
+    type(vector_t), intent(in) :: gradient_scale
+    logical, intent(in) :: match_gradient_norm
+    integer :: n
 
     n = map%size()
     if (n .le. 0) then
@@ -720,13 +723,18 @@ contains
     if (n .ne. this%n) then
        call neko_error('map size does not match MMA n')
     end if
+    if (gradient_scale%size() .ne. n) then
+       call neko_error('gradient scaling size does not match MMA n')
+    end if
 
     call this%clear_variable_map()
     call this%variable_map%init(n)
+    call this%gradient_scale%init(n)
 
     call vector_copy(this%variable_map, map)
-    this%scale_c = scale_c
-    this%scale_gradient = scale_gradient
+    call vector_copy(this%gradient_scale, gradient_scale)
+
+    this%match_gradient_norm = match_gradient_norm
 
     this%has_variable_map = .true.
   end subroutine mma_set_variable_map
@@ -737,10 +745,11 @@ contains
     class(mma_t), intent(inout) :: this
 
     call this%variable_map%free()
+    call this%gradient_scale%free()
     this%has_variable_map = .false.
   end subroutine mma_clear_variable_map
 
-  !> Transform variables from design space to MMA space (`y = cA*x`).
+  !> Transform variables from design space to MMA space (`y = A*x`).
   !! @param[inout] this The MMA object.
   !! @param[inout] x Variables to transform in-place.
   subroutine mma_map_variables_to_mma_space(this, x)
@@ -749,11 +758,10 @@ contains
 
     if (.not. this%has_variable_map) return
     call vector_col2(x, this%variable_map)
-    call vector_cmult(x, this%scale_c)
 
   end subroutine mma_map_variables_to_mma_space
 
-  !> Transform variables from MMA space to design space (`x = 1/ c A^{-1}*y`).
+  !> Transform variables from MMA space to design space (`x = A^{-1}*y`).
   !! @param[inout] this The MMA object.
   !! @param[inout] x Variables to transform in-place.
   subroutine mma_map_variables_from_mma_space(this, x)
@@ -762,7 +770,6 @@ contains
 
     if (.not. this%has_variable_map) return
     call vector_invcol2(x, this%variable_map)
-    call vector_cmult(x, 1.0_rp / this%scale_c)
 
   end subroutine mma_map_variables_from_mma_space
 
@@ -775,36 +782,99 @@ contains
     class(mma_t), intent(inout) :: this
     type(vector_t), intent(inout) :: objective_sensitivities
     type(matrix_t), intent(inout) :: constraint_sensitivities
+    type(vector_t) :: column_scale
     type(vector_t) :: variable_map_inv
     integer :: j, m, n
+    real(kind=rp) :: unscaled_norm, scaled_norm, norm_scale
 
     if (.not. this%has_variable_map) return
 
     n = objective_sensitivities%size()
-
-    call variable_map_inv%init(n)
-    ! Here we do chain rule for the MMA reparametrization
-    call vector_copy(variable_map_inv, this%variable_map)
-    call vector_invcol1(variable_map_inv)
-    call vector_cmult(variable_map_inv, 1.0_rp / this%scale_c)
-    ! Here we simply scale the gradients
-    call vector_cmult(variable_map_inv, this%scale_gradient)
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       m = constraint_sensitivities%get_nrows()
-       call device_col2(objective_sensitivities%x_d, &
-            variable_map_inv%x_d, n)
-       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
-            variable_map_inv%x_d, m, n)
-    else
-       m = constraint_sensitivities%get_nrows()
-       call col2(objective_sensitivities%x, variable_map_inv%x, n)
-       do j = 1, n
-          call cmult(constraint_sensitivities%x(:, j), &
-               variable_map_inv%x(j), m)
-       end do
+    m = constraint_sensitivities%get_nrows()
+    if (constraint_sensitivities%get_ncols() .ne. n) then
+       call neko_error('constraint sensitivity width does not match MMA n')
+    end if
+    if (this%variable_map%size() .ne. n) then
+       call neko_error('variable map size does not match MMA n')
+    end if
+    if (this%gradient_scale%size() .ne. n) then
+       call neko_error('gradient scaling size does not match MMA n')
     end if
 
+    norm_scale = 1.0_rp
+    call variable_map_inv%init(n)
+    call vector_copy(variable_map_inv, this%variable_map)
+    call vector_invcol1(variable_map_inv)
+    call column_scale%init(n)
+    call vector_copy(column_scale, this%gradient_scale)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       if (this%match_gradient_norm) then
+          unscaled_norm = sqrt(device_glsc2(objective_sensitivities%x_d, &
+               objective_sensitivities%x_d, n))
+
+          ! Scale objective gradient by user-provided gradient scaling.
+          call device_col2(objective_sensitivities%x_d, &
+               this%gradient_scale%x_d, n)
+
+          scaled_norm = sqrt(device_glsc2(objective_sensitivities%x_d, &
+               objective_sensitivities%x_d, n))
+          if (scaled_norm .le. tiny(1.0_rp)) then
+             call neko_error('cannot match gradient norm: scaled norm is zero')
+          end if
+          norm_scale = unscaled_norm / scaled_norm
+          call device_cmult(objective_sensitivities%x_d, norm_scale, n)
+       else
+          ! Scale objective gradient by user-provided gradient scaling.
+          call device_col2(objective_sensitivities%x_d, &
+               this%gradient_scale%x_d, n)
+       end if
+
+       ! Chain rule: g_y = A^{-T} g_x for diagonal A.
+       call device_invcol2(objective_sensitivities%x_d, &
+            this%variable_map%x_d, n)
+
+       ! Per-column scaling for constraint sensitivities:
+       ! scale_j = gradient_scale_j * norm_scale / map_j
+       call device_cmult(column_scale%x_d, norm_scale, n)
+       call device_col2(column_scale%x_d, variable_map_inv%x_d, n)
+       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
+            column_scale%x_d, m, n)
+    else
+       if (this%match_gradient_norm) then
+          unscaled_norm = sqrt(glsc2(objective_sensitivities%x, &
+               objective_sensitivities%x, n))
+
+          ! Scale objective gradient by user-provided gradient scaling.
+          call col2(objective_sensitivities%x, this%gradient_scale%x, n)
+
+          scaled_norm = sqrt(glsc2(objective_sensitivities%x, &
+               objective_sensitivities%x, n))
+          if (scaled_norm .le. tiny(1.0_rp)) then
+             call neko_error('cannot match gradient norm: scaled norm is zero')
+          end if
+          norm_scale = unscaled_norm / scaled_norm
+          call cmult(objective_sensitivities%x, norm_scale, n)
+       else
+          ! Scale objective gradient by user-provided gradient scaling.
+          call col2(objective_sensitivities%x, this%gradient_scale%x, n)
+       end if
+
+       ! Chain rule: g_y = A^{-T} g_x for diagonal A.
+       call vector_invcol2(objective_sensitivities, this%variable_map)
+
+       ! Per-column scaling for constraint sensitivities:
+       ! scale_j = gradient_scale_j * norm_scale / map_j
+       call cmult(column_scale%x, norm_scale, n)
+       call col2(column_scale%x, variable_map_inv%x, n)
+       do j = 1, n
+          call cmult(constraint_sensitivities%x(:, j), &
+               column_scale%x(j), m)
+       end do
+
+    end if
+
+    call column_scale%free()
     call variable_map_inv%free()
 
   end subroutine mma_map_sensitivities_to_mma_space
@@ -827,9 +897,7 @@ contains
     end if
 
     call vector_col2(this%xmin, this%variable_map)
-    call vector_cmult(this%xmin, this%scale_c)
     call vector_col2(this%xmax, this%variable_map)
-    call vector_cmult(this%xmax, this%scale_c)
    
   end subroutine mma_scale_variable_bounds
 
@@ -871,6 +939,7 @@ contains
     if (this%has_variable_map) then
        call this%eta%copy_from(direction, sync = .false.)
        call this%variable_map%copy_from(direction, sync = .false.)
+       call this%gradient_scale%copy_from(direction, sync = sync)
     else
        call this%eta%copy_from(direction, sync = sync)
     end if

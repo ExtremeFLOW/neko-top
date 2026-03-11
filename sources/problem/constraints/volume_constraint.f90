@@ -54,7 +54,7 @@ module volume_constraint
   use mask_ops, only: mask_exterior_const
   use math, only: glsc2, copy, cmult
   use device_math, only: device_glsc2, device_copy, device_cmult
-  use vector_math, only: vector_cmult, vector_rone
+  use vector_math, only: vector_cmult
   use math_ext, only: glsc2_mask
   use field_math, only: field_rone, field_copy, field_cmult, field_cfill
   use utils, only: neko_error
@@ -209,9 +209,8 @@ contains
     ! ------------------------------------------------------------------------ !
     ! Initialize the sensitivity value
 
-    call vector_rone(this%sensitivity)
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       ! call device_copy(this%sensitivity%x_d, this%c_xh%B_d, design%size())
+       call device_copy(this%sensitivity%x_d, this%c_xh%B_d, design%size())
        call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, &
             design%size())
 
@@ -219,7 +218,7 @@ contains
           call device_cmult(this%sensitivity%x_d, -1.0_rp, design%size())
        end if
     else
-       ! call copy(this%sensitivity%x, this%c_Xh%B, design%size())
+       call copy(this%sensitivity%x, this%c_Xh%B, design%size())
        call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, &
             design%size())
 

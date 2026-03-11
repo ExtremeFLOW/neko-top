@@ -386,8 +386,8 @@ contains
             this%optimization_domain, 0.0_rp)
     end if
 
-    n = this%design_indicator%dof%size()
-    call this%init_base(name, n)
+    call this%init_sem_base(name, this%design_indicator%dof%size(), &
+         simulation%fluid%c_Xh)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &

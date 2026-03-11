@@ -154,9 +154,8 @@ contains
 
     ! Local variables
     type(vector_t), pointer :: x
-    type(vector_t) :: mma_map
-    real(kind=rp) :: scale_c, scale_gradient
-    logical :: has_mma_map
+    type(vector_t) :: mma_map, gradient_scale
+    logical :: has_mma_map, match_gradient_norm
     integer :: ind
     character(len=32) :: extra_headers(4)
     class(constraint_t), allocatable :: dummy_con
@@ -186,7 +185,7 @@ contains
     has_mma_map = .false.
     select type (des => design)
     class is (design_sem_t)
-       call des%get_mma_variable_map(mma_map, scale_c, scale_gradient)
+       call des%get_mma_variable_map(mma_map, gradient_scale, match_gradient_norm)
        has_mma_map = .true.
     class default
     end select
@@ -200,9 +199,10 @@ contains
          solver_parameters, this%scale, this%auto_scale)
 
     if (has_mma_map) then
-       call this%mma%set_variable_map(mma_map, scale_c, scale_gradient)
+       call this%mma%set_variable_map(mma_map, gradient_scale, match_gradient_norm)
        call this%mma%scale_variable_bounds()
        call mma_map%free()
+       call gradient_scale%free()
     end if
 
     call neko_scratch_registry%relinquish(ind)
