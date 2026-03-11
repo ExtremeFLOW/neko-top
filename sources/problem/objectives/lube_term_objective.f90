@@ -123,6 +123,9 @@ module lube_term_objective
      type(interpolator_t), pointer :: GLL_to_GL
      !> GL scratch registry
      type(scratch_registry_t), pointer :: scratch_GL
+     !> Physical dimension
+     integer :: gdim
+
 
    contains
 
@@ -217,6 +220,7 @@ contains
     ! GLL
     this%c_Xh_GLL => simulation%neko_case%fluid%c_Xh
     this%Xh_GLL => simulation%neko_case%fluid%c_Xh%Xh
+    this%gdim = this%c_Xh_GLL%msh%gdim
 
     ! GL
     this%c_Xh_GL => simulation%adjoint_case%fluid_adj%c_Xh_GL
@@ -244,7 +248,7 @@ contains
            this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
            this%dealias_forcing, this%volume, &
-           this%scratch_GL)
+           this%scratch_GL, this%gdim)
 
     end associate
 
@@ -287,7 +291,9 @@ contains
 
     call field_col3(work, this%u, this%u)
     call field_addcol3(work, this%v, this%v)
-    call field_addcol3(work, this%w, this%w)
+    if (this%gdim .eq. 3) then
+       call field_addcol3(work, this%w, this%w)
+    end if
     call field_col2(work, this%brinkman_amplitude)
 
     if (this%has_mask) then
@@ -341,8 +347,10 @@ contains
        call field_col3(accumulate, fld_GL, fld_GL)
        call this%GLL_to_GL%map(fld_GL%x, this%v%x, nel, this%Xh_GL)
        call field_addcol3(accumulate, fld_GL, fld_GL)
-       call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
-       call field_addcol3(accumulate, fld_GL, fld_GL)
+       if (this%gdim .eq. 3) then
+          call this%GLL_to_GL%map(fld_GL%x, this%w%x, nel, this%Xh_GL)
+          call field_addcol3(accumulate, fld_GL, fld_GL)
+       end if
        ! scale
        call field_cmult(accumulate, this%weight * 0.5_rp / this%volume)
 
@@ -362,7 +370,9 @@ contains
     else
        call field_col3(work, this%u, this%u)
        call field_addcol3(work, this%v, this%v)
-       call field_addcol3(work, this%w, this%w)
+       if (this%gdim .eq. 3) then
+          call field_addcol3(work, this%w, this%w)
+       end if
        ! scale
        call field_cmult(work, this%weight * 0.5_rp / this%volume)
     end if
