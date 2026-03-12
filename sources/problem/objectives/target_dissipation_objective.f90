@@ -303,7 +303,7 @@ contains
   end subroutine target_dissipation_finalize_value
 
   !> update_value the sensitivity of the objective function with respect to
-  !! \f\f$\chi\f\f$
+  !! \f$\chi\f$
   !! @param this the objective.
   !! @param design the design.
   subroutine target_dissipation_update_sensitivity(this, design)
@@ -323,7 +323,7 @@ contains
   !> Header labels for log entries
   subroutine target_dissipation_get_log_headers(this, headers)
     class(target_dissipation_objective_t), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
+    character(len=*), intent(inout) :: headers(:)
     character(len=64) :: prefix
 
     if (size(headers) .lt. 1) return

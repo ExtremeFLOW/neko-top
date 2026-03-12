@@ -66,7 +66,7 @@ module adjoint_target_dissipation_source_term
   private
 
   !> An adjoint source term for objectives of minimum dissipation
-  ! $\int \nabla v \cdot \nabla u $
+  ! \f$\int \nabla v \cdot \nabla u \f$
   type, public, extends(source_term_t) :: &
        adjoint_target_dissipation_source_term_t
      !> u of the primal
