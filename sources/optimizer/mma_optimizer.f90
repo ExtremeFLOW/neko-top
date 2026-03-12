@@ -269,11 +269,11 @@ contains
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
     if (present(simulation) .and. this%enable_output) then
-       call simulation%write_forward(iter)
+       call simulation%write_forward(0)
     end if
     call problem%compute_sensitivity(design, simulation)
     if (present(simulation) .and. this%enable_output) then
-       call simulation%write_adjoint(iter)
+       call simulation%write_adjoint(0)
     end if
 
     ! Retrieve the updated objective and constraint values and sensitivities
