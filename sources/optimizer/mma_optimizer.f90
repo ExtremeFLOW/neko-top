@@ -41,7 +41,7 @@ module mma_optimizer
   use json_utils, only: json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use design, only: design_t
-  use brinkman_design, only: brinkman_design_t
+  use design_sem, only: design_sem_t
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
 
@@ -52,12 +52,10 @@ module mma_optimizer
   use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use vector_math, only: vector_cmult
+  use vector_math, only: vector_cmult, vector_col2
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
-  use comm, only: pe_rank, NEKO_COMM
-  use mpi_f08, only: MPI_Barrier
 
   implicit none
   private
@@ -156,6 +154,8 @@ contains
 
     ! Local variables
     type(vector_t), pointer :: x
+    type(vector_t) :: mma_map, gradient_scale
+    logical :: has_mma_map, match_gradient_norm
     integer :: ind
     character(len=32) :: extra_headers(4)
     class(constraint_t), allocatable :: dummy_con
@@ -182,9 +182,28 @@ contains
     ! problems in mma_optimizer_run()
     call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
+    has_mma_map = .false.
+    select type (des => design)
+    class is (design_sem_t)
+       call des%get_mma_variable_map(mma_map, gradient_scale, match_gradient_norm)
+       has_mma_map = .true.
+    class default
+    end select
+
     call design%get_values(x)
+    if (has_mma_map) then
+       call vector_col2(x, mma_map)
+    end if
+
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
+
+    if (has_mma_map) then
+       call this%mma%set_variable_map(mma_map, gradient_scale, match_gradient_norm)
+       call this%mma%scale_variable_bounds()
+       call mma_map%free()
+       call gradient_scale%free()
+    end if
 
     call neko_scratch_registry%relinquish(ind)
 
@@ -253,16 +272,19 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
+    call this%mma%map_variables_to_mma_space(x)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
-    type is (brinkman_design_t)
+    class is (design_sem_t)
        call des%get_sensitivity(objective_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%mma%map_sensitivities_to_mma_space(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -302,16 +324,19 @@ contains
 
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
+    call this%mma%map_variables_to_mma_space(x)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
-    type is (brinkman_design_t)
+    class is (design_sem_t)
        call des%get_sensitivity(objective_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%mma%map_sensitivities_to_mma_space(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -327,7 +352,9 @@ contains
     ! Update the design variable
     call this%mma%update(iter, x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
+    call this%mma%map_variables_from_mma_space(x)
     call design%update_design(x)
+    call this%mma%map_variables_to_mma_space(x)
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
@@ -343,13 +370,15 @@ contains
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
-    type is (brinkman_design_t)
+    class is (design_sem_t)
        call des%get_sensitivity(objective_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
+    call this%mma%map_sensitivities_to_mma_space(objective_sensitivities, &
+         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &

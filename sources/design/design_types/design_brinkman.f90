@@ -46,7 +46,7 @@ module brinkman_design
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, HOST_TO_DEVICE
-  use design, only: design_t
+  use design_sem, only: design_sem_t
   use simulation_m, only: simulation_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
@@ -63,7 +63,7 @@ module brinkman_design
   private
 
   !> A topology optimization design variable
-  type, extends(design_t), public :: brinkman_design_t
+  type, extends(design_sem_t), public :: brinkman_design_t
      private
 
      ! TODO
@@ -248,7 +248,7 @@ contains
     character(len=:), allocatable :: domain_name, domain_type, name
     character(len=:), allocatable :: output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
-    integer :: output_precision
+    integer :: output_precision, sem_map_option
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
@@ -259,6 +259,7 @@ contains
          verbose_sensitivity, .false.)
     call json_get_or_default(parameters, 'output_precision', &
          output_precision_str, 'sp')
+    call json_get_or_default(parameters, 'sem_map_option', sem_map_option, 2)
 
     select case (trim(output_precision_str))
     case ('sp', 'SP')
@@ -286,6 +287,7 @@ contains
     end select
 
     ! Initialize and inject into the simulation
+    call this%set_sem_map_option(sem_map_option)
     call this%init_from_components(name, simulation, dealias)
 
     ! Initialize the mapper
@@ -318,7 +320,7 @@ contains
   subroutine brinkman_design_free(this)
     class(brinkman_design_t), intent(inout) :: this
 
-    call this%free_base()
+    call this%free_sem_base()
     nullify(this%brinkman_amplitude)
     nullify(this%design_indicator)
     nullify(this%sensitivity)
@@ -331,7 +333,6 @@ contains
     character(len=*), intent(in) :: name
     type(simulation_t), intent(inout) :: simulation
     logical, intent(in) :: dealias
-    integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
@@ -387,8 +388,8 @@ contains
             this%optimization_domain, 0.0_rp)
     end if
 
-    n = this%design_indicator%dof%size()
-    call this%init_base(name, n)
+    call this%init_sem_base(name, this%design_indicator%dof%size(), &
+         simulation%fluid%c_Xh)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
