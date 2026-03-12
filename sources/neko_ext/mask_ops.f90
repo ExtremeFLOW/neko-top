@@ -97,9 +97,7 @@ contains
        call device_copy_mask(work%x_d, vec%x_d, work%size(), zone%mask%get_d(), &
             zone%size)
     else
-       do i = 1, zone%size
-          work%x(zone%mask%get(i), 1, 1, 1) = vec%x(zone%mask%get(i))
-       end do
+       call copy_mask(work%x, vec%x, work%size(), zone%mask%get(), zone%size)
     end if
 
     ! copy over
