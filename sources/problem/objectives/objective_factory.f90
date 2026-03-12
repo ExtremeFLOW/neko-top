@@ -1,6 +1,6 @@
 !> @file objective_factory.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -39,16 +39,18 @@ submodule (objective) objective_factory_mod
 
   ! Import the objective function types
   use minimum_dissipation_objective, only: minimum_dissipation_objective_t
+  use target_dissipation_objective, only: target_dissipation_objective_t
   use lube_term_objective, only: lube_term_objective_t
   use scalar_mixing_objective, only: scalar_mixing_objective_t
 
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
+  character(len=25), parameter :: KNOWN_TYPES(4) = [ character(len=25) :: &
        "minimum_dissipation", &
        "scalar_mixing", &
-       "lube_term"]
+       "lube_term", &
+       "target_dissipation"]
 
 contains
 
@@ -56,6 +58,11 @@ contains
   ! Factory function
 
   !> Factory function
+  !! Allocates and initializes an objective function object
+  !! @param object The objective function object to be created
+  !! @param type The type of the objective function
+  !! @param design The design object
+  !! @param simulation The simulation object
   module subroutine objective_factory(object, json, design, simulation)
     class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
@@ -72,6 +79,8 @@ contains
     select case (trim(type))
     case ("minimum_dissipation")
        allocate(minimum_dissipation_objective_t::object)
+    case ("target_dissipation")
+       allocate(target_dissipation_objective_t::object)
     case ("scalar_mixing")
        allocate(scalar_mixing_objective_t::object)
     case ("lube_term")

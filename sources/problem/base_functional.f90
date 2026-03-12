@@ -104,6 +104,8 @@ module base_functional
      procedure, pass(this) :: get_log_headers => functional_get_log_headers
      !> Get values for this functional's log entries
      procedure, pass(this) :: get_log_values => functional_get_log_values
+     !> Finalize the value after time integration
+     procedure, pass(this) :: finalize_value => functional_finalize_value
      !> Set the value to zero
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
@@ -226,6 +228,12 @@ contains
 
     this%value = 0.0_rp
   end subroutine functional_reset_value
+
+  !> Finalize value of the function
+  subroutine functional_finalize_value(this)
+    class(base_functional_t), intent(inout) :: this
+
+  end subroutine functional_finalize_value
 
   !> Zero sensitivity of the function
   subroutine functional_reset_sensitivity(this)
