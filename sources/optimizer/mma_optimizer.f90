@@ -42,7 +42,6 @@ module mma_optimizer
   use simulation_m, only: simulation_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
-  use neko_config, only: NEKO_BCKND_DEVICE
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
 
@@ -50,17 +49,15 @@ module mma_optimizer
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, copy, glsum
+  use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use csv_file, only: csv_file_t
-  use vector_math, only: vector_cmult, vector_col2, vector_invcol2
+  use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: DEVICE_TO_HOST
-  use device_math, only: device_copy, device_cfill, device_cmult, device_col2, &
-       device_invcol1, device_glsum
-  use device_math_ext, only: device_sqrt_inplace, device_scale_matrix_cols
+  use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
+  use comm, only: pe_rank, NEKO_COMM
+  use mpi_f08, only: MPI_Barrier
 
   implicit none
   private
@@ -88,11 +85,6 @@ module mma_optimizer
 
      !> A file writer to document the convergence history
      logical, private :: enable_output = .true.
-     type(csv_file_t), private :: csv_log
-     !> MMA variable transform weights (z = w * x).
-     type(vector_t), private :: mma_weights
-     !> Inverse squared weights (1 / w^2), used for sensitivity transform.
-     type(vector_t), private :: mma_inv_weight_sq
    contains
 
      ! Override the deferred methods
@@ -111,12 +103,6 @@ module mma_optimizer
           mma_optimizer_save_checkpoint_components
      procedure, pass(this) :: load_checkpoint_components => &
           mma_optimizer_load_checkpoint_components
-     procedure, pass(this), private :: init_variable_weights => &
-          mma_optimizer_init_variable_weights
-     procedure, pass(this), private :: transform_variables => &
-          mma_optimizer_transform_variables
-     procedure, pass(this), private :: transform_sensitivities => &
-          mma_optimizer_transform_sensitivities
 
   end type mma_optimizer_t
 
@@ -171,7 +157,7 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=1024) :: header
+    character(len=32) :: extra_headers(4)
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -196,13 +182,9 @@ contains
     ! problems in mma_optimizer_run()
     call neko_scratch_registry%request(x, ind, design%size(), .false.)
 
-    call this%init_variable_weights(design, simulation)
-
     call design%get_values(x)
-    call this%transform_variables(x, .true.)
     call this%mma%init(x, design%size(), problem%get_n_constraints(), &
          solver_parameters, this%scale, this%auto_scale)
-    call this%mma%scale_variable_bounds(this%mma_weights)
 
     call neko_scratch_registry%relinquish(ind)
 
@@ -213,12 +195,13 @@ contains
 
     ! Initialize the logger
     if (this%enable_output) then
-       call this%csv_log%init('optimization_data.csv')
-       header = 'iter, ' // trim(problem%get_log_header()) // &
-            ', KKTmax, KKTnorm2, scaling factor, ' // &
-            trim(this%mma%get_backend_and_subsolver())
-
-       call this%csv_log%set_header(trim(header))
+       extra_headers(1) = 'KKTmax'
+       extra_headers(2) = 'KKTnorm2'
+       extra_headers(3) = 'scaling factor'
+       extra_headers(4) = this%mma%get_backend_and_subsolver()
+       call this%init_log(problem, extra_headers = extra_headers, &
+            include_constraints = .not. this%unconstrained_problem, &
+            filename = 'optimization_data.csv')
     end if
 
     call this%init_base('MMA', max_iterations)
@@ -234,8 +217,6 @@ contains
     ! Free MMA-specific data
     call this%free_base()
     call this%mma%free()
-    call this%mma_weights%free()
-    call this%mma_inv_weight_sq%free()
   end subroutine mma_optimizer_free
 
   ! -------------------------------------------------------------------------- !
@@ -272,7 +253,6 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
-    call this%transform_variables(x, .true.)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -283,8 +263,6 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-    call this%transform_sensitivities(objective_sensitivities, &
-         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -324,7 +302,6 @@ contains
 
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
-    call this%transform_variables(x, .true.)
     call problem%get_constraint_values(constraint_value)
 
     select type (des => design)
@@ -335,8 +312,6 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-    call this%transform_sensitivities(objective_sensitivities, &
-         constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -352,9 +327,7 @@ contains
     ! Update the design variable
     call this%mma%update(iter, x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
-    call this%transform_variables(x, .false.)
     call design%update_design(x)
-    call this%transform_variables(x, .true.)
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
@@ -377,8 +350,6 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-    call this%transform_sensitivities(objective_sensitivities, &
-         constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -389,138 +360,6 @@ contains
     call neko_scratch_registry%relinquish(indices)
 
   end function mma_optimizer_step
-
-  !> Initialize MMA variable transform weights and inverse-squared weights.
-  !! Uses identity weights by default and, when available, sets
-  !! `weights = sqrt(B) / avg(sqrt(B))` from the simulation mass-matrix
-  !! coefficients.
-  !! @param[inout] this The MMA optimizer.
-  !! @param[in] design The design object used to determine vector size.
-  !! @param[in] simulation Optional simulation with coefficient data.
-  subroutine mma_optimizer_init_variable_weights(this, design, simulation)
-    class(mma_optimizer_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    type(simulation_t), optional, intent(in) :: simulation
-    integer :: n, i, n_coef
-    real(kind=rp) :: global_sum, weight_avg, global_count
-    real(kind=rp) :: local_count(1)
-
-    n = design%size()
-    call this%mma_weights%init(n)
-    call this%mma_inv_weight_sq%init(n)
-    this%mma_weights = 1.0_rp
-    this%mma_inv_weight_sq = 1.0_rp
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%mma_weights%x_d, 1.0_rp, n)
-       call device_cfill(this%mma_inv_weight_sq%x_d, 1.0_rp, n)
-    end if
-
-    if (present(simulation)) then
-      n_coef = simulation%fluid%c_Xh%dof%size()
-      if (n_coef .eq. n) then
-         if (NEKO_BCKND_DEVICE .eq. 1) then
-            call device_copy(this%mma_weights%x_d, simulation%fluid%c_Xh%B_d, n)
-            call device_sqrt_inplace(this%mma_weights%x_d, n)
-            global_sum = device_glsum(this%mma_weights%x_d, n)
-         else
-            call copy(this%mma_weights%x, simulation%fluid%c_Xh%B, n)
-            do i = 1, n
-               if (this%mma_weights%x(i) .le. 0.0_rp) then
-                  call neko_error('mma_optimizer: non-positive mass-matrix entry ' // &
-                       'encountered when building variable weights')
-               end if
-               this%mma_weights%x(i) = sqrt(this%mma_weights%x(i))
-            end do
-            global_sum = glsum(this%mma_weights%x, n)
-         end if
-
-         local_count(1) = real(n, rp)
-         global_count = glsum(local_count, 1)
-
-         if (global_count .le. 0.0_rp) then
-            call neko_error('mma_optimizer: invalid global design size when ' // &
-                 'normalizing variable weights')
-         end if
-
-         weight_avg = global_sum / global_count
-         if (weight_avg .ne. weight_avg .or. weight_avg .le. 0.0_rp) then
-            call neko_error('mma_optimizer: non-positive average weight ' // &
-                 'encountered when normalizing variable weights')
-         end if
-
-         if (NEKO_BCKND_DEVICE .eq. 1) then
-            call device_cmult(this%mma_weights%x_d, 1.0_rp / weight_avg, n)
-            call device_copy(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_col2(this%mma_inv_weight_sq%x_d, this%mma_weights%x_d, n)
-            call device_invcol1(this%mma_inv_weight_sq%x_d, n)
-
-            call this%mma_weights%copy_from(DEVICE_TO_HOST, .false.)
-            call this%mma_inv_weight_sq%copy_from(DEVICE_TO_HOST, .true.)
-         else
-            this%mma_weights%x = this%mma_weights%x / weight_avg
-            this%mma_inv_weight_sq%x = 1.0_rp / &
-                 (this%mma_weights%x * this%mma_weights%x * this%mma_weights%x)
-         end if
-      else
-         call neko_log%message('mma_optimizer: design size and coefficient ' // &
-              'size differ; using identity variable weights.')
-      end if
-    else
-      call neko_log%message('mma_optimizer: simulation not present; using ' // &
-           'identity variable weights.')
-    end if
-  end subroutine mma_optimizer_init_variable_weights
-
-  !> Transform design variables between internal and MMA spaces.
-  !! Applies `x = w*x` when `multiply=.true.` and `x = x/w` otherwise.
-  !! @param[inout] this The MMA optimizer.
-  !! @param[inout] x The variable vector to transform.
-  !! @param[in] multiply Whether to multiply (`.true.`) or divide (`.false.`).
-  subroutine mma_optimizer_transform_variables(this, x, multiply)
-    class(mma_optimizer_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: x
-    logical, intent(in) :: multiply
-
-    if (multiply) then
-       call vector_col2(x, this%mma_weights)
-    else
-       call vector_invcol2(x, this%mma_weights)
-    end if
-  end subroutine mma_optimizer_transform_variables
-
-  !> Transform objective and constraint sensitivities for MMA-space variables.
-  !! Applies elementwise weighting with `1/w^2` (equivalent to `B^-1` for
-  !! `w=sqrt(B)`).
-  !! @param[inout] this The MMA optimizer.
-  !! @param[inout] objective_sensitivities Objective sensitivity vector.
-  !! @param[inout] constraint_sensitivities Constraint sensitivity matrix.
-  subroutine mma_optimizer_transform_sensitivities(this, objective_sensitivities, &
-       constraint_sensitivities)
-    class(mma_optimizer_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: objective_sensitivities
-    type(matrix_t), intent(inout) :: constraint_sensitivities
-    integer :: j, m, n
-
-    call vector_col2(objective_sensitivities, this%mma_inv_weight_sq)
-
-    n = constraint_sensitivities%get_ncols()
-    if (n .ne. this%mma_inv_weight_sq%size()) then
-       call neko_error('mma_optimizer: constraint sensitivity width does not ' // &
-            'match weight vector size')
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       m = constraint_sensitivities%get_nrows()
-       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
-            this%mma_inv_weight_sq%x_d, m, n)
-    else
-       do j = 1, n
-          constraint_sensitivities%x(:, j) = constraint_sensitivities%x(:, j) * &
-               this%mma_inv_weight_sq%x(j)
-       end do
-    end if
-  end subroutine mma_optimizer_transform_sensitivities
 
   !> Validate the solution for the MMA optimizer
   subroutine mma_optimizer_validate(this, problem, design)
@@ -559,70 +398,22 @@ contains
   subroutine mma_optimizer_write(this, iter, problem)
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter
-    class(problem_t), intent(in) :: problem
-
-    type(vector_t), pointer :: log_data
-    type(vector_t), pointer :: all_objectives
-    type(vector_t), pointer :: constraint_value
-    real(kind=rp) :: objective_value
-
-    integer :: log_size, ind(3), n, m, i_tmp1, i_tmp2
+    class(problem_t), intent(inout) :: problem
+    real(kind=rp) :: extras(3)
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
 
-    n = problem%get_n_objectives()
-    m = problem%get_n_constraints()
-    if (this%unconstrained_problem) then
-       log_size = 5 + n
-    else
-       log_size = 5 + n + m
-    endif
-
-    call neko_scratch_registry%request(log_data, ind(1), log_size, .false.)
-    call neko_scratch_registry%request(all_objectives, ind(2), n, .false.)
-    call neko_scratch_registry%request(constraint_value, ind(3), m, .false.)
-
-    ! Prepare data for logging
-    call problem%get_objective_value(objective_value)
-    call problem%get_all_objective_values(all_objectives)
-    call problem%get_constraint_values(constraint_value)
-
-    call all_objectives%copy_from(DEVICE_TO_HOST, sync = .true.)
-    call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
-
-    ! Assemble the log data
-    log_data%x(1) = real(iter, kind=rp)
-
-    ! total objective
-    log_data%x(2) = objective_value
-
-    ! individual objectives
-    i_tmp1 = 3
-    i_tmp2 = i_tmp1 + n - 1
-    log_data%x(i_tmp1 : i_tmp2) = all_objectives%x
-
-    ! constraints
-    if (.not. this%unconstrained_problem) then
-       i_tmp1 = i_tmp2 + 1
-       i_tmp2 = i_tmp1 + m - 1
-       log_data%x(i_tmp1 : i_tmp2) = constraint_value%x
-    end if
-
-    ! convergence stuff
     if (iter .eq. 0) then
-       log_data%x(i_tmp2 + 1) = 0.0_rp
-       log_data%x(i_tmp2 + 2) = 0.0_rp
+       extras(1) = 0.0_rp
+       extras(2) = 0.0_rp
     else
-       log_data%x(i_tmp2 + 1) = this%mma%get_residumax()
-       log_data%x(i_tmp2 + 2) = this%mma%get_residunorm()
+       extras(1) = this%mma%get_residumax()
+       extras(2) = this%mma%get_residunorm()
     end if
-    log_data%x(i_tmp2 + 3) = this%scaling_factor
+    extras(3) = this%scaling_factor
 
-    call this%csv_log%write(log_data)
-
-    ! Free local resources
-    call neko_scratch_registry%relinquish(ind)
+    call this%write_log(iter, problem, extras)
 
     call profiler_end_region('Optimizer logging')
   end subroutine mma_optimizer_write

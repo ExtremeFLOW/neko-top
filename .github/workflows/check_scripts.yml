@@ -92,7 +92,7 @@ jobs:
       - name: Report example errors
         if: failure()
         run: |
-          if [ ! -d logs/ ]; then return; fi
+          if [ ! -d logs/ ]; then exit 0; fi
           echo "Errors encountered during script execution."
           echo "Please check the logs for details."
           logs=($(find logs/ -name "error.log"))
@@ -111,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: setup-script-logs
-          path: logs/**/*.log
+          path: tests/
           overwrite: true
           if-no-files-found: ignore
 
