@@ -118,6 +118,14 @@ def collect_histories(
     return histories
 
 
+def make_case_label(case_name: str) -> str:
+    """Format raw case directory names for plot legends."""
+    label = case_name
+    label = label.replace("sem_map_option_", "option ")
+    label = label.replace("sem_option_", "option ")
+    return label
+
+
 def make_plot(
     histories: Dict[str, Tuple[List[float], List[float], List[float]]],
     output_path: Path,
@@ -128,16 +136,17 @@ def make_plot(
     fig, (ax_left, ax_right) = plt.subplots(1, 2, figsize=(14, 5))
 
     for label, (iters, objective, volume) in histories.items():
-        ax_left.plot(iters, objective, label=label)
-        ax_right.plot(iters, volume, label=label)
+        display_label = make_case_label(label)
+        ax_left.plot(iters, objective, label=display_label)
+        ax_right.plot(iters, volume, label=display_label)
 
     ax_left.set_title("Total objective function")
     ax_left.set_xlabel("Iteration")
-    ax_left.set_ylabel("Objective")
+    ax_left.set_ylabel("Objective function")
     ax_left.grid(True, alpha=0.3)
     ax_left.legend(fontsize=8)
 
-    ax_right.set_title("Volume constraint.volume")
+    ax_right.set_title("Volume")
     ax_right.axhline(
         volume_limit,
         color="black",

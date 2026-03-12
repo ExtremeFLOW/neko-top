@@ -187,6 +187,8 @@ contains
     ! Decision for scaling strategy.
     option = this%sem_map_option
 
+    ! in the document A = mma_map, B = gradient_scale
+
     if (option .eq. 0) then
        ! do nothing (what we have originally)
        call vector_rone(this%gradient_scale)

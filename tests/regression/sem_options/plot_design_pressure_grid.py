@@ -149,7 +149,10 @@ def read_pressure_xy_slice(
 
 def make_case_label(case_dir: Path) -> str:
     """Create a short row label from the folder name."""
-    return case_dir.name
+    label = case_dir.name
+    label = label.replace("sem_map_option_", "option ")
+    label = label.replace("sem_option_", "option ")
+    return label
 
 
 def parse_args() -> argparse.Namespace:
@@ -176,7 +179,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--iterations",
         type=str,
-        default="1,2,10,30,50",
+        default="1,2,3,5,10,20",
         help="Comma-separated iteration numbers.",
     )
     parser.add_argument(
@@ -257,7 +260,6 @@ def main() -> None:
     n_cols = len(iterations)
     fig = None
     axes = None
-    global_k: Optional[int] = None
 
     if rank == 0:
         fig_w = max(3.0 * n_cols, 8.0)
@@ -325,9 +327,6 @@ def main() -> None:
             if rank != 0:
                 continue
 
-            if row_k is not None:
-                global_k = row_k
-
             ax = axes[row_idx, col_idx]
             ax.set_xticks([])
             ax.set_yticks([])
@@ -393,13 +392,7 @@ def main() -> None:
         ax=list(axes.ravel()),
         fraction=0.02,
         pad=0.02,
-        label="pressure",
     )
-
-    k_text = "auto"
-    if global_k is not None:
-        k_text = str(global_k)
-    fig.suptitle(f"Pressure xy slices (k={k_text})", fontsize=12)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out, dpi=args.dpi)
