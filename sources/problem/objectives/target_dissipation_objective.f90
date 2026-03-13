@@ -109,6 +109,12 @@ module target_dissipation_objective
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
           target_dissipation_update_value
+     !> Time accumulation override to include component diagnostics.
+     procedure, public, pass(this) :: accumulate_value => &
+          target_dissipation_accumulate_value
+     !> Reset override to clear component diagnostics.
+     procedure, public, pass(this) :: reset_value => &
+          target_dissipation_reset_value
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
           target_dissipation_update_sensitivity
@@ -320,6 +326,43 @@ contains
 
   end subroutine target_dissipation_update_value
 
+  !> Accumulate objective and component contributions in time.
+  !! @param[inout] this The objective.
+  !! @param[in] design The design.
+  !! @param[in] dt Time-step size.
+  subroutine target_dissipation_accumulate_value(this, design, dt)
+    class(target_dissipation_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+    real(kind=rp) :: viscous_old, brinkman_old
+
+    this%value_old = this%value
+    viscous_old = this%current_viscous_dissipation
+    brinkman_old = this%current_brinkman_dissipation
+
+    call this%update_value(design)
+
+    this%value = this%value_old + this%value * dt
+    this%current_viscous_dissipation = viscous_old + &
+         this%current_viscous_dissipation * dt
+    this%current_brinkman_dissipation = brinkman_old + &
+         this%current_brinkman_dissipation * dt
+  end subroutine target_dissipation_accumulate_value
+
+  !> Reset value and component diagnostics before accumulation.
+  !! @param[inout] this The objective.
+  subroutine target_dissipation_reset_value(this)
+    class(target_dissipation_objective_t), intent(inout) :: this
+
+    this%value = 0.0_rp
+    this%value_old = 0.0_rp
+    this%current_dissipation = 0.0_rp
+    this%current_viscous_dissipation = 0.0_rp
+    this%current_brinkman_dissipation = 0.0_rp
+  end subroutine target_dissipation_reset_value
+
+  !> Finalize the objective after time integration.
+  !! @param[inout] this The objective.
   subroutine target_dissipation_finalize_value(this)
     class(target_dissipation_objective_t), intent(inout) :: this
 
