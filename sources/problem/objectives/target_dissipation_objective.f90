@@ -35,7 +35,7 @@
 module target_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_copy
+  use field_math, only: field_col3, field_addcol3, field_copy, field_cmult
   use operators, only: grad
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use registry, only: neko_registry
@@ -387,7 +387,37 @@ contains
   subroutine target_dissipation_update_sensitivity(this, design)
     class(target_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
+    type(field_t), pointer :: work
+    integer :: temp_indices(1)
+    real(kind=rp) :: scale, denom
 
+    denom = this%initial_dissipation * this%target_fraction
+    if (abs(denom) .le. tiny(1.0_rp)) then
+       call neko_error('zero denominator in sensitivity')
+    end if
+
+    scale = this%weight * 0.5_rp / this%volume * &
+         (this%current_dissipation / denom - 1.0_rp) / denom
+
+    call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
+
+    call field_col3(work, this%u, this%u)
+    call field_addcol3(work, this%v, this%v)
+    call field_addcol3(work, this%w, this%w)
+
+    if (this%has_mask) then
+       call mask_exterior_const(work, this%mask, 0.0_rp)
+    end if
+
+    call field_cmult(work, scale)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, work%x_d, this%sensitivity%size())
+    else
+       call copy(this%sensitivity%x, work%x, this%sensitivity%size())
+    end if
+
+    call neko_scratch_registry%relinquish_field(temp_indices)
   end subroutine target_dissipation_update_sensitivity
 
   !> Number of log entries
