@@ -149,7 +149,7 @@ Define
 \f[
 \mathcal{D}_\text{visc}
 = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} 
-\frac{1}{2} |\nabla \mathbf{u}|^2 d\Omega,
+\frac{1}{2}\frac{\mu}{\rho} |\nabla \mathbf{u}|^2 d\Omega,
 \f]
 \f[
 \mathcal{D}_\text{brinkman}
@@ -159,7 +159,8 @@ Define
 \f[
 \mathcal{D} = \mathcal{D}_\text{visc} + \mathcal{D}_\text{brinkman},
 \f]
-where \f$\chi\f$ is the Brinkman amplitude.
+where \f$\chi\f$ is the Brinkman amplitude and \f$\mu/\rho\f$ is the
+kinematic-viscosity prefactor (for non-dimensional flow this is \f$1/Re\f$).
 The objective takes the form
 
 \f[
@@ -192,7 +193,7 @@ For a target dissipation objective named `<name>`, the optimizer log includes:
 | `<name>.current` | Current total dissipation \f$\mathcal{D}\f$ |
 | `<name>.initial` | Initial total dissipation \f$\mathcal{D}|_{i=0}\f$ |
 | `<name>.ratio` | \f$\mathcal{D} / \mathcal{D}|_{i=0}\f$ |
-| `<name>.viscous` | Current viscous contribution \f$\mathcal{D}_\text{visc}\f$ |
+| `<name>.viscous` | Current weighted viscous contribution \f$\mathcal{D}_\text{visc}\f$ |
 | `<name>.brinkman` | Current Brinkman contribution \f$\mathcal{D}_\text{brinkman}\f$ |
 
 \note By considering the mechanical energy equation (inner product of momentum

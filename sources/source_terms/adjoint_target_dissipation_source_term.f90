@@ -36,9 +36,10 @@
 !
 !
 ! If the objective function is
-! $\int (|\nabla u|^2 + \chi |\mathbf{u}|^2)$,
+! $\int ((\mu/\rho)|\nabla u|^2 + \chi |\mathbf{u}|^2)$,
 ! the corresponding adjoint forcing is
-! $ \int \nabla v \cdot \nabla u + \chi \mathbf{u} \cdot \mathbf{v} $ in weak form.
+! $ \int (\mu/\rho)\nabla v \cdot \nabla u + \chi \mathbf{u} \cdot \mathbf{v} $
+! in weak form.
 module adjoint_target_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
@@ -70,7 +71,7 @@ module adjoint_target_dissipation_source_term
   private
 
   !> Adjoint source term for total dissipation
-  ! \f$\int (|\nabla u|^2 + \chi |\mathbf{u}|^2)\f$
+  ! \f$\int ((\mu/\rho)|\nabla u|^2 + \chi |\mathbf{u}|^2)\f$
   type, public, extends(source_term_t) :: &
        adjoint_target_dissipation_source_term_t
      !> u of the primal
@@ -83,6 +84,8 @@ module adjoint_target_dissipation_source_term
      type(field_t), pointer :: chi => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
+     !> Viscous prefactor mu/rho for consistent weighting.
+     real(kind=rp) :: viscous_scale = 1.0_rp
      !> A mask for where the source term is evaluated
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
@@ -140,6 +143,7 @@ contains
   !! @param u, v, w the flow fields of the primal
   !! @param chi Brinkman amplitude field.
   !! @param obj_scale a scaling factor
+  !! @param viscous_scale viscous prefactor mu/rho.
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
@@ -148,7 +152,8 @@ contains
   !! @param current_dissipation the current dissipation.
   !! @param initial_dissipation the initial dissipation.
   subroutine adjoint_target_dissipation_source_term_init_from_components(this,&
-       f_x, f_y, f_z, u, v, w, chi, obj_scale, mask, if_mask, coef, volume, &
+       f_x, f_y, f_z, u, v, w, chi, obj_scale, viscous_scale, mask, if_mask, &
+       coef, volume, &
        target_fraction, current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
@@ -157,6 +162,7 @@ contains
     real(kind=rp) :: start_time
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
+    real(kind=rp), intent(in) :: viscous_scale
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
     class(point_zone_t), intent(in), target :: mask
@@ -192,6 +198,7 @@ contains
     this%initial_dissipation => initial_dissipation
 
     this%obj_scale = obj_scale
+    this%viscous_scale = viscous_scale
     this%volume = volume
 
     this%if_mask = if_mask
@@ -281,7 +288,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fu, result, this%obj_scale * scale_forcing)
+      call field_add2s2(fu, result, this%obj_scale * scale_forcing * &
+           this%viscous_scale)
 
       ! ------------------------------------------------------------------------
       ! v
@@ -301,7 +309,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fv, result, this%obj_scale * scale_forcing)
+      call field_add2s2(fv, result, this%obj_scale * scale_forcing * &
+           this%viscous_scale)
 
       ! ------------------------------------------------------------------------
       ! w
@@ -321,7 +330,8 @@ contains
       end if
 
       ! add to RHS
-      call field_add2s2(fw, result, this%obj_scale * scale_forcing)
+      call field_add2s2(fw, result, this%obj_scale * scale_forcing * &
+           this%viscous_scale)
 
       ! ------------------------------------------------------------------------
       ! chi * u contribution from Brinkman dissipation

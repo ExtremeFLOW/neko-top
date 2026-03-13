@@ -60,7 +60,7 @@ module target_dissipation_objective
   private
 
   !> An objective based on total dissipation density
-  !! \f$ |\nabla \mathbf{u}|^2 + \chi |\mathbf{u}|^2 \f$.
+  !! \f$ (\mu/\rho)|\nabla \mathbf{u}|^2 + \chi |\mathbf{u}|^2 \f$.
   type, public, extends(objective_t) :: target_dissipation_objective_t
      private
 
@@ -90,6 +90,8 @@ module target_dissipation_objective
      real(kind=rp) :: current_viscous_dissipation = 0.0_rp
      !> Current Brinkman contribution.
      real(kind=rp) :: current_brinkman_dissipation = 0.0_rp
+     !> Viscous prefactor mu/rho for consistent weighting.
+     real(kind=rp) :: viscous_scale = 1.0_rp
      !> logical for first time
      logical :: is_first_time = .true.
      !> Target fraction of initial dissipation.
@@ -182,6 +184,8 @@ contains
     this%adjoint_u => neko_registry%get_field('u_adj')
     this%adjoint_v => neko_registry%get_field('v_adj')
     this%adjoint_w => neko_registry%get_field('w_adj')
+    this%viscous_scale = simulation%adjoint_fluid%mu%x(1,1,1,1) / &
+         simulation%adjoint_fluid%rho%x(1,1,1,1)
     this%target_fraction = target_fraction
 
     ! compute the volume of the objective domain
@@ -197,6 +201,7 @@ contains
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%brinkman_amplitude, this%weight, &
+         this%viscous_scale, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume, this%target_fraction, &
          this%current_dissipation, this%initial_dissipation)
@@ -245,7 +250,7 @@ contains
          .false.)
     call neko_scratch_registry%request_field(work, temp_indices(5), .false.)
 
-    ! Compute viscous dissipation contribution |\nabla u|^2.
+    ! Compute viscous dissipation contribution (\mu/\rho)|\nabla u|^2.
     call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
@@ -305,7 +310,8 @@ contains
        end if
     end if
 
-    this%current_viscous_dissipation = 0.5_rp * viscous_integral / this%volume
+    this%current_viscous_dissipation = 0.5_rp * this%viscous_scale * &
+         viscous_integral / this%volume
     this%current_brinkman_dissipation = 0.5_rp * brinkman_integral / this%volume
     this%value = this%current_viscous_dissipation + &
          this%current_brinkman_dissipation
@@ -352,7 +358,7 @@ contains
   !> Header labels for log entries
   subroutine target_dissipation_get_log_headers(this, headers)
     class(target_dissipation_objective_t), intent(in) :: this
-    character(len=*), intent(inout) :: headers(:)
+    character(len=*), intent(out) :: headers(:)
     character(len=64) :: prefix
 
     if (size(headers) .lt. 1) return
