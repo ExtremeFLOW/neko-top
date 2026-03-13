@@ -35,8 +35,7 @@
 module target_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
-  use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
-       field_copy
+  use field_math, only: field_col3, field_addcol3, field_copy
   use operators, only: grad
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use registry, only: neko_registry
@@ -51,7 +50,6 @@ module target_dissipation_objective
   use math, only: glsc2, copy
   use device_math, only: device_copy, device_glsc2
   use design, only: design_t
-  use brinkman_design, only: brinkman_design_t
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const, compute_masked_volume
   use math_ext, only: glsc2_mask
@@ -61,7 +59,8 @@ module target_dissipation_objective
   implicit none
   private
 
-  !> An objective function corresponding to target dissipation
+  !> An objective based on total dissipation density
+  !! \f$ |\nabla \mathbf{u}|^2 + \chi |\mathbf{u}|^2 \f$.
   type, public, extends(objective_t) :: target_dissipation_objective_t
      private
 
@@ -73,6 +72,8 @@ module target_dissipation_objective
      type(field_t), pointer :: w => null()
      !> Pointer to the coefficient field.
      type(coef_t), pointer :: c_Xh => null()
+     !> Pointer to Brinkman amplitude (chi).
+     type(field_t), pointer :: brinkman_amplitude => null()
      !> Pointer to adjoint u field.
      type(field_t), pointer :: adjoint_u => null()
      !> Pointer to adjoint v field.
@@ -85,6 +86,10 @@ module target_dissipation_objective
      real(kind=rp) :: initial_dissipation = 0.0_rp
      !> Current dissipation.
      real(kind=rp) :: current_dissipation = 0.0_rp
+     !> Current viscous contribution.
+     real(kind=rp) :: current_viscous_dissipation = 0.0_rp
+     !> Current Brinkman contribution.
+     real(kind=rp) :: current_brinkman_dissipation = 0.0_rp
      !> logical for first time
      logical :: is_first_time = .true.
      !> Target fraction of initial dissipation.
@@ -172,6 +177,7 @@ contains
     this%u => neko_registry%get_field('u')
     this%v => neko_registry%get_field('v')
     this%w => neko_registry%get_field('w')
+    this%brinkman_amplitude => neko_registry%get_field('brinkman_amplitude')
     this%c_Xh => simulation%fluid%c_Xh
     this%adjoint_u => neko_registry%get_field('u_adj')
     this%adjoint_v => neko_registry%get_field('v_adj')
@@ -190,7 +196,7 @@ contains
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight, &
+         this%u, this%v, this%w, this%brinkman_amplitude, this%weight, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume, this%target_fraction, &
          this%current_dissipation, this%initial_dissipation)
@@ -211,6 +217,7 @@ contains
     if (associated(this%u)) nullify(this%u)
     if (associated(this%v)) nullify(this%v)
     if (associated(this%w)) nullify(this%w)
+    if (associated(this%brinkman_amplitude)) nullify(this%brinkman_amplitude)
     if (associated(this%c_Xh)) nullify(this%c_Xh)
 
     if (associated(this%adjoint_u)) nullify(this%adjoint_u)
@@ -229,6 +236,7 @@ contains
     type(field_t), pointer :: objective_field
     integer :: temp_indices(5)
     integer n
+    real(kind=rp) :: viscous_integral, brinkman_integral
 
     call neko_scratch_registry%request_field(wo1, temp_indices(1), .false.)
     call neko_scratch_registry%request_field(wo2, temp_indices(2), .false.)
@@ -237,8 +245,7 @@ contains
          .false.)
     call neko_scratch_registry%request_field(work, temp_indices(5), .false.)
 
-    ! Compute the current dissipation
-    ! update_value the objective function.
+    ! Compute viscous dissipation contribution |\nabla u|^2.
     call grad(wo1%x, wo2%x, wo3%x, this%u%x, this%c_Xh)
     call field_col3(objective_field, wo1, wo1)
     call field_addcol3(objective_field, wo2, wo2)
@@ -254,7 +261,7 @@ contains
     call field_addcol3(objective_field, wo2, wo2)
     call field_addcol3(objective_field, wo3, wo3)
 
-    ! integrate the field
+    ! Integrate viscous contribution.
     n = wo1%size()
     if (this%has_mask) then
        if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -262,24 +269,46 @@ contains
           ! device_glsc2_mask
           call field_copy(work, objective_field)
           call mask_exterior_const(work, this%mask, 0.0_rp)
-          this%value = device_glsc2(work%x_d, this%c_xh%B_d, n)
+          viscous_integral = device_glsc2(work%x_d, this%c_xh%B_d, n)
        else
-          this%value = glsc2_mask(objective_field%x, this%c_Xh%b, &
+          viscous_integral = glsc2_mask(objective_field%x, this%c_Xh%b, &
                n, this%mask%mask%get(), this%mask%size)
        end if
     else
        if (neko_bcknd_device .eq. 1) then
-          this%value = device_glsc2(objective_field%x_d, &
+          viscous_integral = device_glsc2(objective_field%x_d, &
                this%c_Xh%b_d, n)
        else
-          this%value = glsc2(objective_field%x, this%c_Xh%b, n)
+          viscous_integral = glsc2(objective_field%x, this%c_Xh%b, n)
        end if
     end if
 
-    ! this is really sneaky, the value we store here is just the dissipation,
-    ! but the value we return is scaled by the initial.
-    ! see target_dissipation_finalize_value
-    this%value = this%value * 0.5_rp / this%volume
+    ! Integrate Brinkman contribution \chi * |u|^2.
+    call field_col3(work, this%u, this%u)
+    call field_addcol3(work, this%v, this%v)
+    call field_addcol3(work, this%w, this%w)
+    call field_col3(work, work, this%brinkman_amplitude)
+
+    if (this%has_mask) then
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call mask_exterior_const(work, this%mask, 0.0_rp)
+          brinkman_integral = device_glsc2(work%x_d, this%c_xh%B_d, n)
+       else
+          brinkman_integral = glsc2_mask(work%x, this%c_Xh%b, &
+               n, this%mask%mask%get(), this%mask%size)
+       end if
+    else
+       if (neko_bcknd_device .eq. 1) then
+          brinkman_integral = device_glsc2(work%x_d, this%c_Xh%b_d, n)
+       else
+          brinkman_integral = glsc2(work%x, this%c_Xh%b, n)
+       end if
+    end if
+
+    this%current_viscous_dissipation = 0.5_rp * viscous_integral / this%volume
+    this%current_brinkman_dissipation = 0.5_rp * brinkman_integral / this%volume
+    this%value = this%current_viscous_dissipation + &
+         this%current_brinkman_dissipation
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
@@ -303,7 +332,7 @@ contains
   end subroutine target_dissipation_finalize_value
 
   !> update_value the sensitivity of the objective function with respect to
-  !! \f\f$\chi\f\f$
+  !! \f$\chi\f$
   !! @param this the objective.
   !! @param design the design.
   subroutine target_dissipation_update_sensitivity(this, design)
@@ -317,13 +346,13 @@ contains
     class(target_dissipation_objective_t), intent(in) :: this
     integer :: n
 
-    n = 5
+    n = 7
   end function target_dissipation_get_log_size
 
   !> Header labels for log entries
   subroutine target_dissipation_get_log_headers(this, headers)
     class(target_dissipation_objective_t), intent(in) :: this
-    character(len=*), intent(out) :: headers(:)
+    character(len=*), intent(inout) :: headers(:)
     character(len=64) :: prefix
 
     if (size(headers) .lt. 1) return
@@ -337,6 +366,10 @@ contains
     headers(4) = trim(prefix) // '.initial'
     if (size(headers) .lt. 5) return
     headers(5) = trim(prefix) // '.ratio'
+    if (size(headers) .lt. 6) return
+    headers(6) = trim(prefix) // '.viscous'
+    if (size(headers) .lt. 7) return
+    headers(7) = trim(prefix) // '.brinkman'
 
   end subroutine target_dissipation_get_log_headers
 
@@ -355,6 +388,10 @@ contains
     values(4) = this%initial_dissipation
     if (size(values) .lt. 5) return
     values(5) = this%current_dissipation / this%initial_dissipation
+    if (size(values) .lt. 6) return
+    values(6) = this%current_viscous_dissipation
+    if (size(values) .lt. 7) return
+    values(7) = this%current_brinkman_dissipation
 
   end subroutine target_dissipation_get_log_values
 

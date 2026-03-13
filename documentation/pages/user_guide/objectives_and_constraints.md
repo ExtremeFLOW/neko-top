@@ -36,6 +36,7 @@ The following objectives
 1. [Minimum dissipation](@ref objective_dissipation)
 2. [Velocity penalty](@ref objective_velocity_penalty)
 3. [Scalar mixing](@ref objective_scalar_mixing)
+4. [Target dissipation](@ref target_dissipation)
 
 and constraints
 
@@ -142,15 +143,24 @@ and has the following input parameters:
 
 ### Target dissipation {#target_dissipation}
 
-This objective is set a target dissipation expressed as a percentage of the
-dissipation of the first iteration.
-If one defines the dissipation as
+This objective sets a target for total dissipation expressed as a percentage of
+the dissipation at the first optimization iteration.
+Define
 \f[
-\mathcal{D} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} 
+\mathcal{D}_\text{visc}
+= \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} 
 \frac{1}{2} |\nabla \mathbf{u}|^2 d\Omega,
 \f]
-
-then this objective takes the form of
+\f[
+\mathcal{D}_\text{brinkman}
+= \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} 
+\frac{1}{2} \chi |\mathbf{u}|^2 d\Omega,
+\f]
+\f[
+\mathcal{D} = \mathcal{D}_\text{visc} + \mathcal{D}_\text{brinkman},
+\f]
+where \f$\chi\f$ is the Brinkman amplitude.
+The objective takes the form
 
 \f[
 \mathcal{F} = \frac{1}{2}\left(\frac{\mathcal{D}}{\gamma \mathcal{D}|_{i=0}} -1\right)^2
@@ -158,6 +168,7 @@ then this objective takes the form of
 
 where \f$\mathcal{D}|_{i=0}\f$ is the dissipation at the first optimization
 iteration and \f$\gamma\f$ is the target multiple of this dissipation.
+\note This objective requires the `brinkman_amplitude` field to be present.
 
 The objective can be selected by prescribing `"type": "target_dissipation"` 
 and has the following input parameters:
@@ -170,19 +181,29 @@ and has the following input parameters:
 | `target` | \f$\gamma\f$ in the above equation. | Real | - |
 | `name`| The name that will appear in `objective_data.csv` | String | `Target Dissipation`|
 
-\note By considering the mechanical energy equation, that is, taking an
-inner product between the momentum equation and \f$\mathbf{u}\f$, one obtains
+\paragraph Logged values
+
+For a target dissipation objective named `<name>`, the optimizer log includes:
+
+| Column | Meaning |
+|------|--------------|
+| `<name>` | Objective value \f$\mathcal{F}\f$ |
+| `<name>.weight` | Objective weight |
+| `<name>.current` | Current total dissipation \f$\mathcal{D}\f$ |
+| `<name>.initial` | Initial total dissipation \f$\mathcal{D}|_{i=0}\f$ |
+| `<name>.ratio` | \f$\mathcal{D} / \mathcal{D}|_{i=0}\f$ |
+| `<name>.viscous` | Current viscous contribution \f$\mathcal{D}_\text{visc}\f$ |
+| `<name>.brinkman` | Current Brinkman contribution \f$\mathcal{D}_\text{brinkman}\f$ |
+
+\note By considering the mechanical energy equation (inner product of momentum
+with \f$\mathbf{u}\f$) one obtains
 \f[
-\rho \frac{D}{Dt}\left(\frac{1}{2} u_i u_i\right)= - u_i \frac{\partial p}{\partial x_i} + u_i \frac{\partial \tau_{ij}}{\partial x_j},
+\Delta p \, Q = \int_{\Omega_\text{obj}} \left( 2\mu D:D + \chi |\mathbf{u}|^2 \right) d\Omega
 \f]
-By integrating over a control volume and assuming assuming 
-\f$\mathbf{u}|_{in} \approx \mathbf{u}|_{out}\f$ and that 
-\f$\frac{\partial}{\partial t}\left(\frac{1}{2} u_i u_i\right) = 0\f$
- in certain circumstances, one can argue this constraint
-is approximately equivalent to a preasure drop constraint, ie,
-\f[
-\mathcal{F} = \frac{1}{2}\left(\frac{\Delta p}{\gamma \Delta p|_{i=0}} -1\right)^2.
-\f]
+for steady incompressible flow over a control volume.
+Therefore, if \f$Q\f$ is fixed, constraining \f$\mathcal{D}\f$ is equivalent
+to constraining pressure drop. If \f$Q\f$ is not fixed, \f$\mathcal{D}\f$
+corresponds to pressure-drop power (\f$\Delta p\,Q\f$), not pressure drop alone.
 
 
 ## Constraints {#constraints}

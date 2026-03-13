@@ -1,41 +1,44 @@
-! Copyright (c) 2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_target_dissipation_source_term.f90
+!! @copyright
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `adjoint_target_dissipation_source_term_t` type.
 !
 !
-! If the objective function $\int |\nabla u|^2$,
-! the corresponding adjoint forcing is $ \int \nabla v \cdot \nabla u $ in weak
-! form.
+! If the objective function is
+! $\int (|\nabla u|^2 + \chi |\mathbf{u}|^2)$,
+! the corresponding adjoint forcing is
+! $ \int \nabla v \cdot \nabla u + \chi \mathbf{u} \cdot \mathbf{v} $ in weak form.
 module adjoint_target_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
@@ -46,7 +49,8 @@ module adjoint_target_dissipation_source_term
   use neko_config, only: NEKO_BCKND_DEVICE
   use utils, only: neko_error
   use field, only: field_t
-  use field_math, only: field_subcol3, field_add2, field_add2s2, field_rzero
+  use field_math, only: field_subcol3, field_add2, field_add2s2, field_rzero, &
+       field_col3
   use json_module, only: json_file
   use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
@@ -65,8 +69,8 @@ module adjoint_target_dissipation_source_term
   implicit none
   private
 
-  !> An adjoint source term for objectives of minimum dissipation
-  ! $\int \nabla v \cdot \nabla u $
+  !> Adjoint source term for total dissipation
+  ! \f$\int (|\nabla u|^2 + \chi |\mathbf{u}|^2)\f$
   type, public, extends(source_term_t) :: &
        adjoint_target_dissipation_source_term_t
      !> u of the primal
@@ -75,6 +79,8 @@ module adjoint_target_dissipation_source_term
      type(field_t), pointer :: v => null()
      !> w of the primal
      type(field_t), pointer :: w => null()
+     !> \f$\chi\f$ Brinkman amplitude
+     type(field_t), pointer :: chi => null()
      !> a scale for the source term
      real(kind=rp) :: obj_scale
      !> A mask for where the source term is evaluated
@@ -132,6 +138,7 @@ contains
   !! @param this The source term.
   !! @param f_x, f_y, f_z the RHS of the adjoint equations
   !! @param u, v, w the flow fields of the primal
+  !! @param chi Brinkman amplitude field.
   !! @param obj_scale a scaling factor
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
@@ -141,7 +148,7 @@ contains
   !! @param current_dissipation the current dissipation.
   !! @param initial_dissipation the initial dissipation.
   subroutine adjoint_target_dissipation_source_term_init_from_components(this,&
-       f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, volume, &
+       f_x, f_y, f_z, u, v, w, chi, obj_scale, mask, if_mask, coef, volume, &
        target_fraction, current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
@@ -151,6 +158,7 @@ contains
     real(kind=rp) :: end_time
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
+    type(field_t), intent(in), target :: chi
     class(point_zone_t), intent(in), target :: mask
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: target_fraction
@@ -178,6 +186,7 @@ contains
     this%u => u
     this%v => v
     this%w => w
+    this%chi => chi
     this%target_fraction = target_fraction
     this%current_dissipation => current_dissipation
     this%initial_dissipation => initial_dissipation
@@ -203,6 +212,7 @@ contains
     nullify(this%u)
     nullify(this%v)
     nullify(this%w)
+    nullify(this%chi)
     nullify(this%mask)
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
@@ -311,6 +321,26 @@ contains
       end if
 
       ! add to RHS
+      call field_add2s2(fw, result, this%obj_scale * scale_forcing)
+
+      ! ------------------------------------------------------------------------
+      ! chi * u contribution from Brinkman dissipation
+      call field_col3(result, this%chi, u)
+      if (this%if_mask) then
+         call mask_exterior_const(result, this%mask, 0.0_rp)
+      end if
+      call field_add2s2(fu, result, this%obj_scale * scale_forcing)
+
+      call field_col3(result, this%chi, v)
+      if (this%if_mask) then
+         call mask_exterior_const(result, this%mask, 0.0_rp)
+      end if
+      call field_add2s2(fv, result, this%obj_scale * scale_forcing)
+
+      call field_col3(result, this%chi, w)
+      if (this%if_mask) then
+         call mask_exterior_const(result, this%mask, 0.0_rp)
+      end if
       call field_add2s2(fw, result, this%obj_scale * scale_forcing)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
