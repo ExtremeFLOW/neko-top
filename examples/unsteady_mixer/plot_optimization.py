@@ -79,8 +79,11 @@ def _load_csv_data(csv_path):
         idx_scalar = _find_header_exact(headers, "scalar mixing")
         idx_scalar_weight = _find_header_exact(headers, "scalar mixing weight")
         idx_target = _find_header_exact(headers, "target dissipation")
-        idx_target_weight = _find_header_exact(
-            headers, "target dissipation weight"
+        idx_target_weight = _find_header_exact(headers, "target dissipation weight")
+        idx_target_initial = _find_header_exact(headers, "target dissipation initial")
+        idx_target_viscous = _find_header_exact(headers, "target dissipation viscous")
+        idx_target_brinkman = _find_header_exact(
+            headers, "target dissipation brinkman"
         )
 
         if idx_iter is None:
@@ -89,13 +92,21 @@ def _load_csv_data(csv_path):
             raise ValueError("Could not find total objective column in CSV.")
         if idx_ratio is None:
             raise ValueError("Could not find target dissipation ratio column in CSV.")
-        if idx_scalar is None or idx_scalar_weight is None:
+        if idx_scalar is None:
+            raise ValueError("Could not find scalar mixing objective column in CSV.")
+        if idx_scalar_weight is None:
+            raise ValueError("Could not find scalar mixing weight column in CSV.")
+        if idx_target is None:
+            raise ValueError("Could not find target dissipation objective column in CSV.")
+        if idx_target_weight is None:
+            raise ValueError("Could not find target dissipation weight column in CSV.")
+        if idx_target_initial is None:
             raise ValueError(
-                "Could not find scalar mixing objective/weight columns in CSV."
+                "Could not find target dissipation initial column in CSV."
             )
-        if idx_target is None or idx_target_weight is None:
+        if idx_target_viscous is None or idx_target_brinkman is None:
             raise ValueError(
-                "Could not find target dissipation objective/weight columns in CSV."
+                "Could not find target dissipation viscous/brinkman columns in CSV."
             )
 
         idx_iter = headers.index(idx_iter)
@@ -105,29 +116,41 @@ def _load_csv_data(csv_path):
         idx_scalar_weight = headers.index(idx_scalar_weight)
         idx_target = headers.index(idx_target)
         idx_target_weight = headers.index(idx_target_weight)
+        idx_target_initial = headers.index(idx_target_initial)
+        idx_target_viscous = headers.index(idx_target_viscous)
+        idx_target_brinkman = headers.index(idx_target_brinkman)
 
         iters = []
         total = []
         ratio = []
-        scalar_contribution = []
-        target_contribution = []
+        scalar = []
+        target = []
+        viscous_ratio = []
+        brinkman_ratio = []
 
         for row in reader:
             if not row or all(cell.strip() == "" for cell in row):
                 continue
             iters.append(float(row[idx_iter]))
             total.append(float(row[idx_total]))
-            ratio.append(float(row[idx_ratio]))
-            scalar_value = float(row[idx_scalar])
             scalar_weight = float(row[idx_scalar_weight])
-            target_value = float(row[idx_target])
             target_weight = float(row[idx_target_weight])
-            scalar_contribution.append(scalar_value * scalar_weight)
-            target_contribution.append(target_value * target_weight)
+
+            ratio.append(float(row[idx_ratio]))
+            scalar.append(float(row[idx_scalar]) * scalar_weight)
+            target.append(float(row[idx_target]) * target_weight)
+
+            target_initial = float(row[idx_target_initial])
+            if target_initial == 0.0:
+                raise ValueError(
+                    "Target dissipation initial value is zero; cannot compute ratios."
+                )
+            viscous_ratio.append(float(row[idx_target_viscous]) / target_initial)
+            brinkman_ratio.append(float(row[idx_target_brinkman]) / target_initial)
 
     if not total:
         raise ValueError("No data rows found in CSV.")
-    return iters, total, ratio, scalar_contribution, target_contribution
+    return iters, total, ratio, scalar, target, viscous_ratio, brinkman_ratio
 
 
 def _normalization_from_total_at_iteration(iters, total, target_iter=0.0, tol=1.0e-12):
@@ -178,7 +201,15 @@ def main():
     elif not case_path.is_absolute():
         case_path = directory / case_path
 
-    iters, total, ratio, scalar_contrib, target_contrib = _load_csv_data(data_path)
+    (
+        iters,
+        total,
+        ratio,
+        scalar,
+        target_obj,
+        viscous_ratio,
+        brinkman_ratio,
+    ) = _load_csv_data(data_path)
     norm_total = _normalization_from_total_at_iteration(iters, total, target_iter=0.0)
     if norm_total == 0.0:
         raise ValueError("Total objective at iteration 0 is zero; cannot normalize.")
@@ -190,17 +221,17 @@ def main():
     ax_left.plot(
         iters,
         [v / norm_total for v in total],
-        label="Total objective function",
+        label="Total objective function / Total(iter=0)",
     )
     ax_left.plot(
         iters,
-        [v / norm_total for v in scalar_contrib],
-        label="Scalar Mixing contribution",
+        [v / norm_total for v in scalar],
+        label="Scalar Mixing.weight*Scalar Mixing / Total(iter=0)",
     )
     ax_left.plot(
         iters,
-        [v / norm_total for v in target_contrib],
-        label="Target Dissipation contribution",
+        [v / norm_total for v in target_obj],
+        label="Target Dissipation.weight*Target Dissipation / Total(iter=0)",
     )
     ax_left.set_xlabel("Iteration")
     ax_left.set_ylabel("Value / Total objective(iter=0)")
@@ -208,6 +239,8 @@ def main():
     ax_left.legend()
 
     ax_right.plot(iters, ratio, label="Target Dissipation.ratio")
+    ax_right.plot(iters, viscous_ratio, label="Target Dissipation.viscous ratio")
+    ax_right.plot(iters, brinkman_ratio, label="Target Dissipation.brinkman ratio")
     ax_right.axhline(
         target_value, color="black", linestyle="--", linewidth=1.0,
         label=f"Target = {target_value}"

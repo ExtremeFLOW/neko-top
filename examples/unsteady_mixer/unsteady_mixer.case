@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 8.0,
-            "timestep": 4.0e-3
+            "end_time": 4.0,
+            "timestep": 5.0e-3
         },
         "numerics": {
             "time_order": 1,
@@ -118,14 +118,14 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [ 0.5, 5.5 ],
+                "x_bounds": [ 0.5, 3.5 ],
                 "y_bounds": [ -1.0, 3.0 ],
                 "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "objective_domain",
                 "geometry": "box",
-                "x_bounds": [ 5.5, 6.5 ],
+                "x_bounds": [ 3.5, 6.5 ],
                 "y_bounds": [ -1.0, 3.0 ],
                 "z_bounds": [ -1.0, 3.0 ]
             },
@@ -183,6 +183,10 @@
                 "xmax": 1.0
             }
         },
+        "checkpoint": {
+            "file": "yofam",
+            "interval": 1
+        },
         "objectives": [
             {
                 "type": "scalar_mixing",
@@ -192,7 +196,7 @@
             },
             {
                 "type": "target_dissipation",
-                "target": 2.0,
+                "target": 6.0,
                 "weight": 1.0,
             }
         ]
