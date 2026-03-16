@@ -52,7 +52,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use math, only: copy
-  use vector_math, only: vector_add2, vector_cfill
+  use vector_math, only: vector_add2, vector_add2s1, vector_cfill
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
@@ -384,7 +384,8 @@ contains
           call json_get(constraint_json, "type", type)
           call neko_log%message(type)
 
-          call constraint_factory(constraint, constraint_json, design, simulation)
+          call constraint_factory(constraint, constraint_json, design, &
+               simulation)
           call this%add_constraint(constraint)
        end do
     end if
@@ -522,7 +523,8 @@ contains
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     simulation%n_timesteps = 0
-    do while (simulation%neko_case%time%t .lt. simulation%neko_case%time%end_time)
+    do while (simulation%neko_case%time%t .lt. &
+         simulation%neko_case%time%end_time)
        simulation%n_timesteps = simulation%n_timesteps + 1
        ! step forward
        call simulation_step(simulation%neko_case, dt_controller, loop_start)
@@ -555,7 +557,8 @@ contains
     ! Reset the sensitivity value to zero
     call this%reset_objective_sensitivities()
 
-    cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
+    cfl = simulation%adjoint_case%fluid_adj%compute_cfl( &
+         simulation%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
     total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
@@ -748,10 +751,14 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: dt
+    real(kind=rp) :: value_old
     integer :: i
 
     do i = 1, this%n_constraints
-       call this%constraint_list(i)%constraint%accumulate_value(design, dt)
+       value_old = this%constraint_list(i)%constraint%get_value()
+       call this%constraint_list(i)%constraint%update_value(design)
+       this%constraint_list(i)%constraint%value = value_old + &
+            this%constraint_list(i)%constraint%value * dt
     end do
   end subroutine problem_accumulate_constraints
 
@@ -782,10 +789,15 @@ contains
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: dt
+    type(vector_t) :: sensitivity_old
     integer :: i
 
     do i = 1, this%n_constraints
-       call this%constraint_list(i)%constraint%accumulate_sensitivity(design, dt)
+       sensitivity_old = this%constraint_list(i)%constraint%sensitivity
+       call this%constraint_list(i)%constraint%update_sensitivity(design)
+       call vector_add2s1(this%constraint_list(i)%constraint%sensitivity, &
+            sensitivity_old, dt)
+       call sensitivity_old%free()
     end do
   end subroutine problem_accumulate_constraint_sensitivities
 

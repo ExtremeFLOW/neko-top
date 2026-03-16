@@ -174,6 +174,7 @@ contains
     type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
+    call this%bind_time(simulation%neko_case%time)
 
     ! Save the simulation and design
     this%u => neko_registry%get_field('u')

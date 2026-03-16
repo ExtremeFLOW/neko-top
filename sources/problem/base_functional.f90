@@ -42,7 +42,6 @@ module base_functional
   use simulation_m, only: simulation_t
   use vector, only: vector_t
   use utils, only: neko_error
-  use vector_math, only: vector_copy, vector_add2s1
   implicit none
   private
 
@@ -60,12 +59,8 @@ module base_functional
 
      !> Value of the base_functional
      real(kind=rp) :: value = 0.0_rp
-     !> Old value for time integration
-     real(kind=rp) :: value_old = 0.0_rp
      !> Sensitivity field
      type(vector_t) :: sensitivity
-     !> Old sensitivity field for time integration
-     type(vector_t) :: sensitivity_old
      !> Name of constraint/objective in the logfile
      character(len=25) :: name = ""
      !> containing a mask
@@ -108,11 +103,6 @@ module base_functional
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
      procedure, pass(this) :: reset_sensitivity => functional_reset_sensitivity
-     !> Accumulate the value
-     procedure, pass(this) :: accumulate_value => functional_accumulate_value
-     !> Accumulate the sensitivity
-     procedure, pass(this) :: accumulate_sensitivity => &
-          functional_accumulate_sensitivity
 
   end type base_functional_t
 
@@ -233,32 +223,4 @@ contains
 
     this%sensitivity = 0.0_rp
   end subroutine functional_reset_sensitivity
-
-  !> Accumulate the value of the function
-  subroutine functional_accumulate_value(this, design, dt)
-    class(base_functional_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
-
-    this%value_old = this%value
-    call this%update_value(design)
-
-    ! could potentially use higher order trapezoidal/Simpson etc, but this
-    ! should suffice
-    this%value = this%value_old + this%value * dt
-  end subroutine functional_accumulate_value
-
-  !> Accumulate the value of the function
-  subroutine functional_accumulate_sensitivity(this, design, dt)
-    class(base_functional_t), intent(inout) :: this
-    class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
-
-    call vector_copy(this%sensitivity_old, this%sensitivity)
-    call this%update_sensitivity(design)
-
-    ! could potentially use higher order trapezoidal/Simpson etc, but this
-    ! should suffice
-    call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
-  end subroutine functional_accumulate_sensitivity
 end module base_functional

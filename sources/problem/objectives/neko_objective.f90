@@ -36,8 +36,11 @@
 module neko_objective
   use num_types, only: rp
   use objective, only: objective_t
+  use design, only: design_t
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use time_state, only: time_state_t
+  use vector_math, only: vector_copy, vector_add2s1
   implicit none
   private
 
@@ -47,9 +50,16 @@ module neko_objective
   type, public, abstract, extends(objective_t) :: neko_objective_t
      real(kind=rp) :: start_time = 0.0_rp
      real(kind=rp) :: end_time = huge(0.0_rp)
+     type(time_state_t), pointer :: time => null()
    contains
      procedure, pass(this) :: init_time_window_json => &
           neko_objective_init_time_window_json
+     procedure, pass(this) :: bind_time => neko_objective_bind_time
+     procedure, pass(this) :: accumulate_value => &
+          neko_objective_accumulate_value
+     procedure, pass(this) :: accumulate_sensitivity => &
+          neko_objective_accumulate_sensitivity
+     procedure, private, pass(this) :: is_active => neko_objective_is_active
   end type neko_objective_t
 
 contains
@@ -62,5 +72,52 @@ contains
     call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
   end subroutine neko_objective_init_time_window_json
+
+  !> Bind the objective to the primal simulation time state.
+  subroutine neko_objective_bind_time(this, time)
+    class(neko_objective_t), intent(inout) :: this
+    type(time_state_t), target, intent(inout) :: time
+
+    this%time => time
+  end subroutine neko_objective_bind_time
+
+  !> Accumulate the value only while the objective time window is active.
+  subroutine neko_objective_accumulate_value(this, design, dt)
+    class(neko_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+
+    if (.not. this%is_active()) return
+
+    this%value_old = this%value
+    call this%update_value(design)
+    this%value = this%value_old + this%value * dt
+  end subroutine neko_objective_accumulate_value
+
+  !> Accumulate the sensitivity while the objective time window is active.
+  subroutine neko_objective_accumulate_sensitivity(this, design, dt)
+    class(neko_objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+
+    if (.not. this%is_active()) return
+
+    call vector_copy(this%sensitivity_old, this%sensitivity)
+    call this%update_sensitivity(design)
+    call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
+  end subroutine neko_objective_accumulate_sensitivity
+
+  !> Return true when the current primal time is inside the objective window.
+  logical function neko_objective_is_active(this)
+    class(neko_objective_t), intent(in) :: this
+
+    if (.not. associated(this%time)) then
+       neko_objective_is_active = .true.
+       return
+    end if
+
+    neko_objective_is_active = this%time%t .ge. this%start_time .and. &
+         this%time%t .le. this%end_time
+  end function neko_objective_is_active
 
 end module neko_objective

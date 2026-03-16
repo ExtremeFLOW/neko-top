@@ -199,6 +199,7 @@ contains
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
+    call this%bind_time(simulation%neko_case%time)
 
     this%dealias_forcing = dealias_forcing
     this%dealias_sensitivity = dealias_sensitivity

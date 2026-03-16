@@ -103,7 +103,6 @@ contains
 
     this%name = name
     call this%sensitivity%init(design_size)
-    call this%sensitivity_old%init(design_size)
 
     if (present(mask_name)) then
        if (mask_name .ne. "") then
@@ -121,9 +120,7 @@ contains
     this%name = ""
 
     this%value = 0.0_rp
-    this%value_old = 0.0_rp
     call this%sensitivity%free()
-    call this%sensitivity_old%free()
 
     this%has_mask = .false.
     if (associated(this%mask)) nullify(this%mask)
@@ -143,4 +140,3 @@ contains
   end subroutine constraint_wrapper_free
 
 end module constraint
-

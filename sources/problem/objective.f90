@@ -40,6 +40,8 @@ module objective
   use num_types, only: rp
   use point_zone_registry, only: neko_point_zone_registry
   use json_module, only: json_file
+  use vector, only: vector_t
+  use vector_math, only: vector_copy, vector_add2s1
   implicit none
   private
 
@@ -52,6 +54,10 @@ module objective
   type, abstract, extends(base_functional_t) :: objective_t
      !> Weight of the objective in the overall cost function
      real(kind=rp) :: weight = 1.0_rp
+     !> Old value for time integration
+     real(kind=rp) :: value_old = 0.0_rp
+     !> Old sensitivity field for time integration
+     type(vector_t) :: sensitivity_old
 
    contains
 
@@ -67,6 +73,11 @@ module objective
      procedure, pass(this) :: get_log_headers => objective_get_log_headers
      !> Get values for this objective's log entries
      procedure, pass(this) :: get_log_values => objective_get_log_values
+     !> Accumulate the value
+     procedure, pass(this) :: accumulate_value => objective_accumulate_value
+     !> Accumulate the sensitivity
+     procedure, pass(this) :: accumulate_sensitivity => &
+          objective_accumulate_sensitivity
 
   end type objective_t
 
@@ -204,5 +215,26 @@ contains
     w = this%weight
   end function objective_get_weight
 
-end module objective
+  !> Accumulate the value of the objective.
+  subroutine objective_accumulate_value(this, design, dt)
+    class(objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
 
+    this%value_old = this%value
+    call this%update_value(design)
+    this%value = this%value_old + this%value * dt
+  end subroutine objective_accumulate_value
+
+  !> Accumulate the sensitivity of the objective.
+  subroutine objective_accumulate_sensitivity(this, design, dt)
+    class(objective_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+
+    call vector_copy(this%sensitivity_old, this%sensitivity)
+    call this%update_sensitivity(design)
+    call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
+  end subroutine objective_accumulate_sensitivity
+
+end module objective
