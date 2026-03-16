@@ -170,6 +170,7 @@ contains
          dealias_sensitivity, .true.)
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, .true.)
+    call this%init_time_window_json(json)
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, dealias_sensitivity, dealias_forcing)
@@ -247,8 +248,8 @@ contains
       call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
            this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing, this%volume, &
-           this%scratch_GL, this%gdim)
+           this%dealias_forcing, this%volume, this%start_time, &
+           this%end_time, this%scratch_GL, this%gdim)
 
     end associate
 

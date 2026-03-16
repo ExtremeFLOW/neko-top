@@ -151,6 +151,7 @@ contains
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
+    call this%init_time_window_json(json)
 
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
   end subroutine minimum_dissipation_init_json_sim
@@ -199,7 +200,7 @@ contains
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%volume)
+         this%c_Xh, this%volume, this%start_time, this%end_time)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
@@ -287,7 +288,8 @@ contains
 
   end subroutine minimum_dissipation_update_value
 
-  !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
+  !> update_value the sensitivity of the objective function with respect to
+  !! \f\f$\chi\f\f$
   !! @param this the objective.
   !! @param design the design.
   subroutine minimum_dissipation_update_sensitivity(this, design)

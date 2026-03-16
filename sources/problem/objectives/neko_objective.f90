@@ -34,7 +34,10 @@
 
 !> Implements the `neko_objective_t` type.
 module neko_objective
+  use num_types, only: rp
   use objective, only: objective_t
+  use json_module, only: json_file
+  use json_utils, only: json_get_or_default
   implicit none
   private
 
@@ -44,6 +47,20 @@ module neko_objective
   type, public, abstract, extends(objective_t) :: neko_objective_t
      real(kind=rp) :: start_time = 0.0_rp
      real(kind=rp) :: end_time = huge(0.0_rp)
+   contains
+     procedure, pass(this) :: init_time_window_json => &
+          neko_objective_init_time_window_json
   end type neko_objective_t
+
+contains
+
+  !> Read the active time window for this objective from JSON.
+  subroutine neko_objective_init_time_window_json(this, json)
+    class(neko_objective_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
+  end subroutine neko_objective_init_time_window_json
 
 end module neko_objective

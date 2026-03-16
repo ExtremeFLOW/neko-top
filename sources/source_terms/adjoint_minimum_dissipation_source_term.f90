@@ -142,27 +142,22 @@ contains
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
   !! @param volume volume of the objective domain.
-  subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
-       f_x, f_y, f_z, &
-       u, v, w, obj_scale, &
-       mask, if_mask, &
-       coef, volume)
+  !! @param start_time when to start applying the source term.
+  !! @param end_time when to stop applying the source term.
+  subroutine adjoint_minimum_dissipation_source_term_init_from_components( &
+       this, f_x, f_y, f_z, u, v, w, obj_scale, mask, if_mask, coef, &
+       volume, start_time, end_time)
     class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
     type(coef_t) :: coef
-    real(kind=rp) :: start_time
-    real(kind=rp) :: end_time
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
     real(kind=rp) :: obj_scale
     type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), target :: mask
     real(kind=rp), intent(in) :: volume
     logical :: if_mask
-
-    ! I wish you didn't need a start time and end time...
-    ! but I'm just going to set a super big number...
-    start_time = 0.0_rp
-    end_time = 100000000.0_rp
 
     call this%free()
 
