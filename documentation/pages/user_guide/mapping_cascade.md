@@ -61,6 +61,8 @@ The following mappings are currently implemented in `Neko-top`.
 1. [PDE filter](@ref mapping_PDE_filter)
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
+4. [SIMP mapping](@ref mapping_SIMP)
+5. [Heaviside mapping](@ref mapping_heaviside_mapping)
 
 ## PDE based filter {#mapping_PDE_filter}
 A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.1002/nme.3072)
@@ -104,13 +106,15 @@ forms depending on the convexity,
 
 concave up:
 \f[
-    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}}{1 +q(1 - X_\text{in})}
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}}{1 +q(1 - X_\text{in})},
 \f]
 
 concave down:
 \f[
-    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}(q + 1)}{q + X_\text{in}}
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}(q + 1)}{q + X_\text{in}},
 \f]
+
+where \f$q\f$ is a penalty parameter.
 
 The mapping can be selected by prescribing `"type": "RAMP"` and has the
 following input parameters:
@@ -122,3 +126,40 @@ following input parameters:
 | `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
 | `q` | \f$q\f$ in the above equation. | Real | `1.0`|
 | `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
+
+## SIMP mapping {#mapping_SIMP}
+A mapping based on the [SIMP](https://doi.org/10.1007/BF01650949) taking the following form
+
+\f[
+    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  X_\text{in}^p,
+\f]
+
+where \f$p\f$ is a penalty parameter.
+
+The mapping can be selected by prescribing `"type": "SIMP"` and has the
+following input parameters:
+
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
+| `p` | \f$p\f$ in the above equation. | Real | `1.0`|
+
+## Heaviside mapping {#mapping_heaviside_mapping}
+A smooth Heaviside mapping taking the form,
+\f[
+    X_\text{out} =
+    \frac{\tanh(\beta \eta) + \tanh(\beta (X_\text{in} - \eta))}
+         {\tanh(\beta \eta) + \tanh(\beta (1-\eta))},
+\f]
+where \f$\beta>0\f$ controls the steepness and \f$\eta\in[0,1]\f$ describes
+the threshold.
+
+The mapping can be selected by prescribing `"type": "heaviside_mapping"` and
+has the following input parameters:
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `beta` | Projection sharpness parameter \f$\beta\f$. | Real, `> 0` | `8.0` |
+| `eta` | Projection threshold parameter \f$\eta\f$. | Real in `[0,1]` | `0.5` |

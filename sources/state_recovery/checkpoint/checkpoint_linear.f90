@@ -57,6 +57,7 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
+<<<<<<< HEAD:sources/state_recovery/checkpoint/checkpoint_linear.f90
     type(time_state_t), intent(in) :: time
     logical :: save_disc
 
@@ -68,8 +69,30 @@ contains
 
        call this%chkp_output%set_counter(time%tstep)
        call this%chkp_output%sample(time%t)
+=======
+    integer :: index, tstep, counter
+    real(kind=rp) :: time
+
+    time = neko_case%time%t
+    tstep = neko_case%time%tstep
+
+    ! We save to disc only every n_saves_memory time steps
+    index = modulo(tstep, this%n_saves_memory)
+
+    ! Sample the checkpoint if needed
+    if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
+       this%loaded_checkpoint = tstep
+
+       counter = determine_counter(tstep, this%n_saves_memory, &
+            this%first_valid_timestep)
+
+       call this%chkp_output%set_counter(counter)
+       call this%chkp_output%sample(time)
+>>>>>>> origin/develop:sources/checkpoint/checkpoint_linear.f90
        this%n_saves_disc = this%n_saves_disc + 1
     end if
+
+    call this%save_data(index + 1)
   end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state in a linear fashion.
@@ -85,8 +108,7 @@ contains
     type(time_state_t), intent(in) :: time
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    integer :: j, k, previous_save, next_save
-    integer :: i_scalars
+    integer :: k, previous_save, next_save, local_idx, counter
     type(field_t), pointer :: u, v, w, p, s
     integer :: tstep
 
@@ -116,7 +138,9 @@ contains
     if (this%loaded_checkpoint .ne. previous_save) then
 
        ! Restart the simulation form the checkpoint file
-       call this%chkp_output%set_counter(previous_save)
+       counter = determine_counter(previous_save, this%n_saves_memory, &
+            this%first_valid_timestep)
+       call this%chkp_output%set_counter(counter)
        call this%chkp_output%file_%read(neko_case%chkp)
        call simulation_restart(neko_case, neko_case%chkp)
 
@@ -134,32 +158,27 @@ contains
              call simulation_step(neko_case, dt_controller, loop_start)
           end if
 
+          ! Save the restored state in memory
           local_idx = modulo(k, this%n_saves_memory) + 1
-          call field_copy(this%p_list(local_idx), p)
-          call field_copy(this%u_list(local_idx), u)
-          call field_copy(this%v_list(local_idx), v)
-          call field_copy(this%w_list(local_idx), w)
-          do i_scalars = 1, this%n_scalars
-             j = (local_idx - 1) * this%n_scalars + i_scalars
-             s => neko_case%scalars%scalar_fields(i_scalars)%s
-             call field_copy(this%s_list(j), s)
-          end do
-
+          call this%save_data(local_idx)
        end do
     end if
 
+    ! Restore the required time step from memory
     local_idx = modulo(tstep, this%n_saves_memory) + 1
-    call field_copy(p, this%p_list(local_idx))
-    call field_copy(u, this%u_list(local_idx))
-    call field_copy(v, this%v_list(local_idx))
-    call field_copy(w, this%w_list(local_idx))
-    do i_scalars = 1, this%n_scalars
-       j = (local_idx - 1) * this%n_scalars + i_scalars
-       s => neko_case%scalars%scalar_fields(i_scalars)%s
-       call field_copy(s, this%s_list(j))
-    end do
-
-
+    call this%load_data(local_idx)
   end subroutine checkpoint_restore_linear
+
+  pure function determine_counter(tstep, n_memory, first) result(counter)
+    integer, intent(in) :: tstep, n_memory, first
+    integer :: counter
+
+    if (tstep .le. first) then
+       counter = tstep
+    else
+       counter = first + tstep / n_memory
+    end if
+
+  end function determine_counter
 
 end submodule checkpoint_linear

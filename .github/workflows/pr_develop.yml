@@ -219,3 +219,11 @@ jobs:
             exit 1
           fi
           echo "All checks passed"
+
+  # Merge group branches produce caches which are not useable by anyone else.
+  # Therefore we remove all of them after the run have completed.
+  cleanup:
+    if: ${{ github.event_name == 'merge_group' && always() }}
+    name: Cleanup merge group caches
+    needs: check_complete
+    uses: ./.github/workflows/cleanup.yml

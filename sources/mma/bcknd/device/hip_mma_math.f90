@@ -40,6 +40,13 @@ module hip_mma_math
   public
 
   interface
+     subroutine mma_update_hessian_z_hip(Hess_d, a_d, m) &
+          bind(C, name="mma_update_hessian_z_hip")
+       use iso_c_binding
+       type(c_ptr), value :: Hess_d
+       type(c_ptr), value :: a_d
+       integer(c_int), value :: m
+     end subroutine mma_update_hessian_z_hip
 
      subroutine hipSOLVER_wrapper(A_d, b_d, n, info) &
           bind(c, name = 'hipSOLVER_wrapper')
@@ -57,10 +64,10 @@ module hip_mma_math
        integer(c_int) :: info
      end subroutine hip_custom_solver
 
-     subroutine mma_prepare_hessian_hip(Hess_d, y_d, d_d, mu_d, lambda_d, m) &
+     subroutine mma_prepare_hessian_hip(Hess_d, y_d, mu_d, lambda_d, m) &
           bind(c, name = 'mma_prepare_hessian_hip')
        import c_int, c_ptr
-       type(c_ptr), value :: Hess_d, y_d, d_d, mu_d, lambda_d
+       type(c_ptr), value :: Hess_d, y_d, mu_d, lambda_d
        integer(c_int), value :: m
      end subroutine mma_prepare_hessian_hip
 

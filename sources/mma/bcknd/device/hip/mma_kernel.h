@@ -37,6 +37,22 @@
 #ifndef MMA_HIP_KERNEL_H
 #define MMA_HIP_KERNEL_H
 
+template <typename T>
+__global__ void mma_update_hessian_z_kernel(
+    T* __restrict__ Hess,
+    const T* __restrict__ a,
+    const int m)
+{
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    int total = m * m;
+
+    if (tid >= total) return;
+
+    int i = tid % m;
+    int j = tid / m;
+
+    Hess[tid] -= a[i] * a[j];
+}
 
 template<typename T>
 __global__ void mma_prepare_aa_matrix_kernel(T* __restrict__ AA,
@@ -62,18 +78,15 @@ __global__ void mma_prepare_aa_matrix_kernel(T* __restrict__ AA,
 //Update Hessian diagonal elements (y contributions for dip subsolve)
 template<typename T>
 __global__ void mma_update_hessian_diagonal_kernel(T* __restrict__ Hess,
-     const T* __restrict__ y, const T* __restrict__ d,
-     const T* __restrict__ mu, const T* __restrict__ lambda, const int m) {
+     const T* __restrict__ y, const T* __restrict__ mu, 
+     const T* __restrict__ lambda, const int m) {
   int tj = blockIdx.x * blockDim.x + threadIdx.x;
   if (tj >= m) return;
 
   T diag = Hess[tj * m + tj];
   // Contribution from y terms (inactive constraints)
   if (y[tj] > (T)0.0) {
-      if (fabs(d[tj]) >= (T)1.0e-15) {
-            diag -= (T)1.0 / d[tj];
-        }
-        // else: skip - equivalent to subtracting 1.0/1.0e-8
+     diag -= (T)1.0;
   }
 
   // Contribution from -mu/lambda (eq 10)

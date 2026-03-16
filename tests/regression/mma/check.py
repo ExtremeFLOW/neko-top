@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import math
 
 # Define the tolerance for comparison
 tol = 1e-10
@@ -67,9 +68,14 @@ for file_name in [
             val_current = df_current[column][i]
             val_reference = df_reference[column][i]
 
-            rmsre = abs(val_current - val_reference)
+            if val_reference == 0.0:
+                rmsre = 0.0 if val_current == 0.0 else float("inf")
+            else:
+                rmsre = math.sqrt(
+                    ((val_current - val_reference) / val_reference) ** 2
+                )
 
-            status = "OK" if rmsre <= tol else "FAIL"
+            status = "OK" if math.isfinite(rmsre) and rmsre <= tol else "FAIL"
             if status == "FAIL":
                 return_value = False
 

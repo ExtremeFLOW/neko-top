@@ -10,13 +10,13 @@
             "timestep": 1e-3
         },
         "numerics": {
-            "time_order": 3,
+            "time_order": 1,
             "polynomial_order": 5,
             "dealias": true
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 100,
+            "Re": 100.0,
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -40,7 +40,7 @@
             "boundary_conditions": [
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 1 ]
                 },
                 {
@@ -48,14 +48,12 @@
                     "zone_indices": [ 2 ]
                 }
             ],
-            "output_control": "never",
+            "output_control": "never"
         },
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -66,24 +64,15 @@
                     "type": "outflow",
                     "zone_indices": [ 2 ]
                 }
-            ],
+            ]
         },
         "point_zones": [
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "y_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "initial_ball",
@@ -91,10 +80,10 @@
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.25
-            },
+            }
         ]
     },
-    "unsteady" : true,
+    "unsteady": true,
     "state_recovery": {
         "type": "checkpoint",
         "enabled": true,
@@ -111,7 +100,7 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 100,
+                    "f_max": 100.0
                 }
             ],
             "initial_distribution": {
@@ -123,7 +112,7 @@
             "domain": {
                 "type": "point_zone",
                 "zone_name": "optimization_domain"
-            },
+            }
         },
         "solver": {
             "type": "mma",
@@ -142,9 +131,6 @@
                 "type": "lube_term",
                 "weight": 1.0
             }
-        ],
-        "constraints": [
-        ],
-    },
-
+        ]
+    }
 }

@@ -61,7 +61,6 @@ module problem
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
   use utils, only: neko_error
-
   implicit none
   private
 
@@ -80,7 +79,6 @@ module problem
      class(objective_wrapper_t), allocatable, dimension(:) :: objective_list
      !> The constraints of the problem.
      class(constraint_wrapper_t), allocatable, dimension(:) :: constraint_list
-
    contains
 
      ! ----------------------------------------------------------------------- !
@@ -123,6 +121,8 @@ module problem
 
      !> Sample the problem.
      procedure, pass(this), public :: write => problem_write
+     !> Fill optimization log values.
+     procedure, pass(this), public :: get_log_values => problem_get_log_values
 
      !> Add an objective to the list.
      procedure, pass(this), public :: add_objective => problem_add_objective
@@ -197,6 +197,8 @@ module problem
 
      !> Return the logfile header
      procedure, pass(this) :: get_log_header => problem_get_log_header
+     !> Return the logfile base size (excluding iter and optimizer extras)
+     procedure, pass(this) :: get_log_size => problem_get_log_size
 
   end type problem_t
 
@@ -254,6 +256,55 @@ contains
     integer, intent(in) :: idx
 
   end subroutine problem_write
+
+  !> Fill optimization log values in caller-provided array.
+  !! @param[in] this The problem object.
+  !! @param[out] values Array to populate with log values.
+  !! @param[in] include_constraints Include constraints in the log values.
+  subroutine problem_get_log_values(this, values, include_constraints)
+    class(problem_t), intent(in) :: this
+    real(kind=rp), intent(out) :: values(:)
+    logical, intent(in), optional :: include_constraints
+    integer :: i, n, offset
+    real(kind=rp) :: objective_value
+    real(kind=rp), allocatable :: tmp(:)
+    logical :: do_constraints
+
+    if (present(include_constraints)) then
+       do_constraints = include_constraints
+    else
+       do_constraints = .true.
+    end if
+
+    call this%get_objective_value(objective_value)
+    values = 0.0_rp
+    values(1) = objective_value
+
+    offset = 2
+    do i = 1, this%n_objectives
+       n = this%objective_list(i)%objective%get_log_size()
+       if (n .gt. 0) then
+          allocate(tmp(n))
+          call this%objective_list(i)%objective%get_log_values(tmp)
+          values(offset:offset + n - 1) = tmp
+          offset = offset + n
+          deallocate(tmp)
+       end if
+    end do
+
+    if (do_constraints) then
+       do i = 1, this%n_constraints
+          n = this%constraint_list(i)%constraint%get_log_size()
+          if (n .gt. 0) then
+             allocate(tmp(n))
+             call this%constraint_list(i)%constraint%get_log_values(tmp)
+             values(offset:offset + n - 1) = tmp
+             offset = offset + n
+             deallocate(tmp)
+          end if
+       end do
+    end if
+  end subroutine problem_get_log_values
 
   ! ========================================================================== !
   ! Handling constraints and objectives
@@ -863,37 +914,82 @@ contains
   end function problem_get_num_constraints
 
   !> Return the header for the problem.
-  function problem_get_log_header(this) result(buff)
+  !! @param[in] this The problem object.
+  !! @param[in] include_constraints Include constraints in the header.
+  !! @return buff Comma-separated header string.
+  function problem_get_log_header(this, include_constraints) result(buff)
     class(problem_t), intent(in) :: this
-    character(len=1024) :: buff
-    character(len=50) :: mini_buff
-    integer :: i
+    logical, intent(in), optional :: include_constraints
+    character(len=4096) :: buff
+    character(len=128) :: mini_buff
+    character(len=128), allocatable :: headers(:)
+    integer :: i, j, n
+    logical :: do_constraints
 
-    ! When it comes to multi-objective optimization
-    ! (handled in the way that we do) we want to know the value of each
-    ! objective individually, not just the combined effect.
-    !
-    ! my vision is:
-    !
-    !      | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m |
-    !
-    ! And then if we also want things like this iteration or KKT they can be
-    ! appended to the beginning or end of this by the optimizer.
-    !
-    ! iter | Total F | F_1 | F_2 | ... | F_n | C_1 | C_2 | ... | C_m | KKT
     buff = "Total objective function"
+    if (present(include_constraints)) then
+       do_constraints = include_constraints
+    else
+       do_constraints = .true.
+    end if
+
     do i = 1, this%get_n_objectives()
-       mini_buff = ""
-       write(mini_buff, '(", ", A)') this%objective_list(i)%objective%name
-       buff = trim(buff) // trim(mini_buff)
+       n = this%objective_list(i)%objective%get_log_size()
+       if (n .gt. 0) then
+          allocate(headers(n))
+          call this%objective_list(i)%objective%get_log_headers(headers)
+          do j = 1, n
+             mini_buff = ""
+             write(mini_buff, '(", ", A)') trim(headers(j))
+             buff = trim(buff) // trim(mini_buff)
+          end do
+          deallocate(headers)
+       end if
     end do
 
-    do i = 1, this%get_n_constraints()
-       mini_buff = ""
-       write(mini_buff, '(", ", A)') &
-            this%constraint_list(i)%constraint%name
-       buff = trim(buff) // trim(mini_buff)
-    end do
+    if (do_constraints) then
+       do i = 1, this%get_n_constraints()
+          n = this%constraint_list(i)%constraint%get_log_size()
+          if (n .gt. 0) then
+             allocate(headers(n))
+             call this%constraint_list(i)%constraint%get_log_headers(headers)
+             do j = 1, n
+                mini_buff = ""
+                write(mini_buff, '(", ", A)') trim(headers(j))
+                buff = trim(buff) // trim(mini_buff)
+             end do
+             deallocate(headers)
+          end if
+       end do
+    end if
 
   end function problem_get_log_header
+
+  !> Return the base log size (excluding iter and optimizer extras).
+  !! @param[in] this The problem object.
+  !! @param[in] include_constraints Include constraints in the size count.
+  !! @return n Number of log entries excluding iteration and optimizer extras.
+  function problem_get_log_size(this, include_constraints) result(n)
+    class(problem_t), intent(in) :: this
+    logical, intent(in), optional :: include_constraints
+    integer :: n, i
+    logical :: do_constraints
+
+    n = 1
+    if (present(include_constraints)) then
+       do_constraints = include_constraints
+    else
+       do_constraints = .true.
+    end if
+    do i = 1, this%get_n_objectives()
+       n = n + this%objective_list(i)%objective%get_log_size()
+    end do
+
+    if (do_constraints) then
+       do i = 1, this%get_n_constraints()
+          n = n + this%constraint_list(i)%constraint%get_log_size()
+       end do
+    end if
+
+  end function problem_get_log_size
 end module problem
