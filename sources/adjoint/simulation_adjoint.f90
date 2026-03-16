@@ -34,7 +34,7 @@
 !
 !> Adjoint simulation driver
 module simulation_adjoint
-  use mpi_f08, only: MPI_WTIME, MPI_IN_PLACE, mpi_allreduce, MPI_SUM
+  use mpi_f08, only: MPI_WTIME
   use neko_config, only: NEKO_BCKND_DEVICE
   use num_types, only: rp, dp
   use time_scheme_controller, only: time_scheme_controller_t
@@ -45,9 +45,8 @@ module simulation_adjoint
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
-  use device_math, only: device_vlsc3
-  use math, only: vlsc3
-  use comm, only: NEKO_COMM, MPI_REAL_PRECISION
+  use device_math, only: device_glsc3
+  use math, only: glsc3
   use vector, only: vector_t
   implicit none
   private
@@ -293,24 +292,22 @@ contains
 
     n = C%fluid_adj%c_Xh%dof%size()
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       norm_l2 = device_vlsc3(C%fluid_adj%u_adj%x_d, &
+       norm_l2 = device_glsc3(C%fluid_adj%u_adj%x_d, &
             C%fluid_adj%u_adj%x_d, C%fluid_adj%c_Xh%B_d, n) + &
-            device_vlsc3(C%fluid_adj%v_adj%x_d, &
+            device_glsc3(C%fluid_adj%v_adj%x_d, &
             C%fluid_adj%v_adj%x_d, C%fluid_adj%c_Xh%B_d, n) + &
-            device_vlsc3(C%fluid_adj%w_adj%x_d, &
+            device_glsc3(C%fluid_adj%w_adj%x_d, &
             C%fluid_adj%w_adj%x_d, C%fluid_adj%c_Xh%B_d, n)
     else
-       norm_l2 = vlsc3(C%fluid_adj%u_adj%x, C%fluid_adj%u_adj%x, &
+       norm_l2 = glsc3(C%fluid_adj%u_adj%x, C%fluid_adj%u_adj%x, &
             C%fluid_adj%c_Xh%B, n) + &
-            vlsc3(C%fluid_adj%v_adj%x, C%fluid_adj%v_adj%x, &
+            glsc3(C%fluid_adj%v_adj%x, C%fluid_adj%v_adj%x, &
             C%fluid_adj%c_Xh%B, n) + &
-            vlsc3(C%fluid_adj%w_adj%x, C%fluid_adj%w_adj%x, &
+            glsc3(C%fluid_adj%w_adj%x, C%fluid_adj%w_adj%x, &
             C%fluid_adj%c_Xh%B, n)
     end if
 
-    call mpi_allreduce(MPI_IN_PLACE, norm_l2, 1, MPI_REAL_PRECISION, &
-         MPI_SUM, NEKO_COMM)
-    norm_l2 = sqrt(norm_l2 / C%fluid_adj%c_Xh%volume)
+    norm_l2 = sqrt(norm_l2) / C%fluid_adj%c_Xh%volume
 
     call data_line%init(1)
     data_line%x = [norm_l2]
