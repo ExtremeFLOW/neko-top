@@ -72,7 +72,7 @@ module minimum_dissipation_objective
   use scratch_registry, only: neko_scratch_registry
   use adjoint_minimum_dissipation_source_term, only: &
        adjoint_minimum_dissipation_source_term_t
-  use objective, only: objective_t
+  use neko_objective, only: neko_objective_t
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use coefs, only: coef_t
@@ -93,7 +93,7 @@ module minimum_dissipation_objective
 
   !> An objective function corresponding to minimum dissipation
   !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega \f$
-  type, public, extends(objective_t) :: minimum_dissipation_objective_t
+  type, public, extends(neko_objective_t) :: minimum_dissipation_objective_t
      private
 
      !> Pointer to the u field.

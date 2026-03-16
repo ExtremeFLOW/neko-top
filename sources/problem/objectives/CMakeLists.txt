@@ -5,6 +5,7 @@
 
 target_sources(neko-top
     PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/neko_objective.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/objective_factory.f90
 
         # List of specific objectives

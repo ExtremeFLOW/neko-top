@@ -37,7 +37,7 @@
 !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
 module scalar_mixing_objective
   use num_types, only: rp
-  use objective, only: objective_t
+  use neko_objective, only: neko_objective_t
   use simulation_m, only: simulation_t
   use design, only: design_t
   use json_module, only: json_file
@@ -62,7 +62,7 @@ module scalar_mixing_objective
   !> An objective function corresponding to the mixing of a passive scalar
   !! \f$ F = \frac{1}{|\Omega_{obj}|}\int_{\Omega_{obj}}
   !! \frac{1}{2}\left(\phi - \phi_{ref}\right)^2 d\Omega, \f$
-  type, public, extends(objective_t) :: scalar_mixing_objective_t
+  type, public, extends(neko_objective_t) :: scalar_mixing_objective_t
      private
 
      !> pointer to the primal passive scalar fields \f$\phi\f$
