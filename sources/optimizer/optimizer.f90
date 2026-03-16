@@ -411,9 +411,9 @@ contains
 
     ! compute potential internals for for a potential restart
     if (this%current_iteration .ne. 0) then
-       call design%set_output_counter(this%current_iteration)
+       call design%set_output_counter(this%current_iteration - 1)
        if (present(simulation)) then
-          call simulation%set_output_counter(this%current_iteration)
+          call simulation%set_output_counter(this%current_iteration - 1)
        end if
     end if
 
