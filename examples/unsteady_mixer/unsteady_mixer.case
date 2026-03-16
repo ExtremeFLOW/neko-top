@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 8.0,
+            "end_time": 0.1,
             "timestep": 5.0e-3
         },
         "numerics": {
@@ -181,11 +181,10 @@
                 "asydecr": 0.9,
                 "xmin": 0.0,
                 "xmax": 1.0
+            },
+            "checkpoint": {
+                "interval": 1
             }
-        },
-        "checkpoint": {
-            "file": "yofam",
-            "interval": 1
         },
         "objectives": [
             {
