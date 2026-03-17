@@ -173,6 +173,8 @@ module brinkman_design
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain
      logical :: has_mask
+     !> SEM coefficients
+     class(coef_t), public, pointer :: coef
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -350,6 +352,8 @@ contains
     this%design_indicator => neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => neko_registry%get_field("sensitivity")
+
+    this%coef => simulation%fluid%c_Xh
 
     ! TODO
     ! this is where we steal basically everything in
