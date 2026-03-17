@@ -34,13 +34,6 @@
 !
 !> Implements the `adjoint_brinkman_dissipation_source_term_t` type.
 !
-!
-! I know this is a stupid naming convention...
-! The `lube` aspect came from a paper that attributed this term to out of plane
-! stresses based on lubrication theory.
-!
-! I preffer to think of it as a constraint that penalizes non-binary designs
-!
 ! The term is $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$
 !
 ! the corresponding adjoint forcing is $K \chi \mathbf{u}$

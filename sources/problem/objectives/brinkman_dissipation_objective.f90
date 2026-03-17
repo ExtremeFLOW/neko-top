@@ -34,34 +34,9 @@
 !
 !> Implements the `brinkman_dissipation_objective_t` type.
 !
-! I promise I'll write this document properly in the future...
-!
-! But the Borval Peterson (I think) paper had an objective function
-! that had 2 terms, dissipation and this term they claimed represented
-! out of plane stresses.
-! I never really understood that extra term, I also don't think it
-! applies to 3D cases, but everyone includes it anyway.
-!
-! It appears to me to be basically a heuristic penality that targets
-! non-binary designs
-!
-! so let's call
-!
 ! F = \int |\nabla u|^2  + K \int \chi \u^2
 !
-!      | dissipation |     |"Brinkman dissipation"|
-!
-! I say "Brinkman dissipation" because they said it came from lubrication
-! theory...
-! Anyway, we can change all this later (especially the names!)
-
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
-!
-! for the Brinkman dissipation, the adjoint forcing is \chi u
-!
-! This has always annoyed me...
-! because now I see one objective and one constraint
+!  |viscous dissipation | |"Brinkman dissipation"|
 !
 module brinkman_dissipation_objective
   use objective, only: objective_t
