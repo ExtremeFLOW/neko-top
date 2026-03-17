@@ -107,6 +107,23 @@ module device_math_ext
        integer(c_int) :: mask_size
      end subroutine hip_sub3_mask
   end interface
+  interface
+     subroutine hip_sqrt_inplace(a_d, size) bind(c, name = 'hip_sqrt_inplace')
+       import c_int, c_ptr
+       type(c_ptr), value :: a_d
+       integer(c_int) :: size
+     end subroutine hip_sqrt_inplace
+  end interface
+  interface
+     subroutine hip_scale_matrix_cols(a_d, w_d, nrows, ncols) &
+          bind(c, name = 'hip_scale_matrix_cols')
+       import c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: w_d
+       integer(c_int) :: nrows
+       integer(c_int) :: ncols
+     end subroutine hip_scale_matrix_cols
+  end interface
 
 #elif HAVE_CUDA
 
@@ -176,6 +193,23 @@ module device_math_ext
        type(c_ptr), value :: mask_d
        integer(c_int) :: mask_size
      end subroutine cuda_sub3_mask
+  end interface
+  interface
+     subroutine cuda_sqrt_inplace(a_d, size) bind(c, name = 'cuda_sqrt_inplace')
+       import c_int, c_ptr
+       type(c_ptr), value :: a_d
+       integer(c_int) :: size
+     end subroutine cuda_sqrt_inplace
+  end interface
+  interface
+     subroutine cuda_scale_matrix_cols(a_d, w_d, nrows, ncols) &
+          bind(c, name = 'cuda_scale_matrix_cols')
+       import c_int, c_ptr
+       type(c_ptr), value :: a_d
+       type(c_ptr), value :: w_d
+       integer(c_int) :: nrows
+       integer(c_int) :: ncols
+     end subroutine cuda_scale_matrix_cols
   end interface
 
 #elif HAVE_OPENCL
@@ -274,5 +308,35 @@ contains
     call neko_error('No device backend configured for device_sub3_mask')
 #endif
   end subroutine device_sub3_mask
+
+  !> Compute in-place square root: `a = sqrt(a)`.
+  subroutine device_sqrt_inplace(a_d, size)
+    type(c_ptr) :: a_d
+    integer :: size
+#if HAVE_HIP
+    call hip_sqrt_inplace(a_d, size)
+#elif HAVE_CUDA
+    call cuda_sqrt_inplace(a_d, size)
+#else
+    call neko_error('No device backend configured for device_sqrt_inplace')
+#endif
+  end subroutine device_sqrt_inplace
+
+  !> Scale each matrix column by a vector entry.
+  !! Matrix is stored in Fortran column-major order.
+  !! `A(:,j) = A(:,j) * w(j)` for j=1..ncols.
+  subroutine device_scale_matrix_cols(a_d, w_d, nrows, ncols)
+    type(c_ptr) :: a_d
+    type(c_ptr) :: w_d
+    integer :: nrows
+    integer :: ncols
+#if HAVE_HIP
+    call hip_scale_matrix_cols(a_d, w_d, nrows, ncols)
+#elif HAVE_CUDA
+    call cuda_scale_matrix_cols(a_d, w_d, nrows, ncols)
+#else
+    call neko_error('No device backend configured for device_scale_matrix_cols')
+#endif
+  end subroutine device_scale_matrix_cols
 
 end module device_math_ext

@@ -44,6 +44,7 @@ module mma_optimizer
   use brinkman_design, only: brinkman_design_t
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
+  use neko_ext, only: device_scale_matrix_cols
 
   ! External modules
   use json_module, only: json_file
