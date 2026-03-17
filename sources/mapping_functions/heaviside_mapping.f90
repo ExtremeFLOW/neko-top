@@ -93,7 +93,6 @@ contains
     real(kind=rp), allocatable :: beta_values(:)
     real(kind=rp) :: eta
     integer :: beta_iter
-    logical :: found
 
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
