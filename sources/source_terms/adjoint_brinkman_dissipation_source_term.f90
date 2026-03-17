@@ -1,4 +1,4 @@
-!> @file adjoint_lube_source_term.f90
+!> @file adjoint_brinkman_dissipation_source_term.f90
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,7 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `adjoint_lube_source_term_t` type.
+!> Implements the `adjoint_brinkman_dissipation_source_term_t` type.
 !
 !
 ! I know this is a stupid naming convention...
@@ -44,7 +44,7 @@
 ! The term is $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$
 !
 ! the corresponding adjoint forcing is $K \chi \mathbf{u}$
-module adjoint_lube_source_term
+module adjoint_brinkman_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
   use json_module, only: json_file
@@ -68,11 +68,12 @@ module adjoint_lube_source_term
   use device_math, only: device_col2, device_invcol2
   implicit none
   private
-  public :: adjoint_lube_source_term_allocate
+  public :: adjoint_brinkman_dissipation_source_term_allocate
 
   !> A adjoint source term corresponding to an objective of
   ! $K \int_\Omega \frac{1}{2}\chi|\mathbf{u}|^2$.
-  type, public, extends(source_term_t) :: adjoint_lube_source_term_t
+  type, public, extends(source_term_t) :: &
+       adjoint_brinkman_dissipation_source_term_t
 
      !> u of the primal
      type(field_t), pointer :: u => null()
@@ -107,23 +108,26 @@ module adjoint_lube_source_term
 
    contains
      !> The common constructor using a JSON object.
-     procedure, pass(this) :: init => adjoint_lube_source_term_init_from_json
+     procedure, pass(this) :: init => &
+          adjoint_brinkman_dissipation_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-          adjoint_lube_source_term_init_from_components
+          adjoint_brinkman_dissipation_source_term_init_from_components
      !> Destructor.
-     procedure, pass(this) :: free => adjoint_lube_source_term_free
+     procedure, pass(this) :: free => &
+          adjoint_brinkman_dissipation_source_term_free
      !> Computes the source term and adds the result to `fields`.
-     procedure, pass(this) :: compute_ => adjoint_lube_source_term_compute
-  end type adjoint_lube_source_term_t
+     procedure, pass(this) :: compute_ => &
+          adjoint_brinkman_dissipation_source_term_compute
+  end type adjoint_brinkman_dissipation_source_term_t
 
 contains
 
-  !> Allocator for the adjoint lube source term.
-  subroutine adjoint_lube_source_term_allocate(obj)
+  !> Allocator for the adjoint Brinkman dissipation source term.
+  subroutine adjoint_brinkman_dissipation_source_term_allocate(obj)
     class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_lube_source_term_t::obj)
-  end subroutine adjoint_lube_source_term_allocate
+    allocate(adjoint_brinkman_dissipation_source_term_t::obj)
+  end subroutine adjoint_brinkman_dissipation_source_term_allocate
 
   !> The common constructor using a JSON object.
   !! @param this The source term.
@@ -131,9 +135,9 @@ contains
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   !! @param variable_name The name of the variable where the source term acts.
-  subroutine adjoint_lube_source_term_init_from_json(this, json, fields, coef, &
-       variable_name)
-    class(adjoint_lube_source_term_t), intent(inout) :: this
+  subroutine adjoint_brinkman_dissipation_source_term_init_from_json(this, &
+       json, fields, coef, variable_name)
+    class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
@@ -146,7 +150,7 @@ contains
     ! maybe throw an error?
 
 
-  end subroutine adjoint_lube_source_term_init_from_json
+  end subroutine adjoint_brinkman_dissipation_source_term_init_from_json
 
   !> The constructor from type components.
   !! @param this The source term.
@@ -163,12 +167,12 @@ contains
   !! @param volume volume of the objective domain.
   !! @param scratch_GL A scratch registry on the GL space.
   !! @param gdim physical dimension.
-  subroutine adjoint_lube_source_term_init_from_components(this, &
-       f_x, f_y, f_z, design, K, &
+  subroutine adjoint_brinkman_dissipation_source_term_init_from_components( &
+       this, f_x, f_y, f_z, design, K, &
        u, v, w, &
        mask, if_mask, &
        coef, c_Xh_GL, GLL_to_GL, dealias, volume, scratch_GL, gdim)
-    class(adjoint_lube_source_term_t), intent(inout) :: this
+    class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     class(design_t), intent(in), target :: design
     real(kind=rp), intent(in) :: K
@@ -229,11 +233,11 @@ contains
        this%mask => mask
     end if
 
-  end subroutine adjoint_lube_source_term_init_from_components
+  end subroutine adjoint_brinkman_dissipation_source_term_init_from_components
 
   !> Destructor.
-  subroutine adjoint_lube_source_term_free(this)
-    class(adjoint_lube_source_term_t), intent(inout) :: this
+  subroutine adjoint_brinkman_dissipation_source_term_free(this)
+    class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
 
     call this%free_base()
     nullify(this%u)
@@ -246,13 +250,13 @@ contains
     nullify(this%mask)
     nullify(this%scratch_GL)
 
-  end subroutine adjoint_lube_source_term_free
+  end subroutine adjoint_brinkman_dissipation_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
   !! @param time The time state.
-  subroutine adjoint_lube_source_term_compute(this, time)
-    class(adjoint_lube_source_term_t), intent(inout) :: this
+  subroutine adjoint_brinkman_dissipation_source_term_compute(this, time)
+    class(adjoint_brinkman_dissipation_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: work
@@ -348,6 +352,6 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine adjoint_lube_source_term_compute
+  end subroutine adjoint_brinkman_dissipation_source_term_compute
 
-end module adjoint_lube_source_term
+end module adjoint_brinkman_dissipation_source_term

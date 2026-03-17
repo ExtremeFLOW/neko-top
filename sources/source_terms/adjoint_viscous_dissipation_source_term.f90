@@ -1,4 +1,4 @@
-!> @file adjoint_minimum_dissipation_source_term.f90
+!> @file adjoint_viscous_dissipation_source_term.f90
 !! @copyright
 !! Copyright (c) 2024-2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,13 +32,13 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `adjoint_minimum_dissipation_source_term_t` type.
+!> Implements the `adjoint_viscous_dissipation_source_term_t` type.
 !
 !
 ! If the objective function $\int |\nabla u|^2$,
 ! the corresponding adjoint forcing is $ \int \nabla v \cdot \nabla u $ in weak
 ! form.
-module adjoint_minimum_dissipation_source_term
+module adjoint_viscous_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t
   use json_module, only: json_file
@@ -67,12 +67,12 @@ module adjoint_minimum_dissipation_source_term
 
   implicit none
   private
-  public :: adjoint_minimum_dissipation_source_term_allocate
+  public :: adjoint_viscous_dissipation_source_term_allocate
 
-  !> An adjoint source term for objectives of minimum dissipation
+  !> An adjoint source term for objectives of viscous dissipation
   ! $\int \nabla v \cdot \nabla u $
   type, public, extends(source_term_t) :: &
-       adjoint_minimum_dissipation_source_term_t
+       adjoint_viscous_dissipation_source_term_t
      !> u of the primal
      type(field_t), pointer :: u => null()
      !> v of the primal
@@ -93,25 +93,25 @@ module adjoint_minimum_dissipation_source_term
    contains
      !> The common constructor using a JSON object.
      procedure, pass(this) :: init => &
-          adjoint_minimum_dissipation_source_term_init_from_json
+          adjoint_viscous_dissipation_source_term_init_from_json
      !> The constructor from type components.
      procedure, pass(this) :: init_from_components => &
-          adjoint_minimum_dissipation_source_term_init_from_components
+          adjoint_viscous_dissipation_source_term_init_from_components
      !> Destructor.
      procedure, pass(this) :: free => &
-          adjoint_minimum_dissipation_source_term_free
+          adjoint_viscous_dissipation_source_term_free
      !> Computes the source term and adds the result to `fields`.
      procedure, pass(this) :: compute_ => &
-          adjoint_minimum_dissipation_source_term_compute
-  end type adjoint_minimum_dissipation_source_term_t
+          adjoint_viscous_dissipation_source_term_compute
+  end type adjoint_viscous_dissipation_source_term_t
 
 contains
 
-  !> Allocator for the adjoint minimum dissipation source term.
-  subroutine adjoint_minimum_dissipation_source_term_allocate(obj)
+  !> Allocator for the adjoint viscous dissipation source term.
+  subroutine adjoint_viscous_dissipation_source_term_allocate(obj)
     class(source_term_t), allocatable, intent(inout) :: obj
-    allocate(adjoint_minimum_dissipation_source_term_t::obj)
-  end subroutine adjoint_minimum_dissipation_source_term_allocate
+    allocate(adjoint_viscous_dissipation_source_term_t::obj)
+  end subroutine adjoint_viscous_dissipation_source_term_allocate
 
   !> The common constructor using a JSON object.
   !! @param json The JSON object for the source.
@@ -119,9 +119,9 @@ contains
   !! @param fields A list of fields for adding the source values.
   !! @param coef The SEM coeffs.
   !! @param variable_name The name of the variable where the source term acts.
-  subroutine adjoint_minimum_dissipation_source_term_init_from_json(this, &
+  subroutine adjoint_viscous_dissipation_source_term_init_from_json(this, &
        json, fields, coef, variable_name)
-    class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
+    class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(field_list_t), intent(in), target :: fields
     type(coef_t), intent(in), target :: coef
@@ -131,7 +131,7 @@ contains
     ! maybe throw an error?
 
 
-  end subroutine adjoint_minimum_dissipation_source_term_init_from_json
+  end subroutine adjoint_viscous_dissipation_source_term_init_from_json
 
   !> The constructor from type components.
   !! @param this The source term.
@@ -142,12 +142,12 @@ contains
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
   !! @param volume volume of the objective domain.
-  subroutine adjoint_minimum_dissipation_source_term_init_from_components(this,&
+  subroutine adjoint_viscous_dissipation_source_term_init_from_components(this,&
        f_x, f_y, f_z, &
        u, v, w, obj_scale, &
        mask, if_mask, &
        coef, volume)
-    class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
+    class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
     type(coef_t) :: coef
@@ -191,11 +191,11 @@ contains
     ! Initialize the ax_helm object
     call ax_helm_factory(this%Ax, full_formulation = .false.)
 
-  end subroutine adjoint_minimum_dissipation_source_term_init_from_components
+  end subroutine adjoint_viscous_dissipation_source_term_init_from_components
 
   !> Destructor.
-  subroutine adjoint_minimum_dissipation_source_term_free(this)
-    class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
+  subroutine adjoint_viscous_dissipation_source_term_free(this)
+    class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
 
     call this%free_base()
     nullify(this%u)
@@ -206,13 +206,13 @@ contains
        deallocate(this%Ax)
     end if
 
-  end subroutine adjoint_minimum_dissipation_source_term_free
+  end subroutine adjoint_viscous_dissipation_source_term_free
 
   !> Computes the source term and adds the result to `fields`.
   !! @param this The source term.
   !! @param time The time state.
-  subroutine adjoint_minimum_dissipation_source_term_compute(this, time)
-    class(adjoint_minimum_dissipation_source_term_t), intent(inout) :: this
+  subroutine adjoint_viscous_dissipation_source_term_compute(this, time)
+    class(adjoint_viscous_dissipation_source_term_t), intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(field_t), pointer :: u, v, w
     type(field_t), pointer :: fu, fv, fw
@@ -309,6 +309,6 @@ contains
 
     end associate
 
-  end subroutine adjoint_minimum_dissipation_source_term_compute
+  end subroutine adjoint_viscous_dissipation_source_term_compute
 
-end module adjoint_minimum_dissipation_source_term
+end module adjoint_viscous_dissipation_source_term

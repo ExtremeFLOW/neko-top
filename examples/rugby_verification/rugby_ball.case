@@ -131,11 +131,11 @@
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "viscous_dissipation",
                 "weight": 1.0
             },
             {
-                "type": "lube_term",
+                "type": "brinkman_dissipation",
                 "weight": 1.0,
                 "dealias_sensitivity": false,
                 "dealias_forcing": false

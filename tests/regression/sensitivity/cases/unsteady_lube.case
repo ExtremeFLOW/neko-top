@@ -127,7 +127,7 @@
         },
         "objectives": [
             {
-                "type": "lube_term",
+                "type": "brinkman_dissipation",
                 "weight": 1.0
             }
         ]
