@@ -45,6 +45,7 @@ module adjoint_case
   use chkp_output, only: chkp_output_t
   use flow_ic, only: set_flow_ic
   use output_controller, only: output_controller_t
+  use time_based_controller, only: time_based_controller_t
   use file, only: file_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_item
@@ -80,6 +81,9 @@ module adjoint_case
      ! Fields
      type(adjoint_output_t) :: f_out
      type(output_controller_t) :: output_controller
+     type(time_based_controller_t) :: norm_output_ctrl
+     type(file_t) :: norm_output_file
+     logical :: norm_output_enabled = .false.
 
      logical :: have_scalar = .false.
 
@@ -107,6 +111,7 @@ contains
     integer :: lx = 0
     real(kind=rp) :: real_val = 0.0_rp
     character(len=:), allocatable :: string_val
+    character(len=:), allocatable :: norm_control, norm_file
     integer :: precision
     integer :: n_scalars_primal, n_scalars_adjoint, i
     logical :: scalar = .false.
@@ -402,6 +407,26 @@ contains
        call this%output_controller%add(this%f_out, real_val, string_val)
     end if
 
+    !
+    ! Setup adjoint norm output
+    !
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.norm_output_control', norm_control, 'never')
+    if (trim(norm_control) .ne. 'never') then
+       call json_get_or_default(neko_case%params, &
+            'case.adjoint_fluid.norm_output_value', real_val, 1.0_rp)
+       call json_get_or_default(neko_case%params, &
+            'case.adjoint_fluid.norm_output_file', norm_file, &
+            'adjoint_norm.csv')
+       call this%norm_output_file%init(trim(neko_case%output_directory) // &
+            trim(norm_file))
+       call this%norm_output_file%set_header('Time, Norm')
+       call this%norm_output_file%set_overwrite(.true.)
+       call this%norm_output_ctrl%init(this%time%start_time, &
+            this%time%end_time, trim(norm_control), real_val)
+       this%norm_output_enabled = .true.
+    end if
+
     ! !
     ! ! Save checkpoints (if nothing specified, default to saving at end of sim)
     ! !
@@ -457,10 +482,11 @@ contains
     ! Fields
     call this%f_out%free()
     call this%output_controller%free()
+    call this%norm_output_ctrl%free()
+    call this%norm_output_file%free()
 
     this%have_scalar = .false.
 
   end subroutine adjoint_free
 
 end module adjoint_case
-
