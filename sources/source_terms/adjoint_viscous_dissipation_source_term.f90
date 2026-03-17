@@ -35,9 +35,9 @@
 !> Implements the `adjoint_viscous_dissipation_source_term_t` type.
 !
 !
-! If the objective function $\int |\nabla u|^2$,
-! the corresponding adjoint forcing is $ \int \nabla v \cdot \nabla u $ in weak
-! form.
+! If the objective function $\frac{\mu}{2} \int |\nabla u|^2$, the
+! corresponding adjoint forcing is
+! $ \mu \int \nabla v \cdot \nabla u $ in weak form.
 module adjoint_viscous_dissipation_source_term
   use num_types, only: rp
   use field_list, only: field_list_t

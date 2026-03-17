@@ -55,8 +55,8 @@
 ! theory...
 ! Anyway, we can change all this later (especially the names!)
 
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+! If the objective function \frac{\mu}{2} \int |\nabla u|^2,
+! the corresponding adjoint forcing is \mu \int \nabla v \cdot \nabla u
 !
 ! for the Brinkman dissipation, the adjoint forcing is \chi u
 !
@@ -93,7 +93,7 @@ module viscous_dissipation_objective
   private
 
   !> An objective function corresponding to viscous dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega \f$
+  !! \f$ F =  \int_\Omega \frac{\mu}{2} |\nabla u|^2 d \Omega \f$
   type, public, extends(objective_t) :: viscous_dissipation_objective_t
      private
 
@@ -113,6 +113,8 @@ module viscous_dissipation_objective
      type(field_t), pointer :: adjoint_w => null()
      !> Volume of the objective domain.
      real(kind=rp) :: volume
+     !> Dynamic viscosity.
+     real(kind=rp) :: viscosity
 
    contains
      !> The common constructor using a JSON object.
@@ -183,6 +185,7 @@ contains
     this%adjoint_u => neko_registry%get_field('u_adj')
     this%adjoint_v => neko_registry%get_field('v_adj')
     this%adjoint_w => neko_registry%get_field('w_adj')
+    this%viscosity = simulation%fluid%mu%x(1,1,1,1)
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
@@ -198,7 +201,7 @@ contains
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight, &
+         this%u, this%v, this%w, this%weight * this%viscosity, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume)
 
@@ -282,7 +285,7 @@ contains
        end if
     end if
 
-    this%value = this%value * 0.5_rp / this%volume
+    this%value = this%value * 0.5_rp * this%viscosity / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 

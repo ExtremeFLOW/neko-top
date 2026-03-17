@@ -47,15 +47,17 @@ have currently been implemented in `neko-top`·
 
 ### Viscous dissipation {#objective_dissipation}
 
-This objective is used to either minimize or maximize the pseudo-dissipation.
+This objective is used to either minimize or maximize the viscous dissipation.
 It takes the form
 \f[
-\mathcal{F} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} \frac{1}{2} |\nabla \mathbf{u}|^2 d\Omega,
+\mathcal{F} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}}
+\frac{\mu}{2} |\nabla \mathbf{u}|^2 d\Omega,
 \f]
 where \f$\mathbf{u}\f$ is the fluid velocity, \f$\Omega_\text{obj}\f$ is the
-objective domain, \f$|\nabla \mathbf{u}|^2\f$ the pseudo-dissipation where the
-notation \f$|\cdot|\f$ denotes the Frobenius norm and where \f$|\Omega_\text{obj}|\f$
-denotes the volume of the objective domain.
+objective domain, \f$\mu\f$ is the dynamic viscosity, and
+\f$|\nabla \mathbf{u}|^2\f$ denotes the Frobenius norm of the velocity
+gradient. Here \f$|\Omega_\text{obj}|\f$ denotes the volume of the objective
+domain.
 
 The objective can be selected by prescribing `"type": "viscous_dissipation"`
 and has the following input parameters:
