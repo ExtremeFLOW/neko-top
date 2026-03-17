@@ -229,6 +229,9 @@ module brinkman_design
 
      ! a writer being called from outside would be nice
      procedure, pass(this) :: write => brinkman_design_write
+     !> Reset output counters after a restart.
+     procedure, pass(this) :: set_output_counter => &
+          brinkman_design_set_output_counter
 
      !> Destructor
      procedure, pass(this) :: free => brinkman_design_free
@@ -632,5 +635,13 @@ contains
     call this%mapping%write_sensitivity(idx)
 
   end subroutine brinkman_design_write
+
+  subroutine brinkman_design_set_output_counter(this, idx)
+    class(brinkman_design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%mapping%set_output_counter(idx)
+
+  end subroutine brinkman_design_set_output_counter
 
 end module brinkman_design
