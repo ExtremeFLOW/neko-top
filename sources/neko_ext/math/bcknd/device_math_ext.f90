@@ -108,13 +108,6 @@ module device_math_ext
      end subroutine hip_sub3_mask
   end interface
   interface
-     subroutine hip_sqrt_inplace(a_d, size) bind(c, name = 'hip_sqrt_inplace')
-       import c_int, c_ptr
-       type(c_ptr), value :: a_d
-       integer(c_int) :: size
-     end subroutine hip_sqrt_inplace
-  end interface
-  interface
      subroutine hip_scale_matrix_cols(a_d, w_d, nrows, ncols) &
           bind(c, name = 'hip_scale_matrix_cols')
        import c_int, c_ptr
