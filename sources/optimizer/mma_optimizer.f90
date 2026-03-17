@@ -508,11 +508,11 @@ contains
      norm_scale = unscaled_norm / scaled_norm
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       ! Scale constraint sensitivity
+       ! Remove mass matrix.
        call device_scale_matrix_cols(constraint_sensitivities%x_d, &
             B_inv%x_d, m, n)
     else
-       ! Scale constraint sensitivity
+       ! Remove mass matrix.
        do j = 1, n
           call cmult(constraint_sensitivities%x(:, j), B_inv%x(j), m)
        end do

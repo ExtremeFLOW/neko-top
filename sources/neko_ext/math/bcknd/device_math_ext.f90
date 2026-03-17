@@ -195,13 +195,6 @@ module device_math_ext
      end subroutine cuda_sub3_mask
   end interface
   interface
-     subroutine cuda_sqrt_inplace(a_d, size) bind(c, name = 'cuda_sqrt_inplace')
-       import c_int, c_ptr
-       type(c_ptr), value :: a_d
-       integer(c_int) :: size
-     end subroutine cuda_sqrt_inplace
-  end interface
-  interface
      subroutine cuda_scale_matrix_cols(a_d, w_d, nrows, ncols) &
           bind(c, name = 'cuda_scale_matrix_cols')
        import c_int, c_ptr
@@ -308,19 +301,6 @@ contains
     call neko_error('No device backend configured for device_sub3_mask')
 #endif
   end subroutine device_sub3_mask
-
-  !> Compute in-place square root: `a = sqrt(a)`.
-  subroutine device_sqrt_inplace(a_d, size)
-    type(c_ptr) :: a_d
-    integer :: size
-#if HAVE_HIP
-    call hip_sqrt_inplace(a_d, size)
-#elif HAVE_CUDA
-    call cuda_sqrt_inplace(a_d, size)
-#else
-    call neko_error('No device backend configured for device_sqrt_inplace')
-#endif
-  end subroutine device_sqrt_inplace
 
   !> Scale each matrix column by a vector entry.
   !! Matrix is stored in Fortran column-major order.

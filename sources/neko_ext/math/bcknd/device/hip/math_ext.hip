@@ -139,19 +139,6 @@ void hip_sub3_mask(
     HIP_CHECK(hipGetLastError());
 }
 
-/** Fortran wrapper for sqrt_inplace
- * Compute in-place square root of a vector.
- */
-void hip_sqrt_inplace(void* a, int* size) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*size) + 1024 - 1) / 1024, 1, 1);
-
-    if(*size == 0) return;
-    hipLaunchKernelGGL(sqrt_inplace_kernel<real>, nblcks, nthrds, 0,
-         (hipStream_t)glb_cmd_queue, (real*)a, *size);
-    HIP_CHECK(hipGetLastError());
-}
-
 /** Fortran wrapper for scale_matrix_cols
  * Scale columns of a matrix in Fortran column-major order:
  * A(:,j) = A(:,j) * w(j)
