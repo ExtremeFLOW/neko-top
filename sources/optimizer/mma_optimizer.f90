@@ -481,7 +481,6 @@ contains
     type(vector_t), intent(inout) :: objective_sensitivities
     type(matrix_t), intent(inout) :: constraint_sensitivities
     class(coef_t), intent(in) :: coef
-    type(vector_t) :: column_scale
     type(vector_t) :: B_inv ! Note. This differs from coef%B_inv by mult
     integer :: j, m, n
     real(kind=rp) :: unscaled_norm, scaled_norm, norm_scale
