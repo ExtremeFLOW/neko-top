@@ -46,8 +46,9 @@ module heaviside_mapping
   use heaviside_mapping_cpu, only: &
        heaviside_mapping_apply_cpu, &
        heaviside_mapping_apply_backward_cpu
-  use json_utils, only: json_get_or_default, json_get_or_lookup
+  use json_utils, only: json_get_or_default
   use utils, only: neko_error
+  use json_utils_ext, only: json_get_with_continuation
   use continuation_scheduler, only: nekotop_continuation
 
   implicit none
@@ -90,39 +91,25 @@ contains
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
     real(kind=rp), allocatable :: beta_values(:)
-    real(kind=rp) :: beta_single, eta
-    integer :: beta_iter, var_type
+    real(kind=rp) :: eta
+    integer :: beta_iter
     logical :: found
 
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
-    call json%info('beta', found=found, var_type=var_type)
-    if (.not. found) then
-       allocate(beta_values(1))
-       beta_values = 1.0_rp
-    else if (var_type == 6) then ! scalar real
-       call json_get_or_default(json, 'beta', beta_single, 1.0_rp)
-       allocate(beta_values(1))
-       beta_values(1) = beta_single
-    else if (var_type == 3) then ! array
-       call json_get_or_lookup(json, 'beta', beta_values)
-    else
-       call neko_error("beta must be real or real array")
-    end if
+    ! Read beta values from json and if that is an array also read beta_iter
+    call json_get_with_continuation(json, 'beta', beta_values, 1.0_rp,&
+         beta_iter)
 
     ! Initialize base
     call this%init_base(json, coef)
     call this%init_from_attributes(coef, beta_values(1), eta)
 
-    ! Register continuation if multiple values
+    ! Register beta for continuation if we have an array of values for beta
     if (size(beta_values) > 1) then
-       ! Read optional iterations per beta step
-       call json_get_or_default(json, 'beta_iterations', beta_iter, &
-            nekotop_continuation%default_iterations)
        call nekotop_continuation%register_parameter("beta", this%beta, &
             beta_values, beta_iter)
     end if
-
   end subroutine heaviside_mapping_init_from_json
 
   !> Constructor from attributes.
