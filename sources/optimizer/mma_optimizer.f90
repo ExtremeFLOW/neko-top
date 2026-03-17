@@ -499,13 +499,13 @@ contains
 
     ! check unscaled norm
     unscaled_norm = sqrt(vector_glsc2(objective_sensitivities, &
-               objective_sensitivities))
-     ! Remove mass matrix.
-     call vector_col2(objective_sensitivities, B_inv)
-     ! Check new norm
-     scaled_norm = sqrt(vector_glsc2(objective_sensitivities, &
-               objective_sensitivities))
-     norm_scale = unscaled_norm / scaled_norm
+         objective_sensitivities))
+    ! Remove mass matrix.
+    call vector_col2(objective_sensitivities, B_inv)
+    ! Check new norm
+    scaled_norm = sqrt(vector_glsc2(objective_sensitivities, &
+         objective_sensitivities))
+    norm_scale = unscaled_norm / scaled_norm
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        ! Remove mass matrix.
@@ -518,9 +518,9 @@ contains
        end do
     end if
 
-     ! rescale
-     call vector_cmult(objective_sensitivities, norm_scale)
-     call matrix_cmult(constraint_sensitivities, norm_scale)
+    ! rescale
+    call vector_cmult(objective_sensitivities, norm_scale)
+    call matrix_cmult(constraint_sensitivities, norm_scale)
 
     call B_inv%free()
 
