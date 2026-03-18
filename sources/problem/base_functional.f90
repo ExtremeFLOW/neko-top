@@ -287,6 +287,8 @@ contains
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: dt
 
+    if (.not. this%is_active()) return
+
     call vector_copy(this%sensitivity_old, this%sensitivity)
     call this%update_sensitivity(design)
 
