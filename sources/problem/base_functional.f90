@@ -265,7 +265,7 @@ contains
     this%sensitivity = 0.0_rp
   end subroutine functional_reset_sensitivity
 
-  !> Accumulate the value of the function.
+  !> Accumulate the value of the function
   subroutine functional_accumulate_value(this, design, dt)
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
@@ -276,24 +276,26 @@ contains
     this%value_old = this%value
     call this%update_value(design)
 
+    ! could potentially use higher order trapezoidal/Simpson etc, but this
+    ! should suffice
     this%value = this%value_old + this%value * dt
   end subroutine functional_accumulate_value
 
-  !> Accumulate the sensitivity of the function.
+  !> Accumulate the sensitivity of the function
   subroutine functional_accumulate_sensitivity(this, design, dt)
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     real(kind=rp), intent(in) :: dt
 
-    if (.not. this%is_active()) return
-
     call vector_copy(this%sensitivity_old, this%sensitivity)
     call this%update_sensitivity(design)
 
+    ! could potentially use higher order trapezoidal/Simpson etc, but this
+    ! should suffice
     call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
   end subroutine functional_accumulate_sensitivity
 
-  !> Return true when the current time is inside the accumulation window.
+  !> Return true when the current time is inside the accumulation window
   logical function functional_is_active(this)
     class(base_functional_t), intent(in) :: this
 
