@@ -36,12 +36,14 @@
 module base_functional
   use design, only: design_t
   use json_module, only: json_file
-  use json_utils, only: json_get
+  use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp
   use point_zone, only: point_zone_t
   use simulation_m, only: simulation_t
+  use time_state, only: time_state_t
   use vector, only: vector_t
   use utils, only: neko_error
+  use vector_math, only: vector_copy, vector_add2s1
   implicit none
   private
 
@@ -59,14 +61,24 @@ module base_functional
 
      !> Value of the base_functional
      real(kind=rp) :: value = 0.0_rp
+     !> Old value for time integration
+     real(kind=rp) :: value_old = 0.0_rp
      !> Sensitivity field
      type(vector_t) :: sensitivity
+     !> Old sensitivity field for time integration
+     type(vector_t) :: sensitivity_old
      !> Name of constraint/objective in the logfile
      character(len=25) :: name = ""
      !> containing a mask
      logical :: has_mask = .false.
      !> A mask for where the objective function is evaluated
      class(point_zone_t), pointer :: mask => null()
+     !> Time window start for accumulation
+     real(kind=rp) :: start_time = 0.0_rp
+     !> Time window end for accumulation
+     real(kind=rp) :: end_time = huge(0.0_rp)
+     !> Bound primal time state used to gate accumulation
+     type(time_state_t), pointer :: time => null()
 
    contains
 
@@ -80,6 +92,11 @@ module base_functional
      procedure, pass(this) :: init_json => functional_init_json
      !> Constructor based on json input and simulation
      procedure, pass(this) :: init_json_sim => functional_init_json_sim
+     !> Read the active time window from JSON
+     procedure, pass(this) :: init_time_window_json => &
+          functional_init_time_window_json
+     !> Bind the functional to the primal simulation time state
+     procedure, pass(this) :: bind_time => functional_bind_time
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
@@ -103,6 +120,13 @@ module base_functional
      procedure, pass(this) :: reset_value => functional_reset_value
      !> Set the sensitivity to zero
      procedure, pass(this) :: reset_sensitivity => functional_reset_sensitivity
+     !> Accumulate the value
+     procedure, pass(this) :: accumulate_value => functional_accumulate_value
+     !> Accumulate the sensitivity
+     procedure, pass(this) :: accumulate_sensitivity => &
+          functional_accumulate_sensitivity
+     !> Return true when the current time is inside the accumulation window
+     procedure, private, pass(this) :: is_active => functional_is_active
 
   end type base_functional_t
 
@@ -160,6 +184,23 @@ contains
     call neko_error("Functional type: '" // type // &
          "' does not support initialization with simulation")
   end subroutine functional_init_json_sim
+
+  !> Read the active time window for this functional from JSON.
+  subroutine functional_init_time_window_json(this, json)
+    class(base_functional_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
+  end subroutine functional_init_time_window_json
+
+  !> Bind the functional to the primal simulation time state.
+  subroutine functional_bind_time(this, time)
+    class(base_functional_t), intent(inout) :: this
+    type(time_state_t), target, intent(inout) :: time
+
+    this%time => time
+  end subroutine functional_bind_time
 
 
   !> Get the value of the function
@@ -223,4 +264,45 @@ contains
 
     this%sensitivity = 0.0_rp
   end subroutine functional_reset_sensitivity
+
+  !> Accumulate the value of the function.
+  subroutine functional_accumulate_value(this, design, dt)
+    class(base_functional_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+
+    if (.not. this%is_active()) return
+
+    this%value_old = this%value
+    call this%update_value(design)
+
+    this%value = this%value_old + this%value * dt
+  end subroutine functional_accumulate_value
+
+  !> Accumulate the sensitivity of the function.
+  subroutine functional_accumulate_sensitivity(this, design, dt)
+    class(base_functional_t), intent(inout) :: this
+    class(design_t), intent(in) :: design
+    real(kind=rp), intent(in) :: dt
+
+    if (.not. this%is_active()) return
+
+    call vector_copy(this%sensitivity_old, this%sensitivity)
+    call this%update_sensitivity(design)
+
+    call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
+  end subroutine functional_accumulate_sensitivity
+
+  !> Return true when the current time is inside the accumulation window.
+  logical function functional_is_active(this)
+    class(base_functional_t), intent(in) :: this
+
+    if (.not. associated(this%time)) then
+       functional_is_active = .true.
+       return
+    end if
+
+    functional_is_active = this%time%t .ge. this%start_time .and. &
+         this%time%t .le. this%end_time
+  end function functional_is_active
 end module base_functional

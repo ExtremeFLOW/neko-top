@@ -63,7 +63,7 @@
 ! because now I see one objective and one constraint
 !
 module lube_term_objective
-  use neko_objective, only: neko_objective_t
+  use objective, only: objective_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use simulation_m, only: simulation_t
@@ -90,7 +90,7 @@ module lube_term_objective
 
   !> An objective function corresponding to out of plane stresses
   !! \f$ F =  \int_Omega \frac{1}{2} \chi |\mathbf{u}|^2 d \Omega \f$
-  type, public, extends(neko_objective_t) :: lube_term_objective_t
+  type, public, extends(objective_t) :: lube_term_objective_t
      private
 
      !> Pointer to the u field.

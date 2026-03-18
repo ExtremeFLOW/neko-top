@@ -38,7 +38,7 @@ module augmented_lagrangian_objective
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult
   use scratch_registry, only: neko_scratch_registry, scratch_registry_t
-  use neko_objective, only: neko_objective_t
+  use objective, only: objective_t
   use simulation_m, only: simulation_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use math, only: copy, col2, invcol2
@@ -54,7 +54,7 @@ module augmented_lagrangian_objective
 
   !> An objective function implementing our augmented lagrangian sensitivity
   !! contribution.
-  type, public, extends(neko_objective_t) :: augmented_lagrangian_objective_t
+  type, public, extends(objective_t) :: augmented_lagrangian_objective_t
      private
 
      !> Pointer to the u field.
