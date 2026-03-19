@@ -160,7 +160,7 @@ contains
     integer, intent(out), optional :: iter
     real(kind=rp) :: scalar_parameter
     logical :: found
-    integer :: var_type, value_iter
+    integer :: var_type
 
     ! Inspect JSON for the parameter
     call json%info(name, found=found, var_type=var_type)
@@ -180,7 +180,7 @@ contains
     ! Read iterations if multiple values
     if (size(values) > 1) then
        ! Read optional iterations per parameter step
-       call json_get_or_default(json, trim(name)//'_iterations', value_iter, &
+       call json_get_or_default(json, trim(name)//'_iterations', iter, &
             nekotop_continuation%default_iterations)
     end if
   end subroutine json_get_with_continuation
