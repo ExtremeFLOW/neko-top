@@ -403,11 +403,11 @@ contains
       ! Now, this value is used in the explicit time scheme to advance these
       ! terms in time.
       call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, &
-           rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
+           rho%x(1,1,1,1), ext_bdf%advection_coeffs%x, n)
 
       ! Add the RHS contributions coming from the BDF scheme.
       call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
-           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
@@ -422,7 +422,7 @@ contains
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual')
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs(1), &
+           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs%x(1), &
            dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
