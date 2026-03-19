@@ -361,7 +361,7 @@ function find_neko() {
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
-    [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
+    [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -389,7 +389,7 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
-        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -446,7 +446,7 @@ function find_neko() {
 
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j || make -j
-        [ "$TEST" == true ] && make check -j
+        [ "$NEKO_TEST" == true ] && make check -j
         make install
 
         cd $CURRENT_DIR
