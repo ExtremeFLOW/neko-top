@@ -560,19 +560,20 @@ contains
     character(len=*), intent(in), optional :: filename
 
     character(len=4096) :: header
-    integer :: total_size, base_size, i
+    integer :: total_size, base_size, i, n_cont
     character(len=256) :: log_name
 
     if (present(include_constraints)) then
        this%log_include_constraints = include_constraints
     end if
+    n_cont = nekotop_continuation%get_n_params()
 
     base_size = problem%get_log_size(this%log_include_constraints)
 
     this%log_extra_size = 0
     if (present(extra_headers)) this%log_extra_size = size(extra_headers)
 
-    total_size = 1 + base_size + this%log_extra_size
+    total_size = 1 + base_size + this%log_extra_size + n_cont
     call this%log_data%init(total_size)
 
     if (present(filename)) then
@@ -594,6 +595,11 @@ contains
        end do
     end if
 
+    ! continuation parameters
+    do i = 1, n_cont
+       header =  trim(header) // ', ' // &
+            trim(nekotop_continuation%get_param_name(i))
+    end do
     call this%log_file%set_header(trim(header))
 
     this%log_initialized = .true.
@@ -609,12 +615,14 @@ contains
     integer, intent(in) :: iter
     class(problem_t), intent(in) :: problem
     real(kind=rp), intent(in), optional :: extra_values(:)
-    integer :: base_size, offset
+    integer :: base_size, offset, n_cont, i
 
     if (.not. this%log_initialized) return
 
+    ! Number of continuation parameters
+    n_cont = nekotop_continuation%get_n_params()
+
     base_size = problem%get_log_size(this%log_include_constraints)
-    this%log_data%x = 0.0_rp
     this%log_data%x(1) = real(iter, kind=rp)
 
     call problem%get_log_values( &
@@ -628,6 +636,12 @@ contains
        end if
        this%log_data%x(offset:offset + size(extra_values) - 1) = extra_values
     end if
+
+    ! Continuation parameter values
+    do i = 1, n_cont
+       this%log_data%x(offset + size(extra_values) - 1 + i) = &
+            nekotop_continuation%params(i)%target
+    end do
 
     call this%log_file%write(this%log_data)
 

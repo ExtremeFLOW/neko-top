@@ -62,8 +62,8 @@ module continuation_scheduler
      type(continuation_parameter_t), allocatable :: params(:)
      integer :: default_iterations = 1
    contains
-     procedure :: init
-     procedure :: free
+     procedure :: init => init_scheduler
+     procedure :: free => free_scheduler
      procedure :: register_parameter
      procedure :: update
      procedure :: get_param_name
@@ -78,7 +78,7 @@ module continuation_scheduler
 contains
 
   !> Initialize the continuation scheduler from JSON defaults
-  subroutine init(this, json)
+  subroutine init_scheduler(this, json)
     class(continuation_scheduler_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     integer :: n_default
@@ -90,10 +90,10 @@ contains
 
     ! Initialize empty parameter array
     if (allocated(this%params)) deallocate(this%params)
-  end subroutine init
+  end subroutine init_scheduler
 
   !> free continuation scheduler
-  subroutine free(this)
+  subroutine free_scheduler(this)
     class(continuation_scheduler_t), intent(inout) :: this
     integer :: i
 
@@ -104,7 +104,7 @@ contains
     end do
 
     deallocate(this%params)
-  end subroutine free
+  end subroutine free_scheduler
 
   !> Register a continuation parameter
   subroutine register_parameter(this, name, target, values, iterations)
