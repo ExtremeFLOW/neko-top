@@ -597,7 +597,7 @@ contains
 
     ! continuation parameters
     do i = 1, n_cont
-       header =  trim(header) // ', ' // &
+       header = trim(header) // ', ' // &
             trim(nekotop_continuation%get_param_name(i))
     end do
     call this%log_file%set_header(trim(header))

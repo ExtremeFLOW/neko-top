@@ -95,12 +95,6 @@
                     "r": 0.01
                 },
                 {
-                    "type": "heaviside_mapping",
-                    "beta": [1.0, 10.0, 100.0],
-                    "beta_iterations": 5,
-                    "eta": 0.5,
-                },
-                {
                     "type": "RAMP",
                     "f_max": 100.0,
                     "q": 3.0,
@@ -155,7 +149,19 @@
                 "type": "volume",
                 "mask_name": "optimization_domain",
                 "limit": 0.2,
-                "is_max": false
+                "is_max": false,
+                "mapping": [
+                {
+                    "type": "PDE_filter",
+                    "r": 0.01
+                },
+                {
+                    "type": "heaviside_mapping",
+                    "beta": [1.0, 5.0, 10.0],
+                    "beta_iterations": 5,
+                    "eta": 0.5,
+                }
+                ]
             }
         ]
     }

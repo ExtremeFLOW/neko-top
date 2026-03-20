@@ -97,7 +97,7 @@ contains
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
     ! Read beta values from json and if that is an array also read beta_iter
-    call json_get_with_continuation(json, 'beta', beta_values, 1.0_rp,&
+    call json_get_with_continuation(json, 'beta', beta_values, 1.0_rp, &
          beta_iter)
 
     ! Initialize base
