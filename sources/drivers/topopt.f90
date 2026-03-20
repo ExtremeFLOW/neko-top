@@ -108,6 +108,7 @@ program topopt
   call prob%free()
   call des%free()
   call sim%free()
+  call nekotop_continuation%free()
 
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)

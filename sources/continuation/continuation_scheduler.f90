@@ -52,6 +52,7 @@ module continuation_scheduler
      integer :: iterations_per_value = 0 ! How many iterations per value
    contains
      procedure :: update => continuation_parameter_update
+     procedure :: free => continuation_parameter_free
   end type continuation_parameter_t
 
   !------------------------------------------------------------------
@@ -62,6 +63,7 @@ module continuation_scheduler
      integer :: default_iterations = 1
    contains
      procedure :: init
+     procedure :: free
      procedure :: register_parameter
      procedure :: update
      procedure :: get_param_name
@@ -89,6 +91,20 @@ contains
     ! Initialize empty parameter array
     if (allocated(this%params)) deallocate(this%params)
   end subroutine init
+
+  !> free continuation scheduler
+  subroutine free(this)
+    class(continuation_scheduler_t), intent(inout) :: this
+    integer :: i
+
+    if (.not. allocated(this%params)) return
+
+    do i = 1, size(this%params)
+       call this%params(i)%free()
+    end do
+
+    deallocate(this%params)
+  end subroutine free
 
   !> Register a continuation parameter
   subroutine register_parameter(this, name, target, values, iterations)
@@ -180,5 +196,13 @@ contains
 
     this%target = this%values(idx)
   end subroutine continuation_parameter_update
+
+  !> Free a single continuation parameter
+  subroutine continuation_parameter_free(this)
+    class(continuation_parameter_t), intent(inout) :: this
+    if (allocated(this%name)) deallocate(this%name)
+    if (allocated(this%values)) deallocate(this%values)
+    nullify(this%target)
+  end subroutine continuation_parameter_free
 
 end module continuation_scheduler
