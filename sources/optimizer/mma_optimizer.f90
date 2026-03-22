@@ -157,7 +157,7 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=64), allocatable :: extra_headers(:)
+    character(len=32) :: extra_headers(3)
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -193,13 +193,11 @@ contains
     this%scaling_factor = this%scale
     this%tolerance = tolerance
 
-    allocate(extra_headers(3))
     ! Initialize the logger
     if (this%enable_output) then
        extra_headers(1) = 'KKTmax'
        extra_headers(2) = 'KKTnorm2'
        extra_headers(3) = 'scaling factor'
-
        call this%init_log(problem, extra_headers = extra_headers, &
             include_constraints = .not. this%unconstrained_problem, &
             filename = 'optimization_data.csv')
@@ -250,7 +248,13 @@ contains
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(0)
+    end if
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(0)
+    end if
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
@@ -400,13 +404,10 @@ contains
     class(mma_optimizer_t), intent(inout) :: this
     integer, intent(in) :: iter
     class(problem_t), intent(inout) :: problem
-    real(kind=rp), allocatable :: extras(:)
+    real(kind=rp) :: extras(3)
 
     if (.not. this%enable_output) return
     call profiler_start_region('Optimizer logging')
-
-    ! Allocate extras
-    allocate(extras(3))
 
     if (iter .eq. 0) then
        extras(1) = 0.0_rp
