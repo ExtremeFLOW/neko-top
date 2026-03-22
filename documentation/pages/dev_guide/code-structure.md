@@ -17,3 +17,4 @@ problem.
 - \subpage simulation. Specifically for problems involving fluid mechanics, a
 simulation can allow for interfaces with `neko` to perform forward simulation
 and additional `neko-top` libraries to perform adjoint sensitivity analysis.
+- \subpage continuation. The continuation strategy for gradually changing different parameters in the run time using a continuation scheduler.
