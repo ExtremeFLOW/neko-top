@@ -46,8 +46,11 @@ module heaviside_mapping
   use heaviside_mapping_cpu, only: &
        heaviside_mapping_apply_cpu, &
        heaviside_mapping_apply_backward_cpu
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get_or_default
   use utils, only: neko_error
+  use json_utils_ext, only: json_get_with_continuation
+  use continuation_scheduler, only: nekotop_continuation
+
   implicit none
   private
 
@@ -87,13 +90,25 @@ contains
     class(heaviside_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
-    real(kind=rp) :: beta, eta
+    real(kind=rp), allocatable :: beta_values(:)
+    real(kind=rp) :: eta
+    integer :: beta_iter
 
-    call json_get(json, 'beta', beta)
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
+    ! Read beta values from json and if that is an array also read beta_iter
+    call json_get_with_continuation(json, 'beta', beta_values, 1.0_rp, &
+         beta_iter)
+
+    ! Initialize base
     call this%init_base(json, coef)
-    call this%init_from_attributes(coef, beta, eta)
+    call this%init_from_attributes(coef, beta_values(1), eta)
+
+    ! Register beta for continuation if we have an array of values for beta
+    if (size(beta_values) > 1) then
+       call nekotop_continuation%register_parameter("beta", this%beta, &
+            beta_values, beta_iter)
+    end if
   end subroutine heaviside_mapping_init_from_json
 
   !> Constructor from attributes.

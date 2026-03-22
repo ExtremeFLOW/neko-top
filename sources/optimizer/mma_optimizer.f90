@@ -157,7 +157,7 @@ contains
     ! Local variables
     type(vector_t), pointer :: x
     integer :: ind
-    character(len=32) :: extra_headers(4)
+    character(len=32) :: extra_headers(3)
     class(constraint_t), allocatable :: dummy_con
 
     call neko_log%section('Optimizer Initialization')
@@ -198,7 +198,6 @@ contains
        extra_headers(1) = 'KKTmax'
        extra_headers(2) = 'KKTnorm2'
        extra_headers(3) = 'scaling factor'
-       extra_headers(4) = this%mma%get_backend_and_subsolver()
        call this%init_log(problem, extra_headers = extra_headers, &
             include_constraints = .not. this%unconstrained_problem, &
             filename = 'optimization_data.csv')
@@ -249,7 +248,13 @@ contains
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(0)
+    end if
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(0)
+    end if
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)

@@ -122,6 +122,9 @@ module mapping_handler
      !> Write sensitivity and backward-mapping stages.
      procedure, pass(this) :: write_sensitivity => &
           mapping_handler_write_sensitivity
+     !> Reset design and sensitivity output counters.
+     procedure, pass(this) :: set_output_counter => &
+          mapping_handler_set_output_counter
   end type mapping_handler_t
 
 contains
@@ -552,6 +555,20 @@ contains
     call this%sensitivity_output%sample(real(idx, kind=rp))
 
   end subroutine mapping_handler_write_sensitivity
+
+  !> Reset design-related output counters.
+  !! @param this The handler object.
+  !! @param[in] idx Output sample index.
+  subroutine mapping_handler_set_output_counter(this, idx)
+    class(mapping_handler_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    if (.not. this%outputs_initialized) return
+
+    call this%design_output%set_counter(idx)
+    call this%sensitivity_output%set_counter(idx)
+
+  end subroutine mapping_handler_set_output_counter
 
   !> Force a field to be continuous.
   !! This can be done in many ways, here it is a simple average.

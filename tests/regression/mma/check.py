@@ -22,11 +22,7 @@ for file_name in [
     # Read current and reference data
     df_current = pd.read_csv(file)
 
-    backend = df_current.keys().tolist()[-2].split(':')[1].strip()
-    subsolver = df_current.keys().tolist()[-1].split(':')[1].strip()
-
-    reference_file = os.path.join(current_dir, "reference_data",
-                                  "optimization_data_" + subsolver + ".csv")
+    reference_file = os.path.join(current_dir, "reference_data", file_name)
 
     if not os.path.exists(reference_file):
         df_current.to_csv(reference_file, index=False)
@@ -37,11 +33,6 @@ for file_name in [
 
     # Compare data
     for column in df_current.columns:
-        if column.split(':')[0].strip() == "backend":
-            continue
-        if column.split(':')[0].strip() == "subsolver":
-            continue
-
         if column not in df_reference.columns:
             raise SystemExit(f"Column '{column}' not found in reference data.")
 
@@ -55,11 +46,7 @@ for file_name in [
     report.write(f"Comparison Report for {file_name}\n")
     report.write("=" * 80 + "\n\n")
 
-    for column in [
-            c for c in df_current.columns
-            if c.split(':')[0].strip() != "backend"
-            and c.split(':')[0].strip() != "subsolver"
-    ]:
+    for column in df_current.columns:
         report.write(f"Checking column: {column}\n")
         report.write(f"{'Iter':>6} | {'Current':>15} | {'Reference':>15} | " +
                      f"{'RMSRE':>15} | {'Status':>10}\n")

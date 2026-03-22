@@ -32,16 +32,19 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 module json_utils_ext
+  use num_types, only: rp
   use mpi_f08, only: MPI_Comm_rank, MPI_Initialized, MPI_Bcast, &
        MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER
   use json_file_module, only: json_file
   use json_value_module, only: json_value
   use utils, only: neko_error, filename_suffix
+  use continuation_scheduler, only: nekotop_continuation
+  use json_utils, only: json_get_or_default, json_get_or_lookup
 
   implicit none
   private
 
-  public :: json_key_fallback, json_read_file
+  public :: json_key_fallback, json_read_file, json_get_with_continuation
 
   interface json_key_fallback
      module procedure json_key_fallback_string
@@ -143,4 +146,42 @@ contains
 
   end function json_read_file
 
+  !> Read a parameter from JSON and optionally register it for continuation.
+  !! @param json The json_file object.
+  !! @param name The parameter name.
+  !! @param values Array of parameter values to do continuation over them.
+  !! @param default_value Default scalar value if parameter not found.
+  !! @param iter An optinal variable to read number of iteration per step
+  subroutine json_get_with_continuation(json, name, values, default_value, iter)
+    type(json_file), intent(inout) :: json
+    character(len=*), intent(in) :: name
+    real(kind=rp), intent(inout), allocatable :: values(:)
+    real(kind=rp), intent(in) :: default_value
+    integer, intent(out), optional :: iter
+    real(kind=rp) :: scalar_parameter
+    logical :: found
+    integer :: var_type
+
+    ! Inspect JSON for the parameter
+    call json%info(name, found=found, var_type=var_type)
+    if (.not. found) then
+       allocate(values(1))
+       values = default_value
+    else if (var_type == 6) then ! scalar
+       call json_get_or_default(json, name, scalar_parameter, default_value)
+       allocate(values(1))
+       values(1) = scalar_parameter
+    else if (var_type == 3) then ! array
+       call json_get_or_lookup(json, name, values)
+    else
+       call neko_error(trim(name)//" can only be real variable or real array!")
+    end if
+
+    ! Read iterations if multiple values
+    if (size(values) > 1) then
+       ! Read optional iterations per parameter step
+       call json_get_or_default(json, trim(name)//'_iterations', iter, &
+            nekotop_continuation%default_iterations)
+    end if
+  end subroutine json_get_with_continuation
 end module json_utils_ext
