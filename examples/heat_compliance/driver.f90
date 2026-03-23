@@ -55,18 +55,9 @@ program usrneko
   !> The optimizer (in this case mma)
   class(optimizer_t), allocatable :: opt
 
-  integer :: nloc, i
-  type(vector_t) :: initdesign
+  integer :: nloc
   real(kind=rp) :: t_start, t_end
 
-  !> Stress constraints
-  character(len=20) :: index_str
-  integer, allocatable :: stress_global_indices(:)
-  real(rp), allocatable :: stress_sigma_max(:)
-
-  !> For getting objectives and constraints values though getters in problem_t
-  type(vector_t) :: all_objectives, constraint_value
-  real(rp) :: objective_value
   ! -------------------------------------------------------------------------- !
   ! Initialize the MPI environment
 

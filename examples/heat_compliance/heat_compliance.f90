@@ -269,7 +269,7 @@ contains
   subroutine heat_compliance_update_value(this, design)
     class(heat_compliance_t), intent(inout) :: this
     class(design_t),         intent(in)    :: design
-    integer :: n, i
+    integer :: n
     type(field_t), pointer :: RHS, work, delta_phi
     character(len=LOG_SIZE) :: log_buf
     integer :: temp_indices(3)
