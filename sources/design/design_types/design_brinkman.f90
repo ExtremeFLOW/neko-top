@@ -49,8 +49,8 @@ module brinkman_design
   use simulation_m, only: simulation_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
-  use math, only: copy
-  use device_math, only: device_copy
+  use math, only: copy, col2
+  use device_math, only: device_copy, col2
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
