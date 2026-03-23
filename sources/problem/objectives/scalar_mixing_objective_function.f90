@@ -161,7 +161,6 @@ contains
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
-    call this%bind_time(simulation%neko_case%time)
 
     ! Associate the integration weights
     this%coef => simulation%fluid%c_Xh

@@ -163,7 +163,6 @@ contains
     logical, intent(in) :: dealias
 
     call this%init_base(name, design%size(), weight, mask_name)
-    call this%bind_time(simulation%neko_case%time)
 
     ! Save the simulation and design
     this%u => simulation%neko_case%fluid%u
