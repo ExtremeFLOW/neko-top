@@ -328,12 +328,21 @@ contains
     ! Initialize a scaling for the sensitivity to keen gradient and vector
     ! of directional derivatives of similar magnitude.
     ! this is |B| / |ones|
+    ! The logic being the norm of the direction derivative (mass weight) will be
+    ! |Bf|
+    ! Whereas the norm of the gradient (not mass weighted) will be
+    ! |f|
+    ! To achieve similar norms one would scale with 
+    ! |Bf| / |f|
+    ! but to remove the dependence on the values of |f| we select
+    ! |B| / |ones|
     if (NEKO_BCKND_DEVICE .eq. 1) then
        normb = sqrt(device_glsc2(this%coef%B_d, this%coef%B_d, this%size()))
     else
         normb = sqrt(glsc2(this%coef%B, this%coef%B, this%size()))
     end if
-    this%sensitivity_scale = normb / sqrt(real(this%coef%msh%glb_nelv, kind=rp))
+    this%sensitivity_scale = normb / sqrt(real(this%coef%msh%glb_nelv * &
+         this%coef%msh%npts, kind=rp))
 
   end subroutine brinkman_design_init_from_json_sim
 
