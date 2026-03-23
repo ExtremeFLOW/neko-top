@@ -339,7 +339,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        normb = sqrt(device_glsc2(this%coef%B_d, this%coef%B_d, this%size()))
     else
-        normb = sqrt(glsc2(this%coef%B, this%coef%B, this%size()))
+       normb = sqrt(glsc2(this%coef%B, this%coef%B, this%size()))
     end if
     this%sensitivity_scale = normb / sqrt(real(this%coef%msh%glb_nelv * &
          this%coef%msh%npts, kind=rp))
