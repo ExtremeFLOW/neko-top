@@ -325,7 +325,7 @@ contains
     ! Map to the Brinkman amplitude
     call this%map_forward()
 
-    ! Initialize a scaling for the sensitivity to keen gradient and vector
+    ! Initialize a scaling for the sensitivity to keep gradient and vector
     ! of directional derivatives of similar magnitude.
     ! this is |B| / |ones|
     ! The logic being the norm of the direction derivative (mass weight) will be
@@ -334,7 +334,7 @@ contains
     ! |f|
     ! To achieve similar norms one would scale with
     ! |Bf| / |f|
-    ! but to remove the dependence on the values of |f| we select
+    ! but to remove the dependence on the values of f we select
     ! |B| / |ones|
     if (NEKO_BCKND_DEVICE .eq. 1) then
        normb = sqrt(device_glsc2(this%coef%B_d, this%coef%B_d, this%size()))
