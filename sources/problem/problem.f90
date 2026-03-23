@@ -63,6 +63,7 @@ module problem
   use neko_config, only: NEKO_BCKND_DEVICE
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
+  use utils, only: neko_error
   implicit none
   private
 
