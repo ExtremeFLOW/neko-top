@@ -30,6 +30,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
+    printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
 
     printf "\n\e[4mEnvironment:\e[0m\n"
     printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
@@ -63,8 +64,8 @@ DRY=false
 RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential
-OPT=a,c,h,n,s:,d,r
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:
+OPT=a,c,h,n,s:,d,r,p:
 
 # Parse the inputs for options
 PARSED=$(getopt --options=$OPT --longoptions=$OPTIONS --name "$0" -- "$@")
@@ -80,6 +81,7 @@ while true; do
     "-d" | "--delete") DELETE=true && shift ;;    # Delete previous runs
     "-s" | "--submit") CLUSTER="${2^^}" && shift 2 ;; # Submit to the queue
     "-r" | "--re-run") RERUN=true && shift ;;     # Re-run the examples
+    "-p" | "--procs") NPROCS="$2" && shift 2 ;;    # Number of processors to use
 
     # Long option with no short option
     "--dry-run") DRY=true && shift ;;             # Dry run
@@ -349,7 +351,7 @@ function Submit() {
 INTERRUPTED=0
 function handler() {
     if [ "$MAIN_DIR" != "$(pwd)" ]; then
-        printf "Interrupted" >error.log
+        printf "Interrupted" >>error.log
     fi
     INTERRUPTED=1
 }
