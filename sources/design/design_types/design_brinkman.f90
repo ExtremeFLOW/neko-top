@@ -194,8 +194,6 @@ module brinkman_design
      procedure, pass(this) :: get_values => brinkman_design_get_design
      !> Retrieve the sensitivity
      procedure, pass(this) :: get_sensitivity => brinkman_design_get_sensitivity
-     !> Set the sensitivity
-     procedure, pass(this) :: set_sensitivity => brinkman_design_set_sensitivity
 
      !> Retrieve the x location of the design variables
      procedure, pass(this) :: design_get_x => brinkman_design_get_x
@@ -486,24 +484,6 @@ contains
     end if
 
   end subroutine brinkman_design_get_sensitivity
-
-  subroutine brinkman_design_set_sensitivity(this, values)
-    class(brinkman_design_t), intent(inout) :: this
-    type(vector_t), intent(in) :: values
-    integer :: n
-
-    n = this%size()
-    if (n .ne. values%size()) then
-      call neko_error('Set sensitivity: size mismatch')
-    end if
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(this%sensitivity%x_d, values%x_d, n)
-    else
-       call copy(this%sensitivity%x, values%x, n)
-    end if
-
-  end subroutine brinkman_design_set_sensitivity
 
   subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this

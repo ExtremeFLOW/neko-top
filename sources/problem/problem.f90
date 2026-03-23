@@ -797,21 +797,27 @@ contains
     end do
   end subroutine problem_accumulate_constraint_sensitivities
 
-  !> Transform stored sensitivities for Brinkman designs.
-  !! This applies the mass-matrix scaling and the option-2 norm
-  !! normalization after all sensitivities have been computed.
+  !> Transform stored sensitivities. Sensitivity should be understood as a
+  !! directional derivative, however, to avoid lumpy designs we consider the
+  !! gradient defined under the mass weighted inner product when dealing with
+  !! spectral elements.
+  !! @param[inout] this The problem.
+  !! @param[inout] design The design.
+  !! @param[inout] objective_sensitivity The directional derivative.
   subroutine problem_transform_sensitivities(this, design, &
        objective_sensitivity)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(inout) :: design
     type(vector_t), intent(inout) :: objective_sensitivity
-    type(vector_t) :: B_inv
+    type(vector_t) :: B_inv ! differs from coef%B_inv by mult
     integer :: i
     real(kind=rp) :: unscaled_norm, scaled_norm, norm_scale
 
     select type (design)
     type is (brinkman_design_t)
-       if (.not. associated(design%coef)) return
+       if (.not. associated(design%coef)) then
+          call neko_error("coef not associated in brinkman design")
+       end if
 
        call design%get_sensitivity(objective_sensitivity)
 
@@ -835,7 +841,6 @@ contains
        end if
 
        call vector_cmult(objective_sensitivity, norm_scale)
-       call design%set_sensitivity(objective_sensitivity)
 
        do i = 1, this%n_constraints
           call vector_col2(this%constraint_list(i)%constraint%sensitivity, &
