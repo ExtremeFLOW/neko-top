@@ -44,19 +44,15 @@ module mma_optimizer
   use brinkman_design, only: brinkman_design_t
   use constraint, only: constraint_t
   use dummy_constraint, only: dummy_constraint_t
-  use device_math_ext, only: device_scale_matrix_cols
 
   ! External modules
   use json_module, only: json_file
   use vector, only: vector_t
   use matrix, only: matrix_t
-  use math, only: abscmp, cmult, copy
-  use device_math, only: device_cmult, device_copy
-  use coefs, only: coef_t
-  use neko_config, only: NEKO_BCKND_DEVICE
+  use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use vector_math, only: vector_cmult, vector_glsc2, vector_invcol1, vector_col2
+  use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
@@ -274,13 +270,6 @@ contains
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-    ! Directional derivative -> Gradient transformation
-    select type (des => design)
-    type is (brinkman_design_t)
-       call mma_map_gradients(this, objective_sensitivities, &
-            constraint_sensitivities, des%coef)
-    end select
-
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
@@ -330,13 +319,6 @@ contains
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
 
-    ! Directional derivative -> Gradient transformation
-    select type (des => design)
-    type is (brinkman_design_t)
-       call mma_map_gradients(this, objective_sensitivities, &
-            constraint_sensitivities, des%coef)
-    end select
-
     ! Execute the scaling
     if (this%auto_scale) then
        call constraint_value%copy_from(DEVICE_TO_HOST, sync = .true.)
@@ -374,13 +356,6 @@ contains
     end select
 
     call problem%get_constraint_sensitivities(constraint_sensitivities)
-
-    ! Directional derivative -> Gradient transformation
-    select type (des => design)
-    type is (brinkman_design_t)
-       call mma_map_gradients(this, objective_sensitivities, &
-            constraint_sensitivities, des%coef)
-    end select
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -468,61 +443,5 @@ contains
 
     call this%mma%load_checkpoint(filename)
   end subroutine mma_optimizer_load_checkpoint_components
-
-
-  !> Transform sensitivities from directional derivative to gradient under a
-  !! mass weighted inner product
-  !! @param[inout] objective_sensitivities Objective sensitivities.
-  !! @param[inout] constraint_sensitivities Constraint sensitivities.
-  !! @param[in] coef SEM coefficients
-  subroutine mma_map_gradients(this, objective_sensitivities, &
-       constraint_sensitivities, coef)
-    class(mma_optimizer_t), intent(inout) :: this
-    type(vector_t), intent(inout) :: objective_sensitivities
-    type(matrix_t), intent(inout) :: constraint_sensitivities
-    class(coef_t), intent(in) :: coef
-    type(vector_t) :: B_inv ! Note. This differs from coef%B_inv by mult
-    integer :: j, m, n
-    real(kind=rp) :: unscaled_norm, scaled_norm, norm_scale
-
-    n = objective_sensitivities%size()
-    m = constraint_sensitivities%get_nrows()
-
-    call B_inv%init(n)
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_copy(B_inv%x_d, coef%B_d, n)
-    else
-       call copy(B_inv%x, coef%B, n)
-    end if
-    call vector_invcol1(B_inv)
-
-    ! check unscaled norm
-    unscaled_norm = sqrt(vector_glsc2(objective_sensitivities, &
-         objective_sensitivities))
-    ! Remove mass matrix.
-    call vector_col2(objective_sensitivities, B_inv)
-    ! Check new norm
-    scaled_norm = sqrt(vector_glsc2(objective_sensitivities, &
-         objective_sensitivities))
-    norm_scale = unscaled_norm / scaled_norm
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       ! Remove mass matrix.
-       call device_scale_matrix_cols(constraint_sensitivities%x_d, &
-            B_inv%x_d, m, n)
-    else
-       ! Remove mass matrix.
-       do j = 1, n
-          call cmult(constraint_sensitivities%x(:, j), B_inv%x(j), m)
-       end do
-    end if
-
-    ! rescale
-    call vector_cmult(objective_sensitivities, norm_scale)
-    call matrix_cmult(constraint_sensitivities, norm_scale)
-
-    call B_inv%free()
-
-  end subroutine mma_map_gradients
 
 end module mma_optimizer

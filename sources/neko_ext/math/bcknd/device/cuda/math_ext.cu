@@ -37,7 +37,6 @@
 // System includes
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 // Device includes
 #include <cuda_runtime.h>
@@ -137,22 +136,6 @@ void cuda_sub3_mask(
     if (*mask_size == 0) return;
     sub3_mask_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
         (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
-    CUDA_CHECK(cudaGetLastError());
-}
-
-/** Fortran wrapper for scale_matrix_cols
- * Scale columns of a matrix in Fortran column-major order:
- * A(:,j) = A(:,j) * w(j)
- */
-void cuda_scale_matrix_cols(void* a, void* w, int* nrows, int* ncols) {
-
-    const int size = (*nrows) * (*ncols);
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks((size + 1024 - 1) / 1024, 1, 1);
-
-    if (size == 0) return;
-    scale_matrix_cols_kernel<real><<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>(
-        (real*)a, (real*)w, *nrows, *ncols);
     CUDA_CHECK(cudaGetLastError());
 }
 }

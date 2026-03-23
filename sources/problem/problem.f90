@@ -41,22 +41,26 @@
 module problem
   use num_types, only: rp, dp
   use design, only: design_t
+  use brinkman_design, only: brinkman_design_t
   use objective, only: objective_t, objective_wrapper_t, objective_factory
   use constraint, only: constraint_t, constraint_wrapper_t, constraint_factory
   use augmented_lagrangian_objective, only: augmented_lagrangian_objective_t
   use vector, only: vector_t
   use matrix, only: matrix_t
   use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST
+  use device_math, only: device_copy
   use json_module, only: json_file
   use json_utils, only: json_extract_item, json_get, json_get_or_default
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use math, only: copy
-  use vector_math, only: vector_add2, vector_cfill
+  use vector_math, only: vector_add2, vector_cfill, vector_cmult, &
+       vector_glsc2, vector_invcol1, vector_col2
   use time_step_controller, only: time_step_controller_t
   use simulation_adjoint, only: simulation_adjoint_init, &
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize
+  use neko_config, only: NEKO_BCKND_DEVICE
   use mpi_f08, only: MPI_WTIME
   use profiler, only: profiler_start_region, profiler_end_region
   implicit none
@@ -105,6 +109,9 @@ module problem
      !! sensitivity.
      procedure, pass(this), public :: run_backward_unsteady => &
           problem_run_backward_unsteady
+     !> Transform stored sensitivities after they are computed.
+     procedure, pass(this) :: transform_sensitivities => &
+          problem_transform_sensitivities
      ! ----------------------------------------------------------------------- !
      ! Base class methods
 
@@ -499,6 +506,7 @@ contains
     call this%get_objective_sensitivities(objective_sensitivity)
 
     call design%map_backward(objective_sensitivity)
+    call this%transform_sensitivities(design, objective_sensitivity)
 
     call objective_sensitivity%free()
   end subroutine problem_compute_sensitivity
@@ -788,6 +796,57 @@ contains
        call this%constraint_list(i)%constraint%accumulate_sensitivity(design, dt)
     end do
   end subroutine problem_accumulate_constraint_sensitivities
+
+  !> Transform stored sensitivities for Brinkman designs.
+  !! This applies the mass-matrix scaling and the option-2 norm
+  !! normalization after all sensitivities have been computed.
+  subroutine problem_transform_sensitivities(this, design, &
+       objective_sensitivity)
+    class(problem_t), intent(inout) :: this
+    class(design_t), intent(inout) :: design
+    type(vector_t), intent(inout) :: objective_sensitivity
+    type(vector_t) :: B_inv
+    integer :: i
+    real(kind=rp) :: unscaled_norm, scaled_norm, norm_scale
+
+    select type (design)
+    type is (brinkman_design_t)
+       if (.not. associated(design%coef)) return
+
+       call design%get_sensitivity(objective_sensitivity)
+
+       call B_inv%init(this%n_design)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call device_copy(B_inv%x_d, design%coef%B_d, this%n_design)
+       else
+          call copy(B_inv%x, design%coef%B, this%n_design)
+       end if
+       call vector_invcol1(B_inv)
+
+       unscaled_norm = sqrt(vector_glsc2(objective_sensitivity, &
+            objective_sensitivity))
+       call vector_col2(objective_sensitivity, B_inv)
+       scaled_norm = sqrt(vector_glsc2(objective_sensitivity, &
+            objective_sensitivity))
+
+       norm_scale = 1.0_rp
+       if (scaled_norm .gt. 0.0_rp) then
+          norm_scale = unscaled_norm / scaled_norm
+       end if
+
+       call vector_cmult(objective_sensitivity, norm_scale)
+       call design%set_sensitivity(objective_sensitivity)
+
+       do i = 1, this%n_constraints
+          call vector_col2(this%constraint_list(i)%constraint%sensitivity, &
+               B_inv)
+          call vector_cmult( &
+               this%constraint_list(i)%constraint%sensitivity, norm_scale)
+       end do
+
+       call B_inv%free()
+    end select
+  end subroutine problem_transform_sensitivities
 
   ! ========================================================================== !
   ! Problem part getters

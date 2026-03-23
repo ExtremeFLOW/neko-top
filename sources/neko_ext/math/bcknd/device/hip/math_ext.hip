@@ -37,7 +37,6 @@
 // System includes
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 // Device includes
 #include <hip/hip_runtime.h>
@@ -136,21 +135,6 @@ void hip_sub3_mask(
     hipLaunchKernelGGL(sub3_mask_kernel<real>, nblcks, nthrds, 0,
          (hipStream_t)glb_cmd_queue,
          (real*)a, (real*)b, (real*)c, *size, mask, *mask_size);
-    HIP_CHECK(hipGetLastError());
-}
-
-/** Fortran wrapper for scale_matrix_cols
- * Scale columns of a matrix in Fortran column-major order:
- * A(:,j) = A(:,j) * w(j)
- */
-void hip_scale_matrix_cols(void* a, void* w, int* nrows, int* ncols) {
-    const int size = (*nrows) * (*ncols);
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks((size + 1024 - 1) / 1024, 1, 1);
-
-    if(size == 0) return;
-    hipLaunchKernelGGL(scale_matrix_cols_kernel<real>, nblcks, nthrds, 0,
-         (hipStream_t)glb_cmd_queue, (real*)a, (real*)w, *nrows, *ncols);
     HIP_CHECK(hipGetLastError());
 }
 }

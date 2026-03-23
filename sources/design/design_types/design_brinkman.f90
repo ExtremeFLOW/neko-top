@@ -45,11 +45,8 @@ module brinkman_design
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
-  use math, only: rzero
   use simulation_m, only: simulation_t
-  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
   use math, only: copy
@@ -58,9 +55,8 @@ module brinkman_design
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_get
+  use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
-  use comm, only: NEKO_COMM
   implicit none
   private
 
@@ -198,6 +194,8 @@ module brinkman_design
      procedure, pass(this) :: get_values => brinkman_design_get_design
      !> Retrieve the sensitivity
      procedure, pass(this) :: get_sensitivity => brinkman_design_get_sensitivity
+     !> Set the sensitivity
+     procedure, pass(this) :: set_sensitivity => brinkman_design_set_sensitivity
 
      !> Retrieve the x location of the design variables
      procedure, pass(this) :: design_get_x => brinkman_design_get_x
@@ -488,6 +486,24 @@ contains
     end if
 
   end subroutine brinkman_design_get_sensitivity
+
+  subroutine brinkman_design_set_sensitivity(this, values)
+    class(brinkman_design_t), intent(inout) :: this
+    type(vector_t), intent(in) :: values
+    integer :: n
+
+    n = this%size()
+    if (n .ne. values%size()) then
+      call neko_error('Set sensitivity: size mismatch')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_copy(this%sensitivity%x_d, values%x_d, n)
+    else
+       call copy(this%sensitivity%x, values%x, n)
+    end if
+
+  end subroutine brinkman_design_set_sensitivity
 
   subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this

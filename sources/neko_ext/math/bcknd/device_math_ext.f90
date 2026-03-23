@@ -107,16 +107,6 @@ module device_math_ext
        integer(c_int) :: mask_size
      end subroutine hip_sub3_mask
   end interface
-  interface
-     subroutine hip_scale_matrix_cols(a_d, w_d, nrows, ncols) &
-          bind(c, name = 'hip_scale_matrix_cols')
-       import c_int, c_ptr
-       type(c_ptr), value :: a_d
-       type(c_ptr), value :: w_d
-       integer(c_int) :: nrows
-       integer(c_int) :: ncols
-     end subroutine hip_scale_matrix_cols
-  end interface
 
 #elif HAVE_CUDA
 
@@ -186,16 +176,6 @@ module device_math_ext
        type(c_ptr), value :: mask_d
        integer(c_int) :: mask_size
      end subroutine cuda_sub3_mask
-  end interface
-  interface
-     subroutine cuda_scale_matrix_cols(a_d, w_d, nrows, ncols) &
-          bind(c, name = 'cuda_scale_matrix_cols')
-       import c_int, c_ptr
-       type(c_ptr), value :: a_d
-       type(c_ptr), value :: w_d
-       integer(c_int) :: nrows
-       integer(c_int) :: ncols
-     end subroutine cuda_scale_matrix_cols
   end interface
 
 #elif HAVE_OPENCL
@@ -294,22 +274,5 @@ contains
     call neko_error('No device backend configured for device_sub3_mask')
 #endif
   end subroutine device_sub3_mask
-
-  !> Scale each matrix column by a vector entry.
-  !! Matrix is stored in Fortran column-major order.
-  !! `A(:,j) = A(:,j) * w(j)` for j=1..ncols.
-  subroutine device_scale_matrix_cols(a_d, w_d, nrows, ncols)
-    type(c_ptr) :: a_d
-    type(c_ptr) :: w_d
-    integer :: nrows
-    integer :: ncols
-#if HAVE_HIP
-    call hip_scale_matrix_cols(a_d, w_d, nrows, ncols)
-#elif HAVE_CUDA
-    call cuda_scale_matrix_cols(a_d, w_d, nrows, ncols)
-#else
-    call neko_error('No device backend configured for device_scale_matrix_cols')
-#endif
-  end subroutine device_scale_matrix_cols
 
 end module device_math_ext
