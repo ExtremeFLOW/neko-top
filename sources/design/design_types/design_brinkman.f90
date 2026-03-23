@@ -219,6 +219,10 @@ module brinkman_design
      ! d_design_indicator <- d_filtering <- d_chi
      ! and ultimately handle mapping different coeficients!
      procedure, pass(this) :: map_backward => brinkman_design_map_backward
+     !> Project a gradient field onto all GLL points, recovering a vector of
+     !! directional derivatives
+     procedure, pass(this) :: convert_to_directional_derivative => &
+          brinkman_design_convert_to_directional_derivative
      ! TODO
      ! maybe it would have been smarter to have a "coeficient" type,
      ! which is just a scalar field and set of mappings going from
@@ -474,7 +478,7 @@ contains
 
     n = this%size()
     if (n .ne. values%size()) then
-       call neko_error('Get design: size mismatch')
+       call neko_error('Get sensitivity: size mismatch')
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -484,6 +488,24 @@ contains
     end if
 
   end subroutine brinkman_design_get_sensitivity
+
+  subroutine brinkman_design_convert_to_directional_derivative(this, vec_in)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: vec_in
+    integer :: n
+
+    n = this%size()
+    if (n .ne. vec_in%size()) then
+       call neko_error('convert_to_directional_derivative: size mismatch')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(vec_in%x_d, this%coef%B_d, n)
+    else
+       call col2(vec_in%x, this%coef%B, n)
+    end if
+
+  end subroutine brinkman_design_convert_to_directional_derivative
 
   subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this
