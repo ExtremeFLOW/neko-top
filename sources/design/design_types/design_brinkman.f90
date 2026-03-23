@@ -332,7 +332,7 @@ contains
     ! |Bf|
     ! Whereas the norm of the gradient (not mass weighted) will be
     ! |f|
-    ! To achieve similar norms one would scale with 
+    ! To achieve similar norms one would scale with
     ! |Bf| / |f|
     ! but to remove the dependence on the values of |f| we select
     ! |B| / |ones|
