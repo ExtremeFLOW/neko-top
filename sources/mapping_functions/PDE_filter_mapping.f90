@@ -62,6 +62,8 @@ module PDE_filter
   use utils, only: neko_error
   use device_math, only: device_cfill, device_subcol3, device_cmult
   use json_utils, only: json_get, json_get_or_default
+  use json_utils_ext, only: json_get_with_continuation
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -125,19 +127,28 @@ contains
     class(PDE_filter_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
-    real(kind=rp) :: r, tol
-    integer :: max_iter
+    real(kind=rp) :: tol
+    integer :: max_iter, r_iter
     character(len=:), allocatable :: ksp_solver, precon_type
+    real(kind=rp), allocatable :: r_values(:)
 
-    call json_get(json, 'r', r)
+
+    ! Read r values from json and if that is an array also read r_iter
+    call json_get_with_continuation(json, 'r', r_values, 1.0_rp, &
+         r_iter)
     call json_get_or_default(json, 'tol', tol, 0.0000000001_rp)
     call json_get_or_default(json, 'max_iter', max_iter, 200)
     call json_get_or_default(json, 'solver', ksp_solver, "cg")
     call json_get_or_default(json, 'preconditioner', precon_type, "jacobi")
 
     call this%init_base(json, coef)
-    call this%init_from_attributes(coef, r, tol, max_iter, &
+    call this%init_from_attributes(coef, r_values(1), tol, max_iter, &
          ksp_solver, precon_type)
+    ! Register beta for continuation if we have an array of values for beta
+    if (size(r_values) > 1) then
+       call nekotop_continuation%register_parameter("r", this%r, &
+            r_values, r_iter)
+    end if
 
   end subroutine PDE_filter_init_from_json
 
@@ -151,7 +162,7 @@ contains
     character(len=*), intent(in) :: ksp_solver, precon_type
     integer :: n
 
-    this%r = r / (2.0_rp * sqrt(3.0_rp))
+    this%r = r
     this%abstol_filt = tol
     this%ksp_max_iter = max_iter
     this%ksp_solver = ksp_solver
@@ -230,11 +241,11 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h1_d, (this%r/(2.0_rp * sqrt(3.0_rp)))**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
     else
        ! h1 is already negative in its definition
-       this%coef%h1 = this%r**2
+       this%coef%h1 = (this%r/(2.0_rp * sqrt(3.0_rp)))**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
     end if
@@ -329,11 +340,11 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h1_d, (this%r/(2.0_rp * sqrt(3.0_rp)))**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
     else
        ! h1 is already negative in its definition
-       this%coef%h1 = this%r**2
+       this%coef%h1 = (this%r/(2.0_rp * sqrt(3.0_rp)))**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
     end if
