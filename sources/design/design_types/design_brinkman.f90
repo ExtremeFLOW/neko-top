@@ -49,8 +49,8 @@ module brinkman_design
   use simulation_m, only: simulation_t
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
-  use math, only: copy, col2
-  use device_math, only: device_copy, device_col2
+  use math, only: copy, col2, glsc2
+  use device_math, only: device_copy, device_col2, device_glsc2
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
@@ -171,6 +171,8 @@ module brinkman_design
      logical :: has_mask
      !> SEM coefficients
      class(coef_t), public, pointer :: coef
+     !> A global scale for both objectives and constraint sensitivity
+     real(kind=rp), private :: sensitivity_scale = 1.0_rp
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -207,6 +209,9 @@ module brinkman_design
      procedure, pass(this) :: design_get_z => brinkman_design_get_z
      !> Retrieve the z location of the i'th design variable
      procedure, pass(this) :: design_get_z_i => brinkman_design_get_z_i
+     !> Retrieve the sensitivity scale
+     procedure, pass(this) :: get_sensitivity_scale => &
+          brinkman_design_sensitivity_scale
 
      !> Update the design
      procedure, pass(this) :: update_design => brinkman_design_update_design
@@ -256,6 +261,7 @@ contains
     character(len=:), allocatable :: output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
     integer :: output_precision
+    real(kind=rp) :: normb
 
     call json_get_or_default(parameters, 'name', name, 'Brinkman Design')
     call json_get_or_default(parameters, 'domain.type', domain_type, 'full')
@@ -318,6 +324,16 @@ contains
 
     ! Map to the Brinkman amplitude
     call this%map_forward()
+
+    ! Initialize a scaling for the sensitivity to keen gradient and vector
+    ! of directional derivatives of similar magnitude.
+    ! this is |B| / |ones|
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       normb = sqrt(device_glsc2(this%coef%B_d, this%coef%B_d, this%size()))
+    else
+        normb = sqrt(glsc2(this%coef%B, this%coef%B, this%size()))
+    end if
+    this%sensitivity_scale = normb / sqrt(real(this%coef%msh%glb_nelv, kind=rp))
 
   end subroutine brinkman_design_init_from_json_sim
 
@@ -572,6 +588,14 @@ contains
     y_i = this%design_indicator%dof%y(i,1,1,1)
 
   end function brinkman_design_get_y_i
+
+  function brinkman_design_sensitivity_scale(this) result(sensitivity_scale)
+    class(brinkman_design_t), intent(in) :: this
+    real(kind=rp) :: sensitivity_scale
+
+    sensitivity_scale = this%sensitivity_scale
+
+  end function brinkman_design_sensitivity_scale
 
   subroutine brinkman_design_get_z(this, z)
     class(brinkman_design_t), intent(in) :: this

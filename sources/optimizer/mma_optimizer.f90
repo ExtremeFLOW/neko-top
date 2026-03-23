@@ -80,6 +80,9 @@ module mma_optimizer
      logical, private :: auto_scale = .false.
      real(kind=rp) :: tolerance = 0.0_rp
 
+     !> A global scale for both objectives and constraint sensitivity
+     real(kind=rp), private :: sensitivity_scale = 1.0_rp
+
      ! Set to flags to remove logging for optimal performance
      logical, private :: unconstrained_problem = .false.
 
@@ -177,6 +180,12 @@ contains
        call problem%add_constraint(dummy_con)
        if (allocated(dummy_con)) deallocate(dummy_con)
     end if
+
+    ! Specific design types may want specific scales
+    select type (des => design)
+    type is (brinkman_design_t)
+       this%sensitivity_scale = des%get_sensitivity_scale()
+    end select
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
     ! problems in mma_optimizer_run()
@@ -328,6 +337,12 @@ contains
     if (.not. abscmp(this%scaling_factor, 1.0_rp)) then
        call vector_cmult(constraint_value, this%scaling_factor)
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    end if
+
+    ! Scale objectives and constraint sensitivities
+    if (.not. abscmp(this%sensitivity_scale, 1.0_rp)) then
+       call vector_cmult(objective_sensitivities, this%sensitivity_scale)
+       call matrix_cmult(constraint_sensitivities, this%sensitivity_scale)
     end if
 
     ! Update the design variable
