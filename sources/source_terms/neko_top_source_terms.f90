@@ -51,14 +51,15 @@ contains
 
   !> @brief Register the known source terms from Neko-TOP in the Neko system.
   module subroutine register_source_terms()
-    procedure(source_term_allocate), pointer :: adjoint_lube
+    procedure(source_term_allocate), pointer :: adjoint_brinkman_dissipation
     procedure(source_term_allocate), pointer :: adjoint_viscous_dissipation
     procedure(source_term_allocate), pointer :: adjoint_mixing_scalar
     procedure(source_term_allocate), pointer :: adjoint_scalar_convection
     procedure(source_term_allocate), pointer :: simple_brinkman
 
     ! Assign the pointers
-    adjoint_lube => adjoint_brinkman_dissipation_source_term_allocate
+    adjoint_brinkman_dissipation => &
+         adjoint_brinkman_dissipation_source_term_allocate
     adjoint_viscous_dissipation => &
          adjoint_viscous_dissipation_source_term_allocate
     adjoint_mixing_scalar => adjoint_mixing_scalar_source_term_allocate
@@ -66,7 +67,8 @@ contains
     simple_brinkman => simple_brinkman_source_term_allocate
 
     ! Register the source terms
-    call register_source_term('adjoint_lube', adjoint_lube)
+    call register_source_term('adjoint_brinkman_dissipation', &
+         adjoint_brinkman_dissipation)
     call register_source_term('adjoint_viscous_dissipation', &
          adjoint_viscous_dissipation)
     call register_source_term('adjoint_mixing_scalar', adjoint_mixing_scalar)
