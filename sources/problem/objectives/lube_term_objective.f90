@@ -85,6 +85,8 @@ module lube_term_objective
   use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
+  use json_utils_ext, only: json_get_with_continuation
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -160,10 +162,12 @@ contains
 
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: name
-    real(kind=rp) :: weight
+    real(kind=rp), allocatable :: weight_values(:)
     logical :: dealias_sensitivity, dealias_forcing
+    integer :: weight_iter
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    call json_get_with_continuation(json, "weight", weight_values, 1.0_rp, &
+         weight_iter)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Out of plane stresses")
     call json_get_or_default(json, "dealias_sensitivity", &
@@ -171,8 +175,13 @@ contains
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, .true.)
 
-    call this%init_from_attributes(design, simulation, weight, name, &
+    call this%init_from_attributes(design, simulation, weight_values(1), name, &
          mask_name, dealias_sensitivity, dealias_forcing)
+    if (size(weight_values) > 1) then
+       call nekotop_continuation%register_parameter( &
+            trim(name)//'_weight', this%weight, &
+            weight_values, weight_iter)
+    end if
   end subroutine lube_term_init_json_sim
 
   !> The actual constructor.

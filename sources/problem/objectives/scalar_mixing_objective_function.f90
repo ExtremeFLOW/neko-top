@@ -56,6 +56,8 @@ module scalar_mixing_objective
   use neko_ext, only: get_scalar_indicies
   ! delete after the simulation computes u u_adj
   use field_math, only: field_addcol3, field_col3
+  use json_utils_ext, only: json_get_with_continuation
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -113,21 +115,28 @@ contains
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
-    real(kind=rp) :: weight
+    real(kind=rp), allocatable :: weight_values(:)
+    integer :: weight_iter
     real(kind=rp) :: phi_ref
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: scalar_name
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    call json_get_with_continuation(json, "weight", weight_values, 1.0_rp, &
+         weight_iter)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
 
     ! initialize
-    call this%init_from_attributes(design, simulation, weight, name, &
+    call this%init_from_attributes(design, simulation, weight_values(1), name, &
          mask_name, phi_ref, scalar_name)
+    if (size(weight_values) > 1) then
+       call nekotop_continuation%register_parameter( &
+            trim(name)//'_weight', this%weight, &
+            weight_values, weight_iter)
+    end if
   end subroutine scalar_mixing_init_json_sim
 
   !> The actual constructor.

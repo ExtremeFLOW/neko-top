@@ -88,6 +88,8 @@ module minimum_dissipation_objective
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use json_utils_ext, only: json_get_with_continuation
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -146,13 +148,21 @@ contains
 
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
-    real(kind=rp) :: weight
+    real(kind=rp), allocatable :: weight_values(:)
+    integer :: weight_iter
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    call json_get_with_continuation(json, "weight", weight_values, 1.0_rp, &
+         weight_iter)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
 
-    call this%init_from_attributes(design, simulation, weight, name, mask_name)
+    call this%init_from_attributes(design, simulation, weight_values(1), name, &
+         mask_name)
+    if (size(weight_values) > 1) then
+       call nekotop_continuation%register_parameter( &
+            trim(name)//'_weight', this%weight, &
+            weight_values, weight_iter)
+    end if
   end subroutine minimum_dissipation_init_json_sim
 
   !> The actual constructor.
