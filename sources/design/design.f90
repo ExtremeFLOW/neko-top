@@ -38,8 +38,8 @@ module design
   use simulation_m, only: simulation_t
   use num_types, only: rp
   use vector, only: vector_t
+  use matrix, only: matrix_t
   use utils, only: neko_error, filename_suffix
-  use point_zone, only: point_zone_t
   use comm, only: neko_comm
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM
   implicit none
@@ -120,6 +120,9 @@ module design
      procedure, public, pass(this) :: save_checkpoint => design_save_checkpoint
      !> Load the design from a checkpoint file
      procedure, public, pass(this) :: load_checkpoint => design_load_checkpoint
+     !> Project sensitivities before they are passed to the optimizer.
+     generic, public :: project_sensitivity => &
+          project_sensitivity_vector, project_sensitivity_matrix
      !> Set the design output counter
      procedure, public, pass(this) :: set_output_counter => &
           design_set_output_counter
@@ -150,6 +153,12 @@ module design
      procedure, pass(this) :: design_get_z
      !> Getter of i'th element of z
      procedure, pass(this) :: design_get_z_i
+     !> Project a vector sensitivity.
+     procedure, pass(this) :: project_sensitivity_vector => &
+          design_project_sensitivity_vector
+     !> Project a matrix sensitivity.
+     procedure, pass(this) :: project_sensitivity_matrix => &
+          design_project_sensitivity_matrix
 
   end type design_t
 
@@ -264,6 +273,18 @@ contains
     call neko_error("Design type does not support initialization " // &
          "with simulation")
   end subroutine design_init_from_json_sim
+
+  !> Default no-op sensitivity projection for vectors.
+  subroutine design_project_sensitivity_vector(this, sensitivity)
+    class(design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: sensitivity
+  end subroutine design_project_sensitivity_vector
+
+  !> Default no-op sensitivity projection for matrices.
+  subroutine design_project_sensitivity_matrix(this, sensitivity)
+    class(design_t), intent(inout) :: this
+    type(matrix_t), intent(inout) :: sensitivity
+  end subroutine design_project_sensitivity_matrix
 
   !> Initialize the base design
   !! @param this The design object.

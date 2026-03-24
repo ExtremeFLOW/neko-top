@@ -54,10 +54,8 @@ module mma_optimizer
   use logger, only: neko_log
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: device_memcpy, DEVICE_TO_HOST
+  use device, only: DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
-  use comm, only: pe_rank, NEKO_COMM
-  use mpi_f08, only: MPI_Barrier
 
   implicit none
   private
@@ -79,9 +77,6 @@ module mma_optimizer
      real(kind=rp), private :: scaling_factor = 1.0_rp
      logical, private :: auto_scale = .false.
      real(kind=rp) :: tolerance = 0.0_rp
-
-     !> A global scale for both objectives and constraint sensitivity
-     real(kind=rp), private :: sensitivity_scale = 1.0_rp
 
      ! Set to flags to remove logging for optimal performance
      logical, private :: unconstrained_problem = .false.
@@ -180,12 +175,6 @@ contains
        call problem%add_constraint(dummy_con)
        if (allocated(dummy_con)) deallocate(dummy_con)
     end if
-
-    ! Specific design types may want specific scales
-    select type (des => design)
-    type is (brinkman_design_t)
-       this%sensitivity_scale = des%get_sensitivity_scale()
-    end select
 
     ! Initialize mma_t, handling the dummy_constraint added for unconstrained
     ! problems in mma_optimizer_run()
@@ -339,11 +328,8 @@ contains
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
     end if
 
-    ! Scale objectives and constraint sensitivities
-    if (.not. abscmp(this%sensitivity_scale, 1.0_rp)) then
-       call vector_cmult(objective_sensitivities, this%sensitivity_scale)
-       call matrix_cmult(constraint_sensitivities, this%sensitivity_scale)
-    end if
+    call design%project_sensitivity(objective_sensitivities)
+    call design%project_sensitivity(constraint_sensitivities)
 
     ! Update the design variable
     call this%mma%update(iter, x, objective_sensitivities, &
