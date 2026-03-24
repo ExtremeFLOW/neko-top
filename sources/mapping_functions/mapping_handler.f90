@@ -377,13 +377,6 @@ contains
 
     end if
 
-    ! post-multiply by mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
-    else
-       call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
-    end if
-
     ! our final mapping should now live in tmp_fld_out
     call field_copy(sens_out, tmp_fld_out)
 

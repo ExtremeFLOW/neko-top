@@ -110,6 +110,8 @@ program problem_tester
      end if
   end if
 
+  call des%convert_to_directional_derivative(sensitivities)
+
   call des%write(1)
   ! --------------------------------------
   ! Reset the simulation

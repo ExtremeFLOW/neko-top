@@ -115,6 +115,8 @@ program problem_tester
           constraint_sensitivity%size())
   end if
 
+  call des%convert_to_directional_derivative(sensitivities)
+
   call des%write(1)
   ! --------------------------------------
   ! Reset the simulation

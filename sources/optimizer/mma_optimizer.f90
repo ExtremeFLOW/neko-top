@@ -260,15 +260,17 @@ contains
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -309,15 +311,17 @@ contains
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -347,15 +351,17 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
