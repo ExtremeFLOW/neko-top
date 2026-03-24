@@ -317,9 +317,9 @@ contains
       if ('mapping' .in. parameters) then
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
-         call this%mapping%init_output_fields(this%brinkman_amplitude, &
-              this%sensitivity, verbose_design, verbose_sensitivity, &
-              output_precision, output_format_str)
+         call this%mapping%init_output_fields(this%design_indicator, &
+              this%brinkman_amplitude, this%sensitivity, verbose_design, &
+              verbose_sensitivity, output_precision, output_format_str)
       end if
 
       if ('initial_distribution' .in. parameters) then
