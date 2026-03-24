@@ -112,7 +112,6 @@ contains
   !! @param json The json_file object.
   !! @param name The parameter name.
   !! @param target The pointer to the value that we possibly want to register.
-  !! @param values Array of parameter values to do continuation over them.
   !! @param default_value Default scalar value if parameter not found.
   subroutine json_get_or_register(this, json, name, target, default_value)
     class(continuation_scheduler_t), intent(inout) :: this
