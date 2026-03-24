@@ -39,7 +39,6 @@ module design
   use num_types, only: rp
   use vector, only: vector_t
   use utils, only: neko_error, filename_suffix
-  use point_zone, only: point_zone_t
   use comm, only: neko_comm
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM
   implicit none
