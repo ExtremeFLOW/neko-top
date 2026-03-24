@@ -234,6 +234,8 @@ module brinkman_design
      !> Project a matrix sensitivity before optimization.
      procedure, pass(this) :: project_sensitivity_matrix => &
           brinkman_design_project_sensitivity_matrix
+     generic, public :: project_sensitivity => &
+          project_sensitivity_vector, project_sensitivity_matrix
      ! TODO
      ! maybe it would have been smarter to have a "coeficient" type,
      ! which is just a scalar field and set of mappings going from
@@ -367,15 +369,6 @@ contains
 
     this%coef => simulation%fluid%c_Xh
 
-    ! compute the average mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       total_B = device_glsum(this%coef%B_d, this%size())
-    else
-       total_B = glsum(this%coef%B, this%size())
-    end if
-    this%avg_B = total_B / real(this%coef%msh%glb_nelv * &
-         this%coef%msh%npts, kind=rp)
-
     ! TODO
     ! this is where we steal basically everything in
     ! brinkman_source_term regarding loading initial fields
@@ -419,6 +412,15 @@ contains
 
     n = this%design_indicator%dof%size()
     call this%init_base(name, n)
+
+    ! compute the average mass matrix
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       total_B = device_glsum(this%coef%B_d, this%size())
+    else
+       total_B = glsum(this%coef%B, this%size())
+    end if
+    this%avg_B = total_B / real(this%coef%msh%glb_nelv * &
+         this%coef%msh%npts, kind=rp)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -614,6 +616,7 @@ contains
     y_i = this%design_indicator%dof%y(i,1,1,1)
 
   end function brinkman_design_get_y_i
+
   subroutine brinkman_design_get_z(this, z)
     class(brinkman_design_t), intent(in) :: this
     type(vector_t), intent(inout) :: z

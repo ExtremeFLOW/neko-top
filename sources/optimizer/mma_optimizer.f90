@@ -54,8 +54,10 @@ module mma_optimizer
   use logger, only: neko_log
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use device, only: DEVICE_TO_HOST
+  use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
+  use comm, only: pe_rank, NEKO_COMM
+  use mpi_f08, only: MPI_Barrier
 
   implicit none
   private
@@ -258,15 +260,17 @@ contains
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -307,15 +311,17 @@ contains
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -327,9 +333,6 @@ contains
        call vector_cmult(constraint_value, this%scaling_factor)
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
     end if
-
-    call design%project_sensitivity(objective_sensitivities)
-    call design%project_sensitivity(constraint_sensitivities)
 
     ! Update the design variable
     call this%mma%update(iter, x, objective_sensitivities, &
@@ -348,15 +351,17 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
