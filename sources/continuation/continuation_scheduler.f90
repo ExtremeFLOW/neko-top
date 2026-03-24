@@ -109,6 +109,7 @@ contains
   end subroutine free_scheduler
 
   !> Read a parameter from JSON and optionally register it for continuation.
+  !! @param this The continuation scheduler instance.
   !! @param json The json_file object.
   !! @param name The parameter name.
   !! @param target The pointer to the value that we possibly want to register.
