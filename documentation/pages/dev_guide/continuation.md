@@ -63,6 +63,7 @@ type continuation_scheduler_t
    contains
      procedure :: init => init_scheduler
      procedure :: free => free_scheduler
+     procedure :: json_get_or_register
      procedure :: register_parameter
      procedure :: update
      procedure :: get_param_name
@@ -93,6 +94,12 @@ Reads `optimization.solver.continuation_iterations` in the case file as the defu
 # 5. Registering Parameters
 ```fortran
 call nekotop_continuation%register_parameter(name, target, values, iterations)
+```
+It is possible to use `json_get_or_register` function in the scheduler to read the parameter form the json file.
+Note that if the parameter in the json is an array, then it will automatically register in the scheduler as well.
+If a single scalar is given in the json, then this function will work as a single call of `json_get_or_default`.
+```fortran
+call nekotop_continuation%json_get_or_register(json, name, target, default_value)
 ```
 ---
 

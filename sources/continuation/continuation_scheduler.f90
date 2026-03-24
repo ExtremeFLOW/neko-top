@@ -36,7 +36,8 @@
 module continuation_scheduler
   use num_types, only: rp
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default
+  use json_utils, only: json_get_or_default, json_get_or_lookup
+  use utils, only: neko_error
   implicit none
   private
 
@@ -64,6 +65,7 @@ module continuation_scheduler
    contains
      procedure :: init => init_scheduler
      procedure :: free => free_scheduler
+     procedure :: json_get_or_register
      procedure :: register_parameter
      procedure :: update
      procedure :: get_param_name
@@ -105,6 +107,43 @@ contains
 
     deallocate(this%params)
   end subroutine free_scheduler
+
+  !> Read a parameter from JSON and optionally register it for continuation.
+  !! @param json The json_file object.
+  !! @param name The parameter name.
+  !! @param target The pointer to the value that we possibly want to register.
+  !! @param values Array of parameter values to do continuation over them.
+  !! @param default_value Default scalar value if parameter not found.
+  subroutine json_get_or_register(this, json, name, target, default_value)
+    class(continuation_scheduler_t), intent(inout) :: this
+    type(json_file), intent(inout) :: json
+    character(len=*), intent(in) :: name
+    real(kind=rp), target, intent(inout) :: target
+    real(kind=rp), intent(inout) :: default_value
+    real(kind=rp), allocatable :: values(:)
+    real(kind=rp) :: scalar_parameter
+    logical :: found
+    integer :: var_type, iter
+
+    ! Inspect JSON for the parameter
+    call json%info(name, found=found, var_type=var_type)
+    if (.not. found) then
+    else if (var_type == 6) then ! scalar
+       call json_get_or_default(json, name, scalar_parameter, default_value)
+       default_value = scalar_parameter
+    else if (var_type == 3) then ! array
+       call json_get_or_lookup(json, name, values)
+       default_value = values(1)
+       ! Read optional iterations per parameter step
+       call json_get_or_default(json, trim(name)//'_iterations', iter, &
+            this%default_iterations)
+       ! Register the parameter for continuation
+       call this%register_parameter(name, target, values, iter)
+    else
+       call neko_error(trim(name)//" can only be real variable or real array!")
+    end if
+
+  end subroutine json_get_or_register
 
   !> Register a continuation parameter
   subroutine register_parameter(this, name, target, values, iterations)
