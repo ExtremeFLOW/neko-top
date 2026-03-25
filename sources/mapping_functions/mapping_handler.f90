@@ -271,8 +271,8 @@ contains
     this%output_fields_set = .false.
     this%output_precision = sp
     this%output_format = 'fld'
-    this%forward_file_name = 'design'
-    this%sensitivity_file_name = 'sensitivity'
+    this%forward_file_name = ''
+    this%sensitivity_file_name = ''
     if (associated(this%design_in)) nullify(this%design_in)
     if (associated(this%design_out)) nullify(this%design_out)
     if (associated(this%sensitivity_out)) nullify(this%sensitivity_out)
