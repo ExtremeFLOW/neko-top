@@ -33,8 +33,8 @@ handled through the MMA functionality discussed in
 
 The following objectives
 
-1. [Minimum dissipation](@ref objective_dissipation)
-2. [Velocity penalty](@ref objective_velocity_penalty)
+1. [Viscous dissipation](@ref objective_dissipation)
+2. [Brinkman dissipation](@ref objective_velocity_penalty)
 3. [Scalar mixing](@ref objective_scalar_mixing)
 
 and constraints
@@ -45,19 +45,21 @@ have currently been implemented in `neko-top`·
 
 ## Objectives {#objectives}
 
-### Minimum dissipation {#objective_dissipation}
+### Viscous dissipation {#objective_dissipation}
 
-This objective is used to either minimize or maximize the pseudo-dissipation.
+This objective is used to either minimize or maximize the viscous dissipation.
 It takes the form
 \f[
-\mathcal{F} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}} \frac{1}{2} |\nabla \mathbf{u}|^2 d\Omega,
+\mathcal{F} = \frac{1}{|\Omega_\text{obj}|}\int_{\Omega_\text{obj}}
+\frac{\mu}{2} |\nabla \mathbf{u}|^2 d\Omega,
 \f]
 where \f$\mathbf{u}\f$ is the fluid velocity, \f$\Omega_\text{obj}\f$ is the
-objective domain, \f$|\nabla \mathbf{u}|^2\f$ the pseudo-dissipation where the
-notation \f$|\cdot|\f$ denotes the Frobenius norm and where \f$|\Omega_\text{obj}|\f$
-denotes the volume of the objective domain.
+objective domain, \f$\mu\f$ is the dynamic viscosity, and
+\f$|\nabla \mathbf{u}|^2\f$ denotes the Frobenius norm of the velocity
+gradient. Here \f$|\Omega_\text{obj}|\f$ denotes the volume of the objective
+domain.
 
-The objective can be selected by prescribing `"type": "minimum_dissipation"` 
+The objective can be selected by prescribing `"type": "viscous_dissipation"`
 and has the following input parameters:
 
 
@@ -67,7 +69,7 @@ and has the following input parameters:
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Dissipation`|
 
-### Velocity penalty {#objective_velocity_penalty}
+### Brinkman dissipation {#objective_velocity_penalty}
 In the works of [A. Gersborg-Hansen et al. (2005)](https://link.springer.com/article/10.1007/s00158-004-0508-7)
 an objective function of the form
 \f[
@@ -98,10 +100,10 @@ a "velocity penalty" in `neko-top` and takes the form
 \frac{1}{2} \chi \mathbf{u}^2 d\Omega.
 \f]
 
-The objective can be selected by prescribing `"type": "lube_term"` 
+The objective can be selected by prescribing `"type": "brinkman_dissipation"`
 and has the following input parameters:
 
-\note the naming convention of `"lube_term"` comes from the original claim
+\note the naming convention of `"brinkman_dissipation"` comes from the original claim
 based on lubrication theory written by Gersborg-Hansen et al.
 
 

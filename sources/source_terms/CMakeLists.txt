@@ -10,8 +10,8 @@ target_sources(neko-top PRIVATE
 
         # Individual source terms
         ${CMAKE_CURRENT_SOURCE_DIR}/simple_brinkman_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_lube_source_term.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_minimum_dissipation_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_brinkman_dissipation_source_term.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_viscous_dissipation_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_mixing_scalar_source_term.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/adjoint_scalar_convection_source_term.f90
 )

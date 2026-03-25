@@ -1,4 +1,4 @@
-!> @file lube_term_objective.f90
+!> @file brinkman_dissipation_objective.f90
 !! @copyright
 !! Copyright (c) 2025, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,42 +32,19 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `lube_term_objective_t` type.
-!
-! I promise I'll write this document properly in the future...
-!
-! But the Borval Peterson (I think) paper had an objective function
-! that had 2 terms, dissipation and this term they claimed represented
-! out of plane stresses.
-! I never really understood that extra term, I also don't think it
-! applies to 3D cases, but everyone includes it anyway.
-!
-! It appears to me to be basically a heuristic penality that targets
-! non-binary designs
-!
-! so let's call
+!> Implements the `brinkman_dissipation_objective_t` type.
 !
 ! F = \int |\nabla u|^2  + K \int \chi \u^2
 !
-!      | dissipation |     |"lube term"|
+!  |viscous dissipation | |"Brinkman dissipation"|
 !
-! I say "lube term" because they said it came from lubrication theory...
-! Anyway, we can change all this later (especially the names!)
-
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
-!
-! for the lube term, the adjoint forcing is \chi u
-!
-! This has always annoyed me...
-! because now I see one objective and one constraint
-!
-module lube_term_objective
+module brinkman_dissipation_objective
   use objective, only: objective_t
   use design, only: design_t
   use brinkman_design, only: brinkman_design_t
   use simulation_m, only: simulation_t
-  use adjoint_lube_source_term, only: adjoint_lube_source_term_t
+  use adjoint_brinkman_dissipation_source_term, only: &
+       adjoint_brinkman_dissipation_source_term_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use num_types, only: rp
   use field, only: field_t
@@ -90,7 +67,7 @@ module lube_term_objective
 
   !> An objective function corresponding to out of plane stresses
   !! \f$ F =  \int_Omega \frac{1}{2} \chi |\mathbf{u}|^2 d \Omega \f$
-  type, public, extends(objective_t) :: lube_term_objective_t
+  type, public, extends(objective_t) :: brinkman_dissipation_objective_t
      private
 
      !> Pointer to the u field.
@@ -130,20 +107,21 @@ module lube_term_objective
    contains
 
      !> The common constructor using a JSON object.
-     procedure, public, pass(this) :: init_json_sim => lube_term_init_json_sim
+     procedure, public, pass(this) :: init_json_sim => &
+          brinkman_dissipation_init_json_sim
      !> The actual constructor.
      procedure, public, pass(this) :: init_from_attributes => &
-          lube_term_init_attributes
+          brinkman_dissipation_init_attributes
      !> Destructor.
-     procedure, public, pass(this) :: free => lube_term_free
+     procedure, public, pass(this) :: free => brinkman_dissipation_free
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
-          lube_term_update_value
+          brinkman_dissipation_update_value
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
-          lube_term_update_sensitivity
+          brinkman_dissipation_update_sensitivity
 
-  end type lube_term_objective_t
+  end type brinkman_dissipation_objective_t
 
 contains
 
@@ -152,8 +130,8 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine lube_term_init_json_sim(this, json, design, simulation)
-    class(lube_term_objective_t), intent(inout) :: this
+  subroutine brinkman_dissipation_init_json_sim(this, json, design, simulation)
+    class(brinkman_dissipation_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -173,7 +151,7 @@ contains
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, dealias_sensitivity, dealias_forcing)
-  end subroutine lube_term_init_json_sim
+  end subroutine brinkman_dissipation_init_json_sim
 
   !> The actual constructor.
   !! @param this The objective.
@@ -184,9 +162,9 @@ contains
   !! @param mask_name the name of the mask.
   !! @param dealias_sensitivity use dealiasing on the sensitivity.
   !! @param dealias_forcing use dealiasing on the adjoint forcing.
-  subroutine lube_term_init_attributes(this, design, simulation, weight, &
-       name, mask_name, dealias_sensitivity, dealias_forcing)
-    class(lube_term_objective_t), intent(inout) :: this
+  subroutine brinkman_dissipation_init_attributes(this, design, simulation, &
+       weight, name, mask_name, dealias_sensitivity, dealias_forcing)
+    class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
@@ -194,7 +172,7 @@ contains
     character(len=*), intent(in) :: name
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
-    type(adjoint_lube_source_term_t) :: lube_term
+    type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
     ! Call the base initializer
     call this%init_base(name, design%size(), weight, mask_name)
@@ -202,7 +180,7 @@ contains
     this%dealias_forcing = dealias_forcing
     this%dealias_sensitivity = dealias_sensitivity
 
-    ! Grab the brinkman amplitude for the lube term
+    ! Grab the Brinkman amplitude field.
     select type (design)
     type is (brinkman_design_t)
        this%brinkman_amplitude => &
@@ -210,7 +188,8 @@ contains
 
 
     class default
-       call neko_error('Minimum dissipation only works with brinkman_design')
+       call neko_error('Brinkman dissipation only works with '// &
+            'brinkman_design')
     end select
 
     this%u => neko_registry%get_field('u')
@@ -238,14 +217,14 @@ contains
        this%volume = this%c_Xh_GLL%volume
     end if
 
-    ! if we have the lube term we need to initialize and append that too
+    ! if we have the Brinkman dissipation we initialize and append it too
 
     associate(f_adj_x => simulation%adjoint_fluid%f_adj_x, &
          f_adj_y => simulation%adjoint_fluid%f_adj_y, &
          f_adj_z => simulation%adjoint_fluid%f_adj_z)
 
-      call lube_term%init_from_components(f_adj_x, f_adj_y, f_adj_z, design, &
-           this%weight, this%u, this%v, this%w, this%mask, &
+      call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
+           f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
            this%dealias_forcing, this%volume, &
            this%scratch_GL, this%gdim)
@@ -255,14 +234,14 @@ contains
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
     type is (adjoint_fluid_pnpn_t)
-       call f%source_term%add_source_term(lube_term)
+       call f%source_term%add_source_term(brinkman_dissipation)
     end select
 
-  end subroutine lube_term_init_attributes
+  end subroutine brinkman_dissipation_init_attributes
 
   !> Destructor.
-  subroutine lube_term_free(this)
-    class(lube_term_objective_t), intent(inout) :: this
+  subroutine brinkman_dissipation_free(this)
+    class(brinkman_dissipation_objective_t), intent(inout) :: this
     call this%free_base()
 
     this%u => null()
@@ -276,13 +255,13 @@ contains
     nullify(this%GLL_to_GL)
     nullify(this%scratch_GL)
 
-  end subroutine lube_term_free
+  end subroutine brinkman_dissipation_free
 
   !> Compute the objective function.
   !! @param this The objective.
   !! @param design the design.
-  subroutine lube_term_update_value(this, design)
-    class(lube_term_objective_t), intent(inout) :: this
+  subroutine brinkman_dissipation_update_value(this, design)
+    class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -317,14 +296,14 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine lube_term_update_value
+  end subroutine brinkman_dissipation_update_value
 
   !> update_value the sensitivity of the objective function with respect to
   !! \f$chi\f$
   !! @param this The objective.
   !! @param design the design.
-  subroutine lube_term_update_sensitivity(this, design)
-    class(lube_term_objective_t), intent(inout) :: this
+  subroutine brinkman_dissipation_update_sensitivity(this, design)
+    class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: work
     integer :: temp_indices(1)
@@ -332,7 +311,7 @@ contains
     type(field_t), pointer :: accumulate, fld_GL
     integer :: temp_indices_GL(2)
 
-    ! if we have the lube term we also get an extra term in the sensitivity
+    ! The Brinkman dissipation adds an extra term in the sensitivity.
 
     call neko_scratch_registry%request_field(work, temp_indices(1), .false.)
 
@@ -385,6 +364,6 @@ contains
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine lube_term_update_sensitivity
+  end subroutine brinkman_dissipation_update_sensitivity
 
-end module lube_term_objective
+end module brinkman_dissipation_objective

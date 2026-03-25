@@ -38,17 +38,17 @@ submodule (objective) objective_factory_mod
   use utils, only: neko_type_error
 
   ! Import the objective function types
-  use minimum_dissipation_objective, only: minimum_dissipation_objective_t
-  use lube_term_objective, only: lube_term_objective_t
+  use viscous_dissipation_objective, only: viscous_dissipation_objective_t
+  use brinkman_dissipation_objective, only: brinkman_dissipation_objective_t
   use scalar_mixing_objective, only: scalar_mixing_objective_t
 
   implicit none
 
   !> Known function types
   character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
-       "minimum_dissipation", &
+       "viscous_dissipation", &
        "scalar_mixing", &
-       "lube_term"]
+       "brinkman_dissipation"]
 
 contains
 
@@ -70,12 +70,12 @@ contains
 
     call json_get(json, "type", type)
     select case (trim(type))
-    case ("minimum_dissipation")
-       allocate(minimum_dissipation_objective_t::object)
+    case ("viscous_dissipation")
+       allocate(viscous_dissipation_objective_t::object)
     case ("scalar_mixing")
        allocate(scalar_mixing_objective_t::object)
-    case ("lube_term")
-       allocate(lube_term_objective_t::object)
+    case ("brinkman_dissipation")
+       allocate(brinkman_dissipation_objective_t::object)
 
     case default
        call neko_type_error("Objective", type, KNOWN_TYPES)
