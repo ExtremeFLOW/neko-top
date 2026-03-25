@@ -37,9 +37,10 @@ submodule(neko_top) neko_top_source_terms
   use source_term, only: source_term_allocate, register_source_term
 
   ! Our user-defined source terms
-  use adjoint_lube_source_term, only: adjoint_lube_source_term_allocate
-  use adjoint_minimum_dissipation_source_term, only: &
-       adjoint_minimum_dissipation_source_term_allocate
+  use adjoint_brinkman_dissipation_source_term, only: &
+       adjoint_brinkman_dissipation_source_term_allocate
+  use adjoint_viscous_dissipation_source_term, only: &
+       adjoint_viscous_dissipation_source_term_allocate
   use adjoint_mixing_scalar_source_term, only: &
        adjoint_mixing_scalar_source_term_allocate
   use adjoint_scalar_convection_source_term, only: &
@@ -50,24 +51,26 @@ contains
 
   !> @brief Register the known source terms from Neko-TOP in the Neko system.
   module subroutine register_source_terms()
-    procedure(source_term_allocate), pointer :: adjoint_lube
-    procedure(source_term_allocate), pointer :: adjoint_minimum_dissipation
+    procedure(source_term_allocate), pointer :: adjoint_brinkman_dissipation
+    procedure(source_term_allocate), pointer :: adjoint_viscous_dissipation
     procedure(source_term_allocate), pointer :: adjoint_mixing_scalar
     procedure(source_term_allocate), pointer :: adjoint_scalar_convection
     procedure(source_term_allocate), pointer :: simple_brinkman
 
     ! Assign the pointers
-    adjoint_lube => adjoint_lube_source_term_allocate
-    adjoint_minimum_dissipation => &
-         adjoint_minimum_dissipation_source_term_allocate
+    adjoint_brinkman_dissipation => &
+         adjoint_brinkman_dissipation_source_term_allocate
+    adjoint_viscous_dissipation => &
+         adjoint_viscous_dissipation_source_term_allocate
     adjoint_mixing_scalar => adjoint_mixing_scalar_source_term_allocate
     adjoint_scalar_convection => adjoint_scalar_convection_source_term_allocate
     simple_brinkman => simple_brinkman_source_term_allocate
 
     ! Register the source terms
-    call register_source_term('adjoint_lube', adjoint_lube)
-    call register_source_term('adjoint_minimum_dissipation', &
-         adjoint_minimum_dissipation)
+    call register_source_term('adjoint_brinkman_dissipation', &
+         adjoint_brinkman_dissipation)
+    call register_source_term('adjoint_viscous_dissipation', &
+         adjoint_viscous_dissipation)
     call register_source_term('adjoint_mixing_scalar', adjoint_mixing_scalar)
     call register_source_term('adjoint_scalar_convection', &
          adjoint_scalar_convection)
