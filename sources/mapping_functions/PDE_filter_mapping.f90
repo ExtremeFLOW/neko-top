@@ -135,7 +135,7 @@ contains
     call json_get_or_default(json, 'solver', ksp_solver, "cg")
     call json_get_or_default(json, 'preconditioner', precon_type, "jacobi")
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "PDE_filter_mapping")
     call this%init_from_attributes(coef, r, tol, max_iter, &
          ksp_solver, precon_type)
 

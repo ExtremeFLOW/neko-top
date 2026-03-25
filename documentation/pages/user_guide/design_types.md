@@ -37,9 +37,13 @@ Brinkman source-term coupling.
 | `dealias` | bool | No | `true` | Controls dealiasing for Brinkman source terms |
 | `verbose_design` | bool | No | `false` | Write all forward mapping stages |
 | `verbose_sensitivity` | bool | No | `false` | Write all backward sensitivity stages |
-| `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity fld output |
+| `output_precision` | string | No | `"sp"` | `"sp"` or `"dp"` for design/sensitivity field output |
+| `output_format` | string | No | `"fld"` | Field-output format, e.g. `"fld"`, `"vtkhdf"`, or `"adios2"` |
 | `mapping` | array | No | omitted | Mapping cascade definition, see [Mapping cascade](@ref mapping_cascade) |
 | `initial_distribution` | object | No | omitted | Initial design field setup (details below) |
+
+The `verbose_*`, `output_precision`, and `output_format` options control the
+intermediate forward and backward fields written by the mapping cascade.
 
 ### `initial_distribution` options {#design_types-brinkman-initial}
 

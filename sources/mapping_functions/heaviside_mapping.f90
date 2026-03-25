@@ -92,7 +92,7 @@ contains
     call json_get(json, 'beta', beta)
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "heaviside_mapping")
     call this%init_from_attributes(coef, beta, eta)
   end subroutine heaviside_mapping_init_from_json
 

@@ -79,7 +79,7 @@ contains
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
     call json_get(json, 'f_max', f_max)
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "linear_mapping")
     call linear_mapping_init_from_attributes(this, coef, f_min, f_max)
 
   end subroutine linear_mapping_init_from_json

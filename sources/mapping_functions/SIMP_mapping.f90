@@ -86,7 +86,7 @@ contains
     call json_get(json, 'f_max', f_max)
     call json_get_or_default(json, 'p', p, 1.0_rp)
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "SIMP_mapping")
     call this%init_from_attributes(coef, f_min, f_max, p)
 
   end subroutine SIMP_mapping_init_from_json
