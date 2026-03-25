@@ -546,7 +546,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    real(kind=rp) :: total_time, tmp_time
+    real(kind=rp) :: total_time
     integer :: i
     type(time_state_t) :: accumulation_time
 
