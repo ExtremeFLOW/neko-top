@@ -319,7 +319,8 @@ contains
          call this%mapping%add(parameters, 'mapping')
          call this%mapping%init_output_fields(this%design_indicator, &
               this%brinkman_amplitude, this%sensitivity, verbose_design, &
-              verbose_sensitivity, output_precision, output_format_str)
+              verbose_sensitivity, output_precision, output_format_str, &
+              'design', 'sensitivity')
       end if
 
       if ('initial_distribution' .in. parameters) then

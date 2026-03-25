@@ -88,6 +88,10 @@ module mapping_handler
      integer :: output_precision = sp
      !> Format used for design/sensitivity field outputs.
      character(len=32) :: output_format = 'fld'
+     !> Base file name for forward mapping output.
+     character(len=80) :: forward_file_name = ''
+     !> Base file name for sensitivity output.
+     character(len=80) :: sensitivity_file_name = ''
 
    contains
      !> Constructor.
@@ -181,7 +185,7 @@ contains
        end if
     end if
 
-    call this%design_output%init('design', n_fields, &
+    call this%design_output%init(trim(this%forward_file_name), n_fields, &
          precision = this%output_precision, &
          format = trim(this%output_format))
     if (this%verbose_design .and. n_mappings .gt. 0) then
@@ -206,7 +210,8 @@ contains
           call this%sensitivity_stages(i)%init(this%coef%dof)
        end do
        call this%set_stage_names()
-       call this%sensitivity_output%init('sensitivity', n_fields, &
+       call this%sensitivity_output%init( &
+            trim(this%sensitivity_file_name), n_fields, &
             precision = this%output_precision, &
             format = trim(this%output_format))
        do i = 1, n_mappings + 1
@@ -217,7 +222,8 @@ contains
             this%sensitivity_out)
     else
        call this%set_stage_names()
-       call this%sensitivity_output%init('sensitivity', 1, &
+       call this%sensitivity_output%init( &
+            trim(this%sensitivity_file_name), 1, &
             precision = this%output_precision, &
             format = trim(this%output_format))
        call this%sensitivity_output%fields%assign_to_field(1, &
@@ -265,6 +271,8 @@ contains
     this%output_fields_set = .false.
     this%output_precision = sp
     this%output_format = 'fld'
+    this%forward_file_name = 'design'
+    this%sensitivity_file_name = 'sensitivity'
     if (associated(this%design_in)) nullify(this%design_in)
     if (associated(this%design_out)) nullify(this%design_out)
     if (associated(this%sensitivity_out)) nullify(this%sensitivity_out)
@@ -556,9 +564,12 @@ contains
   !! @param[in] verbose_sensitivity If true, output all backward stages.
   !! @param[in] output_precision Output precision (sp or dp).
   !! @param[in] output_format Output format for design/sensitivity fields.
+  !! @param[in] forward_file_name Base file name for forward mapping output.
+  !! @param[in] sensitivity_file_name Base file name for sensitivity output.
   subroutine mapping_handler_init_output_fields(this, design_in, design_out, &
        sensitivity_out, verbose_design, verbose_sensitivity, &
-       output_precision, output_format)
+       output_precision, output_format, forward_file_name, &
+       sensitivity_file_name)
     class(mapping_handler_t), intent(inout) :: this
     type(field_t), target, intent(inout) :: design_in
     type(field_t), target, intent(inout) :: design_out
@@ -567,6 +578,8 @@ contains
     logical, intent(in) :: verbose_sensitivity
     integer, intent(in) :: output_precision
     character(len=*), intent(in) :: output_format
+    character(len=*), intent(in) :: forward_file_name
+    character(len=*), intent(in) :: sensitivity_file_name
 
     this%design_in => design_in
     this%design_out => design_out
@@ -578,6 +591,8 @@ contains
     end if
     this%output_precision = output_precision
     this%output_format = trim(output_format)
+    this%forward_file_name = trim(forward_file_name)
+    this%sensitivity_file_name = trim(sensitivity_file_name)
     this%output_fields_set = .true.
 
     call mapping_handler_setup_outputs(this)
