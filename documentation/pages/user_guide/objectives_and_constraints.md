@@ -48,7 +48,7 @@ have currently been implemented in `neko-top`·
 ### Time integration for unsteady objectives {#objectives_time_integration}
 For unsteady simulations, the instantaneous objective is time integrated as
 \f[
-\mathcal{F} = \int_0^T  f(t),
+\mathcal{F} = \int_0^T  f(t) dt,
 \f]
 where \f$T\f$ is the final simulation time.
 
