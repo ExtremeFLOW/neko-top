@@ -546,7 +546,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
-    real(kind=rp) :: time_flip_origin
+    real(kind=rp) :: total_time, tmp_time
     integer :: i
     type(time_state_t) :: accumulation_time
 
@@ -560,9 +560,8 @@ contains
     cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
-    ! Mirror the adjoint clock back onto the primal physical-time interval.
-    time_flip_origin = simulation%neko_case%time%start_time + &
-         simulation%neko_case%time%end_time
+    ! Total time of the forward simulation
+    total_time = simulation%neko_case%time%end_time
 
     call profiler_start_region("Adjoint simulation")
 
@@ -586,15 +585,13 @@ contains
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%checkpoint%restore(simulation%neko_case, i)
-       ! accumulate objective sensitivity
+       ! accumulate objective sensitivity (must be reversed)
        accumulation_time = simulation%adjoint_case%time
-       ! The adjoint state stored at the start of the loop corresponds to the
-       ! mirrored current physical time, not the raw forward-running clock.
-       accumulation_time%t = time_flip_origin - simulation%adjoint_case%time%t
+       accumulation_time%t = total_time - simulation%adjoint_case%time%t
        call this%accumulate_objective_sensitivities(design, accumulation_time)
        ! step the adjoint backwards
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
-            cfl, loop_start, time_flip_origin)
+            cfl, loop_start, total_time)
     end do
 
     call profiler_end_region("Adjoint simulation")
