@@ -32,12 +32,10 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 module json_utils_ext
-  use num_types, only: rp
   use mpi_f08, only: MPI_Comm_rank, MPI_Initialized, MPI_Bcast, &
        MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER
   use json_file_module, only: json_file
-  use utils, only: neko_error, filename_suffix
-  use json_utils, only: json_get_or_default
+  use utils, only: neko_error
 
   implicit none
   private
@@ -143,4 +141,5 @@ contains
     end if
 
   end function json_read_file
+
 end module json_utils_ext
