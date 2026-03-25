@@ -518,6 +518,9 @@ contains
     integer :: i, j
     character(len=80) :: previous_name
 
+    ! Since each mapping stores their unmapped field (for chain rule purposes)
+    ! and stores the name for the mapped field, we need to loop through and
+    ! name them correctly
     previous_name = trim(this%design_in%name)
     if (allocated(this%mapping_cascade)) then
        do i = 1, size(this%mapping_cascade)
@@ -526,6 +529,7 @@ contains
        end do
     end if
 
+    ! same thing for sensitivities
     this%sensitivity_out%name = mapping_handler_derivative_name( &
          this%design_in%name)
     if (allocated(this%sensitivity_stages)) then

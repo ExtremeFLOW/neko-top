@@ -157,7 +157,8 @@ contains
 
     this%coef => coef
     this%fld_name = fld_name
-    call this%X_in%init(coef%dof, fld_name)
+    ! The mapping handler will take care of naming this field
+    call this%X_in%init(coef%dof)
 
   end subroutine mapping_init_base
 
