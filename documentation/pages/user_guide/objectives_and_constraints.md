@@ -46,19 +46,11 @@ have currently been implemented in `neko-top`·
 ## Objectives {#objectives}
 
 ### Time integration for unsteady objectives {#objectives_time_integration}
-For unsteady simulations, the instantaneous objective is accumulated in time
-through the timestep loop. In practice, `neko-top` evaluates the instantaneous
-objective at each timestep and forms
+For unsteady simulations, the instantaneous objective is time integrated as
 \f[
-\mathcal{F} \approx \sum_{n=1}^{N} \Delta t_n f(t_n),
+\mathcal{F} = \int_0^T  f(t),
 \f]
-where \f$f(t_n)\f$ is the instantaneous objective value at timestep
-\f$n\f$ and \f$\Delta t_n\f$ is the corresponding timestep size.
-
-The same time window is used when accumulating the objective sensitivity in the
-backward sweep, and for objective types that define adjoint source terms the
-same window is also applied to the source term itself. This keeps the forward
-objective accumulation and the adjoint forcing consistent.
+where \f$T\f$ is the final simulation time.
 
 The time window can be restricted with the optional input parameters
 `start_time` and `end_time`. Their defaults are `0.0` and `+\infty`,
