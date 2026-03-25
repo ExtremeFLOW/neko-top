@@ -45,6 +45,7 @@ program topopt
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
   use continuation_scheduler, only: nekotop_continuation
+
   implicit none
 
   ! JSON related arguments
