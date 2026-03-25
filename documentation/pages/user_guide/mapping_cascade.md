@@ -54,6 +54,10 @@ this corresponds to applying a filter first, and then a RAMP mapping.
 \note Currently the mapping cascade is only applicable to the `"brinkman"` type
 design.
 
+\note The intermediate forward and backward mapping fields written by the
+Brinkman design use the `verbose_design`, `verbose_sensitivity`,
+`output_precision`, and `output_format` options from `optimization.design`.
+
 # Mappings {#mapping_list}
 
 The following mappings are currently implemented in `Neko-top`.

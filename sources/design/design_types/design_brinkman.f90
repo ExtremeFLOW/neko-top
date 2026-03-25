@@ -266,7 +266,7 @@ contains
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
-    character(len=:), allocatable :: output_precision_str
+    character(len=:), allocatable :: output_format_str, output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
     integer :: output_precision
 
@@ -279,6 +279,8 @@ contains
          verbose_sensitivity, .false.)
     call json_get_or_default(parameters, 'output_precision', &
          output_precision_str, 'sp')
+    call json_get_or_default(parameters, 'output_format', &
+         output_format_str, 'fld')
 
     select case (trim(output_precision_str))
     case ('sp', 'SP')
@@ -315,9 +317,10 @@ contains
       if ('mapping' .in. parameters) then
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
-         call this%mapping%init_output_fields(this%brinkman_amplitude, &
-              this%sensitivity, verbose_design, verbose_sensitivity, &
-              output_precision)
+         call this%mapping%init_output_fields(this%design_indicator, &
+              this%brinkman_amplitude, this%sensitivity, verbose_design, &
+              verbose_sensitivity, output_precision, output_format_str, &
+              'design', 'sensitivity')
       end if
 
       if ('initial_distribution' .in. parameters) then

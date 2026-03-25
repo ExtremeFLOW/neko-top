@@ -48,6 +48,8 @@ module mapping
      type(coef_t), pointer :: coef => null()
      !> A copy of the unmapped field (often used for chain rule)
      type(field_t) :: X_in
+     !> A name for the field
+     character(len=80) :: fld_name = ""
 
    contains
      !> Constructor for the mapping_t class.
@@ -147,12 +149,15 @@ module mapping
 contains
 
   !> Constructor for the `mapping_t` (base) class.
-  subroutine mapping_init_base(this, json, coef)
+  subroutine mapping_init_base(this, json, coef, fld_name)
     class(mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
+    character(len=*), intent(in) :: fld_name
     type(coef_t), intent(inout), target :: coef
 
     this%coef => coef
+    this%fld_name = fld_name
+    ! The mapping handler will take care of naming this field
     call this%X_in%init(coef%dof)
 
   end subroutine mapping_init_base
