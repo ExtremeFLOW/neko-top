@@ -536,12 +536,12 @@ contains
        this%sensitivity_stages(1)%name = mapping_handler_derivative_name( &
             this%design_out%name)
        if (allocated(this%mapping_cascade)) then
-         do i = size(this%mapping_cascade), 1, -1
-            j = size(this%mapping_cascade) - i + 2
-            this%sensitivity_stages(j)%name = &
-                 mapping_handler_derivative_name( &
-                 this%mapping_cascade(i)%mapping%X_in%name)
-         end do
+          do i = size(this%mapping_cascade), 1, -1
+             j = size(this%mapping_cascade) - i + 2
+             this%sensitivity_stages(j)%name = &
+                  mapping_handler_derivative_name( &
+                  this%mapping_cascade(i)%mapping%X_in%name)
+          end do
        end if
     end if
 
