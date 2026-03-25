@@ -201,11 +201,11 @@
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 1.0
+                "weight": 0.1
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 1.0,
+                "weight": 0.1,
             }
         ]
     }
