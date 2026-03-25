@@ -561,7 +561,7 @@ contains
     loop_start = MPI_WTIME()
 
     ! Total time of the forward simulation
-    total_time = simulation%neko_case%time%end_time
+    total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
 
     call profiler_start_region("Adjoint simulation")
 
@@ -585,7 +585,7 @@ contains
     do i = simulation%n_timesteps, 1, -1
        ! restore primal field
        call simulation%checkpoint%restore(simulation%neko_case, i)
-       ! accumulate objective sensitivity (must be reversed)
+       ! accumulate objective sensitivity
        accumulation_time = simulation%adjoint_case%time
        accumulation_time%t = total_time - simulation%adjoint_case%time%t
        call this%accumulate_objective_sensitivities(design, accumulation_time)
