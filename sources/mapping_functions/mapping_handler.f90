@@ -122,6 +122,9 @@ module mapping_handler
      !> Write sensitivity and backward-mapping stages.
      procedure, pass(this) :: write_sensitivity => &
           mapping_handler_write_sensitivity
+     !> Reset design and sensitivity output counters.
+     procedure, pass(this) :: set_output_counter => &
+          mapping_handler_set_output_counter
   end type mapping_handler_t
 
 contains
@@ -374,13 +377,6 @@ contains
 
     end if
 
-    ! post-multiply by mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
-    else
-       call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
-    end if
-
     ! our final mapping should now live in tmp_fld_out
     call field_copy(sens_out, tmp_fld_out)
 
@@ -552,6 +548,20 @@ contains
     call this%sensitivity_output%sample(real(idx, kind=rp))
 
   end subroutine mapping_handler_write_sensitivity
+
+  !> Reset design-related output counters.
+  !! @param this The handler object.
+  !! @param[in] idx Output sample index.
+  subroutine mapping_handler_set_output_counter(this, idx)
+    class(mapping_handler_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    if (.not. this%outputs_initialized) return
+
+    call this%design_output%set_counter(idx)
+    call this%sensitivity_output%set_counter(idx)
+
+  end subroutine mapping_handler_set_output_counter
 
   !> Force a field to be continuous.
   !! This can be done in many ways, here it is a simple average.
