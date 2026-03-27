@@ -39,7 +39,6 @@ module design
   use num_types, only: rp
   use vector, only: vector_t
   use utils, only: neko_error, filename_suffix
-  use point_zone, only: point_zone_t
   use comm, only: neko_comm
   use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM
   implicit none
@@ -120,7 +119,9 @@ module design
      procedure, public, pass(this) :: save_checkpoint => design_save_checkpoint
      !> Load the design from a checkpoint file
      procedure, public, pass(this) :: load_checkpoint => design_load_checkpoint
-
+     !> Set the design output counter
+     procedure, public, pass(this) :: set_output_counter => &
+          design_set_output_counter
      ! ----------------------------------------------------------------------- !
      ! Methods
 
@@ -208,6 +209,12 @@ module design
        class(design_t), intent(inout) :: this
        integer, intent(in) :: idx
      end subroutine design_write
+
+     subroutine set_output_counter(this, idx)
+       import design_t
+       class(design_t), intent(inout) :: this
+       integer, intent(in) :: idx
+     end subroutine set_output_counter
   end interface
 
   ! ========================================================================== !
@@ -328,6 +335,14 @@ contains
     end select
 
   end subroutine design_load_checkpoint
+
+  !> Set design output counters.
+  !! Default implementation is a no-op.
+  subroutine design_set_output_counter(this, idx)
+    class(design_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+  end subroutine design_set_output_counter
 
   ! ========================================================================== !
   ! Getter methods

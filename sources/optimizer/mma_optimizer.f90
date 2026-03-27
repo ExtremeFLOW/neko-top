@@ -249,20 +249,28 @@ contains
 
     ! Evaluate the problem based on the updated design
     call problem%compute(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_forward(0)
+    end if
     call problem%compute_sensitivity(design, simulation)
+    if (present(simulation) .and. this%enable_output) then
+       call simulation%write_adjoint(0)
+    end if
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
@@ -303,15 +311,17 @@ contains
     !  Retrieve the current objective and constraint values and sensitivities
     call design%get_values(x)
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Execute the scaling
     if (this%auto_scale) then
@@ -341,15 +351,17 @@ contains
 
     ! Retrieve the updated objective and constraint values and sensitivities
     call problem%get_constraint_values(constraint_value)
+    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     select type (des => design)
     type is (brinkman_design_t)
        call des%get_sensitivity(objective_sensitivities)
+       ! Convert gradient to directional derivative
+       call des%project_sensitivity(objective_sensitivities)
+       call des%project_sensitivity(constraint_sensitivities)
     class default
        call problem%get_objective_sensitivities(objective_sensitivities)
     end select
-
-    call problem%get_constraint_sensitivities(constraint_sensitivities)
 
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &

@@ -599,7 +599,7 @@ contains
             cfl, loop_start, total_time)
     end do
 
-    call profiler_end_region("Forward simulation")
+    call profiler_end_region("Adjoint simulation")
 
     call simulation_adjoint_finalize(simulation%adjoint_case)
 
