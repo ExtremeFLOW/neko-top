@@ -219,10 +219,10 @@ contains
     end if
 
     ! Read settings for the output types, with some reasonable defaults
-    call json_get_or_default(parameters, 'case.adjoint.output_format', &
-         file_format, 'fld')
-    call json_get_or_default(parameters, 'case.adjoint.output_subdivide', &
-         subdivide, .false.)
+    call json_get_or_default(parameters, &
+         'case.adjoint_fluid.output_format', file_format, 'fld')
+    call json_get_or_default(parameters, &
+         'case.adjoint_fluid.output_subdivide', subdivide, .false.)
 
     n_scalars = 0
     if (allocated(this%adjoint_case%adjoint_scalars)) then
