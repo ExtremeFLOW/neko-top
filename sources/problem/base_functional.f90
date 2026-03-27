@@ -93,6 +93,9 @@ module base_functional
      !> Read the active time window from JSON
      procedure, pass(this) :: init_time_window_json => &
           functional_init_time_window_json
+     !> Set the active time window externally
+     procedure, pass(this) :: set_time_window => &
+          functional_set_time_window
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
@@ -187,6 +190,16 @@ contains
     call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
   end subroutine functional_init_time_window_json
+
+  !> Set the active time window for this functional externally.
+  subroutine functional_set_time_window(this, start_time, end_time)
+    class(base_functional_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+
+    this%start_time = start_time
+    this%end_time = end_time
+  end subroutine functional_set_time_window
 
   !> Get the value of the function
   function functional_get_value(this) result(v)
