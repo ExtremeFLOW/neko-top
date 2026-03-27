@@ -121,12 +121,12 @@ contains
     type(field_t), intent(in), target :: s
     class(point_zone_t), intent(in), target :: mask
     type(field_list_t) :: fields
-    type(coef_t) :: coef
+    type(coef_t), intent(in) :: coef
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
-    real(kind=rp) :: obj_scale
+    real(kind=rp), intent(in) :: obj_scale
 
-    logical :: if_mask
+    logical, intent(in) :: if_mask
 
 
     call this%free()

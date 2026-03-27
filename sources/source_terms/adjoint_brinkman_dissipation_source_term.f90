@@ -172,7 +172,7 @@ contains
     real(kind=rp), intent(in) :: K
     type(field_t), intent(in), target :: u, v, w
     class(point_zone_t), intent(in), target :: mask
-    logical :: if_mask
+    logical, intent(in) :: if_mask
     type(coef_t), intent(in) :: coef
     type(coef_t), intent(in), target :: c_Xh_GL
     type(interpolator_t), intent(in), target :: GLL_to_GL
