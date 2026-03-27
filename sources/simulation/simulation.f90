@@ -49,7 +49,7 @@ module simulation_m
   use fluid_pnpn, only: fluid_pnpn_t
   use time_step_controller, only: time_step_controller_t
   use time_state, only: time_state_t
-  use fld_file_output, only: fld_file_output_t
+  use field_output, only: field_output_t
   use chkp_output, only: chkp_output_t
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
@@ -95,10 +95,10 @@ module simulation_m
      type(adjoint_scalars_t), public, pointer :: adjoint_scalars => null()
      !> An output sampler for the forward problem.
      !! This should probably be an output controller at some point instead.
-     type(fld_file_output_t), public :: output_forward
+     type(field_output_t), public :: output_forward
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
-     type(fld_file_output_t), public :: output_adjoint
+     type(field_output_t), public :: output_adjoint
      !> Whether the simulation is steady or unsteady
      logical :: unsteady = .false.
 
@@ -142,7 +142,9 @@ contains
     type(json_file), intent(inout) :: parameters
     type(json_file) :: checkpoint_params
     integer :: i, n_scalars, unsteady_support
-    logical :: unsteady
+    character(len=:), allocatable :: output_directory, precision_s, file_format
+    integer :: precision
+    logical :: unsteady, subdivide
 
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
@@ -173,14 +175,35 @@ contains
        this%adjoint_scalars => this%adjoint_case%adjoint_scalars
     end if
 
-    ! init the sampler
     !---------------------------------------------------------
+    ! Initialize the output types
+
+    ! Read settings for the output types, with some reasonable defaults
+    call json_get_or_default(parameters, 'case.output_directory', &
+         output_directory, '')
+    call json_get_or_default(parameters, 'case.output_precision', precision_s, &
+         'single')
+    call json_get_or_default(parameters, 'case.fluid.output_format', &
+         file_format, 'fld')
+    call json_get_or_default(parameters, 'case.fluid.output_subdivide', &
+         subdivide, .false.)
+
+    if (trim(precision_s) .eq. 'double') then
+       precision = dp
+    else
+       precision = sp
+    end if
+
     ! Allocate the output type
     n_scalars = 0
     if (allocated(this%neko_case%scalars)) then
        n_scalars = size(this%neko_case%scalars%scalar_fields)
     end if
-    call this%output_forward%init(sp, 'forward_fields', 4 + n_scalars)
+    call this%output_forward%init('forward_fields', 4 + n_scalars, &
+         precision = precision, &
+         path = trim(output_directory), &
+         format = trim(file_format))
+    call this%output_forward%file_%set_subdivide(subdivide)
 
     call this%output_forward%fields%assign(1, this%fluid%p)
     call this%output_forward%fields%assign(2, this%fluid%u)
@@ -195,11 +218,22 @@ contains
        end do
     end if
 
+    ! Read settings for the output types, with some reasonable defaults
+    call json_get_or_default(parameters, 'case.adjoint.output_format', &
+         file_format, 'fld')
+    call json_get_or_default(parameters, 'case.adjoint.output_subdivide', &
+         subdivide, .false.)
+
     n_scalars = 0
     if (allocated(this%adjoint_case%adjoint_scalars)) then
        n_scalars = size(this%adjoint_case%adjoint_scalars%adjoint_scalar_fields)
     end if
-    call this%output_adjoint%init(sp, 'adjoint_fields', 4 + n_scalars)
+    call this%output_adjoint%init('adjoint_fields', 4 + n_scalars, &
+         precision = precision, &
+         path = trim(output_directory), &
+         format = trim(file_format))
+    call this%output_adjoint%file_%set_subdivide(subdivide)
+
     call this%output_adjoint%fields%assign(1, this%adjoint_fluid%p_adj)
     call this%output_adjoint%fields%assign(2, this%adjoint_fluid%u_adj)
     call this%output_adjoint%fields%assign(3, this%adjoint_fluid%v_adj)
