@@ -108,8 +108,8 @@ contains
     class(design_sem_t), intent(inout) :: this
     integer, intent(in) :: option
 
-    if (option .lt. 0 .or. option .gt. 6) then
-      call neko_error('design_sem_t: sem_map_option must be in [0, 6]')
+    if (option .lt. 0 .or. option .gt. 7) then
+      call neko_error('design_sem_t: sem_map_option must be in [0, 7]')
     end if
 
     this%sem_map_option = option
@@ -234,6 +234,11 @@ contains
        call vector_copy(this%mma_map, sqrtB)
        call vector_cmult(this%mma_map, 1.0_rp / (sum_B_half / global_count))
        call vector_cmult(this%gradient_scale, (sum_B_half / global_count) ** 2)
+       this%match_gradient_norm = .false.
+    else if (option .eq. 7) then
+       ! remove mass matrix, map MMA (this is what's written in Martin's notes)
+       call vector_rone(this%gradient_scale)
+       call vector_copy(this%mma_map, sqrtB)
        this%match_gradient_norm = .false.
 
     else

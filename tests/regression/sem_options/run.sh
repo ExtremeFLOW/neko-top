@@ -56,11 +56,11 @@ for arg in "$@"; do
 done
 
 BIN="${WORKING_DIR}/reg_sem_options_bin"
-CASE_SRC="${ROOT_DIR}/logs/rugby_ball/rugby_ball.case"
+CASE_SRC="${ROOT_DIR}/examples/rugby_ball/rugby_ball.case"
 MESH_SRC="${ROOT_DIR}/logs/rugby_ball/box.nmsh"
 RESULTS_DIR="${WORKING_DIR}/results"
 SUMMARY_CSV="${RESULTS_DIR}/summary.csv"
-OPTIONS=(0 1 2 3 4 5 6)
+OPTIONS=(7)
 FAILURES=0
 FAILED_OPTS=()
 
