@@ -422,8 +422,7 @@ contains
     else
        total_B = glsum(this%coef%B, this%size())
     end if
-    this%avg_B = total_B / real(this%coef%msh%glb_nelv * &
-         this%coef%msh%npts, kind=rp)
+    this%avg_B = total_B / real(simulation%fluid%glb_unique_points)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
