@@ -48,7 +48,8 @@ module adjoint_case
   use time_based_controller, only: time_based_controller_t
   use file, only: file_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default, json_extract_item
+  use json_utils, only: json_get, json_get_or_default, json_extract_item, &
+       json_get_or_lookup
   use adjoint_scalar_scheme, only: adjoint_scalar_scheme_t
   use adjoint_scalar_pnpn, only : adjoint_scalar_pnpn_t
   use logger, only : neko_log
@@ -110,12 +111,13 @@ contains
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
     real(kind=rp) :: real_val = 0.0_rp
-    character(len=:), allocatable :: string_val
+    character(len=:), allocatable :: string_val, file_format, name, fmt
     character(len=:), allocatable :: norm_control, norm_file
-    integer :: precision
+    integer :: precision, integer_val, layout
     integer :: n_scalars_primal, n_scalars_adjoint, i
     logical :: scalar = .false.
     logical :: temperature_found = .false.
+    logical :: logical_val
 
     ! extra things for json
     type(json_file) :: ic_json, numerics_params
@@ -381,30 +383,54 @@ contains
     !
     ! Setup output_controller
     !
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.output_filename', name, "adjoint")
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.output_format', file_format, 'fld')
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.output_mesh_in_all_files', &
+         logical_val, .false.)
     call this%output_controller%init(this%time%end_time)
-    if (this%have_scalar) then
+    if (scalar) then
        call this%f_out%init(precision, this%fluid_adj, &
-            this%adjoint_scalars, path = trim(neko_case%output_directory))
+            this%adjoint_scalars, name = name, &
+            path = trim(neko_case%output_directory), &
+            fmt = trim(file_format), layout = layout, &
+            always_write_mesh = logical_val)
     else
-       call this%f_out%init(precision, this%fluid_adj, &
-            path = trim(neko_case%output_directory))
+       call this%f_out%init(precision, this%fluid_adj, name = name, &
+            path = trim(neko_case%output_directory), &
+            fmt = trim(file_format), layout = layout, &
+            always_write_mesh = logical_val)
     end if
 
-    call json_get_or_default(neko_case%params, 'case.fluid.output_control',&
-         string_val, 'org')
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.output_subdivide', logical_val, .false.)
+    call this%f_out%file_%set_subdivide(logical_val)
+
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.output_control', string_val, 'never')
 
     if (trim(string_val) .eq. 'org') then
        ! yes, it should be real_val below for type compatibility
-       call json_get(neko_case%params, 'case.nsamples', real_val)
+       call json_get_or_lookup(neko_case%params, 'case.nsamples', integer_val)
+       real_val = real(integer_val, kind=rp)
        call this%output_controller%add(this%f_out, real_val, 'nsamples')
     else if (trim(string_val) .eq. 'never') then
-       ! Fix a dummy 0.0 output_value
-       call json_get_or_default(neko_case%params, 'case.fluid.output_value', &
-            real_val, 0.0_rp)
-       call this%output_controller%add(this%f_out, 0.0_rp, string_val)
-    else
-       call json_get(neko_case%params, 'case.fluid.output_value', real_val)
+       call this%output_controller%add(this%f_out, 0.0_rp, 'never')
+    else if (trim(string_val) .eq. 'tsteps' .or. &
+         trim(string_val) .eq. 'nsamples') then
+       call json_get_or_lookup(neko_case%params, &
+            'case.adjoint_fluid.output_value', integer_val)
+       real_val = real(integer_val, kind=rp)
        call this%output_controller%add(this%f_out, real_val, string_val)
+    else if (trim(string_val) .eq. 'simulationtime') then
+       call json_get_or_lookup(neko_case%params, &
+            'case.adjoint_fluid.output_value', real_val)
+       call this%output_controller%add(this%f_out, real_val, string_val)
+    else
+       call neko_log%error('Unknown output control type for the fluid: ' // &
+            trim(string_val))
     end if
 
     !

@@ -314,12 +314,13 @@ contains
 
     call dt_controller%init(this%neko_case%params)
 
+    call this%neko_case%time%reset()
     call simulation_init(this%neko_case, dt_controller)
 
     call profiler_start_region("Forward simulation")
     loop_start = MPI_WTIME()
     this%n_timesteps = 0
-    do while (this%neko_case%time%t .lt. this%neko_case%time%end_time)
+    do while (.not. this%neko_case%time%is_done())
        this%n_timesteps = this%n_timesteps + 1
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
