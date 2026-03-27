@@ -111,7 +111,7 @@ contains
     type(case_t), intent(inout) :: neko_case
     integer :: lx = 0
     real(kind=rp) :: real_val = 0.0_rp
-    character(len=:), allocatable :: string_val, file_format, name, fmt
+    character(len=:), allocatable :: string_val, file_format, name
     character(len=:), allocatable :: norm_control, norm_file
     integer :: precision, integer_val, layout
     integer :: n_scalars_primal, n_scalars_adjoint, i

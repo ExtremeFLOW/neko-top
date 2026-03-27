@@ -401,10 +401,10 @@ contains
        checkpoint_file = trim(this%checkpoint_file)
     else
        select case (trim(this%checkpoint_format))
-         case ('h5', 'hdf5', 'hf5', 'hdf')
-             checkpoint_file = trim(this%checkpoint_path) // &
-                  'optimizer_rt_checkpoint.h5'
-         end select
+       case ('h5', 'hdf5', 'hf5', 'hdf')
+          checkpoint_file = trim(this%checkpoint_path) // &
+               'optimizer_rt_checkpoint.h5'
+       end select
     end if
 
     inquire(file = checkpoint_file, exist = file_exists)
