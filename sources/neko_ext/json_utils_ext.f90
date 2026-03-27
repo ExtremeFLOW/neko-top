@@ -35,6 +35,7 @@ module json_utils_ext
   use mpi_f08, only: MPI_Comm_rank, MPI_Initialized, MPI_Bcast, &
        MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER
   use json_file_module, only: json_file
+  use json_value_module, only: json_value
   use utils, only: neko_error, filename_suffix
 
   implicit none
