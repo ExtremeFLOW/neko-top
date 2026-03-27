@@ -49,7 +49,7 @@ submodule (objective) objective_factory_mod
   character(len=25), parameter :: KNOWN_TYPES(4) = [ character(len=25) :: &
        "viscous_dissipation", &
        "scalar_mixing", &
-       "brinkman_dissipation"]
+       "brinkman_dissipation", &
        "target_dissipation"]
 
 contains
