@@ -39,13 +39,11 @@ module mapping_handler
   use mapping, only: mapping_wrapper_t, mapping_t, &
        mapping_factory
   use field, only: field_t
-  use fld_file_output, only: fld_file_output_t
-  use field_list, only: field_list_t
-  use json_utils, only: json_get, json_extract_item, json_get_or_default
+  use field_output, only: field_output_t
+  use json_utils, only: json_extract_item
   use json_module, only: json_file
   use coefs, only: coef_t
-  use user_intf, only: user_t
-  use field_math, only: field_rzero, field_copy
+  use field_math, only: field_copy
   use math, only: col2
   use device_math, only: device_col2
   use scratch_registry, only: neko_scratch_registry
@@ -70,10 +68,11 @@ module mapping_handler
      !> The coefficients of the (space, mesh) pair.
      type(coef_t), pointer :: coef
      !> Output for design and intermediate forward-mapping stages.
-     type(fld_file_output_t) :: design_output
+     type(field_output_t) :: design_output
      !> Output for sensitivity and intermediate backward-mapping stages.
-     type(fld_file_output_t) :: sensitivity_output
+     type(field_output_t) :: sensitivity_output
      !> Field pointers used to initialize design/sensitivity outputs.
+     type(field_t), pointer :: design_in => null()
      type(field_t), pointer :: design_out => null()
      type(field_t), pointer :: sensitivity_out => null()
      !> Internal storage of sensitivity propagation stages.
@@ -85,8 +84,14 @@ module mapping_handler
      logical :: verbose_design = .false.
      !> Flag controlling output verbose sensitivity output (default = false).
      logical :: verbose_sensitivity = .false.
-     !> Precision used for design/sensitivity fld outputs.
+     !> Precision used for design/sensitivity field outputs.
      integer :: output_precision = sp
+     !> Format used for design/sensitivity field outputs.
+     character(len=32) :: output_format = 'fld'
+     !> Base file name for forward mapping output.
+     character(len=80) :: forward_file_name = ''
+     !> Base file name for sensitivity output.
+     character(len=80) :: sensitivity_file_name = ''
 
    contains
      !> Constructor.
@@ -112,6 +117,9 @@ module mapping_handler
      !> Read from the json file and initialize the mapping_cascade.
      procedure, pass(this) :: add_json_mappings => &
           mapping_handler_add_json_mappings
+     !> Set names of the stored mapping-stage fields.
+     procedure, pass(this) :: set_stage_names => &
+          mapping_handler_set_stage_names
      !> Force a field to be continuous.
      procedure, pass(this) :: make_cts => mapping_handler_make_cts
      !> Configure output fields and initialize mapping-stage writers.
@@ -144,6 +152,9 @@ contains
     if (.not. associated(this%design_out)) then
        call neko_error('Mapped design output field is not associated')
     end if
+    if (.not. associated(this%design_in)) then
+       call neko_error('Unmapped design input field is not associated')
+    end if
     if (.not. associated(this%sensitivity_out)) then
        call neko_error('Sensitivity output field is not associated')
     end if
@@ -174,7 +185,9 @@ contains
        end if
     end if
 
-    call this%design_output%init(this%output_precision, 'design', n_fields)
+    call this%design_output%init(trim(this%forward_file_name), n_fields, &
+         precision = this%output_precision, &
+         format = trim(this%output_format))
     if (this%verbose_design .and. n_mappings .gt. 0) then
        do i = 1, n_mappings
           call this%design_output%fields%assign_to_field(i, &
@@ -196,9 +209,11 @@ contains
        do i = 1, n_mappings + 1
           call this%sensitivity_stages(i)%init(this%coef%dof)
        end do
-
-       call this%sensitivity_output%init(this%output_precision, &
-            'sensitivity', n_fields)
+       call this%set_stage_names()
+       call this%sensitivity_output%init( &
+            trim(this%sensitivity_file_name), n_fields, &
+            precision = this%output_precision, &
+            format = trim(this%output_format))
        do i = 1, n_mappings + 1
           call this%sensitivity_output%fields%assign_to_field(i, &
                this%sensitivity_stages(i))
@@ -206,8 +221,11 @@ contains
        call this%sensitivity_output%fields%assign_to_field(n_fields, &
             this%sensitivity_out)
     else
-       call this%sensitivity_output%init(this%output_precision, &
-            'sensitivity', 1)
+       call this%set_stage_names()
+       call this%sensitivity_output%init( &
+            trim(this%sensitivity_file_name), 1, &
+            precision = this%output_precision, &
+            format = trim(this%output_format))
        call this%sensitivity_output%fields%assign_to_field(1, &
             this%sensitivity_out)
     end if
@@ -252,6 +270,10 @@ contains
     this%outputs_initialized = .false.
     this%output_fields_set = .false.
     this%output_precision = sp
+    this%output_format = 'fld'
+    this%forward_file_name = ''
+    this%sensitivity_file_name = ''
+    if (associated(this%design_in)) nullify(this%design_in)
     if (associated(this%design_out)) nullify(this%design_out)
     if (associated(this%sensitivity_out)) nullify(this%sensitivity_out)
     if (associated(this%coef)) nullify(this%coef)
@@ -377,13 +399,6 @@ contains
 
     end if
 
-    ! post-multiply by mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_col2(tmp_fld_out%x_d, this%coef%B_d, tmp_fld_out%size())
-    else
-       call col2(tmp_fld_out%x, this%coef%B, tmp_fld_out%size())
-    end if
-
     ! our final mapping should now live in tmp_fld_out
     call field_copy(sens_out, tmp_fld_out)
 
@@ -495,33 +510,89 @@ contains
 
   end subroutine mapping_handler_add_mapping
 
+  !> Prefix a field name to indicate a derivative with respect to it.
+  pure function mapping_handler_derivative_name(field_name) result(name)
+    character(len=*), intent(in) :: field_name
+    character(len=80) :: name
+
+    name = 'dFd_' // trim(field_name)
+
+  end function mapping_handler_derivative_name
+
+  !> Set the names of the stored mapping and sensitivity stages.
+  !! @param this The handler object.
+  subroutine mapping_handler_set_stage_names(this)
+    class(mapping_handler_t), intent(inout) :: this
+    integer :: i, j
+    character(len=80) :: previous_name
+
+    ! Since each mapping stores their unmapped field (for chain rule purposes)
+    ! and stores the name for the mapped field, we need to loop through and
+    ! name them correctly
+    previous_name = trim(this%design_in%name)
+    if (allocated(this%mapping_cascade)) then
+       do i = 1, size(this%mapping_cascade)
+          this%mapping_cascade(i)%mapping%X_in%name = trim(previous_name)
+          previous_name = trim(this%mapping_cascade(i)%mapping%fld_name)
+       end do
+    end if
+
+    ! same thing for sensitivities
+    this%sensitivity_out%name = mapping_handler_derivative_name( &
+         this%design_in%name)
+    if (allocated(this%sensitivity_stages)) then
+       this%sensitivity_stages(1)%name = mapping_handler_derivative_name( &
+            this%design_out%name)
+       if (allocated(this%mapping_cascade)) then
+          do i = size(this%mapping_cascade), 1, -1
+             j = size(this%mapping_cascade) - i + 2
+             this%sensitivity_stages(j)%name = &
+                  mapping_handler_derivative_name( &
+                  this%mapping_cascade(i)%mapping%X_in%name)
+          end do
+       end if
+    end if
+
+  end subroutine mapping_handler_set_stage_names
+
   !> Configure fields used by design/sensitivity output writers.
   !! @param this The handler object.
+  !! @param design_in Initial unmapped design field.
   !! @param design_out Final mapped design field.
   !! @param sensitivity_out Final backward-mapped sensitivity field.
   !! @param[in] verbose_design If true, output all forward cascade stages.
   !! @param[in] verbose_sensitivity If true, output all backward stages.
   !! @param[in] output_precision Output precision (sp or dp).
-  subroutine mapping_handler_init_output_fields(this, design_out, &
-       sensitivity_out, verbose_design, verbose_sensitivity, output_precision)
+  !! @param[in] output_format Output format for design/sensitivity fields.
+  !! @param[in] forward_file_name Base file name for forward mapping output.
+  !! @param[in] sensitivity_file_name Base file name for sensitivity output.
+  subroutine mapping_handler_init_output_fields(this, design_in, design_out, &
+       sensitivity_out, verbose_design, verbose_sensitivity, &
+       output_precision, output_format, forward_file_name, &
+       sensitivity_file_name)
     class(mapping_handler_t), intent(inout) :: this
+    type(field_t), target, intent(inout) :: design_in
     type(field_t), target, intent(inout) :: design_out
     type(field_t), target, intent(inout) :: sensitivity_out
-    logical, intent(in), optional :: verbose_design
-    logical, intent(in), optional :: verbose_sensitivity
-    integer, intent(in), optional :: output_precision
+    logical, intent(in) :: verbose_design
+    logical, intent(in) :: verbose_sensitivity
+    integer, intent(in) :: output_precision
+    character(len=*), intent(in) :: output_format
+    character(len=*), intent(in) :: forward_file_name
+    character(len=*), intent(in) :: sensitivity_file_name
 
+    this%design_in => design_in
     this%design_out => design_out
     this%sensitivity_out => sensitivity_out
-    if (present(verbose_design)) this%verbose_design = verbose_design
-    if (present(verbose_sensitivity)) this%verbose_sensitivity = &
-         verbose_sensitivity
-    if (present(output_precision)) then
-       if (output_precision .ne. sp .and. output_precision .ne. dp) then
-          call neko_error('output_precision must be either sp or dp')
-       end if
-       this%output_precision = output_precision
+    this%verbose_design = verbose_design
+    this%verbose_sensitivity = verbose_sensitivity
+    if (output_precision .ne. sp .and. output_precision .ne. dp) then
+       call neko_error('output_precision must be either sp or dp')
     end if
+    this%output_precision = output_precision
+    this%output_format = trim(output_format)
+    this%forward_file_name = trim(forward_file_name)
+    this%sensitivity_file_name = trim(sensitivity_file_name)
     this%output_fields_set = .true.
 
     call mapping_handler_setup_outputs(this)

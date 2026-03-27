@@ -45,22 +45,21 @@ module brinkman_design
   use point_zone, only: point_zone_t
   use mask_ops, only: mask_exterior_const
   use neko_config, only: NEKO_BCKND_DEVICE
-  use device, only: device_memcpy, HOST_TO_DEVICE
   use design, only: design_t
-  use math, only: rzero
   use simulation_m, only: simulation_t
-  use json_module, only: json_file
   use simple_brinkman_source_term, only: simple_brinkman_source_term_t
   use vector, only: vector_t
-  use math, only: copy
-  use device_math, only: device_copy
+  use matrix, only: matrix_t
+  use vector_math, only: vector_cmult
+  use matrix_math, only: matrix_cmult
+  use math, only: copy, col2, glsum
+  use device_math, only: device_copy, device_col2, device_glsum
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
   use field_math, only: field_rzero
-  use json_utils, only: json_get, json_get_or_default, json_get
+  use json_utils, only: json_get, json_get_or_default
   use utils, only: neko_error
-  use comm, only: NEKO_COMM
   implicit none
   private
 
@@ -173,6 +172,10 @@ module brinkman_design
      class(point_zone_t), pointer :: optimization_domain
      !> A logical if we're restricting the optimization domain
      logical :: has_mask
+     !> SEM coefficients
+     class(coef_t), pointer :: coef
+     !> Average mass matrix
+     real(kind=rp) :: avg_B
 
      ! TODO
      ! you also had logicals for convergence etc,
@@ -221,6 +224,18 @@ module brinkman_design
      ! d_design_indicator <- d_filtering <- d_chi
      ! and ultimately handle mapping different coeficients!
      procedure, pass(this) :: map_backward => brinkman_design_map_backward
+     !> Project a gradient field onto all GLL points, recovering a vector of
+     !! directional derivatives
+     procedure, pass(this) :: convert_to_directional_derivative => &
+          brinkman_design_convert_to_directional_derivative
+     !> Project a vector sensitivity before optimization.
+     procedure, pass(this) :: project_sensitivity_vector => &
+          brinkman_design_project_sensitivity_vector
+     !> Project a matrix sensitivity before optimization.
+     procedure, pass(this) :: project_sensitivity_matrix => &
+          brinkman_design_project_sensitivity_matrix
+     generic, public :: project_sensitivity => &
+          project_sensitivity_vector, project_sensitivity_matrix
      ! TODO
      ! maybe it would have been smarter to have a "coeficient" type,
      ! which is just a scalar field and set of mappings going from
@@ -251,7 +266,7 @@ contains
     type(simulation_t), intent(inout) :: simulation
     type(json_file) :: json_subdict
     character(len=:), allocatable :: domain_name, domain_type, name
-    character(len=:), allocatable :: output_precision_str
+    character(len=:), allocatable :: output_format_str, output_precision_str
     logical :: dealias, verbose_design, verbose_sensitivity
     integer :: output_precision
 
@@ -264,6 +279,8 @@ contains
          verbose_sensitivity, .false.)
     call json_get_or_default(parameters, 'output_precision', &
          output_precision_str, 'sp')
+    call json_get_or_default(parameters, 'output_format', &
+         output_format_str, 'fld')
 
     select case (trim(output_precision_str))
     case ('sp', 'SP')
@@ -300,9 +317,10 @@ contains
       if ('mapping' .in. parameters) then
          call this%mapping%init_base(coef)
          call this%mapping%add(parameters, 'mapping')
-         call this%mapping%init_output_fields(this%brinkman_amplitude, &
-              this%sensitivity, verbose_design, verbose_sensitivity, &
-              output_precision)
+         call this%mapping%init_output_fields(this%design_indicator, &
+              this%brinkman_amplitude, this%sensitivity, verbose_design, &
+              verbose_sensitivity, output_precision, output_format_str, &
+              'design', 'sensitivity')
       end if
 
       if ('initial_distribution' .in. parameters) then
@@ -338,6 +356,7 @@ contains
     logical, intent(in) :: dealias
     integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
+    real(kind=rp) :: total_B
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 
@@ -350,6 +369,8 @@ contains
     this%design_indicator => neko_registry%get_field("design_indicator")
     this%brinkman_amplitude => neko_registry%get_field("brinkman_amplitude")
     this%sensitivity => neko_registry%get_field("sensitivity")
+
+    this%coef => simulation%fluid%c_Xh
 
     ! TODO
     ! this is where we steal basically everything in
@@ -394,6 +415,15 @@ contains
 
     n = this%design_indicator%dof%size()
     call this%init_base(name, n)
+
+    ! compute the average mass matrix
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       total_B = device_glsum(this%coef%B_d, this%size())
+    else
+       total_B = glsum(this%coef%B, this%size())
+    end if
+    this%avg_B = total_B / real(this%coef%msh%glb_nelv * &
+         this%coef%msh%npts, kind=rp)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &
@@ -474,7 +504,7 @@ contains
 
     n = this%size()
     if (n .ne. values%size()) then
-       call neko_error('Get design: size mismatch')
+       call neko_error('Get sensitivity: size mismatch')
     end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
@@ -484,6 +514,45 @@ contains
     end if
 
   end subroutine brinkman_design_get_sensitivity
+
+  ! The interpretation of the sensitivity DF is a function that satisfies
+  ! <DF,phi> = delta F(x;phi)
+  ! To recover directional derivatives we should project the sensitivity onto
+  ! the basis functions, equivelent to multiplying by the mass matrix.
+  subroutine brinkman_design_convert_to_directional_derivative(this, vec_in)
+    class(brinkman_design_t), intent(in) :: this
+    type(vector_t), intent(inout) :: vec_in
+    integer :: n
+
+    n = this%size()
+    if (n .ne. vec_in%size()) then
+       call neko_error('convert_to_directional_derivative: size mismatch')
+    end if
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_col2(vec_in%x_d, this%coef%B_d, n)
+    else
+       call col2(vec_in%x, this%coef%B, n)
+    end if
+
+  end subroutine brinkman_design_convert_to_directional_derivative
+
+  ! to aleviate lumpy designs due to non uniform spacing, we instead project
+  ! onto a uniform mass matrix with average weight, as opposed to using the
+  ! directional derivative
+  subroutine brinkman_design_project_sensitivity_vector(this, sensitivity)
+    class(brinkman_design_t), intent(inout) :: this
+    type(vector_t), intent(inout) :: sensitivity
+
+    call vector_cmult(sensitivity, this%avg_B)
+  end subroutine brinkman_design_project_sensitivity_vector
+
+  subroutine brinkman_design_project_sensitivity_matrix(this, sensitivity)
+    class(brinkman_design_t), intent(inout) :: this
+    type(matrix_t), intent(inout) :: sensitivity
+
+    call matrix_cmult(sensitivity, this%avg_B)
+  end subroutine brinkman_design_project_sensitivity_matrix
 
   subroutine brinkman_design_get_x(this, x)
     class(brinkman_design_t), intent(in) :: this

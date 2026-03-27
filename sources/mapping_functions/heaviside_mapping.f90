@@ -100,7 +100,7 @@ contains
          beta)
 
     ! Initialize base
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "heaviside_mapping")
     call this%init_from_attributes(coef, beta, eta)
   end subroutine heaviside_mapping_init_from_json
 
