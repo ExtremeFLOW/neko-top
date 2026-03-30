@@ -5,7 +5,6 @@ program usrneko
   use LightKrylov, only: wp => dp, rtol => rtol_dp
   use LightKrylov_Logger
   use LightKrylov_Constants
-  use global_coef, only: global_coef_t, global_coef_getter
   use neko_vector, only: state_vector_t
   use neko_system, only: non_linear_propagator_t
   use neko_jacobian, only: jacobian_t
@@ -32,8 +31,6 @@ program usrneko
   type(non_linear_propagator_t) :: non_linear
   !> a jacobian.
   type(jacobian_t) :: jacobian
-  !> A way to access coef globally
-  type(global_coef_t), target :: my_global_coef_getter
   !> State vectors
    type(state_vector_t), allocatable :: bf, dx, residual
 
@@ -102,10 +99,6 @@ program usrneko
     type is (jacobian_t)
        call f%init(simulation)
     end select
-
-!> Extract the global coef from neko
-  my_global_coef_getter%global_coef = non_linear%simulation%neko_case%fluid%c_Xh
-  global_coef_getter => my_global_coef_getter
 
   !> initial guess is baseflow loaded
   allocate(bf); call bf%init()

@@ -25,8 +25,7 @@ module cylinder
    use device, only : device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: gs_t, GS_OP_ADD
    use comm, only: pe_rank
-   ! This one is silly... But we need coef to initialize fields
-   use global_coef, only: global_coef_t, global_coef_getter
+   use user_access_singleton, only: neko_user_access
    ! sponges
    ! use sponge_source_term, only: sponge_source_term_t
    ! debugging, my own eigs
@@ -119,15 +118,13 @@ module cylinder
     subroutine state_vector_init(self)
      class(state_vector), intent(inout) :: self
 
-     ! Check for global coef
-     ! if (.not. self%initialized) then
+     ! Access the SEM coefficients through Neko's user-access singleton.
      if (.not. allocated(self%u%x)) then
-       if (.not. associated(global_coef_getter)) then
-          error stop "No global coef set!"
+       if (.not. associated(neko_user_access%case)) then
+          error stop "Neko user access is not initialized!"
        end if
           call self%free()
-          ! Take the global coef
-          self%coef => global_coef_getter%global_coef
+          self%coef => neko_user_access%case%fluid%c_Xh
 
           ! initialize fields
           ! allocate(self%u)

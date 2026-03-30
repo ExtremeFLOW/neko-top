@@ -60,6 +60,7 @@ module simulation_m
   use file, only: file_t
   use utils, only: neko_warning, neko_error
   use comm, only: pe_rank
+  use user_access_singleton, only: neko_user_access
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -150,6 +151,7 @@ contains
 
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
+    call neko_user_access%init(this%neko_case)
     call neko_rt_stats%init(parameters)
     call neko_simcomps%init(this%neko_case)
 
@@ -254,6 +256,7 @@ contains
     call profiler_stop
 
     ! Free the objects
+    call neko_user_access%free()
     call this%neko_case%free()
     call this%adjoint_case%free()
     call this%output_forward%free()
