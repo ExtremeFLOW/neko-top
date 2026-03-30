@@ -54,7 +54,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/optimizer_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/optimizer/mma_optimizer.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/continuation/continuation_scheduler.f90
-
 )
 
 # ============================================================================ #

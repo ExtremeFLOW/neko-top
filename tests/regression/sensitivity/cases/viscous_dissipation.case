@@ -130,7 +130,7 @@
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "viscous_dissipation",
                 "weight": 1.0
             }
         ]

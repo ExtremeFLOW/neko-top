@@ -87,8 +87,6 @@
         "design": {
             "type": "brinkman",
             "dealias": false,
-            "verbose_design": true,
-            "verbose_sensitivity": true,
             "mapping": [
                 {
                     "type": "PDE_filter",
@@ -114,9 +112,8 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 15,
-            "tolerance": 1.0e-7,
-            "continuation_iterations": 10,
+            "max_iterations": 5,
+            "tolerance": 1.0e-3,
             "mma": {
                 "max_iter": 100,
                 "asyinit": 0.5,
@@ -129,16 +126,16 @@
                 "a0": 1.0,
                 "a": 0.0,
                 "c": 1000.0,
-                "d": 1.0
+                "d": 10.0
             }
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "viscous_dissipation",
                 "weight": 1.0
             },
             {
-                "type": "lube_term",
+                "type": "brinkman_dissipation",
                 "weight": 1.0,
                 "dealias_sensitivity": false,
                 "dealias_forcing": false

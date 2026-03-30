@@ -1,4 +1,4 @@
-!> @file minimum_dissipation_objective.f90
+!> @file viscous_dissipation_objective.f90
 !! @copyright
 !! Copyright (c) 2025, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,7 +32,7 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> Implements the `minimum_dissipation_objective_t` type.
+!> Implements the `viscous_dissipation_objective_t` type.
 !
 ! I promise I'll write this document properly in the future...
 !
@@ -49,20 +49,21 @@
 !
 ! F = \int |\nabla u|^2  + K \int \chi \u^2
 !
-!      | dissipation |     |"lube term"|
+!      | dissipation |     |"Brinkman dissipation"|
 !
-! I say "lube term" because they said it came from lubrication theory...
+! I say "Brinkman dissipation" because they said it came from lubrication
+! theory...
 ! Anyway, we can change all this later (especially the names!)
 
-! If the objective function \int |\nabla u|^2,
-! the corresponding adjoint forcing is \int \nabla v \cdot \nabla u
+! If the objective function \frac{\mu}{2} \int |\nabla u|^2,
+! the corresponding adjoint forcing is \mu \int \nabla v \cdot \nabla u
 !
-! for the lube term, the adjoint forcing is \chi u
+! for the Brinkman dissipation, the adjoint forcing is \chi u
 !
 ! This has always annoyed me...
 ! because now I see one objective and one constraint
 !
-module minimum_dissipation_objective
+module viscous_dissipation_objective
   use num_types, only: rp
   use field, only: field_t
   use field_math, only: field_col3, field_addcol3, field_cmult, field_add2s2, &
@@ -70,8 +71,8 @@ module minimum_dissipation_objective
   use operators, only: grad
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
   use scratch_registry, only: neko_scratch_registry
-  use adjoint_minimum_dissipation_source_term, only: &
-       adjoint_minimum_dissipation_source_term_t
+  use adjoint_viscous_dissipation_source_term, only: &
+       adjoint_viscous_dissipation_source_term_t
   use objective, only: objective_t
   use simulation_m, only: simulation_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
@@ -91,9 +92,9 @@ module minimum_dissipation_objective
   implicit none
   private
 
-  !> An objective function corresponding to minimum dissipation
-  !! \f$ F =  \int_\Omega |\nabla u|^2 d \Omega \f$
-  type, public, extends(objective_t) :: minimum_dissipation_objective_t
+  !> An objective function corresponding to viscous dissipation
+  !! \f$ F =  \int_\Omega \frac{\mu}{2} |\nabla u|^2 d \Omega \f$
+  type, public, extends(objective_t) :: viscous_dissipation_objective_t
      private
 
      !> Pointer to the u field.
@@ -112,24 +113,26 @@ module minimum_dissipation_objective
      type(field_t), pointer :: adjoint_w => null()
      !> Volume of the objective domain.
      real(kind=rp) :: volume
+     !> Dynamic viscosity.
+     real(kind=rp) :: viscosity
 
    contains
      !> The common constructor using a JSON object.
      procedure, public, pass(this) :: init_json_sim => &
-          minimum_dissipation_init_json_sim
+          viscous_dissipation_init_json_sim
      !> The direct initializer from attributes.
      procedure, public, pass(this) :: init_from_attributes => &
-          minimum_dissipation_init_attributes
+          viscous_dissipation_init_attributes
      !> Destructor.
-     procedure, public, pass(this) :: free => minimum_dissipation_free
+     procedure, public, pass(this) :: free => viscous_dissipation_free
      !> Computes the value of the objective function.
      procedure, public, pass(this) :: update_value => &
-          minimum_dissipation_update_value
+          viscous_dissipation_update_value
      !> Computes the sensitivity with respect to the coefficient \f$\chi\f$.
      procedure, public, pass(this) :: update_sensitivity => &
-          minimum_dissipation_update_sensitivity
+          viscous_dissipation_update_sensitivity
 
-  end type minimum_dissipation_objective_t
+  end type viscous_dissipation_objective_t
 
 contains
 
@@ -138,8 +141,8 @@ contains
   !! @param json the JSON object.
   !! @param design the design.
   !! @param simulation the simulation.
-  subroutine minimum_dissipation_init_json_sim(this, json, design, simulation)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine viscous_dissipation_init_json_sim(this, json, design, simulation)
+    class(viscous_dissipation_objective_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -153,7 +156,7 @@ contains
     call json_get_or_default(json, "name", name, "Dissipation")
 
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
-  end subroutine minimum_dissipation_init_json_sim
+  end subroutine viscous_dissipation_init_json_sim
 
   !> The actual constructor.
   !! @param this the objective.
@@ -162,15 +165,15 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
-  subroutine minimum_dissipation_init_attributes(this, design, simulation, &
+  subroutine viscous_dissipation_init_attributes(this, design, simulation, &
        weight, name, mask_name)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+    class(viscous_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
-    type(adjoint_minimum_dissipation_source_term_t) :: adjoint_forcing
+    type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
 
@@ -182,6 +185,7 @@ contains
     this%adjoint_u => neko_registry%get_field('u_adj')
     this%adjoint_v => neko_registry%get_field('v_adj')
     this%adjoint_w => neko_registry%get_field('w_adj')
+    this%viscosity = simulation%fluid%mu%x(1,1,1,1)
 
     ! compute the volume of the objective domain
     if (this%has_mask) then
@@ -191,13 +195,13 @@ contains
     end if
 
     ! you will need to init this!
-    ! append a source term based on the minimum dissipation
+    ! append a source term based on the viscous dissipation
     ! init the adjoint forcing term for the adjoint
     call adjoint_forcing%init_from_components( &
          simulation%adjoint_fluid%f_adj_x, &
          simulation%adjoint_fluid%f_adj_y, &
          simulation%adjoint_fluid%f_adj_z, &
-         this%u, this%v, this%w, this%weight, &
+         this%u, this%v, this%w, this%weight * this%viscosity, &
          this%mask, this%has_mask, &
          this%c_Xh, this%volume)
 
@@ -207,11 +211,11 @@ contains
        call f%source_term%add_source_term(adjoint_forcing)
     end select
 
-  end subroutine minimum_dissipation_init_attributes
+  end subroutine viscous_dissipation_init_attributes
 
   !> Destructor.
-  subroutine minimum_dissipation_free(this)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine viscous_dissipation_free(this)
+    class(viscous_dissipation_objective_t), intent(inout) :: this
     call this%free_base()
 
     if (associated(this%u)) nullify(this%u)
@@ -223,13 +227,13 @@ contains
     if (associated(this%adjoint_v)) nullify(this%adjoint_v)
     if (associated(this%adjoint_w)) nullify(this%adjoint_w)
 
-  end subroutine minimum_dissipation_free
+  end subroutine viscous_dissipation_free
 
   !> Compute the objective function.
   !! @param this the objective.
   !! @param design the design.
-  subroutine minimum_dissipation_update_value(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine viscous_dissipation_update_value(this, design)
+    class(viscous_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(field_t), pointer :: wo1, wo2, wo3, work
     type(field_t), pointer :: objective_field
@@ -281,19 +285,19 @@ contains
        end if
     end if
 
-    this%value = this%value * 0.5_rp / this%volume
+    this%value = this%value * 0.5_rp * this%viscosity / this%volume
 
     call neko_scratch_registry%relinquish_field(temp_indices)
 
-  end subroutine minimum_dissipation_update_value
+  end subroutine viscous_dissipation_update_value
 
-  !> update_value the sensitivity of the objective function with respect to \f\f$\chi\f\f$
+  !> Compute the objective sensitivity with respect to \f$\chi\f$.
   !! @param this the objective.
   !! @param design the design.
-  subroutine minimum_dissipation_update_sensitivity(this, design)
-    class(minimum_dissipation_objective_t), intent(inout) :: this
+  subroutine viscous_dissipation_update_sensitivity(this, design)
+    class(viscous_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
 
-  end subroutine minimum_dissipation_update_sensitivity
+  end subroutine viscous_dissipation_update_sensitivity
 
-end module minimum_dissipation_objective
+end module viscous_dissipation_objective
