@@ -159,20 +159,20 @@ contains
        current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
-    type(field_list_t) :: fields
-    type(coef_t), intent(in) :: coef
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
-    real(kind=rp), intent(in) :: obj_scale
-    real(kind=rp), intent(in) :: viscous_scale
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
+    real(kind=rp), intent(in) :: obj_scale
+    real(kind=rp), intent(in) :: viscous_scale
     class(point_zone_t), intent(in), target :: mask
+    logical, intent(in) :: if_mask
+    type(coef_t), intent(in) :: coef
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: target_fraction
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
     real(kind=rp), target, intent(in) :: current_dissipation
     real(kind=rp), target, intent(in) :: initial_dissipation
-    logical, intent(in) :: if_mask
+    type(field_list_t) :: fields
 
     call this%free()
 
