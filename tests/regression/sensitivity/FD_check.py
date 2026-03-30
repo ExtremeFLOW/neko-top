@@ -82,13 +82,13 @@ for i, csv_file in enumerate(csv_files):
 for ax in axes[n_files:]:
     ax.axis('off')
 
-plt.tight_layout()
-plt.show()
-
 # Create plots folder if it does not exist
 if not os.path.exists("plots"):
     os.makedirs("plots")
+
+plt.tight_layout()
 plt.savefig('plots/FD_comparison.png', dpi=200)
+plt.close(fig)
 
 if not return_value:
     raise SystemExit("Discrepancies found compared to reference data.")
