@@ -124,7 +124,8 @@ contains
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
-    call this%init_time_window_json(json)
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
 
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &

@@ -148,7 +148,8 @@ contains
          dealias_sensitivity, .true.)
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, .true.)
-    call this%init_time_window_json(json)
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, dealias_sensitivity, dealias_forcing)

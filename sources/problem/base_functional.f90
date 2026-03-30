@@ -36,7 +36,7 @@
 module base_functional
   use design, only: design_t
   use json_module, only: json_file
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get
   use num_types, only: rp
   use point_zone, only: point_zone_t
   use simulation_m, only: simulation_t
@@ -90,12 +90,6 @@ module base_functional
      procedure, pass(this) :: init_json => functional_init_json
      !> Constructor based on json input and simulation
      procedure, pass(this) :: init_json_sim => functional_init_json_sim
-     !> Read the active time window from JSON
-     procedure, pass(this) :: init_time_window_json => &
-          functional_init_time_window_json
-     !> Set the active time window externally
-     procedure, pass(this) :: set_time_window => &
-          functional_set_time_window
      !> Destructor
      procedure(functional_free), pass(this), deferred :: free
 
@@ -181,25 +175,6 @@ contains
     call neko_error("Functional type: '" // type // &
          "' does not support initialization with simulation")
   end subroutine functional_init_json_sim
-
-  !> Read the active time window for this functional from JSON.
-  subroutine functional_init_time_window_json(this, json)
-    class(base_functional_t), intent(inout) :: this
-    type(json_file), intent(inout) :: json
-
-    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
-  end subroutine functional_init_time_window_json
-
-  !> Set the active time window for this functional externally.
-  subroutine functional_set_time_window(this, start_time, end_time)
-    class(base_functional_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
-
-    this%start_time = start_time
-    this%end_time = end_time
-  end subroutine functional_set_time_window
 
   !> Get the value of the function
   function functional_get_value(this) result(v)

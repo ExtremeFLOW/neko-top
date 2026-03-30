@@ -138,7 +138,6 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Augmented Lagrangian")
     call json_get_or_default(json, "dealias", dealias, .true.)
-    call this%init_time_window_json(json)
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, dealias)
