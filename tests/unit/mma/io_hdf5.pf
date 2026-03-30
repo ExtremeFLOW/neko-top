@@ -1,0 +1,619 @@
+module io_hdf5
+  use mpi
+  use pfunit
+  use hdf5
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use mma, only: mma_t
+  use vector, only: vector_t
+  use matrix, only: matrix_t
+  use num_types, only: rp, sp, dp
+  use neko, only: neko_init
+  use comm, only: pe_rank, pe_size, NEKO_COMM, MPI_REAL_PRECISION
+  use device, only: device_finalize, HOST_TO_DEVICE, DEVICE_TO_HOST, &
+       device_init
+  use neko_mpi_types, only: neko_mpi_types_free
+  use logger, only: neko_log
+  use registry, only: neko_registry
+  use scratch_registry, only: neko_scratch_registry
+  use vector_math, only: vector_glsc2
+  use math, only: NEKO_EPS
+  use utils, only: neko_error
+
+  implicit none
+
+  @TestCase
+  type, extends(MPITestCase) :: test_io_hdf5_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_io_hdf5_case
+
+  logical :: initialized = .false.
+contains
+
+  subroutine setUp(this)
+    class(test_io_hdf5_case), intent(inout) :: this
+
+    if (initialized) return
+    initialized = .true.
+    call neko_init()
+
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_io_hdf5_case), intent(inout) :: this
+
+    ! if ((NEKO_BCKND_DEVICE .eq. 1)) then
+    !    call device_finalize
+    ! end if
+
+  end subroutine tearDown
+
+  ! ========================================================================== !
+  ! Test writing the MMA object to HDF5 file.
+
+  @test(npes=[2])
+  subroutine save_checkpoint(this)
+    class(test_io_hdf5_case), intent(inout) :: this
+    integer :: i
+    type(mma_t) :: obj
+    character(len=100) :: msg
+
+    ! MMA Parameters
+    integer :: n, m, max_iter
+    type(vector_t) :: x
+    character(len=:), allocatable :: bcknd, subsolver
+    real(kind=rp) :: a0, epsimin, asyinit, asyincr, asydecr
+    real(kind=rp), dimension(:), allocatable :: a, c, d, xmin, xmax
+
+    ! Reading variables
+    type(vector_t) :: r_xold1, r_xold2
+    integer :: r_n(pe_size), r_n_global, r_m
+    integer :: r_max_iter
+    real(kind=rp) :: r_a0, r_asyinit, r_asyincr, r_asydecr, r_epsimin
+    real(kind=rp), dimension(:), allocatable :: r_a, r_c, r_d
+    character(len=12) :: r_bcknd, r_subsolver
+
+    ! HDF5 variables
+    integer :: ierr
+    character(len=256) :: fname
+    character(len=:), allocatable :: group_name
+    logical :: file_exists
+    integer :: file_unit
+    integer(hid_t) :: H5T_NEKO_REAL, str_type, hdferr
+    integer(hid_t) :: fapl_id, file_id, attr_id, dset_id, filespace, memspace
+    integer(hid_t) :: xf_id, grp_id
+    integer(hsize_t), dimension(1) :: ddim, dcount, doffset
+    integer :: drank, n_accum, n_global
+
+    ! ------------------------------------------------------------------------ !
+
+    call neko_log%section("Test MMA HDF5 Checkpoint I/O")
+
+    ! ------------------------------------------------------------------------ !
+    ! Setup the MMA object and write to HDF5 file
+
+    if (pe_rank .eq. 0) n = 4
+    if (pe_rank .ne. 0) n = 2
+    m = 2
+
+    call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, &
+         NEKO_COMM%mpi_val, ierr)
+
+    call x%init(n)
+    do i = 1, n
+       x%x(i) = real(i, kind=rp) + real(pe_rank, kind=rp) * 0.01_rp
+    end do
+    call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    allocate(a(m), c(m), d(m), xmin(n), xmax(n))
+    a = 0.5_rp
+    c = 1.0_rp
+    d = 0.0_rp
+    xmin = 0.0_rp
+    xmax = 1.0_rp
+    a0 = 1.0_rp
+    max_iter = 10
+    epsimin = 1.0e-9_rp
+    asyinit = 0.5_rp
+    asyincr = 1.2_rp
+    asydecr = 0.7_rp
+
+    subsolver = 'dip'
+    if (NEKO_BCKND_DEVICE .eq. 0) bcknd = 'cpu'
+    if (NEKO_BCKND_DEVICE .eq. 1) bcknd = 'device'
+
+    ! Initialize MMA object
+    call obj%init_from_components(x, n, m, a0, a, c, d, xmin, xmax, &
+         max_iter, epsimin, asyinit, asyincr, asydecr, &
+         bcknd = bcknd, subsolver = subsolver)
+
+    group_name = '/MMA/checkpoint'
+    fname = 'mma_test_write.h5'
+
+    inquire(file=trim(fname), exist=file_exists, iostat=ierr)
+    if (file_exists .and. pe_rank .eq. 0) then
+       open(newunit=file_unit, file=trim(fname), iostat=ierr)
+       close(unit=file_unit, status='delete', iostat=ierr)
+    end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+
+    call neko_log%message("Writing MMA object to HDF5 file: " // trim(fname))
+    call obj%save_checkpoint(trim(fname))
+    call neko_log%message("Finished writing MMA object to HDF5 file.")
+
+    ! ------------------------------------------------------------------------ !
+    ! Read back the data
+
+    ! Initialize reader values
+    r_n = -1
+    r_n_global = -1
+    r_m = -1
+    r_max_iter = -1
+    r_asyinit = -1.0_rp
+    r_asyincr = -1.0_rp
+    r_asydecr = -1.0_rp
+    r_epsimin = -1.0_rp
+
+    r_bcknd = ''
+    r_subsolver = ''
+
+    allocate(r_a(m), r_c(m), r_d(m))
+    r_a = -1.0_rp
+    r_c = -1.0_rp
+    r_d = -1.0_rp
+
+    call r_xold1%init(n)
+    call r_xold2%init(n)
+
+    ! ------------------------------------------------------------------------ !
+    ! Read from HDF5 file
+
+    ! Open file and prepare reading
+    call h5open_f(ierr)
+    call h5pcreate_f(H5P_FILE_ACCESS_F, fapl_id, ierr)
+    call h5pset_fapl_mpio_f(fapl_id, NEKO_COMM%mpi_val, MPI_INFO_NULL, ierr)
+    call h5fopen_f(trim(fname), H5F_ACC_RDONLY_F, file_id, ierr, &
+         access_prp = fapl_id)
+    call h5gopen_f(file_id, group_name, grp_id, ierr)
+
+    ! Assign the correct HDF5 data type based on the neko real kind
+    select case (rp)
+    case (dp)
+       H5T_NEKO_REAL = H5T_NATIVE_DOUBLE
+    case (sp)
+       H5T_NEKO_REAL = H5T_NATIVE_REAL
+    case default
+       call neko_error('mma: unsupported real kind for HDF5')
+    end select
+
+    ! Read attributes
+    ddim(1) = 1
+    call h5aopen_f(grp_id, 'n_global', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, r_n_global, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'm', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, r_m, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'max_iter', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, r_max_iter, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'asyinit', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NEKO_REAL, r_asyinit, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'asyincr', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NEKO_REAL, r_asyincr, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'asydecr', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NEKO_REAL, r_asydecr, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'epsimin', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NEKO_REAL, r_epsimin, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read strings
+    call h5aopen_f(grp_id, 'bcknd', attr_id, ierr)
+    call h5aget_type_f(attr_id, str_type, ierr)
+    call h5aread_f(attr_id, str_type, r_bcknd, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5aopen_f(grp_id, 'subsolver', attr_id, ierr)
+    call h5aget_type_f(attr_id, str_type, ierr)
+    call h5aread_f(attr_id, str_type, r_subsolver, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    call h5tclose_f(str_type, ierr)
+
+    ! Read Array parameter types
+
+    ddim(1) = pe_size
+    call h5aopen_f(grp_id, 'n', attr_id, ierr)
+    call h5aread_f(attr_id, H5T_NATIVE_INTEGER, r_n, ddim, ierr)
+    call h5aclose_f(attr_id, ierr)
+
+    ! Read penalty parameters
+    ddim(1) = 1
+    call h5dopen_f(grp_id, 'a0', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_a0, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    ddim(1) = m
+    call h5dopen_f(grp_id, 'a', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_a, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    call h5dopen_f(grp_id, 'c', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_c, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    call h5dopen_f(grp_id, 'd', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_d, ddim, ierr)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Read distributed datasets
+
+    ! Define the sizes and offsets (each pe_rank reads its local n from the global array)
+    call MPI_Scan(n, n_accum, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM%mpi_val, ierr)
+
+    dcount(1) = n
+    doffset(1) = n_accum - n
+    ddim(1) = n_global
+
+    ! Create file and memory space (pe_rank = 1 for 1D arrays)
+    call h5screate_simple_f(1, ddim, filespace, ierr)
+    call h5screate_simple_f(1, dcount, memspace, ierr)
+
+    ! Dataset transfer property list: MPI collective I/O
+    call h5pcreate_f(H5P_DATASET_XFER_F, xf_id, ierr)
+    call h5pset_dxpl_mpio_f(xf_id, H5FD_MPIO_COLLECTIVE_F, ierr)
+
+    ! Select hyperslab in the file space for this pe_rank
+    call h5sselect_hyperslab_f(filespace, H5S_SELECT_SET_F, doffset, dcount, &
+         ierr)
+
+    ! Read xold1
+    call h5dopen_f(grp_id, 'xold1', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_xold1%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Read xold2
+    call h5dopen_f(grp_id, 'xold2', dset_id, ierr)
+    call h5dread_f(dset_id, H5T_NEKO_REAL, r_xold2%x, dcount, ierr, &
+         file_space_id = filespace, mem_space_id = memspace, xfer_prp = xf_id)
+    call h5dclose_f(dset_id, ierr)
+
+    ! Close transfer property list and dataspaces
+    call h5pclose_f(xf_id, ierr)
+    call h5sclose_f(memspace, ierr)
+    call h5sclose_f(filespace, ierr)
+
+    ! Close file and property list
+    call h5gclose_f(grp_id, ierr)
+    call h5fclose_f(file_id, ierr)
+    call h5pclose_f(fapl_id, ierr)
+    call h5close_f(ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! Check the values read from file
+
+    @assertEqual(n, r_n(pe_rank + 1), message = "n")
+    @assertEqual(m, r_m, message = "m")
+    @assertEqual(n_global, r_n_global, message = "n_global")
+    @assertEqual(max_iter, r_max_iter, message = "max_iter")
+
+    @assertEqual(asyinit, r_asyinit, message = "asyinit")
+    @assertEqual(asyincr, r_asyincr, message = "asyincr")
+    @assertEqual(asydecr, r_asydecr, message = "asydecr")
+    @assertEqual(epsimin, r_epsimin, message = "epsimin")
+
+    @assertEqual(trim(bcknd), trim(r_bcknd), message = "bcknd")
+    @assertEqual(trim(subsolver), trim(r_subsolver), message = "subsolver")
+
+    @assertEqual(a0, r_a0, message = "a0")
+    do i = 1, m
+       write(msg, '(A,I0,A)') "(", i, ")"
+       @assertEqual(a(i), r_a(i), NEKO_EPS, message = "a" // trim(msg))
+       @assertEqual(c(i), r_c(i), NEKO_EPS, message = "c" // trim(msg))
+       @assertEqual(d(i), r_d(i), NEKO_EPS, message = "d" // trim(msg))
+    end do
+
+    call r_xold1%copy_from(HOST_TO_DEVICE, sync = .false.)
+    call r_xold2%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    do i = 1, n
+       write(msg, '(A,I0,A)') "(", i, ")"
+       @assertEqual(x%x(i), r_xold1%x(i), NEKO_EPS, message = "xold1" // trim(msg))
+       @assertEqual(x%x(i), r_xold2%x(i), NEKO_EPS, message = "xold2" // trim(msg))
+    end do
+
+    ! ------------------------------------------------------------------------ !
+    ! Clean up
+
+    call x%free()
+    call r_xold1%free()
+    call r_xold2%free()
+    call obj%free()
+    deallocate(a, c, d, xmin, xmax)
+    deallocate(r_a, r_c, r_d)
+
+    call neko_log%end_section()
+  end subroutine save_checkpoint
+
+  ! ========================================================================== !
+  ! Test the MMA object restart functionality.
+
+  ! The test should initialize a MMA object. Perform 5 iterations, write the
+  ! hdf5 file and do another 5 iterations. Then restart from the hdf5 file and
+  ! perform 5 iterations again. The results of each iteration should be the
+  ! same.
+  !
+  ! A good test function would be the following Rosenbrock function:
+  ! min  f(x) = sum_{i=1}^n-1 [100 (x_{i+1} - x_i^2)^2 + (1 - x_i)^2]
+  ! s.t. g_1(x) = + n   - sum_{i=1}^n x_i^2 <= 0
+  ! s.t. g_2(x) = - 0.1 - sum_{i=1}^n x_i^2 <= 0
+  !      -1.5 <= x_i <= 1.5
+
+  subroutine rosenbrock(x, f, df)
+    type(vector_t), intent(inout) :: x
+    real(kind=rp), intent(out) :: f
+    type(vector_t), intent(inout), optional :: df
+    real(kind=rp) :: ghost_p, ghost_n, f_buffer
+    real(kind=rp), allocatable :: f_list(:)
+    integer :: rank_p, rank_n
+    integer :: request_p, request_n
+    integer :: i, ierr
+
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    ! ------------------------------------------------------------------------ !
+    ! Communicate ghost points
+
+    rank_p = pe_rank + 1
+    rank_n = pe_rank - 1
+
+    ! We need x(i-1) and x(i+1) which might be on a neighbouring process.
+    if (pe_rank .gt. 0) then
+       call MPI_Irecv(ghost_n, 1, MPI_REAL_PRECISION%mpi_val, rank_n, 0, &
+            NEKO_COMM%mpi_val, request_n, ierr)
+    end if
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Irecv(ghost_p, 1, MPI_REAL_PRECISION%mpi_val, rank_p, 1, &
+            NEKO_COMM%mpi_val, request_p, ierr)
+    end if
+
+    if (pe_rank .gt. 0) then
+       call MPI_Send(x%x(1), 1, MPI_REAL_PRECISION%mpi_val, rank_n, 1, &
+            NEKO_COMM%mpi_val, ierr)
+    end if
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Send(x%x(x%size()), 1, MPI_REAL_PRECISION%mpi_val, rank_p, 0, &
+            NEKO_COMM%mpi_val, ierr)
+    end if
+
+    if (pe_rank .lt. pe_size - 1) then
+       call MPI_Wait(request_p, MPI_STATUS_IGNORE, ierr)
+    end if
+    if (pe_rank .gt. 0) then
+       call MPI_Wait(request_n, MPI_STATUS_IGNORE, ierr)
+    end if
+
+    ! ------------------------------------------------------------------------ !
+    ! Compute function value
+
+    allocate(f_list(x%size()))
+    do i = 1, x%size() - 1
+       f_list(i) = 100.0_rp * (x%x(i + 1) - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
+    end do
+
+    ! Handle the last entry which needs the ghost value
+    i = x%size()
+    if (pe_rank .lt. pe_size - 1) then
+       f_list(i) = 100.0_rp * (ghost_p - x%x(i)**2)**2 + (1.0_rp - x%x(i))**2
+    else
+       f_list(i) = 0.0_rp
+    end if
+
+    ! Compute function value as the global sum
+    f = sum(f_list)
+    f_buffer = f
+    call MPI_Allreduce(f_buffer, f, 1, MPI_REAL_PRECISION%mpi_val, MPI_SUM, &
+         NEKO_COMM%mpi_val, ierr)
+    deallocate(f_list)
+
+    ! ------------------------------------------------------------------------ !
+    ! Compute gradient if requested
+    if (present(df)) then
+       do i = 1, x%size()
+          if (i .eq. 1 .and. pe_rank .eq. 0) then
+             df%x(i) = -400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          else if (i .eq. 1) then
+             df%x(i) = 200.0_rp * (x%x(i) - ghost_n**2) - &
+                  400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          else if (i .eq. x%size() .and. pe_rank .eq. pe_size - 1) then
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2)
+          else if (i .eq. x%size()) then
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2) - &
+                  400.0_rp * x%x(i) * (ghost_p - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          else
+             df%x(i) = 200.0_rp * (x%x(i) - x%x(i - 1)**2) - &
+                  400.0_rp * x%x(i) * (x%x(i + 1) - x%x(i)**2) - &
+                  2.0_rp * (1.0_rp - x%x(i))
+          end if
+       end do
+
+       call df%copy_from(HOST_TO_DEVICE, sync = .true.)
+    end if
+  end subroutine rosenbrock
+
+  subroutine constraint(x, g, dg)
+    type(vector_t), intent(inout) :: x
+    type(vector_t), intent(inout) :: g
+    type(matrix_t), intent(inout), optional :: dg
+    integer :: i, ierr
+    real(kind=rp) :: sum_x2, global_size
+
+    ! Compute sum_i x_i^2
+    sum_x2 = vector_glsc2(x, x)
+    global_size = real(x%size(), kind=rp)
+    call MPI_Allreduce(MPI_IN_PLACE, global_size, 1, &
+         MPI_REAL_PRECISION%mpi_val, MPI_SUM, NEKO_COMM%mpi_val, ierr)
+
+    g%x(1) = - global_size - sum_x2
+    g%x(2) = 0.1_rp - sum_x2
+
+    if (present(dg)) then
+       call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+       do i = 1, x%size()
+          dg%x(1, i) = - 2.0_rp * x%x(i)
+          dg%x(2, i) = - 2.0_rp * x%x(i)
+       end do
+       call dg%copy_from(HOST_TO_DEVICE, sync = .false.)
+    end if
+    call g%copy_from(HOST_TO_DEVICE, sync = .true.)
+  end subroutine constraint
+
+  @test(npes=[2])
+  subroutine restart_mma(this)
+    class(test_io_hdf5_case), intent(inout) :: this
+
+    type(vector_t) :: x, x_init, x_50, x_ref
+
+    real(kind=rp) :: f
+    type(vector_t) :: df, g
+    type(matrix_t) :: dg
+
+    type(mma_t) :: mma_obj
+    integer :: n, m, i, iter, max_iter
+    real(kind=rp) :: a0
+    real(kind=rp), dimension(:), allocatable :: a, c, d, xmin, xmax
+    character(len=:), allocatable :: bcknd, subsolver
+
+    character(len=:), allocatable :: fname
+    character(len=256) :: msg
+    logical :: file_exists
+    integer :: file_unit, ierr
+
+    call neko_log%section("Test MMA Restart")
+
+    ! ------------------------------------------------------------------------ !
+    ! Setup the MMA object
+
+    if (pe_rank .eq. 0) n = 3
+    if (pe_rank .ne. 0) n = 2
+    m = 2
+
+    call x%init(n)
+    call x_50%init(n)
+    call x_init%init(n)
+    call x_ref%init(n)
+
+    if (pe_rank .eq. 0) then
+       x_init%x = [0.2_rp, 1.0_rp, 1.1_rp]
+    else
+       x_init%x = [1.0_rp, 1.1_rp]
+    end if
+    call x_init%copy_from(HOST_TO_DEVICE, sync = .true.)
+
+    allocate(a(m), c(m), d(m), xmin(n), xmax(n))
+    a0 = 1.0_rp
+    a = 0.0_rp
+    c = 100.0_rp
+    d = 1.0_rp
+
+    xmin = -1.5_rp
+    xmax = 1.5_rp
+
+    subsolver = 'dip'
+    if (NEKO_BCKND_DEVICE .eq. 0) bcknd = 'cpu'
+    if (NEKO_BCKND_DEVICE .eq. 1) bcknd = 'device'
+
+    call mma_obj%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = subsolver)
+
+    ! Write the initial state, this will help us test the overwrite option
+    fname = 'mma_restart_test.h5'
+    inquire(file=trim(fname), exist=file_exists, iostat=ierr)
+    if (file_exists .and. pe_rank .eq. 0) then
+       open(newunit=file_unit, file=trim(fname), iostat=ierr)
+       close(unit=file_unit, status='delete', iostat=ierr)
+    end if
+    call MPI_Barrier(NEKO_COMM%mpi_val, ierr)
+
+    ! ------------------------------------------------------------------------ !
+    ! Run the optimization save halfway and then continue
+    max_iter = 100
+
+    f = 0.0_rp
+    x = x_init
+    call df%init(n)
+    call g%init(m)
+    call dg%init(m, n)
+
+    ! Run the optimization and save at iteration 5
+    do iter = 1, max_iter
+       call rosenbrock(x, f, df)
+       call constraint(x, g, dg)
+       call mma_obj%update(iter, x, df, g, dg)
+
+       if (iter .eq. max_iter / 2) then
+          call mma_obj%save_checkpoint(fname)
+          x_50 = x
+       end if
+    end do
+    call x%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    ! Store result after solving all iterations
+    x_ref = x
+
+    call mma_obj%free()
+
+    ! ------------------------------------------------------------------------ !
+    ! Now restart from HDF5 file
+
+    call mma_obj%init_from_components(x_init, n, m, a0, a, c, d, xmin, xmax, &
+         bcknd = bcknd, subsolver = subsolver)
+    call mma_obj%load_checkpoint(fname)
+
+    x = x_50
+
+    ! Perform 5 iterations again
+    do iter = max_iter / 2 + 1, max_iter
+       call rosenbrock(x, f, df)
+       call constraint(x, g, dg)
+       call mma_obj%update(iter, x, df, g, dg)
+    end do
+
+    ! Check that the result matches the one after 10 iterations
+    call x%copy_from(DEVICE_TO_HOST, sync = .false.)
+    call x_ref%copy_from(DEVICE_TO_HOST, sync = .true.)
+
+    do i = 1, n
+       write(msg, '(A,I0,A)') "X at index (", i, ")"
+       @assertEqual(x_ref%x(i), x%x(i), NEKO_EPS, message = trim(msg))
+    end do
+
+    call x%free()
+    call x_50%free()
+    call x_init%free()
+    call x_ref%free()
+
+    call df%free()
+    call g%free()
+    call dg%free()
+    call mma_obj%free()
+    deallocate(a, c, d, xmin, xmax)
+
+    call neko_log%end_section()
+  end subroutine restart_mma
+
+end module io_hdf5

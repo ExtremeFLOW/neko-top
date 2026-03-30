@@ -187,3 +187,85 @@ be found in [Mapping cascade](@ref mapping_cascade).
 of the theory guide. This will tie together all aspects from the mapping, to
 how these terms arise etc. For now we are simply documenting the equations
 being solved.
+
+## Time integration
+This section summarizes the discrete adjoint for the pressure-correction
+time integration used in `Neko-TOP`. We start from a right-handed Riemann sum
+for the objective,
+\f[
+  F \approx \Delta t \sum_{n=1}^{N} f(\mathbf{u}_n), \qquad
+  \mathrm{d}F = \Delta t \sum_{n=1}^{N}
+  \int_\Omega \nabla_{\mathbf{u}_n} f(\mathbf{u}_n)\cdot \delta \mathbf{u}_n \, \mathrm{d}\Omega.
+\f]
+
+The velocity-pressure splitting currently implemented `Neko` follows that of
+[Karniadakis et al. 1991](https://doi.org/10.1016/0021-9991(91)90007-8) and is commonly
+referred to as the  \f$ \mathbb{P}_N-\mathbb{P}_N\f$ formulation, whereby
+we introduce an intermediate velocity \f$\mathbf{u}_n^{\star}\f$ and write the
+forward time step as three sub-problems:
+\f[
+  \int_\Omega \mathbf{v}_n \cdot \frac{\mathbf{u}_n^{\star}}{\Delta t} \, \mathrm{d}\Omega
+  =
+  \int_\Omega \mathbf{v}_n \cdot \frac{\mathbf{u}_{n-1}}{\Delta t} \, \mathrm{d}\Omega
+  - \int_\Omega \mathbf{v}_n \cdot \mathcal{C}_{\mathbf{u}_{n-1}}\,\mathbf{u}_{n-1} \, \mathrm{d}\Omega
+  - \int_\Omega \mathbf{v}_n \cdot \chi\,\mathbf{u}_{n-1} \, \mathrm{d}\Omega,
+\f]
+\f[
+  \int_\Omega \nabla q_n \cdot \nabla p_n \, \mathrm{d}\Omega
+  =
+  \int_\Omega \nabla q_n \cdot \frac{\mathbf{u}_n^{\star}}{\Delta t} \, \mathrm{d}\Omega
+  - \int_\Omega \nabla q_n \cdot \nabla \times (\nabla \times \mathbf{u}_{n-1}) \, \mathrm{d}\Omega,
+\f]
+\f[
+  \int_\Omega \mathbf{w}_n \cdot \frac{\mathbf{u}_n}{\Delta t} \, \mathrm{d}\Omega
+  + \int_\Omega \mathbf{w}_n \cdot \mathcal{L}\mathbf{u}_n \, \mathrm{d}\Omega
+  =
+  \int_\Omega \mathbf{w}_n \cdot \frac{\mathbf{u}_n^{\star}}{\Delta t} \, \mathrm{d}\Omega
+  - \int_\Omega \mathbf{w}_n \cdot \nabla p_n \, \mathrm{d}\Omega.
+\f]
+Here \f$\mathcal{C}_{\mathbf{u}_{n-1}}\f$ denotes the linearized convection
+operator about \f$\mathbf{u}_{n-1}\f$, \f$\chi\f$ denotes any explicit linear
+operator (e.g. Brinkman), and \f$\mathcal{L}\f$ is the implicit
+diffusion/Helmholtz operator.
+
+Perturbing these equations and collecting terms yields a discrete adjoint that
+is solved in three steps (backward in time). First, solve for the adjoint
+velocity associated with the implicit step,
+\f[
+  -\int_\Omega \frac{\mathbf{u}_n^{*\dagger}}{\Delta t} \, \mathrm{d}\Omega
+  + \int_\Omega \mathcal{L}^\dagger \mathbf{u}_n^{*\dagger} \, \mathrm{d}\Omega
+  =
+  \int_\Omega \nabla_{\mathbf{u}_n} f(\mathbf{u}_n)\,\Delta t \, \mathrm{d}\Omega
+  + \int_\Omega \frac{\mathbf{u}_{n+1}^{\dagger}}{\Delta t} \, \mathrm{d}\Omega
+  - \int_\Omega \mathcal{C}^\dagger_{\mathbf{u}_n}\,\mathbf{u}_{n+1}^{\dagger} \, \mathrm{d}\Omega
+  - \int_\Omega \chi^\dagger\, \mathbf{u}_{n+1}^{\dagger} \, \mathrm{d}\Omega.
+\f]
+Second, solve the adjoint pressure equation,
+\f[
+  \int_\Omega \nabla q_n \cdot \nabla p_n^{\dagger} \, \mathrm{d}\Omega
+  =
+  \int_\Omega -\mathbf{u}_n^{*\dagger} \cdot \nabla p_n^{\dagger} \, \mathrm{d}\Omega.
+\f]
+Finally, recover the adjoint velocity associated with the explicit step,
+\f[
+  \mathbf{u}_n^{\dagger}
+  = \mathbf{u}_n^{*\dagger} - \nabla p_n^{\dagger}.
+\f]
+
+With these adjoint variables, the discrete gradient contribution associated
+with an explicit linear operator \f$\chi\f$ is
+\f[
+  \mathrm{d}F(\chi,\delta \chi)
+  = -\sum_{n=1}^{N} \int_\Omega \delta \chi\,
+  \mathbf{u}_{n+1}^{\dagger} \mathbf{u}_n \, \mathrm{d}\Omega.
+\f]
+The order above matches the implementation: solve the implicit adjoint step,
+then the adjoint pressure correction, then form the projection to obtain the
+adjoint velocity used in the sensitivity accumulation.
+
+\warning The curl--curl contribution in the pressure equation is implemented
+as the boundary integral
+\f$-\int_{\partial\Omega}\big(\mathbf{n}\times\nabla p_{n+1}^{\dagger}\big)\cdot
+\big(\nabla\times \mathbf{w}\big)\,\mathrm{d}S\f$, where \f$\mathbf{w}\f$
+is the test function of adjoint velocity equation, however
+it has not yet been tested extensively.

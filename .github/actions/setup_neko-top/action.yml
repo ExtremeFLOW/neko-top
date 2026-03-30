@@ -23,6 +23,11 @@ inputs:
     required: false
     default: "/home/runner/pkg/json-fortran"
 
+  hdf5-dir:
+    description: "The directory where the HDF5 library was installed."
+    required: false
+    default: "/home/runner/pkg/hdf5"
+
   neko-dir:
     description: "The directory where the JSON-Fortran library was installed."
     required: false
@@ -141,6 +146,7 @@ runs:
         FCFLAGS: ${{ inputs.compiler-flags }}
         NEKO_DIR: ${{ inputs.neko-dir }}
         JSON_FORTRAN_DIR: ${{ inputs.json-fortran-dir }}
+        HDF5_DIR: ${{ inputs.hdf5-dir }}
         CONFIGURE_OPTIONS: ${{ inputs.configure-options }}
       run: |
         cmake -B $WORKING_DIR/build -S $WORKING_DIR -G Ninja \
@@ -150,6 +156,7 @@ runs:
           -DCMAKE_Fortran_FLAGS=$FCFLAGS \
           -DJSON_FORTRAN_DIR=$JSON_FORTRAN_DIR \
           -DNEKO_DIR=$NEKO_DIR \
+          -DHDF5_DIR=$HDF5_DIR \
           $CONFIGURE_OPTIONS
 
     - name: Build

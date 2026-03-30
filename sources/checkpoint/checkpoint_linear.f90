@@ -1,34 +1,36 @@
-! Copyright (c) 2025, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file checkpoint_linear.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 
 !> Implementation for the Linear Checkpointing algorithm.
@@ -52,18 +54,28 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    logical :: save_disc
+    integer :: index, tstep, counter
+    real(kind=rp) :: time
+
+    time = neko_case%time%t
+    tstep = neko_case%time%tstep
 
     ! We save to disc only every n_saves_memory time steps
-    save_disc = modulo(neko_case%time%tstep, this%n_saves_memory) .eq. 0
+    index = modulo(tstep, this%n_saves_memory)
 
     ! Sample the checkpoint if needed
-    if (save_disc .or. neko_case%time%tstep .le. this%first_valid_timestep) then
+    if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
+       this%loaded_checkpoint = tstep
 
-       call this%chkp_output%set_counter(neko_case%time%tstep)
-       call this%chkp_output%sample(neko_case%time%t)
+       counter = determine_counter(tstep, this%n_saves_memory, &
+            this%first_valid_timestep)
+
+       call this%chkp_output%set_counter(counter)
+       call this%chkp_output%sample(time)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
+
+    call this%save_data(index + 1)
   end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state in a linear fashion.
@@ -76,8 +88,7 @@ contains
     integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
-    integer :: j, k, previous_save, next_save
-    integer :: i_scalars
+    integer :: k, previous_save, next_save, local_idx, counter
     type(field_t), pointer :: u, v, w, p, s
 
     loop_start = MPI_WTIME()
@@ -105,7 +116,9 @@ contains
     if (this%loaded_checkpoint .ne. previous_save) then
 
        ! Restart the simulation form the checkpoint file
-       call this%chkp_output%set_counter(previous_save)
+       counter = determine_counter(previous_save, this%n_saves_memory, &
+            this%first_valid_timestep)
+       call this%chkp_output%set_counter(counter)
        call this%chkp_output%file_%read(neko_case%chkp)
        call simulation_restart(neko_case, neko_case%chkp)
 
@@ -123,32 +136,27 @@ contains
              call simulation_step(neko_case, dt_controller, loop_start)
           end if
 
+          ! Save the restored state in memory
           local_idx = modulo(k, this%n_saves_memory) + 1
-          call field_copy(this%p_list(local_idx), p)
-          call field_copy(this%u_list(local_idx), u)
-          call field_copy(this%v_list(local_idx), v)
-          call field_copy(this%w_list(local_idx), w)
-          do i_scalars = 1, this%n_scalars
-             j = (local_idx - 1) * this%n_scalars + i_scalars
-             s => neko_case%scalars%scalar_fields(i_scalars)%s
-             call field_copy(this%s_list(j), s)
-          end do
-
+          call this%save_data(local_idx)
        end do
     end if
 
+    ! Restore the required time step from memory
     local_idx = modulo(tstep, this%n_saves_memory) + 1
-    call field_copy(p, this%p_list(local_idx))
-    call field_copy(u, this%u_list(local_idx))
-    call field_copy(v, this%v_list(local_idx))
-    call field_copy(w, this%w_list(local_idx))
-    do i_scalars = 1, this%n_scalars
-       j = (local_idx - 1) * this%n_scalars + i_scalars
-       s => neko_case%scalars%scalar_fields(i_scalars)%s
-       call field_copy(s, this%s_list(j))
-    end do
-
-
+    call this%load_data(local_idx)
   end subroutine checkpoint_restore_linear
+
+  pure function determine_counter(tstep, n_memory, first) result(counter)
+    integer, intent(in) :: tstep, n_memory, first
+    integer :: counter
+
+    if (tstep .le. first) then
+       counter = tstep
+    else
+       counter = first + tstep / n_memory
+    end if
+
+  end function determine_counter
 
 end submodule checkpoint_linear

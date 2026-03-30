@@ -3,6 +3,39 @@
 !!
 !! This module contains extensions to the neko library required to run the
 !! code. It is not part of the neko library itself.
+!!
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 
 !> @brief Contains extensions to the neko library required to run the topology
 !! optimization code.
@@ -72,7 +105,7 @@ contains
     w => neko_case%fluid%w
     p => neko_case%fluid%p
     if (allocated(neko_case%scalars)) then
-       s => neko_case%scalars%scalar_fields(1)%s
+       s => neko_case%scalars%scalar_fields(1)%scalar%s
     else
        nullify(s)
     end if
@@ -157,33 +190,33 @@ contains
           call neko_error('Multiple scalars not supported')
        end if
        ! zero out RHS
-       call field_rzero(neko_case%scalars%scalar_fields(1)%f_Xh)
+       call field_rzero(neko_case%scalars%scalar_fields(1)%scalar%f_Xh)
        ! reset the forward scalar
        call json_get(neko_case%params, &
             'case.scalar.initial_condition.type', string_val)
        call json_get(neko_case%params, &
             'case.scalar.initial_condition', json_subdict)
        if (trim(string_val) .ne. 'user') then
-          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+          if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                'temperature') then
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%s, &
                   neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
                   json_subdict, 0)
           else
-             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%s, &
+             call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%s, &
                   neko_case%fluid%c_Xh, neko_case%fluid%gs_Xh, string_val, &
                   json_subdict, 1)
           end if
        else
-          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%name, &
-               neko_case%scalars%scalar_fields(1)%s, &
-               neko_case%scalars%scalar_fields(1)%c_Xh, &
-               neko_case%scalars%scalar_fields(1)%gs_Xh, &
+          call set_scalar_ic(neko_case%scalars%scalar_fields(1)%scalar%name, &
+               neko_case%scalars%scalar_fields(1)%scalar%s, &
+               neko_case%scalars%scalar_fields(1)%scalar%c_Xh, &
+               neko_case%scalars%scalar_fields(1)%scalar%gs_Xh, &
                neko_case%user%initial_conditions)
        end if
        ! set lags to IC
-       call neko_case%scalars%scalar_fields(1)%slag%set(&
-            neko_case%scalars%scalar_fields(1)%s)
+       call neko_case%scalars%scalar_fields(1)%scalar%slag%set(&
+            neko_case%scalars%scalar_fields(1)%scalar%s)
     end if
 
     ! ------------------------------------------------------------------------ !
@@ -242,6 +275,9 @@ contains
 
     ! Reset the time step counter
     call adjoint_case%output_controller%set_counter(adjoint_case%time)
+    if (adjoint_case%norm_output_enabled) then
+       call adjoint_case%norm_output_ctrl%set_counter(adjoint_case%time)
+    end if
 
     ! Reset the external BDF coefficients
     do i = 1, size(adjoint_case%time%dtlag)
@@ -307,7 +343,7 @@ contains
        call json_get(neko_case%params, &
             'case.adjoint_scalar.initial_condition', json_subdict)
        if (trim(string_val) .ne. 'user') then
-          if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+          if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                'temperature') then
              call set_scalar_ic( &
                   adjoint_case%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
@@ -423,7 +459,7 @@ contains
     end do
 
     do i = 1, n_primal_scalars
-       if (scalars%scalar_fields(i)%name .eq. primal_name) then
+       if (scalars%scalar_fields(i)%scalar%name .eq. primal_name) then
           i_primal = i
           exit
        end if

@@ -1,56 +1,57 @@
-! Copyright (c) 2025, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_fluid_pnpn.f90
+!! @copyright
+!! Copyright (c) 2024-2026, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Adjoint Pn/Pn formulation.
 module adjoint_fluid_pnpn
   use, intrinsic :: iso_fortran_env, only: error_unit
   use coefs, only: coef_t
   use symmetry, only: symmetry_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use num_types, only: rp
   use krylov, only: ksp_monitor_t
-  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t, &
-       pnpn_prs_res_factory, pnpn_vel_res_factory, &
-       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
+  use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
+       adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
+       adjoint_pnpn_vel_res_factory
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
-  use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_scheme_incompressible, only: &
        adjoint_fluid_scheme_incompressible_t
-  use device_mathops, only: device_opcolv, device_opadd2cm
+  use device_mathops, only: device_opadd2cm
   use fluid_aux, only: fluid_step_info
-  use time_scheme_controller, only: time_scheme_controller_t
+  use scratch_registry, only: neko_scratch_registry
   use projection, only: projection_t
   use projection_vel, only: projection_vel_t
   use device, only: device_memcpy, HOST_TO_DEVICE, device_event_sync, &
@@ -59,7 +60,6 @@ module adjoint_fluid_pnpn
   use profiler, only: profiler_start_region, profiler_end_region
   use json_module, only: json_file, json_core, json_value
   use json_utils, only: json_get, json_get_or_default, json_extract_item
-  use json_module, only: json_file
   use ax_product, only: ax_t, ax_helm_factory
   use field, only: field_t
   use dirichlet, only: dirichlet_t
@@ -73,14 +73,16 @@ module adjoint_fluid_pnpn
   use time_step_controller, only: time_step_controller_t
   use gs_ops, only: GS_OP_ADD
   use neko_config, only: NEKO_BCKND_DEVICE
-  use mathops, only: opadd2cm, opcolv
+  use mathops, only: opadd2cm
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
-  use utils, only: neko_error, neko_type_error
-  use field_math, only: field_add2, field_copy, field_rzero
+  use utils, only: neko_error
+  use field_math, only: field_add2, field_copy, field_rzero &
+       field_add2s2
   use bc, only: bc_t
   use file, only: file_t
   use operators, only: ortho
+  use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
   use blasius, only: blasius_t
@@ -88,18 +90,20 @@ module adjoint_fluid_pnpn
   use dong_outflow, only: dong_outflow_t
   use time_state, only: time_state_t
   use vector, only: vector_t
-  use device_math, only: device_vlsc3, device_cmult
-  use math, only: vlsc3, cmult
-  use json_utils_ext, only: json_key_fallback
+  use device_math, only: device_vlsc3, device_cmult, device_col2
+  use math, only: vlsc3, cmult, col2
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
        MPI_INTEGER, MPI_LOGICAL, MPI_LOR
+  use operators, only : opgrad, curl, grad
+  use normal_vec_bcs, only: normal_vec_bcs_t
 
   implicit none
   private
 
-  type, public, extends(adjoint_fluid_scheme_incompressible_t) :: adjoint_fluid_pnpn_t
+  type, public, extends(adjoint_fluid_scheme_incompressible_t) :: &
+       adjoint_fluid_pnpn_t
 
      !> The right-hand sides in the linear solves.
      type(field_t) :: p_res, u_res, v_res, w_res
@@ -134,6 +138,9 @@ module adjoint_fluid_pnpn
 
      !> Surface term in pressure rhs. Masks symmetry bcs.
      type(facet_normal_t) :: bc_sym_surface
+
+     !> Surface term in pressure rhs. Masks symmetry bcs.
+     type(normal_vec_bcs_t) :: bc_curl_curl
 
      !
      ! Boundary conditions and  lists for residuals and solution increments
@@ -177,10 +184,10 @@ module adjoint_fluid_pnpn
      type(field_t) :: advx, advy, advz
 
      !> Pressure residual equation for computing `p_res`.
-     class(pnpn_prs_res_t), allocatable :: prs_res
+     class(adjoint_pnpn_prs_res_t), allocatable :: prs_res
 
      !> Velocity residual equation for computing `u_res`, `v_res`, `w_res`.
-     class(pnpn_vel_res_t), allocatable :: vel_res
+     class(adjoint_pnpn_vel_res_t), allocatable :: vel_res
 
      !> Summation of AB/BDF contributions
      class(rhs_maker_sumab_t), allocatable :: sumab
@@ -238,6 +245,7 @@ module adjoint_fluid_pnpn
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
+
      !> Reset a simulation
      procedure, public, pass(this) :: reset => adjoint_fluid_pnpn_reset
 
@@ -279,8 +287,7 @@ module adjoint_fluid_pnpn
 
 contains
 
-  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, chkp, &
-       if_adjoint)
+  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, chkp, if_adjoint)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
@@ -308,10 +315,10 @@ contains
     ! Initialize base class
     call this%init_base(msh, lx, params, scheme, user, .true.)
 
-    ! Allocate pressure field. For this scheme it is in the same
+    ! Add pressure field to the registry. For this scheme it is in the same
     ! Xh as the velocity
-    allocate(this%p_adj)
-    call this%p_adj%init(this%dm_Xh, fld_name = "adjoint_p")
+    call neko_registry%add_field(this%dm_Xh, 'p_adj')
+    this%p_adj => neko_registry%get_field('p_adj')
 
     !
     ! Select governing equations via associated residual and Ax types
@@ -340,10 +347,10 @@ contains
        call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
 
        ! Setup backend dependent prs residual routines
-       call pnpn_prs_res_factory(this%prs_res)
+       call adjoint_pnpn_prs_res_factory(this%prs_res)
 
        ! Setup backend dependent vel residual routines
-       call pnpn_vel_res_factory(this%vel_res)
+       call adjoint_pnpn_vel_res_factory(this%vel_res)
     end if
 
     if (params%valid_path('case.fluid.nut_field')) then
@@ -455,7 +462,7 @@ contains
     this%chkp => chkp
     ! This is probably scheme specific
     ! Should not be init really, but more like, add fluid or something...
-    call this%chkp%init(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
+    call this%chkp%add_fluid(this%u_adj, this%v_adj, this%w_adj, this%p_adj)
 
     this%chkp%abx1 => this%abx1
     this%chkp%abx2 => this%abx2
@@ -476,14 +483,14 @@ contains
 
     ! The baseflow is the solution to the forward.
     ! Userdefined baseflows can be invoked via setting initial conditions
-    ! call neko_field_registry%add_field(this%dm_Xh, 'u')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'v')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'w')
-    ! call neko_field_registry%add_field(this%dm_Xh, 'p')
-    this%u_b => neko_field_registry%get_field('u')
-    this%v_b => neko_field_registry%get_field('v')
-    this%w_b => neko_field_registry%get_field('w')
-    this%p_b => neko_field_registry%get_field('p')
+    ! call neko_registry%add_field(this%dm_Xh, 'u')
+    ! call neko_registry%add_field(this%dm_Xh, 'v')
+    ! call neko_registry%add_field(this%dm_Xh, 'w')
+    ! call neko_registry%add_field(this%dm_Xh, 'p')
+    this%u_b => neko_registry%get_field('u')
+    this%v_b => neko_registry%get_field('v')
+    this%w_b => neko_registry%get_field('w')
+    this%p_b => neko_registry%get_field('p')
 
     ! Read the json file
     call json_get_or_default(params, 'norm_target', &
@@ -504,7 +511,7 @@ contains
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(chkp_t), intent(inout) :: chkp
     real(kind=rp) :: dtlag(10), tlag(10)
-    integer :: i, j, n
+    integer :: i, n
 
     dtlag = chkp%dtlag
     tlag = chkp%tlag
@@ -515,21 +522,14 @@ contains
        associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
             p => this%p_adj, c_Xh => this%c_Xh, ulag => this%ulag, &
             vlag => this%vlag, wlag => this%wlag)
-         do concurrent (j = 1:n)
-            u%x(j,1,1,1) = u%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            v%x(j,1,1,1) = v%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            w%x(j,1,1,1) = w%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-            p%x(j,1,1,1) = p%x(j,1,1,1) * c_Xh%mult(j,1,1,1)
-         end do
+         call col2(u%x, c_Xh%mult, n)
+         call col2(v%x, c_Xh%mult, n)
+         call col2(w%x, c_Xh%mult, n)
+         call col2(p%x, c_Xh%mult, n)
          do i = 1, this%ulag%size()
-            do concurrent (j = 1:n)
-               ulag%lf(i)%x(j,1,1,1) = ulag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-               vlag%lf(i)%x(j,1,1,1) = vlag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-               wlag%lf(i)%x(j,1,1,1) = wlag%lf(i)%x(j,1,1,1) &
-                    * c_Xh%mult(j,1,1,1)
-            end do
+            call col2(ulag%lf(i)%x, c_Xh%mult, n)
+            call col2(vlag%lf(i)%x, c_Xh%mult, n)
+            call col2(wlag%lf(i)%x, c_Xh%mult, n)
          end do
        end associate
     end if
@@ -608,6 +608,7 @@ contains
 
     call this%bc_prs_surface%free()
     call this%bc_sym_surface%free()
+    call this%bc_curl_curl%free()
     call this%bclst_vel_res%free()
     call this%bclst_dp%free()
     call this%proj_prs%free()
@@ -687,6 +688,11 @@ contains
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
     type(ksp_monitor_t) :: ksp_results(4)
+    type(field_t), pointer :: dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, &
+         work1, work2
+    integer :: temp_indices(3)
+    integer :: cc_indices(8)
+    real(kind=rp) :: rho_val, mu_val
 
     if (this%freeze) return
 
@@ -717,19 +723,7 @@ contains
 
       ! Extrapolate the velocity if it's not done in nut_field estimation
       call sumab%compute_fluid(u_e, v_e, w_e, u, v, w, &
-           ulag, vlag, wlag, ext_bdf%advection_coeffs, ext_bdf%nadv)
-
-      ! DELETE THIS, it's super hard coded! But I'm forcing w to zero at each
-      ! timestep!
-      call field_rzero(w)
-      call field_rzero(w_e)
-      ! and this!
-      call z_plane_fix(u)
-      call z_plane_fix(v)
-      call z_plane_fix(w)
-      call z_plane_fix(u_e)
-      call z_plane_fix(v_e)
-      ! should probably do the lags too
+           ulag, vlag, wlag, ext_bdf%advection_coeffs%x, ext_bdf%nadv)
 
       ! Compute the source terms
       call this%source_term%compute(time)
@@ -754,17 +748,13 @@ contains
          call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
               this%abx2, this%aby2, this%abz2, &
               f_x%x, f_y%x, f_z%x, &
-              rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
+              rho%x(1,1,1,1), ext_bdf%advection_coeffs%x, n)
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
               u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
-              ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
-
-      ! DELETE THIS,
-      ! again, hard code the shit out of this so that everything is 2D.
-      call field_rzero(f_z)
 
       call ulag%update()
       call vlag%update()
@@ -773,23 +763,132 @@ contains
       call this%bc_apply_vel(time, strong = .true.)
       call this%bc_apply_prs(time)
 
+      ! Now we need the surface contribution of the curl curl BC.(explicit in p)
+      call neko_scratch_registry%request_field(dx_p_adj, cc_indices(1), .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, cc_indices(2), .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, cc_indices(3), .false.)
+
+      ! Note: zero interior
+      call neko_scratch_registry%request_field(nx1, cc_indices(4), .true.)
+      call neko_scratch_registry%request_field(nx2, cc_indices(5), .true.)
+      call neko_scratch_registry%request_field(nx3, cc_indices(6), .true.)
+
+      call neko_scratch_registry%request_field(work1, cc_indices(7), .false.)
+      call neko_scratch_registry%request_field(work2, cc_indices(8), .false.)
+
+      ! gradient of adjoint pressure (explicit)
+      call grad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+
+      ! Now we compute the n x grad(p) (this include 2D weights)
+      call this%bc_curl_curl%apply_n_cross(nx1%x, nx2%x, nx3%x, dx_p_adj%x, &
+           dy_p_adj%x, dz_p_adj%x, dx_p_adj%size())
+
+      ! Now we need curl on the test function, note that transpose of curl is
+      ! negative curl
+      ! reuse dx_p_adj etc as fx, fy, fz etc
+      call curl(dx_p_adj, dy_p_adj, dz_p_adj, nx1, nx2, nx3, work1, work2, c_Xh)
+
+      ! Forward does gsop on the residual (which has the pressure gradient)
+      call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dy_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! multiplcity
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_col2(dx_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
+         call device_col2(dy_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
+         call device_col2(dz_p_adj%x_d, c_Xh%mult_d, dx_p_adj%size())
+      else
+         call col2(dx_p_adj%x, c_Xh%mult, dx_p_adj%size())
+         call col2(dy_p_adj%x, c_Xh%mult, dx_p_adj%size())
+         call col2(dz_p_adj%x, c_Xh%mult, dx_p_adj%size())
+      end if
+
+      rho_val = rho%x(1,1,1,1)
+      mu_val = mu%x(1,1,1,1)
+      call field_add2s2(f_x, dx_p_adj, -mu_val / rho_val)
+      call field_add2s2(f_y, dy_p_adj, -mu_val / rho_val)
+      call field_add2s2(f_z, dz_p_adj, -mu_val / rho_val)
+
+      call neko_scratch_registry%relinquish_field(cc_indices)
+
       ! Update material properties if necessary
       call this%update_material_properties(time)
 
-      ! Compute pressure residual.
+      ! Compute intermediate velocity residual.
+
+      call profiler_start_region('Adjoint_velocity_residual')
+
+      call vel_res%compute(Ax_vel, u, v, w, &
+           u_res, v_res, w_res, &
+           p, &
+           f_x, f_y, f_z, &
+           c_Xh, msh, Xh, &
+           mu, rho, ext_bdf%diffusion_coeffs%x(1), &
+           dt, dm_Xh%size())
+
+      call gs_Xh%op(u_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(v_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(w_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! Set residual to zero at strong velocity boundaries.
+      call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
+
+      call profiler_end_region('Adjoint_velocity_residual')
+
+      call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, &
+           tstep, c_Xh, n, dt_controller, 'Velocity')
+
+      call this%pc_vel%update()
+
+      call profiler_start_region("Adjoint_velocity_solve")
+      ksp_results(1:3) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
+           u_res%x, v_res%x, w_res%x, n, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
+           this%ksp_vel%max_iter)
+
+      call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
+           dt_controller)
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, &
+              du%x_d, dv%x_d, dw%x_d, 1.0_rp, n, msh%gdim)
+      else
+         call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
+      end if
+      call profiler_end_region("Adjoint_velocity_solve")
+
+      !------------------------------------------------------------------------!
+      ! now the RHS of our pressure eqn is the new adjoint velocity
+      ! be careful with the order of the gsops here, we will handle this in the
+      ! residual calculation. So we enter WITHOUT a mass matrix.
+      call field_copy(f_x, u)
+      call field_copy(f_y, v)
+      call field_copy(f_z, w)
+      !------------------------------------------------------------------------!
       call profiler_start_region('Adjoint_pressure_residual')
 
       call prs_res%compute(p, p_res, &
            u, v, w, &
-           u_e, v_e, w_e, &
            f_x, f_y, f_z, &
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface, &
-           Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
+           Ax_prs, ext_bdf%diffusion_coeffs%x(1), dt, &
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present
-      if (.not. this%prs_dirichlet) call ortho(p_res%x, this%glb_n_points, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p_res%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p_res%x, this%glb_n_points, n)
+      end if
 
       call gs_Xh%op(p_res, GS_OP_ADD, event)
       call device_event_sync(event)
@@ -809,7 +908,7 @@ contains
       call profiler_start_region('Adjoint_pressure_solve')
 
       ! Solve for the pressure increment.
-      ksp_results(1) = &
+      ksp_results(4) = &
            this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, &
            this%bclst_dp, gs_Xh)
 
@@ -821,73 +920,65 @@ contains
 
       ! Update the pressure with the increment. Demean if necessary.
       call field_add2(p, dp, n)
-      if (.not. this%prs_dirichlet) call ortho(p%x, this%glb_n_points, n)
-
-      ! Compute velocity residual.
-      call profiler_start_region('Adjoint_velocity_residual')
-      call vel_res%compute(Ax_vel, u, v, w, &
-           u_res, v_res, w_res, &
-           p, &
-           f_x, f_y, f_z, &
-           c_Xh, msh, Xh, &
-           mu, rho, ext_bdf%diffusion_coeffs(1), &
-           dt, dm_Xh%size())
-
-      call gs_Xh%op(u_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(v_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-      call gs_Xh%op(w_res, GS_OP_ADD, event)
-      call device_event_sync(event)
-
-      ! Set residual to zero at strong velocity boundaries.
-      call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
-
-
-      call profiler_end_region('Adjoint_velocity_residual')
-
-      call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, &
-           tstep, c_Xh, n, dt_controller, 'Velocity')
-
-      call this%pc_vel%update()
-
-      call profiler_start_region("Adjoint_velocity_solve")
-      ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
-           u_res%x, v_res%x, w_res%x, n, c_Xh, &
-           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, &
-           this%ksp_vel%max_iter)
-      call profiler_end_region("Adjoint_velocity_solve")
-
-      ksp_results(1)%name = 'Adjoint Pressure'
-      ksp_results(2)%name = 'Adjoint Velocity U'
-      ksp_results(3)%name = 'Adjoint Velocity V'
-      ksp_results(4)%name = 'Adjoint Velocity W'
-
-      call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
-           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
-           dt_controller)
-
-      ! DELETE
-      ! zero out dw
-      call field_rzero(dw)
-
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_opadd2cm(u%x_d, v%x_d, w%x_d, &
-              du%x_d, dv%x_d, dw%x_d, 1.0_rp, n, msh%gdim)
-      else
-         call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p%x, this%glb_n_points, n)
       end if
 
-      ! DELETE
-      ! one more for safety
-      call z_plane_fix(u)
-      call z_plane_fix(v)
-      call z_plane_fix(w)
+      ksp_results(4)%name = 'Adjoint Pressure'
+      ksp_results(1)%name = 'Adjoint Velocity U'
+      ksp_results(2)%name = 'Adjoint Velocity V'
+      ksp_results(3)%name = 'Adjoint Velocity W'
 
       if (this%forced_flow_rate) then
          call neko_error('Forced flow rate is not implemented for the adjoint')
 
       end if
+
+      !------------------------------------------------------------------------!
+      ! correct the velocity with the pressure
+      call neko_scratch_registry%request_field(dx_p_adj, temp_indices(1), &
+           .false.)
+      call neko_scratch_registry%request_field(dy_p_adj, temp_indices(2), &
+           .false.)
+      call neko_scratch_registry%request_field(dz_p_adj, temp_indices(3), &
+           .false.)
+
+      ! gradient of adjoint pressure (explicit)
+      call opgrad(dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, this%p_adj%x, c_Xh)
+
+      ! they gsop the residual (which has the pressure gradient)
+      call gs_Xh%op(dx_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dy_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(dz_p_adj, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      ! divide by mass matrix
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_col2(dx_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dy_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+         call device_col2(dz_p_adj%x_d, c_Xh%Binv_d, dx_p_adj%size())
+      else
+         ! NOTE. This term comes from the handling of the pressure RHS, which
+         ! DOES include the multiplicity in the op.
+         call col2(dx_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dy_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+         call col2(dz_p_adj%x, c_Xh%Binv, dx_p_adj%size())
+      end if
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, dx_p_adj%x_d, &
+              dy_p_adj%x_d, dz_p_adj%x_d, -1.0_rp, n, msh%gdim)
+      else
+         call opadd2cm(u%x, v%x, w%x, dx_p_adj%x, dy_p_adj%x, dz_p_adj%x, &
+              -1.0_rp, n, msh%gdim)
+      end if
+
+      call neko_scratch_registry%relinquish_field(temp_indices)
+      !------------------------------------------------------------------------!
 
       call fluid_step_info(time, ksp_results, &
            this%full_stress_formulation, this%strict_convergence)
@@ -933,6 +1024,7 @@ contains
     ! Special PnPn boundary conditions for pressure
     call this%bc_prs_surface%init_from_components(this%c_Xh)
     call this%bc_sym_surface%init_from_components(this%c_Xh)
+    call this%bc_curl_curl%init_from_components(this%c_Xh)
 
     json_key = 'case.adjoint_fluid.boundary_conditions'
 
@@ -1051,6 +1143,9 @@ contains
                    call this%bc_prs_surface%mark_facets(bc_i%marked_facet)
                 end if
 
+                ! add all BCs to curl curl
+                call this%bc_curl_curl%mark_facets(bc_i%marked_facet)
+
                 call this%bcs_vel%append(bc_i)
              end select
           end if
@@ -1102,6 +1197,7 @@ contains
 
     call this%bc_prs_surface%finalize()
     call this%bc_sym_surface%finalize()
+    call this%bc_curl_curl%finalize()
 
     call this%bc_vel_res%finalize()
     call this%bc_du%finalize()
@@ -1162,8 +1258,7 @@ contains
     call neko_log%message(log_buf)
     call neko_log%end_section()
 
-    call this%scratch%request_field(bdry_field, temp_index)
-    bdry_field = 0.0_rp
+    call neko_scratch_registry%request_field(bdry_field, temp_index, .true.)
 
 
 
@@ -1249,7 +1344,7 @@ contains
     call bdry_file%init('boundary_adjoint.fld')
     call bdry_file%write(bdry_field)
 
-    call this%scratch%relinquish_field(temp_index)
+    call neko_scratch_registry%relinquish_field(temp_index)
   end subroutine adjoint_fluid_pnpn_write_boundary_conditions
 
   ! End of section to verify
@@ -1515,6 +1610,4 @@ contains
   end do
 
   end subroutine z_plane_fix
-
-
 end module adjoint_fluid_pnpn

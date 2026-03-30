@@ -1,0 +1,106 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
+        "output_directory": "fields",
+        "output_boundary": false,
+        "output_at_end": false,
+        "output_checkpoints": false,
+        "time": {
+            "end_time": 12.0,
+            "variable_timestep": true,
+            "target_cfl": 0.2,
+            "max_timestep": 4e-3
+        },
+        "numerics": {
+            "time_order": 3,
+            "polynomial_order": 7,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 500.0,
+            "output_control": "simulationtime",
+            "output_value": 4e-2,
+            "initial_condition": {
+                "type": "user"
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": { "type": "hsmg" },
+                "absolute_tolerance": 1e-7,
+                "max_iterations": 800
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": { "type": "jacobi" },
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "boundary_conditions ": [
+                {
+                    "type": "user_velocity",
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [ 2 ]
+                },
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 3, 4, 5, 6 ]
+                }
+            ],
+            "source_terms": [
+                {
+                    "type": "brinkman",
+                    "objects": [
+                        {
+                            "type": "boundary_mesh",
+                            "name": "data_local/static_mixer/petsc/Test_mixer_095_smooth.stl",
+                            "cache": true,
+                            "cache_file": "data_local/static_mixer/petsc/cache_8_",
+                            "distance_transform": {
+                                "type": "smooth_step",
+                                "value": 0.01
+                            }
+                        }
+                    ],
+                    "brinkman": {
+                        "limits": [ 0.0, 1000.0 ],
+                        "penalty": 1.0
+                    }
+                }
+            ]
+        },
+        "scalar": {
+            "name": "temperature",
+            "enabled": true,
+            "Pe": 1000.0,
+            "solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-6,
+                "max_iterations": 800
+            },
+            "boundary_conditions": [
+                {
+                    "type": "user",
+                    "value": 1,
+                    "zone_indices": [ 1 ]
+                },
+                {
+                    "type": "neumann",
+                    "flux": 0,
+                    "zone_indices": [ 2, 3, 4, 5, 6 ]
+                }
+            ],
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            }
+        }
+    }
+}

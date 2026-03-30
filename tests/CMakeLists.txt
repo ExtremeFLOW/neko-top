@@ -19,4 +19,3 @@ set_target_properties(Tests PROPERTIES
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/unit)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/regression)
-

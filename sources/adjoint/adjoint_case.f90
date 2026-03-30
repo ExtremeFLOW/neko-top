@@ -1,34 +1,36 @@
-! Copyright (c) 2024, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_case.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 
 ! Implements the `adjoint_case_t` type.
 module adjoint_case
@@ -43,6 +45,7 @@ module adjoint_case
   use chkp_output, only: chkp_output_t
   use flow_ic, only: set_flow_ic
   use output_controller, only: output_controller_t
+  use time_based_controller, only: time_based_controller_t
   use file, only: file_t
   use json_module, only: json_file
   use json_utils, only: json_get, json_get_or_default, json_extract_item
@@ -57,7 +60,7 @@ module adjoint_case
   use adjoint_scalars, only: adjoint_scalars_t
   implicit none
   private
-  public :: adjoint_case_t, adjoint_init, adjoint_free
+  public :: adjoint_case_t
 
   !> Adjoint case type.
   !! Todo: This should Ideally be a subclass of case_t, however, that is not yet
@@ -76,19 +79,19 @@ module adjoint_case
      type(chkp_output_t) :: chkp_out
 
      ! Fields
-     real(kind=rp) :: tol
      type(adjoint_output_t) :: f_out
      type(output_controller_t) :: output_controller
+     type(time_based_controller_t) :: norm_output_ctrl
+     type(file_t) :: norm_output_file
 
+     logical :: norm_output_enabled = .false.
      logical :: have_scalar = .false.
-
      logical :: if_adjoint = .true.
 
+   contains
+     procedure, pass(this) :: init => adjoint_init_from_json
+     procedure, pass(this) :: free => adjoint_free
   end type adjoint_case_t
-
-  interface adjoint_init
-     module procedure adjoint_init_from_json ! todo, init from file
-  end interface adjoint_init
 
 contains
 
@@ -109,6 +112,7 @@ contains
     integer :: lx = 0
     real(kind=rp) :: real_val = 0.0_rp
     character(len=:), allocatable :: string_val
+    character(len=:), allocatable :: norm_control, norm_file
     integer :: precision
     integer :: n_scalars_primal, n_scalars_adjoint, i
     logical :: scalar = .false.
@@ -118,6 +122,7 @@ contains
     type(json_file) :: ic_json, numerics_params
     type(json_file) :: scalar_params_primal, scalar_params_adjoint, json_subdict
     character(len=:), allocatable :: json_key
+    logical :: dealias_adjoint_scalar_convection
 
     !
     ! Setup adjoint fluid
@@ -128,6 +133,7 @@ contains
     call json_get(neko_case%params, 'case.numerics.polynomial_order', lx)
     lx = lx + 1 ! add 1 to get number of gll points
 
+    call this%chkp%init()
     this%chkp%tlag => this%time%tlag
     this%chkp%dtlag => this%time%dtlag
 
@@ -184,11 +190,16 @@ contains
           ! allocate the coupling term
           allocate(this%adjoint_convection_term)
           ! initialize the coupling term
+          call json_get_or_default(neko_case%params, &
+               'case.adjoint_scalar.dealias_coupling_term', &
+               dealias_adjoint_scalar_convection, .true.)
           call this%adjoint_convection_term%init_from_components( &
                this%fluid_adj%f_adj_x, this%fluid_adj%f_adj_y, &
-               this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%s, &
+               this%fluid_adj%f_adj_z, this%case%scalars%scalar_fields(1)%scalar%s, &
                this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
-               this%fluid_adj%c_Xh)
+               this%fluid_adj%c_Xh, this%fluid_adj%c_Xh_GL, &
+               this%fluid_adj%GLL_to_GL, &
+               dealias_adjoint_scalar_convection, this%fluid_adj%scratch_GL)
 
           select type (f => this%fluid_adj)
           type is (adjoint_fluid_pnpn_t)
@@ -273,7 +284,7 @@ contains
           !call neko_log%section("Adjoint scalar initial condition ")
 
           if (trim(string_val) .ne. 'user') then
-             if (trim(neko_case%scalars%scalar_fields(1)%name) .eq. &
+             if (trim(neko_case%scalars%scalar_fields(1)%scalar%name) .eq. &
                   'temperature') then
                 call set_scalar_ic(&
                      this%adjoint_scalars%adjoint_scalar_fields(1)%s_adj, &
@@ -307,7 +318,7 @@ contains
                   'initial_condition', json_subdict)
 
              if (trim(string_val) .ne. 'user') then
-                if (trim(neko_case%scalars%scalar_fields(i)%name) .eq. &
+                if (trim(neko_case%scalars%scalar_fields(i)%scalar%name) .eq. &
                      'temperature') then
                    call set_scalar_ic(&
                         this%adjoint_scalars%adjoint_scalar_fields(i)%s_adj, &
@@ -373,10 +384,10 @@ contains
     !
     call this%output_controller%init(this%time%end_time)
     if (this%have_scalar) then
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             this%adjoint_scalars, path = trim(neko_case%output_directory))
     else
-       this%f_out = adjoint_output_t(precision, this%fluid_adj, &
+       call this%f_out%init(precision, this%fluid_adj, &
             path = trim(neko_case%output_directory))
     end if
 
@@ -395,6 +406,26 @@ contains
     else
        call json_get(neko_case%params, 'case.fluid.output_value', real_val)
        call this%output_controller%add(this%f_out, real_val, string_val)
+    end if
+
+    !
+    ! Setup adjoint norm output
+    !
+    call json_get_or_default(neko_case%params, &
+         'case.adjoint_fluid.norm_output_control', norm_control, 'never')
+    if (trim(norm_control) .ne. 'never') then
+       call json_get_or_default(neko_case%params, &
+            'case.adjoint_fluid.norm_output_value', real_val, 1.0_rp)
+       call json_get_or_default(neko_case%params, &
+            'case.adjoint_fluid.norm_output_file', norm_file, &
+            'adjoint_norm.csv')
+       call this%norm_output_file%init(trim(neko_case%output_directory) // &
+            trim(norm_file))
+       call this%norm_output_file%set_header('Time, Norm')
+       call this%norm_output_file%set_overwrite(.true.)
+       call this%norm_output_ctrl%init(this%time%start_time, &
+            this%time%end_time, trim(norm_control), real_val)
+       this%norm_output_enabled = .true.
     end if
 
     ! !
@@ -428,19 +459,35 @@ contains
   subroutine adjoint_free(this)
     class(adjoint_case_t), intent(inout) :: this
 
-    nullify(this%case)
+    if (allocated(this%fluid_adj)) then
+       call this%fluid_adj%free()
+       deallocate(this%fluid_adj)
+    end if
+
     if (allocated(this%adjoint_scalars)) then
        call this%adjoint_scalars%free()
        deallocate(this%adjoint_scalars)
     end if
 
-    if (allocated(this%fluid_adj)) then
-       call this%fluid_adj%free()
-       deallocate(this%fluid_adj)
+    if (allocated(this%adjoint_convection_term)) then
+       call this%adjoint_convection_term%free()
+       deallocate(this%adjoint_convection_term)
     end if
+
+    nullify(this%case)
+
+    ! call this%time%free()
+    call this%chkp%free()
+    call this%chkp_out%free()
+
+    ! Fields
+    call this%f_out%free()
     call this%output_controller%free()
+    call this%norm_output_ctrl%free()
+    call this%norm_output_file%free()
+
+    this%have_scalar = .false.
 
   end subroutine adjoint_free
 
 end module adjoint_case
-

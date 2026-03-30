@@ -57,22 +57,9 @@ list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 # Options
 
 # Assign default values to options
-set(DEFAULT_EXAMPLES OFF)
-set(DEFAULT_TESTING OFF)
-set(DEFAULT_DOCS OFF)
-
-# Modify default options based on the build type
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set(DEFAULT_EXAMPLES ON)
-elseif(CMAKE_BUILD_TYPE STREQUAL "Testing")
-    set(DEFAULT_TESTING ON)
-    set(DEFAULT_DOCS ON)
-    set(DEFAULT_EXAMPLES ON)
-endif()
-
-option(BUILD_EXAMPLES "Build the examples" ${DEFAULT_EXAMPLES})
-option(BUILD_DOCS "Build documentation" ${DEFAULT_DOCS})
-option(BUILD_TESTING "Build the tests" ${DEFAULT_TESTING})
+option(BUILD_EXAMPLES "Build the examples" OFF)
+option(BUILD_DOCS "Build documentation" OFF)
+option(BUILD_TESTING "Build the tests" OFF)
 option(ONLY_DOCS "Only build the documentation" OFF)
 
 # ============================================================================ #
@@ -105,15 +92,25 @@ endif()
 include_directories(${MPI_Fortran_INCLUDE_DIRS})
 include_directories(${MPI_Fortran_MODULE_DIR})
 
+# Set the default external directory
+if (DEFINED ENV{EXTERNAL_DIR})
+    set(EXTERNAL_DIR $ENV{EXTERNAL_DIR})
+else()
+    set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
+endif()
+
 # ............................................................................ #
 # Setup of JSON-Fortran
 
 # Set the proper paths for the JSON_FORTRAN_DIR directory
-if (DEFINED ENV{JSON_FORTRAN_DIR})
+if (DEFINED ENV{JSON_FORTRAN_DIR} AND IS_ABSOLUTE $ENV{JSON_FORTRAN_DIR})
     set(JSON_FORTRAN_DIR $ENV{JSON_FORTRAN_DIR} CACHE STRING
         "Path to the JSON-Fortran installation")
+elseif(DEFINED ENV{JSON_FORTRAN_DIR})
+    set(JSON_FORTRAN_DIR ${EXTERNAL_DIR}/$ENV{JSON_FORTRAN_DIR}
+        CACHE STRING "Path to the JSON-Fortran installation")
 else()
-    set(JSON_FORTRAN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/json-fortran
+    set(JSON_FORTRAN_DIR ${EXTERNAL_DIR}/json-fortran
         CACHE STRING "Path to the JSON-Fortran installation")
 endif()
 
@@ -126,10 +123,14 @@ pkg_check_modules(json-fortran REQUIRED IMPORTED_TARGET json-fortran)
 # Setup of the Neko library
 
 # Set the proper paths for the NEKO_DIR
-if (DEFINED ENV{NEKO_DIR})
-    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING "Path to the Neko installation")
+if (DEFINED ENV{NEKO_DIR} AND IS_ABSOLUTE $ENV{NEKO_DIR})
+    set(NEKO_DIR $ENV{NEKO_DIR} CACHE STRING
+        "Path to the Neko installation")
+elseif(DEFINED ENV{NEKO_DIR})
+    set(NEKO_DIR ${EXTERNAL_DIR}/$ENV{NEKO_DIR}
+        CACHE STRING "Path to the Neko installation")
 else()
-    set(NEKO_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/neko
+    set(NEKO_DIR ${EXTERNAL_DIR}/neko
         CACHE STRING "Path to the Neko installation")
 endif()
 
@@ -140,10 +141,36 @@ pkg_check_modules(neko REQUIRED IMPORTED_TARGET neko)
 pkg_get_variable(DEVICE_TYPE neko backend)
 
 # ............................................................................ #
+# HDF5 Support
+
+if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
+    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
+        "Path to the HDF5 installation")
+elseif(DEFINED ENV{HDF5_DIR})
+    set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
+        CACHE STRING "Path to the HDF5 installation")
+endif()
+
+if (DEFINED HDF5_DIR)
+    set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
+
+    pkg_check_modules(hdf5 REQUIRED IMPORTED_TARGET hdf5)
+    add_compile_definitions(HAVE_HDF5=1)
+endif()
+
+# ............................................................................ #
 # Setup PFUnit
 
-set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pFUnit
-    CACHE STRING "Path to the pFUnit installation")
+if (DEFINED ENV{PFUNIT_DIR} AND IS_ABSOLUTE $ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR $ENV{PFUNIT_DIR} CACHE STRING
+        "Path to the pFUnit installation")
+elseif(DEFINED ENV{PFUNIT_DIR})
+    set(PFUNIT_DIR ${EXTERNAL_DIR}/$ENV{PFUNIT_DIR}
+        CACHE STRING "Path to the pFUnit installation")
+else()
+    set(PFUNIT_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external/pfunit
+        CACHE STRING "Path to the pFUnit installation")
+endif()
 
 # ============================================================================ #
 # Setup compiler specific options
@@ -201,15 +228,20 @@ if (CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(STATUS "")
     message(STATUS "Current configuration:")
     message(STATUS "- CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
-    message(STATUS "- BUILD_DOCS: ${BUILD_DOCS}")
-    message(STATUS "- BUILD_TESTING: ${BUILD_TESTING}")
-    message(STATUS "- BUILD_EXAMPLES: ${BUILD_EXAMPLES}")
-    message(STATUS "- DEVICE_TYPE: ${DEVICE_TYPE}")
+    message(STATUS "- DEVICE_TYPE:      ${DEVICE_TYPE}")
+    message(STATUS "- BUILD_DOCS:       ${BUILD_DOCS}")
+    message(STATUS "- BUILD_TESTING:    ${BUILD_TESTING}")
+    message(STATUS "- BUILD_EXAMPLES:   ${BUILD_EXAMPLES}")
     message(STATUS "")
     message(STATUS "External dependencies:")
     message(STATUS "- JSON_FORTRAN_DIR: ${JSON_FORTRAN_DIR}")
-    message(STATUS "- NEKO_DIR: ${NEKO_DIR}")
-    message(STATUS "- PFUNIT_DIR: ${PFUNIT_DIR}")
+    message(STATUS "- NEKO_DIR:         ${NEKO_DIR}")
+    message(STATUS "- PFUNIT_DIR:       ${PFUNIT_DIR}")
+    if (hdf5_FOUND)
+        message(STATUS "- HDF5_DIR:         ${HDF5_DIR}")
+    else()
+        message(STATUS "- HDF5_DIR:         Not found (HDF5 support disabled)")
+    endif()
     message(STATUS ${BARRIER})
     message(STATUS "")
 

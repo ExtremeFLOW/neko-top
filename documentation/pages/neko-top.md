@@ -13,6 +13,11 @@ user interface.
   - [Installation](@ref installation)
   - [Examples](@ref examples)
   - \subpage examples-list
+  - [Clusters](@ref clusters)
+  - [Mapping cascade](@ref mapping_cascade)
+  - [Objectives and constraints](@ref objectives_and_constraints)
+  - [Simulation components](@ref simulation_components)
+  - [Unsteady simulations](@ref unsteady_simulation)
 - \subpage dev_guide
   - [Contributing](@ref contributing)
   - [Code structure](@ref code-structure)

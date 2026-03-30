@@ -27,14 +27,22 @@
 name: Check PR for Develop Branch
 on:
   pull_request:
-    branches: [develop]
+    branches:
+      - develop
     types:
       - opened
       - synchronize
       - reopened
       - ready_for_review
   merge_group:
-    types: [checks_requested]
+    types:
+      - checks_requested
+
+  # This allow us to cache parts which can be used by PR checks
+  push:
+    branches:
+      - develop
+      - main
 
 # ---------------------------------------------------------------------------- #
 # Define the global environment variables, these control versioning and other
@@ -46,6 +54,7 @@ env:
   PFUNIT_VERSION: v4.12.0
   JSON_FORTRAN_VERSION: master
   NEKO_VERSION: neko-top
+  HDF5_VERSION: hdf5_1_14_6
 
 # ---------------------------------------------------------------------------- #
 # Allow only one concurrent deployment, skipping runs queued between the run
@@ -69,6 +78,7 @@ jobs:
       pfunit-version: ${{ steps.store.outputs.pfunit-version }}
       json-fortran-version: ${{ steps.store.outputs.json-fortran-version }}
       neko-version: ${{ steps.store.outputs.neko-version }}
+      hdf5-version: ${{ steps.store.outputs.hdf5-version }}
 
     steps:
       - name: Check if PR is a draft
@@ -84,6 +94,7 @@ jobs:
         run: |
           echo "pfunit-version=$PFUNIT_VERSION" >> $GITHUB_OUTPUT
           echo "json-fortran-version=$JSON_FORTRAN_VERSION" >> $GITHUB_OUTPUT
+          echo "hdf5-version=$HDF5_VERSION" >> $GITHUB_OUTPUT
           echo "neko-version=$NEKO_VERSION" >> $GITHUB_OUTPUT
 
   # -------------------------------------------------------------------------- #
@@ -115,16 +126,16 @@ jobs:
       neko-version: ${{ needs.prepare.outputs.neko-version }}
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
 
   check_scripts:
     name: Scripting
-    needs:
-      - prepare
-      - check_compile
+    needs: prepare
     uses: ./.github/workflows/check_scripts.yml
     with:
       json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
       neko-version: ${{ needs.prepare.outputs.neko-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
       neko-top-version: ${{ github.head_ref || github.ref_name }}
 
   # -------------------------------------------------------------------------- #
@@ -208,3 +219,11 @@ jobs:
             exit 1
           fi
           echo "All checks passed"
+
+  # Merge group branches produce caches which are not useable by anyone else.
+  # Therefore we remove all of them after the run have completed.
+  cleanup:
+    if: ${{ github.event_name == 'merge_group' && always() }}
+    name: Cleanup merge group caches
+    needs: check_complete
+    uses: ./.github/workflows/cleanup.yml

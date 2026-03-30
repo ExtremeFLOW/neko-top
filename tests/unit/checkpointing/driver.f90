@@ -25,6 +25,7 @@ program checkpointing_test
   use problem, only: problem_t
   use simulation, only: simulation_init, simulation_step, simulation_finalize
 
+  use neko, only: neko_init, neko_finalize
   use num_types, only: dp, rp
   use json_module, only: json_file
   use utils, only: neko_error, neko_warning
@@ -45,9 +46,6 @@ program checkpointing_test
   integer :: argc
   type(json_file) :: parameters, design_parameters
   character(len=256) :: parameter_file
-
-  ! MPI parameters
-  integer :: ierr
 
   !> The simulation we are working with
   type(simulation_t) :: sim
@@ -87,9 +85,9 @@ program checkpointing_test
   real(kind=rp), parameter :: tol_p = NEKO_EPS
 
   ! -------------------------------------------------------------------------- !
-  ! Initialize the MPI environment
+  ! Initialize the Neko environment
 
-  call MPI_Init(ierr)
+  call neko_init()
   call neko_top_register_types()
 
   ! -------------------------------------------------------------------------- !
@@ -134,7 +132,7 @@ program checkpointing_test
   end do
 
 
-! -------------------------------------------------------------------------- !
+  ! -------------------------------------------------------------------------- !
   ! Initialize the checkpointing
   if (pe_rank .eq. 0) then
      write(*, '(A)') repeat('-', 80)
@@ -197,6 +195,8 @@ program checkpointing_test
      if (error) exit
   end do
 
+  call simulation_finalize(sim%neko_case)
+
   if (error) then
      if (pe_rank .eq. 0) then
         write(stderr, '(A,I0)') 'Inconsistency found at time step: ', i
@@ -231,5 +231,8 @@ program checkpointing_test
   call prob%free()
 
   if (allocated(des)) deallocate(des)
+
+  ! Finalize the Neko environment
+  call neko_finalize()
 
 end program checkpointing_test

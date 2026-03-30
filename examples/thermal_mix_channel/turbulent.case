@@ -26,13 +26,17 @@
             },
             "velocity_solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": "hsmg",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
@@ -42,21 +46,15 @@
                 {
                     "type": "velocity_value",
                     "value": [ 1.0, 0.0, 0.0 ],
-                    "zone_indices": [
-                        1, 2
-                    ]
+                    "zone_indices": [ 1, 2 ]
                 },
                 {
                     "type": "outflow",
-                    "zone_indices": [
-                        3
-                    ]
+                    "zone_indices": [ 3 ]
                 },
                 {
                     "type": "no_slip",
-                    "zone_indices": [
-                        4
-                    ]
+                    "zone_indices": [ 4 ]
                 }
             ]
         },
@@ -65,7 +63,9 @@
             "Pe": 1000.0,
             "solver": {
                 "type": "cg",
-                "preconditioner": "jacobi",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
                 "absolute_tolerance": 1e-8,
                 "max_iterations": 800
             },
