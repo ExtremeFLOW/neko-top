@@ -6,7 +6,6 @@ program usrneko
   use LightKrylov_Logger
   use LightKrylov_Constants
   use cylinder, only: neko_propagator, state_vector, my_eigs
-  use global_coef, only: global_coef_t, global_coef_getter
   use LightKrylov_IterativeSolvers, only: write_results_cdp
   use json_module, only: json_file
   use json_utils, only: json_get
@@ -25,8 +24,6 @@ program usrneko
   type(neko_propagator), allocatable :: A
   !> Sampling time.
   real(kind=wp) :: tau
-  !> A way to access coef globally
-  type(global_coef_t), target :: my_global_coef_getter
 
   !---------------------------------------------------
   !-----     KRYLOV-BASED EIGENDECOMPOSITION     -----
@@ -86,10 +83,6 @@ program usrneko
 
   !> Get the integration time
   tau = real(A%simulation%neko_case%time%end_time,kind=wp)
-
-  !> Extract the global coef from neko
-  my_global_coef_getter%global_coef = A%simulation%neko_case%fluid%c_Xh
-  global_coef_getter => my_global_coef_getter
 
   !> Initialize Krylov subspace.
   allocate(X(nev)); call initialize_krylov_subspace(X)

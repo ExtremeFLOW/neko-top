@@ -77,7 +77,7 @@ module adjoint_fluid_pnpn
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error
-  use field_math, only: field_add2, field_copy, field_rzero &
+  use field_math, only: field_add2, field_copy, field_rzero, &
        field_add2s2
   use bc, only: bc_t
   use file, only: file_t

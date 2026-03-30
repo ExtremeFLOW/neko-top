@@ -12,7 +12,7 @@ module neko_vector
    use device_math, only: device_glsc3
    use device, only : device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: GS_OP_ADD
-   use global_coef, only: global_coef_getter
+   use user_access_singleton, only: neko_user_access
 
    implicit none
  
@@ -49,14 +49,13 @@ module neko_vector
     subroutine state_vector_init(self)
      class(state_vector_t), intent(inout) :: self
 
-     ! Check for global coef
+     ! Access the SEM coefficients through Neko's user-access singleton.
      if (.not. allocated(self%u%x)) then
-       if (.not. associated(global_coef_getter)) then
-          error stop "No global coef set!"
+       if (.not. associated(neko_user_access%case)) then
+          error stop "Neko user access is not initialized!"
        end if
           call self%free()
-          ! Take the global coef
-          self%coef => global_coef_getter%global_coef
+          self%coef => neko_user_access%case%fluid%c_Xh
 
           if(self%coef%msh%gdim .eq. 2) then
              self%if_2d = .true.
