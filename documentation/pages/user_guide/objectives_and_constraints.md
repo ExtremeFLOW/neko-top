@@ -219,6 +219,8 @@ and has the following input parameters:
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `target` | \f$\gamma\f$ in the above equation. | Real | - |
 | `name`| The name that will appear in `objective_data.csv` | String | `Target Dissipation`|
+| `dealias_forcing`| If dealiasing should be applied to the adjoint forcing term | logical | `.true.`|
+| `dealias_sensitivity`| If dealiasing should be applied to the sensitivity contribution | logical | `.true.`|
 | `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
 | `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
 

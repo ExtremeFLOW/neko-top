@@ -51,7 +51,7 @@ module adjoint_target_dissipation_source_term
   use utils, only: neko_error
   use field, only: field_t
   use field_math, only: field_subcol3, field_add2, field_add2s2, field_rzero, &
-       field_col3
+       field_col3, field_copy, field_cmult
   use json_module, only: json_file
   use time_state, only: time_state_t
   use steady_simcomp, only: steady_simcomp_t
@@ -59,13 +59,16 @@ module adjoint_target_dissipation_source_term
   use user_source_term, only: user_source_term_t
   use num_types, only: rp
   use field, only: field_t
-  use math, only: rzero, copy, chsign, cfill, invcol2
-  use device_math, only: device_copy, device_cmult, device_cfill, device_invcol2
+  use math, only: rzero, copy, chsign, cfill, invcol2, col2
+  use device_math, only: device_copy, device_cmult, device_cfill, &
+       device_invcol2, device_col2
   use neko_config, only: NEKO_BCKND_DEVICE
-  use scratch_registry, only: neko_scratch_registry
+  use scratch_registry, only: neko_scratch_registry, scratch_registry_t
   use mask_ops, only: mask_exterior_const
   use point_zone, only: point_zone_t
   use ax_product, only : ax_t, ax_helm_factory
+  use interpolation, only: interpolator_t
+  use space, only: space_t
 
   implicit none
   private
@@ -90,8 +93,20 @@ module adjoint_target_dissipation_source_term
      class(point_zone_t), pointer :: mask => null()
      !> containing a mask?
      logical :: if_mask
+     !> should dealiasing be used?
+     logical :: dealias = .true.
      !> an ax_helm type to compute weak laplacian
      class(ax_t), allocatable :: Ax
+     !> The original space used in the simulation.
+     type(space_t), pointer :: Xh_GLL => null()
+     !> The additional higher-order space used in dealiasing.
+     type(space_t), pointer :: Xh_GL => null()
+     !> Coefficients on the overintegration space.
+     type(coef_t), pointer :: c_Xh_GL => null()
+     !> Interpolator between GLL and GL.
+     type(interpolator_t), pointer :: GLL_to_GL => null()
+     !> GL scratch registry.
+     type(scratch_registry_t), pointer :: scratch_GL => null()
      !> volume of the objective domain.
      real(kind=rp) :: volume
      !> Initial dissipation.
@@ -147,15 +162,20 @@ contains
   !! @param mask the mask for the source term
   !! @param if_mask whether to use the mask
   !! @param coef The SEM coeffs.
+  !! @param c_Xh_GL The SEM coeffs on the over integration mesh.
+  !! @param GLL_to_GL Interpolator between GLL and GL.
+  !! @param dealias whether this term should be overintegrated.
   !! @param volume volume of the objective domain.
   !! @param target_fraction target fraction of the initial dissipation.
   !! @param start_time when to start applying the source term.
   !! @param end_time when to stop applying the source term.
+  !! @param scratch_GL A scratch registry on the GL space.
   !! @param current_dissipation the current dissipation.
   !! @param initial_dissipation the initial dissipation.
   subroutine adjoint_target_dissipation_source_term_init_from_components( &
        this, f_x, f_y, f_z, u, v, w, chi, obj_scale, viscous_scale, &
-       mask, if_mask, coef, volume, target_fraction, start_time, end_time, &
+       mask, if_mask, coef, c_Xh_GL, GLL_to_GL, dealias, volume, &
+       target_fraction, start_time, end_time, scratch_GL, &
        current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
@@ -166,10 +186,14 @@ contains
     class(point_zone_t), intent(in), target :: mask
     logical, intent(in) :: if_mask
     type(coef_t), intent(in) :: coef
+    type(coef_t), intent(in), target :: c_Xh_GL
+    type(interpolator_t), intent(in), target :: GLL_to_GL
+    logical, intent(in) :: dealias
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: target_fraction
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+    type(scratch_registry_t), intent(in), target :: scratch_GL
     real(kind=rp), target, intent(in) :: current_dissipation
     real(kind=rp), target, intent(in) :: initial_dissipation
     type(field_list_t) :: fields
@@ -193,6 +217,12 @@ contains
     this%target_fraction = target_fraction
     this%current_dissipation => current_dissipation
     this%initial_dissipation => initial_dissipation
+    this%c_Xh_GL => c_Xh_GL
+    this%Xh_GL => this%c_Xh_GL%Xh
+    this%Xh_GLL => this%coef%Xh
+    this%GLL_to_GL => GLL_to_GL
+    this%dealias = dealias
+    this%scratch_GL => scratch_GL
 
     this%obj_scale = obj_scale
     this%viscous_scale = viscous_scale
@@ -218,6 +248,11 @@ contains
     nullify(this%w)
     nullify(this%chi)
     nullify(this%mask)
+    nullify(this%c_Xh_GL)
+    nullify(this%Xh_GL)
+    nullify(this%Xh_GLL)
+    nullify(this%GLL_to_GL)
+    nullify(this%scratch_GL)
     if (allocated(this%Ax)) then
        deallocate(this%Ax)
     end if
@@ -233,6 +268,9 @@ contains
     type(field_t), pointer :: fu, fv, fw
     type(field_t), pointer :: result
     integer :: temp_indices(1)
+    type(field_t), pointer :: accumulate, fld_GL, chi_GL
+    integer :: temp_indices_GL(3)
+    integer :: n_GL, nel
     integer n
     real(kind=rp) :: scale_forcing
 
@@ -332,23 +370,83 @@ contains
 
       ! ------------------------------------------------------------------------
       ! chi * u contribution from Brinkman dissipation
-      call field_col3(result, this%chi, u)
-      if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
-      end if
-      call field_add2s2(fu, result, this%obj_scale * scale_forcing)
+      if (this%dealias) then
+         nel = this%coef%msh%nelv
+         n_GL = nel * this%Xh_GL%lxyz
 
-      call field_col3(result, this%chi, v)
-      if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
-      end if
-      call field_add2s2(fv, result, this%obj_scale * scale_forcing)
+         call this%scratch_GL%request_field(accumulate, temp_indices_GL(1), &
+              .false.)
+         call this%scratch_GL%request_field(fld_GL, temp_indices_GL(2), &
+              .false.)
+         call this%scratch_GL%request_field(chi_GL, temp_indices_GL(3), &
+              .false.)
 
-      call field_col3(result, this%chi, w)
-      if (this%if_mask) then
-         call mask_exterior_const(result, this%mask, 0.0_rp)
+         call field_copy(result, this%chi)
+         call field_cmult(result, this%obj_scale * scale_forcing)
+         if (this%if_mask) then
+            call mask_exterior_const(result, this%mask, 0.0_rp)
+         end if
+         call this%GLL_to_GL%map(chi_GL%x, result%x, nel, this%Xh_GL)
+
+         call this%GLL_to_GL%map(fld_GL%x, u%x, nel, this%Xh_GL)
+         call field_col3(accumulate, chi_GL, fld_GL)
+         if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call device_invcol2(result%x_d, coef%B_d, result%size())
+         else
+            call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call invcol2(result%x, coef%B, result%size())
+         end if
+         call field_add2(fu, result)
+
+         call this%GLL_to_GL%map(fld_GL%x, v%x, nel, this%Xh_GL)
+         call field_col3(accumulate, chi_GL, fld_GL)
+         if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call device_invcol2(result%x_d, coef%B_d, result%size())
+         else
+            call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call invcol2(result%x, coef%B, result%size())
+         end if
+         call field_add2(fv, result)
+
+         call this%GLL_to_GL%map(fld_GL%x, w%x, nel, this%Xh_GL)
+         call field_col3(accumulate, chi_GL, fld_GL)
+         if (NEKO_BCKND_DEVICE .eq. 1) then
+            call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call device_invcol2(result%x_d, coef%B_d, result%size())
+         else
+            call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
+            call this%GLL_to_GL%map(result%x, accumulate%x, nel, this%Xh_GLL)
+            call invcol2(result%x, coef%B, result%size())
+         end if
+         call field_add2(fw, result)
+
+         call this%scratch_GL%relinquish_field(temp_indices_GL)
+      else
+         call field_col3(result, this%chi, u)
+         if (this%if_mask) then
+            call mask_exterior_const(result, this%mask, 0.0_rp)
+         end if
+         call field_add2s2(fu, result, this%obj_scale * scale_forcing)
+
+         call field_col3(result, this%chi, v)
+         if (this%if_mask) then
+            call mask_exterior_const(result, this%mask, 0.0_rp)
+         end if
+         call field_add2s2(fv, result, this%obj_scale * scale_forcing)
+
+         call field_col3(result, this%chi, w)
+         if (this%if_mask) then
+            call mask_exterior_const(result, this%mask, 0.0_rp)
+         end if
+         call field_add2s2(fw, result, this%obj_scale * scale_forcing)
       end if
-      call field_add2s2(fw, result, this%obj_scale * scale_forcing)
 
       call neko_scratch_registry%relinquish_field(temp_indices)
 
