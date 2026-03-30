@@ -5,6 +5,7 @@ program usrneko
   use LightKrylov, only: wp => dp, rtol => rtol_dp
   use LightKrylov_Logger
   use LightKrylov_Constants
+  use neko, only: neko_init, neko_finalize
   use neko_vector, only: state_vector_t
   use neko_system, only: non_linear_propagator_t
   use neko_jacobian, only: jacobian_t
@@ -61,8 +62,6 @@ program usrneko
   integer :: argc
   character(len=256) :: parameter_file
   type(json_file) :: parameters, design_parameters
-  ! MPI parameters
-  integer :: ierr
 
   !=============================================================================
 
@@ -70,13 +69,10 @@ program usrneko
   !-----     INITIALIZATION     -----
   !----------------------------------
 
-  !> Set up logging
-  call logger_setup()
-
-  ! Initialize the MPI environment
-
-  call MPI_Init(ierr)
+  ! Initialize the Neko environment before any LightKrylov/MPI setup.
+  call neko_init()
   call neko_top_register_types()
+  call logger_setup()
 
   ! -------------------------------------------------------------------------- !
   ! Read the parameters file as the first terminal argument
@@ -107,8 +103,8 @@ program usrneko
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
   call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
-  ! call newton(non_linear, bf, gmres_rdp, info)
-  ! call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp)
+  call newton(non_linear, bf, gmres_rdp, info)
+  call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp)
 
   ! Now we have a steady baseflow, let's compute the spectra
   allocate(A)
@@ -139,8 +135,11 @@ program usrneko
 
   !> Clean up
   call A%free()
+  call X_writer%free()
+  call bf%free()
   do i = 1, nev
     call X(i)%free()
   enddo
+  call neko_finalize()
 
 end program usrneko

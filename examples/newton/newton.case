@@ -16,15 +16,12 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 100,
+            "Re": 100.0,
             "initial_condition": {
-                "type": "field",
-                "file_name": "steady_baseflow0.f00012",
-                //"interpolate": true
-                // "type": "uniform",
-                // "value": [
-                //     0.0, 0.0, 0.0
-                // ]
+                 "type": "uniform",
+                 "value": [
+                     0.0, 0.0, 0.0
+                 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -50,7 +47,7 @@
                 },
                 {
                     "type": "velocity_value",
-                    "value": [ 1, 0, 0 ],
+                    "value": [ 1.0, 0.0, 0.0 ],
                     "zone_indices": [ 5, 2, 4]
                 },
                 {
