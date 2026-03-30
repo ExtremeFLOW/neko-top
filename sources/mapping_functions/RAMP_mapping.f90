@@ -1,35 +1,36 @@
-! Copyright (c) 2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
-!
+!> @file RAMP_mapping.f90
+!! @copyright
+!! Copyright (c) 2024-2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> A RAMP mapping of coefficients
 module RAMP_mapping
@@ -43,7 +44,12 @@ module RAMP_mapping
        device_convex_down_RAMP_mapping_apply_backward, &
        device_convex_up_RAMP_mapping_apply, &
        device_convex_up_RAMP_mapping_apply_backward
+  use RAMP_mapping_cpu, only: convex_down_RAMP_mapping_apply_cpu, &
+       convex_down_RAMP_mapping_apply_backward_cpu, &
+       convex_up_RAMP_mapping_apply_cpu, &
+       convex_up_RAMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
+  use logger, only: neko_log
   implicit none
   private
 
@@ -115,7 +121,7 @@ contains
     call json_get_or_default(json, 'q', q, 1.0_rp)
     call json_get_or_default(json, 'convex_up', convex_up, .false.)
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "RAMP_mapping")
     call this%init_from_attributes(coef, f_min, f_max, q, &
          convex_up)
 
@@ -128,11 +134,26 @@ contains
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: f_min, f_max, q
     logical, intent(in) :: convex_up
+    character(len=256) :: msg
 
     this%f_min = f_min
     this%f_max = f_max
     this%q = q
     this%convex_up = convex_up
+
+    call neko_log%section('RAMP Mapping')
+    write(msg, '(A,F8.4)') '  f_min: ', this%f_min
+    call neko_log%message(msg)
+    write(msg, '(A,F8.4)') '  f_max: ', this%f_max
+    call neko_log%message(msg)
+    write(msg, '(A,F8.4)') '  q:     ', this%q
+    call neko_log%message(msg)
+    if (this%convex_up .eqv. .true.) then
+       call neko_log%message('  convexity: up (Borrvall & Peterson)')
+    else
+       call neko_log%message('  convexity: down (standard RAMP)')
+    end if
+    call neko_log%end_section()
 
   end subroutine RAMP_mapping_init_from_attributes
 
@@ -195,7 +216,7 @@ contains
     real(kind=rp), intent(in) :: q, f_min, f_max
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     ! x_out = f_min + (f_max - f_min) * x_in / (1 + q * (1 - x_in) )
 
@@ -204,10 +225,8 @@ contains
        call device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-               X_in%x(i,1,1,1) / (1.0_rp + q * (1.0_rp - X_in%x(i,1,1,1) ) )
-       end do
+       call convex_down_RAMP_mapping_apply_cpu(f_min, f_max, q, &
+            X_out%x, X_in%x, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply
@@ -226,7 +245,7 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
@@ -238,11 +257,8 @@ contains
        call device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) / &
-               ((1.0_rp - q * (X_in%x(i,1,1,1) - 1.0_rp))**2) * &
-               sens_in%x(i,1,1,1)
-       end do
+       call convex_down_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine convex_down_RAMP_mapping_apply_backward
@@ -257,7 +273,7 @@ contains
     real(kind=rp), intent(in) :: f_min, f_max, q
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
-    integer :: n, i
+    integer :: n
 
     ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q)
 
@@ -267,10 +283,8 @@ contains
        call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
             X_out%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          X_out%x(i,1,1,1) = f_min + (f_max - f_min) * &
-               X_in%x(i,1,1,1) * (1.0_rp + q ) / (X_in%x(i,1,1,1) + q)
-       end do
+       call convex_up_RAMP_mapping_apply_cpu(f_min, f_max, q, &
+            X_out%x, X_in%x, n)
     end if
 
 
@@ -290,7 +304,7 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
-    integer :: n, i
+    integer :: n
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
@@ -302,11 +316,8 @@ contains
        call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
             sens_out%x_d, sens_in%x_d, X_in%x_d, n)
     else
-       do i = 1, n
-          sens_out%x(i,1,1,1) = (f_max - f_min) * (q + 1.0_rp) * q / &
-               ( (X_in%x(i,1,1,1) + q)**2) * &
-               sens_in%x(i,1,1,1)
-       end do
+       call convex_up_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
+            sens_out%x, sens_in%x, X_in%x, n)
     end if
 
   end subroutine convex_up_RAMP_mapping_apply_backward

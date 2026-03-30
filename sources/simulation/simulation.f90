@@ -1,41 +1,43 @@
-! Copyright (c) 2023, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file simulation.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Implements the `steady_problem_t` type.
 ! Here, we simply march forward to steady state solutions
 module simulation_m
   use case, only: case_t
-  use neko, only: neko_init, neko_finalize, neko_solve
-  use adjoint_case, only: adjoint_case_t, adjoint_init, adjoint_free
+  use neko, only: neko_solve
+  use adjoint_case, only: adjoint_case_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
   use adjoint_fluid_pnpn, only: adjoint_fluid_pnpn_t
@@ -52,7 +54,7 @@ module simulation_m
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
-  use field_registry, only: neko_field_registry
+  use registry, only: neko_registry
   use field_math, only: field_rzero, field_copy
   use checkpoint, only: chkp_t
   use file, only: file_t
@@ -71,6 +73,9 @@ module simulation_m
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
   use simulation_checkpoint, only: simulation_checkpoint_t
+  use runtime_stats, only: neko_rt_stats
+  use scratch_registry, only: neko_scratch_registry
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -94,6 +99,8 @@ module simulation_m
      !> An output sampler for the adjoint problem.
      !! This should probably be an output controller at some point instead.
      type(fld_file_output_t), public :: output_adjoint
+     !> Whether the simulation is steady or unsteady
+     logical :: unsteady = .false.
 
      logical :: have_scalar = .false.
      integer :: n_timesteps = 0
@@ -111,7 +118,7 @@ module simulation_m
      procedure, pass(this) :: free => simulation_free
      !> Run the simulation
      procedure, pass(this) :: run_forward => simulation_run_forward
-     !> Run the simulation
+     !> Run the adjoint simulation
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
@@ -119,8 +126,15 @@ module simulation_m
      procedure, pass(this) :: reset_adjoint => simulation_reset_adjoint
      !> Reset the forward only
      procedure, pass(this) :: reset_forward => simulation_reset_forward
+     !> Set simulation output counters.
+     procedure, pass(this) :: set_output_counter => &
+          simulation_set_output_counter
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
+     !> Write current state of the forward simulation to disk
+     procedure, pass(this) :: write_forward => simulation_write_forward
+     !> Write current state of the adjoint simulation to disk
+     procedure, pass(this) :: write_adjoint => simulation_write_adjoint
 
   end type simulation_t
   public :: simulation_t
@@ -131,12 +145,16 @@ contains
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
     type(json_file) :: checkpoint_params
-    integer :: i, n_scalars
+    integer :: i, n_scalars, unsteady_support
+    logical :: unsteady
 
-    ! initialize the primal
-    call neko_init(this%neko_case)
+    ! initialize the primal Neko objects
+    call this%neko_case%init(parameters)
+    call neko_rt_stats%init(parameters)
+    call neko_simcomps%init(this%neko_case)
+
     ! initialize the adjoint
-    call adjoint_init(this%adjoint_case, this%neko_case)
+    call this%adjoint_case%init(this%neko_case)
 
     ! Start the profiler
     call profiler_start
@@ -177,7 +195,7 @@ contains
     if (allocated(this%neko_case%scalars)) then
        do i = 1, n_scalars
           call this%output_forward%fields%assign(4 + i, &
-               this%scalars%scalar_fields(i)%s)
+               this%scalars%scalar_fields(i)%scalar%s)
        end do
     end if
 
@@ -199,6 +217,28 @@ contains
        end do
     end if
 
+    ! Check if the simulation is steady or unsteady
+    call json_get_or_default(parameters, "unsteady", unsteady, .false.)
+    this%unsteady = unsteady
+
+    ! Ensure there is a means to deal with unsteadiness
+    if (this%unsteady) then
+       unsteady_support = 0
+       if ("checkpoints" .in. parameters) then
+          unsteady_support = unsteady_support + 1
+       end if
+
+       if (unsteady_support .eq. 0) then
+          call neko_error("No support for unsteady simulation provided, \\ &
+          & \\ current options include enabling checkpoints.")
+       end if
+
+       if (unsteady_support .gt. 1) then
+          call neko_error("Too many supports for unsteady simulation \\ &
+          & \\ provided, please select one.")
+       end if
+    end if
+
     if ("checkpoints" .in. parameters) then
        call json_get(parameters, 'checkpoints', checkpoint_params)
        call this%checkpoint%init(this%neko_case, checkpoint_params)
@@ -213,9 +253,26 @@ contains
     ! Stop the profiler
     call profiler_stop
 
+    ! Free the objects
+    call this%neko_case%free()
+    call this%adjoint_case%free()
+    call this%output_forward%free()
+    call this%output_adjoint%free()
     call this%checkpoint%free()
-    call adjoint_free(this%adjoint_case)
-    call neko_finalize(this%neko_case)
+
+    ! Nullify pointers
+    nullify(this%fluid)
+    nullify(this%scalars)
+    nullify(this%adjoint_fluid)
+    nullify(this%adjoint_scalars)
+
+    ! Reset flags and counters
+    this%unsteady = .false.
+    this%have_scalar = .false.
+    this%n_timesteps = 0
+
+    ! Close global objects
+    call neko_simcomps%free()
 
   end subroutine simulation_free
 
@@ -299,6 +356,15 @@ contains
 
   end subroutine simulation_reset_forward
 
+  subroutine simulation_set_output_counter(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_forward%set_counter(idx)
+    call this%output_adjoint%set_counter(idx)
+
+  end subroutine simulation_set_output_counter
+
   !> Write current state of the simulation to disk
   subroutine simulation_write(this, idx)
     class(simulation_t), intent(inout) :: this
@@ -308,5 +374,23 @@ contains
     call this%output_adjoint%sample(real(idx, kind=rp))
 
   end subroutine simulation_write
+
+  !> Write current state of the forward simulation to disk
+  subroutine simulation_write_forward(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_forward%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_forward
+
+  !> Write current state of the adjoint simulation to disk
+  subroutine simulation_write_adjoint(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_adjoint%sample(real(idx, kind=rp))
+
+  end subroutine simulation_write_adjoint
 
 end module simulation_m

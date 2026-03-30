@@ -1,0 +1,13 @@
+*
+!**/
+!**/readme.md
+!**/box.nmsh
+!**/.gitignore
+!**/*.f90
+!**/*.py
+!**/*.sh
+!**/*.case
+!**/CMakeLists.txt
+!**/reference_data
+!**/reference_data/*
+!**/requirements.txt

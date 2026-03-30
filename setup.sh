@@ -6,12 +6,12 @@ function help() {
     echo -e "Usage: $0 [options]"
     echo -e "Options:"
     echo -e "\t-h, --help        Show this help message and exit"
-    echo -e "\t-t, --test        Run the tests after the installation"
+    echo -e "\t-t, --tests       Run the tests after the installation"
     echo -e "\t-c, --clean       Clean the build directory before compiling"
     echo -e "\t-q, --quiet       Suppress output"
     echo -e "\t-d, --device      Device type to compile for (off, CUDA, HIP)"
     echo -e "\t-e, --examples    Build the examples"
-    echo -e "\t    --doc         Build the documentation"
+    echo -e "\t    --docs        Build the documentation"
     echo -e ""
     echo -e "Compilation and setup of Neko-TOP, this script will install all"
     echo -e "the dependencies and compile the Neko-TOP code."
@@ -44,12 +44,12 @@ DEVICE_TYPE="CPU"
 CLEAN=false
 CLEAN_NEKO=false
 QUIET=false
-TEST=false
-DOCS=false
-EXAMPLES=false
+TEST=OFF
+DOCS=OFF
+EXAMPLES=OFF
 
 # List possible options
-OPTIONS=help,test,clean,clean-neko,quiet,device:,docs,examples
+OPTIONS=help,tests,clean,clean-neko,quiet,device:,docs,examples
 OPT=h,t,c,q,d:,e
 
 # Parse the inputs for options
@@ -60,14 +60,14 @@ eval set -- "$PARSED"
 while true; do
     case "$1" in
     "-h" | "--help") help && exit ;;                  # Print help
-    "-t" | "--test") TEST=true && shift ;;            # Build the tests
+    "-t" | "--tests") TEST="ON" && shift ;;            # Build the tests
     "-c" | "--clean") CLEAN=true && shift ;;          # Clean compilation
     "-q" | "--quiet") QUIET=true && shift ;;          # Suppress output
     "-d" | "--device") DEVICE_TYPE="$2" && shift 2 ;; # Device type
-    "-e" | "--examples") EXAMPLES=true && shift ;;    # Build the examples
+    "-e" | "--examples") EXAMPLES="ON" && shift ;;    # Build the examples
 
     # Purely long settings
-    "--docs") DOCS=true && shift ;;             # Build the documentation
+    "--docs") DOCS="ON" && shift ;;             # Build the documentation
     "--clean-neko") CLEAN_NEKO=true && shift ;; # Clean Neko
 
     # End of options
@@ -116,7 +116,7 @@ printf "Setting up external dependencies\n"
 check_system_dependencies                      # Check for system dependencies.
 find_json_fortran $JSON_FORTRAN_DIR            # Re-defines the JSON_FORTRAN_DIR variable.
 find_neko $NEKO_DIR                            # Re-defines the NEKO_DIR variable.
-[ "$TEST" == true ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
+[ "$TEST" == "ON" ] && find_pfunit $PFUNIT_DIR # Re-defines the PFUNIT_DIR variable.
 
 # Done setting up external dependencies
 # ============================================================================ #
@@ -128,25 +128,20 @@ printf "Compiling the example codes and Neko-TOP\n"
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
 
-# Set CMAKE_VARIABLES to pass to the cmake command
-if [ -z "$CMAKE_VARIABLES" ]; then CMAKE_VARIABLES=(); fi
-
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then
     CMAKE_VARIABLES=($CMAKE_VARIABLES)
+else
+    CMAKE_VARIABLES=()
 fi
 
 # Enable desired features
-[ "$DOCS" == true ] && CMAKE_VARIABLES+=("-DBUILD_DOCS=ON")
-[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DBUILD_TESTING=ON")
-[ "$EXAMPLES" == true ] && CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=ON")
+CMAKE_VARIABLES+=("-DBUILD_DOCS=$DOCS")
+CMAKE_VARIABLES+=("-DBUILD_TESTING=$TEST")
+CMAKE_VARIABLES+=("-DBUILD_EXAMPLES=$EXAMPLES")
 
-# Set the variables for the compilation
-[ "$TEST" == true ] && CMAKE_VARIABLES+=("-DPFUNIT_DIR=$PFUNIT_DIR/cmake")
-
-if [ ! -d $MAIN_DIR/build ]; then
-    cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
-fi
+# Run the cmake command to configure the build
+cmake -B $MAIN_DIR/build -S $MAIN_DIR "${CMAKE_VARIABLES[@]}"
 
 # Clean the build directory if the clean flag is set
 cmake --build $MAIN_DIR/build --parallel
@@ -154,15 +149,16 @@ cmake --build $MAIN_DIR/build --parallel
 # ============================================================================ #
 # Print the status of the build
 
+printf "=%.0s" {1..80} && printf "\n"
 printf "Neko-TOP Installation Complete\n"
 printf "=%.0s" {1..80} && printf "\n"
 printf "Neko installed to:\n"
 printf "\t$NEKO_DIR\n"
 printf "Supported features:\n"
-printf "\tMPI: YES\n"
-printf "\tTests: " && [[ "$TEST" == true ]] && printf "YES\n" || printf "NO\n"
-printf "\tDevice: $DEVICE_TYPE\n"
+printf "\tMPI:           YES\n"
+printf "\tDevice:        $DEVICE_TYPE\n"
+printf "\tTests:         " && [[ "$TEST" == "ON" ]] && printf "YES\n" || printf "NO\n"
+printf "\tExamples:      " && [[ "$EXAMPLES" == "ON" ]] && printf "YES\n" || printf "NO\n"
+printf "\tDocumentation: " && [[ "$DOCS" == "ON" ]] && printf "YES\n" || printf "NO\n"
+printf "\tHDF5:          " && [[ -d "$HDF5_DIR" ]] && printf "YES\n" || printf "NO\n"
 printf "=%.0s" {1..80} && printf "\n"
-if [ "$TEST" == true ]; then
-    ctest -C Debug -O test_report.log --verbose --test-dir $MAIN_DIR/build
-fi

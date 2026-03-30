@@ -40,8 +40,17 @@ done
 # Print status
 
 # List all the tests, if there are none we return
-tests=($(find $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
+tests=($(find -L $LPATH -type d -exec test -f '{}'/output.log \; -print | sort -u))
 for ((i = 0; i < ${#tests[@]}; i++)); do tests[$i]="${tests[$i]#$LPATH/}"; done
+
+# Trim tests called `run_*` which are not actual tests
+filtered_tests=()
+for test in ${tests[@]}; do
+    if [[ ! $(basename $test) == run_* ]]; then
+        filtered_tests+=("$test")
+    fi
+done
+tests=("${filtered_tests[@]}")
 
 if [ ${#tests[@]} -eq 0 ]; then
     printf "No tests found.\n"
@@ -54,7 +63,7 @@ if [ $(which bjobs 2>/dev/null) ]; then
     bjobs -ro -noheader "time_left:8 job_name"
 elif [ $(which squeue 2>/dev/null) ]; then
     printf "\n\e[4mRunning jobs.\e[m\n"
-    squeue -ro "%.8L %j" -u $USER
+    squeue -rho "%.10t %9L %j" -u $USER
 fi
 
 printf "\n\e[4mTest status.\e[m\n"
@@ -62,6 +71,7 @@ printf "\n\e[4mTest status.\e[m\n"
 for test in ${tests[@]}; do
     if [[ -d $RPATH/$test && ! -s $LPATH/$test/output.log && ! -s $LPATH/$test/error.log ]]; then
         printf '\t\e[1;32m%-12s\e[m %-s\n' "Complete:" "$test"
+        rm -rf $LPATH/$test
     fi
 done
 

@@ -1,34 +1,36 @@
-! Copyright (c) 2022-2025, The Neko Authors
-! All rights reserved.
-!
-! Redistribution and use in source and binary forms, with or without
-! modification, are permitted provided that the following conditions
-! are met:
-!
-!   * Redistributions of source code must retain the above copyright
-!     notice, this list of conditions and the following disclaimer.
-!
-!   * Redistributions in binary form must reproduce the above
-!     copyright notice, this list of conditions and the following
-!     disclaimer in the documentation and/or other materials provided
-!     with the distribution.
-!
-!   * Neither the name of the authors nor the names of its
-!     contributors may be used to endorse or promote products derived
-!     from this software without specific prior written permission.
-!
-! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
-! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
-! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
-! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
-! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-! POSSIBILITY OF SUCH DAMAGE.
+!> @file adjoint_scalars.f90
+!! @copyright
+!! Copyright (c) 2025, The Neko-TOP Authors
+!! All rights reserved.
+!!
+!! Redistribution and use in source and binary forms, with or without
+!! modification, are permitted provided that the following conditions
+!! are met:
+!!
+!!   * Redistributions of source code must retain the above copyright
+!!     notice, this list of conditions and the following disclaimer.
+!!
+!!   * Redistributions in binary form must reproduce the above
+!!     copyright notice, this list of conditions and the following
+!!     disclaimer in the documentation and/or other materials provided
+!!     with the distribution.
+!!
+!!   * Neither the name of the authors nor the names of its
+!!     contributors may be used to endorse or promote products derived
+!!     from this software without specific prior written permission.
+!!
+!! THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+!! "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+!! LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+!! FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+!! COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+!! INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+!! BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+!! LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+!! CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+!! LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+!! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+!! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Contains the adjoint_scalars_t type that manages multiple scalar fields.
 
@@ -45,7 +47,9 @@ module adjoint_scalars
   use json_utils, only: json_get, json_get_or_default, json_extract_item
   use field, only: field_t
   use field_series, only: field_series_t
-  use field_registry, only: neko_field_registry
+  use scalar_aux, only : scalar_step_info
+  use krylov, only : ksp_monitor_t
+  use registry, only: neko_registry
   use checkpoint, only: chkp_t
   use krylov, only: ksp_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_VERBOSE
@@ -265,11 +269,26 @@ contains
     type(time_state_t), intent(in) :: time
     type(time_scheme_controller_t), intent(inout) :: ext_bdf
     type(time_step_controller_t), intent(inout) :: dt_controller
+    type(ksp_monitor_t), dimension(size(this%adjoint_scalar_fields)) :: ksp_results
     integer :: i
+    logical :: all_frozen
+
+    all_frozen = .true.
 
     ! Iterate through all scalar fields
     do i = 1, size(this%adjoint_scalar_fields)
-       call this%adjoint_scalar_fields(i)%step(time, ext_bdf, dt_controller)
+       all_frozen = all_frozen .and. this%adjoint_scalar_fields(i)%freeze
+       call this%adjoint_scalar_fields(i)%step(time, ext_bdf, dt_controller, &
+            ksp_results(i))
+    end do
+
+    if (.not. all_frozen) then
+       call ksp_results(i)%print_header()
+    end if
+
+    do i = 1, size(this%adjoint_scalar_fields)
+       if (this%adjoint_scalar_fields(i)%freeze) cycle
+       call scalar_step_info(time, ksp_results(i))
     end do
   end subroutine adjoint_scalars_step
 
