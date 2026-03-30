@@ -56,6 +56,7 @@ module target_dissipation_objective
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default, json_get
+  use time_state, only: time_state_t
   implicit none
   private
 
@@ -155,6 +156,8 @@ contains
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Target Dissipation")
     call json_get(json, "target", target_fraction)
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
 
     call this%init_from_attributes(design, simulation, weight, name, &
          mask_name, target_fraction)
@@ -209,8 +212,9 @@ contains
          this%u, this%v, this%w, this%brinkman_amplitude, this%weight, &
          this%viscous_scale, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%volume, this%target_fraction, &
-         this%current_dissipation, this%initial_dissipation)
+         this%c_Xh, this%volume, this%target_fraction, this%start_time, &
+         this%end_time, this%current_dissipation, &
+         this%initial_dissipation)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)
@@ -329,12 +333,14 @@ contains
   !> Accumulate objective and component contributions in time.
   !! @param[inout] this The objective.
   !! @param[in] design The design.
-  !! @param[in] dt Time-step size.
-  subroutine target_dissipation_accumulate_value(this, design, dt)
+  !! @param[in] time The current time state.
+  subroutine target_dissipation_accumulate_value(this, design, time)
     class(target_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     real(kind=rp) :: viscous_old, brinkman_old
+
+    if (time%t .lt. this%start_time .or. time%t .gt. this%end_time) return
 
     this%value_old = this%value
     viscous_old = this%current_viscous_dissipation
@@ -342,11 +348,11 @@ contains
 
     call this%update_value(design)
 
-    this%value = this%value_old + this%value * dt
+    this%value = this%value_old + this%value * time%dt
     this%current_viscous_dissipation = viscous_old + &
-         this%current_viscous_dissipation * dt
+         this%current_viscous_dissipation * time%dt
     this%current_brinkman_dissipation = brinkman_old + &
-         this%current_brinkman_dissipation * dt
+         this%current_brinkman_dissipation * time%dt
   end subroutine target_dissipation_accumulate_value
 
   !> Reset value and component diagnostics before accumulation.

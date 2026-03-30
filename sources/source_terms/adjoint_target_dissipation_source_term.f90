@@ -149,19 +149,21 @@ contains
   !! @param coef The SEM coeffs.
   !! @param volume volume of the objective domain.
   !! @param target_fraction target fraction of the initial dissipation.
+  !! @param start_time when to start applying the source term.
+  !! @param end_time when to stop applying the source term.
   !! @param current_dissipation the current dissipation.
   !! @param initial_dissipation the initial dissipation.
-  subroutine adjoint_target_dissipation_source_term_init_from_components(this,&
-       f_x, f_y, f_z, u, v, w, chi, obj_scale, viscous_scale, mask, if_mask, &
-       coef, volume, &
-       target_fraction, current_dissipation, initial_dissipation)
+  subroutine adjoint_target_dissipation_source_term_init_from_components( &
+       this, f_x, f_y, f_z, u, v, w, chi, obj_scale, viscous_scale, &
+       mask, if_mask, coef, volume, target_fraction, start_time, end_time, &
+       current_dissipation, initial_dissipation)
     class(adjoint_target_dissipation_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_x, f_y, f_z
     type(field_list_t) :: fields
-    type(coef_t) :: coef
-    real(kind=rp) :: start_time
-    real(kind=rp) :: end_time
-    real(kind=rp) :: obj_scale
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+    real(kind=rp), intent(in) :: obj_scale
     real(kind=rp), intent(in) :: viscous_scale
     type(field_t), intent(in), target :: u, v, w
     type(field_t), intent(in), target :: chi
@@ -170,12 +172,7 @@ contains
     real(kind=rp), intent(in) :: target_fraction
     real(kind=rp), target, intent(in) :: current_dissipation
     real(kind=rp), target, intent(in) :: initial_dissipation
-    logical :: if_mask
-
-    ! I wish you didn't need a start time and end time...
-    ! but I'm just going to set a super big number...
-    start_time = 0.0_rp
-    end_time = 100000000.0_rp
+    logical, intent(in) :: if_mask
 
     call this%free()
 
