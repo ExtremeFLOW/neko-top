@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout develop branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
           ref: develop
@@ -55,7 +55,7 @@ jobs:
 
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -82,7 +82,7 @@ jobs:
 
     steps:
       - name: Checkout current branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       # Check if the current branch has a lower score than the develop branch.
       # If the score is lower, the linting has failed and we require improvements.
@@ -122,7 +122,6 @@ jobs:
             exit 2
           fi
 
-
   # Run the flint linter on the changed fortran files and provide suggestions
   # for improvements. The suggestions are saved in a linter-report.txt file.
   lint-changes:
@@ -134,7 +133,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 1
 
@@ -217,7 +216,7 @@ jobs:
           fi
 
       - name: Save linter report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linter-report
           path: linter-report.txt
@@ -233,7 +232,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup env.
         run: |
@@ -243,13 +242,13 @@ jobs:
 
       - name: Create badge
         env:
-            score: ${{ needs.score-current.outputs.score }}
+          score: ${{ needs.score-current.outputs.score }}
         run: |
-            mkdir -p doc/media
-            anybadge -l Flint -o --file=doc/media/lint-badge.svg -v $score 9.0=red 9.9=yellow 10=green
+          mkdir -p doc/media
+          anybadge -l Flint -o --file=doc/media/lint-badge.svg -v $score 9.0=red 9.9=yellow 10=green
 
       - name: Save artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: lint-badge
           path: doc/media/lint-badge.svg
