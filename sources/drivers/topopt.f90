@@ -44,6 +44,7 @@ program topopt
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
+  use continuation_scheduler, only: nekotop_continuation
 
   implicit none
 
@@ -81,6 +82,9 @@ program topopt
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  ! initialize the global continuation_scheduler object (nekotop_continuation)
+  call nekotop_continuation%init(parameters)
+
   ! initialize the simulation
   call sim%init(parameters)
 
@@ -105,6 +109,7 @@ program topopt
   call prob%free()
   call des%free()
   call sim%free()
+  call nekotop_continuation%free()
 
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)

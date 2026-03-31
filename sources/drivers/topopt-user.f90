@@ -45,6 +45,7 @@ program topopt_user
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
   use user, only: user_setup
+  use continuation_scheduler, only: nekotop_continuation
 
   implicit none
 
@@ -82,6 +83,9 @@ program topopt_user
   ! -------------------------------------------------------------------------- !
   ! Initialization of the components
 
+  ! initialize the global continuation_scheduler object (nekotop_continuation)
+  call nekotop_continuation%init(parameters)
+
   ! initialize the user additions for the forward (through the neko interface)
   call user_setup(sim%neko_case%user)
 
@@ -109,6 +113,7 @@ program topopt_user
   call prob%free()
   call des%free()
   call sim%free()
+  call nekotop_continuation%free()
 
   if (allocated(des)) deallocate(des)
   if (allocated(opt)) deallocate(opt)
