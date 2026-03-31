@@ -27,13 +27,11 @@ on:
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
 jobs:
-
   # -------------------------------------------------------------------------- #
   # Define the compilation and testing job that will be run in this workflow.
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
 
   neko-top-debug:
-
     # ------------------------------------------------------------------------ #
     # Define the Matrix for the job.
     # ------------------------------------------------------------------------ #
@@ -41,7 +39,6 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-
         # Default matrix
         precision: [dp]
         backend: [CPU, CUDA, HIP]
@@ -61,18 +58,14 @@ jobs:
 
           - backend: CUDA
             setup-backend: |
-              sudo apt-get update
-              sudo apt-get install -y nvidia-cuda-toolkit
               echo "backend-path=/usr" >> $GITHUB_OUTPUT
 
           - backend: HIP
             setup-backend: |
-              wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
-              sudo apt install ./amdgpu-install_*.deb
-              sudo apt-get update && sudo apt-get install -y amdgpu-dkms rocm-dev hipsolver-dev hipblas-dev
               ROCM_DIR=$(ls -d /opt/rocm-*)
               CMAKE_PREFIX_PATH="$ROCM_DIR/lib/cmake:$CMAKE_PREFIX_PATH"
               echo "CMAKE_PREFIX_PATH=$CMAKE_PREFIX_PATH" >> $GITHUB_ENV
+              echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ROCM_DIR/lib" >> $GITHUB_ENV
               echo "backend-path=$ROCM_DIR" >> $GITHUB_OUTPUT
 
     # ------------------------------------------------------------------------ #
@@ -83,13 +76,12 @@ jobs:
     env:
       JOB_NAME: ${{ matrix.backend }}-${{ matrix.compiler }}-${{ matrix.precision }}
     steps:
-
       # ---------------------------------------------------------------------- #
       # Checkout the repository and setup the environment
       # ---------------------------------------------------------------------- #
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Compiler
         id: setup-compiler
@@ -102,6 +94,31 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y cmake libopenblas-dev libopenmpi-dev \
             openmpi-bin pkg-config liblapack-dev ninja-build
+
+      # Setup device specific dependencies
+      - name: Setup Device (CUDA)
+        if: matrix.backend == 'cuda'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: nvidia-cuda-toolkit
+          version: cuda-cache-1.0
+
+      - name: Setup Device (HIP) - install rocm-dev
+        if: matrix.backend == 'hip'
+        run: |
+          # Following the instructions from https://rocm.docs.amd.com/projects/install-on-linux/en/latest/install/quick-start.html
+
+          wget -r -np -nd -A 'amdgpu*.deb' https://repo.radeon.com/amdgpu-install/latest/ubuntu/noble/
+          sudo apt install ./amdgpu-install_*.deb
+          sudo apt update
+          sudo apt install -y rocm-dev
+
+      - name: Setup Device (HIP) - install amdgpu-dkms
+        if: matrix.backend == 'hip'
+        uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: amdgpu-dkms hipsolver-dev hipblas-dev
+          version: hip-cache-1.0
 
       - name: Setup backend
         id: setup-backend
@@ -186,6 +203,7 @@ jobs:
           ctest -L unit --test-dir build --output-on-failure --parallel
 
       - name: Building Examples
+        if: ${{ matrix.backend == 'cpu' }}
         run: |
           cmake --build build --target Examples --parallel
 
@@ -225,7 +243,7 @@ jobs:
 
       - name: Save logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.JOB_NAME }}-logs
           path: logs/

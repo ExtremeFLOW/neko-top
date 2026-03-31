@@ -8,45 +8,45 @@ description: |
 # back to the caller.
 
 inputs:
-    install-dir:
-      description: "The directory to install the ParMetis library."
-      required: false
-      default: "/home/runner/pkg/parmetis"
+  install-dir:
+    description: "The directory to install the ParMetis library."
+    required: false
+    default: "/home/runner/pkg/parmetis"
 
-    working-dir:
-      description: "The directory to work in."
-      required: false
-      default: "/home/runner/tmp/parmetis"
+  working-dir:
+    description: "The directory to work in."
+    required: false
+    default: "/home/runner/tmp/parmetis"
 
-    os:
-      description: "The operating system to use."
-      required: false
-      default: "${{ runner.os }}"
+  os:
+    description: "The operating system to use."
+    required: false
+    default: "${{ runner.os }}"
 
-    compiler:
-      description: "The compiler to use."
-      required: false
-      default: "gfortran"
+  compiler:
+    description: "The compiler to use."
+    required: false
+    default: "gfortran"
 
-    compiler-flags:
-      description: "The compiler flag to use."
-      required: false
-      default: "-O3"
+  compiler-flags:
+    description: "The compiler flag to use."
+    required: false
+    default: "-O3"
 
-    build-options:
-      description: "The build option to use."
-      required: false
-      default: "--parallel"
+  build-options:
+    description: "The build option to use."
+    required: false
+    default: "--parallel"
 
-    install-options:
-      description: "The install option to use."
-      required: false
-      default: ""
+  install-options:
+    description: "The install option to use."
+    required: false
+    default: ""
 
-    version:
-      description: "The version of the ParMetis library to use."
-      required: false
-      default: "4.0.3"
+  version:
+    description: "The version of the ParMetis library to use."
+    required: false
+    default: "4.0.3"
 
 outputs:
   install-dir:
@@ -76,7 +76,7 @@ runs:
 
     - name: Cache
       id: cache-ParMETIS
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: ${{ inputs.install-dir }}
         key: ${{ steps.create-key.outputs.key }}

@@ -120,6 +120,10 @@ function(build_example)
         MPI::MPI_Fortran
         $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
         $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
+        $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
+        $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
+        $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
+        $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
     )
 
     # Reset the module directory if we set it earlier.
