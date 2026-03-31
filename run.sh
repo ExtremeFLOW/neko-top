@@ -127,7 +127,6 @@ if [ "$NEKO" == true ]; then
     export EPATH="$NEKO_DIR/examples"
     export RPATH="$RPATH/neko"
     export LPATH="$LPATH/neko"
-    export HPATH="$HPATH/neko"
 fi
 
 # End of user inputs

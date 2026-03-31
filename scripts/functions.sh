@@ -26,12 +26,12 @@ function run {
     # ------------------------------------------------------------------------ #
     # Set up the environment and find neko
     prepare 2>error.log || return 1
-    rm -fr error.log && touch error.log
     if [ -s ./error.log ]; then
         printf "ERROR: An error occured during preparation.\n"
         printf "See error.log for details.\n"
         return 1
     fi
+    rm -fr error.log && touch error.log
 
     # ------------------------------------------------------------------------ #
     # Execute the example
@@ -162,11 +162,16 @@ function prepare {
         printf "Running user provided preparation script.\n"
         printf "=%.0s" {1..80} && printf "\n"
 
+        prep_sh=$(realpath ./prepare.sh)
+        if [ -f "./select_gpu" ]; then
+            prep_sh="./select_gpu $prep_sh"
+        fi
+
         if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
-            srun --ntasks=1 --cpu-bind=${CPU_BIND} ./prepare.sh
+            srun --ntasks=1 --cpu-bind=${CPU_BIND} $prep_sh
             sleep 1 # Make sure SLURM have time to clean up.
         else
-            ./prepare.sh
+            $prep_sh
         fi
 
     fi
@@ -186,7 +191,7 @@ function prepare {
         printf "Building user Neko based on the following files\n"
         for f in $(ls *.f90); do printf "\t- %s\n" $f; done
 
-        $NEKO_DIR/bin/makeneko *.f90 || echo "makeneko failed" >&2
+        $NEKO_DIR/bin/makeneko *.f90 2>&1 || echo "makeneko failed" >&2
         neko=$(realpath ./neko)
 
     else
