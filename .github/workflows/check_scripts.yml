@@ -27,7 +27,6 @@ on:
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
 jobs:
-
   # -------------------------------------------------------------------------- #
   # Define the compilation and testing job that will be run in this workflow.
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
@@ -42,7 +41,7 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest
@@ -54,7 +53,7 @@ jobs:
         run: sudo apt-get install -y libopenblas-dev libopenmpi-dev
 
       - name: Setup python environment
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.x"
           cache: "pip"
@@ -108,10 +107,9 @@ jobs:
 
       - name: Save logs
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: setup-script-logs
           path: tests/
           overwrite: true
           if-no-files-found: ignore
-
