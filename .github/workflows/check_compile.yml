@@ -122,7 +122,7 @@ jobs:
         if: matrix.backend == 'hip'
         uses: awalsh128/cache-apt-pkgs-action@latest
         with:
-          packages: amdgpu-dkms
+          packages: amdgpu-dkms hipsolver-dev hipblas-dev
           version: hip-cache-1.0
 
       # ---------------------------------------------------------------------- #
