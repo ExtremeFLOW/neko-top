@@ -46,8 +46,10 @@ module heaviside_mapping
   use heaviside_mapping_cpu, only: &
        heaviside_mapping_apply_cpu, &
        heaviside_mapping_apply_backward_cpu
-  use json_utils, only: json_get, json_get_or_default
+  use json_utils, only: json_get_or_default
   use utils, only: neko_error
+  use continuation_scheduler, only: nekotop_continuation
+
   implicit none
   private
 
@@ -87,11 +89,17 @@ contains
     class(heaviside_mapping_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
-    real(kind=rp) :: beta, eta
+    real(kind=rp) :: eta, beta
 
-    call json_get(json, 'beta', beta)
+    ! default value for beta
+    beta = 1.0_rp
+
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
+    call nekotop_continuation%json_get_or_register(json, 'beta', this%beta, &
+         beta)
+
+    ! Initialize base
     call this%init_base(json, coef, "heaviside_mapping")
     call this%init_from_attributes(coef, beta, eta)
   end subroutine heaviside_mapping_init_from_json

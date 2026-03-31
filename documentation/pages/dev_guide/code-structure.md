@@ -13,7 +13,9 @@ flexible and allow for easy extension and modification.
 - \subpage design. The design space over which one optimizes.
 - \subpage problem. The definition of the optimization problem being solved.
 - \subpage optimizer. The optimization algorithm used to solve the optimization
-problem.
+  problem.
 - \subpage simulation. Specifically for problems involving fluid mechanics, a
-simulation can allow for interfaces with `neko` to perform forward simulation
-and additional `neko-top` libraries to perform adjoint sensitivity analysis.
+  simulation can allow for interfaces with `neko` to perform forward simulation
+  and additional `neko-top` libraries to perform adjoint sensitivity analysis.
+- \subpage continuation. The continuation strategy for gradually changing
+  different parameters in the run time using a continuation scheduler.
