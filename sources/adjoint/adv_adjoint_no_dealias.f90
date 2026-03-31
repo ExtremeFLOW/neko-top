@@ -70,11 +70,6 @@ module adv_lin_no_dealias
      !! the RHS.
      procedure, pass(this) :: compute_adjoint => adjoint_advection_no_dealias
      
-     ! this is so stupid, we need a better way of pointing but I kept getting
-     ! silly errors
-     procedure, pass(this) :: compute => compute_wrapper
-
-
      !> Compute the adjoint passive scalar.
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
@@ -122,25 +117,6 @@ contains
        call device_free(this%temp_d)
     end if
   end subroutine free_no_dealias
-
-  subroutine compute_wrapper(this, vx, vy, vz, vxb, vyb, vzb, fx, &
-       fy, fz, Xh, coef, n)
-    implicit none
-    class(adv_lin_no_dealias_t), intent(inout) :: this
-    type(space_t), intent(inout) :: Xh
-    type(coef_t), intent(inout) :: coef
-    type(field_t), intent(inout) :: vx, vy, vz
-    type(field_t), intent(inout) :: vxb, vyb, vzb
-    integer, intent(in) :: n
-    type(field_t), intent(inout) :: fx, fy, fz
-
-    if (this%if_adjoint) then
-       call this%compute_adjoint(vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
-    else
-       call this%compute_linear(vx, vy, vz, vxb, vyb, vzb, fx, fy, fz, Xh, coef, n)
-    end if
-
-  end subroutine compute_wrapper
 
   !> Add the adjoint advection term for the fluid in weak form, i.e.
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
