@@ -215,8 +215,10 @@ _ACEOF
 
     if [[ -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
         cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -G "Unix Makefiles" \
-            -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR
-        cmake --build $PFUNIT_DIR/build --parallel
+            -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_Fortran_COMPILER=$FC
+        cmake --build $PFUNIT_DIR/build
         cmake --install $PFUNIT_DIR/build
     fi
 
@@ -431,7 +433,7 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS" > configure.log 2>&1
+                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
 
         # Update compile dependencies if makedepf90 is installed
