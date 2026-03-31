@@ -103,10 +103,12 @@ program usrneko
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
   call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
-  call newton(non_linear, bf, gmres_rdp, info)
   call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp)
 
-  ! Now we have a steady baseflow, let's compute the spectra
+  ! Now we have a steady baseflow, let's take a browse
+  call non_linear%simulation%write_forward(1)
+  
+  ! let's compute the spectra
   allocate(A)
   call A%init(simulation)
 
