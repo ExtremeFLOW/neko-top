@@ -22,11 +22,7 @@ for file_name in [
     # Read current and reference data
     df_current = pd.read_csv(file)
 
-    backend = df_current.keys().tolist()[-2].split(':')[1].strip()
-    subsolver = df_current.keys().tolist()[-1].split(':')[1].strip()
-
-    reference_file = os.path.join(current_dir, "reference_data",
-                                  "optimization_data_" + subsolver + ".csv")
+    reference_file = os.path.join(current_dir, "reference_data", file_name)
 
     if not os.path.exists(reference_file):
         df_current.to_csv(reference_file, index=False)
@@ -72,8 +68,7 @@ for file_name in [
                 rmsre = 0.0 if val_current == 0.0 else float("inf")
             else:
                 rmsre = math.sqrt(
-                    ((val_current - val_reference) / val_reference) ** 2
-                )
+                    ((val_current - val_reference) / val_reference)**2)
 
             status = "OK" if math.isfinite(rmsre) and rmsre <= tol else "FAIL"
             if status == "FAIL":
