@@ -63,6 +63,8 @@ program usrneko
   character(len=256) :: parameter_file
   type(json_file) :: parameters, design_parameters
 
+  real(kind=wp) :: newton_tol, eigs_tol
+
   !=============================================================================
 
   !----------------------------------
@@ -103,7 +105,8 @@ program usrneko
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
   call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
-  call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp)
+  newton_tol = 1.0e-3
+  call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp, rtol=newton_tol)
 
   ! Now we have a steady baseflow, let's take a browse
   call non_linear%simulation%write_forward(1)
