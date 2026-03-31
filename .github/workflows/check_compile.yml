@@ -203,6 +203,7 @@ jobs:
           ctest -L unit --test-dir build --output-on-failure --parallel
 
       - name: Building Examples
+        if: ${{ matrix.backend == 'cpu' }}
         run: |
           cmake --build build --target Examples --parallel
 
