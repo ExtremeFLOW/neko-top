@@ -44,6 +44,9 @@ module adjoint_fluid_pnpn
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
        adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
        adjoint_pnpn_vel_res_factory
+  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t, &
+       pnpn_prs_res_factory, pnpn_vel_res_factory, &
+       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
@@ -80,7 +83,7 @@ module adjoint_fluid_pnpn
   use field_math, only: field_add2, field_copy, field_rzero, field_add2s2
   use bc, only: bc_t
   use file, only: file_t
-  use operators, only: ortho
+  use operators, only: ortho, rotate_cyc
   use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
@@ -182,11 +185,17 @@ module adjoint_fluid_pnpn
      ! Advection terms for the oifs method
      type(field_t) :: advx, advy, advz
 
-     !> Pressure residual equation for computing `p_res`.
-     class(adjoint_pnpn_prs_res_t), allocatable :: prs_res
+     !> Pressure residual equation for the adjoint step.
+     class(adjoint_pnpn_prs_res_t), allocatable :: adjoint_prs_res
 
-     !> Velocity residual equation for computing `u_res`, `v_res`, `w_res`.
-     class(adjoint_pnpn_vel_res_t), allocatable :: vel_res
+     !> Velocity residual equation for the adjoint step.
+     class(adjoint_pnpn_vel_res_t), allocatable :: adjoint_vel_res
+
+     !> Pressure residual equation for the linearized step.
+     class(pnpn_prs_res_t), allocatable :: linearized_prs_res
+
+     !> Velocity residual equation for the linearized step.
+     class(pnpn_vel_res_t), allocatable :: linearized_vel_res
 
      !> Summation of AB/BDF contributions
      class(rhs_maker_sumab_t), allocatable :: sumab
@@ -338,25 +347,31 @@ contains
          this%full_stress_formulation, .false.)
 
     if (this%full_stress_formulation .eqv. .true.) then
-       call neko_error( &
-            "Full stress formulation is not supported in the adjoint module.")
-       !  ! Setup backend dependent Ax routines
-       !  call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
+       if (this%if_adjoint) then
+          call neko_error( &
+               "Full stress formulation is not supported in the adjoint " // &
+               "module.")
+       else
+          ! Setup backend dependent Ax routines
+          call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
 
-       !  ! Setup backend dependent prs residual routines
-       !  call pnpn_prs_res_stress_factory(this%prs_res)
-
-       !  ! Setup backend dependent vel residual routines
-       !  call pnpn_vel_res_stress_factory(this%vel_res)
+          ! Setup backend dependent residual routines for the linearized step
+          call pnpn_prs_res_stress_factory(this%linearized_prs_res)
+          call pnpn_vel_res_stress_factory(this%linearized_vel_res)
+       end if
     else
        ! Setup backend dependent Ax routines
        call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
 
-       ! Setup backend dependent prs residual routines
-       call adjoint_pnpn_prs_res_factory(this%prs_res)
-
-       ! Setup backend dependent vel residual routines
-       call adjoint_pnpn_vel_res_factory(this%vel_res)
+       if (this%if_adjoint) then
+          ! Setup backend dependent residual routines for the adjoint step
+          call adjoint_pnpn_prs_res_factory(this%adjoint_prs_res)
+          call adjoint_pnpn_vel_res_factory(this%adjoint_vel_res)
+       else
+          ! Setup backend dependent residual routines for the linearized step
+          call pnpn_prs_res_factory(this%linearized_prs_res)
+          call pnpn_vel_res_factory(this%linearized_vel_res)
+       end if
     end if
 
     if (params%valid_path('case.fluid.nut_field')) then
@@ -650,12 +665,20 @@ contains
        deallocate(this%Ax_prs)
     end if
 
-    if (allocated(this%prs_res)) then
-       deallocate(this%prs_res)
+    if (allocated(this%adjoint_prs_res)) then
+       deallocate(this%adjoint_prs_res)
     end if
 
-    if (allocated(this%vel_res)) then
-       deallocate(this%vel_res)
+    if (allocated(this%adjoint_vel_res)) then
+       deallocate(this%adjoint_vel_res)
+    end if
+
+    if (allocated(this%linearized_prs_res)) then
+       deallocate(this%linearized_prs_res)
+    end if
+
+    if (allocated(this%linearized_vel_res)) then
+       deallocate(this%linearized_vel_res)
     end if
 
     if (allocated(this%sumab)) then
@@ -732,8 +755,8 @@ contains
          Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          ulag => this%ulag, vlag => this%vlag, wlag => this%wlag, &
-         msh => this%msh, prs_res => this%prs_res, &
-         source_term => this%source_term, vel_res => this%vel_res, &
+         msh => this%msh, prs_res => this%adjoint_prs_res, &
+         source_term => this%source_term, vel_res => this%adjoint_vel_res, &
          sumab => this%sumab, &
          makeabf => this%makeabf, makebdf => this%makebdf, &
          vel_projection_dim => this%vel_projection_dim, &
@@ -1037,8 +1060,8 @@ contains
          Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          ulag => this%ulag, vlag => this%vlag, wlag => this%wlag, &
-         msh => this%msh, prs_res => this%prs_res, &
-         source_term => this%source_term, vel_res => this%vel_res, &
+         msh => this%msh, prs_res => this%linearized_prs_res, &
+         source_term => this%source_term, vel_res => this%linearized_vel_res, &
          sumab => this%sumab, &
          makeabf => this%makeabf, makebdf => this%makebdf, &
          vel_projection_dim => this%vel_projection_dim, &
@@ -1084,8 +1107,8 @@ contains
 
       call profiler_start_region('Linearized_pressure_residual')
 
-      call prs_res%compute(p, p_res, u, v, w, f_x, f_y, f_z, c_Xh, gs_Xh, &
-           this%bc_prs_surface, this%bc_sym_surface, Ax_prs, &
+      call prs_res%compute(p, p_res, u, v, w, u_e, v_e, w_e, f_x, f_y, f_z, &
+           c_Xh, gs_Xh, this%bc_prs_surface, this%bc_sym_surface, Ax_prs, &
            ext_bdf%diffusion_coeffs%x(1), dt, mu, rho, event)
 
       if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
@@ -1126,12 +1149,14 @@ contains
            f_y, f_z, c_Xh, msh, Xh, mu, rho, &
            ext_bdf%diffusion_coeffs%x(1), dt, dm_Xh%size())
 
+      call rotate_cyc(u_res%x, v_res%x, w_res%x, 1, c_Xh)
       call gs_Xh%op(u_res, GS_OP_ADD, event)
       call device_event_sync(event)
       call gs_Xh%op(v_res, GS_OP_ADD, event)
       call device_event_sync(event)
       call gs_Xh%op(w_res, GS_OP_ADD, event)
       call device_event_sync(event)
+      call rotate_cyc(u_res%x, v_res%x, w_res%x, 0, c_Xh)
 
       call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
 
@@ -1148,10 +1173,10 @@ contains
            this%bclst_dv, this%bclst_dw, gs_Xh, this%ksp_vel%max_iter)
       call profiler_end_region('Linearized_velocity_solve')
 
-      ksp_results(1)%name = 'Linearized Pressure'
-      ksp_results(2)%name = 'Linearized Velocity U'
-      ksp_results(3)%name = 'Linearized Velocity V'
-      ksp_results(4)%name = 'Linearized Velocity W'
+      ksp_results(1)%name = 'LNS Pressure'
+      ksp_results(2)%name = 'LNS Velocity U'
+      ksp_results(3)%name = 'LNS Velocity V'
+      ksp_results(4)%name = 'LNS Velocity W'
 
       call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
            this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
