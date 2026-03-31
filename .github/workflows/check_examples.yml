@@ -14,7 +14,6 @@ on:
 # Define the jobs that will be run in this workflow. The jobs are run in a
 
 jobs:
-
   # -------------------------------------------------------------------------- #
   # Define the compilation and testing job that will be run in this workflow.
   # This job will build the Neko-TOP code in debug mode and run the unit tests.
@@ -29,7 +28,7 @@ jobs:
       # ---------------------------------------------------------------------- #
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Get system cache
         uses: awalsh128/cache-apt-pkgs-action@latest

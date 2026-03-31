@@ -5,21 +5,21 @@
 
 name: Cleanup After Merge
 on:
-  workflow_call:                       # Triggered by other workflows
-  pull_request_target:                 # Trigger on pull request close
+  workflow_call: # Triggered by other workflows
+  pull_request_target: # Trigger on pull request close
     types: closed
 
 permissions:
-  contents: read                       # Minimum permission for actions/checkout
-  pull-requests: read                  # To read PR info
-  actions: write                       # To delete caches
+  contents: read # Minimum permission for actions/checkout
+  pull-requests: read # To read PR info
+  actions: write # To delete caches
 
 jobs:
   cleanup:
     name: Cleanup Caches
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Remove Cache from merged Pull Request
         env:
@@ -64,5 +64,3 @@ jobs:
             done
           fi
           echo "Done"
-
-
