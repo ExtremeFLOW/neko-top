@@ -10,8 +10,8 @@
         },
         "runtime_statistics": { "enabled": true },
         "numerics": {
-            "time_order": 3,
-            "polynomial_order": 3,
+            "time_order": 1,
+            "polynomial_order": 10,
             "dealias": true
         },
         "fluid": {
@@ -55,8 +55,8 @@
     "optimization": {
         "solver": {
             "type": "mma",
-            "max_iterations": 20,
-            "tolerance": 1.0e-6,
+            "max_iterations": 10,
+            "tolerance": 1.0e-9,
             "enable_output": true,
             "mma": {
                 "max_iter": 100,
@@ -64,7 +64,7 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
-                "scale": 1000.0,
+                "scale": 100.0,
                 "auto_scale": false,
                 "xmin": 0.0,
                 "xmax": 1.0,
@@ -80,8 +80,7 @@
                     "type": "SIMP",
                     "f_max": 1.0,
                     "f_min": 0.0001,
-                    "p": [1.0,3.0],
-                    "p_iterations": 20,
+                    "p": 3.0,
                 }
     ]
 
