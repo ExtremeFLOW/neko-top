@@ -171,11 +171,15 @@ contains
           fi => neko_registry%get_field(extra_field_names(i))
           call extra_fields%append(fi)
        end do
+       ! Create a field list for the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            filename, fmt, keep_checkpoints, extra_fields)
+    else
+       ! Create a field list without the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            filename, fmt, keep_checkpoints)
     end if
 
-    ! Create a field list for the extra fields
-    call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-         filename, fmt, keep_checkpoints, extra_fields)
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
