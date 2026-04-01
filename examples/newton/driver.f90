@@ -2,7 +2,7 @@ program usrneko
 
 !  use stdlib_io_npy, only : save_npy
   use LightKrylov
-  use LightKrylov, only: wp => dp, rtol => rtol_dp
+  use LightKrylov, only: wp => dp
   use LightKrylov_Logger
   use LightKrylov_Constants
   use neko, only: neko_init, neko_finalize
@@ -11,9 +11,7 @@ program usrneko
   use neko_jacobian, only: jacobian_t
   use neko_linop, only: linear_propagator_t
   use simulation_m, only: simulation_t
-  use LightKrylov_IterativeSolvers, only: write_results_cdp
   use json_module, only: json_file
-  use json_utils, only: json_get
   use utils, only: neko_error
   use json_utils_ext, only: json_read_file
   use neko_top, only: neko_top_register_types
@@ -33,7 +31,7 @@ program usrneko
   !> a jacobian.
   type(jacobian_t) :: jacobian
   !> State vectors
-   type(state_vector_t), allocatable :: bf, dx, residual
+  type(state_vector_t), allocatable :: bf
 
   !---------------------------------------------------
   !-----     KRYLOV-BASED EIGENDECOMPOSITION     -----
@@ -44,8 +42,6 @@ program usrneko
   real(kind=wp) :: tau
   !> Number of eigenvalues we wish to converge.
   integer, parameter :: nev = 15
-  !> Size of Krylov subspace.
-  integer, parameter :: kdim = 126
   !> Krylov subspace.
   type(state_vector_t), allocatable :: X(:)
   !> Eigenvalues.
@@ -57,13 +53,13 @@ program usrneko
   !> writer
   type(state_vector_t), allocatable :: X_writer
   !> Miscellaneous.
-  integer :: i, j
+  integer :: i
   ! JSON related arguments
   integer :: argc
   character(len=256) :: parameter_file
-  type(json_file) :: parameters, design_parameters
+  type(json_file) :: parameters
 
-  real(kind=wp) :: newton_tol, eigs_tol
+  real(kind=wp) :: newton_tol
 
   !=============================================================================
 
@@ -91,15 +87,17 @@ program usrneko
   ! do a linear simulation
   simulation%adjoint_case%if_adjoint = .false.
   call simulation%init(parameters)
+  tau = real(simulation%neko_case%time%end_time, kind=wp)
   call non_linear%init(simulation)
   non_linear%jacobian = jacobian
-    select type (f => non_linear%jacobian)
-    type is (jacobian_t)
-       call f%init(simulation)
-    end select
+  select type (f => non_linear%jacobian)
+  type is (jacobian_t)
+     call f%init(simulation)
+  end select
 
   !> initial guess is baseflow loaded
-  allocate(bf); call bf%init()
+  allocate(bf)
+  call bf%init()
   call field_copy(bf%u, non_linear%simulation%neko_case%fluid%u)
   call field_copy(bf%v, non_linear%simulation%neko_case%fluid%v)
   call field_copy(bf%w, non_linear%simulation%neko_case%fluid%w)
@@ -116,10 +114,13 @@ program usrneko
   call A%init(simulation)
 
   !> Initialize Krylov subspace.
-  allocate(X(nev)); call initialize_krylov_subspace(X)
+  allocate(X(nev))
+  call init_basis(X)
+  call initialize_krylov_subspace(X)
 
   !> initialize writer
-  allocate(X_writer); call X_writer%init()
+  allocate(X_writer)
+  call X_writer%init()
 
   !> Call to LightKrylov.
   call eigs(A, X, lambda, residuals, info)
@@ -139,12 +140,29 @@ program usrneko
   enddo
 
   !> Clean up
-  call A%free()
-  call X_writer%free()
-  call bf%free()
-  do i = 1, nev
-    call X(i)%free()
-  enddo
+  if (allocated(A)) then
+    call A%free()
+    deallocate(A)
+  end if
+  call non_linear%free()
+  call jacobian%free()
+  if (allocated(X_writer)) then
+    call X_writer%free()
+    deallocate(X_writer)
+  end if
+  if (allocated(bf)) then
+    call bf%free()
+    deallocate(bf)
+  end if
+  if (allocated(X)) then
+    do i = 1, size(X)
+      call X(i)%free()
+    end do
+    deallocate(X)
+  end if
+  if (allocated(lambda)) deallocate(lambda)
+  if (allocated(residuals)) deallocate(residuals)
+  call simulation%free()
   call neko_finalize()
 
 end program usrneko
