@@ -104,7 +104,8 @@ program usrneko
   call field_copy(bf%p, non_linear%simulation%neko_case%fluid%p)
 
   newton_tol = 1.0e-3
-  call newton(non_linear, bf, gmres_rdp, info, scheduler=dynamic_tol_dp, rtol=newton_tol)
+  call newton(non_linear, bf, gmres_rdp, info, &
+       scheduler=dynamic_tol_dp, rtol=newton_tol)
 
   ! Now we have a steady baseflow, let's take a browse
   call non_linear%simulation%write_forward(1)

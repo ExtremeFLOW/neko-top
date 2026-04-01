@@ -32,18 +32,26 @@ module neko_jacobian
          type is (state_vector_t)
             call self%simulation%reset_adjoint()
 
-            call field_copy(self%simulation%adjoint_case%fluid_adj%u_adj, vec_in%u)
-            call field_copy(self%simulation%adjoint_case%fluid_adj%v_adj, vec_in%v)
-            call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, vec_in%w)
-            call field_copy(self%simulation%adjoint_case%fluid_adj%p_adj, vec_in%p)
+            call field_copy(self%simulation%adjoint_case%fluid_adj%u_adj, &
+                 vec_in%u)
+            call field_copy(self%simulation%adjoint_case%fluid_adj%v_adj, &
+                 vec_in%v)
+            call field_copy(self%simulation%adjoint_case%fluid_adj%w_adj, &
+                 vec_in%w)
+            call field_copy(self%simulation%adjoint_case%fluid_adj%p_adj, &
+                 vec_in%p)
 
             call self%simulation%run_backward()
 
             call vec_out%init()
-            call field_copy(vec_out%u, self%simulation%adjoint_case%fluid_adj%u_adj)
-            call field_copy(vec_out%v, self%simulation%adjoint_case%fluid_adj%v_adj)
-            call field_copy(vec_out%w, self%simulation%adjoint_case%fluid_adj%w_adj)
-            call field_copy(vec_out%p, self%simulation%adjoint_case%fluid_adj%p_adj)
+            call field_copy(vec_out%u, &
+                 self%simulation%adjoint_case%fluid_adj%u_adj)
+            call field_copy(vec_out%v, &
+                 self%simulation%adjoint_case%fluid_adj%v_adj)
+            call field_copy(vec_out%w, &
+                 self%simulation%adjoint_case%fluid_adj%w_adj)
+            call field_copy(vec_out%p, &
+                 self%simulation%adjoint_case%fluid_adj%p_adj)
 
             if (self%if_2d) then
                call z_plane_fix(vec_out%u)

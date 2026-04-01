@@ -78,9 +78,11 @@ module neko_vector
 
          if (NEKO_BCKND_DEVICE .eq. 1) then
             alpha_rp = device_glsc3(self%u%x_d, vec%u%x_d, self%coef%B_d, n)
-            alpha_rp = alpha_rp + device_glsc3(self%v%x_d, vec%v%x_d, self%coef%B_d, n)
+            alpha_rp = alpha_rp + &
+                 device_glsc3(self%v%x_d, vec%v%x_d, self%coef%B_d, n)
             if (.not. self%if_2d) then
-               alpha_rp = alpha_rp + device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
+               alpha_rp = alpha_rp + &
+                    device_glsc3(self%w%x_d, vec%w%x_d, self%coef%B_d, n)
             end if
          else
             alpha_rp = glsc3(self%u%x, vec%u%x, self%coef%B, n)
@@ -253,7 +255,7 @@ module neko_vector
       call output%fields%assign_to_field(2, self%u)
       call output%fields%assign_to_field(3, self%v)
       call output%fields%assign_to_field(4, self%w)
-      call output%set_counter(idx)
+      call output%set_counter(idx - 1)
       call output%sample(real(idx, kind=rp))
       call output%free()
    end subroutine state_vector_write

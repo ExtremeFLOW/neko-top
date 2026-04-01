@@ -7,7 +7,8 @@ if (TARGET neko-top)
     ${CMAKE_CURRENT_SOURCE_DIR}/neko_linop.f90
   )
 else()
-  message(FATAL_ERROR "neko-top target not defined before adding stability sources.")
+  message(FATAL_ERROR
+    "neko-top target not defined before adding stability sources.")
 endif()
 
 # --- ExternalProject (unchanged)
