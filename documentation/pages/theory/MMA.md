@@ -221,6 +221,64 @@ The implementation is encapsulated in the `mma_t` type and includes the followin
 - The constant term in the approximation (see Eq. 3.5 in Svanberg) is omitted,
   as it does not affect the minimization (\f$ b_0 \f$ in the approximation of \f$ f_0 \f$).
 
+### Note on the DIP subsolver formulation
+
+The `dip` (Dual Interior Point) subsolver solves a **slightly different but equivalent reformulation** of the MMA subproblem.
+
+Instead of directly minimizing the primal convex approximation in \f$(x, y, z)\f$, the method forms the **Lagrangian dual problem**:
+
+\f[
+\Psi(\lambda) =
+\sum_{j=1}^{n} \min_{x_j}
+\left\{ L_x(x_j, \lambda) \;\middle|\; \alpha_j \le x_j \le \beta_j \right\}
++ \min_{z \ge 0} L_z(z, \lambda)
++ \sum_{i=1}^{m} \min_{y_i \ge 0} L_y(y_i, \lambda)
+\f]
+
+and then solves:
+
+\f[
+\max_{\lambda \ge 0} \; \Psi(\lambda)
+\f]
+
+
+### Key difference from the primal MMA subproblem
+
+The DIP formulation uses the Lagrangian:
+
+\f[
+\begin{aligned}
+L(x,y,z,\lambda) =
+&\sum_{j=1}^{n}
+\left(
+\frac{p_{0j} + \sum_{i=1}^{m} \lambda_i p_{ij}}{u_j - x_j}
++
+\frac{q_{0j} + \sum_{i=1}^{m} \lambda_i q_{ij}}{x_j - l_j}
+\right)
+- \sum_{i=1}^{m} \lambda_i b_i \\
+&+ \sum_{i=1}^{m}
+\left[
+(c_i - \lambda_i) y_i + \frac{1}{2} y_i^2
+\right]
++ \left(a_0 - \sum_{i=1}^{m} \lambda_i a_i\right) z
++ \frac{1}{2} z^2
+\end{aligned}
+\f]
+
+
+so the quadratic terms for \f$y_i\f$ and \f$z\f$ are enforced to make sure that we can solve the minimization problems, analytically.
+
+
+### Practical implication
+
+Compared to a standard primal MMA subsolve:
+- the quadratic terms for \f$y_i\f$ and \f$z\f$ are considered in the solver regardless of what parameters user set in the case file.
+- the primal subproblem is **not solved directly**
+- instead, each iteration computes:
+  - analytical minimizers in \f$x_j, y_i, z\f$
+  - and then performs a **dual ascent on** \f$\lambda\f$
+- DIP is cheaper per iteration
+
 ---
 
 ## References
