@@ -273,7 +273,7 @@ module neko_vector
    end subroutine state_vector_attach_coef
 
    logical function state_vector_is_initialized(self)
-      class(state_vector_t), intent(in) :: self
+      class(state_vector_t), intent(inout) :: self
 
       state_vector_is_initialized = .false.
 
