@@ -10,9 +10,10 @@ module neko_vector
    use field_math, only: field_rzero, field_cmult, field_copy, field_add3s2
    use math, only: glsc3
    use device_math, only: device_glsc3
-   use device, only : device_memcpy, HOST_TO_DEVICE
+   use device, only : device_associated, device_memcpy, HOST_TO_DEVICE
    use gather_scatter, only: GS_OP_ADD
    use user_access_singleton, only: neko_user_access
+   use, intrinsic :: iso_c_binding, only: c_null_ptr
 
    implicit none
  
@@ -21,9 +22,6 @@ module neko_vector
       type(field_t) :: u, v, w, p
       ! we need the mass matrix to integrate fields..
       type(coef_t), pointer :: coef => null()
-      logical, private :: initialized = .false.
-      ! a way to spy on the vector (mostly for debugging)
-      type(fld_file_output_t), public :: output
       logical :: if_2d = .false.
     contains
       private
@@ -46,52 +44,26 @@ module neko_vector
  
  contains
  
-    subroutine state_vector_init(self)
+   subroutine state_vector_init(self)
      class(state_vector_t), intent(inout) :: self
 
-     ! Access the SEM coefficients through Neko's user-access singleton.
-     if (.not. allocated(self%u%x)) then
-       if (.not. associated(neko_user_access%case)) then
-          error stop "Neko user access is not initialized!"
-       end if
-          call self%free()
-          self%coef => neko_user_access%case%fluid%c_Xh
+     call state_vector_attach_coef(self)
 
-          if(self%coef%msh%gdim .eq. 2) then
-             self%if_2d = .true.
-          end if
+     if (state_vector_is_initialized(self)) return
 
-          call self%u%init(self%coef%dof, fld_name = "state_u")
-          call self%v%init(self%coef%dof, fld_name = "state_v")
-          call self%w%init(self%coef%dof, fld_name = "state_w")
-          call self%p%init(self%coef%dof, fld_name = "state_p")
+     call state_vector_prepare_field_init(self%u)
+     call state_vector_prepare_field_init(self%v)
+     call state_vector_prepare_field_init(self%w)
+     call state_vector_prepare_field_init(self%p)
 
-          ! initialize the sampler so we can spy in if needed
-          call self%output%init(sp, 'state', 4)
-          call self%output%fields%assign_to_field(1, self%p)
-          call self%output%fields%assign_to_field(2, self%u)
-          call self%output%fields%assign_to_field(3, self%v)
-          call self%output%fields%assign_to_field(4, self%w)
-
-          ! done
-          self%initialized = .true.
-
-          ! hard code the zero so you don't go into an infinite loop
-          call field_rzero(self%u)
-          call field_rzero(self%v)
-          call field_rzero(self%w)
-          call field_rzero(self%p)
-     end if
-
-     return
+     call self%u%init(self%coef%dof, fld_name="state_u")
+     call self%v%init(self%coef%dof, fld_name="state_v")
+     call self%w%init(self%coef%dof, fld_name="state_w")
+     call self%p%init(self%coef%dof, fld_name="state_p")
    end subroutine state_vector_init
  
    subroutine zero(self)
      class(state_vector_t), intent(inout) :: self
-     
-     ! If we're going to zero, we're going to completely reinitilize.
-     ! self protects us against shallow copying
-     call self%init()
 
      call field_rzero(self%u)
      call field_rzero(self%v)
@@ -152,9 +124,8 @@ module neko_vector
      real(kind=rp) :: alpha_rp, beta_rp
      select type(vec)
      type is(state_vector_t)
-        ! always try initializing
-        call state_vector_init_wrapper(self)
-        call state_vector_init_wrapper(vec)
+        if (.not. associated(self%coef)) self%coef => vec%coef
+        call self%init()
 
         alpha_rp = real(alpha, kind=rp)
         beta_rp = real(beta, kind=rp)
@@ -175,54 +146,50 @@ module neko_vector
  
    subroutine rand(self, ifnorm)
      class(state_vector_t), intent(inout) :: self
-     logical, optional,   intent(in)    :: ifnorm
-     ! internals
+     logical, optional, intent(in) :: ifnorm
      logical :: normalize
      real(kind=wp) :: alpha
 
-     normalize = optval(ifnorm,.true.)
+     normalize = optval(ifnorm, .true.)
      call rand_ic(self%u, self%v, self%w, self%if_2d)
 
-    ! enforce continuity across the field
-    call self%coef%gs_h%op(self%u, GS_OP_ADD)
-    call self%coef%gs_h%op(self%v, GS_OP_ADD)
-    call self%coef%gs_h%op(self%w, GS_OP_ADD)
+     call self%coef%gs_h%op(self%u, GS_OP_ADD)
+     call self%coef%gs_h%op(self%v, GS_OP_ADD)
+     call self%coef%gs_h%op(self%w, GS_OP_ADD)
 
      if (normalize) then
-       alpha = self%norm()
-       call self%scal(1.0_wp/alpha)
-     endif
+        alpha = self%norm()
+        call self%scal(1.0_wp / alpha)
+     end if
      return
    end subroutine rand
 
-subroutine state_vector_assignment(lhs, rhs)
-    class(state_vector_t), intent(out) :: lhs
-    class(state_vector_t), intent(in)  :: rhs
-    
-    call lhs%init()
-    call lhs%copy(rhs)
+   subroutine state_vector_assignment(lhs, rhs)
+     class(state_vector_t), intent(out) :: lhs
+     class(state_vector_t), intent(in)  :: rhs
 
-end subroutine state_vector_assignment
+     call lhs%copy(rhs)
+
+   end subroutine state_vector_assignment
 
    subroutine state_vector_free(self)
      class(state_vector_t), intent(inout) :: self
 
+     call self%u%free()
+     call self%v%free()
+     call self%w%free()
+     call self%p%free()
 
-        call self%u%free()
-        call self%v%free()
-        call self%w%free()
-        call self%p%free()
      self%coef => null()
-
-     self%initialized = .false.
-
-     return
+     self%if_2d = .false.
    end subroutine state_vector_free
 
    subroutine state_vector_copy(self, vec)
      class(state_vector_t), intent(inout) :: self
      class(state_vector_t), intent(in) :: vec
 
+     if (.not. associated(self%coef)) self%coef => vec%coef
+     call self%init()
      call field_copy(self%u, vec%u)
      call field_copy(self%v, vec%v)
      call field_copy(self%w, vec%w)
@@ -304,29 +271,74 @@ end subroutine state_vector_assignment
     return
   end function math_ran_dst
 
-  subroutine state_vector_write(self, idx)
+   subroutine state_vector_write(self, idx)
      class(state_vector_t), intent(inout) :: self
      integer :: idx
-      ! always try initializing
-      call state_vector_init_wrapper(self)
-      call self%output%sample(real(idx, kind=rp))
+     type(fld_file_output_t) :: output
 
-     return
+     call output%init(sp, "state", 4)
+     call output%fields%assign_to_field(1, self%p)
+     call output%fields%assign_to_field(2, self%u)
+     call output%fields%assign_to_field(3, self%v)
+     call output%fields%assign_to_field(4, self%w)
+     call output%sample(real(idx, kind=rp))
+
    end subroutine state_vector_write
- 
-  ! silly wrapper to ignore intent
-  subroutine state_vector_init_wrapper(self)
-     class(state_vector_t) :: self
 
-     call self%init()
+   subroutine state_vector_attach_coef(self)
+     class(state_vector_t), intent(inout) :: self
 
-     return
-   end subroutine state_vector_init_wrapper
+     if (.not. associated(neko_user_access%case)) then
+        if (.not. associated(self%coef)) then
+           error stop "Neko user access is not initialized!"
+        end if
+     else
+        self%coef => neko_user_access%case%fluid%c_Xh
+     end if
+
+     self%if_2d = (self%coef%msh%gdim .eq. 2)
+   end subroutine state_vector_attach_coef
+
+   logical function state_vector_is_initialized(self)
+     class(state_vector_t), intent(inout) :: self
+
+     state_vector_is_initialized = .false.
+
+     if (.not. associated(self%coef)) return
+     if (.not. allocated(self%u%x)) return
+     if (.not. allocated(self%v%x)) return
+     if (.not. allocated(self%w%x)) return
+     if (.not. allocated(self%p%x)) return
+     if (.not. associated(self%u%dof, self%coef%dof)) return
+     if (.not. associated(self%v%dof, self%coef%dof)) return
+     if (.not. associated(self%w%dof, self%coef%dof)) return
+     if (.not. associated(self%p%dof, self%coef%dof)) return
+     if (NEKO_BCKND_DEVICE .eq. 1) then
+        if (.not. device_associated(self%u%x)) return
+        if (.not. device_associated(self%v%x)) return
+        if (.not. device_associated(self%w%x)) return
+        if (.not. device_associated(self%p%x)) return
+     end if
+
+     state_vector_is_initialized = .true.
+   end function state_vector_is_initialized
+
+   subroutine state_vector_prepare_field_init(fld)
+     type(field_t), intent(inout) :: fld
+
+     ! `allocate(..., source=...)` copies `x_d`; clear the stale device handle
+     ! before calling `field_t%init()`, which internally starts with `%free()`.
+     if (NEKO_BCKND_DEVICE .ne. 1) return
+     if (.not. allocated(fld%x)) return
+
+     if (.not. device_associated(fld%x)) then
+        fld%x_d = c_null_ptr
+     end if
+   end subroutine state_vector_prepare_field_init
    
    subroutine z_plane_fix(fld)
   type(field_t), intent(inout) :: fld
-  integer :: iel, iz, iy, ix, nel
-  ! note self wont work on GPUs
+  integer :: iel, iz, iy, ix
 
   do iel = 1, fld%msh%nelv
      do iz = 2, fld%xh%lz
