@@ -13,7 +13,9 @@ endif()
 # --- ExternalProject (unchanged)
 include(ExternalProject)
 
-set(LK_PREFIX      ${CMAKE_BINARY_DIR}/lightkrylov)
+set(LK_REPOSITORY  https://github.com/gloopydoop/LightKrylov.git)
+set(LK_TAG         init_and_free)
+set(LK_PREFIX      ${CMAKE_BINARY_DIR}/lightkrylov_init_and_free)
 set(LK_INSTALL_DIR ${LK_PREFIX}/install)
 
 file(MAKE_DIRECTORY ${LK_INSTALL_DIR}/include)
@@ -22,8 +24,8 @@ file(MAKE_DIRECTORY ${LK_INSTALL_DIR}/lib)
 if (NOT EXISTS ${LK_INSTALL_DIR}/lib/libLightKrylov.a)
   ExternalProject_Add(LightKrylov
     PREFIX              ${LK_PREFIX}
-    GIT_REPOSITORY      https://github.com/nekStab/LightKrylov.git
-    GIT_TAG             main
+    GIT_REPOSITORY      ${LK_REPOSITORY}
+    GIT_TAG             ${LK_TAG}
     UPDATE_DISCONNECTED TRUE
     CONFIGURE_COMMAND   ""
     BUILD_COMMAND       fpm build --profile release
