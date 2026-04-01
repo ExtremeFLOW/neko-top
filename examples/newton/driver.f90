@@ -137,7 +137,7 @@ program usrneko
   !> Save eigenvectors to disk.
   do i = 1, nev
       call X_writer%axpby(1.0_wp, X(i), 0.0_wp)
-      call X_writer%write(i)
+      call X_writer%write(i - 1)
   enddo
 
   !> Clean up
