@@ -56,6 +56,7 @@ module scalar_mixing_objective
   use neko_ext, only: get_scalar_indicies
   ! delete after the simulation computes u u_adj
   use field_math, only: field_addcol3, field_col3
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -119,7 +120,9 @@ contains
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: scalar_name
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    weight = 1.0_rp
+    call nekotop_continuation%json_get_or_register(json, 'weight', &
+         this%weight, weight)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
