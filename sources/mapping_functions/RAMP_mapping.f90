@@ -121,7 +121,7 @@ contains
     call json_get_or_default(json, 'q', q, 1.0_rp)
     call json_get_or_default(json, 'convex_up', convex_up, .false.)
 
-    call this%init_base(json, coef)
+    call this%init_base(json, coef, "RAMP_mapping")
     call this%init_from_attributes(coef, f_min, f_max, q, &
          convex_up)
 

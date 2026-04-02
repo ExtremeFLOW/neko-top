@@ -10,9 +10,9 @@ simulation.
 
 ### Brinkman source term {#source_brinkman}
 
-### Minimum dissipation {#source_dissipation}
+### Viscous dissipation {#source_dissipation}
 
-### Lube term {#source_lube}
+### Brinkman dissipation {#source_lube}
 
 ### Scalar mixing {#source_scalar_mixing}
 

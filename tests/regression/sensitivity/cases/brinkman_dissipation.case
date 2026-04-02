@@ -130,12 +130,8 @@
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
-                "weight": 0.5
-            },
-            {
-                "type": "lube_term",
-                "weight": 2.0
+                "type": "brinkman_dissipation",
+                "weight": 1.0
             }
         ]
     }

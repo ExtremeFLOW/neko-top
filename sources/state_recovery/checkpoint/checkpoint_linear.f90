@@ -57,24 +57,12 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case, time)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-<<<<<<< HEAD:sources/state_recovery/checkpoint/checkpoint_linear.f90
     type(time_state_t), intent(in) :: time
-    logical :: save_disc
-
-    ! We save to disc only every n_saves_memory time steps
-    save_disc = modulo(time%tstep, this%n_saves_memory) .eq. 0
-
-    ! Sample the checkpoint if needed
-    if (save_disc .or. time%tstep .le. this%first_valid_timestep) then
-
-       call this%chkp_output%set_counter(time%tstep)
-       call this%chkp_output%sample(time%t)
-=======
     integer :: index, tstep, counter
-    real(kind=rp) :: time
+    real(kind=rp) :: current_time
 
-    time = neko_case%time%t
-    tstep = neko_case%time%tstep
+    current_time = time%t
+    tstep = time%tstep
 
     ! We save to disc only every n_saves_memory time steps
     index = modulo(tstep, this%n_saves_memory)
@@ -87,8 +75,7 @@ contains
             this%first_valid_timestep)
 
        call this%chkp_output%set_counter(counter)
-       call this%chkp_output%sample(time)
->>>>>>> origin/develop:sources/checkpoint/checkpoint_linear.f90
+       call this%chkp_output%sample(current_time)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 

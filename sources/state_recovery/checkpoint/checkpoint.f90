@@ -48,13 +48,10 @@ module simulation_checkpoint
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
-<<<<<<< HEAD:sources/state_recovery/checkpoint/checkpoint.f90
   use state_recover, only: state_recover_t
-=======
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   use registry, only: neko_registry
->>>>>>> origin/develop:sources/checkpoint/checkpoint.f90
   implicit none
   private
 
@@ -204,11 +201,15 @@ contains
           fi => neko_registry%get_field(extra_field_names(i))
           call extra_fields%append(fi)
        end do
+       ! Create a field list for the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            filename, fmt, keep_checkpoints, extra_fields)
+    else
+       ! Create a field list without the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            filename, fmt, keep_checkpoints)
     end if
 
-    ! Create a field list for the extra fields
-    call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-         filename, fmt, keep_checkpoints, extra_fields)
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
@@ -310,39 +311,12 @@ contains
     logical :: exists
     integer :: stat, unit
 
-    ! Free the RAM Checkpoints
-<<<<<<< HEAD:sources/state_recovery/checkpoint/checkpoint.f90
-    if (allocated(this%p_list)) then
-       do i = 1, size(this%p_list)
-          call this%p_list(i)%free()
-       end do
-    end if
-    if (allocated(this%u_list)) then
-       do i = 1, size(this%u_list)
-          call this%u_list(i)%free()
-       end do
-    end if
-    if (allocated(this%v_list)) then
-       do i = 1, size(this%v_list)
-          call this%v_list(i)%free()
-       end do
-    end if
-    if (allocated(this%w_list)) then
-       do i = 1, size(this%w_list)
-          call this%w_list(i)%free()
-       end do
-    end if
-
-    if (allocated(this%s_list)) then
-       do i = 1, size(this%s_list)
-          call this%s_list(i)%free()
-=======
+    ! Free the RAM checkpoints
     if (allocated(this%state_storage)) then
        do i = 1, this%n_saves_memory
           do j = 1, this%state_list%size()
              call this%state_storage(i, j)%free()
           end do
->>>>>>> origin/develop:sources/checkpoint/checkpoint.f90
        end do
     end if
 
@@ -533,23 +507,14 @@ contains
     this%n_saves_disc = 0
     call this%set_n_timesteps(0)
 
-<<<<<<< HEAD:sources/state_recovery/checkpoint/checkpoint.f90
-    if (allocated(this%p_list)) then
-       do i = 1, size(this%p_list)
-          call field_rzero(this%p_list(i))
-          call field_rzero(this%u_list(i))
-          call field_rzero(this%v_list(i))
-          call field_rzero(this%w_list(i))
-       end do
-    end if
-=======
     do i = 1, size(this%state_storage, 1)
        do j = 1, size(this%state_storage, 2)
-          call rzero(this%state_storage(i, j)%data, &
-               this%state_storage(i, j)%size)
+          if (this%state_storage(i, j)%is_allocated()) then
+             call rzero(this%state_storage(i, j)%data, &
+                  this%state_storage(i, j)%size)
+          end if
        end do
     end do
->>>>>>> origin/develop:sources/checkpoint/checkpoint.f90
 
   end subroutine checkpoint_reset
 

@@ -34,12 +34,7 @@
 !
 !> Adjoint simulation driver
 module simulation_adjoint
-<<<<<<< HEAD
-  use mpi_f08, only: MPI_WTIME, MPI_IN_PLACE, mpi_allreduce, MPI_SUM
-  use case, only: case_t
-=======
   use mpi_f08, only: MPI_WTIME
->>>>>>> origin/develop
   use num_types, only: rp, dp
   use neko_config, only: NEKO_BCKND_DEVICE
   use time_scheme_controller, only: time_scheme_controller_t
@@ -50,9 +45,8 @@ module simulation_adjoint
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
-  use device_math, only: device_vlsc3
-  use math, only: vlsc3
-  use comm, only: NEKO_COMM, MPI_REAL_PRECISION
+  use device_math, only: device_glsc3
+  use math, only: glsc3
   use vector, only: vector_t
   implicit none
   private
@@ -122,7 +116,6 @@ contains
     real(kind=dp), intent(in) :: tstep_loop_start_time
     real(kind=rp), optional, intent(in) :: final_time
     real(kind=rp) :: t_bkp
-    type(time_state_t) :: time_forward
     real(kind=dp) :: start_time, end_time, tstep_start_time
     character(len=LOG_SIZE) :: log_buf
 
@@ -184,11 +177,7 @@ contains
 
     ! Run any IO needed.
     call C%output_controller%execute(C%time)
-    time_forward = C%time
-    if (present(final_time)) then
-       time_forward%t = t_bkp
-    end if
-    call simulation_adjoint_norm_output(C, time_forward, C%time)
+    call simulation_adjoint_norm_output(C, C%time)
 
     call neko_log%end_section()
 
@@ -291,6 +280,42 @@ contains
     end if
   end subroutine simulation_adjoint_restart
 
+  subroutine simulation_adjoint_norm_output(C, time_output)
+    type(adjoint_case_t), intent(inout) :: C
+    type(time_state_t), intent(in) :: time_output
+    type(vector_t) :: data_line
+    real(kind=rp) :: norm_l2
+    integer :: n
+
+    if (.not. C%norm_output_enabled) return
+    if (.not. C%norm_output_ctrl%check(time_output)) return
+
+    n = C%fluid_adj%c_Xh%dof%size()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       norm_l2 = device_glsc3(C%fluid_adj%u_adj%x_d, &
+            C%fluid_adj%u_adj%x_d, C%fluid_adj%c_Xh%B_d, n) + &
+            device_glsc3(C%fluid_adj%v_adj%x_d, &
+            C%fluid_adj%v_adj%x_d, C%fluid_adj%c_Xh%B_d, n) + &
+            device_glsc3(C%fluid_adj%w_adj%x_d, &
+            C%fluid_adj%w_adj%x_d, C%fluid_adj%c_Xh%B_d, n)
+    else
+       norm_l2 = glsc3(C%fluid_adj%u_adj%x, C%fluid_adj%u_adj%x, &
+            C%fluid_adj%c_Xh%B, n) + &
+            glsc3(C%fluid_adj%v_adj%x, C%fluid_adj%v_adj%x, &
+            C%fluid_adj%c_Xh%B, n) + &
+            glsc3(C%fluid_adj%w_adj%x, C%fluid_adj%w_adj%x, &
+            C%fluid_adj%c_Xh%B, n)
+    end if
+
+    norm_l2 = sqrt(norm_l2) / C%fluid_adj%c_Xh%volume
+
+    call data_line%init(1)
+    data_line%x = [norm_l2]
+    call C%norm_output_file%write(data_line, time_output%t)
+    call data_line%free()
+    call C%norm_output_ctrl%register_execution()
+  end subroutine simulation_adjoint_norm_output
+
   !> Write a checkpoint at joblimit
   subroutine simulation_adjoint_joblimit_chkp(C, t)
     type(adjoint_case_t), intent(inout) :: C
@@ -315,50 +340,5 @@ contains
     call neko_log%message(log_buf)
 
   end subroutine simulation_adjoint_joblimit_chkp
-
-  subroutine simulation_adjoint_norm_output(C, time_ctrl, time_out)
-    type(adjoint_case_t), intent(inout) :: C
-    type(time_state_t), intent(in) :: time_ctrl
-    type(time_state_t), intent(in), optional :: time_out
-    type(vector_t) :: data_line
-    real(kind=rp) :: norm_l2
-    real(kind=rp) :: t_out
-    integer :: n
-
-    if (.not. C%norm_output_enabled) return
-    if (.not. C%norm_output_ctrl%check(time_ctrl)) return
-
-    n = C%fluid_adj%c_Xh%dof%size()
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       norm_l2 = device_vlsc3(C%fluid_adj%u_adj%x_d, &
-            C%fluid_adj%u_adj%x_d, C%fluid_adj%c_Xh%B_d, n) + &
-            device_vlsc3(C%fluid_adj%v_adj%x_d, C%fluid_adj%v_adj%x_d, &
-            C%fluid_adj%c_Xh%B_d, n) + &
-            device_vlsc3(C%fluid_adj%w_adj%x_d, C%fluid_adj%w_adj%x_d, &
-            C%fluid_adj%c_Xh%B_d, n)
-    else
-       norm_l2 = vlsc3(C%fluid_adj%u_adj%x, C%fluid_adj%u_adj%x, &
-            C%fluid_adj%c_Xh%B, n) + &
-            vlsc3(C%fluid_adj%v_adj%x, C%fluid_adj%v_adj%x, &
-            C%fluid_adj%c_Xh%B, n) + &
-            vlsc3(C%fluid_adj%w_adj%x, C%fluid_adj%w_adj%x, &
-            C%fluid_adj%c_Xh%B, n)
-    end if
-
-    call mpi_allreduce(MPI_IN_PLACE, norm_l2, 1, MPI_REAL_PRECISION, &
-         MPI_SUM, NEKO_COMM)
-    norm_l2 = sqrt(norm_l2 / C%fluid_adj%c_Xh%volume)
-    if (present(time_out)) then
-       t_out = time_out%t
-    else
-       t_out = time_ctrl%t
-    end if
-
-    call data_line%init(1)
-    data_line%x = [norm_l2]
-    call C%norm_output_file%write(data_line, t_out)
-    call data_line%free()
-    call C%norm_output_ctrl%register_execution()
-  end subroutine simulation_adjoint_norm_output
 
 end module simulation_adjoint

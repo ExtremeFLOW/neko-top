@@ -128,7 +128,7 @@
         },
         "objectives": [
             {
-                "type": "lube_term",
+                "type": "viscous_dissipation",
                 "weight": 1.0
             }
         ]

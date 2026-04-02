@@ -123,6 +123,9 @@ module simulation_m
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
+     !> Set simulation output counters.
+     procedure, pass(this) :: set_output_counter => &
+          simulation_set_output_counter
      !> Write current state of the simulation to disk
      procedure, pass(this) :: write => simulation_write
      !> Write current state of the forward simulation to disk
@@ -339,6 +342,15 @@ contains
     call this%state_recover%reset()
 
   end subroutine simulation_reset
+
+  subroutine simulation_set_output_counter(this, idx)
+    class(simulation_t), intent(inout) :: this
+    integer, intent(in) :: idx
+
+    call this%output_forward%set_counter(idx)
+    call this%output_adjoint%set_counter(idx)
+
+  end subroutine simulation_set_output_counter
 
   !> Write current state of the simulation to disk
   subroutine simulation_write(this, idx)

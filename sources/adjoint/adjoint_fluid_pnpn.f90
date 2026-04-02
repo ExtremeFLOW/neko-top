@@ -717,7 +717,7 @@ contains
 
       ! Extrapolate the velocity if it's not done in nut_field estimation
       call sumab%compute_fluid(u_e, v_e, w_e, u, v, w, &
-           ulag, vlag, wlag, ext_bdf%advection_coeffs, ext_bdf%nadv)
+           ulag, vlag, wlag, ext_bdf%advection_coeffs%x, ext_bdf%nadv)
 
       ! Compute the source terms
       call this%source_term%compute(time)
@@ -742,12 +742,12 @@ contains
          call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1,&
               this%abx2, this%aby2, this%abz2, &
               f_x%x, f_y%x, f_z%x, &
-              rho%x(1,1,1,1), ext_bdf%advection_coeffs, n)
+              rho%x(1,1,1,1), ext_bdf%advection_coeffs%x, n)
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
               u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
-              ext_bdf%diffusion_coeffs, ext_bdf%ndiff, n)
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
       call ulag%update()
@@ -821,7 +821,7 @@ contains
            p, &
            f_x, f_y, f_z, &
            c_Xh, msh, Xh, &
-           mu, rho, ext_bdf%diffusion_coeffs(1), &
+           mu, rho, ext_bdf%diffusion_coeffs%x(1), &
            dt, dm_Xh%size())
 
       call gs_Xh%op(u_res, GS_OP_ADD, event)
@@ -874,7 +874,7 @@ contains
            f_x, f_y, f_z, &
            c_Xh, gs_Xh, &
            this%bc_prs_surface, this%bc_sym_surface, &
-           Ax_prs, ext_bdf%diffusion_coeffs(1), dt, &
+           Ax_prs, ext_bdf%diffusion_coeffs%x(1), dt, &
            mu, rho, event)
 
       ! De-mean the pressure residual when no strong pressure boundaries present

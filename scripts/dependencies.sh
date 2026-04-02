@@ -215,8 +215,10 @@ _ACEOF
 
     if [[ -z "$(find $PFUNIT_DIR -name libpfunit.a)" ]]; then
         cmake -B $PFUNIT_DIR/build -S $PFUNIT_DIR -G "Unix Makefiles" \
-            -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR
-        cmake --build $PFUNIT_DIR/build --parallel
+            -DCMAKE_INSTALL_PREFIX=$PFUNIT_DIR \
+            -DCMAKE_C_COMPILER=$CC \
+            -DCMAKE_Fortran_COMPILER=$FC
+        cmake --build $PFUNIT_DIR/build
         cmake --install $PFUNIT_DIR/build
     fi
 
@@ -483,7 +485,7 @@ function find_neko() {
     find_hdf5 $HDF5_DIR
     find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
-    [ "$TEST" == true ] && find_pfunit $PFUNIT_DIR
+    [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -512,7 +514,7 @@ function find_neko() {
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
-        [ "$TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -554,7 +556,7 @@ function find_neko() {
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
-                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS" > configure.log 2>&1
+                CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
 
         # Update compile dependencies if makedepf90 is installed
@@ -569,7 +571,7 @@ function find_neko() {
 
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j || make -j
-        [ "$TEST" == true ] && make check -j
+        [ "$NEKO_TEST" == true ] && make check -j
         make install
 
         cd $CURRENT_DIR
