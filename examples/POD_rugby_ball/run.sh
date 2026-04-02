@@ -1,6 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../.." && pwd)
+
+cd "${SCRIPT_DIR}"
+
 if [ $# -ge 1 ]; then
     CASE_FILE="$1"
 else
@@ -16,16 +21,18 @@ else
     fi
 fi
 
-PY_SCRIPT=${2:-../../sources/state_recovery/POD_state_recover/pod_state_recover.py}
+PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover/pod_state_recover.py"}
 
 NEKO_RANKS=${NEKO_RANKS:-10}
 PY_RANKS=${PY_RANKS:-4}
-PY_STARTUP_DELAY=${PY_STARTUP_DELAY:-3}
+LOG_FILE=${LOG_FILE:-mpmd.log}
 
 # Resolve ADIOS2_PATH
 if [ -z "${ADIOS2_PATH:-}" ]; then
     if [ -n "${ADIOS2_DIR:-}" ]; then
         ADIOS2_PATH="$ADIOS2_DIR"
+    elif [ -d "${ROOT_DIR}/external/adios2" ]; then
+        ADIOS2_PATH="${ROOT_DIR}/external/adios2"
     elif [ -n "${MAIN_DIR:-}" ] && [ -d "$MAIN_DIR/external/adios2" ]; then
         ADIOS2_PATH="$MAIN_DIR/external/adios2"
     fi
@@ -47,17 +54,19 @@ echo "PYTHONPATH (start):${PYTHONPATH:-<unset>}"
 echo "LD_LIBRARY_PATH:   ${LD_LIBRARY_PATH:-<unset>}"
 echo "---------------------------------------------------------"
 
-# mpirun -n "${PY_RANKS}" python3 "${PY_SCRIPT}" "${CASE_FILE}" > python.log : -n "${NEKO_RANKS}" ./neko "${CASE_FILE}" > neko.log
+mpirun_cmd=(
+    mpirun
+    --tag-output
+    -n "${PY_RANKS}"
+    python3 "${PY_SCRIPT}" "${CASE_FILE}"
+    :
+    -n "${NEKO_RANKS}"
+    ./neko "${CASE_FILE}"
+)
 
-# Start python first
-mpirun --tag-output -n "${PY_RANKS}" python3 "${PY_SCRIPT}" "${CASE_FILE}" > python.log 2>&1 &
-PY_PID=$!
+echo "Launching shared MPI job:"
+printf '  %q' "${mpirun_cmd[@]}"
+printf '\n'
+echo "Combined output:   ${LOG_FILE}"
 
-sleep "${PY_STARTUP_DELAY}"
-
-# Run neko
-mpirun --tag-output -n "${NEKO_RANKS}" ./neko "${CASE_FILE}" > neko.log 2>&1 
-
-# If you want to cleanly stop python when neko exits:
-# kill "${PY_PID}" 2>/dev/null || true
-# wait "${PY_PID}" 2>/dev/null || true
+"${mpirun_cmd[@]}" > "${LOG_FILE}" 2>&1
