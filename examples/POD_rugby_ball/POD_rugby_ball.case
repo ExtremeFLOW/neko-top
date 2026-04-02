@@ -169,12 +169,12 @@
         },
         "objectives": [
             {
-                "type": "minimum_dissipation",
+                "type": "viscous_dissipation",
                 "mask_name": "objective_domain",
                 "weight": 1.0
             },
             {
-                "type": "lube_term",
+                "type": "brinkman_dissipation",
                 "mask_name": "optimization_domain",
                 "weight": 1.0
             }
