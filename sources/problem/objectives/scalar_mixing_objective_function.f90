@@ -201,8 +201,7 @@ contains
       ! Initialize the scalar mixing adjoint source term
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
            this%get_weight(), this%phi_ref, this%mask, this%has_mask, &
-           this%coef, &
-           this%start_time, this%end_time)
+           this%coef, this%start_time, this%end_time)
 
     end associate
 
