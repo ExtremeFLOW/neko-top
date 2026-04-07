@@ -177,10 +177,11 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
-    real(kind=rp), intent(in) :: start_time
-    real(kind=rp), intent(in) :: end_time
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+
     type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)

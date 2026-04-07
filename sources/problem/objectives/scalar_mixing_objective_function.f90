@@ -150,12 +150,12 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
+    character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: mask_name
     real(kind=rp), intent(in) :: phi_ref
+    character(len=*), intent(in) :: scalar_name
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
-    character(len=*), intent(in) :: mask_name
-    character(len=*), intent(in) :: name
-    character(len=*), intent(in) :: scalar_name
 
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     integer :: i_scalar, i_adjoint_scalar

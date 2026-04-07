@@ -157,6 +157,7 @@ contains
     real(kind=rp), intent(in) :: volume
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+
     type(field_list_t) :: fields
 
     call this%free()

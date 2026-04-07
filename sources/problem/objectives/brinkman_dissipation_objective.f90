@@ -175,12 +175,13 @@ contains
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
-    character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
     real(kind=rp), intent(in) :: start_time
     real(kind=rp), intent(in) :: end_time
+
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
     ! Call the base initializer
@@ -237,8 +238,8 @@ contains
       call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
            f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing, this%volume, this%start_time, &
-           this%end_time, this%scratch_GL, this%gdim)
+           this%dealias_forcing, this%volume, this%scratch_GL, this%gdim, &
+           this%start_time, this%end_time)
 
     end associate
 
