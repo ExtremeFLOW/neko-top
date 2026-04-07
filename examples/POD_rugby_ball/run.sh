@@ -21,7 +21,8 @@ else
     fi
 fi
 
-PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover/pod_state_recover.py"}
+PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover"\
+"/pod_state_recover.py"}
 
 NEKO_RANKS=${NEKO_RANKS:-10}
 PY_RANKS=${PY_RANKS:-4}
@@ -39,12 +40,17 @@ if [ -z "${ADIOS2_PATH:-}" ]; then
 fi
 
 if [ -n "${ADIOS2_PATH:-}" ]; then
-    pyver=$(python3 -c 'import sys; print("{}.{}".format(sys.version_info.major, sys.version_info.minor))')
-    export PYTHONPATH="${ADIOS2_PATH}/lib/python${pyver}/site-packages:${PYTHONPATH:-}"
-    export LD_LIBRARY_PATH="${ADIOS2_PATH}/lib:${ADIOS2_PATH}/lib64:${LD_LIBRARY_PATH:-}"
+    pyver=$(python3 -c \
+        'import sys; print("{}.{}".format(sys.version_info.major, '\
+'sys.version_info.minor))')
+    export PYTHONPATH="${ADIOS2_PATH}/lib/python${pyver}/site-packages:"\
+"${PYTHONPATH:-}"
+    export LD_LIBRARY_PATH="${ADIOS2_PATH}/lib:${ADIOS2_PATH}/lib64:"\
+"${LD_LIBRARY_PATH:-}"
     echo "Using ADIOS2_PATH=${ADIOS2_PATH}"
 else
-    echo "Warning: ADIOS2_PATH is not set; in-situ Python may fail to import ADIOS2." >&2
+    echo "Warning: ADIOS2_PATH is not set; in-situ Python may fail to " \
+         "import ADIOS2." >&2
 fi
 
 echo "Using Python:      $(which python3)"

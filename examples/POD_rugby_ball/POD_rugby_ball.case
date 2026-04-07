@@ -50,14 +50,12 @@
             ],
             "output_control": "never",
             //"output_control": "tsteps",
-            //"output_value": 200,
+            //"output_value": 50,
         },
         "adjoint_fluid": {
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    0.0, 0.0, 0.0
-                ]
+                "value": [ 0.0, 0.0, 0.0 ]
             },
             "boundary_conditions": [
                 {
@@ -77,18 +75,9 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "y_bounds": [
-                    0.2,
-                    0.8,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 0.2, 0.8 ],
+                "y_bounds": [ 0.2, 0.8 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "objective_domain",
@@ -157,8 +146,8 @@
             "tolerance": 1.0e-12,
             "mma": {
                 "asyinit": 0.02,
-                "asyincr": 1.02,
-                "asydecr": 0.98,
+                "asyincr": 1.2,
+                "asydecr": 0.7,
                 "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,
@@ -188,5 +177,4 @@
             }
         ]
     }
-
 }
