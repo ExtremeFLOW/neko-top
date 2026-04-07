@@ -151,9 +151,13 @@ for in in $@; do
     for match in ${matches[@]}; do
         file_list=()
         if [ -d $match ]; then
-            file_list=($(find $match -name "run.sh" 2>/dev/null))
-            file_list+=($(find $match -name "*.case" 2>/dev/null))
-            file_list+=($(find $match -name "*.json" 2>/dev/null))
+            if [ -f "$match/run.sh" ]; then
+                file_list=("$match/run.sh")
+            else
+                file_list=($(find $match -name "run.sh" 2>/dev/null))
+                file_list+=($(find $match -name "*.case" 2>/dev/null))
+                file_list+=($(find $match -name "*.json" 2>/dev/null))
+            fi
         fi
         if [ -f $match ]; then
             file_list+=($match)
@@ -385,7 +389,9 @@ for case in ${example_list[@]}; do
     # same folder, we add the case name to the example name.
     example=$case_dir
 
-    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" | wc -l) > 1 ]]; then
+    if [[ ${case: -6} == "run.sh" ]]; then
+        example=$case_dir
+    elif [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 
