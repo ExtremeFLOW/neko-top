@@ -36,8 +36,9 @@
 !> Implementation for the Linear Checkpointing algorithm.
 !! In this case, we save the state of the simulation every `n_saves_memory`
 !! time steps. When restoring to a given time step, we load the nearest
-!! checkpoint and then we fill our cache with the following `n_saves_memory` time
-!! steps. Finally, we copy the required time step from our cache.
+!! checkpoint and then we fill our cache with the following
+!! `n_saves_memory` time steps. Finally, we copy the required time step from
+!! our cache.
 !!
 !! This algorithm is the simplest one and do a minimum of re-computation. But
 !! requires large amounts of memory and disk space.
@@ -51,18 +52,14 @@ contains
   !> Save the current state of the simulation in a linear fashion.
   !! We save every `n_saves_memory` time steps to disc and we always save
   !! any timestep leading up to the `first_valid_timestep` time steps to disc.
-  !! @param[inout] this Checkpointing implementation.
-  !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Current time state.
-  module subroutine checkpoint_save_linear(this, neko_case, time)
+  module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
     integer :: index, tstep, counter
-    real(kind=rp) :: current_time
+    real(kind=rp) :: time
 
-    current_time = time%t
-    tstep = time%tstep
+    time = neko_case%time%t
+    tstep = neko_case%time%tstep
 
     ! We save to disc only every n_saves_memory time steps
     index = modulo(tstep, this%n_saves_memory)
@@ -75,7 +72,7 @@ contains
             this%first_valid_timestep)
 
        call this%chkp_output%set_counter(counter)
-       call this%chkp_output%sample(current_time)
+       call this%chkp_output%sample(time)
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
@@ -86,21 +83,16 @@ contains
   !! If the requested time step is not in memory, we load the nearest
   !! checkpoint from disc and then we step forward in time to fill our cache.
   !! Finally, we copy the requested time step from our cache.
-  !! @param[inout] this Checkpointing implementation.
-  !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Target time state.
-  module subroutine checkpoint_restore_linear(this, neko_case, time)
+  module subroutine checkpoint_restore_linear(this, neko_case, tstep)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
+    integer, intent(in) :: tstep
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     integer :: k, previous_save, next_save, local_idx, counter
     type(field_t), pointer :: u, v, w, p, s
-    integer :: tstep
 
     loop_start = MPI_WTIME()
-    tstep = time%tstep
 
     u => neko_case%fluid%u
     v => neko_case%fluid%v
