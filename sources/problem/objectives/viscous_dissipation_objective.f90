@@ -150,14 +150,16 @@ contains
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
+    real(kind=rp) :: start_time, end_time
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
-    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
+    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
-    call this%init_from_attributes(design, simulation, weight, name, mask_name)
+    call this%init_from_attributes(design, simulation, weight, name, &
+         mask_name, start_time, end_time)
   end subroutine viscous_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -167,17 +169,23 @@ contains
   !! @param weight the weight of the objective function.
   !! @param name the name of the objective.
   !! @param mask_name the name of the mask.
+  !! @param start_time start of the integration window.
+  !! @param end_time end of the integration window.
   subroutine viscous_dissipation_init_attributes(this, design, simulation, &
-       weight, name, mask_name)
+       weight, name, mask_name, start_time, end_time)
     class(viscous_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
     character(len=*), intent(in) :: name
     character(len=*), intent(in) :: mask_name
     type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
 
     call this%init_base(name, design%size(), weight, mask_name)
+    this%start_time = start_time
+    this%end_time = end_time
 
     ! Save the simulation and design
     this%u => neko_registry%get_field('u')

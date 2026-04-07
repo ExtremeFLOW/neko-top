@@ -140,6 +140,7 @@ contains
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
     logical :: dealias_sensitivity, dealias_forcing
+    real(kind=rp) :: start_time, end_time
 
     call json_get_or_default(json, "weight", weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
@@ -148,11 +149,12 @@ contains
          dealias_sensitivity, .true.)
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, .true.)
-    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
-    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
+    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, dealias_sensitivity, dealias_forcing)
+         mask_name, dealias_sensitivity, dealias_forcing, start_time, &
+         end_time)
   end subroutine brinkman_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -164,8 +166,11 @@ contains
   !! @param mask_name the name of the mask.
   !! @param dealias_sensitivity use dealiasing on the sensitivity.
   !! @param dealias_forcing use dealiasing on the adjoint forcing.
+  !! @param start_time start of the integration window.
+  !! @param end_time end of the integration window.
   subroutine brinkman_dissipation_init_attributes(this, design, simulation, &
-       weight, name, mask_name, dealias_sensitivity, dealias_forcing)
+       weight, name, mask_name, dealias_sensitivity, dealias_forcing, &
+       start_time, end_time)
     class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
@@ -174,6 +179,8 @@ contains
     character(len=*), intent(in) :: name
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
     ! Call the base initializer
@@ -181,6 +188,8 @@ contains
 
     this%dealias_forcing = dealias_forcing
     this%dealias_sensitivity = dealias_sensitivity
+    this%start_time = start_time
+    this%end_time = end_time
 
     ! Grab the Brinkman amplitude field.
     select type (design)
