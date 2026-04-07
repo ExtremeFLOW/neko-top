@@ -90,8 +90,8 @@ module adjoint_fluid_pnpn
   use dong_outflow, only: dong_outflow_t
   use time_state, only: time_state_t
   use vector, only: vector_t
-  use device_math, only: device_glsc3, device_cmult, device_col2
-  use math, only: glsc3, cmult, col2
+  use device_math, only: device_vlsc3, device_cmult, device_col2
+  use math, only: vlsc3, cmult, col2
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
   use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_INTEGER, &
@@ -1440,7 +1440,10 @@ contains
 
     real(kind=rp) :: norm
 
-    norm = glsc3(x, x, B, n) + glsc3(y, y, B, n) + glsc3(z, z, B, n)
+    norm = vlsc3(x, x, B, n) + vlsc3(y, y, B, n) + vlsc3(z, z, B, n)
+
+    call mpi_allreduce(MPI_IN_PLACE, norm, 1, &
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM)
 
     norm = sqrt(norm / volume)
   end function norm
@@ -1455,9 +1458,12 @@ contains
 
     real(kind=rp) :: device_norm
 
-    device_norm = device_glsc3(x_d, x_d, B_d, n) + &
-         device_glsc3(y_d, y_d, B_d, n) + &
-         device_glsc3(z_d, z_d, B_d, n)
+    device_norm = device_vlsc3(x_d, x_d, B_d, n) + &
+         device_vlsc3(y_d, y_d, B_d, n) + &
+         device_vlsc3(z_d, z_d, B_d, n)
+
+    call mpi_allreduce(MPI_IN_PLACE, device_norm, 1, &
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM)
 
     device_norm = sqrt(device_norm / volume)
 
