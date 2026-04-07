@@ -43,10 +43,11 @@ module simulation_checkpoint
   use field, only: field_t
   use field_list, only: field_list_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use mpi_f08, only: MPI_WTIME
+  use mpi_f08, only: MPI_WTIME, MPI_Barrier
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
+  use comm, only: pe_rank, NEKO_COMM
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_memcpy, DEVICE_TO_HOST, HOST_TO_DEVICE
   use registry, only: neko_registry
@@ -286,16 +287,20 @@ contains
 
     ! Delete the checkpoint file list
     if (.not. this%keep_checkpoints) then
-       do i = this%n_timesteps, 1, -1
-          call this%chkp_output%set_counter(i)
-          file_name = this%chkp_output%file_%get_fname()
-          inquire(file = trim(file_name), exist = exists)
-          if (exists) then
-             open(newunit = unit, file = trim(file_name), iostat = stat, &
-                  status='old')
-             if (stat .eq. 0) close(unit, status = 'delete')
-          end if
-       end do
+       call MPI_Barrier(NEKO_COMM)
+       if (pe_rank .eq. 0) then
+          do i = this%n_timesteps, 1, -1
+             call this%chkp_output%set_counter(i)
+             file_name = this%chkp_output%file_%get_fname()
+             inquire(file = trim(file_name), exist = exists)
+             if (exists) then
+                open(newunit = unit, file = trim(file_name), iostat = stat, &
+                     status='old')
+                if (stat .eq. 0) close(unit, status = 'delete')
+             end if
+          end do
+       end if
+       call MPI_Barrier(NEKO_COMM)
     end if
 
     ! Reset to default values
