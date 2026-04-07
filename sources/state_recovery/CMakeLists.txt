@@ -8,7 +8,6 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/state_recover_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_linear.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_ram.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_ctrl_mod.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_adio2_ctrl.cpp

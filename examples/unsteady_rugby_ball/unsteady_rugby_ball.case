@@ -107,7 +107,6 @@
     "unsteady" : true,
     "state_recovery": {
         "type": "checkpoint",
-        "algorithm": "ram",
         "enabled": true,
         "n_memory": 1300
     },

@@ -63,13 +63,11 @@ module simulation_checkpoint
 
      !> Whether checkpointing is enabled
      logical :: enabled = .false.
-     !> The checkpointing algorithm to use ("linear" or "ram")
-     character(len=256) :: algorithm = "linear"
      !> The name of the checkpoint file
      character(len=256) :: filename = "checkpoint"
      !> The format of the checkpoint file
      character(len=8) :: fmt = "chkp"
-     !> Number of checkpoints to keep in memory
+     !> Number of checkpoints to keep in the in-memory cache
      integer :: n_saves_memory = 10
      !> Whether to keep the checkpoint files on disk after the simulation ends
      logical :: keep_checkpoints = .false.
@@ -83,7 +81,7 @@ module simulation_checkpoint
      type(field_list_t) :: state_list
      type(host_array), dimension(:,:), allocatable :: state_storage
 
-     ! Structures to hold the checkpoint data
+     ! Cached field states used by the linear restore path
      type(chkp_output_t) :: chkp_output
 
    contains
@@ -103,9 +101,9 @@ module simulation_checkpoint
      !> Restore the forward simulation state
      procedure, public, pass(this) :: restore => checkpoint_restore
 
-     !> Save current data to the ram checkpoint at index
+     !> Save current data to the in-memory checkpoint cache at index
      procedure, pass(this) :: save_data => checkpoint_save_data
-     !> Restore data from the ram checkpoint at index to the current state
+     !> Restore data from the in-memory checkpoint cache at index
      procedure, pass(this) :: load_data => checkpoint_load_data
   end type simulation_checkpoint_t
 
@@ -142,25 +140,6 @@ module simulation_checkpoint
        type(time_state_t), intent(in) :: time
      end subroutine checkpoint_restore_linear
 
-     !> Save the current state of the simulation in RAM only
-     !! @param[inout] this Checkpointing implementation.
-     !! @param[inout] neko_case Case data structure.
-     !! @param[in] time Current time state.
-     module subroutine checkpoint_save_ram(this, neko_case, time)
-       class(simulation_checkpoint_t), intent(inout) :: this
-       class(case_t), intent(inout) :: neko_case
-       type(time_state_t), intent(in) :: time
-     end subroutine checkpoint_save_ram
-
-     !> Restore the forward simulation state from RAM only
-     !! @param[inout] this Checkpointing implementation.
-     !! @param[inout] neko_case Case data structure.
-     !! @param[in] time Target time state.
-     module subroutine checkpoint_restore_ram(this, neko_case, time)
-       class(simulation_checkpoint_t), intent(inout) :: this
-       class(case_t), target, intent(inout) :: neko_case
-       type(time_state_t), intent(in) :: time
-     end subroutine checkpoint_restore_ram
   end interface
 
 contains
@@ -194,6 +173,12 @@ contains
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
          .false.)
 
+    select case (trim(algorithm))
+    case ("linear", "LINEAR", "Linear")
+    case default
+       call neko_error("Only the linear checkpoint strategy is supported.")
+    end select
+
     if ("extra_fields" .in. params) then
        allocate(extra_field_names(0))
        call json_get(params, "extra_fields", extra_field_names)
@@ -202,12 +187,12 @@ contains
           call extra_fields%append(fi)
        end do
        ! Create a field list for the extra fields
-       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-            filename, fmt, keep_checkpoints, extra_fields)
+       call this%init_from_components(neko_case, n_saves_memory, filename, &
+            fmt, keep_checkpoints, extra_fields)
     else
        ! Create a field list without the extra fields
-       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-            filename, fmt, keep_checkpoints)
+       call this%init_from_components(neko_case, n_saves_memory, filename, &
+            fmt, keep_checkpoints)
     end if
 
   end subroutine checkpoint_init_from_json
@@ -215,16 +200,14 @@ contains
   !> Initialization from components
   !! @param[inout] this Checkpointing implementation.
   !! @param[inout] neko_case Case data structure.
-  !! @param[in] algorithm Checkpointing algorithm identifier.
   !! @param[in] n_saves_memory Number of checkpoints in memory.
   !! @param[in] filename Checkpoint base filename.
   !! @param[in] fmt Checkpoint file format.
   !! @param[in] keep_checkpoints Whether to keep checkpoint files on disk.
-  subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
-       n_saves_memory, filename, fmt, keep_checkpoints, extra_fields)
+  subroutine checkpoint_init_from_components(this, neko_case, n_saves_memory, &
+       filename, fmt, keep_checkpoints, extra_fields)
     class(simulation_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
-    character(len=*), optional, intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
     character(len=*), optional, intent(in) :: filename
     character(len=*), optional, intent(in) :: fmt
@@ -238,7 +221,6 @@ contains
 
     ! Assign parameters from arguments or defaults
     this%enabled = .true.
-    if (present(algorithm)) this%algorithm = algorithm
     if (present(filename)) this%filename = filename
     if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
     if (present(fmt)) this%fmt = fmt
@@ -270,15 +252,13 @@ contains
        end do
     end if
 
-    ! Allocate the storage for the RAM checkpoints
+    ! Allocate the storage for the in-memory checkpoint cache
     allocate(this%state_storage(this%n_saves_memory, this%state_list%size()))
 
     ! Write a status message with the parameters set
     call neko_log%section("Checkpointing")
 
-    write(msg, '(A, A)') "Algorithm:                    ", trim(this%algorithm)
-    call neko_log%message(trim(msg))
-    write(msg, '(A,I0)') "Number of checkpoints in RAM: ", this%n_saves_memory
+    write(msg, '(A,I0)') "Number of cached checkpoints: ", this%n_saves_memory
     call neko_log%message(trim(msg))
     write(msg, '(A, A)') "Checkpoint file name:         ", trim(this%filename)
     call neko_log%message(trim(msg))
@@ -311,7 +291,7 @@ contains
     logical :: exists
     integer :: stat, unit
 
-    ! Free the RAM checkpoints
+    ! Free the cached checkpoint states
     if (allocated(this%state_storage)) then
        do i = 1, this%n_saves_memory
           do j = 1, this%state_list%size()
@@ -341,7 +321,6 @@ contains
     this%enabled = .false.
     this%filename = "checkpoint"
     this%fmt = "chkp"
-    this%algorithm = "linear"
     this%n_saves_memory = 10
     this%keep_checkpoints = .false.
 
@@ -372,14 +351,7 @@ contains
     ! Update the number of recorded timesteps
     call this%set_n_timesteps(max(this%get_n_timesteps(), time%tstep))
 
-    select case (this%algorithm)
-    case ("linear")
-       call checkpoint_save_linear(this, neko_case, time)
-    case ("ram", "memory")
-       call checkpoint_save_ram(this, neko_case, time)
-    case default
-       call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
-    end select
+    call checkpoint_save_linear(this, neko_case, time)
 
     call profiler_end_region("Checkpoint save")
   end subroutine checkpoint_save
@@ -407,21 +379,14 @@ contains
        call neko_error(trim(msg))
     end if
 
-    select case (this%algorithm)
-    case ("linear")
-       call checkpoint_restore_linear(this, neko_case, time)
-    case ("ram", "memory")
-       call checkpoint_restore_ram(this, neko_case, time)
-    case default
-       call neko_error("Unknown checkpoint algorithm: " // this%algorithm)
-    end select
+    call checkpoint_restore_linear(this, neko_case, time)
 
     call profiler_end_region("Checkpoint restore")
   end subroutine checkpoint_restore
 
-  !> Save current data to the RAM checkpoint at the specified index.
+  !> Save current data to the checkpoint cache at the specified index.
   !! @param this The checkpoint object.
-  !! @param index The index in the RAM checkpoint to save to.
+  !! @param index The cache index to save to.
   subroutine checkpoint_save_data(this, index)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: index
@@ -435,7 +400,7 @@ contains
        call neko_error(trim(msg))
     end if
 
-    ! Allocate the RAM checkpoint if not already allocated
+    ! Allocate the cache entry if not already allocated
     do i = 1, this%state_list%size()
        if (.not. this%state_storage(index, i)%is_allocated()) then
           si => this%state_list%get(i)
@@ -458,9 +423,9 @@ contains
     end if
   end subroutine checkpoint_save_data
 
-  !> Restore data from the RAM checkpoint at the specified index to the current state.
+  !> Restore data from the checkpoint cache at the specified index.
   !! @param this The checkpoint object.
-  !! @param index The index in the RAM checkpoint to restore from.
+  !! @param index The cache index to restore from.
   subroutine checkpoint_load_data(this, index)
     class(simulation_checkpoint_t), intent(inout) :: this
     integer, intent(in) :: index
