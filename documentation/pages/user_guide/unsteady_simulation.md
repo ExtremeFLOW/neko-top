@@ -20,26 +20,24 @@ directly from Neko and are used to restart the forward simulation. The memory
 checkpoints are a RAM based copy of the required state variables, and not a
 complete memory of the forward state.
 
-The current implementation uses a linear checkpointing strategy, where a
-regular interval of restart-capable checkpoints is written to disc.
+Current implementation supports the following algorithms:
+
+- Linear: Store a regular interval of restart capable checkpoints to disc. 
 
 By default, we store pressure, velocity, and scalar fields in the checkpoint,
 but users can specify extra fields to be included in the checkpoint.
 
 ### Parameters
 
-- `enabled` (`bool`, default `false`):
-  Whether checkpointing is enabled.
-- `n_memory` (`int`, default `10`):
-  The number of checkpoints to store in memory.
-- `filename` (`string`, default `"checkpoint"`):
-  The base name for checkpoint files.
-- `format` (`string`, default `"chkp"`):
-  The checkpoint file format. Currently only `chkp` is supported.
-- `keep_checkpoints` (`bool`, default `false`):
-  Whether to keep checkpoint files after the simulation.
-- `extra_fields` (`string array`, default `[]`):
-  Additional fields to include in the checkpoint.
+| Parameter          | Type           | Default        | Description                                                               |
+| ------------------ | -------------- | -------------- | ------------------------------------------------------------------------- |
+| `enabled`          | `bool`         | `false`        | Whether checkpointing is enabled.                                         |
+| `algorithm`        | `string`       | `"linear"`     | The checkpointing algorithm to use. Currently only "linear" is supported. |
+| `n_memory`         | `int`          | `10`           | The number of checkpoints to store in memory.                             |
+| `filename`         | `string`       | `"checkpoint"` | The base name for checkpoint files.                                       |
+| `format`           | `string`       | `"chkp"`       | The file format for checkpoint files. Currently "chkp" is supported.      |
+| `keep_checkpoints` | `bool`         | `false`        | Whether to keep checkpoint files after the simulation.                    |
+| `extra_fields`     | `string array` | `[]`           | A list of extra fields to include in the checkpoint.                      |
 
 ### Linear algorithm
 
