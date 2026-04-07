@@ -2,21 +2,24 @@
 # pod_state_recover.py
 #
 # Debug-first in-situ driver for Neko <-> pySEMTools using ADIOS2 SST.
-# - Uses ONE pySEMTools DataStreamer for the whole lifetime (mesh + forward snapshots + mode return).
+# - Uses ONE pySEMTools DataStreamer for the whole lifetime
+#   (mesh + forward snapshots + mode return).
 # - Uses a rank-0-only control client (COMM_SELF) that:
 #     reads  "neko_ctrl_state"
 #     writes "neko_ctrl_cmd"
-# - Adds very verbose, rank-tagged prints around every blocking ADIOS/MPI operation.
+# - Adds very verbose, rank-tagged prints around every blocking
+#   ADIOS/MPI operation.
 #
 # IMPORTANT: This file is written for `import adios2.bindings as adios2`.
-# In that binding, DefineVariable expects a numpy ndarray (including 0-D), not np.int32 scalars.
+# In that binding, DefineVariable expects a numpy ndarray
+# (including 0-D), not np.int32 scalars.
 
 import os
 import sys
 import time
 import json
 import re
-from typing import Optional, Tuple
+from typing import Optional, Sequence, Tuple
 
 import numpy as np
 from mpi4py import MPI
@@ -65,7 +68,10 @@ def log0(msg: str) -> None:
 
 
 def strip_json_comments(text: str) -> str:
-    """Remove // and /* */ comments from JSON-like text (ignores comment markers in strings)."""
+    """Remove // and /* */ comments from JSON-like text.
+
+    Comment markers inside strings are ignored.
+    """
     out = []
     i = 0
     n = len(text)
@@ -131,7 +137,9 @@ def rotate_time_coeffs(path: str) -> Optional[str]:
         idx += 1
 
 
-def wait_for_sst_contact(stem: str, timeout: float = 120.0, poll: float = 0.05) -> str:
+def wait_for_sst_contact(
+    stem: str, timeout: float = 120.0, poll: float = 0.05
+) -> str:
     """
     SST rendezvous is file-based. Depending on ADIOS2 version/config,
     the contact file may be created as 'stem' or 'stem.sst'.
@@ -157,7 +165,8 @@ def wait_for_sst_contact(stem: str, timeout: float = 120.0, poll: float = 0.05) 
 class CtrlClient:
     """
     Rank-0-only control channel.
-    Uses COMM_SELF so it does NOT depend on python MPI ranks matching neko ranks.
+    Uses COMM_SELF so it does not depend on python MPI ranks
+    matching Neko ranks.
 
     Reads:
       - stream name: "neko_ctrl_state"   (Neko writes)
@@ -181,15 +190,22 @@ class CtrlClient:
         self.io_r = self.ad.DeclareIO("py_ctrl_read")
         self.io_r.SetEngine("SST")
 
-        # IMPORTANT: wait for contact file before Open(Read) to avoid startup race.
+        # Wait for the contact file before Open(Read) to avoid the
+        # startup race.
         if self.debug:
-            log0("CtrlClient: waiting for SST contact file for 'neko_ctrl_state'")
+            log0(
+                "CtrlClient: waiting for SST contact file for "
+                "'neko_ctrl_state'"
+            )
         found = wait_for_sst_contact("neko_ctrl_state", timeout=120.0)
         if self.debug:
             log0(f"CtrlClient: found contact file: {found}")
 
         if self.debug:
-            log0("CtrlClient: Open('neko_ctrl_state', Read) (this may still block briefly)")
+            log0(
+                "CtrlClient: Open('neko_ctrl_state', Read) "
+                "(this may still block briefly)"
+            )
         self.rd = self.io_r.Open("neko_ctrl_state", adios2.Mode.Read)
 
         # Writer IO
@@ -203,9 +219,16 @@ class CtrlClient:
         self._phase_cmd_buf = np.zeros((), dtype=np.int32)
 
         if self.debug:
-            log0("CtrlClient: DefineVariable(mode_cmd, phase_cmd) as 0-D arrays")
-        self.v_mode_cmd = self.io_w.DefineVariable("mode_cmd", self._mode_cmd_buf)
-        self.v_phase_cmd = self.io_w.DefineVariable("phase_cmd", self._phase_cmd_buf)
+            log0(
+                "CtrlClient: DefineVariable(mode_cmd, phase_cmd) "
+                "as 0-D arrays"
+            )
+        self.v_mode_cmd = self.io_w.DefineVariable(
+            "mode_cmd", self._mode_cmd_buf
+        )
+        self.v_phase_cmd = self.io_w.DefineVariable(
+            "phase_cmd", self._phase_cmd_buf
+        )
 
         # Open writer
         if self.debug:
@@ -215,7 +238,9 @@ class CtrlClient:
         if self.debug:
             log0("CtrlClient: ready")
 
-    def read_state(self, poll_sleep: float = 0.001) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
+    def read_state(
+        self, poll_sleep: float = 0.001
+    ) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
         """
         Poll BeginStep until OK or EndOfStream.
         Returns (mode, phase, step, time) or (None, None, None, None) on EOS.
@@ -246,7 +271,10 @@ class CtrlClient:
                 s = int(step_buf)
                 t = float(time_buf)
                 if self.debug:
-                    log0(f"CtrlClient: got state mode={m} phase={p} step={s} t={t}")
+                    log0(
+                        f"CtrlClient: got state mode={m} "
+                        f"phase={p} step={s} t={t}"
+                    )
                 return m, p, s, t
 
             if st == adios2.StepStatus.NotReady:
@@ -284,8 +312,21 @@ class CtrlClient:
 # -------------------------
 # POD helper
 # -------------------------
-def make_pod(comm: MPI.Comm, bm: np.ndarray, n_fields: int, batch_size: int, keep_modes: int, dtype) -> Tuple[POD, IoHelp]:
-    pod = POD(comm, number_of_modes_to_update=keep_modes, global_updates=True, auto_expand=False, bckend="numpy")
+def make_pod(
+    comm: MPI.Comm,
+    bm: np.ndarray,
+    n_fields: int,
+    batch_size: int,
+    keep_modes: int,
+    dtype,
+) -> Tuple[POD, IoHelp]:
+    pod = POD(
+        comm,
+        number_of_modes_to_update=keep_modes,
+        global_updates=True,
+        auto_expand=False,
+        bckend="numpy",
+    )
     ioh = IoHelp(comm,
                  number_of_fields=n_fields,
                  batch_size=batch_size,
@@ -302,31 +343,71 @@ def add_snapshot(comm: MPI.Comm,
                  pod: POD,
                  ioh: IoHelp,
                  bm: np.ndarray,
-                 u: np.ndarray,
-                 v: np.ndarray,
-                 w: np.ndarray,
+                 fields: Sequence[np.ndarray],
                  tcur: Optional[float],
                  times: list,
                  energy_state: dict) -> None:
     if tcur is not None:
         times.append(float(tcur))
 
-    local_energy = (
-        np.sum(u * u * bm, dtype=np.float64)
-        + np.sum(v * v * bm, dtype=np.float64)
-        + np.sum(w * w * bm, dtype=np.float64)
-    )
+    local_energy = 0.0
+    for field in fields:
+        local_energy += np.sum(field * field * bm, dtype=np.float64)
     snapshot_energy = comm.allreduce(local_energy, op=MPI.SUM)
     energy_state["total"] += float(snapshot_energy)
     energy_state["count"] += 1
 
-    ioh.copy_fieldlist_to_xi([u, v, w])
+    ioh.copy_fieldlist_to_xi(list(fields))
     ioh.load_buffer(scale_snapshot=True)
     if ioh.update_from_buffer:
         log(comm, f"POD.update(buff) with buffer_index={ioh.buffer_index}")
         pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
         ioh.buffer_index = 0
         ioh.update_from_buffer = False
+
+
+def parse_enabled_flag(value, default: bool = True) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "y", "t")
+    return bool(value)
+
+
+def count_enabled_scalars(case_cfg: dict) -> int:
+    case_data = case_cfg.get("case", {})
+    if not isinstance(case_data, dict):
+        return 0
+
+    if "scalar" in case_data:
+        scalar_cfg = case_data.get("scalar")
+        if isinstance(scalar_cfg, dict) and parse_enabled_flag(
+                scalar_cfg.get("enabled"), True):
+            return 1
+        return 0
+
+    if "scalars" in case_data:
+        scalar_cfgs = case_data.get("scalars")
+        if not isinstance(scalar_cfgs, list):
+            return 0
+        return sum(
+            1 for scalar_cfg in scalar_cfgs
+            if not isinstance(scalar_cfg, dict)
+            or parse_enabled_flag(scalar_cfg.get("enabled"), True)
+        )
+
+    return 0
+
+
+def recv_field(ds: DataStreamer, dtype) -> np.ndarray:
+    return get_fld_from_ndarray(
+        ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv
+    ).astype(dtype)
+
+
+def stream_mode_fields(ds: DataStreamer, fields1d, dtype) -> None:
+    for field in fields1d:
+        ds.stream(field.astype(dtype, copy=False))
 
 
 # -------------------------
@@ -359,10 +440,31 @@ def main() -> None:
     i_stream = int(sr["i_stream"])
     dtype_str = str(sr["dtype"]).strip().lower()
     write_modes = sr.get("write_modes", False)
+    include_scalar = sr.get("include_scalar", False)
     if isinstance(write_modes, str):
-        write_modes = write_modes.strip().lower() in ("1", "true", "yes", "y", "t")
+        write_modes = write_modes.strip().lower() in (
+            "1", "true", "yes", "y", "t"
+        )
     else:
         write_modes = bool(write_modes)
+
+    if isinstance(include_scalar, str):
+        include_scalar = include_scalar.strip().lower() in (
+            "1", "true", "yes", "y", "t"
+        )
+    else:
+        include_scalar = bool(include_scalar)
+
+    enabled_scalars = count_enabled_scalars(case)
+    if include_scalar and enabled_scalars == 0:
+        raise ValueError(
+            "POD include_scalar=true but no enabled scalar was found "
+            "in the case"
+        )
+    if include_scalar and enabled_scalars != 1:
+        raise ValueError(
+            "POD include_scalar currently supports exactly one enabled scalar"
+        )
 
     # time settings (used for CSV)
     dt = float(case["case"]["time"]["timestep"])
@@ -379,27 +481,31 @@ def main() -> None:
     ds = DataStreamer(comm)
 
     log(comm, "Python: receive mesh x,y,z")
-    x = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-    y = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-    z = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+    x = recv_field(ds, dtype)
+    y = recv_field(ds, dtype)
+    z = recv_field(ds, dtype)
 
-    log(comm, "Python: receive initial u,v,w snapshot")
-    u0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-    v0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-    w0 = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
+    log(comm, "Python: receive initial snapshot")
+    fields0 = [
+        recv_field(ds, dtype),
+        recv_field(ds, dtype),
+        recv_field(ds, dtype),
+    ]
+    if include_scalar:
+        fields0.append(recv_field(ds, dtype))
 
     # Build mesh/coefs on all python ranks (pySEMTools expects this)
     msh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
     coef = Coef(msh, comm)
     bm = coef.B
 
-    n_fields = 3
+    n_fields = 4 if include_scalar else 3
     pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
     times = []
     energy_state = {"total": 0.0, "count": 0}
 
     log(comm, "Python: add initial snapshot at t=0")
-    add_snapshot(comm, pod, ioh, bm, u0, v0, w0, 0.0, times, energy_state)
+    add_snapshot(comm, pod, ioh, bm, fields0, 0.0, times, energy_state)
 
     # Rank0 control client only (COMM_SELF)
     ctrl = CtrlClient(debug=DEBUG) if rank == 0 else None
@@ -418,14 +524,20 @@ def main() -> None:
 
     try:
         while True:
-            # ---- read control state on rank0, broadcast to all python ranks ----
+            # ---- read control state on rank 0 and broadcast it ----
             if rank == 0:
                 mode, phase, step, tcur = ctrl.read_state()
             else:
                 mode, phase, step, tcur = None, None, None, None
 
-            mode, phase, step, tcur = comm.bcast((mode, phase, step, tcur), root=0)
-            log(comm, f"Loop: state mode={mode} phase={phase} step={step} t={tcur}")
+            mode, phase, step, tcur = comm.bcast(
+                (mode, phase, step, tcur), root=0
+            )
+            log(
+                comm,
+                f"Loop: state mode={mode} phase={phase} "
+                f"step={step} t={tcur}",
+            )
 
             if mode is None:
                 log(comm, "Loop: ctrl EOS -> exit")
@@ -436,14 +548,20 @@ def main() -> None:
 
             # ---- forward streaming snapshots ----
             if mode == MODE_FORWARD and phase == PHASE_FWD_RUNNING:
-                log(comm, "Forward: about to recieve u,v,w (3x)")
-                u = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-                v = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-                w = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv).astype(dtype)
-                add_snapshot(comm, pod, ioh, bm, u, v, w, tcur, times, energy_state)
+                log(comm, "Forward: about to recieve snapshot fields")
+                fields = [
+                    recv_field(ds, dtype),
+                    recv_field(ds, dtype),
+                    recv_field(ds, dtype),
+                ]
+                if include_scalar:
+                    fields.append(recv_field(ds, dtype))
+                add_snapshot(
+                    comm, pod, ioh, bm, fields, tcur, times, energy_state
+                )
                 continue
 
-            # ---- forward finished: compute/write + send modes back + tell neko to switch ----
+            # ---- forward finished: compute/write/send modes ----
             if mode == MODE_FORWARD and phase == PHASE_FWD_DONE:
                 log(comm, "Forward done: flush buffer -> update POD")
                 if ioh.buffer_index > 0 and not ioh.update_from_buffer:
@@ -455,7 +573,11 @@ def main() -> None:
                 pod.rotate_local_modes_to_global(comm)
 
                 # Build time coeffs (rank0 writes)
-                n_avail = min(keep_modes, pod.u_1t.shape[1]) if hasattr(pod, "u_1t") else 0
+                n_avail = (
+                    min(keep_modes, pod.u_1t.shape[1])
+                    if hasattr(pod, "u_1t")
+                    else 0
+                )
                 if n_avail > 0:
                     A = (pod.d_1t[:n_avail, None] * pod.vt_1t[:n_avail, :]).T
                 else:
@@ -466,12 +588,22 @@ def main() -> None:
                     tvec = np.asarray(times, dtype=np.float64)
                 else:
                     if len(times) > 0:
-                        log(comm, f"Time list length {len(times)} != nsnaps {nsnaps}, falling back to dt.")
+                        log(
+                            comm,
+                            f"Time list length {len(times)} != nsnaps "
+                            f"{nsnaps}, falling back to dt.",
+                        )
                     # Snapshots start at t=0 (initial condition).
                     tvec = np.arange(nsnaps, dtype=np.float64) * snapshot_dt
                 # pad to keep_modes columns
                 if A.shape[1] < keep_modes:
-                    A = np.hstack([A, np.zeros((nsnaps, keep_modes - A.shape[1]), dtype=A.dtype)])
+                    A = np.hstack([
+                        A,
+                        np.zeros(
+                            (nsnaps, keep_modes - A.shape[1]),
+                            dtype=A.dtype,
+                        ),
+                    ])
                 out = np.column_stack([tvec, A])
                 header = "t," + ",".join([f"a{i+1}" for i in range(keep_modes)])
 
@@ -482,23 +614,54 @@ def main() -> None:
                     if write_modes:
                         rotated = rotate_time_coeffs("pod_time_coeffs.csv")
                         if rotated:
-                            log(comm, f"Rank0: archived pod_time_coeffs.csv -> {rotated}")
+                            log(
+                                comm,
+                                f"Rank0: archived pod_time_coeffs.csv -> "
+                                f"{rotated}",
+                            )
                     log(comm, "Rank0: writing pod_time_coeffs.csv")
-                    np.savetxt("pod_time_coeffs.csv", out, delimiter=",", header=header, comments="")
+                    np.savetxt(
+                        "pod_time_coeffs.csv",
+                        out,
+                        delimiter=",",
+                        header=header,
+                        comments="",
+                    )
 
-                    if energy_state["total"] <= 0.0 or energy_state["count"] == 0:
-                        print("POD energy capture: no snapshot energy available.", flush=True)
-                    elif getattr(pod, "d_1t", None) is None or pod.d_1t.size == 0:
-                        print("POD energy capture: no singular values available.", flush=True)
+                    if (
+                        energy_state["total"] <= 0.0
+                        or energy_state["count"] == 0
+                    ):
+                        print(
+                            "POD energy capture: no snapshot energy "
+                            "available.",
+                            flush=True,
+                        )
+                    elif (
+                        getattr(pod, "d_1t", None) is None
+                        or pod.d_1t.size == 0
+                    ):
+                        print(
+                            "POD energy capture: no singular values "
+                            "available.",
+                            flush=True,
+                        )
                     else:
                         energies = np.asarray(pod.d_1t, dtype=np.float64) ** 2
                         fractions = 100.0 * energies / energy_state["total"]
                         n_report = min(keep_modes, fractions.size)
-                        print("POD energy capture (% of snapshot energy):", flush=True)
-                        for i in range(n_report):
-                            print(f"  mode {i + 1}: {fractions[i]:.6f}%", flush=True)
                         print(
-                            f"  sum first {n_report}: {np.sum(fractions[:n_report]):.6f}%",
+                            "POD energy capture (% of snapshot energy):",
+                            flush=True,
+                        )
+                        for i in range(n_report):
+                            print(
+                                f"  mode {i + 1}: {fractions[i]:.6f}%",
+                                flush=True,
+                            )
+                        print(
+                            f"  sum first {n_report}: "
+                            f"{np.sum(fractions[:n_report]):.6f}%",
                             flush=True,
                         )
 
@@ -506,27 +669,38 @@ def main() -> None:
                 comm.Barrier()
 
                 # IMPORTANT ordering:
-                # 1) send modes back (so Neko can receive immediately after ctrl_wait_cmd returns)
+                # 1) send modes back so Neko can receive them
                 # 2) then send command that tells Neko to switch to adjoint
                 #
-                # If your Fortran side waits for cmd BEFORE receiving modes, flip this ordering.
-                log(comm, f"Streaming modes back: expect 3*{keep_modes} streams")
+                # If Fortran waits for the command before the modes,
+                # flip this ordering.
+                log(
+                    comm,
+                    f"Streaming modes back: expect {n_fields}*"
+                    f"{keep_modes} streams",
+                )
                 for j in range(keep_modes):
                     if j < n_avail:
                         fields1d = ioh.split_narray_to_1dfields(pod.u_1t[:, j])
                         log(comm, f"stream mode {j+1}/{keep_modes} (real)")
-                        ds.stream(fields1d[0].astype(dtype, copy=False))
-                        ds.stream(fields1d[1].astype(dtype, copy=False))
-                        ds.stream(fields1d[2].astype(dtype, copy=False))
+                        stream_mode_fields(ds, fields1d, dtype)
                     else:
-                        log(comm, f"stream mode {j+1}/{keep_modes} (zero padded)")
-                        ds.stream(zero_field); ds.stream(zero_field); ds.stream(zero_field)
+                        log(
+                            comm,
+                            f"stream mode {j+1}/{keep_modes} "
+                            "(zero padded)",
+                        )
+                        for _ in range(n_fields):
+                            ds.stream(zero_field)
 
                 log(comm, "Barrier after streaming modes")
                 comm.Barrier()
 
                 if rank == 0:
-                    log0("Rank0: sending ctrl cmd MODE_ADJOINT/PHASE_ADJ_RUNNING")
+                    log0(
+                        "Rank0: sending ctrl cmd "
+                        "MODE_ADJOINT/PHASE_ADJ_RUNNING"
+                    )
                     ctrl.send_cmd(MODE_ADJOINT, PHASE_ADJ_RUNNING)
 
                 log(comm, "Barrier after sending ctrl cmd")
@@ -536,15 +710,22 @@ def main() -> None:
             # ---- adjoint done: reset POD buffers ----
             if mode == MODE_ADJOINT and phase == PHASE_ADJ_DONE:
                 log(comm, "Adjoint done: reset POD/ioh")
-                pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
+                pod, ioh = make_pod(
+                    comm, bm, n_fields, batch_size, keep_modes, dtype
+                )
                 times = []
                 energy_state = {"total": 0.0, "count": 0}
                 log(comm, "Adjoint done: add initial snapshot at t=0")
-                add_snapshot(comm, pod, ioh, bm, u0, v0, w0, 0.0, times, energy_state)
+                add_snapshot(
+                    comm, pod, ioh, bm, fields0, 0.0, times, energy_state
+                )
                 continue
 
             # if we get here, we're in an unhandled state
-            log(comm, f"Unhandled state: mode={mode} phase={phase} -> idle spin")
+            log(
+                comm,
+                f"Unhandled state: mode={mode} phase={phase} -> idle spin",
+            )
             time.sleep(0.001)
 
     finally:

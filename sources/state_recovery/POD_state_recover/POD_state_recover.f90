@@ -59,7 +59,8 @@ module simulation_POD_state_recover
 
   use neko_ctrl_mod, only: ctrl_stream_t, &
        MODE_IDLE, MODE_FORWARD, MODE_ADJOINT, MODE_STOP, &
-       PHASE_INIT, PHASE_FWD_RUNNING, PHASE_FWD_DONE, PHASE_ADJ_RUNNING, PHASE_ADJ_DONE
+       PHASE_INIT, PHASE_FWD_RUNNING, PHASE_FWD_DONE, &
+       PHASE_ADJ_RUNNING, PHASE_ADJ_DONE
   use, intrinsic :: iso_c_binding, only: c_int, c_double
 
   implicit none
@@ -74,6 +75,7 @@ module simulation_POD_state_recover
      integer :: i_stream
      integer :: n_modes
      integer :: n_flds = 3
+     logical :: include_scalar = .false.
      character(len=16) :: dtype = "double"
 
      type(coef_t), pointer :: coef => null()
@@ -83,6 +85,8 @@ module simulation_POD_state_recover
 
      ! POD mode storage
      type(field_t), allocatable :: u_modes(:), v_modes(:), w_modes(:)
+     type(field_t), allocatable :: s_modes(:)
+     type(field_t), pointer :: s => null()
 
      ! CSV coeffs
      type(file_t)   :: csv_reader
@@ -108,8 +112,10 @@ module simulation_POD_state_recover
 
    contains
      procedure, public, pass(this) :: init => POD_state_recover_init_from_json
-     procedure, public, pass(this) :: init_from_json => POD_state_recover_init_from_json
-     procedure, public, pass(this) :: init_from_components => POD_state_recover_init_from_components
+     procedure, public, pass(this) :: init_from_json => &
+          POD_state_recover_init_from_json
+     procedure, public, pass(this) :: init_from_components => &
+          POD_state_recover_init_from_components
      procedure, public, pass(this) :: free => POD_state_recover_free
      procedure, public, pass(this) :: reset => POD_state_recover_reset
      procedure, public, pass(this) :: save => POD_state_recover_save
@@ -129,6 +135,7 @@ contains
     integer :: i_stream, n_modes
     logical :: write_modes
     logical :: debug
+    logical :: include_scalar
     logical :: output_reconstruction
     character(len=:), allocatable :: output_precision
     character(len=:), allocatable :: output_control
@@ -139,21 +146,28 @@ contains
     call json_get(params, "i_stream", i_stream)
     call json_get(params, "n_modes", n_modes)
     call json_get_or_default(params, "dtype", dtype, "double")
+    call json_get_or_default(params, "include_scalar", include_scalar, &
+         .false.)
     call json_get_or_default(params, "write_modes", write_modes, .false.)
     call json_get_or_default(params, "debug", debug, .false.)
     call json_get_or_default(params, "output_reconstruction", &
          output_reconstruction, .false.)
 
-    call this%init_from_components(neko_case, i_stream, n_modes, debug)
+    call this%init_from_components(neko_case, i_stream, n_modes, &
+         include_scalar, debug)
     this%dtype = adjustl(dtype)
     this%write_modes = write_modes
     this%output_reconstruction = output_reconstruction
 
     select case (trim(this%dtype))
     case ("single", "SINGLE", "Single")
-       if (rp .ne. sp) call neko_error("POD dtype single but code not single precision.")
+       if (rp .ne. sp) then
+          call neko_error("POD dtype single but code not single precision.")
+       end if
     case ("double", "DOUBLE", "Double")
-       if (rp .ne. dp) call neko_error("POD dtype double but code not double precision.")
+       if (rp .ne. dp) then
+          call neko_error("POD dtype double but code not double precision.")
+       end if
     case default
        call neko_error("Unsupported POD dtype: " // trim(this%dtype))
     end select
@@ -172,6 +186,9 @@ contains
        call this%recon_output%fields%assign_to_field(1, neko_case%fluid%u)
        call this%recon_output%fields%assign_to_field(2, neko_case%fluid%v)
        call this%recon_output%fields%assign_to_field(3, neko_case%fluid%w)
+       if (this%include_scalar) then
+          call this%recon_output%fields%assign_to_field(4, this%s)
+       end if
 
        call json_get_or_default(neko_case%params, 'case.fluid.output_control', &
             output_control, 'org')
@@ -187,23 +204,26 @@ contains
                   neko_case%time%start_time) / output_value
           end if
        case ('nsamples')
-          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          call json_get(neko_case%params, 'case.fluid.output_value', &
+               output_value)
           this%recon_output_value = output_value
           if (output_value .gt. 0.0_rp) then
              this%recon_time_interval = (neko_case%time%end_time - &
                   neko_case%time%start_time) / output_value
           end if
        case ('simulationtime')
-          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          call json_get(neko_case%params, 'case.fluid.output_value', &
+               output_value)
           this%recon_output_value = output_value
           this%recon_time_interval = output_value
        case ('tsteps')
-          call json_get(neko_case%params, 'case.fluid.output_value', output_value)
+          call json_get(neko_case%params, 'case.fluid.output_value', &
+               output_value)
           this%recon_output_value = output_value
           this%recon_nsteps = int(output_value)
        case ('never')
-          call json_get_or_default(neko_case%params, 'case.fluid.output_value', &
-               output_value, 0.0_rp)
+          call json_get_or_default(neko_case%params, &
+               'case.fluid.output_value', output_value, 0.0_rp)
           this%recon_output_value = output_value
        case default
           call neko_error('Unsupported output_control for reconstruction: ' // &
@@ -218,22 +238,44 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[in] i_stream Snapshot stride.
   !! @param[in] n_modes Number of POD modes to keep.
+  !! @param[in] include_scalar Include one scalar field in the POD basis.
   !! @param[in] debug Optional debug flag.
-  subroutine POD_state_recover_init_from_components(this, neko_case, i_stream, n_modes, debug)
+  subroutine POD_state_recover_init_from_components(this, neko_case, &
+       i_stream, n_modes, include_scalar, debug)
     class(POD_state_recover_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: i_stream, n_modes
+    logical, intent(in) :: include_scalar
     logical, intent(in), optional :: debug
     integer :: i
     character(len=80) :: str
 
+    this%enabled = .true.
     this%i_stream = i_stream
-    this%n_modes  = n_modes
+    this%n_modes = n_modes
+    this%include_scalar = include_scalar
+    this%n_flds = 3
     this%coef => neko_case%fluid%c_Xh
+
+    if (this%include_scalar) then
+       if (.not. allocated(neko_case%scalars)) then
+          call neko_error('POD scalar recovery requested but no scalar ' // &
+               'is enabled.')
+       end if
+       if (size(neko_case%scalars%scalar_fields) .ne. 1) then
+          call neko_error('POD scalar recovery currently supports ' // &
+               'exactly one scalar.')
+       end if
+       this%s => neko_case%scalars%scalar_fields(1)%scalar%s
+       this%n_flds = 4
+    else
+       nullify(this%s)
+    end if
 
     allocate(this%u_modes(this%n_modes))
     allocate(this%v_modes(this%n_modes))
     allocate(this%w_modes(this%n_modes))
+    if (this%include_scalar) allocate(this%s_modes(this%n_modes))
 
     call this%output%init(sp, 'POD_modes', this%n_flds * this%n_modes)
     do i = 1, this%n_modes
@@ -248,6 +290,13 @@ contains
        write(str, '(A,I0)') "w_mode_", i
        call this%w_modes(i)%init(this%coef%dof, trim(str))
        call this%output%fields%assign(this%n_flds*(i-1) + 3, this%w_modes(i))
+
+       if (this%include_scalar) then
+          write(str, '(A,I0)') "s_mode_", i
+          call this%s_modes(i)%init(this%s%dof, trim(str))
+          call this%output%fields%assign(this%n_flds*(i-1) + 4, &
+               this%s_modes(i))
+       end if
     end do
 
     call this%a_interp%init(this%n_modes)
@@ -263,23 +312,28 @@ contains
 
     ! Stream initial condition once (t=0 snapshot)
     block
-      type(field_t), pointer :: u, v, w
+      type(field_t), pointer :: u, v, w, s
       integer :: n
 
       u => neko_case%fluid%u
       v => neko_case%fluid%v
       w => neko_case%fluid%w
+      if (this%include_scalar) s => this%s
       n = u%dof%size()
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
          call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
          call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
          call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+         if (this%include_scalar) then
+            call device_memcpy(s%x, s%x_d, n, DEVICE_TO_HOST, sync=.true.)
+         end if
       end if
 
       call this%dstream%stream(u%x)
       call this%dstream%stream(v%x)
       call this%dstream%stream(w%x)
+      if (this%include_scalar) call this%dstream%stream(s%x)
     end block
 
     ! Control init (use neko_comm%mpi_val – your working pattern)
@@ -312,6 +366,10 @@ contains
        do i = 1, size(this%w_modes); call this%w_modes(i)%free(); end do
        deallocate(this%w_modes)
     end if
+    if (allocated(this%s_modes)) then
+       do i = 1, size(this%s_modes); call this%s_modes(i)%free(); end do
+       deallocate(this%s_modes)
+    end if
 
     call this%dstream%free()
     call this%csv_reader%free()
@@ -320,6 +378,8 @@ contains
 
     call this%ctrl%free()
 
+    this%include_scalar = .false.
+    nullify(this%s)
     this%enabled = .false.
   end subroutine POD_state_recover_free
 
@@ -347,6 +407,7 @@ contains
        call field_rzero(this%u_modes(i))
        call field_rzero(this%v_modes(i))
        call field_rzero(this%w_modes(i))
+       if (this%include_scalar) call field_rzero(this%s_modes(i))
     end do
 
   end subroutine POD_state_recover_reset
@@ -360,7 +421,7 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
     type(time_state_t), intent(in) :: time
-    type(field_t), pointer :: u, v, w
+    type(field_t), pointer :: u, v, w, s
     integer :: n
 
     if (.not. this%enabled) return
@@ -375,6 +436,7 @@ contains
     u => neko_case%fluid%u
     v => neko_case%fluid%v
     w => neko_case%fluid%w
+    if (this%include_scalar) s => this%s
     n = u%dof%size()
 
     call profiler_start_region("POD save")
@@ -388,11 +450,15 @@ contains
        call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
        call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
        call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       if (this%include_scalar) then
+          call device_memcpy(s%x, s%x_d, n, DEVICE_TO_HOST, sync=.true.)
+       end if
     end if
 
     call this%dstream%stream(u%x)
     call this%dstream%stream(v%x)
     call this%dstream%stream(w%x)
+    if (this%include_scalar) call this%dstream%stream(s%x)
 
     call profiler_end_region("POD save")
   end subroutine POD_state_recover_save
@@ -427,7 +493,8 @@ contains
           call this%ctrl%wait_cmd(mode_cmd, phase_cmd)
 
           if (mode_cmd /= MODE_ADJOINT) then
-             call neko_error("Expected MODE_ADJOINT from Python at forward->adjoint boundary.")
+             call neko_error('Expected MODE_ADJOINT from Python at ' // &
+                  'forward->adjoint boundary.')
           end if
        end if
 
@@ -438,6 +505,7 @@ contains
           call this%dstream%recieve(this%u_modes(i)%x)
           call this%dstream%recieve(this%v_modes(i)%x)
           call this%dstream%recieve(this%w_modes(i)%x)
+          if (this%include_scalar) call this%dstream%recieve(this%s_modes(i)%x)
        end do
 
        ! Move modes back to GPU
@@ -450,6 +518,10 @@ contains
                HOST_TO_DEVICE, sync=.true.)
           call device_memcpy(this%w_modes(i)%x, this%w_modes(i)%x_d, n, &
                HOST_TO_DEVICE, sync=.true.)
+          if (this%include_scalar) then
+             call device_memcpy(this%s_modes(i)%x, this%s_modes(i)%x_d, n, &
+                  HOST_TO_DEVICE, sync=.true.)
+          end if
        end do
        end if
 
@@ -465,7 +537,8 @@ contains
        call this%csv_reader%read(this%time_coefs)
 
        call MPI_Allreduce(MPI_IN_PLACE, this%time_coefs%x, &
-            this%time_coefs%size(), mpi_real_precision, MPI_SUM, neko_comm, ierr)
+            this%time_coefs%size(), mpi_real_precision, MPI_SUM, &
+            neko_comm, ierr)
 
        this%have_received_modes = .true.
        call profiler_end_region("POD recieve modes")
@@ -540,8 +613,11 @@ contains
     integer :: n
     integer :: ierr, file_unit
 
-    open(file = trim(file_in%get_fname()), status='old', newunit=file_unit, iostat=ierr)
-    if (ierr .ne. 0) call neko_error("Error opening " // trim(file_in%get_fname()))
+    open(file = trim(file_in%get_fname()), status='old', &
+         newunit=file_unit, iostat=ierr)
+    if (ierr .ne. 0) then
+       call neko_error("Error opening " // trim(file_in%get_fname()))
+    end if
     rewind(file_unit)
 
     n = 0
@@ -618,7 +694,8 @@ contains
     end if
 
     do j = 1, ncols-1
-       a_out%x(j) = (1.0_rp - w) * time_coefs%x(i0, j+1) + w * time_coefs%x(i1, j+1)
+       a_out%x(j) = (1.0_rp - w) * time_coefs%x(i0, j+1) + &
+            w * time_coefs%x(i1, j+1)
     end do
   end subroutine interpolate_time_coeffs_vec
 
@@ -628,20 +705,25 @@ contains
     class(case_t), intent(inout)              :: neko_case
     type(vector_t), intent(in)                :: a
     integer :: j
-    type(field_t), pointer :: u, v, w
+    type(field_t), pointer :: u, v, w, s
 
     u => neko_case%fluid%u
     v => neko_case%fluid%v
     w => neko_case%fluid%w
+    if (this%include_scalar) s => this%s
 
     call field_rzero(u)
     call field_rzero(v)
     call field_rzero(w)
+    if (this%include_scalar) call field_rzero(s)
 
     do j = 1, this%n_modes
        call field_add2s2(u, this%u_modes(j), a%x(j))
        call field_add2s2(v, this%v_modes(j), a%x(j))
        call field_add2s2(w, this%w_modes(j), a%x(j))
+       if (this%include_scalar) then
+          call field_add2s2(s, this%s_modes(j), a%x(j))
+       end if
     end do
   end subroutine reconstruct_from_coeffs
 
