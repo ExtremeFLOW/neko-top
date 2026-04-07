@@ -124,7 +124,8 @@ if [ "$is_parametric_root" = true ] && [ $# -lt 1 ]; then
         echo "========================================================="
         echo "Running study case: $(basename "${study_dir}")"
         echo "========================================================="
-        "${study_dir}/run.sh" "${study_dir}/case.case" "${PY_SCRIPT}"
+        NEKO_BIN="${NEKO_EXE}" \
+            "${study_dir}/run.sh" "${study_dir}/case.case" "${PY_SCRIPT}"
     done
     exit 0
 fi
