@@ -33,7 +33,8 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 module json_utils_ext
   use mpi_f08, only: MPI_Comm_rank, MPI_Initialized, MPI_Bcast, &
-       MPI_COMM_WORLD, MPI_INTEGER, MPI_CHARACTER
+       MPI_INTEGER, MPI_CHARACTER
+  use comm, only: NEKO_COMM
   use json_file_module, only: json_file
   use json_value_module, only: json_value
   use utils, only: neko_error, filename_suffix
@@ -117,7 +118,7 @@ contains
 
     ! Check if MPI is initialized and get the rank if it is.
     call MPI_Initialized(mpi_is_initialized, ierr)
-    if (mpi_is_initialized) call MPI_Comm_rank(MPI_COMM_WORLD, rank, ierr)
+    if (mpi_is_initialized) call MPI_Comm_rank(NEKO_COMM, rank, ierr)
 
     ! Read the json file and broadcast it to all ranks.
     if (rank .eq. 0) then
@@ -129,11 +130,10 @@ contains
        if (rank .eq. 0) call json%print_to_string(json_buffer)
 
        length = len(json_buffer)
-       call MPI_Bcast(length, 1, MPI_INTEGER, 0, MPI_COMM_WORLD, ierr)
+       call MPI_Bcast(length, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
        if (rank .ne. 0) allocate(character(len=length) :: json_buffer)
-       call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, MPI_COMM_WORLD, &
-            ierr)
+       call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, NEKO_COMM, ierr)
 
        if (rank .ne. 0) then
           call json%load_from_string(json_buffer)
