@@ -43,12 +43,14 @@ module adjoint_output
   use device, only: device_memcpy, DEVICE_TO_HOST
   use output, only: output_t
   use adjoint_scalars, only : adjoint_scalars_t
+  use fld_file, only: fld_file_t
   implicit none
   private
 
   !> adjoint output
   type, public, extends(output_t) :: adjoint_output_t
      type(field_list_t) :: adjoint
+     logical :: always_write_mesh = .false.
    contains
      !> Constructor
      procedure, pass(this) :: init => adjoint_output_init
@@ -68,30 +70,53 @@ contains
   !! @param[in] adjoint_scalars The adjoint scalar schemes.
   !! @param[in] name The name of the .fld file.
   !! @param[in] path The path to save the .fld files.
+  !! @param[in] fmt The format of the .fld files.
+  !! @param[in] layout The layout of the .fld files.
+  !! @param[in] always_write_mesh Whether to always write the mesh.
   subroutine adjoint_output_init(this, precision, adjoint, adjoint_scalars, &
-       name, path)
+       name, path, fmt, layout, always_write_mesh)
     class(adjoint_output_t), intent(inout) :: this
     integer, intent(in) :: precision
     class(adjoint_fluid_scheme_t), intent(in), target :: adjoint
     class(adjoint_scalars_t), intent(in), optional, target :: adjoint_scalars
     character(len=*), intent(in), optional :: name
     character(len=*), intent(in), optional :: path
-    character(len=1024) :: fname
+    character(len=*), intent(in), optional :: fmt
+    logical, intent(in), optional :: always_write_mesh
+    integer, intent(in), optional :: layout
+    character(len=1024) :: fname, suffix
     integer :: i, n_scalars
 
     call this%free()
 
-    if (present(name) .and. present(path)) then
-       fname = trim(path) // trim(name) // '.fld'
-    else if (present(name)) then
-       fname = trim(name) // '.fld'
-    else if (present(path)) then
-       fname = trim(path) // 'adjoint.fld'
-    else
-       fname = 'adjoint.fld'
+    suffix = '.fld'
+    if (present(fmt)) then
+       if (fmt .eq. 'adios2') then
+          suffix = '.bp'
+       else if (fmt .eq. 'vtkhdf') then
+          suffix = '.vtkhdf'
+       end if
     end if
 
-    call this%init_base(fname, precision)
+    if (present(always_write_mesh)) then
+       this%always_write_mesh = always_write_mesh
+    end if
+
+    if (present(name) .and. present(path)) then
+       fname = trim(path) // trim(name) // trim(suffix)
+    else if (present(name)) then
+       fname = trim(name) // trim(suffix)
+    else if (present(path)) then
+       fname = trim(path) // 'field' // trim(suffix)
+    else
+       fname = 'field' // trim(suffix)
+    end if
+
+    if (present(layout)) then
+       call this%init_base(fname, precision, layout)
+    else
+       call this%init_base(fname, precision)
+    end if
 
     ! Calculate total number of fields
     n_scalars = 0
@@ -146,7 +171,14 @@ contains
 
     end if
 
-    call this%file_%write(this%adjoint, t)
+    select type (ft => this%file_%file_type)
+       ! Only fld files have the option to write the mesh at command
+    type is (fld_file_t)
+       ft%write_mesh = this%always_write_mesh
+       call ft%write(this%adjoint, t)
+    class default
+       call ft%write(this%adjoint, t)
+    end select
 
   end subroutine adjoint_output_sample
 
