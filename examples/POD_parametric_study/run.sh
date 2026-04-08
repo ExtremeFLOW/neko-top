@@ -1,12 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../.." && pwd)
+if [ -z "${MAIN_DIR:-}" ]; then
+    MAIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
+fi
 
-cd "${SCRIPT_DIR}"
+source "${MAIN_DIR}/scripts/pod_run_helpers.sh"
 
-source "${ROOT_DIR}/scripts/pod_run_helpers.sh"
+CASE_DIR=$(pwd)
 
 resolve_neko_exe() {
     local example_dir
@@ -17,14 +18,14 @@ resolve_neko_exe() {
         return 0
     fi
 
-    if [ -x "${SCRIPT_DIR}/neko" ]; then
-        printf '%s\n' "${SCRIPT_DIR}/neko"
+    if [ -x "${CASE_DIR}/neko" ]; then
+        printf '%s\n' "${CASE_DIR}/neko"
         return 0
     fi
 
-    example_dir="${SCRIPT_DIR}"
-    if [[ "${SCRIPT_DIR}" == "${ROOT_DIR}/logs/"* ]]; then
-        example_dir="${SCRIPT_DIR/${ROOT_DIR}\/logs/${ROOT_DIR}\/examples}"
+    example_dir="${CASE_DIR}"
+    if [[ "${CASE_DIR}" == "${MAIN_DIR}/logs/"* ]]; then
+        example_dir="${CASE_DIR/${MAIN_DIR}\/logs/${MAIN_DIR}\/examples}"
     fi
     example_parent="$(dirname "${example_dir}")"
 
@@ -38,8 +39,8 @@ resolve_neko_exe() {
 }
 
 prepare_case_dir() {
-    if [ -x "${SCRIPT_DIR}/prepare.sh" ]; then
-        (cd "${SCRIPT_DIR}" && ./prepare.sh)
+    if [ -x "${CASE_DIR}/prepare.sh" ]; then
+        ./prepare.sh
     fi
 }
 
@@ -55,7 +56,7 @@ run_case() {
     base="${case_name%.case}"
 
     if pod_case_is_pod "${case_path}"; then
-        pod_ensure_adios2_python "${ROOT_DIR}"
+        pod_ensure_adios2_python "${MAIN_DIR}"
         log_file=${LOG_FILE:-"mpmd_${base}.log"}
     else
         log_file=${LOG_FILE:-"neko_${base}.log"}
@@ -72,27 +73,26 @@ run_case() {
     fi
 }
 
-PY_SCRIPT=${2:-"${ROOT_DIR}/scripts/python/pod_state_recover.py"}
+PY_SCRIPT=${2:-"${MAIN_DIR}/scripts/python/pod_state_recover.py"}
 NEKO_RANKS=${NEKO_RANKS:-5}
 PY_RANKS=${PY_RANKS:-3}
 
 IS_PARAMETRIC_ROOT=false
-if [ -x "${SCRIPT_DIR}/generate_cases.sh" ] && \
-   [ -f "${SCRIPT_DIR}/checkpoint.case" ] && \
-   [ -f "${SCRIPT_DIR}/pod.case" ]; then
+if [ -x "${CASE_DIR}/generate_cases.sh" ] && \
+   [ -f "${CASE_DIR}/checkpoint.case" ] && \
+   [ -f "${CASE_DIR}/pod.case" ]; then
     IS_PARAMETRIC_ROOT=true
 fi
 
 NEKO_EXE=$(resolve_neko_exe)
 
-if [ -x "${SCRIPT_DIR}/neko" ] && [ -z "${NEKO_BIN:-}" ] && \
-   [ "${SCRIPT_DIR}/neko" -ot \
-   "${ROOT_DIR}/sources/problem/problem.f90" ]; then
+if [ -x "${CASE_DIR}/neko" ] && [ -z "${NEKO_BIN:-}" ] && \
+   [ "${CASE_DIR}/neko" -ot "${MAIN_DIR}/sources/problem/problem.f90" ]; then
     echo "Warning: ./neko is older than sources/problem/problem.f90." >&2
 fi
 
 if { [ "${IS_PARAMETRIC_ROOT}" = false ] || [ $# -ge 1 ]; } && \
-   [ -x "${SCRIPT_DIR}/prepare.sh" ]; then
+   [ -x "${CASE_DIR}/prepare.sh" ]; then
     prepare_case_dir
 fi
 
@@ -101,19 +101,19 @@ if [ "${IS_PARAMETRIC_ROOT}" = true ] && [ $# -lt 1 ]; then
 
     ./generate_cases.sh
 
-    if [ -d "${SCRIPT_DIR}/checkpoint" ]; then
-        study_dirs+=("${SCRIPT_DIR}/checkpoint")
+    if [ -d "${CASE_DIR}/checkpoint" ]; then
+        study_dirs+=("${CASE_DIR}/checkpoint")
     fi
 
     while IFS= read -r study_dir; do
         study_dirs+=("${study_dir}")
     done < <(
-        find "${SCRIPT_DIR}" -mindepth 1 -maxdepth 1 -type d \
+        find "${CASE_DIR}" -mindepth 1 -maxdepth 1 -type d \
             -name 'POD_nm*_is*' | sort
     )
 
     if [ ${#study_dirs[@]} -eq 0 ]; then
-        echo "Error: no generated study cases found in ${SCRIPT_DIR}" >&2
+        echo "Error: no generated study cases found in ${CASE_DIR}" >&2
         exit 1
     fi
 
@@ -121,8 +121,10 @@ if [ "${IS_PARAMETRIC_ROOT}" = true ] && [ $# -lt 1 ]; then
         echo "========================================================="
         echo "Running study case: $(basename "${study_dir}")"
         echo "========================================================="
-        NEKO_BIN="${NEKO_EXE}" \
-            "${study_dir}/run.sh" "${study_dir}/case.case" "${PY_SCRIPT}"
+        (
+            cd "${study_dir}"
+            NEKO_BIN="${NEKO_EXE}" ./run.sh case.case "${PY_SCRIPT}"
+        )
     done
     exit 0
 fi
@@ -135,11 +137,11 @@ else
     shopt -u nullglob
 
     if [ ${#case_files[@]} -eq 0 ]; then
-        echo "Error: no .case files found in ${SCRIPT_DIR}" >&2
+        echo "Error: no .case files found in ${CASE_DIR}" >&2
         exit 1
     fi
     if [ ${#case_files[@]} -gt 1 ]; then
-        echo "Error: multiple .case files found in ${SCRIPT_DIR}" >&2
+        echo "Error: multiple .case files found in ${CASE_DIR}" >&2
         exit 1
     fi
     CASE_PATH="${case_files[0]}"

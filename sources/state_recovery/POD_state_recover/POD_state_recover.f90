@@ -354,6 +354,11 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
     integer :: i
 
+    if (this%ctrl%inited) then
+       call this%ctrl%send(MODE_STOP, PHASE_ADJ_DONE, 0_c_int, &
+            0.0_c_double)
+    end if
+
     if (allocated(this%u_modes)) then
        do i = 1, size(this%u_modes); call this%u_modes(i)%free(); end do
        deallocate(this%u_modes)
