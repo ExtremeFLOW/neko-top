@@ -8,11 +8,24 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/state_recover_factory.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/checkpoint/checkpoint_linear.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_ctrl_mod.f90
-        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_adio2_ctrl.cpp
 )
-# --- ADIOS2 (needed for neko_adio2_ctrl.cpp) ---
-find_package(ADIOS2 REQUIRED COMPONENTS CXX MPI)
 
-target_link_libraries(neko-top PRIVATE adios2::cxx11_mpi)
+find_package(ADIOS2 QUIET COMPONENTS CXX MPI)
+
+if(ADIOS2_FOUND)
+    message(STATUS "ADIOS2 found: enabling POD state recovery")
+    target_sources(neko-top
+        PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90
+            ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_ctrl_mod.f90
+    )
+else()
+    message(STATUS "ADIOS2 not found: POD state recovery disabled")
+    set(POD_STATE_RECOVER_DIR
+        ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover
+    )
+    target_sources(neko-top
+        PRIVATE
+            ${POD_STATE_RECOVER_DIR}/POD_state_recover_stub.f90
+    )
+endif()

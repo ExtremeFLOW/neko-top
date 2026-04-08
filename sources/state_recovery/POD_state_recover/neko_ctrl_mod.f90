@@ -35,8 +35,12 @@
 !> @brief Control stream helpers for POD in-situ coordination.
 module neko_ctrl_mod
   use, intrinsic :: iso_c_binding, only: c_int, c_double
+  use, intrinsic :: iso_fortran_env, only: int32
   use comm, only: neko_comm
-  use mpi_f08, only: MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, MPI_INTEGER
+  use utils, only: neko_error
+  use mpi_f08, only: MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, &
+       MPI_INTEGER, MPI_COMM_WORLD, MPI_Send, MPI_Recv, &
+       MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE
   implicit none
   private
 
@@ -54,38 +58,21 @@ module neko_ctrl_mod
   integer(c_int), public, parameter :: PHASE_ADJ_RUNNING = 20_c_int
   integer(c_int), public, parameter :: PHASE_ADJ_DONE    = 21_c_int
 
+  integer, parameter :: CTRL_TAG_STATE_INT = 4101
+  integer, parameter :: CTRL_TAG_STATE_REAL = 4102
+  integer, parameter :: CTRL_TAG_CMD = 4103
+
   !> Lightweight control channel for coordinating POD streaming phases.
   type, public :: ctrl_stream_t
      logical :: inited = .false.
      logical :: debug = .false.
-     integer(c_int) :: comm_int = 0_c_int
+     integer :: peer_root = -1
    contains
      procedure, pass(this) :: init => ctrl_stream_init
      procedure, pass(this) :: free => ctrl_stream_free
      procedure, pass(this) :: put => ctrl_stream_put
      procedure, pass(this) :: wait_cmd => ctrl_stream_wait_cmd
   end type ctrl_stream_t
-
-  interface
-    subroutine adios2_ctrl_initialize_(comm_int) bind(C, name="adios2_ctrl_initialize_")
-      import :: c_int
-      integer(c_int), intent(in) :: comm_int
-    end subroutine
-
-    subroutine adios2_ctrl_finalize_() bind(C, name="adios2_ctrl_finalize_")
-    end subroutine
-
-    subroutine adios2_ctrl_put_state_(mode, phase, step, time) bind(C, name="adios2_ctrl_put_state_")
-      import :: c_int, c_double
-      integer(c_int), intent(in) :: mode, phase, step
-      real(c_double), intent(in) :: time
-    end subroutine
-
-    subroutine adios2_ctrl_wait_cmd_(mode_cmd, phase_cmd) bind(C, name="adios2_ctrl_wait_cmd_")
-      import :: c_int
-      integer(c_int), intent(inout) :: mode_cmd, phase_cmd
-    end subroutine
-  end interface
 
 contains
 
@@ -131,29 +118,43 @@ contains
     end select
   end function phase_name
 
-  !> Initialize the ADIOS2 control stream.
+  !> Read the peer root rank from the environment.
   !! @param[inout] this Control stream instance.
-  !! @param[in] comm_int MPI communicator as C int.
-  subroutine ctrl_stream_init(this, comm_int)
+  subroutine ctrl_stream_init_peer_root(this)
     class(ctrl_stream_t), intent(inout) :: this
-    integer(c_int), intent(in) :: comm_int
+    character(len=32) :: env_val
+    integer :: env_len
+    integer :: ios
+
+    call get_environment_variable("NEKO_CTRL_PEER_ROOT", env_val, env_len)
+    if (env_len <= 0) then
+       call neko_error('NEKO_CTRL_PEER_ROOT must be set for POD MPI control.')
+    end if
+
+    read(env_val(1:env_len), *, iostat=ios) this%peer_root
+    if (ios /= 0 .or. this%peer_root < 0) then
+       call neko_error('Invalid NEKO_CTRL_PEER_ROOT for POD MPI control.')
+    end if
+  end subroutine ctrl_stream_init_peer_root
+
+  !> Initialize the MPI control stream.
+  !! @param[inout] this Control stream instance.
+  subroutine ctrl_stream_init(this)
+    class(ctrl_stream_t), intent(inout) :: this
     if (this%inited) return
-    this%comm_int = comm_int
-    call ctrl_dbg_print(this, 'ctrl_init: calling adios2_ctrl_initialize_')
-    call adios2_ctrl_initialize_(comm_int)
-    call ctrl_dbg_print(this, 'ctrl_init: returned from adios2_ctrl_initialize_')
+    call ctrl_stream_init_peer_root(this)
+    call ctrl_dbg_print(this, 'ctrl_init: MPI control ready')
     this%inited = .true.
   end subroutine ctrl_stream_init
 
-  !> Finalize the ADIOS2 control stream.
+  !> Finalize the MPI control stream.
   !! @param[inout] this Control stream instance.
   subroutine ctrl_stream_free(this)
     class(ctrl_stream_t), intent(inout) :: this
     if (.not. this%inited) return
-    call ctrl_dbg_print(this, 'ctrl_finalize: calling adios2_ctrl_finalize_')
-    call adios2_ctrl_finalize_()
-    call ctrl_dbg_print(this, 'ctrl_finalize: returned from adios2_ctrl_finalize_')
+    call ctrl_dbg_print(this, 'ctrl_finalize: MPI control done')
     this%inited = .false.
+    this%peer_root = -1
   end subroutine ctrl_stream_free
 
   !> Publish current mode/phase/step/time to the control stream.
@@ -166,13 +167,27 @@ contains
     class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(in) :: mode, phase, step
     real(c_double), intent(in) :: time
+    integer(int32) :: state_i(3)
     character(len=128) :: msg
+    integer :: ierr
+    integer :: rank
     if (.not. this%inited) return
-    write(msg,'(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_put: mode=', trim(mode_name(mode)), &
-         ' phase=', trim(phase_name(phase)), ' step=', int(step), ' t=', real(time, kind=c_double)
+
+    call MPI_Comm_rank(neko_comm, rank, ierr)
+    if (rank /= 0) return
+
+    state_i(1) = int(mode, int32)
+    state_i(2) = int(phase, int32)
+    state_i(3) = int(step, int32)
+
+    write(msg,'(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_put: mode=', &
+         trim(mode_name(mode)), ' phase=', trim(phase_name(phase)), &
+         ' step=', int(step), ' t=', real(time, kind=c_double)
     call ctrl_dbg_print(this, msg)
-    call adios2_ctrl_put_state_(mode, phase, step, time)
-    call ctrl_dbg_print(this, 'ctrl_put: returned from adios2_ctrl_put_state_')
+    call MPI_Send(state_i, size(state_i), MPI_INTEGER, this%peer_root, &
+         CTRL_TAG_STATE_INT, MPI_COMM_WORLD, ierr)
+    call MPI_Send(time, 1, MPI_DOUBLE_PRECISION, this%peer_root, &
+         CTRL_TAG_STATE_REAL, MPI_COMM_WORLD, ierr)
   end subroutine ctrl_stream_put
 
   !> Wait for a control command and broadcast it to all ranks.
@@ -184,23 +199,25 @@ contains
     integer(c_int), intent(inout) :: mode_cmd, phase_cmd
     integer :: ierr, rank
     integer :: mode_i, phase_i
+    integer(int32) :: cmd_i(2)
     character(len=128) :: msg
     if (.not. this%inited) return
 
     call MPI_Comm_rank(neko_comm, rank, ierr)
 
-    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: enter with defaults mode=', trim(mode_name(mode_cmd)), &
-         ' phase=', trim(phase_name(phase_cmd))
+    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: enter with defaults mode=', &
+         trim(mode_name(mode_cmd)), ' phase=', trim(phase_name(phase_cmd))
     call ctrl_dbg_print(this, msg)
 
     if (rank == 0) then
-       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 calling C++ adios2_ctrl_wait_cmd_ (BLOCKING)')
-       call adios2_ctrl_wait_cmd_(mode_cmd, phase_cmd)
-       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 returned from C++ wait_cmd')
-       mode_i  = int(mode_cmd)
-       phase_i = int(phase_cmd)
+       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 waiting on MPI cmd')
+       call MPI_Recv(cmd_i, size(cmd_i), MPI_INTEGER, this%peer_root, &
+            CTRL_TAG_CMD, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+       mode_i  = int(cmd_i(1))
+       phase_i = int(cmd_i(2))
     else
-       call ctrl_dbg_print(this, 'ctrl_wait_cmd: non-root waiting for Bcast from rank0')
+       call ctrl_dbg_print(this, &
+            'ctrl_wait_cmd: non-root waiting for Bcast from rank0')
        mode_i  = 0
        phase_i = 0
     end if
@@ -213,8 +230,8 @@ contains
     mode_cmd  = int(mode_i,  c_int)
     phase_cmd = int(phase_i, c_int)
 
-    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: exit with mode=', trim(mode_name(mode_cmd)), &
-         ' phase=', trim(phase_name(phase_cmd))
+    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: exit with mode=', &
+         trim(mode_name(mode_cmd)), ' phase=', trim(phase_name(phase_cmd))
     call ctrl_dbg_print(this, msg)
   end subroutine ctrl_stream_wait_cmd
 

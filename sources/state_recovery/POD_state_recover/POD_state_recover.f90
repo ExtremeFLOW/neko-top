@@ -336,11 +336,11 @@ contains
       if (this%include_scalar) call this%dstream%stream(s%x)
     end block
 
-    ! Control init (use neko_comm%mpi_val – your working pattern)
+    ! Control init for root-to-root MPI coordination with Python.
     if (present(debug)) then
        this%ctrl%debug = debug
     end if
-    call this%ctrl%init(int(neko_comm%mpi_val, c_int))
+    call this%ctrl%init()
 
     ! Fire an init tick (python might miss it; harmless)
     call this%ctrl%put(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)

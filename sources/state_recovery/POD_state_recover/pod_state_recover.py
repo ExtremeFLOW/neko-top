@@ -8,7 +8,6 @@ import time
 from dataclasses import dataclass
 from typing import Optional
 
-import adios2.bindings as adios2
 import numpy as np
 from mpi4py import MPI
 
@@ -30,6 +29,10 @@ PHASE_FWD_RUNNING = 10
 PHASE_FWD_DONE = 11
 PHASE_ADJ_RUNNING = 20
 PHASE_ADJ_DONE = 21
+
+CTRL_TAG_STATE_INT = 4101
+CTRL_TAG_STATE_REAL = 4102
+CTRL_TAG_CMD = 4103
 
 DEBUG = False
 
@@ -127,25 +130,6 @@ def rotate_time_coeffs(path: str) -> Optional[str]:
         idx += 1
 
 
-def wait_for_sst_contact(
-    stem: str, timeout: float = 120.0, poll: float = 0.05
-) -> str:
-    candidates = [stem, f"{stem}.sst"]
-    t_start = time.time()
-    cwd = os.getcwd()
-
-    while time.time() - t_start < timeout:
-        for candidate in candidates:
-            if os.path.exists(candidate):
-                return os.path.join(cwd, candidate)
-        time.sleep(poll)
-
-    raise RuntimeError(
-        f"Timed out waiting for SST contact file for '{stem}' in {cwd}. "
-        f"Checked {candidates} for {timeout} seconds."
-    )
-
-
 def count_enabled_scalars(case_cfg: dict) -> int:
     case_data = case_cfg.get("case", {})
     if not isinstance(case_data, dict):
@@ -241,94 +225,82 @@ def load_pod_config(case_path: str) -> tuple[dict, PODConfig]:
     return case, cfg
 
 
+def get_comm_color() -> Optional[int]:
+    value = os.getenv("NEKO_COMM_ID")
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise ValueError("Invalid NEKO_COMM_ID") from exc
+
+
+def get_peer_root() -> int:
+    value = os.getenv("NEKO_CTRL_PEER_ROOT")
+    if value is None:
+        raise ValueError("NEKO_CTRL_PEER_ROOT must be set for POD control.")
+    try:
+        peer_root = int(value)
+    except ValueError as exc:
+        raise ValueError("Invalid NEKO_CTRL_PEER_ROOT") from exc
+    if peer_root < 0:
+        raise ValueError("NEKO_CTRL_PEER_ROOT must be non-negative.")
+    return peer_root
+
+
 class CtrlClient:
-    def __init__(self, debug: bool):
+    def __init__(
+        self,
+        world: MPI.Comm,
+        peer_root: int,
+        debug: bool,
+    ):
         self.debug = debug
-        self.comm = MPI.COMM_SELF
-        self.adios = adios2.ADIOS(self.comm)
-
-        self.io_read = self.adios.DeclareIO("py_ctrl_read")
-        self.io_read.SetEngine("SST")
-
-        if self.debug:
-            log0("waiting for SST contact file 'neko_ctrl_state'")
-        found = wait_for_sst_contact("neko_ctrl_state", timeout=120.0)
-        if self.debug:
-            log0(f"found contact file: {found}")
-
-        self.reader = self.io_read.Open("neko_ctrl_state", adios2.Mode.Read)
-
-        self.io_write = self.adios.DeclareIO("py_ctrl_write")
-        self.io_write.SetEngine("SST")
-
-        self._mode_cmd = np.zeros((), dtype=np.int32)
-        self._phase_cmd = np.zeros((), dtype=np.int32)
-        self.v_mode_cmd = self.io_write.DefineVariable(
-            "mode_cmd", self._mode_cmd
-        )
-        self.v_phase_cmd = self.io_write.DefineVariable(
-            "phase_cmd", self._phase_cmd
-        )
-        self.writer = self.io_write.Open("neko_ctrl_cmd", adios2.Mode.Write)
+        self.world = world
+        self.peer_root = peer_root
 
     def read_state(
-        self, poll_sleep: float = 0.001
     ) -> tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
-        while True:
-            status = self.reader.BeginStep()
-            if status == adios2.StepStatus.OK:
-                v_mode = self.io_read.InquireVariable("mode")
-                v_phase = self.io_read.InquireVariable("phase")
-                v_step = self.io_read.InquireVariable("step")
-                v_time = self.io_read.InquireVariable("time")
+        state_i = np.zeros(3, dtype=np.int32)
+        state_t = np.zeros(1, dtype=np.float64)
 
-                mode = np.zeros((), dtype=np.int32)
-                phase = np.zeros((), dtype=np.int32)
-                step = np.zeros((), dtype=np.int32)
-                sim_time = np.zeros((), dtype=np.float64)
+        self.world.Recv(
+            [state_i, MPI.INT],
+            source=self.peer_root,
+            tag=CTRL_TAG_STATE_INT,
+        )
+        self.world.Recv(
+            [state_t, MPI.DOUBLE],
+            source=self.peer_root,
+            tag=CTRL_TAG_STATE_REAL,
+        )
 
-                self.reader.Get(v_mode, mode)
-                self.reader.Get(v_phase, phase)
-                self.reader.Get(v_step, step)
-                self.reader.Get(v_time, sim_time)
-                self.reader.EndStep()
-
-                result = (
-                    int(mode),
-                    int(phase),
-                    int(step),
-                    float(sim_time),
-                )
-                if self.debug:
-                    log0(
-                        "got state mode="
-                        f"{result[0]} phase={result[1]} "
-                        f"step={result[2]} t={result[3]}"
-                    )
-                return result
-
-            if status == adios2.StepStatus.NotReady:
-                time.sleep(poll_sleep)
-                continue
-
-            if self.debug:
-                log0(f"state stream ended with status={status}")
-            return None, None, None, None
+        result = (
+            int(state_i[0]),
+            int(state_i[1]),
+            int(state_i[2]),
+            float(state_t[0]),
+        )
+        if self.debug:
+            log0(
+                "got state mode="
+                f"{result[0]} phase={result[1]} "
+                f"step={result[2]} t={result[3]}"
+            )
+        return result
 
     def send_cmd(self, mode_cmd: int, phase_cmd: int) -> None:
         if self.debug:
             log0(f"send_cmd mode={mode_cmd} phase={phase_cmd}")
-
-        self._mode_cmd[...] = np.int32(mode_cmd)
-        self._phase_cmd[...] = np.int32(phase_cmd)
-        self.writer.BeginStep()
-        self.writer.Put(self.v_mode_cmd, self._mode_cmd)
-        self.writer.Put(self.v_phase_cmd, self._phase_cmd)
-        self.writer.EndStep()
+        cmd = np.asarray([mode_cmd, phase_cmd], dtype=np.int32)
+        self.world.Send(
+            [cmd, MPI.INT],
+            dest=self.peer_root,
+            tag=CTRL_TAG_CMD,
+        )
 
     def close(self) -> None:
-        self.reader.Close()
-        self.writer.Close()
+        return
 
 
 def recv_field(ds: DataStreamer, dtype: type) -> np.ndarray:
@@ -542,8 +514,13 @@ def main() -> None:
     global DEBUG
 
     world = MPI.COMM_WORLD
-    comm = world.Split(1, world.Get_rank())
+    comm_color = get_comm_color()
+    if comm_color is None:
+        comm = world.Dup()
+    else:
+        comm = world.Split(comm_color, world.Get_rank())
     rank = comm.Get_rank()
+    peer_root = get_peer_root()
 
     case_path = sys.argv[1] if len(sys.argv) > 1 else "POD_rugby_ball.case"
     case_path = os.path.abspath(case_path)
@@ -555,7 +532,9 @@ def main() -> None:
     energy = EnergyState()
     add_snapshot(comm, pod, ioh, bm, initial_fields, 0.0, times, energy)
 
-    ctrl = CtrlClient(debug=cfg.debug) if rank == 0 else None
+    ctrl = None
+    if rank == 0:
+        ctrl = CtrlClient(world, peer_root, cfg.debug)
 
     my_count = getattr(ds, "py2f_field_my_count", None)
     if my_count is None:

@@ -11,7 +11,9 @@ function check_system_dependencies() {
     if ! command -v aclocal 2>&1 1>/dev/null; then MISSING+=("Aclocal"); fi
     if ! command -v autoconf 2>&1 1>/dev/null; then MISSING+=("Autoconf"); fi
     if ! command -v automake 2>&1 1>/dev/null; then MISSING+=("Automake"); fi
-    if ! command -v pkg-config 2>&1 1>/dev/null; then MISSING+=("Pkg-config"); fi
+    if ! command -v pkg-config 2>&1 1>/dev/null; then
+        MISSING+=("Pkg-config")
+    fi
     [ -z "$MPICC" ] && MISSING+=("MPICC Environment Variable")
     [ -z "$MPICXX" ] && MISSING+=("MPICXX Environment Variable")
     [ -z "$MPIFC" ] && MISSING+=("MPIFC Environment Variable")
@@ -52,7 +54,8 @@ function find_json_fortran() {
     if [[ ! -d "$JSON_FORTRAN_LIB" ]]; then
 
         # Clone JSON-Fortran from the repository if it does not exist.
-        if [[ ! -d "$JSON_FORTRAN_DIR" || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
+        if [[ ! -d "$JSON_FORTRAN_DIR" || \
+            $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
             [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
 
             git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
@@ -195,21 +198,9 @@ function find_pfunit() {
         # Patch pFUnit to work with Neko
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $PFUNIT_DIR
-        cat >>pfunit_error_stop.patch <<_ACEOF
-diff --git a/src/funit/FUnit.F90 b/src/funit/FUnit.F90
-index 7df7b65..4f7dbf5 100644
---- a/src/funit/FUnit.F90
-+++ b/src/funit/FUnit.F90
-@@ -168,6 +168,6 @@ contains
- #if defined(PGI)
-          call exit(-1)
- #else
--         stop '*** Encountered 1 or more failures/errors during testing. ***'
-+         error stop '*** Encountered 1 or more failures/errors during testing. ***'
- #endif
-       end if
-_ACEOF
-        git apply pfunit_error_stop.patch
+        sed -i \
+            '/Encountered 1 or more failures\/errors/s/stop/error stop/' \
+            src/funit/FUnit.F90
         cd $CURRENT_DIR
     fi
 
@@ -300,49 +291,35 @@ function find_hdf5() {
 function find_adios2() {
     check_external_dir
 
-    # Determine the ADIOS2 installation directory
-    if [[ $# -ge 1 ]]; then
+    if [[ $# -ge 1 && -n "$1" ]]; then
         ADIOS2_DIR="$1"
-    elif [ -z "$ADIOS2_DIR" ]; then
-        ADIOS2_DIR="adios2"
     fi
 
-    if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
-        ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
+    if [ -z "$ADIOS2_DIR" ] && command -v adios2-config >/dev/null 2>&1; then
+        ADIOS2_CONFIG=$(realpath "$(command -v adios2-config)")
+        ADIOS2_DIR=$(dirname "$(dirname "$ADIOS2_CONFIG")")
+    elif [ -n "$ADIOS2_DIR" ]; then
+        if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
+            ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
+        fi
+        mkdir -p $ADIOS2_DIR
+        ADIOS2_DIR=$(realpath $ADIOS2_DIR)
+        ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
+    else
+        error "ADIOS2 was requested but ADIOS2_DIR is not set and"
+        error "'adios2-config' was not found in PATH."
+        exit 1
     fi
-
-    mkdir -p $ADIOS2_DIR
-    ADIOS2_DIR=$(realpath $ADIOS2_DIR)
-    ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
 
     if [[ ! -x "$ADIOS2_CONFIG" ]]; then
         [ -z "$ADIOS2_VERSION" ] && ADIOS2_VERSION="2.10.1"
         [ -z "$ADIOS2_ENABLE_FORTRAN" ] && ADIOS2_ENABLE_FORTRAN="ON"
         [ -z "$ADIOS2_ENABLE_PYTHON" ] && ADIOS2_ENABLE_PYTHON="ON"
-        [ -z "$ADIOS2_ENABLE_BZIP2" ] && ADIOS2_ENABLE_BZIP2="ON"
-        [ -z "$ADIOS2_BZIP2_VERSION" ] && ADIOS2_BZIP2_VERSION="1.0.8"
+        [ -z "$ADIOS2_ENABLE_SST" ] && ADIOS2_ENABLE_SST="ON"
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $ADIOS2_DIR
 
-        # Build BZip2 locally if requested
-        if [ "$ADIOS2_ENABLE_BZIP2" == "ON" ]; then
-            BZIP2_SRC_DIR=$ADIOS2_DIR/bzip2-$ADIOS2_BZIP2_VERSION
-            BZIP2_ARCHIVE=bzip2-$ADIOS2_BZIP2_VERSION.tar.gz
-            if [[ ! -f "$BZIP2_SRC_DIR/libbz2.so.$ADIOS2_BZIP2_VERSION" ]]; then
-                rm -fr $BZIP2_SRC_DIR
-                wget https://www.sourceware.org/pub/bzip2/$BZIP2_ARCHIVE
-                tar -xvf $BZIP2_ARCHIVE
-                rm $BZIP2_ARCHIVE
-                cd $BZIP2_SRC_DIR
-                make CC=${CC:-cc} -f Makefile-libbz2_so
-                cd ..
-            fi
-            BZIP2_INCLUDE_DIR=$BZIP2_SRC_DIR
-            BZIP2_LIBRARY=$BZIP2_SRC_DIR/libbz2.so.$ADIOS2_BZIP2_VERSION
-        fi
-
-        # Clone ADIOS2 from the repository if it does not exist.
         if [ ! -d ADIOS2/.git ]; then
             rm -fr ADIOS2
             git clone --depth 1 --branch v$ADIOS2_VERSION \
@@ -352,9 +329,13 @@ function find_adios2() {
         cmake_args=(
             -DCMAKE_BUILD_TYPE=RelWithDebInfo
             -DCMAKE_INSTALL_PREFIX=$ADIOS2_DIR
+            -DADIOS2_BUILD_EXAMPLES=OFF
             -DADIOS2_USE_MPI=ON
+            -DADIOS2_USE_SST=$ADIOS2_ENABLE_SST
             -DADIOS2_USE_Fortran=$ADIOS2_ENABLE_FORTRAN
             -DADIOS2_USE_Python=$ADIOS2_ENABLE_PYTHON
+            -DADIOS2_USE_BZip2=OFF
+            -DBUILD_TESTING=OFF
             -DPython_EXECUTABLE=$(which python3)
             -DPYTHON_EXECUTABLE=$(which python3)
             -DPython_FIND_STRATEGY=LOCATION
@@ -362,7 +343,6 @@ function find_adios2() {
             -DCMAKE_CXX_COMPILER=${MPICXX:-${CXX:-c++}}
         )
 
-        # Tie ADIOS2 to the same HDF5 that Neko uses
         if [ -n "$HDF5_DIR" ]; then
             cmake_args+=(
                 -DADIOS2_USE_HDF5=ON
@@ -372,17 +352,6 @@ function find_adios2() {
             cmake_args+=(
                 -DADIOS2_USE_HDF5=OFF
             )
-        fi
-
-        if [ "$ADIOS2_ENABLE_BZIP2" == "ON" ]; then
-            cmake_args+=(
-                -DADIOS2_USE_BZip2=ON
-                -DBZIP2_INCLUDE_DIR=$BZIP2_INCLUDE_DIR
-                -DBZIP2_LIBRARY_DEBUG=$BZIP2_LIBRARY
-                -DBZIP2_LIBRARY_RELEASE=$BZIP2_LIBRARY
-            )
-        else
-            cmake_args+=(-DADIOS2_USE_BZip2=OFF)
         fi
 
         cmake -S ADIOS2 -B build "${cmake_args[@]}"
@@ -439,8 +408,10 @@ function find_parmetis() {
         CMAKE_GENERATOR="Unix Makefiles"
 
         # Download and install ParMETIS
+        PARMETIS_ARCHIVE_URL="https://github.com/mfem/tpls/raw/refs/heads/"\
+"gh-pages/parmetis-4.0.3.tar.gz"
         mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
-        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
+        wget $PARMETIS_ARCHIVE_URL
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
@@ -483,7 +454,9 @@ function find_neko() {
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
-    find_adios2 $ADIOS2_DIR
+    if [ -n "$ADIOS2_DIR" ] || [ "${NEKO_WITH_ADIOS2:-false}" == true ]; then
+        find_adios2 $ADIOS2_DIR
+    fi
     find_parmetis $PARMETIS_DIR
     [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
 
