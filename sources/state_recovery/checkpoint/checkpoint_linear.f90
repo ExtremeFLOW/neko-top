@@ -46,6 +46,7 @@ submodule (simulation_checkpoint) checkpoint_linear
   use simulation, only: simulation_step, simulation_restart
   use file, only: file_t, file_free
   use time_step_controller, only: time_step_controller_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
 contains
 
@@ -72,7 +73,9 @@ contains
             this%first_valid_timestep)
 
        call this%chkp_output%set_counter(counter)
+       call profiler_start_region("Checkpoint write to disk")
        call this%chkp_output%sample(time)
+       call profiler_start_region("Checkpoint write to disk")
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
@@ -120,7 +123,9 @@ contains
        counter = determine_counter(previous_save, this%n_saves_memory, &
             this%first_valid_timestep)
        call this%chkp_output%set_counter(counter)
+       call profiler_start_region("Checkpoint read from disk")
        call this%chkp_output%file_%read(neko_case%chkp)
+       call profiler_start_region("Checkpoint read from disk")
        call simulation_restart(neko_case, neko_case%chkp)
 
        ! Initialize the time step controller and set the time step
@@ -128,6 +133,7 @@ contains
        neko_case%time%tstep = previous_save
        this%loaded_checkpoint = neko_case%time%tstep
 
+       call profiler_start_region("Checkpoint recompute")
        ! Step through the simulation and store field states in memory
        do k = previous_save, min(next_save - 1, this%get_n_timesteps())
 
@@ -141,6 +147,7 @@ contains
           local_idx = modulo(k, this%n_saves_memory) + 1
           call this%save_data(local_idx)
        end do
+       call profiler_start_region("Checkpoint recompute")
     end if
 
     ! Restore the required time step from memory
