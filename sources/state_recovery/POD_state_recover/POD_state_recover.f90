@@ -140,7 +140,6 @@ contains
     character(len=:), allocatable :: output_precision
     character(len=:), allocatable :: output_control
     real(kind=rp) :: output_value
-    integer :: output_prec
     character(len=:), allocatable :: dtype
 
     call json_get(params, "i_stream", i_stream)
@@ -153,83 +152,34 @@ contains
     call json_get_or_default(params, "output_reconstruction", &
          output_reconstruction, .false.)
 
-    call this%init_from_components(neko_case, i_stream, n_modes, &
-         include_scalar, debug)
-    this%dtype = adjustl(dtype)
-    this%write_modes = write_modes
-    this%output_reconstruction = output_reconstruction
+    output_precision = 'single'
+    output_control = 'never'
+    output_value = 0.0_rp
 
-    select case (trim(this%dtype))
-    case ("single", "SINGLE", "Single")
-       if (rp .ne. sp) then
-          call neko_error("POD dtype single but code not single precision.")
-       end if
-    case ("double", "DOUBLE", "Double")
-       if (rp .ne. dp) then
-          call neko_error("POD dtype double but code not double precision.")
-       end if
-    case default
-       call neko_error("Unsupported POD dtype: " // trim(this%dtype))
-    end select
-
-    if (this%output_reconstruction) then
+    if (output_reconstruction) then
        call json_get_or_default(neko_case%params, 'case.output_precision', &
             output_precision, 'single')
-       if (trim(output_precision) .eq. 'double') then
-          output_prec = dp
-       else
-          output_prec = sp
-       end if
-
-       call this%recon_output%init(output_prec, 'pod_reconstruction', &
-            this%n_flds, path = trim(neko_case%output_directory))
-       call this%recon_output%fields%assign_to_field(1, neko_case%fluid%u)
-       call this%recon_output%fields%assign_to_field(2, neko_case%fluid%v)
-       call this%recon_output%fields%assign_to_field(3, neko_case%fluid%w)
-       if (this%include_scalar) then
-          call this%recon_output%fields%assign_to_field(4, this%s)
-       end if
 
        call json_get_or_default(neko_case%params, 'case.fluid.output_control', &
             output_control, 'org')
-       this%recon_output_control = trim(lower_string(output_control))
-
-       select case (this%recon_output_control)
+       select case (trim(lower_string(output_control)))
        case ('org')
           call json_get(neko_case%params, 'case.nsamples', output_value)
-          this%recon_output_control = 'nsamples'
-          this%recon_output_value = output_value
-          if (output_value .gt. 0.0_rp) then
-             this%recon_time_interval = (neko_case%time%end_time - &
-                  neko_case%time%start_time) / output_value
-          end if
-       case ('nsamples')
+       case ('nsamples', 'simulationtime', 'tsteps')
           call json_get(neko_case%params, 'case.fluid.output_value', &
                output_value)
-          this%recon_output_value = output_value
-          if (output_value .gt. 0.0_rp) then
-             this%recon_time_interval = (neko_case%time%end_time - &
-                  neko_case%time%start_time) / output_value
-          end if
-       case ('simulationtime')
-          call json_get(neko_case%params, 'case.fluid.output_value', &
-               output_value)
-          this%recon_output_value = output_value
-          this%recon_time_interval = output_value
-       case ('tsteps')
-          call json_get(neko_case%params, 'case.fluid.output_value', &
-               output_value)
-          this%recon_output_value = output_value
-          this%recon_nsteps = int(output_value)
        case ('never')
           call json_get_or_default(neko_case%params, &
                'case.fluid.output_value', output_value, 0.0_rp)
-          this%recon_output_value = output_value
        case default
-          call neko_error('Unsupported output_control for reconstruction: ' // &
-               trim(output_control))
+          call json_get_or_default(neko_case%params, &
+               'case.fluid.output_value', output_value, 0.0_rp)
        end select
     end if
+
+    call this%init_from_components(neko_case, i_stream, n_modes, dtype, &
+         include_scalar, write_modes, output_reconstruction, &
+         output_precision, output_control, output_value, debug)
   end subroutine POD_state_recover_init_from_json
 
 
@@ -238,24 +188,59 @@ contains
   !! @param[inout] neko_case Case data structure.
   !! @param[in] i_stream Snapshot stride.
   !! @param[in] n_modes Number of POD modes to keep.
+  !! @param[in] dtype POD floating-point precision.
   !! @param[in] include_scalar Include one scalar field in the POD basis.
+  !! @param[in] write_modes Whether to write modes to output.
+  !! @param[in] output_reconstruction Whether to output reconstructions.
+  !! @param[in] output_precision Reconstruction output precision.
+  !! @param[in] output_control Reconstruction output cadence control.
+  !! @param[in] output_value Reconstruction cadence value.
   !! @param[in] debug Optional debug flag.
   subroutine POD_state_recover_init_from_components(this, neko_case, &
-       i_stream, n_modes, include_scalar, debug)
+       i_stream, n_modes, dtype, include_scalar, write_modes, &
+       output_reconstruction, output_precision, output_control, &
+       output_value, debug)
     class(POD_state_recover_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: i_stream, n_modes
+    character(len=*), intent(in) :: dtype
     logical, intent(in) :: include_scalar
+    logical, intent(in) :: write_modes
+    logical, intent(in) :: output_reconstruction
+    character(len=*), intent(in) :: output_precision
+    character(len=*), intent(in) :: output_control
+    real(kind=rp), intent(in) :: output_value
     logical, intent(in), optional :: debug
     integer :: i
+    integer :: output_prec
     character(len=80) :: str
 
     this%enabled = .true.
     this%i_stream = i_stream
     this%n_modes = n_modes
+    this%dtype = adjustl(dtype)
     this%include_scalar = include_scalar
+    this%write_modes = write_modes
+    this%output_reconstruction = output_reconstruction
+    this%recon_output_control = 'never'
+    this%recon_output_value = 0.0_rp
+    this%recon_time_interval = 0.0_rp
+    this%recon_nsteps = 0
     this%n_flds = 3
     this%coef => neko_case%fluid%c_Xh
+
+    select case (trim(lower_string(this%dtype)))
+    case ('single')
+       if (rp .ne. sp) then
+          call neko_error("POD dtype single but code not single precision.")
+       end if
+    case ('double')
+       if (rp .ne. dp) then
+          call neko_error("POD dtype double but code not double precision.")
+       end if
+    case default
+       call neko_error("Unsupported POD dtype: " // trim(this%dtype))
+    end select
 
     if (this%include_scalar) then
        if (.not. allocated(neko_case%scalars)) then
@@ -298,6 +283,48 @@ contains
                this%s_modes(i))
        end if
     end do
+
+    if (this%output_reconstruction) then
+       if (trim(lower_string(output_precision)) .eq. 'double') then
+          output_prec = dp
+       else
+          output_prec = sp
+       end if
+
+       call this%recon_output%init(output_prec, 'pod_reconstruction', &
+            this%n_flds, path = trim(neko_case%output_directory))
+       call this%recon_output%fields%assign_to_field(1, neko_case%fluid%u)
+       call this%recon_output%fields%assign_to_field(2, neko_case%fluid%v)
+       call this%recon_output%fields%assign_to_field(3, neko_case%fluid%w)
+       if (this%include_scalar) then
+          call this%recon_output%fields%assign_to_field(4, this%s)
+       end if
+
+       this%recon_output_control = trim(lower_string(output_control))
+       this%recon_output_value = output_value
+
+       select case (this%recon_output_control)
+       case ('org')
+          this%recon_output_control = 'nsamples'
+          if (output_value .gt. 0.0_rp) then
+             this%recon_time_interval = (neko_case%time%end_time - &
+                  neko_case%time%start_time) / output_value
+          end if
+       case ('nsamples')
+          if (output_value .gt. 0.0_rp) then
+             this%recon_time_interval = (neko_case%time%end_time - &
+                  neko_case%time%start_time) / output_value
+          end if
+       case ('simulationtime')
+          this%recon_time_interval = output_value
+       case ('tsteps')
+          this%recon_nsteps = int(output_value)
+       case ('never')
+       case default
+          call neko_error('Unsupported output_control for reconstruction: ' // &
+               trim(output_control))
+       end select
+    end if
 
     call this%a_interp%init(this%n_modes)
     call this%csv_reader%init('pod_time_coeffs.csv')
