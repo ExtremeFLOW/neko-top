@@ -260,6 +260,7 @@ class CtrlClient:
         self.peer_root = peer_root
 
     def read_state(
+        self,
     ) -> tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
         state_i = np.zeros(3, dtype=np.int32)
         state_t = np.zeros(1, dtype=np.float64)
@@ -493,15 +494,12 @@ def init_runtime(
     comm: MPI.Comm,
     cfg: PODConfig,
 ) -> tuple[DataStreamer, np.ndarray, POD, IoHelp, list[np.ndarray]]:
-    log(comm, "init DataStreamer")
     ds = DataStreamer(comm)
 
-    log(comm, "receive mesh")
     x = recv_field(ds, cfg.dtype)
     y = recv_field(ds, cfg.dtype)
     z = recv_field(ds, cfg.dtype)
 
-    log(comm, "receive initial fields")
     initial_fields = recv_fields(ds, cfg.n_fields, cfg.dtype)
 
     mesh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
@@ -549,10 +547,6 @@ def main() -> None:
                 state = (None, None, None, None)
 
             mode, phase, step, tcur = comm.bcast(state, root=0)
-            log(
-                comm,
-                f"state mode={mode} phase={phase} step={step} t={tcur}",
-            )
 
             if mode is None or mode == MODE_STOP:
                 break
@@ -575,14 +569,9 @@ def main() -> None:
                 )
                 if rank == 0:
                     report_energy_capture(pod, energy, cfg.keep_modes)
-
-                comm.Barrier()
-                stream_mode_fields(ds, ioh, pod, cfg, zero_field, n_avail)
-                comm.Barrier()
-
-                if rank == 0:
                     ctrl.send_cmd(MODE_ADJOINT, PHASE_ADJ_RUNNING)
-                comm.Barrier()
+
+                stream_mode_fields(ds, ioh, pod, cfg, zero_field, n_avail)
                 continue
 
             if mode == MODE_ADJOINT and phase == PHASE_ADJ_DONE:
