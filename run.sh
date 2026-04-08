@@ -23,14 +23,11 @@ function help() {
 
     printf "\e[4mOptions:\e[0m\n"
     printf "  -%-1s, --%-10s %-60s\n" "a" "all" "Run all journals available."
-    printf "  -%-1s, --%-10s %-60s\n" "c" "clean" \
-        "Clean artifacts from previous runs."
-    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" \
-        "Delete previously completed runs."
+    printf "  -%-1s, --%-10s %-60s\n" "c" "clean" "Clean artifacts from previous runs."
+    printf "  -%-1s, --%-10s %-60s\n" "d" "delete" "Delete previously completed runs."
     printf "  -%-1s, --%-10s %-60s\n" "h" "help" "Print help."
     printf "  -%-1s, --%-10s %-60s\n" "n" "neko" "Look for examples in neko."
-    printf "  -%-1s, --%-10s %-60s\n" "s" "submit" \
-        "Submit the examples to a cluster."
+    printf "  -%-1s, --%-10s %-60s\n" "s" "submit" "Submit the examples to a cluster."
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
     printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
@@ -148,10 +145,8 @@ for in in $@; do
     # Extract the examples from the input
     matches=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type d -name "$base"))
     matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base"))
-    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 \
-        -type f -name "$base.case"))
-    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 \
-        -type f -name "$base.json"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.case"))
+    matches+=($(find $EPATH/$dir -mindepth 1 -maxdepth 1 -type f -name "$base.json"))
 
     for match in ${matches[@]}; do
         file_list=()
@@ -223,15 +218,13 @@ for i in ${!example_list[@]}; do
     parent=$(dirname ${example%/*.*})
     while [ $parent != "." ]; do
 
-        if [[ -n "$(find $EPATH/$parent -maxdepth 1 \
-            -name '*.case' -or -name '*.json')" ]]; then
+        if [[ -n "$(find $EPATH/$parent -maxdepth 1 -name '*.case' -or -name '*.json')" ]]; then
 
             printf >&2 "\e[1;31mInvalid example file:\e[m\n"
             printf >&2 "$EPATH/$example\n"
             printf >&2 "\tNested examples are not allowed.\n"
             printf >&2 "\tMove the $example file to the root of example suite\n"
-            if [[ ${example: -5} == ".case" || \
-                ${example: -5} == ".json" ]]; then
+            if [[ ${example: -5} == ".case" || ${example: -5} == ".json" ]]; then
                 printf >&2 "\tor create a run.sh file in the parent folder.\n"
             fi
 
@@ -335,8 +328,7 @@ function Submit() {
             return
         fi
 
-        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh \
-            1>/dev/null 2>error.log
+        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh 1>/dev/null 2>error.log
         if [ "$SEQUENTIAL" == true ]; then
             job_list=$(squeue -ho "%i" -S "i" --me | tail -n 1)
             if [ -n "$job_list" ]; then
@@ -393,8 +385,7 @@ for case in ${example_list[@]}; do
     # same folder, we add the case name to the example name.
     example=$case_dir
 
-    if [[ $(find $EPATH/$case_dir -name "*.case" -or \
-        -name "*.json" | wc -l) > 1 ]]; then
+    if [[ $(find $EPATH/$case_dir -name "*.case" -or -name "*.json" | wc -l) > 1 ]]; then
         example=$example/$case_name
     fi
 

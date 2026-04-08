@@ -41,18 +41,14 @@ function run {
     printf "=%.0s" {1..80} && printf "\n"
 
     TIME_START=$(date +%s)
-    status=0
     if [ -f "run.sh" ]; then
         ./run.sh 2>error.log
-        status=$?
 
     elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
         srun --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
-        status=$?
 
     elif command -v srun 2>&1 1>/dev/null; then
         srun $neko $casefile 2>error.log
-        status=$?
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
@@ -73,7 +69,6 @@ function run {
         fi
 
         mpirun --tag-output -n $ncores $neko $casefile 2>error.log
-        status=$?
 
         # Remove all lines printed from mpi rank > 0 and remove the mpi tag
         sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
@@ -81,7 +76,6 @@ function run {
 
     else
         $neko $casefile 2>error.log
-        status=$?
 
     fi
     TIME_END=$(date +%s)
@@ -93,10 +87,6 @@ function run {
         printf "ERROR: An error occurred during execution.\n"
         printf "See error.log for details.\n"
         return 1
-    fi
-    if [ $status -ne 0 ]; then
-        printf "ERROR: The example exited with status %d.\n" $status
-        return $status
     fi
 
     printf "\nExample concluded.\n"
