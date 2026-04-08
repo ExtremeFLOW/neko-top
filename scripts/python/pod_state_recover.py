@@ -18,16 +18,16 @@ from pysemtools.io.utils import get_fld_from_ndarray
 from pysemtools.rom.io_help import IoHelp
 from pysemtools.rom.pod import POD
 
-from pod_communicator import CtrlClient
-from pod_communicator import MODE_ADJOINT
-from pod_communicator import MODE_FORWARD
-from pod_communicator import MODE_STOP
-from pod_communicator import PHASE_ADJ_DONE
-from pod_communicator import PHASE_ADJ_RUNNING
-from pod_communicator import PHASE_FWD_DONE
-from pod_communicator import PHASE_FWD_RUNNING
-from pod_communicator import get_peer_root
-from pod_communicator import make_local_comm
+from neko_communicator import CtrlClient
+from neko_communicator import MODE_ADJOINT
+from neko_communicator import MODE_FORWARD
+from neko_communicator import MODE_STOP
+from neko_communicator import PHASE_ADJ_DONE
+from neko_communicator import PHASE_ADJ_RUNNING
+from neko_communicator import PHASE_FWD_DONE
+from neko_communicator import PHASE_FWD_RUNNING
+from neko_communicator import get_peer_root
+from neko_communicator import make_local_comm
 
 DEBUG = False
 
@@ -39,6 +39,7 @@ def log(comm: MPI.Comm, msg: str) -> None:
         f"[py r={comm.Get_rank()}/{comm.Get_size()}] {msg}",
         flush=True,
     )
+
 
 def as_bool(value, default: bool = False) -> bool:
     if value is None:

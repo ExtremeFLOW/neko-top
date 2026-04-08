@@ -72,8 +72,7 @@ run_case() {
     fi
 }
 
-PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover"\
-"/pod_state_recover.py"}
+PY_SCRIPT=${2:-"${ROOT_DIR}/scripts/python/pod_state_recover.py"}
 NEKO_RANKS=${NEKO_RANKS:-5}
 PY_RANKS=${PY_RANKS:-3}
 

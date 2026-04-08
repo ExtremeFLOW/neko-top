@@ -9,8 +9,7 @@ cd "${SCRIPT_DIR}"
 source "${ROOT_DIR}/scripts/pod_run_helpers.sh"
 
 CASE_FILE=$(pod_resolve_case_file "${SCRIPT_DIR}" "${1:-}")
-PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover"\
-"/pod_state_recover.py"}
+PY_SCRIPT=${2:-"${ROOT_DIR}/scripts/python/pod_state_recover.py"}
 
 NEKO_RANKS=${NEKO_RANKS:-10}
 PY_RANKS=${PY_RANKS:-4}
