@@ -75,7 +75,7 @@ contains
        call this%chkp_output%set_counter(counter)
        call profiler_start_region("Checkpoint write to disk")
        call this%chkp_output%sample(time)
-       call profiler_start_region("Checkpoint write to disk")
+       call profiler_end_region("Checkpoint write to disk")
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
@@ -125,7 +125,7 @@ contains
        call this%chkp_output%set_counter(counter)
        call profiler_start_region("Checkpoint read from disk")
        call this%chkp_output%file_%read(neko_case%chkp)
-       call profiler_start_region("Checkpoint read from disk")
+       call profiler_end_region("Checkpoint read from disk")
        call simulation_restart(neko_case, neko_case%chkp)
 
        ! Initialize the time step controller and set the time step
@@ -147,7 +147,7 @@ contains
           local_idx = modulo(k, this%n_saves_memory) + 1
           call this%save_data(local_idx)
        end do
-       call profiler_start_region("Checkpoint recompute")
+       call profiler_end_region("Checkpoint recompute")
     end if
 
     ! Restore the required time step from memory
