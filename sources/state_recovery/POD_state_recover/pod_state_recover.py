@@ -1,125 +1,114 @@
 #!/usr/bin/env python3
-# pod_state_recover.py
-#
-# Debug-first in-situ driver for Neko <-> pySEMTools using ADIOS2 SST.
-# - Uses ONE pySEMTools DataStreamer for the whole lifetime
-#   (mesh + forward snapshots + mode return).
-# - Uses a rank-0-only control client (COMM_SELF) that:
-#     reads  "neko_ctrl_state"
-#     writes "neko_ctrl_cmd"
-# - Adds very verbose, rank-tagged prints around every blocking
-#   ADIOS/MPI operation.
-#
-# IMPORTANT: This file is written for `import adios2.bindings as adios2`.
-# In that binding, DefineVariable expects a numpy ndarray
-# (including 0-D), not np.int32 scalars.
 
+import json
 import os
+import re
 import sys
 import time
-import json
-import re
-from typing import Optional, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Optional
 
+import adios2.bindings as adios2
 import numpy as np
 from mpi4py import MPI
-import adios2.bindings as adios2
 
+from pysemtools.datatypes.coef import Coef
+from pysemtools.datatypes.msh import Mesh
 from pysemtools.io.adios2.stream import DataStreamer
 from pysemtools.io.utils import get_fld_from_ndarray
-from pysemtools.datatypes.msh import Mesh
-from pysemtools.datatypes.coef import Coef
-from pysemtools.rom.pod import POD
 from pysemtools.rom.io_help import IoHelp
+from pysemtools.rom.pod import POD
 
 
-# -------------------------
-# Control enums (keep consistent with Fortran/C++)
-# -------------------------
-MODE_IDLE    = 0
+MODE_IDLE = 0
 MODE_FORWARD = 1
 MODE_ADJOINT = 2
-MODE_STOP    = 9
+MODE_STOP = 9
 
-PHASE_INIT        = 0
+PHASE_INIT = 0
 PHASE_FWD_RUNNING = 10
-PHASE_FWD_DONE    = 11
+PHASE_FWD_DONE = 11
 PHASE_ADJ_RUNNING = 20
-PHASE_ADJ_DONE    = 21
+PHASE_ADJ_DONE = 21
 
-
-# -------------------------
-# Logging helpers
-# -------------------------
 DEBUG = False
+
 
 def log(comm: MPI.Comm, msg: str) -> None:
     if not DEBUG:
         return
-    r = comm.Get_rank()
-    s = comm.Get_size()
-    print(f"[py r={r}/{s}] {msg}", flush=True)
+    print(
+        f"[py r={comm.Get_rank()}/{comm.Get_size()}] {msg}",
+        flush=True,
+    )
 
 
 def log0(msg: str) -> None:
-    if not DEBUG:
-        return
-    print(f"[py ctrl r=0/1] {msg}", flush=True)
+    if DEBUG:
+        print(f"[py ctrl r=0/1] {msg}", flush=True)
+
+
+def as_bool(value, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "y", "t")
+    return bool(value)
 
 
 def strip_json_comments(text: str) -> str:
-    """Remove // and /* */ comments from JSON-like text.
-
-    Comment markers inside strings are ignored.
-    """
     out = []
-    i = 0
-    n = len(text)
-    in_str = False
-    escape = False
-    while i < n:
-        ch = text[i]
-        if in_str:
-            out.append(ch)
-            if escape:
-                escape = False
-            elif ch == "\\":
-                escape = True
-            elif ch == '"':
-                in_str = False
-            i += 1
+    idx = 0
+    n_chars = len(text)
+    in_string = False
+    escaped = False
+
+    while idx < n_chars:
+        char = text[idx]
+
+        if in_string:
+            out.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            idx += 1
             continue
 
-        if ch == '"':
-            in_str = True
-            out.append(ch)
-            i += 1
+        if char == '"':
+            in_string = True
+            out.append(char)
+            idx += 1
             continue
 
-        if ch == "/" and i + 1 < n:
-            nxt = text[i + 1]
+        if char == "/" and idx + 1 < n_chars:
+            nxt = text[idx + 1]
             if nxt == "/":
-                i += 2
-                while i < n and text[i] != "\n":
-                    i += 1
+                idx += 2
+                while idx < n_chars and text[idx] != "\n":
+                    idx += 1
                 continue
             if nxt == "*":
-                i += 2
-                while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
-                    i += 1
-                i += 2
+                idx += 2
+                while idx + 1 < n_chars:
+                    if text[idx] == "*" and text[idx + 1] == "/":
+                        break
+                    idx += 1
+                idx += 2
                 continue
 
-        out.append(ch)
-        i += 1
+        out.append(char)
+        idx += 1
+
     return "".join(out)
 
 
 def load_case_config(case_path: str) -> dict:
     with open(case_path, "r", encoding="utf-8") as handle:
-        raw = handle.read()
-    cleaned = strip_json_comments(raw)
-    # Allow trailing commas in .case files
+        text = handle.read()
+    cleaned = strip_json_comments(text)
     cleaned = re.sub(r",\s*([}\]])", r"\1", cleaned)
     return json.loads(cleaned)
 
@@ -127,10 +116,11 @@ def load_case_config(case_path: str) -> dict:
 def rotate_time_coeffs(path: str) -> Optional[str]:
     if not os.path.exists(path):
         return None
-    base, ext = os.path.splitext(path)
+
+    stem, ext = os.path.splitext(path)
     idx = 1
     while True:
-        candidate = f"{base}_{idx:03d}{ext}"
+        candidate = f"{stem}_{idx:03d}{ext}"
         if not os.path.exists(candidate):
             os.rename(path, candidate)
             return candidate
@@ -140,238 +130,20 @@ def rotate_time_coeffs(path: str) -> Optional[str]:
 def wait_for_sst_contact(
     stem: str, timeout: float = 120.0, poll: float = 0.05
 ) -> str:
-    """
-    SST rendezvous is file-based. Depending on ADIOS2 version/config,
-    the contact file may be created as 'stem' or 'stem.sst'.
-    We wait until one exists in the current working directory.
-    """
-    candidates = [stem, stem + ".sst"]
-    t0 = time.time()
+    candidates = [stem, f"{stem}.sst"]
+    t_start = time.time()
     cwd = os.getcwd()
-    while time.time() - t0 < timeout:
-        for c in candidates:
-            if os.path.exists(c):
-                return os.path.join(cwd, c)
+
+    while time.time() - t_start < timeout:
+        for candidate in candidates:
+            if os.path.exists(candidate):
+                return os.path.join(cwd, candidate)
         time.sleep(poll)
+
     raise RuntimeError(
-        f"Timed out waiting for SST contact file for '{stem}' in cwd={cwd}. "
+        f"Timed out waiting for SST contact file for '{stem}' in {cwd}. "
         f"Checked {candidates} for {timeout} seconds."
     )
-
-
-# -------------------------
-# Control client (rank-0 only, COMM_SELF)
-# -------------------------
-class CtrlClient:
-    """
-    Rank-0-only control channel.
-    Uses COMM_SELF so it does not depend on python MPI ranks
-    matching Neko ranks.
-
-    Reads:
-      - stream name: "neko_ctrl_state"   (Neko writes)
-    Writes:
-      - stream name: "neko_ctrl_cmd"     (Python writes)
-    """
-
-    def __init__(self, debug: bool = True):
-        self.debug = debug
-        self.comm = MPI.COMM_SELF
-        self.rank = 0  # COMM_SELF
-
-        if self.debug:
-            log0(f"CtrlClient: cwd={os.getcwd()}")
-            log0("CtrlClient: creating ADIOS(COMM_SELF)")
-        self.ad = adios2.ADIOS(self.comm)
-
-        # Reader IO
-        if self.debug:
-            log0("CtrlClient: DeclareIO read (py_ctrl_read) + SetEngine(SST)")
-        self.io_r = self.ad.DeclareIO("py_ctrl_read")
-        self.io_r.SetEngine("SST")
-
-        # Wait for the contact file before Open(Read) to avoid the
-        # startup race.
-        if self.debug:
-            log0(
-                "CtrlClient: waiting for SST contact file for "
-                "'neko_ctrl_state'"
-            )
-        found = wait_for_sst_contact("neko_ctrl_state", timeout=120.0)
-        if self.debug:
-            log0(f"CtrlClient: found contact file: {found}")
-
-        if self.debug:
-            log0(
-                "CtrlClient: Open('neko_ctrl_state', Read) "
-                "(this may still block briefly)"
-            )
-        self.rd = self.io_r.Open("neko_ctrl_state", adios2.Mode.Read)
-
-        # Writer IO
-        if self.debug:
-            log0("CtrlClient: DeclareIO write (py_ctrl_write) + SetEngine(SST)")
-        self.io_w = self.ad.DeclareIO("py_ctrl_write")
-        self.io_w.SetEngine("SST")
-
-        # Define scalar variables as 0-D ndarrays (required by adios2.bindings)
-        self._mode_cmd_buf = np.zeros((), dtype=np.int32)
-        self._phase_cmd_buf = np.zeros((), dtype=np.int32)
-
-        if self.debug:
-            log0(
-                "CtrlClient: DefineVariable(mode_cmd, phase_cmd) "
-                "as 0-D arrays"
-            )
-        self.v_mode_cmd = self.io_w.DefineVariable(
-            "mode_cmd", self._mode_cmd_buf
-        )
-        self.v_phase_cmd = self.io_w.DefineVariable(
-            "phase_cmd", self._phase_cmd_buf
-        )
-
-        # Open writer
-        if self.debug:
-            log0("CtrlClient: Open('neko_ctrl_cmd', Write)")
-        self.wr = self.io_w.Open("neko_ctrl_cmd", adios2.Mode.Write)
-
-        if self.debug:
-            log0("CtrlClient: ready")
-
-    def read_state(
-        self, poll_sleep: float = 0.001
-    ) -> Tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
-        """
-        Poll BeginStep until OK or EndOfStream.
-        Returns (mode, phase, step, time) or (None, None, None, None) on EOS.
-        """
-        while True:
-            if self.debug:
-                log0("CtrlClient: BeginStep(Read state)")
-            st = self.rd.BeginStep()
-            if st == adios2.StepStatus.OK:
-                v_mode = self.io_r.InquireVariable("mode")
-                v_phase = self.io_r.InquireVariable("phase")
-                v_step = self.io_r.InquireVariable("step")
-                v_time = self.io_r.InquireVariable("time")
-
-                mode_buf = np.zeros((), dtype=np.int32)
-                phase_buf = np.zeros((), dtype=np.int32)
-                step_buf = np.zeros((), dtype=np.int32)
-                time_buf = np.zeros((), dtype=np.float64)
-
-                self.rd.Get(v_mode, mode_buf)
-                self.rd.Get(v_phase, phase_buf)
-                self.rd.Get(v_step, step_buf)
-                self.rd.Get(v_time, time_buf)
-                self.rd.EndStep()
-
-                m = int(mode_buf)
-                p = int(phase_buf)
-                s = int(step_buf)
-                t = float(time_buf)
-                if self.debug:
-                    log0(
-                        f"CtrlClient: got state mode={m} "
-                        f"phase={p} step={s} t={t}"
-                    )
-                return m, p, s, t
-
-            if st == adios2.StepStatus.NotReady:
-                time.sleep(poll_sleep)
-                continue
-
-            # EndOfStream or other status
-            if self.debug:
-                log0(f"CtrlClient: state stream ended / not OK (status={st})")
-            return None, None, None, None
-
-    def send_cmd(self, mode_cmd: int, phase_cmd: int) -> None:
-        if self.debug:
-            log0(f"CtrlClient: send_cmd mode={mode_cmd} phase={phase_cmd}")
-        self._mode_cmd_buf[...] = np.int32(mode_cmd)
-        self._phase_cmd_buf[...] = np.int32(phase_cmd)
-
-        if self.debug:
-            log0("CtrlClient: BeginStep(Write cmd)")
-        self.wr.BeginStep()
-        self.wr.Put(self.v_mode_cmd, self._mode_cmd_buf)
-        self.wr.Put(self.v_phase_cmd, self._phase_cmd_buf)
-        self.wr.EndStep()
-        if self.debug:
-            log0("CtrlClient: EndStep(Write cmd)")
-
-    def close(self) -> None:
-        if self.debug:
-            log0("CtrlClient: Close reader/writer")
-        # Always close to avoid SST warnings
-        self.rd.Close()
-        self.wr.Close()
-
-
-# -------------------------
-# POD helper
-# -------------------------
-def make_pod(
-    comm: MPI.Comm,
-    bm: np.ndarray,
-    n_fields: int,
-    batch_size: int,
-    keep_modes: int,
-    dtype,
-) -> Tuple[POD, IoHelp]:
-    pod = POD(
-        comm,
-        number_of_modes_to_update=keep_modes,
-        global_updates=True,
-        auto_expand=False,
-        bckend="numpy",
-    )
-    ioh = IoHelp(comm,
-                 number_of_fields=n_fields,
-                 batch_size=batch_size,
-                 field_size=bm.size,
-                 field_data_type=dtype,
-                 mass_matrix_data_type=dtype)
-    mass_list = [np.copy(np.sqrt(bm)) for _ in range(n_fields)]
-    ioh.copy_fieldlist_to_xi(mass_list)
-    ioh.bm1sqrt[:, :] = np.copy(ioh.xi[:, :])
-    return pod, ioh
-
-
-def add_snapshot(comm: MPI.Comm,
-                 pod: POD,
-                 ioh: IoHelp,
-                 bm: np.ndarray,
-                 fields: Sequence[np.ndarray],
-                 tcur: Optional[float],
-                 times: list,
-                 energy_state: dict) -> None:
-    if tcur is not None:
-        times.append(float(tcur))
-
-    local_energy = 0.0
-    for field in fields:
-        local_energy += np.sum(field * field * bm, dtype=np.float64)
-    snapshot_energy = comm.allreduce(local_energy, op=MPI.SUM)
-    energy_state["total"] += float(snapshot_energy)
-    energy_state["count"] += 1
-
-    ioh.copy_fieldlist_to_xi(list(fields))
-    ioh.load_buffer(scale_snapshot=True)
-    if ioh.update_from_buffer:
-        log(comm, f"POD.update(buff) with buffer_index={ioh.buffer_index}")
-        pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
-        ioh.buffer_index = 0
-        ioh.update_from_buffer = False
-
-
-def parse_enabled_flag(value, default: bool = True) -> bool:
-    if value is None:
-        return default
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "y", "t")
-    return bool(value)
 
 
 def count_enabled_scalars(case_cfg: dict) -> int:
@@ -379,362 +151,483 @@ def count_enabled_scalars(case_cfg: dict) -> int:
     if not isinstance(case_data, dict):
         return 0
 
-    if "scalar" in case_data:
-        scalar_cfg = case_data.get("scalar")
-        if isinstance(scalar_cfg, dict) and parse_enabled_flag(
-                scalar_cfg.get("enabled"), True):
-            return 1
+    scalar_cfg = case_data.get("scalar")
+    if isinstance(scalar_cfg, dict):
+        return int(as_bool(scalar_cfg.get("enabled"), True))
+
+    scalar_cfgs = case_data.get("scalars")
+    if not isinstance(scalar_cfgs, list):
         return 0
 
-    if "scalars" in case_data:
-        scalar_cfgs = case_data.get("scalars")
-        if not isinstance(scalar_cfgs, list):
-            return 0
-        return sum(
-            1 for scalar_cfg in scalar_cfgs
-            if not isinstance(scalar_cfg, dict)
-            or parse_enabled_flag(scalar_cfg.get("enabled"), True)
+    return sum(
+        1
+        for entry in scalar_cfgs
+        if not isinstance(entry, dict)
+        or as_bool(entry.get("enabled"), True)
+    )
+
+
+@dataclass(frozen=True)
+class PODConfig:
+    batch_size: int
+    keep_modes: int
+    i_stream: int
+    dtype: type
+    write_modes: bool
+    include_scalar: bool
+    debug: bool
+    snapshot_dt: float
+
+    @property
+    def n_fields(self) -> int:
+        return 4 if self.include_scalar else 3
+
+
+@dataclass
+class EnergyState:
+    total: float = 0.0
+    count: int = 0
+
+    def add(
+        self, comm: MPI.Comm, fields: list[np.ndarray], bm: np.ndarray
+    ) -> None:
+        local_energy = 0.0
+        for field in fields:
+            local_energy += np.sum(field * field * bm, dtype=np.float64)
+        self.total += float(comm.allreduce(local_energy, op=MPI.SUM))
+        self.count += 1
+
+
+def load_pod_config(case_path: str) -> tuple[dict, PODConfig]:
+    case = load_case_config(case_path)
+    state_recovery = case.get("state_recovery", {})
+    if not isinstance(state_recovery, dict):
+        raise KeyError("case['state_recovery'] must be a dict")
+
+    include_scalar = as_bool(state_recovery.get("include_scalar"))
+    enabled_scalars = count_enabled_scalars(case)
+    if include_scalar and enabled_scalars == 0:
+        raise ValueError(
+            "POD include_scalar=true but no enabled scalar was found in "
+            "the case."
+        )
+    if include_scalar and enabled_scalars != 1:
+        raise ValueError(
+            "POD include_scalar currently supports exactly one enabled "
+            "scalar."
         )
 
-    return 0
+    dtype_name = str(state_recovery.get("dtype", "double")).strip().lower()
+    if dtype_name == "single":
+        dtype = np.float32
+    elif dtype_name == "double":
+        dtype = np.float64
+    else:
+        raise ValueError(f"Unsupported dtype '{dtype_name}'")
+
+    i_stream = int(state_recovery["i_stream"])
+    timestep = float(case["case"]["time"]["timestep"])
+
+    cfg = PODConfig(
+        batch_size=int(state_recovery["batch_size"]),
+        keep_modes=int(state_recovery["n_modes"]),
+        i_stream=i_stream,
+        dtype=dtype,
+        write_modes=as_bool(state_recovery.get("write_modes")),
+        include_scalar=include_scalar,
+        debug=as_bool(state_recovery.get("debug")),
+        snapshot_dt=timestep * i_stream,
+    )
+    return case, cfg
 
 
-def recv_field(ds: DataStreamer, dtype) -> np.ndarray:
-    return get_fld_from_ndarray(
-        ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv
-    ).astype(dtype)
+class CtrlClient:
+    def __init__(self, debug: bool):
+        self.debug = debug
+        self.comm = MPI.COMM_SELF
+        self.adios = adios2.ADIOS(self.comm)
+
+        self.io_read = self.adios.DeclareIO("py_ctrl_read")
+        self.io_read.SetEngine("SST")
+
+        if self.debug:
+            log0("waiting for SST contact file 'neko_ctrl_state'")
+        found = wait_for_sst_contact("neko_ctrl_state", timeout=120.0)
+        if self.debug:
+            log0(f"found contact file: {found}")
+
+        self.reader = self.io_read.Open("neko_ctrl_state", adios2.Mode.Read)
+
+        self.io_write = self.adios.DeclareIO("py_ctrl_write")
+        self.io_write.SetEngine("SST")
+
+        self._mode_cmd = np.zeros((), dtype=np.int32)
+        self._phase_cmd = np.zeros((), dtype=np.int32)
+        self.v_mode_cmd = self.io_write.DefineVariable(
+            "mode_cmd", self._mode_cmd
+        )
+        self.v_phase_cmd = self.io_write.DefineVariable(
+            "phase_cmd", self._phase_cmd
+        )
+        self.writer = self.io_write.Open("neko_ctrl_cmd", adios2.Mode.Write)
+
+    def read_state(
+        self, poll_sleep: float = 0.001
+    ) -> tuple[Optional[int], Optional[int], Optional[int], Optional[float]]:
+        while True:
+            status = self.reader.BeginStep()
+            if status == adios2.StepStatus.OK:
+                v_mode = self.io_read.InquireVariable("mode")
+                v_phase = self.io_read.InquireVariable("phase")
+                v_step = self.io_read.InquireVariable("step")
+                v_time = self.io_read.InquireVariable("time")
+
+                mode = np.zeros((), dtype=np.int32)
+                phase = np.zeros((), dtype=np.int32)
+                step = np.zeros((), dtype=np.int32)
+                sim_time = np.zeros((), dtype=np.float64)
+
+                self.reader.Get(v_mode, mode)
+                self.reader.Get(v_phase, phase)
+                self.reader.Get(v_step, step)
+                self.reader.Get(v_time, sim_time)
+                self.reader.EndStep()
+
+                result = (
+                    int(mode),
+                    int(phase),
+                    int(step),
+                    float(sim_time),
+                )
+                if self.debug:
+                    log0(
+                        "got state mode="
+                        f"{result[0]} phase={result[1]} "
+                        f"step={result[2]} t={result[3]}"
+                    )
+                return result
+
+            if status == adios2.StepStatus.NotReady:
+                time.sleep(poll_sleep)
+                continue
+
+            if self.debug:
+                log0(f"state stream ended with status={status}")
+            return None, None, None, None
+
+    def send_cmd(self, mode_cmd: int, phase_cmd: int) -> None:
+        if self.debug:
+            log0(f"send_cmd mode={mode_cmd} phase={phase_cmd}")
+
+        self._mode_cmd[...] = np.int32(mode_cmd)
+        self._phase_cmd[...] = np.int32(phase_cmd)
+        self.writer.BeginStep()
+        self.writer.Put(self.v_mode_cmd, self._mode_cmd)
+        self.writer.Put(self.v_phase_cmd, self._phase_cmd)
+        self.writer.EndStep()
+
+    def close(self) -> None:
+        self.reader.Close()
+        self.writer.Close()
 
 
-def stream_mode_fields(ds: DataStreamer, fields1d, dtype) -> None:
-    for field in fields1d:
-        ds.stream(field.astype(dtype, copy=False))
+def recv_field(ds: DataStreamer, dtype: type) -> np.ndarray:
+    field = get_fld_from_ndarray(ds.recieve(), ds.lx, ds.ly, ds.lz, ds.nelv)
+    return field.astype(dtype)
 
 
-# -------------------------
-# Main
-# -------------------------
+def recv_fields(
+    ds: DataStreamer, n_fields: int, dtype: type
+) -> list[np.ndarray]:
+    return [recv_field(ds, dtype) for _ in range(n_fields)]
+
+
+def make_pod(
+    comm: MPI.Comm,
+    bm: np.ndarray,
+    cfg: PODConfig,
+) -> tuple[POD, IoHelp]:
+    pod = POD(
+        comm,
+        number_of_modes_to_update=cfg.keep_modes,
+        global_updates=True,
+        auto_expand=False,
+        bckend="numpy",
+    )
+    ioh = IoHelp(
+        comm,
+        number_of_fields=cfg.n_fields,
+        batch_size=cfg.batch_size,
+        field_size=bm.size,
+        field_data_type=cfg.dtype,
+        mass_matrix_data_type=cfg.dtype,
+    )
+    mass_fields = [np.copy(np.sqrt(bm)) for _ in range(cfg.n_fields)]
+    ioh.copy_fieldlist_to_xi(mass_fields)
+    ioh.bm1sqrt[:, :] = np.copy(ioh.xi[:, :])
+    return pod, ioh
+
+
+def flush_buffer(comm: MPI.Comm, pod: POD, ioh: IoHelp) -> None:
+    if ioh.buffer_index > 0 and not ioh.update_from_buffer:
+        log(comm, f"POD.update(buff) buffer_index={ioh.buffer_index}")
+        pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
+        ioh.buffer_index = 0
+
+
+def add_snapshot(
+    comm: MPI.Comm,
+    pod: POD,
+    ioh: IoHelp,
+    bm: np.ndarray,
+    fields: list[np.ndarray],
+    tcur: Optional[float],
+    times: list[float],
+    energy: EnergyState,
+) -> None:
+    if tcur is not None:
+        times.append(float(tcur))
+
+    energy.add(comm, fields, bm)
+    ioh.copy_fieldlist_to_xi(fields)
+    ioh.load_buffer(scale_snapshot=True)
+
+    if ioh.update_from_buffer:
+        log(comm, f"POD.update(buff) buffer_index={ioh.buffer_index}")
+        pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
+        ioh.buffer_index = 0
+        ioh.update_from_buffer = False
+
+
+def available_modes(pod: POD, keep_modes: int) -> int:
+    local_modes = getattr(pod, "u_1t", None)
+    if local_modes is None:
+        return 0
+    return min(keep_modes, local_modes.shape[1])
+
+
+def build_time_coefficients(
+    comm: MPI.Comm,
+    pod: POD,
+    cfg: PODConfig,
+    times: list[float],
+) -> tuple[np.ndarray, str, int]:
+    n_avail = available_modes(pod, cfg.keep_modes)
+    if n_avail > 0:
+        coeffs = (
+            pod.d_1t[:n_avail, None] * pod.vt_1t[:n_avail, :]
+        ).T
+    else:
+        coeffs = np.zeros((0, 0), dtype=np.float64)
+
+    n_snaps = coeffs.shape[0]
+    if len(times) == n_snaps:
+        time_vec = np.asarray(times, dtype=np.float64)
+    else:
+        if times:
+            log(
+                comm,
+                f"time list length {len(times)} != n_snaps {n_snaps}; "
+                "falling back to dt",
+            )
+        time_vec = np.arange(n_snaps, dtype=np.float64) * cfg.snapshot_dt
+
+    if coeffs.shape[1] < cfg.keep_modes:
+        coeffs = np.hstack(
+            [
+                coeffs,
+                np.zeros(
+                    (n_snaps, cfg.keep_modes - coeffs.shape[1]),
+                    dtype=coeffs.dtype,
+                ),
+            ]
+        )
+
+    header = "t," + ",".join(f"a{i + 1}" for i in range(cfg.keep_modes))
+    return np.column_stack([time_vec, coeffs]), header, n_avail
+
+
+def write_time_coefficients(
+    comm: MPI.Comm,
+    data: np.ndarray,
+    header: str,
+    rotate_existing: bool,
+) -> None:
+    if comm.Get_rank() != 0:
+        return
+
+    if rotate_existing:
+        rotated = rotate_time_coeffs("pod_time_coeffs.csv")
+        if rotated:
+            log0(f"archived pod_time_coeffs.csv -> {rotated}")
+
+    np.savetxt(
+        "pod_time_coeffs.csv",
+        data,
+        delimiter=",",
+        header=header,
+        comments="",
+    )
+
+
+def report_energy_capture(
+    pod: POD,
+    energy: EnergyState,
+    keep_modes: int,
+) -> None:
+    if energy.total <= 0.0 or energy.count == 0:
+        print("POD energy capture: no snapshot energy available.", flush=True)
+        return
+
+    singular_values = getattr(pod, "d_1t", None)
+    if singular_values is None or singular_values.size == 0:
+        print("POD energy capture: no singular values available.", flush=True)
+        return
+
+    energies = np.asarray(singular_values, dtype=np.float64) ** 2
+    fractions = 100.0 * energies / energy.total
+    n_report = min(keep_modes, fractions.size)
+
+    print("POD energy capture (% of snapshot energy):", flush=True)
+    for idx in range(n_report):
+        print(f"  mode {idx + 1}: {fractions[idx]:.6f}%", flush=True)
+    print(
+        f"  sum first {n_report}: "
+        f"{np.sum(fractions[:n_report]):.6f}%",
+        flush=True,
+    )
+
+
+def stream_mode_fields(
+    ds: DataStreamer,
+    ioh: IoHelp,
+    pod: POD,
+    cfg: PODConfig,
+    zero_field: np.ndarray,
+    n_avail: int,
+) -> None:
+    for idx in range(cfg.keep_modes):
+        if idx < n_avail:
+            fields_1d = ioh.split_narray_to_1dfields(pod.u_1t[:, idx])
+            for field in fields_1d:
+                ds.stream(field.astype(cfg.dtype, copy=False))
+            continue
+
+        for _ in range(cfg.n_fields):
+            ds.stream(zero_field)
+
+
+def init_runtime(
+    comm: MPI.Comm,
+    cfg: PODConfig,
+) -> tuple[DataStreamer, np.ndarray, POD, IoHelp, list[np.ndarray]]:
+    log(comm, "init DataStreamer")
+    ds = DataStreamer(comm)
+
+    log(comm, "receive mesh")
+    x = recv_field(ds, cfg.dtype)
+    y = recv_field(ds, cfg.dtype)
+    z = recv_field(ds, cfg.dtype)
+
+    log(comm, "receive initial fields")
+    initial_fields = recv_fields(ds, cfg.n_fields, cfg.dtype)
+
+    mesh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
+    coef = Coef(mesh, comm)
+    pod, ioh = make_pod(comm, coef.B, cfg)
+    return ds, coef.B, pod, ioh, initial_fields
+
+
 def main() -> None:
     global DEBUG
+
     world = MPI.COMM_WORLD
-    # keep your original "split for MPMD" approach (col=1)
     comm = world.Split(1, world.Get_rank())
     rank = comm.Get_rank()
 
     case_path = sys.argv[1] if len(sys.argv) > 1 else "POD_rugby_ball.case"
     case_path = os.path.abspath(case_path)
-    case = load_case_config(case_path)
+    case, cfg = load_pod_config(case_path)
+    DEBUG = cfg.debug
 
-    sr = case.get("state_recovery", {})
-    if not isinstance(sr, dict):
-        raise KeyError("case['state_recovery'] must be a dict")
-
-    debug = sr.get("debug", False)
-    if isinstance(debug, str):
-        debug = debug.strip().lower() in ("1", "true", "yes", "y", "t")
-    else:
-        debug = bool(debug)
-    DEBUG = debug
-
-    batch_size = int(sr["batch_size"])
-    keep_modes = int(sr["n_modes"])
-    i_stream = int(sr["i_stream"])
-    dtype_str = str(sr["dtype"]).strip().lower()
-    write_modes = sr.get("write_modes", False)
-    include_scalar = sr.get("include_scalar", False)
-    if isinstance(write_modes, str):
-        write_modes = write_modes.strip().lower() in (
-            "1", "true", "yes", "y", "t"
-        )
-    else:
-        write_modes = bool(write_modes)
-
-    if isinstance(include_scalar, str):
-        include_scalar = include_scalar.strip().lower() in (
-            "1", "true", "yes", "y", "t"
-        )
-    else:
-        include_scalar = bool(include_scalar)
-
-    enabled_scalars = count_enabled_scalars(case)
-    if include_scalar and enabled_scalars == 0:
-        raise ValueError(
-            "POD include_scalar=true but no enabled scalar was found "
-            "in the case"
-        )
-    if include_scalar and enabled_scalars != 1:
-        raise ValueError(
-            "POD include_scalar currently supports exactly one enabled scalar"
-        )
-
-    # time settings (used for CSV)
-    dt = float(case["case"]["time"]["timestep"])
-    snapshot_dt = dt * i_stream
-
-    if dtype_str == "single":
-        dtype = np.float32
-    elif dtype_str == "double":
-        dtype = np.float64
-    else:
-        raise ValueError(f"Unsupported dtype '{dtype_str}'")
-
-    log(comm, "Python: init DataStreamer (single lifetime)")
-    ds = DataStreamer(comm)
-
-    log(comm, "Python: receive mesh x,y,z")
-    x = recv_field(ds, dtype)
-    y = recv_field(ds, dtype)
-    z = recv_field(ds, dtype)
-
-    log(comm, "Python: receive initial snapshot")
-    fields0 = [
-        recv_field(ds, dtype),
-        recv_field(ds, dtype),
-        recv_field(ds, dtype),
-    ]
-    if include_scalar:
-        fields0.append(recv_field(ds, dtype))
-
-    # Build mesh/coefs on all python ranks (pySEMTools expects this)
-    msh = Mesh(comm, x=x, y=y, z=z, create_connectivity=False)
-    coef = Coef(msh, comm)
-    bm = coef.B
-
-    n_fields = 4 if include_scalar else 3
-    pod, ioh = make_pod(comm, bm, n_fields, batch_size, keep_modes, dtype)
+    ds, bm, pod, ioh, initial_fields = init_runtime(comm, cfg)
     times = []
-    energy_state = {"total": 0.0, "count": 0}
+    energy = EnergyState()
+    add_snapshot(comm, pod, ioh, bm, initial_fields, 0.0, times, energy)
 
-    log(comm, "Python: add initial snapshot at t=0")
-    add_snapshot(comm, pod, ioh, bm, fields0, 0.0, times, energy_state)
+    ctrl = CtrlClient(debug=cfg.debug) if rank == 0 else None
 
-    # Rank0 control client only (COMM_SELF)
-    ctrl = CtrlClient(debug=DEBUG) if rank == 0 else None
-
-    log(comm, "Python: Barrier after ctrl init")
-    comm.Barrier()
-
-    log(comm, "Python: entering control loop")
-
-    # For padding when sending modes back
-    # Use local field count if available, else fall back to x.size.
     my_count = getattr(ds, "py2f_field_my_count", None)
     if my_count is None:
-        my_count = x.size
-    zero_field = np.zeros(my_count, dtype=dtype)
+        my_count = initial_fields[0].size
+    zero_field = np.zeros(my_count, dtype=cfg.dtype)
 
     try:
         while True:
-            # ---- read control state on rank 0 and broadcast it ----
             if rank == 0:
-                mode, phase, step, tcur = ctrl.read_state()
+                state = ctrl.read_state()
             else:
-                mode, phase, step, tcur = None, None, None, None
+                state = (None, None, None, None)
 
-            mode, phase, step, tcur = comm.bcast(
-                (mode, phase, step, tcur), root=0
-            )
+            mode, phase, step, tcur = comm.bcast(state, root=0)
             log(
                 comm,
-                f"Loop: state mode={mode} phase={phase} "
-                f"step={step} t={tcur}",
+                f"state mode={mode} phase={phase} step={step} t={tcur}",
             )
 
-            if mode is None:
-                log(comm, "Loop: ctrl EOS -> exit")
-                break
-            if mode == MODE_STOP:
-                log(comm, "Loop: MODE_STOP -> exit")
+            if mode is None or mode == MODE_STOP:
                 break
 
-            # ---- forward streaming snapshots ----
             if mode == MODE_FORWARD and phase == PHASE_FWD_RUNNING:
-                log(comm, "Forward: about to recieve snapshot fields")
-                fields = [
-                    recv_field(ds, dtype),
-                    recv_field(ds, dtype),
-                    recv_field(ds, dtype),
-                ]
-                if include_scalar:
-                    fields.append(recv_field(ds, dtype))
-                add_snapshot(
-                    comm, pod, ioh, bm, fields, tcur, times, energy_state
-                )
+                fields = recv_fields(ds, cfg.n_fields, cfg.dtype)
+                add_snapshot(comm, pod, ioh, bm, fields, tcur, times, energy)
                 continue
 
-            # ---- forward finished: compute/write/send modes ----
             if mode == MODE_FORWARD and phase == PHASE_FWD_DONE:
-                log(comm, "Forward done: flush buffer -> update POD")
-                if ioh.buffer_index > 0 and not ioh.update_from_buffer:
-                    pod.update(comm, buff=ioh.buff[:, :ioh.buffer_index])
-                    ioh.buffer_index = 0
-
-                log(comm, "Forward done: scale/rotate modes")
+                flush_buffer(comm, pod, ioh)
                 pod.scale_modes(comm, bm1sqrt=ioh.bm1sqrt, op="div")
                 pod.rotate_local_modes_to_global(comm)
 
-                # Build time coeffs (rank0 writes)
-                n_avail = (
-                    min(keep_modes, pod.u_1t.shape[1])
-                    if hasattr(pod, "u_1t")
-                    else 0
+                coeffs, header, n_avail = build_time_coefficients(
+                    comm, pod, cfg, times
                 )
-                if n_avail > 0:
-                    A = (pod.d_1t[:n_avail, None] * pod.vt_1t[:n_avail, :]).T
-                else:
-                    A = np.zeros((0, 0), dtype=np.float64)
-
-                nsnaps = A.shape[0]
-                if len(times) == nsnaps:
-                    tvec = np.asarray(times, dtype=np.float64)
-                else:
-                    if len(times) > 0:
-                        log(
-                            comm,
-                            f"Time list length {len(times)} != nsnaps "
-                            f"{nsnaps}, falling back to dt.",
-                        )
-                    # Snapshots start at t=0 (initial condition).
-                    tvec = np.arange(nsnaps, dtype=np.float64) * snapshot_dt
-                # pad to keep_modes columns
-                if A.shape[1] < keep_modes:
-                    A = np.hstack([
-                        A,
-                        np.zeros(
-                            (nsnaps, keep_modes - A.shape[1]),
-                            dtype=A.dtype,
-                        ),
-                    ])
-                out = np.column_stack([tvec, A])
-                header = "t," + ",".join([f"a{i+1}" for i in range(keep_modes)])
-
-                print(pod.d_1t.shape)
-                print(pod.vt_1t.shape)
-                print(" TIME COEFS ")
+                write_time_coefficients(
+                    comm, coeffs, header, cfg.write_modes
+                )
                 if rank == 0:
-                    if write_modes:
-                        rotated = rotate_time_coeffs("pod_time_coeffs.csv")
-                        if rotated:
-                            log(
-                                comm,
-                                f"Rank0: archived pod_time_coeffs.csv -> "
-                                f"{rotated}",
-                            )
-                    log(comm, "Rank0: writing pod_time_coeffs.csv")
-                    np.savetxt(
-                        "pod_time_coeffs.csv",
-                        out,
-                        delimiter=",",
-                        header=header,
-                        comments="",
-                    )
+                    report_energy_capture(pod, energy, cfg.keep_modes)
 
-                    if (
-                        energy_state["total"] <= 0.0
-                        or energy_state["count"] == 0
-                    ):
-                        print(
-                            "POD energy capture: no snapshot energy "
-                            "available.",
-                            flush=True,
-                        )
-                    elif (
-                        getattr(pod, "d_1t", None) is None
-                        or pod.d_1t.size == 0
-                    ):
-                        print(
-                            "POD energy capture: no singular values "
-                            "available.",
-                            flush=True,
-                        )
-                    else:
-                        energies = np.asarray(pod.d_1t, dtype=np.float64) ** 2
-                        fractions = 100.0 * energies / energy_state["total"]
-                        n_report = min(keep_modes, fractions.size)
-                        print(
-                            "POD energy capture (% of snapshot energy):",
-                            flush=True,
-                        )
-                        for i in range(n_report):
-                            print(
-                                f"  mode {i + 1}: {fractions[i]:.6f}%",
-                                flush=True,
-                            )
-                        print(
-                            f"  sum first {n_report}: "
-                            f"{np.sum(fractions[:n_report]):.6f}%",
-                            flush=True,
-                        )
-
-                log(comm, "Barrier after CSV write")
                 comm.Barrier()
-
-                # IMPORTANT ordering:
-                # 1) send modes back so Neko can receive them
-                # 2) then send command that tells Neko to switch to adjoint
-                #
-                # If Fortran waits for the command before the modes,
-                # flip this ordering.
-                log(
-                    comm,
-                    f"Streaming modes back: expect {n_fields}*"
-                    f"{keep_modes} streams",
-                )
-                for j in range(keep_modes):
-                    if j < n_avail:
-                        fields1d = ioh.split_narray_to_1dfields(pod.u_1t[:, j])
-                        log(comm, f"stream mode {j+1}/{keep_modes} (real)")
-                        stream_mode_fields(ds, fields1d, dtype)
-                    else:
-                        log(
-                            comm,
-                            f"stream mode {j+1}/{keep_modes} "
-                            "(zero padded)",
-                        )
-                        for _ in range(n_fields):
-                            ds.stream(zero_field)
-
-                log(comm, "Barrier after streaming modes")
+                stream_mode_fields(ds, ioh, pod, cfg, zero_field, n_avail)
                 comm.Barrier()
 
                 if rank == 0:
-                    log0(
-                        "Rank0: sending ctrl cmd "
-                        "MODE_ADJOINT/PHASE_ADJ_RUNNING"
-                    )
                     ctrl.send_cmd(MODE_ADJOINT, PHASE_ADJ_RUNNING)
-
-                log(comm, "Barrier after sending ctrl cmd")
                 comm.Barrier()
                 continue
 
-            # ---- adjoint done: reset POD buffers ----
             if mode == MODE_ADJOINT and phase == PHASE_ADJ_DONE:
-                log(comm, "Adjoint done: reset POD/ioh")
-                pod, ioh = make_pod(
-                    comm, bm, n_fields, batch_size, keep_modes, dtype
-                )
+                pod, ioh = make_pod(comm, bm, cfg)
                 times = []
-                energy_state = {"total": 0.0, "count": 0}
-                log(comm, "Adjoint done: add initial snapshot at t=0")
+                energy = EnergyState()
                 add_snapshot(
-                    comm, pod, ioh, bm, fields0, 0.0, times, energy_state
+                    comm,
+                    pod,
+                    ioh,
+                    bm,
+                    initial_fields,
+                    0.0,
+                    times,
+                    energy,
                 )
                 continue
 
-            # if we get here, we're in an unhandled state
-            log(
-                comm,
-                f"Unhandled state: mode={mode} phase={phase} -> idle spin",
-            )
             time.sleep(0.001)
 
     finally:
-        # Clean shutdown
         if rank == 0 and ctrl is not None:
             ctrl.close()
-        log(comm, "Barrier before ds.finalize()")
         comm.Barrier()
-        log(comm, "Finalize DataStreamer")
         ds.finalize()
 
 
