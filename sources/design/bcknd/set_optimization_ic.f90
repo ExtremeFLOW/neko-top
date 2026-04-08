@@ -266,9 +266,7 @@ contains
     call filename_chsuffix(file_name, file_name, 'fld')
 
     call fld_data%init()
-    print *, "about to"
     call f%init(trim(file_name))
-    print *, "done"
 
     if (interpolate) then
 
@@ -302,11 +300,9 @@ contains
 
     end if
 
-    print *, "one more"
     ! Read the field file containing (u,v,w,p)
     call f%set_counter(sample_idx)
     call f%read(fld_data)
-    print *, "done"
 
     !
     ! Check that the data in the fld file matches the current case.
@@ -366,8 +362,6 @@ contains
     end if
 
     call fld_data%free()
-
-    print *, "super done"
 
   end subroutine set_optimization_ic_fld
 
