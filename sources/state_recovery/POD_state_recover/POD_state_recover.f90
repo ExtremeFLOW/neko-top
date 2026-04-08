@@ -343,7 +343,7 @@ contains
     call this%ctrl%init()
 
     ! Fire an init tick (python might miss it; harmless)
-    call this%ctrl%put(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
+    call this%ctrl%send(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
 
   end subroutine POD_state_recover_init_from_components
 
@@ -394,7 +394,8 @@ contains
 
     ! If we were in adjoint previously, emit ADJ_DONE once on reset
     if (this%ctrl%inited .and. this%adjoint_started) then
-       call this%ctrl%put(MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, 0.0_c_double)
+       call this%ctrl%send(MODE_ADJOINT, PHASE_ADJ_DONE, 0_c_int, &
+            0.0_c_double)
     end if
 
     this%have_received_modes = .false.
@@ -442,7 +443,7 @@ contains
     call profiler_start_region("POD save")
 
     if (this%ctrl%inited) then
-       call this%ctrl%put(MODE_FORWARD, PHASE_FWD_RUNNING, &
+       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_RUNNING, &
             int(time%tstep, c_int), real(time%t, c_double))
     end if
 
@@ -483,7 +484,7 @@ contains
 
     ! Emit ADJ_RUNNING only once (avoid flooding SST)
     if (this%ctrl%inited .and. .not. this%adj_running_sent) then
-       call this%ctrl%put(MODE_ADJOINT, PHASE_ADJ_RUNNING, &
+       call this%ctrl%send(MODE_ADJOINT, PHASE_ADJ_RUNNING, &
             int(time%tstep, c_int), real(time%t, c_double))
        this%adj_running_sent = .true.
     end if
@@ -511,14 +512,14 @@ contains
     call profiler_start_region("POD recieve modes")
 
     if (this%ctrl%inited) then
-      call this%ctrl%put(MODE_FORWARD, PHASE_FWD_DONE, &
+      call this%ctrl%send(MODE_FORWARD, PHASE_FWD_DONE, &
            int(time%tstep, c_int), real(time%t, c_double))
 
       mode_cmd  = MODE_FORWARD
       phase_cmd = PHASE_FWD_DONE
 
       ! BLOCK until Python says "go adjoint"
-      call this%ctrl%wait_cmd(mode_cmd, phase_cmd)
+      call this%ctrl%recieve(mode_cmd, phase_cmd)
 
       if (mode_cmd /= MODE_ADJOINT) then
          call neko_error('Expected MODE_ADJOINT from Python at ' // &

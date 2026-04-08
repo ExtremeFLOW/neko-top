@@ -70,8 +70,8 @@ module neko_ctrl_mod
    contains
      procedure, pass(this) :: init => ctrl_stream_init
      procedure, pass(this) :: free => ctrl_stream_free
-     procedure, pass(this) :: put => ctrl_stream_put
-     procedure, pass(this) :: wait_cmd => ctrl_stream_wait_cmd
+     procedure, pass(this) :: send => ctrl_stream_send
+     procedure, pass(this) :: recieve => ctrl_stream_recieve
   end type ctrl_stream_t
 
 contains
@@ -157,13 +157,13 @@ contains
     this%peer_root = -1
   end subroutine ctrl_stream_free
 
-  !> Publish current mode/phase/step/time to the control stream.
+  !> Send current mode/phase/step/time over the control stream.
   !! @param[inout] this Control stream instance.
   !! @param[in] mode Current mode.
   !! @param[in] phase Current phase.
   !! @param[in] step Current step index.
   !! @param[in] time Current time.
-  subroutine ctrl_stream_put(this, mode, phase, step, time)
+  subroutine ctrl_stream_send(this, mode, phase, step, time)
     class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(in) :: mode, phase, step
     real(c_double), intent(in) :: time
@@ -180,7 +180,7 @@ contains
     state_i(2) = int(phase, int32)
     state_i(3) = int(step, int32)
 
-    write(msg,'(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_put: mode=', &
+    write(msg,'(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_send: mode=', &
          trim(mode_name(mode)), ' phase=', trim(phase_name(phase)), &
          ' step=', int(step), ' t=', real(time, kind=c_double)
     call ctrl_dbg_print(this, msg)
@@ -188,13 +188,13 @@ contains
          CTRL_TAG_STATE_INT, MPI_COMM_WORLD, ierr)
     call MPI_Send(time, 1, MPI_DOUBLE_PRECISION, this%peer_root, &
          CTRL_TAG_STATE_REAL, MPI_COMM_WORLD, ierr)
-  end subroutine ctrl_stream_put
+  end subroutine ctrl_stream_send
 
-  !> Wait for a control command and broadcast it to all ranks.
+  !> Recieve a control command and broadcast it to all ranks.
   !! @param[inout] this Control stream instance.
   !! @param[inout] mode_cmd Mode command (input default, output command).
   !! @param[inout] phase_cmd Phase command (input default, output command).
-  subroutine ctrl_stream_wait_cmd(this, mode_cmd, phase_cmd)
+  subroutine ctrl_stream_recieve(this, mode_cmd, phase_cmd)
     class(ctrl_stream_t), intent(inout) :: this
     integer(c_int), intent(inout) :: mode_cmd, phase_cmd
     integer :: ierr, rank
@@ -205,34 +205,34 @@ contains
 
     call MPI_Comm_rank(neko_comm, rank, ierr)
 
-    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: enter with defaults mode=', &
+    write(msg,'(A,A,A,A)') 'ctrl_recieve: enter with defaults mode=', &
          trim(mode_name(mode_cmd)), ' phase=', trim(phase_name(phase_cmd))
     call ctrl_dbg_print(this, msg)
 
     if (rank == 0) then
-       call ctrl_dbg_print(this, 'ctrl_wait_cmd: rank0 waiting on MPI cmd')
+       call ctrl_dbg_print(this, 'ctrl_recieve: rank0 waiting on MPI cmd')
        call MPI_Recv(cmd_i, size(cmd_i), MPI_INTEGER, this%peer_root, &
             CTRL_TAG_CMD, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
        mode_i  = int(cmd_i(1))
        phase_i = int(cmd_i(2))
     else
        call ctrl_dbg_print(this, &
-            'ctrl_wait_cmd: non-root waiting for Bcast from rank0')
+            'ctrl_recieve: non-root waiting for Bcast from rank0')
        mode_i  = 0
        phase_i = 0
     end if
 
-    call ctrl_dbg_print(this, 'ctrl_wait_cmd: MPI_Bcast(mode)')
+    call ctrl_dbg_print(this, 'ctrl_recieve: MPI_Bcast(mode)')
     call MPI_Bcast(mode_i,  1, MPI_INTEGER, 0, neko_comm, ierr)
-    call ctrl_dbg_print(this, 'ctrl_wait_cmd: MPI_Bcast(phase)')
+    call ctrl_dbg_print(this, 'ctrl_recieve: MPI_Bcast(phase)')
     call MPI_Bcast(phase_i, 1, MPI_INTEGER, 0, neko_comm, ierr)
 
     mode_cmd  = int(mode_i,  c_int)
     phase_cmd = int(phase_i, c_int)
 
-    write(msg,'(A,A,A,A)') 'ctrl_wait_cmd: exit with mode=', &
+    write(msg,'(A,A,A,A)') 'ctrl_recieve: exit with mode=', &
          trim(mode_name(mode_cmd)), ' phase=', trim(phase_name(phase_cmd))
     call ctrl_dbg_print(this, msg)
-  end subroutine ctrl_stream_wait_cmd
+  end subroutine ctrl_stream_recieve
 
 end module neko_ctrl_mod
