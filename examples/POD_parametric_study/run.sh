@@ -2,70 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-ROOT_DIR="${SCRIPT_DIR}"
-while [ ! -d "${ROOT_DIR}/sources" ] && [ "${ROOT_DIR}" != "/" ]; do
-    ROOT_DIR="$(dirname "${ROOT_DIR}")"
-done
-if [ ! -d "${ROOT_DIR}/sources" ]; then
-    echo "Error: could not locate repo root from ${SCRIPT_DIR}" >&2
-    exit 1
-fi
+ROOT_DIR=$(cd -- "${SCRIPT_DIR}/../.." && pwd)
 
 cd "${SCRIPT_DIR}"
 
-resolve_adios2_root() {
-    local candidate
-
-    for candidate in \
-        "${ADIOS2_PATH:-}" \
-        "${ADIOS2_DIR:-}" \
-        "${ROOT_DIR}/external/adios2" \
-        "${MAIN_DIR:-}/external/adios2"; do
-        if [ -n "${candidate}" ] && \
-           [ -x "${candidate}/bin/adios2-config" ]; then
-            printf '%s\n' "${candidate}"
-            return 0
-        fi
-    done
-
-    if command -v adios2-config >/dev/null 2>&1; then
-        dirname "$(dirname "$(realpath "$(command -v adios2-config)")")"
-        return 0
-    fi
-
-    return 1
-}
-
-ensure_adios2_python() {
-    local adios2_root
-    local pyver
-
-    if python3 -c 'import adios2.bindings' >/dev/null 2>&1; then
-        return 0
-    fi
-
-    adios2_root=$(resolve_adios2_root) || {
-        echo "Error: could not locate ADIOS2 for the POD Python driver." >&2
-        return 1
-    }
-
-    pyver=$(python3 -c \
-        'import sys; print(f"{sys.version_info.major}.'\
-'{sys.version_info.minor}")')
-
-    export ADIOS2_PATH="${adios2_root}"
-    export PYTHONPATH="${ADIOS2_PATH}/lib/python${pyver}/site-packages"\
-"${PYTHONPATH:+:${PYTHONPATH}}"
-    export LD_LIBRARY_PATH="${ADIOS2_PATH}/lib:${ADIOS2_PATH}/lib64"\
-"${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
-
-    python3 -c 'import adios2.bindings' >/dev/null 2>&1 || {
-        echo "Error: adios2.bindings is still not importable." >&2
-        return 1
-    }
-
-    echo "Using ADIOS2_PATH=${ADIOS2_PATH}"
-}
+source "${ROOT_DIR}/scripts/pod_run_helpers.sh"
 
 resolve_neko_exe() {
     local example_dir
@@ -109,54 +50,26 @@ run_case() {
     local case_name
     local base
     local log_file
-    local mpirun_cmd
 
     case_name="$(basename "${case_path}")"
     base="${case_name%.case}"
 
-    if grep -q '"type"[[:space:]]*:[[:space:]]*"pod"' "${case_path}"; then
-        ensure_adios2_python
+    if pod_case_is_pod "${case_path}"; then
+        pod_ensure_adios2_python "${ROOT_DIR}"
         log_file=${LOG_FILE:-"mpmd_${base}.log"}
-        mpirun_cmd=(
-            mpirun
-            --tag-output
-            -n "${PY_RANKS}"
-            /usr/bin/env
-            NEKO_COMM_ID=1
-            NEKO_CTRL_PEER_ROOT="${PY_RANKS}"
-            python3 "${py_script}" "${case_path}"
-            :
-            -n "${NEKO_RANKS}"
-            /usr/bin/env
-            NEKO_COMM_ID=0
-            NEKO_CTRL_PEER_ROOT=0
-            "${neko_exe}" "${case_path}"
-        )
-
-        echo "Launching shared MPI job:"
     else
         log_file=${LOG_FILE:-"neko_${base}.log"}
-        mpirun_cmd=(
-            mpirun
-            --tag-output
-            -n "${NEKO_RANKS}"
-            "${neko_exe}" "${case_path}"
-        )
-
-        echo "Launching MPI job:"
     fi
 
-    echo "Using Python:      $(which python3)"
-    echo "Using mpirun:      $(which mpirun)"
-    echo "CONDA_PREFIX:      ${CONDA_PREFIX:-<unset>}"
-    echo "PYTHONPATH (start):${PYTHONPATH:-<unset>}"
-    echo "LD_LIBRARY_PATH:   ${LD_LIBRARY_PATH:-<unset>}"
-    echo "---------------------------------------------------------"
+    pod_print_runtime_env
 
-    printf '  %q' "${mpirun_cmd[@]}"
-    printf '\n'
-    echo "Output:            ${log_file}"
-    "${mpirun_cmd[@]}" > "${log_file}" 2>&1
+    if pod_case_is_pod "${case_path}"; then
+        pod_launch_shared_mpi "${case_path}" "${py_script}" "${neko_exe}" \
+            "${PY_RANKS}" "${NEKO_RANKS}" "${log_file}"
+    else
+        pod_launch_neko_only "${case_path}" "${neko_exe}" \
+            "${NEKO_RANKS}" "${log_file}"
+    fi
 }
 
 PY_SCRIPT=${2:-"${ROOT_DIR}/sources/state_recovery/POD_state_recover"\
