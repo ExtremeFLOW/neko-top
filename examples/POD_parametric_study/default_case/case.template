@@ -102,8 +102,8 @@
                     1.1,
                 ],
                 "z_bounds": [
-                    -10.0,
-                    10.0,
+                    -1.0,
+                    1.0,
                 ],
             },
             {
@@ -117,9 +117,15 @@
     },
     "unsteady" : true,
     "state_recovery": {
-        "type": "checkpoint",
+        "type": "pod",
         "enabled": true,
-        "n_memory": 100
+        "n_memory": 100,
+        "batch_size": 50,
+        "n_modes": 4,
+        "i_stream": 1,
+        "dtype": "double",
+        "output_reconstruction": true,
+        "write_modes": true,
     },
     "optimization": {
         "design": {
