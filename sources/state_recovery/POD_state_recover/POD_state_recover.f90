@@ -472,76 +472,13 @@ contains
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     type(time_state_t), intent(in) :: time
-    integer :: i, ierr, n_lines, nrows, ncols, n
-    integer(c_int) :: mode_cmd, phase_cmd
     type(time_state_t) :: time_out
 
     if (.not. this%enabled) return
 
     ! First restore() call is the phase boundary forward->adjoint
     if (.not. this%have_received_modes) then
-       call profiler_start_region("POD recieve modes")
-
-       if (this%ctrl%inited) then
-          call this%ctrl%put(MODE_FORWARD, PHASE_FWD_DONE, &
-               int(time%tstep, c_int), real(time%t, c_double))
-
-          mode_cmd  = MODE_FORWARD
-          phase_cmd = PHASE_FWD_DONE
-
-          ! BLOCK until Python says "go adjoint"
-          call this%ctrl%wait_cmd(mode_cmd, phase_cmd)
-
-          if (mode_cmd /= MODE_ADJOINT) then
-             call neko_error('Expected MODE_ADJOINT from Python at ' // &
-                  'forward->adjoint boundary.')
-          end if
-       end if
-
-       this%adjoint_started = .true.
-
-       ! Receive modes (Python streams after sending cmd)
-       do i = 1, this%n_modes
-          call this%dstream%recieve(this%u_modes(i)%x)
-          call this%dstream%recieve(this%v_modes(i)%x)
-          call this%dstream%recieve(this%w_modes(i)%x)
-          if (this%include_scalar) call this%dstream%recieve(this%s_modes(i)%x)
-       end do
-
-       ! Move modes back to GPU
-       n = this%u_modes(1)%dof%size()
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-       do i = 1, this%n_modes
-          call device_memcpy(this%u_modes(i)%x, this%u_modes(i)%x_d, n, &
-               HOST_TO_DEVICE, sync=.true.)
-          call device_memcpy(this%v_modes(i)%x, this%v_modes(i)%x_d, n, &
-               HOST_TO_DEVICE, sync=.true.)
-          call device_memcpy(this%w_modes(i)%x, this%w_modes(i)%x_d, n, &
-               HOST_TO_DEVICE, sync=.true.)
-          if (this%include_scalar) then
-             call device_memcpy(this%s_modes(i)%x, this%s_modes(i)%x_d, n, &
-                  HOST_TO_DEVICE, sync=.true.)
-          end if
-       end do
-       end if
-
-       if (this%write_modes) then
-          call this%output%sample(0.0_rp)
-       end if
-
-       ! Read CSV once
-       n_lines = csv_file_count_lines(this%csv_reader)
-       nrows = n_lines - 1
-       ncols = 1 + this%n_modes
-       call this%time_coefs%init(nrows, ncols)
-       call this%csv_reader%read(this%time_coefs)
-
-       call MPI_Allreduce(MPI_IN_PLACE, this%time_coefs%x, &
-            this%time_coefs%size(), mpi_real_precision, MPI_SUM, &
-            neko_comm, ierr)
-
-       this%have_received_modes = .true.
-       call profiler_end_region("POD recieve modes")
+       call POD_state_recover_recieve_modes(this, time)
     end if
 
     ! Emit ADJ_RUNNING only once (avoid flooding SST)
@@ -561,6 +498,81 @@ contains
     end if
     call profiler_end_region("POD restore")
   end subroutine POD_state_recover_restore
+
+  !> Receive POD modes at the forward-to-adjoint boundary.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[in] time Target time state.
+  subroutine POD_state_recover_recieve_modes(this, time)
+    class(POD_state_recover_t), intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+    integer :: i, ierr, n_lines, nrows, ncols, n
+    integer(c_int) :: mode_cmd, phase_cmd
+
+    call profiler_start_region("POD recieve modes")
+
+    if (this%ctrl%inited) then
+      call this%ctrl%put(MODE_FORWARD, PHASE_FWD_DONE, &
+           int(time%tstep, c_int), real(time%t, c_double))
+
+      mode_cmd  = MODE_FORWARD
+      phase_cmd = PHASE_FWD_DONE
+
+      ! BLOCK until Python says "go adjoint"
+      call this%ctrl%wait_cmd(mode_cmd, phase_cmd)
+
+      if (mode_cmd /= MODE_ADJOINT) then
+         call neko_error('Expected MODE_ADJOINT from Python at ' // &
+              'forward->adjoint boundary.')
+      end if
+    end if
+
+    this%adjoint_started = .true.
+
+    ! Receive modes (Python streams after sending cmd)
+    do i = 1, this%n_modes
+       call this%dstream%recieve(this%u_modes(i)%x)
+       call this%dstream%recieve(this%v_modes(i)%x)
+       call this%dstream%recieve(this%w_modes(i)%x)
+       if (this%include_scalar) then
+          call this%dstream%recieve(this%s_modes(i)%x)
+       end if
+    end do
+
+    ! Move modes back to GPU
+    n = this%u_modes(1)%dof%size()
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       do i = 1, this%n_modes
+          call device_memcpy(this%u_modes(i)%x, this%u_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+          call device_memcpy(this%v_modes(i)%x, this%v_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+          call device_memcpy(this%w_modes(i)%x, this%w_modes(i)%x_d, n, &
+               HOST_TO_DEVICE, sync=.true.)
+          if (this%include_scalar) then
+             call device_memcpy(this%s_modes(i)%x, this%s_modes(i)%x_d, &
+                  n, HOST_TO_DEVICE, sync=.true.)
+          end if
+       end do
+    end if
+
+    if (this%write_modes) then
+       call this%output%sample(0.0_rp)
+    end if
+
+    ! Read CSV once
+    n_lines = csv_file_count_lines(this%csv_reader)
+    nrows = n_lines - 1
+    ncols = 1 + this%n_modes
+    call this%time_coefs%init(nrows, ncols)
+    call this%csv_reader%read(this%time_coefs)
+
+    call MPI_Allreduce(MPI_IN_PLACE, this%time_coefs%x, &
+         this%time_coefs%size(), mpi_real_precision, MPI_SUM, &
+         neko_comm, ierr)
+
+    this%have_received_modes = .true.
+    call profiler_end_region("POD recieve modes")
+  end subroutine POD_state_recover_recieve_modes
 
   logical function recon_should_output(this, time, time_out)
     class(POD_state_recover_t), intent(in) :: this

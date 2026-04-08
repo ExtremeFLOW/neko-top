@@ -11,9 +11,7 @@ function check_system_dependencies() {
     if ! command -v aclocal 2>&1 1>/dev/null; then MISSING+=("Aclocal"); fi
     if ! command -v autoconf 2>&1 1>/dev/null; then MISSING+=("Autoconf"); fi
     if ! command -v automake 2>&1 1>/dev/null; then MISSING+=("Automake"); fi
-    if ! command -v pkg-config 2>&1 1>/dev/null; then
-        MISSING+=("Pkg-config")
-    fi
+    if ! command -v pkg-config 2>&1 1>/dev/null; then MISSING+=("Pkg-config"); fi
     [ -z "$MPICC" ] && MISSING+=("MPICC Environment Variable")
     [ -z "$MPICXX" ] && MISSING+=("MPICXX Environment Variable")
     [ -z "$MPIFC" ] && MISSING+=("MPIFC Environment Variable")
@@ -54,8 +52,7 @@ function find_json_fortran() {
     if [[ ! -d "$JSON_FORTRAN_LIB" ]]; then
 
         # Clone JSON-Fortran from the repository if it does not exist.
-        if [[ ! -d "$JSON_FORTRAN_DIR" || \
-            $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
+        if [[ ! -d "$JSON_FORTRAN_DIR" || $(ls -A $JSON_FORTRAN_DIR | wc -l) -eq 0 ]]; then
             [ -z "$JSON_FORTRAN_VERSION" ] && JSON_FORTRAN_VERSION="master"
 
             git clone --depth=1 --branch $JSON_FORTRAN_VERSION \
@@ -198,9 +195,21 @@ function find_pfunit() {
         # Patch pFUnit to work with Neko
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $PFUNIT_DIR
-        sed -i \
-            '/Encountered 1 or more failures\/errors/s/stop/error stop/' \
-            src/funit/FUnit.F90
+        cat >>pfunit_error_stop.patch <<_ACEOF
+diff --git a/src/funit/FUnit.F90 b/src/funit/FUnit.F90
+index 7df7b65..4f7dbf5 100644
+--- a/src/funit/FUnit.F90
++++ b/src/funit/FUnit.F90
+@@ -168,6 +168,6 @@ contains
+ #if defined(PGI)
+          call exit(-1)
+ #else
+-         stop '*** Encountered 1 or more failures/errors during testing. ***'
++         error stop '*** Encountered 1 or more failures/errors during testing. ***'
+ #endif
+       end if
+_ACEOF
+        git apply pfunit_error_stop.patch
         cd $CURRENT_DIR
     fi
 
@@ -408,10 +417,8 @@ function find_parmetis() {
         CMAKE_GENERATOR="Unix Makefiles"
 
         # Download and install ParMETIS
-        PARMETIS_ARCHIVE_URL="https://github.com/mfem/tpls/raw/refs/heads/"\
-"gh-pages/parmetis-4.0.3.tar.gz"
         mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
-        wget $PARMETIS_ARCHIVE_URL
+        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
