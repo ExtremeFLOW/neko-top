@@ -184,8 +184,8 @@ contains
 
     type(adjoint_viscous_dissipation_source_term_t) :: adjoint_forcing
 
-    call this%init_base(name, design%size(), weight, mask_name, start_time, &
-    end_time)
+    call this%init_base(name, design%size(), weight, mask_name, &
+         start_time, end_time)
 
     ! Save the simulation and design
     this%u => neko_registry%get_field('u')

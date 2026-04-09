@@ -166,8 +166,8 @@ contains
     end if
 
     ! Call the base initializer
-    call this%init_base(name, design%size(), weight, mask_name, start_time,
-    end_time)
+    call this%init_base(name, design%size(), weight, mask_name, &
+         start_time, end_time)
 
     ! Associate the integration weights
     this%coef => simulation%fluid%c_Xh
@@ -187,9 +187,8 @@ contains
 
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
-    associate(f_phi_adj => &
-         simulation%adjoint_scalars%adjoint_scalar_fields( &
-         i_adjoint_scalar)%f_Xh)
+    associate(f_phi_adj => simulation%adjoint_scalars% &
+         adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref

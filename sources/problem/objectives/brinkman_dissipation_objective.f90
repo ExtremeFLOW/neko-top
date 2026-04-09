@@ -185,8 +185,8 @@ contains
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
     ! Call the base initializer
-    call this%init_base(name, design%size(), weight, mask_name, start_time, &
-    end_time)
+    call this%init_base(name, design%size(), weight, mask_name, &
+         start_time, end_time)
 
     this%dealias_forcing = dealias_forcing
     this%dealias_sensitivity = dealias_sensitivity
