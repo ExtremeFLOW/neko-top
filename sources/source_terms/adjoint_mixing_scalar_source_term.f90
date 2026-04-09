@@ -146,6 +146,7 @@ contains
     call fields%assign(1, f_s)
 
     call this%init_base(fields, coef, start_time, end_time)
+    call fields%free()
 
     ! point everything in the correct places
     this%s => s
