@@ -166,9 +166,8 @@ contains
     end if
 
     ! Call the base initializer
-    call this%init_base(name, design%size(), weight, mask_name)
-    this%start_time = start_time
-    this%end_time = end_time
+    call this%init_base(name, design%size(), weight, mask_name, start_time,
+    end_time)
 
     ! Associate the integration weights
     this%coef => simulation%fluid%c_Xh
