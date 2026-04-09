@@ -87,6 +87,8 @@
         "design": {
             "type": "brinkman",
             "dealias": false,
+            "verbose_design": true,
+            "verbose_sensitivity": true,
             "mapping": [
                 {
                     "type": "PDE_filter",

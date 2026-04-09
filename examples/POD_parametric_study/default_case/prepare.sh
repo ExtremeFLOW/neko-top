@@ -24,7 +24,7 @@ function help() {
 }
 
 # Handle options
-N=5
+N=10
 Lx=4
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
