@@ -62,6 +62,7 @@ module brinkman_dissipation_objective
   use device_math, only: device_copy, device_glsc2, device_col2, device_invcol2
   use math_ext, only: glsc2_mask
   use field_math, only: field_col3, field_addcol3, field_cmult, field_col2
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -142,7 +143,9 @@ contains
     logical :: dealias_sensitivity, dealias_forcing
     real(kind=rp) :: start_time, end_time
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    weight = 1.0_rp
+    call nekotop_continuation%json_get_or_register(json, 'weight', &
+         this%weight, weight)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Out of plane stresses")
     call json_get_or_default(json, "dealias_sensitivity", &

@@ -89,6 +89,7 @@ module viscous_dissipation_objective
   use utils, only: neko_error
   use json_module, only: json_file
   use json_utils, only: json_get_or_default
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -152,7 +153,9 @@ contains
     real(kind=rp) :: weight
     real(kind=rp) :: start_time, end_time
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    weight = 1.0_rp
+    call nekotop_continuation%json_get_or_register(json, 'weight', &
+         this%weight, weight)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
