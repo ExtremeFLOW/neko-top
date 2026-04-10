@@ -133,8 +133,7 @@ contains
        call MPI_Bcast(length, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
        if (rank .ne. 0) allocate(character(len=length) :: json_buffer)
-       call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, NEKO_COMM, &
-            ierr)
+       call MPI_Bcast(json_buffer, length, MPI_CHARACTER, 0, NEKO_COMM, ierr)
 
        if (rank .ne. 0) then
           call json%load_from_string(json_buffer)

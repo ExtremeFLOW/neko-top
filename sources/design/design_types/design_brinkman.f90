@@ -283,13 +283,13 @@ contains
          output_format_str, 'fld')
 
     select case (trim(output_precision_str))
-    case ('sp', 'SP')
+    case ('sp', 'SP', 'single')
        output_precision = sp
-    case ('dp', 'DP')
+    case ('dp', 'DP', 'double')
        output_precision = dp
     case default
        call neko_error('Invalid output_precision in design.brinkman. ' // &
-            'Expected ''sp'' or ''dp''.')
+            'Expected "sp" or "dp".')
     end select
 
     select case (trim(domain_type))
