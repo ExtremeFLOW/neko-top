@@ -33,12 +33,25 @@ contains
   end subroutine POD_state_recover_init_from_json
 
   subroutine POD_state_recover_init_from_components(this, neko_case, &
-       i_stream, n_modes, include_scalar, debug)
+       i_stream, n_modes, dtype, write_modes, output_reconstruction, &
+       output_control, output_value, debug, &
+       mode_output_precision, mode_output_format, mode_file_name, &
+       recon_output_precision, recon_output_format, recon_file_name)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: i_stream, n_modes
-    logical, intent(in) :: include_scalar
+    character(len=*), intent(in) :: dtype
+    logical, intent(in) :: write_modes
+    logical, intent(in) :: output_reconstruction
+    character(len=*), intent(in) :: output_control
+    real, intent(in) :: output_value
     logical, intent(in), optional :: debug
+    integer, intent(in), optional :: mode_output_precision
+    character(len=*), intent(in), optional :: mode_output_format
+    character(len=*), intent(in), optional :: mode_file_name
+    integer, intent(in), optional :: recon_output_precision
+    character(len=*), intent(in), optional :: recon_output_format
+    character(len=*), intent(in), optional :: recon_file_name
 
     call POD_state_recover_unavailable()
   end subroutine POD_state_recover_init_from_components

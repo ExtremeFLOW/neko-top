@@ -178,17 +178,12 @@ def load_pod_config(case_path: str) -> tuple[dict, PODConfig]:
     if not isinstance(state_recovery, dict):
         raise KeyError("case['state_recovery'] must be a dict")
 
-    include_scalar = as_bool(state_recovery.get("include_scalar"))
     enabled_scalars = count_enabled_scalars(case)
-    if include_scalar and enabled_scalars == 0:
+    include_scalar = enabled_scalars > 0
+    if enabled_scalars > 1:
         raise ValueError(
-            "POD include_scalar=true but no enabled scalar was found in "
-            "the case."
-        )
-    if include_scalar and enabled_scalars != 1:
-        raise ValueError(
-            "POD include_scalar currently supports exactly one enabled "
-            "scalar."
+            "POD state recovery currently supports exactly one enabled "
+            "scalar in the case."
         )
 
     dtype_name = str(state_recovery.get("dtype", "double")).strip().lower()

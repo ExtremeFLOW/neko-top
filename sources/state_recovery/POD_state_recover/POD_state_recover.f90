@@ -41,7 +41,7 @@ module simulation_POD_state_recover
   use field, only: field_t
   use file, only: file_t
   use matrix, only: matrix_t
-  use fld_file_output, only: fld_file_output_t
+  use field_output, only: field_output_t
   use coefs, only: coef_t
   use data_streamer, only: data_streamer_t
   use profiler, only: profiler_start_region, profiler_end_region
@@ -94,10 +94,16 @@ module simulation_POD_state_recover
      type(vector_t) :: a_interp
 
      ! optional output
-     type(fld_file_output_t) :: output
+     type(field_output_t) :: output
+     integer :: mode_output_precision = sp
+     character(len=32) :: mode_output_format = 'fld'
+     character(len=80) :: mode_file_name = 'POD_modes'
      logical :: write_modes = .false.
      logical :: output_reconstruction = .false.
-     type(fld_file_output_t) :: recon_output
+     type(field_output_t) :: recon_output
+     integer :: recon_output_precision = sp
+     character(len=32) :: recon_output_format = 'fld'
+     character(len=80) :: recon_file_name = 'pod_reconstruction'
      character(len=16) :: recon_output_control = "never"
      real(kind=rp) :: recon_output_value = 0.0_rp
      real(kind=rp) :: recon_time_interval = 0.0_rp
@@ -135,30 +141,64 @@ contains
     integer :: i_stream, n_modes
     logical :: write_modes
     logical :: debug
-    logical :: include_scalar
     logical :: output_reconstruction
-    character(len=:), allocatable :: output_precision
+    character(len=:), allocatable :: recon_output_precision_str
     character(len=:), allocatable :: output_control
     real(kind=rp) :: output_value
     character(len=:), allocatable :: dtype
+    character(len=:), allocatable :: mode_output_precision_str
+    character(len=:), allocatable :: mode_output_format
+    character(len=:), allocatable :: mode_file_name
+    character(len=:), allocatable :: recon_output_format
+    character(len=:), allocatable :: recon_file_name
+    integer :: mode_output_precision
+    integer :: recon_output_precision
 
     call json_get(params, "i_stream", i_stream)
     call json_get(params, "n_modes", n_modes)
     call json_get_or_default(params, "dtype", dtype, "double")
-    call json_get_or_default(params, "include_scalar", include_scalar, &
-         .false.)
     call json_get_or_default(params, "write_modes", write_modes, .false.)
     call json_get_or_default(params, "debug", debug, .false.)
     call json_get_or_default(params, "output_reconstruction", &
          output_reconstruction, .false.)
+    call json_get_or_default(params, "output_precision", &
+         mode_output_precision_str, "sp")
+    call json_get_or_default(params, "output_format", &
+         mode_output_format, "fld")
+    call json_get_or_default(params, "output_file_name", mode_file_name, &
+         "POD_modes")
 
-    output_precision = 'single'
+    mode_output_precision = precision_from_string(mode_output_precision_str, &
+         'state_recovery.output_precision')
+
+    recon_output_precision = mode_output_precision
+    recon_output_precision_str = trim(mode_output_precision_str)
+    recon_output_format = trim(mode_output_format)
+    recon_file_name = 'pod_reconstruction'
     output_control = 'never'
     output_value = 0.0_rp
 
     if (output_reconstruction) then
-       call json_get_or_default(neko_case%params, 'case.output_precision', &
-            output_precision, 'single')
+       if (.not. ('output_precision' .in. params)) then
+          call json_get_or_default(neko_case%params, 'case.output_precision', &
+               recon_output_precision_str, 'single')
+          recon_output_precision = precision_from_string( &
+               recon_output_precision_str, &
+               'state_recovery.reconstruction_output_precision')
+       end if
+       if ('reconstruction_output_precision' .in. params) then
+          call json_get(params, 'reconstruction_output_precision', &
+               recon_output_precision_str)
+          recon_output_precision = precision_from_string( &
+               recon_output_precision_str, &
+               'state_recovery.reconstruction_output_precision')
+       end if
+       if ('reconstruction_output_format' .in. params) then
+          call json_get(params, 'reconstruction_output_format', &
+               recon_output_format)
+       end if
+       call json_get_or_default(params, 'reconstruction_output_file_name', &
+            recon_file_name, 'pod_reconstruction')
 
        call json_get_or_default(neko_case%params, 'case.fluid.output_control', &
             output_control, 'org')
@@ -178,8 +218,10 @@ contains
     end if
 
     call this%init_from_components(neko_case, i_stream, n_modes, dtype, &
-         include_scalar, write_modes, output_reconstruction, &
-         output_precision, output_control, output_value, debug)
+         write_modes, output_reconstruction, output_control, output_value, &
+         debug, mode_output_precision, &
+         mode_output_format, mode_file_name, recon_output_precision, &
+         recon_output_format, recon_file_name)
   end subroutine POD_state_recover_init_from_json
 
 
@@ -189,45 +231,87 @@ contains
   !! @param[in] i_stream Snapshot stride.
   !! @param[in] n_modes Number of POD modes to keep.
   !! @param[in] dtype POD floating-point precision.
-  !! @param[in] include_scalar Include one scalar field in the POD basis.
   !! @param[in] write_modes Whether to write modes to output.
   !! @param[in] output_reconstruction Whether to output reconstructions.
-  !! @param[in] output_precision Reconstruction output precision.
   !! @param[in] output_control Reconstruction output cadence control.
   !! @param[in] output_value Reconstruction cadence value.
   !! @param[in] debug Optional debug flag.
+  !! @param[in] mode_output_precision Optional POD mode output precision.
+  !! @param[in] mode_output_format Optional POD mode output format.
+  !! @param[in] mode_file_name Optional POD mode output base name.
+  !! @param[in] recon_output_precision Optional reconstruction precision.
+  !! @param[in] recon_output_format Optional reconstruction output format.
+  !! @param[in] recon_file_name Optional reconstruction output base name.
   subroutine POD_state_recover_init_from_components(this, neko_case, &
-       i_stream, n_modes, dtype, include_scalar, write_modes, &
-       output_reconstruction, output_precision, output_control, &
-       output_value, debug)
+       i_stream, n_modes, dtype, write_modes, output_reconstruction, &
+       output_control, output_value, debug, &
+       mode_output_precision, mode_output_format, mode_file_name, &
+       recon_output_precision, recon_output_format, recon_file_name)
     class(POD_state_recover_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     integer, intent(in) :: i_stream, n_modes
     character(len=*), intent(in) :: dtype
-    logical, intent(in) :: include_scalar
     logical, intent(in) :: write_modes
     logical, intent(in) :: output_reconstruction
-    character(len=*), intent(in) :: output_precision
     character(len=*), intent(in) :: output_control
     real(kind=rp), intent(in) :: output_value
     logical, intent(in), optional :: debug
+    integer, intent(in), optional :: mode_output_precision
+    character(len=*), intent(in), optional :: mode_output_format
+    character(len=*), intent(in), optional :: mode_file_name
+    integer, intent(in), optional :: recon_output_precision
+    character(len=*), intent(in), optional :: recon_output_format
+    character(len=*), intent(in), optional :: recon_file_name
     integer :: i
-    integer :: output_prec
     character(len=80) :: str
 
     this%enabled = .true.
     this%i_stream = i_stream
     this%n_modes = n_modes
     this%dtype = adjustl(dtype)
-    this%include_scalar = include_scalar
     this%write_modes = write_modes
     this%output_reconstruction = output_reconstruction
     this%recon_output_control = 'never'
     this%recon_output_value = 0.0_rp
     this%recon_time_interval = 0.0_rp
     this%recon_nsteps = 0
+    this%recon_output_precision = sp
+    this%recon_output_format = 'fld'
+    this%recon_file_name = 'pod_reconstruction'
+    this%mode_output_precision = sp
+    this%mode_output_format = 'fld'
+    this%mode_file_name = 'POD_modes'
     this%n_flds = 3
     this%coef => neko_case%fluid%c_Xh
+
+    this%include_scalar = allocated(neko_case%scalars)
+
+    if (present(mode_output_precision)) then
+       if (mode_output_precision .ne. sp .and. &
+            mode_output_precision .ne. dp) then
+          call neko_error('mode_output_precision must be either sp or dp')
+       end if
+       this%mode_output_precision = mode_output_precision
+    end if
+    if (present(mode_output_format)) then
+       this%mode_output_format = trim(mode_output_format)
+    end if
+    if (present(mode_file_name)) then
+       this%mode_file_name = trim(mode_file_name)
+    end if
+    if (present(recon_output_precision)) then
+      if (recon_output_precision .ne. sp .and. &
+           recon_output_precision .ne. dp) then
+         call neko_error('recon_output_precision must be either sp or dp')
+      end if
+      this%recon_output_precision = recon_output_precision
+    end if
+    if (present(recon_output_format)) then
+       this%recon_output_format = trim(recon_output_format)
+    end if
+    if (present(recon_file_name)) then
+       this%recon_file_name = trim(recon_file_name)
+    end if
 
     select case (trim(lower_string(this%dtype)))
     case ('single')
@@ -243,10 +327,6 @@ contains
     end select
 
     if (this%include_scalar) then
-       if (.not. allocated(neko_case%scalars)) then
-          call neko_error('POD scalar recovery requested but no scalar ' // &
-               'is enabled.')
-       end if
        if (size(neko_case%scalars%scalar_fields) .ne. 1) then
           call neko_error('POD scalar recovery currently supports ' // &
                'exactly one scalar.')
@@ -262,37 +342,39 @@ contains
     allocate(this%w_modes(this%n_modes))
     if (this%include_scalar) allocate(this%s_modes(this%n_modes))
 
-    call this%output%init(sp, 'POD_modes', this%n_flds * this%n_modes)
+    call this%output%init(trim(this%mode_file_name), &
+         this%n_flds * this%n_modes, &
+         precision = this%mode_output_precision, &
+         format = trim(this%mode_output_format))
     do i = 1, this%n_modes
        write(str, '(A,I0)') "u_mode_", i
        call this%u_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign(this%n_flds*(i-1) + 1, this%u_modes(i))
+       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 1, &
+            this%u_modes(i))
 
        write(str, '(A,I0)') "v_mode_", i
        call this%v_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign(this%n_flds*(i-1) + 2, this%v_modes(i))
+       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 2, &
+            this%v_modes(i))
 
        write(str, '(A,I0)') "w_mode_", i
        call this%w_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign(this%n_flds*(i-1) + 3, this%w_modes(i))
+       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 3, &
+            this%w_modes(i))
 
        if (this%include_scalar) then
           write(str, '(A,I0)') "s_mode_", i
           call this%s_modes(i)%init(this%s%dof, trim(str))
-          call this%output%fields%assign(this%n_flds*(i-1) + 4, &
+          call this%output%fields%assign_to_field(this%n_flds*(i-1) + 4, &
                this%s_modes(i))
        end if
     end do
 
     if (this%output_reconstruction) then
-       if (trim(lower_string(output_precision)) .eq. 'double') then
-          output_prec = dp
-       else
-          output_prec = sp
-       end if
-
-       call this%recon_output%init(output_prec, 'pod_reconstruction', &
-            this%n_flds, path = trim(neko_case%output_directory))
+       call this%recon_output%init(trim(this%recon_file_name), this%n_flds, &
+            precision = this%recon_output_precision, &
+            path = trim(neko_case%output_directory), &
+            format = trim(this%recon_output_format))
        call this%recon_output%fields%assign_to_field(1, neko_case%fluid%u)
        call this%recon_output%fields%assign_to_field(2, neko_case%fluid%v)
        call this%recon_output%fields%assign_to_field(3, neko_case%fluid%w)
@@ -403,6 +485,8 @@ contains
        deallocate(this%s_modes)
     end if
 
+    call this%output%free()
+    call this%recon_output%free()
     call this%dstream%free()
     call this%csv_reader%free()
     call this%a_interp%free()
@@ -411,6 +495,12 @@ contains
     call this%ctrl%free()
 
     this%include_scalar = .false.
+    this%mode_output_precision = sp
+    this%mode_output_format = 'fld'
+    this%mode_file_name = 'POD_modes'
+    this%recon_output_precision = sp
+    this%recon_output_format = 'fld'
+    this%recon_file_name = 'pod_reconstruction'
     nullify(this%s)
     this%enabled = .false.
   end subroutine POD_state_recover_free
@@ -636,6 +726,21 @@ contains
        recon_should_output = .false.
     end select
   end function recon_should_output
+
+  integer function precision_from_string(str, name) result(precision)
+    character(len=*), intent(in) :: str
+    character(len=*), intent(in) :: name
+
+    select case (trim(lower_string(str)))
+    case ('sp', 'single')
+       precision = sp
+    case ('dp', 'double')
+       precision = dp
+    case default
+       call neko_error('Invalid ' // trim(name) // '. Expected ''sp'', ' // &
+            '''dp'', ''single'', or ''double''.')
+    end select
+  end function precision_from_string
 
   pure function lower_string(str) result(out)
     character(len=*), intent(in) :: str
