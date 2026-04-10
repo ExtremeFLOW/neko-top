@@ -108,6 +108,7 @@ module simulation_POD_state_recover
      real(kind=rp) :: recon_output_value = 0.0_rp
      real(kind=rp) :: recon_time_interval = 0.0_rp
      integer :: recon_nsteps = 0
+     integer :: i_output = 0
 
      ! Control state
      type(ctrl_stream_t) :: ctrl
@@ -503,6 +504,7 @@ contains
     this%recon_file_name = 'pod_reconstruction'
     nullify(this%s)
     this%enabled = .false.
+    this%i_output = 0
   end subroutine POD_state_recover_free
 
 
@@ -679,7 +681,8 @@ contains
     end if
 
     if (this%write_modes) then
-       call this%output%sample(0.0_rp)
+       call this%output%sample(real(this%i_output, kind=rp))
+       this%i_output = this%i_output + 1
     end if
 
     ! Read CSV once
