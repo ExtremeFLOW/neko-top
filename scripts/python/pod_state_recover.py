@@ -337,7 +337,7 @@ def write_time_coefficients(
     if rotate_existing:
         rotated = rotate_time_coeffs("pod_time_coeffs.csv")
         if rotated:
-            log0(f"archived pod_time_coeffs.csv -> {rotated}")
+            log(comm, f"archived pod_time_coeffs.csv -> {rotated}")
 
     np.savetxt(
         "pod_time_coeffs.csv",
