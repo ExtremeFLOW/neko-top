@@ -141,9 +141,17 @@
         ]
     },
     "unsteady": true,
-    "checkpoints": {
+    "state_recovery": {
+        "type": "pod",
         "enabled": true,
-        "n_memory": 300
+        "n_memory": 100,
+        "batch_size": 50,
+        "n_modes": 4,
+        "i_stream": 20,
+        "dtype": "double",
+        "output_reconstruction": true,
+        "output_format": "vtkhdf",
+        "write_modes": true
     },
     "optimization": {
         "design": {
