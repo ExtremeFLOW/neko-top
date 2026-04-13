@@ -157,6 +157,8 @@ contains
          this%weight, weight)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
+    call json_get_or_default(json, "start_time", this%start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", this%end_time, huge(0.0_rp))
 
     call this%init_from_attributes(design, simulation, weight, name, mask_name)
   end subroutine viscous_dissipation_init_json_sim
@@ -206,7 +208,7 @@ contains
          simulation%adjoint_fluid%f_adj_z, &
          this%u, this%v, this%w, this%weight * this%viscosity, &
          this%mask, this%has_mask, &
-         this%c_Xh, this%volume)
+         this%c_Xh, this%volume, this%start_time, this%end_time)
 
     ! append adjoint forcing term based on objective function
     select type (f => simulation%adjoint_fluid)

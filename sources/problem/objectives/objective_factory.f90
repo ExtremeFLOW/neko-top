@@ -1,6 +1,6 @@
 !> @file objective_factory.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -38,6 +38,7 @@ submodule (objective) objective_factory_mod
   use utils, only: neko_type_error
 
   ! Import the objective function types
+  use target_dissipation_objective, only: target_dissipation_objective_t
   use viscous_dissipation_objective, only: viscous_dissipation_objective_t
   use brinkman_dissipation_objective, only: brinkman_dissipation_objective_t
   use scalar_mixing_objective, only: scalar_mixing_objective_t
@@ -45,10 +46,11 @@ submodule (objective) objective_factory_mod
   implicit none
 
   !> Known function types
-  character(len=25), parameter :: KNOWN_TYPES(3) = [ character(len=25) :: &
+  character(len=25), parameter :: KNOWN_TYPES(4) = [ character(len=25) :: &
        "viscous_dissipation", &
        "scalar_mixing", &
-       "brinkman_dissipation"]
+       "brinkman_dissipation", &
+       "target_dissipation"]
 
 contains
 
@@ -56,6 +58,11 @@ contains
   ! Factory function
 
   !> Factory function
+  !! Allocates and initializes an objective function object
+  !! @param object The objective function object to be created
+  !! @param type The type of the objective function
+  !! @param design The design object
+  !! @param simulation The simulation object
   module subroutine objective_factory(object, json, design, simulation)
     class(objective_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
@@ -76,6 +83,8 @@ contains
        allocate(scalar_mixing_objective_t::object)
     case ("brinkman_dissipation")
        allocate(brinkman_dissipation_objective_t::object)
+    case ("target_dissipation")
+       allocate(target_dissipation_objective_t::object)
 
     case default
        call neko_type_error("Objective", type, KNOWN_TYPES)

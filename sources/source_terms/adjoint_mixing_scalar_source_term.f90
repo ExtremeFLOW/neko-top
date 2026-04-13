@@ -114,22 +114,19 @@ contains
 
 
   subroutine adjoint_mixing_scalar_source_term_init_from_components(this, &
-       f_s, s, obj_scale, phi_ref, mask, if_mask, coef)
+       f_s, s, obj_scale, phi_ref, mask, if_mask, coef, start_time, end_time)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
     real(kind=rp), intent(in) :: phi_ref
     type(field_t), intent(in), target :: s
     class(point_zone_t), intent(in), target :: mask
     type(field_list_t) :: fields
-    type(coef_t) :: coef
-    real(kind=rp) :: start_time
-    real(kind=rp) :: end_time
-    real(kind=rp) :: obj_scale
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+    real(kind=rp), intent(in) :: obj_scale
 
-    logical :: if_mask
-
-    start_time = 0.0_rp
-    end_time = 100000000.0_rp
+    logical, intent(in) :: if_mask
 
 
     call this%free()
