@@ -17,7 +17,6 @@ if(ADIOS2_FOUND)
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/POD_state_recover.f90
-            ${CMAKE_CURRENT_SOURCE_DIR}/POD_state_recover/neko_ctrl_mod.f90
     )
 else()
     message(STATUS "ADIOS2 not found: POD state recovery disabled")
