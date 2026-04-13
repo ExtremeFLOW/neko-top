@@ -95,53 +95,22 @@ At the case-file level, POD recovery looks like:
 
 ### Parameters
 
-- `type`
-  Selects the recovery implementation. Use `"pod"` for POD state recovery.
-
-- `batch_size`
-  Required. Number of streamed snapshots accumulated by the Python POD driver
-  before each POD update.
-
-- `n_modes`
-  Required. Number of POD modes kept for the reduced basis.
-
-- `i_stream`
-  Required. Snapshot stride in timesteps. Every `i_stream` steps is sent to
-  the Python driver.
-
-- `dtype`
-  Optional. Defaults to `"double"`. Supported values are `"single"` and
-  `"double"`.
-
-- `write_modes`
-  Optional. Defaults to `false`. Write the final POD modes from the Neko side.
-
-- `output_reconstruction`
-  Optional. Defaults to `false`. Write reconstructed fields during replay.
-
-- `output_precision`
-  Optional. Defaults to `"sp"`. Precision used when writing POD modes.
-
-- `output_format`
-  Optional. Defaults to `"fld"`. Output format used when writing POD modes.
-
-- `output_file_name`
-  Optional. Defaults to `"POD_modes"`. Base name for POD mode output.
-
-- `reconstruction_output_precision`
-  Optional. If set, overrides reconstruction output precision. Otherwise the
-  reconstruction output inherits the POD output precision, or falls back to
-  `case.output_precision` when POD output precision was not set explicitly.
-
-- `reconstruction_output_format`
-  Optional. Defaults to the POD mode output format.
-
-- `reconstruction_output_file_name`
-  Optional. Defaults to `"pod_reconstruction"`.
-
-- `debug`
-  Optional. Defaults to `false`. Enables verbose control-stream logging for the
-  coupled Neko/Python run.
+| Parameter                         | Type      | Default                | Description |
+| --------------------------------- | --------- | ---------------------- | ----------- |
+| `type`                            | `string`  | `"checkpoint"`         | Selects the recovery implementation. Use `"pod"` for POD state recovery. |
+| `batch_size`                      | `int`     | required               | Number of streamed snapshots accumulated by the Python POD driver before each POD update. |
+| `n_modes`                         | `int`     | required               | Number of POD modes kept for the reduced basis. |
+| `i_stream`                        | `int`     | required               | Snapshot stride in timesteps. Every `i_stream` steps is sent to the Python driver. |
+| `dtype`                           | `string`  | `"double"`             | Floating-point precision used in the POD driver. Supported values are `"single"` and `"double"`. |
+| `write_modes`                     | `bool`    | `false`                | Whether to write the final POD modes from the Neko side. |
+| `output_reconstruction`           | `bool`    | `false`                | Whether to write reconstructed fields during replay. |
+| `output_precision`                | `string`  | `"sp"`                 | Precision used when writing POD modes. |
+| `output_format`                   | `string`  | `"fld"`                | Output format used when writing POD modes. |
+| `output_file_name`                | `string`  | `"POD_modes"`          | Base name for POD mode output. |
+| `reconstruction_output_precision` | `string`  | inherited from output  | Overrides reconstruction output precision when set. Otherwise reconstruction inherits the POD output precision, or falls back to `case.output_precision` when POD output precision was not set explicitly. |
+| `reconstruction_output_format`    | `string`  | inherited from output  | Format used for reconstructed-field output. |
+| `reconstruction_output_file_name` | `string`  | `"pod_reconstruction"` | Base name for reconstructed-field output. |
+| `debug`                           | `bool`    | `false`                | Enables verbose control-stream logging for the coupled Neko/Python run. |
 
 When `output_reconstruction = true`, the reconstruction output cadence is taken
 from `case.fluid.output_control` and `case.fluid.output_value`.
@@ -215,9 +184,9 @@ The recommended workflow is:
    and the Python dependencies required by `pySEMTools`.
 3. Use the example `prepare.sh` scripts to build the case in the same software
    environment you intend to run.
-4. Launch the POD case through the provided example `run.sh` script, for
-   example in `examples/POD_rugby_ball/run.sh`, rather than manually piecing
-   together the MPI command.
+4. Launch the POD case through the repository-level `run.sh` script from the
+   Neko-TOP root, for example `./run.sh POD_rugby_ball`, rather than manually
+   piecing together the MPI command.
 
 The POD helper scripts print the active `python3`, `mpirun`, `CONDA_PREFIX`,
 `PYTHONPATH`, and `LD_LIBRARY_PATH` before launching. If `mpi4py` or ADIOS2
