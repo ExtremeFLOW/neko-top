@@ -307,17 +307,17 @@ function find_adios2() {
     if [ -z "$ADIOS2_DIR" ] && command -v adios2-config >/dev/null 2>&1; then
         ADIOS2_CONFIG=$(realpath "$(command -v adios2-config)")
         ADIOS2_DIR=$(dirname "$(dirname "$ADIOS2_CONFIG")")
-    elif [ -n "$ADIOS2_DIR" ]; then
+    else
+        if [ -z "$ADIOS2_DIR" ]; then
+            ADIOS2_DIR="$EXTERNAL_DIR/adios2"
+        fi
+
         if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
             ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
         fi
-        mkdir -p $ADIOS2_DIR
-        ADIOS2_DIR=$(realpath $ADIOS2_DIR)
-        ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
-    else
-        error "ADIOS2 was requested but ADIOS2_DIR is not set and"
-        error "'adios2-config' was not found in PATH."
-        exit 1
+        mkdir -p "$ADIOS2_DIR"
+        ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
+        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
     fi
 
     if [[ ! -x "$ADIOS2_CONFIG" ]]; then
@@ -695,9 +695,10 @@ function check_external_dir() {
     if [ -z "$EXTERNAL_DIR" ]; then
         echo "Environment EXTERNAL_DIR is not set."
         echo "Default path will be used: ~/tmp/external"
-        export EXTERNAL_DIR=$(realpath ~/tmp/external)
+        EXTERNAL_DIR=~/tmp/external
     fi
 
-    mkdir -p $EXTERNAL_DIR
+    mkdir -p "$EXTERNAL_DIR"
+    export EXTERNAL_DIR=$(realpath "$EXTERNAL_DIR")
 
 }
