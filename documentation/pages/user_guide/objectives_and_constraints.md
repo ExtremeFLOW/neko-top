@@ -45,6 +45,36 @@ have currently been implemented in `neko-top`·
 
 ## Objectives {#objectives}
 
+### Time integration for unsteady objectives {#objectives_time_integration}
+For unsteady simulations, the instantaneous objective is time integrated as
+\f[
+\mathcal{F} = \int_0^T  f(t) dt,
+\f]
+where \f$T\f$ is the final simulation time.
+
+The time window can be restricted with the optional input parameters
+`start_time` and `end_time`. Their defaults are `0.0` and `+\infty`,
+respectively, meaning that the full simulated time horizon is used unless a
+smaller window is prescribed.
+
+For example,
+
+```json
+{
+    "type": "scalar_mixing",
+    "weight": 1.0,
+    "start_time": 2.5,
+    "end_time": 6.0
+}
+```
+
+accumulates the scalar-mixing objective only over the interval
+\f$2.5 \le t \le 6.0\f$.
+
+For the underlying adjoint formulation and how objective functions generate
+adjoint forcing terms, please refer to
+[Adjoint sensitivity analysis](@ref adjoint).
+
 ### Viscous dissipation {#objective_dissipation}
 
 This objective is used to either minimize or maximize the viscous dissipation.
@@ -68,6 +98,8 @@ and has the following input parameters:
 | `weight`| The weight used in the objective. | Real | `1.0` |
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Dissipation`|
+| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
+| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
 
 ### Brinkman dissipation {#objective_velocity_penalty}
 In the works of [A. Gersborg-Hansen et al. (2005)](https://link.springer.com/article/10.1007/s00158-004-0508-7)
@@ -114,6 +146,8 @@ based on lubrication theory written by Gersborg-Hansen et al.
 | `name`| The name that will appear in `objective_data.csv` | String | `Out of plane stresses`|
 | `dealias_forcing`| If dealiasing should be applied to adjoint forcing term | logical | `.true.`|
 | `dealias_sensitivity`| If dealiasing should be applied to sensitivity contribution | logical | `.true.`|
+| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
+| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
 
 ### Scalar mixing {#objective_scalar_mixing}
 
@@ -141,6 +175,8 @@ and has the following input parameters:
 | `mask_name` | The name of the `point_zone` indicating \f$\Omega_\text{obj}\f$. | String | `""`|
 | `target_concentration` | \f$\phi_\text{ref}\f$ in the above equation. | Real | `0.5`|
 | `name`| The name that will appear in `objective_data.csv` | String | `Scalar Mixing`|
+| `start_time` | Start of the active time window for unsteady accumulation. | Real | `0.0` |
+| `end_time` | End of the active time window for unsteady accumulation. | Real | `+\infty` |
 
 ## Constraints {#constraints}
 

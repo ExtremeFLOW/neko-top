@@ -93,11 +93,16 @@ contains
   !! @param name The name of the constraint.
   !! @param design_size The number of design variables.
   !! @param mask_name The name design the mask. [optional]
-  subroutine constraint_init_base(this, name, design_size, mask_name)
+  !! @param start_time start of the integration window. [optional]
+  !! @param end_time end of the integration window. [optional]
+  subroutine constraint_init_base(this, name, design_size, mask_name, &
+       start_time, end_time)
     class(constraint_t), intent(inout) :: this
     character(len=*), intent(in) :: name
     integer, intent(in) :: design_size
     character(len=*), intent(in), optional :: mask_name
+    real(kind=rp), intent(in), optional :: start_time
+    real(kind=rp), intent(in), optional :: end_time
 
     call this%free_base()
 
@@ -112,6 +117,18 @@ contains
        end if
     end if
 
+    if (present(start_time)) then
+       this%start_time = start_time
+    else
+       this%start_time = 0.0_rp
+    end if
+
+    if (present(end_time)) then
+       this%end_time = end_time
+    else
+       this%end_time = huge(0.0_rp)
+    end if
+
   end subroutine constraint_init_base
 
   !> Free the base class
@@ -122,6 +139,8 @@ contains
 
     this%value = 0.0_rp
     this%value_old = 0.0_rp
+    this%start_time = 0.0_rp
+    this%end_time = huge(0.0_rp)
     call this%sensitivity%free()
     call this%sensitivity_old%free()
 
