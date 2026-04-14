@@ -143,8 +143,8 @@ program checkpointing_test
      write(*, '(A)') repeat('-', 80)
   end if
 
-  call chkp%init(sim%neko_case, algorithm, n_saves_memory, filename, fmt, &
-       keep_checkpoints)
+  call chkp%init(sim%neko_case, algorithm, n_saves_memory = n_saves_memory, &
+       filename = filename, fmt = fmt, keep_checkpoints = keep_checkpoints)
 
   ! -------------------------------------------------------------------------- !
   ! Run the forward simulation and save the resulting u fields in a list

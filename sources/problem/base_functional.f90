@@ -40,6 +40,7 @@ module base_functional
   use num_types, only: rp
   use point_zone, only: point_zone_t
   use simulation_m, only: simulation_t
+  use time_state, only: time_state_t
   use vector, only: vector_t
   use utils, only: neko_error
   use vector_math, only: vector_copy, vector_add2s1
@@ -72,6 +73,10 @@ module base_functional
      logical :: has_mask = .false.
      !> A mask for where the objective function is evaluated
      class(point_zone_t), pointer :: mask => null()
+     !> Time window start for accumulation
+     real(kind=rp) :: start_time = 0.0_rp
+     !> Time window end for accumulation
+     real(kind=rp) :: end_time = huge(0.0_rp)
 
    contains
 
@@ -171,7 +176,6 @@ contains
          "' does not support initialization with simulation")
   end subroutine functional_init_json_sim
 
-
   !> Get the value of the function
   function functional_get_value(this) result(v)
     class(base_functional_t), intent(in) :: this
@@ -235,30 +239,34 @@ contains
   end subroutine functional_reset_sensitivity
 
   !> Accumulate the value of the function
-  subroutine functional_accumulate_value(this, design, dt)
+  subroutine functional_accumulate_value(this, design, time)
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
+
+    if (time%t .lt. this%start_time .or. time%t .gt. this%end_time) return
 
     this%value_old = this%value
     call this%update_value(design)
 
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    this%value = this%value_old + this%value * dt
+    this%value = this%value_old + this%value * time%dt
   end subroutine functional_accumulate_value
 
-  !> Accumulate the value of the function
-  subroutine functional_accumulate_sensitivity(this, design, dt)
+  !> Accumulate the sensitivity of the function
+  subroutine functional_accumulate_sensitivity(this, design, time)
     class(base_functional_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
+
+    if (time%t .lt. this%start_time .or. time%t .gt. this%end_time) return
 
     call vector_copy(this%sensitivity_old, this%sensitivity)
     call this%update_sensitivity(design)
 
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    call vector_add2s1(this%sensitivity, this%sensitivity_old, dt)
+    call vector_add2s1(this%sensitivity, this%sensitivity_old, time%dt)
   end subroutine functional_accumulate_sensitivity
 end module base_functional
