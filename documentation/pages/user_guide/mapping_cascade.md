@@ -73,21 +73,44 @@ A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.
 that solves a Helmholtz-type differential equation to provide smoothing. The
 equation has the form
 \f[
-    -r^2 \nabla^2 X_\text{out} + X_\text{out} = X_\text{in},
+    -\tilde{r}^2 \nabla^2 X_\text{out} + X_\text{out} = X_\text{in},
 \f]
-subject to Neumann boundary conditions.
+subject to Neumann boundary conditions (\f$\nabla X_\text{out} \cdot n = 0\f$).
+
+**Note on the locality of the filter:**<br>
+Although the Helmholtz-type PDE filter is formally a global operator (i.e. the
+solution is affected in the entire domain), its influence exhibits a rapid
+exponential decay.
+For a point source in \f$X_\text{in}\f$, the filtered response \f$X_\text{out}\f$
+behaves as
+\f[
+X_\text{out}(\mathbf{x}) \propto \exp\left(-\frac{|\mathbf{x}|}{\tilde{r}}\right),
+\f]
+where \f$|\mathbf{x}|\f$ denotes the distance from the source. This exponential
+decay ensures that the filter acts in a localized manner.
+In the implementation, the effective filter radius \f$\tilde{r}\f$ is related to
+the user-prescribed parameter \f$r\f$ by
+\f[
+    \tilde{r} = \frac{r}{2\sqrt{3}},
+\f]
+such that the parameter \f$r\f$ corresponds to the physical filter radius
+commonly used in the topology optimization literature.
+This scaling ensures that the influence of the filter is strongly localized, with more than 95\% of its
+effect contained within a distance \f$r\f$.
 The filter can be selected by prescribing `"type": "PDE_filter"` and has the
 following input parameters:
 
 
 | Name | Description  | Admissible values | Default value |
 |------|--------------|-------------------|---------------|
-| `r` | \f$r\f$ is the above equation. | Real | - |
+| `r` | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real | - |
 | `tol`| The desired tolerance used when solving the system. | Real | `0.0000000001` |
 | `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
 | `solver` | Numerical solver used to solve the system. | `cg`,`gmres`, `gmres` | `cg` |
 | `preconditioner` | Pre-conditioner used to solve the system. | `ident`, `hsmg`, `jacobi` | `jacobi`  |
 
+Since the Helmholtz operator is Symmetric Positive Definite (SPD), `CG` is recommended.
+The convergence rate is highly dependent on the filter radius; larger radii typically improve the condition number.
 
 ## Linear mapping {#mapping_linear}
 A linear mapping of the form
