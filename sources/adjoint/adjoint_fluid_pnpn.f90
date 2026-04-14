@@ -94,8 +94,8 @@ module adjoint_fluid_pnpn
   use math, only: vlsc3, cmult, col2
   use, intrinsic :: iso_c_binding, only: c_ptr, C_NULL_PTR, c_associated
   use comm, only: NEKO_COMM, MPI_REAL_PRECISION
-  use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_COMM_WORLD, &
-       MPI_INTEGER, MPI_LOGICAL, MPI_LOR
+  use mpi_f08, only: mpi_sum, mpi_max, mpi_allreduce, MPI_INTEGER, &
+       MPI_LOGICAL, MPI_LOR
   use operators, only : opgrad, curl, grad
   use normal_vec_bcs, only: normal_vec_bcs_t
 
@@ -1443,7 +1443,7 @@ contains
     norm = vlsc3(x, x, B, n) + vlsc3(y, y, B, n) + vlsc3(z, z, B, n)
 
     call mpi_allreduce(MPI_IN_PLACE, norm, 1, &
-         MPI_REAL_PRECISION, MPI_SUM, MPI_COMM_WORLD)
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM)
 
     norm = sqrt(norm / volume)
   end function norm
@@ -1463,7 +1463,7 @@ contains
          device_vlsc3(z_d, z_d, B_d, n)
 
     call mpi_allreduce(MPI_IN_PLACE, device_norm, 1, &
-         MPI_REAL_PRECISION, MPI_SUM, MPI_COMM_WORLD)
+         MPI_REAL_PRECISION, MPI_SUM, NEKO_COMM)
 
     device_norm = sqrt(device_norm / volume)
 
