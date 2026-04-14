@@ -152,9 +152,8 @@ contains
     character(len=:), allocatable :: mask_name
     real(kind=rp) :: weight
 
-    weight = 1.0_rp
     call nekotop_continuation%json_get_or_register(json, 'weight', &
-         this%weight, weight)
+         this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "name", name, "Dissipation")
 

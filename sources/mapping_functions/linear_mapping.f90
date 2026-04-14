@@ -78,7 +78,6 @@ contains
     real(kind=rp) :: f_min, f_max
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
-    f_max = 1.0_rp
     call nekotop_continuation%json_get_or_register(json, 'f_max', this%f_max, &
          f_max)
 

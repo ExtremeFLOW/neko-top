@@ -118,11 +118,9 @@ contains
     logical :: convex_up
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
-    f_max = 1.0_rp
     call nekotop_continuation%json_get_or_register(json, 'f_max', this%f_max, &
          f_max)
-    q = 1.0_rp
-    call nekotop_continuation%json_get_or_register(json, 'q', this%q, q)
+    call nekotop_continuation%json_get_or_register(json, 'q', this%q, q, 1.0_rp)
     call json_get_or_default(json, 'convex_up', convex_up, .false.)
 
     call this%init_base(json, coef, "RAMP_mapping")
