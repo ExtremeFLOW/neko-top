@@ -141,6 +141,7 @@ contains
     character(len=:), allocatable :: name
     real(kind=rp) :: weight
     logical :: dealias_sensitivity, dealias_forcing
+    real(kind=rp) :: start_time, end_time
 
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
@@ -150,9 +151,12 @@ contains
          dealias_sensitivity, .true.)
     call json_get_or_default(json, "dealias_forcing", &
          dealias_forcing, .true.)
+    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, dealias_sensitivity, dealias_forcing)
+         mask_name, dealias_sensitivity, dealias_forcing, start_time, &
+         end_time)
   end subroutine brinkman_dissipation_init_json_sim
 
   !> The actual constructor.
@@ -164,20 +168,27 @@ contains
   !! @param mask_name the name of the mask.
   !! @param dealias_sensitivity use dealiasing on the sensitivity.
   !! @param dealias_forcing use dealiasing on the adjoint forcing.
+  !! @param start_time start of the integration window.
+  !! @param end_time end of the integration window.
   subroutine brinkman_dissipation_init_attributes(this, design, simulation, &
-       weight, name, mask_name, dealias_sensitivity, dealias_forcing)
+       weight, name, mask_name, dealias_sensitivity, dealias_forcing, &
+       start_time, end_time)
     class(brinkman_dissipation_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
-    character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: mask_name
     logical, intent(in) :: dealias_sensitivity
     logical, intent(in) :: dealias_forcing
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+
     type(adjoint_brinkman_dissipation_source_term_t) :: brinkman_dissipation
 
     ! Call the base initializer
-    call this%init_base(name, design%size(), weight, mask_name)
+    call this%init_base(name, design%size(), weight, mask_name, &
+         start_time, end_time)
 
     this%dealias_forcing = dealias_forcing
     this%dealias_sensitivity = dealias_sensitivity
@@ -228,8 +239,8 @@ contains
       call brinkman_dissipation%init_from_components(f_adj_x, f_adj_y, &
            f_adj_z, design, this%weight, this%u, this%v, this%w, this%mask, &
            this%has_mask, this%c_Xh_GLL, this%c_Xh_GL, this%GLL_to_GL, &
-           this%dealias_forcing, this%volume, &
-           this%scratch_GL, this%gdim)
+           this%dealias_forcing, this%volume, this%scratch_GL, this%gdim, &
+           this%start_time, this%end_time)
 
     end associate
 
