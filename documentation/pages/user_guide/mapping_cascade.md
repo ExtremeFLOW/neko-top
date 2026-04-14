@@ -103,7 +103,7 @@ following input parameters:
 
 | Name | Description  | Admissible values | Default value |
 |------|--------------|-------------------|---------------|
-| `r` | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real | `1.0` |
+| `r` | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real | - |
 | `tol`| The desired tolerance used when solving the system. | Real | `0.0000000001` |
 | `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
 | `solver` | Numerical solver used to solve the system. | `cg`,`gmres`, `gmres` | `cg` |
