@@ -112,25 +112,31 @@ contains
 
   end subroutine adjoint_mixing_scalar_source_term_init_from_json
 
-
+  !> The constructor from type components.
+  !! @param this The source term.
+  !! @param f_s RHS of the adjoint scalar.
+  !! @param s the forward scalar field.
+  !! @param obj_scale a scaling factor.
+  !! @param phi_ref target concentration.
+  !! @param mask the mask for the source term.
+  !! @param if_mask whether to use the mask.
+  !! @param coef The SEM coeffs.
+  !! @param start_time start of the integration window.
+  !! @param end_time end of the integration window.
   subroutine adjoint_mixing_scalar_source_term_init_from_components(this, &
-       f_s, s, obj_scale, phi_ref, mask, if_mask, coef)
+       f_s, s, obj_scale, phi_ref, mask, if_mask, coef, start_time, end_time)
     class(adjoint_mixing_scalar_source_term_t), intent(inout) :: this
     type(field_t), pointer, intent(in) :: f_s
-    real(kind=rp), intent(in) :: phi_ref
     type(field_t), intent(in), target :: s
+    real(kind=rp), intent(in) :: obj_scale
+    real(kind=rp), intent(in) :: phi_ref
     class(point_zone_t), intent(in), target :: mask
+    logical, intent(in) :: if_mask
+    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
+
     type(field_list_t) :: fields
-    type(coef_t) :: coef
-    real(kind=rp) :: start_time
-    real(kind=rp) :: end_time
-    real(kind=rp) :: obj_scale
-
-    logical :: if_mask
-
-    start_time = 0.0_rp
-    end_time = 100000000.0_rp
-
 
     call this%free()
 
@@ -140,6 +146,7 @@ contains
     call fields%assign(1, f_s)
 
     call this%init_base(fields, coef, start_time, end_time)
+    call fields%free()
 
     ! point everything in the correct places
     this%s => s
