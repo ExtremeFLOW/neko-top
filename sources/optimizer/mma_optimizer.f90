@@ -56,8 +56,8 @@ module mma_optimizer
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
-  use comm, only: pe_rank, NEKO_COMM
-  use mpi_f08, only: MPI_Barrier
+  use comm, only: pe_rank, NEKO_COMM, mpi_real_precision
+  use mpi_f08, only: MPI_Barrier, MPI_IN_PLACE, MPI_MAX
 
   implicit none
   private
@@ -293,7 +293,8 @@ contains
     type(matrix_t), pointer :: constraint_sensitivities
     integer :: n_design, n_constraint, indices(4)
 
-    logical :: converged
+    logical :: converged, ierr
+    real(kind=rp) :: maxobjsen, maxconsen
 
     n_design = design%size()
     n_constraint = problem%get_n_constraints()
@@ -331,6 +332,16 @@ contains
     if (.not. abscmp(this%scaling_factor, 1.0_rp)) then
        call vector_cmult(constraint_value, this%scaling_factor)
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
+    end if
+    ! print the max value for sensitivity
+    maxobjsen = maxval(abs(objective_sensitivities%x))
+    maxconsen = maxval(abs(constraint_sensitivities%x))
+    call MPI_Allreduce(MPI_IN_PLACE, maxobjsen, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, maxconsen, 1, &
+         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+    if (pe_rank == 0) then
+       print *, "iter", iter, "maxobj sen=", maxobjsen, "maxC sen=", maxconsen
     end if
 
     ! Update the design variable
