@@ -52,6 +52,7 @@ module problem
   use simulation_m, only: simulation_t
   use logger, only: neko_log
   use math, only: copy
+  use time_state, only: time_state_t
   use vector_math, only: vector_add2, vector_cfill
   use time_step_controller, only: time_step_controller_t
   use time_state, only: time_state_t
@@ -529,7 +530,7 @@ contains
        ! step forward
        call simulation_step(simulation%neko_case, dt_controller, loop_start)
        ! accumulate objective value
-       call this%accumulate_objectives(design, simulation%adjoint_case%time%dt)
+       call this%accumulate_objectives(design, simulation%neko_case%time)
        ! save a checkpoint
        if (.not. allocated(simulation%state_recover)) then
           call neko_error("State recovery not initialized.")
@@ -554,6 +555,7 @@ contains
     real(kind=rp) :: total_time
     type(time_state_t) :: time
     integer :: i
+    type(time_state_t) :: accumulation_time
 
     call dt_controller%init(simulation%neko_case%params)
 
@@ -565,6 +567,7 @@ contains
     cfl = simulation%adjoint_case%fluid_adj%compute_cfl(simulation%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
 
+    ! Total time of the forward simulation
     total_time = simulation%n_timesteps * simulation%adjoint_case%time%dt
 
     call profiler_start_region("Adjoint simulation")
@@ -579,8 +582,9 @@ contains
        end if
        call simulation%state_recover%restore(simulation%neko_case, time)
        ! accumulate objective sensitivity
-       call this%accumulate_objective_sensitivities(design, &
-            simulation%adjoint_case%time%dt)
+       accumulation_time = simulation%adjoint_case%time
+       accumulation_time%t = total_time - simulation%adjoint_case%time%t
+       call this%accumulate_objective_sensitivities(design, accumulation_time)
        ! step the adjoint backwards
        call simulation_adjoint_step(simulation%adjoint_case, dt_controller, &
             cfl, loop_start, total_time)
@@ -722,15 +726,15 @@ contains
   !! This function will accumulate all objectives.
   !! @param[inout] this The problem to accumulate the objectives with.
   !! @param[in] design The design to accumulate the objectives with.
-  !! @param[in] dt The timestep.
-  subroutine problem_accumulate_objectives(this, design, dt)
+  !! @param[in] time The current time state.
+  subroutine problem_accumulate_objectives(this, design, time)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     integer :: i
 
     do i = 1, this%n_objectives
-       call this%objective_list(i)%objective%accumulate_value(design, dt)
+       call this%objective_list(i)%objective%accumulate_value(design, time)
     end do
   end subroutine problem_accumulate_objectives
 
@@ -739,15 +743,15 @@ contains
   !! This function will accumulate all the constraints.
   !! @param[inout] this The problem to accumulate the objectives with.
   !! @param[in] design The design to accumulate the constraints with.
-  !! @param[in] dt The timestep.
-  subroutine problem_accumulate_constraints(this, design, dt)
+  !! @param[in] time The current time state.
+  subroutine problem_accumulate_constraints(this, design, time)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     integer :: i
 
     do i = 1, this%n_constraints
-       call this%constraint_list(i)%constraint%accumulate_value(design, dt)
+       call this%constraint_list(i)%constraint%accumulate_value(design, time)
     end do
   end subroutine problem_accumulate_constraints
 
@@ -756,15 +760,16 @@ contains
   !! This function will accumulate all the objective sensitivity.
   !! @param[inout] this The problem to accumulate the objectives with.
   !! @param[in] design The design to accumulate the objectives with.
-  !! @param[in] dt The timestep.
-  subroutine problem_accumulate_objective_sensitivities(this, design, dt)
+  !! @param[in] time The current time state.
+  subroutine problem_accumulate_objective_sensitivities(this, design, time)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     integer :: i
 
     do i = 1, this%n_objectives
-       call this%objective_list(i)%objective%accumulate_sensitivity(design, dt)
+       call this%objective_list(i)%objective%accumulate_sensitivity(design, &
+            time)
     end do
   end subroutine problem_accumulate_objective_sensitivities
 
@@ -773,15 +778,16 @@ contains
   !! This function will accumulate all the constraint sensitivity.
   !! @param[inout] this The problem to accumulate the objectives with.
   !! @param[in] design The design to accumulate the constraints with.
-  !! @param[in] dt The timestep.
-  subroutine problem_accumulate_constraint_sensitivities(this, design, dt)
+  !! @param[in] time The current time state.
+  subroutine problem_accumulate_constraint_sensitivities(this, design, time)
     class(problem_t), intent(inout) :: this
     class(design_t), intent(in) :: design
-    real(kind=rp), intent(in) :: dt
+    type(time_state_t), intent(in) :: time
     integer :: i
 
     do i = 1, this%n_constraints
-       call this%constraint_list(i)%constraint%accumulate_sensitivity(design, dt)
+       call this%constraint_list(i)%constraint%accumulate_sensitivity(design, &
+            time)
     end do
   end subroutine problem_accumulate_constraint_sensitivities
 
