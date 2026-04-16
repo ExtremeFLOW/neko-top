@@ -52,8 +52,8 @@ module brinkman_design
   use matrix, only: matrix_t
   use vector_math, only: vector_cmult
   use matrix_math, only: matrix_cmult
-  use math, only: copy, col2, glsum
-  use device_math, only: device_copy, device_col2, device_glsum
+  use math, only: copy, col2
+  use device_math, only: device_copy, device_col2
   use registry, only: neko_registry
   use neko_ext, only: field_to_vector, vector_to_field
   use optimization_ic, only: set_optimization_ic
@@ -283,13 +283,13 @@ contains
          output_format_str, 'fld')
 
     select case (trim(output_precision_str))
-    case ('sp', 'SP')
+    case ('sp', 'SP', 'single')
        output_precision = sp
-    case ('dp', 'DP')
+    case ('dp', 'DP', 'double')
        output_precision = dp
     case default
        call neko_error('Invalid output_precision in design.brinkman. ' // &
-            'Expected ''sp'' or ''dp''.')
+            'Expected "sp" or "dp".')
     end select
 
     select case (trim(domain_type))
@@ -356,7 +356,6 @@ contains
     logical, intent(in) :: dealias
     integer :: n
     type(simple_brinkman_source_term_t) :: forward_brinkman, adjoint_brinkman
-    real(kind=rp) :: total_B
 
     associate(dof => simulation%neko_case%fluid%dm_Xh)
 
@@ -417,12 +416,7 @@ contains
     call this%init_base(name, n)
 
     ! compute the average mass matrix
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       total_B = device_glsum(this%coef%B_d, this%size())
-    else
-       total_B = glsum(this%coef%B, this%size())
-    end if
-    this%avg_B = total_B / real(simulation%fluid%glb_unique_points)
+    this%avg_B = this%coef%volume / real(simulation%fluid%glb_unique_points)
 
     ! init the simple brinkman term for the forward problem
     call forward_brinkman%init_from_components( &

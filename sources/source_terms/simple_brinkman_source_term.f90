@@ -163,6 +163,7 @@ contains
     call fields%assign(3, f_z)
 
     call this%init_base(fields, coef, start_time, end_time)
+    call fields%free()
 
     ! point everything in the correct places
     this%u => u

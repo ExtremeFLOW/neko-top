@@ -43,7 +43,8 @@ module simulation_checkpoint
   use field, only: field_t
   use field_list, only: field_list_t
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG
-  use mpi_f08, only: MPI_WTIME
+  use mpi_f08, only: MPI_WTIME, MPI_Barrier
+  use comm, only: NEKO_COMM, pe_rank
   use utils, only: neko_error
   use math, only: copy, rzero
   use profiler, only: profiler_start_region, profiler_end_region
@@ -64,7 +65,9 @@ module simulation_checkpoint
      !> The checkpointing algorithm to use
      character(len=256) :: algorithm = "linear"
      !> The name of the checkpoint file
-     character(len=256) :: filename = "checkpoint"
+     character(len=256) :: filename = "forward_checkpoint"
+     !> The path to the checkpoint file (directory)
+     character(len=256) :: path = "checkpoints/"
      !> The format of the checkpoint file
      character(len=8) :: fmt = "chkp"
      !> Number of checkpoints to keep in memory
@@ -147,7 +150,7 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     type(json_file), target, intent(inout) :: params
     integer :: n_saves_memory
-    character(len=:), allocatable :: filename, algorithm, fmt
+    character(len=:), allocatable :: path, filename, algorithm, fmt
     character(len=256), dimension(:), allocatable :: extra_field_names
     type(field_list_t) :: extra_fields
     type(field_t), pointer :: fi
@@ -159,6 +162,7 @@ contains
 
     call json_get_or_default(params, "algorithm", algorithm, "linear")
     call json_get_or_default(params, "n_memory", n_saves_memory, 10)
+    call json_get_or_default(params, "path", path, "checkpoints/")
     call json_get_or_default(params, "filename", filename, "checkpoint")
     call json_get_or_default(params, "format", fmt, "chkp")
     call json_get_or_default(params, "keep_checkpoints", keep_checkpoints, &
@@ -167,66 +171,96 @@ contains
     if ("extra_fields" .in. params) then
        allocate(extra_field_names(0))
        call json_get(params, "extra_fields", extra_field_names)
+       call extra_fields%init(size(extra_field_names))
        do i = 1, size(extra_field_names)
           fi => neko_registry%get_field(extra_field_names(i))
-          call extra_fields%append(fi)
+          call extra_fields%assign(i, fi)
        end do
+       ! Create a field list for the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            path, filename, fmt, keep_checkpoints, extra_fields)
+    else
+       ! Create a field list without the extra fields
+       call this%init_from_components(neko_case, algorithm, n_saves_memory, &
+            path, filename, fmt, keep_checkpoints)
     end if
 
-    ! Create a field list for the extra fields
-    call this%init_from_components(neko_case, algorithm, n_saves_memory, &
-         filename, fmt, keep_checkpoints, extra_fields)
   end subroutine checkpoint_init_from_json
 
   !> Initialization from components
   subroutine checkpoint_init_from_components(this, neko_case, algorithm, &
-       n_saves_memory, filename, fmt, keep_checkpoints, extra_fields)
+       n_saves_memory, path, filename, fmt, keep_checkpoints, extra_fields)
     class(simulation_checkpoint_t), intent(inout), target :: this
     class(case_t), target, intent(inout) :: neko_case
     character(len=*), optional, intent(in) :: algorithm
     integer, optional, intent(in) :: n_saves_memory
+    character(len=*), optional, intent(in) :: path
     character(len=*), optional, intent(in) :: filename
     character(len=*), optional, intent(in) :: fmt
     logical, optional, intent(in) :: keep_checkpoints
     type(field_list_t), optional, intent(inout) :: extra_fields
     type(field_t), pointer :: si
     character(len=LOG_SIZE) :: msg
-    integer :: i
+    integer :: i, n_states
+    logical :: exists
 
     call this%free()
 
     ! Assign parameters from arguments or defaults
     this%enabled = .true.
     if (present(algorithm)) this%algorithm = algorithm
-    if (present(filename)) this%filename = filename
     if (present(n_saves_memory)) this%n_saves_memory = n_saves_memory
-    if (present(fmt)) this%fmt = fmt
+    if (present(path)) this%path = trim(path)
+    if (present(filename)) this%filename = trim(filename)
+    if (present(fmt)) this%fmt = trim(fmt)
     if (present(keep_checkpoints)) this%keep_checkpoints = keep_checkpoints
 
+    inquire(file = trim(this%path), exist = exists)
+    if (.not. exists) then
+       call MPI_Barrier(NEKO_COMM)
+       if (pe_rank .eq. 0) then
+          call execute_command_line("mkdir -p '" // trim(this%path) // "'")
+       end if
+       call MPI_Barrier(NEKO_COMM)
+    end if
+
     ! Initialize the Neko checkpoint output
-    call this%chkp_output%init(neko_case%chkp, this%filename, fmt = this%fmt, &
-         overwrite = .true.)
+    call this%chkp_output%init(neko_case%chkp, this%filename, &
+         fmt = this%fmt, path = this%path, overwrite = .true.)
+
+    n_states = 4
+    if (allocated(neko_case%scalars)) then
+       n_states = n_states + size(neko_case%scalars%scalar_fields)
+    end if
+    if (present(extra_fields)) then
+       n_states = n_states + extra_fields%size()
+    end if
+
+    call this%state_list%init(n_states)
 
     ! Assign fluid pointers
-    call this%state_list%append(neko_case%fluid%p)
-    call this%state_list%append(neko_case%fluid%u)
-    call this%state_list%append(neko_case%fluid%v)
-    call this%state_list%append(neko_case%fluid%w)
+    call this%state_list%assign(1, neko_case%fluid%p)
+    call this%state_list%assign(2, neko_case%fluid%u)
+    call this%state_list%assign(3, neko_case%fluid%v)
+    call this%state_list%assign(4, neko_case%fluid%w)
+    n_states = 4
 
     ! Assign scalar pointers
     if (allocated(neko_case%scalars)) then
        do i = 1, size(neko_case%scalars%scalar_fields)
           si => neko_case%scalars%scalar_fields(i)%scalar%s
-          call this%state_list%append(si)
+          call this%state_list%assign(n_states + i, si)
        end do
+       n_states = n_states + size(neko_case%scalars%scalar_fields)
     end if
 
     ! Assign any extra fields specified by the user
     if (present(extra_fields)) then
        do i = 1, extra_fields%size()
-          si => extra_fields%get(i)
-          call this%state_list%append(si)
+          si => extra_fields%get_by_index(i)
+          call this%state_list%assign(n_states + i, si)
        end do
+       n_states = n_states + extra_fields%size()
     end if
 
     ! Allocate the storage for the RAM checkpoints
@@ -238,6 +272,8 @@ contains
     write(msg, '(A, A)') "Algorithm:                    ", trim(this%algorithm)
     call neko_log%message(trim(msg))
     write(msg, '(A,I0)') "Number of checkpoints in RAM: ", this%n_saves_memory
+    call neko_log%message(trim(msg))
+    write(msg, '(A, A)') "Checkpoint file path:         ", trim(this%path)
     call neko_log%message(trim(msg))
     write(msg, '(A, A)') "Checkpoint file name:         ", trim(this%filename)
     call neko_log%message(trim(msg))
@@ -281,7 +317,7 @@ contains
     if (allocated(this%state_storage)) deallocate(this%state_storage)
 
     ! Delete the checkpoint file list
-    if (.not. this%keep_checkpoints) then
+    if (.not. this%keep_checkpoints .and. pe_rank .eq. 0) then
        do i = this%n_timesteps, 1, -1
           call this%chkp_output%set_counter(i)
           file_name = this%chkp_output%file_%get_fname()
@@ -293,6 +329,7 @@ contains
           end if
        end do
     end if
+    call MPI_Barrier(NEKO_COMM)
 
     ! Reset to default values
     this%enabled = .false.
