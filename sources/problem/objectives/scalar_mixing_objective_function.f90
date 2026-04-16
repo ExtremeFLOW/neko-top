@@ -56,6 +56,7 @@ module scalar_mixing_objective
   use neko_ext, only: get_scalar_indicies
   ! delete after the simulation computes u u_adj
   use field_math, only: field_addcol3, field_col3
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -115,19 +116,24 @@ contains
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp) :: weight
     real(kind=rp) :: phi_ref
+    real(kind=rp) :: start_time, end_time
     character(len=:), allocatable :: name
     character(len=:), allocatable :: mask_name
     character(len=:), allocatable :: scalar_name
 
-    call json_get_or_default(json, "weight", weight, 1.0_rp)
+    weight = 1.0_rp
+    call nekotop_continuation%json_get_or_register(json, 'weight', &
+         this%weight, weight)
     call json_get_or_default(json, "mask_name", mask_name, "")
     call json_get_or_default(json, "target_concentration", phi_ref, 0.5_rp)
     call json_get_or_default(json, "name", name, "Scalar Mixing")
     call json_get_or_default(json, "scalar_name", scalar_name, "s")
+    call json_get_or_default(json, "start_time", start_time, 0.0_rp)
+    call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
     ! initialize
     call this%init_from_attributes(design, simulation, weight, name, &
-         mask_name, phi_ref, scalar_name)
+         mask_name, phi_ref, scalar_name, start_time, end_time)
   end subroutine scalar_mixing_init_json_sim
 
   !> The actual constructor.
@@ -139,16 +145,20 @@ contains
   !! @param mask_name the name of the mask.
   !! @param phi_ref target concentration used in the objective function.
   !! @param scalar_name name of the scalar field.
+  !! @param start_time start of the integration window.
+  !! @param end_time end of the integration window.
   subroutine scalar_mixing_init_attributes(this, design, simulation, weight, &
-       name, mask_name, phi_ref, scalar_name)
+       name, mask_name, phi_ref, scalar_name, start_time, end_time)
     class(scalar_mixing_objective_t), intent(inout) :: this
     class(design_t), intent(in) :: design
     type(simulation_t), target, intent(inout) :: simulation
     real(kind=rp), intent(in) :: weight
-    real(kind=rp), intent(in) :: phi_ref
-    character(len=*), intent(in) :: mask_name
     character(len=*), intent(in) :: name
+    character(len=*), intent(in) :: mask_name
+    real(kind=rp), intent(in) :: phi_ref
     character(len=*), intent(in) :: scalar_name
+    real(kind=rp), intent(in) :: start_time
+    real(kind=rp), intent(in) :: end_time
 
     type(adjoint_mixing_scalar_source_term_t) :: adjoint_forcing
     integer :: i_scalar, i_adjoint_scalar
@@ -159,7 +169,8 @@ contains
     end if
 
     ! Call the base initializer
-    call this%init_base(name, design%size(), weight, mask_name)
+    call this%init_base(name, design%size(), weight, mask_name, &
+         start_time, end_time)
 
     ! Associate the integration weights
     this%coef => simulation%fluid%c_Xh
@@ -179,8 +190,8 @@ contains
 
     !> Associate the RHS of the passive scalar equation
     !! \f$ f_{\phi^\dagger} \f$
-    associate(f_phi_adj => &
-         simulation%adjoint_scalars%adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
+    associate(f_phi_adj => simulation%adjoint_scalars% &
+         adjoint_scalar_fields(i_adjoint_scalar)%f_Xh)
 
       ! Associate json parameters
       this%phi_ref = phi_ref
@@ -190,7 +201,8 @@ contains
 
       ! Initialize the scalar mixing adjoint source term
       call adjoint_forcing%init_from_components(f_phi_adj, this%phi, &
-           this%get_weight(), this%phi_ref, this%mask, this%has_mask, this%coef)
+           this%get_weight(), this%phi_ref, this%mask, this%has_mask, &
+           this%coef, this%start_time, this%end_time)
 
     end associate
 
