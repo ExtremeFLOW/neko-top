@@ -300,62 +300,79 @@ function find_hdf5() {
 function find_adios2() {
     check_external_dir
 
+    local pyexe
+    local pyver
+    local current_dir
+    local cmake_args=()
+
     if [[ $# -ge 1 && -n "$1" ]]; then
         ADIOS2_DIR="$1"
     fi
 
-    if [ -z "$ADIOS2_DIR" ] && command -v adios2-config >/dev/null 2>&1; then
+    if [ -z "${ADIOS2_DIR:-}" ] && command -v adios2-config >/dev/null 2>&1; then
         ADIOS2_CONFIG=$(realpath "$(command -v adios2-config)")
         ADIOS2_DIR=$(dirname "$(dirname "$ADIOS2_CONFIG")")
     else
-        if [ -z "$ADIOS2_DIR" ]; then
+        if [ -z "${ADIOS2_DIR:-}" ]; then
             ADIOS2_DIR="$EXTERNAL_DIR/adios2"
         fi
 
         if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
             ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
         fi
+
         mkdir -p "$ADIOS2_DIR"
         ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
         ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
     fi
 
-    if [[ ! -x "$ADIOS2_CONFIG" ]]; then
-        [ -z "$ADIOS2_VERSION" ] && ADIOS2_VERSION="2.10.1"
-        [ -z "$ADIOS2_ENABLE_FORTRAN" ] && ADIOS2_ENABLE_FORTRAN="ON"
-        [ -z "$ADIOS2_ENABLE_PYTHON" ] && ADIOS2_ENABLE_PYTHON="ON"
-        [ -z "$ADIOS2_ENABLE_SST" ] && ADIOS2_ENABLE_SST="ON"
+    if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
+        [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
+        [ -z "${ADIOS2_ENABLE_FORTRAN:-}" ] && ADIOS2_ENABLE_FORTRAN="ON"
+        [ -z "${ADIOS2_ENABLE_PYTHON:-}" ] && ADIOS2_ENABLE_PYTHON="ON"
+        [ -z "${ADIOS2_ENABLE_SST:-}" ] && ADIOS2_ENABLE_SST="ON"
 
-        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
-        cd $ADIOS2_DIR
+        pyexe=$(command -v python)
+        if [ -z "${pyexe}" ]; then
+            echo "Error: could not find python in PATH." >&2
+            return 1
+        fi
+
+        pyver=$("${pyexe}" -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+
+        current_dir=$(pwd)
+        cd "$ADIOS2_DIR" || return 1
 
         if [ ! -d ADIOS2/.git ]; then
-            rm -fr ADIOS2
-            git clone --depth 1 --branch v$ADIOS2_VERSION \
+            rm -rf ADIOS2
+            git clone --depth 1 --branch "v${ADIOS2_VERSION}" \
                 https://github.com/ornladios/ADIOS2.git ADIOS2
         fi
 
         cmake_args=(
             -DCMAKE_BUILD_TYPE=RelWithDebInfo
-            -DCMAKE_INSTALL_PREFIX=$ADIOS2_DIR
+            -DCMAKE_INSTALL_PREFIX="$ADIOS2_DIR"
+            -DCMAKE_INSTALL_PYTHONDIR="lib/python${pyver}/site-packages"
             -DADIOS2_BUILD_EXAMPLES=OFF
             -DADIOS2_USE_MPI=ON
-            -DADIOS2_USE_SST=$ADIOS2_ENABLE_SST
-            -DADIOS2_USE_Fortran=$ADIOS2_ENABLE_FORTRAN
-            -DADIOS2_USE_Python=$ADIOS2_ENABLE_PYTHON
+            -DADIOS2_USE_SST="$ADIOS2_ENABLE_SST"
+            -DADIOS2_USE_Python="$ADIOS2_ENABLE_PYTHON"
+            -DADIOS2_USE_Fortran="$ADIOS2_ENABLE_FORTRAN"
             -DADIOS2_USE_BZip2=OFF
             -DBUILD_TESTING=OFF
-            -DPython_EXECUTABLE=$(which python3)
-            -DPYTHON_EXECUTABLE=$(which python3)
+            -DPython3_EXECUTABLE="$pyexe"
+            -DPython_EXECUTABLE="$pyexe"
+            -DPYTHON_EXECUTABLE="$pyexe"
+            -DPython3_FIND_STRATEGY=LOCATION
             -DPython_FIND_STRATEGY=LOCATION
-            -DCMAKE_C_COMPILER=${MPICC:-${CC:-cc}}
-            -DCMAKE_CXX_COMPILER=${MPICXX:-${CXX:-c++}}
+            -DCMAKE_C_COMPILER="${MPICC:-${CC:-cc}}"
+            -DCMAKE_CXX_COMPILER="${MPICXX:-${CXX:-CC}}"
         )
 
-        if [ -n "$HDF5_DIR" ]; then
+        if [ -n "${HDF5_DIR:-}" ]; then
             cmake_args+=(
                 -DADIOS2_USE_HDF5=ON
-                -DHDF5_ROOT=$HDF5_DIR
+                -DHDF5_ROOT="$HDF5_DIR"
             )
         else
             cmake_args+=(
@@ -366,13 +383,13 @@ function find_adios2() {
         cmake -S ADIOS2 -B build "${cmake_args[@]}"
         cmake --build build --parallel
         cmake --install build
-        rm -fr build
+        rm -rf build
 
-        cd $CURRENT_DIR
-        ADIOS2_CONFIG=$ADIOS2_DIR/bin/adios2-config
+        cd "$current_dir" || return 1
+        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
     fi
 
-    if [ ! -x "$ADIOS2_CONFIG" ]; then
+    if [ ! -x "${ADIOS2_CONFIG}" ]; then
         error "ADIOS2 not found at:"
         error "\t$ADIOS2_DIR"
         error "Please set ADIOS2_DIR to the directory containing"
@@ -380,20 +397,32 @@ function find_adios2() {
         exit 1
     fi
 
-    export ADIOS2_DIR=$(realpath $ADIOS2_DIR)
-    export ADIOS2_FORTRAN_DIR=$ADIOS2_DIR
-    export PATH=$ADIOS2_DIR/bin:$PATH
+    export ADIOS2_DIR="$(realpath "$ADIOS2_DIR")"
+    export ADIOS2_PATH="$ADIOS2_DIR"
+    export ADIOS2_FORTRAN_DIR="$ADIOS2_DIR"
+    export PATH="$ADIOS2_DIR/bin:$PATH"
+
     [ -d "$ADIOS2_DIR/lib/pkgconfig" ] && \
-        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
     [ -d "$ADIOS2_DIR/lib64/pkgconfig" ] && \
-        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib64/pkgconfig:$PKG_CONFIG_PATH"
+        export PKG_CONFIG_PATH="$ADIOS2_DIR/lib64/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+
     [ -d "$ADIOS2_DIR/lib" ] && \
-        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib:$LD_LIBRARY_PATH"
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
     [ -d "$ADIOS2_DIR/lib64" ] && \
-        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64:$LD_LIBRARY_PATH"
+        export LD_LIBRARY_PATH="$ADIOS2_DIR/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
+    if [ -d "$ADIOS2_DIR/lib/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+    if [ -d "$ADIOS2_DIR/lib64/python${pyver}/site-packages" ]; then
+        export PYTHONPATH="$ADIOS2_DIR/lib64/python${pyver}/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+    fi
+
+    echo "Using ADIOS2_DIR=$ADIOS2_DIR"
+    echo "Using Python=$pyexe"
     echo "done"
 }
-
 # ============================================================================ #
 # Ensure ParMETIS is installed, if not install it.
 
