@@ -52,12 +52,11 @@ module mma_optimizer
   use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use vector_math, only: vector_cmult
-  use matrix_math, only: matrix_cmult
+  use vector_math, only: vector_cmult, vector_glmax, vector_glmin
+  use matrix_math, only: matrix_cmult, matrix_glmax, matrix_glmin
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
-  use comm, only: pe_rank, NEKO_COMM, mpi_real_precision
-  use mpi_f08, only: MPI_Barrier, MPI_IN_PLACE, MPI_MAX
+  use comm, only: pe_rank
 
   implicit none
   private
@@ -294,7 +293,7 @@ contains
     integer :: n_design, n_constraint, indices(4)
 
     logical :: converged, ierr
-    real(kind=rp) :: maxobjsen, maxconsen
+    real(kind=rp) :: maxobjsen, minobjsen, maxconsen, minconsen
 
     n_design = design%size()
     n_constraint = problem%get_n_constraints()
@@ -334,14 +333,13 @@ contains
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
     end if
     ! print the max value for sensitivity
-    maxobjsen = maxval(abs(objective_sensitivities%x))
-    maxconsen = maxval(abs(constraint_sensitivities%x))
-    call MPI_Allreduce(MPI_IN_PLACE, maxobjsen, 1, &
-         mpi_real_precision, MPI_MAX, neko_comm, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, maxconsen, 1, &
-         mpi_real_precision, MPI_MAX, neko_comm, ierr)
+    maxobjsen = vector_glmax(objective_sensitivities)
+    minobjsen = vector_glmin(objective_sensitivities)
+    maxconsen = matrix_glmax(constraint_sensitivities)
+    maxconsen = matrix_glmin(constraint_sensitivities)
     if (pe_rank == 0) then
-       print *, "iter", iter, "maxobj sen=", maxobjsen, "maxC sen=", maxconsen
+       print *, "iter", iter, "maxobj sen=", maxobjsen , "minob sen=", &
+            minobjsen, "maxC sen=", maxconsen, "minC sen=", minconsen
     end if
 
     ! Update the design variable
