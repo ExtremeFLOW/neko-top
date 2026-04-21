@@ -283,7 +283,7 @@ contains
     call json_get(params_adjoint, 'primal_name', this%primal_name)
     ! Assign a name
     call json_get_or_default(params_adjoint, 'name', this%name, &
-         'scalar adjoint')
+         this%primal_name // '_adj')
 
     call neko_log%section('Adjoint scalar')
     params_selected => json_key_fallback(params_adjoint, params_primal, &
