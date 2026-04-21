@@ -280,7 +280,8 @@ contains
     this%rho => rho
 
     ! get the primal adjoint's name
-    call json_get(params_adjoint, 'primal_name', this%primal_name)
+    call json_get_or_default(params_adjoint, 'primal_name', this%primal_name, &
+         's')
     ! Assign a name
     call json_get_or_default(params_adjoint, 'name', this%name, &
          this%primal_name // '_adj')
