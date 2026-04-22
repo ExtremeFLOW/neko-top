@@ -130,7 +130,6 @@ contains
     integer :: max_iter
     character(len=:), allocatable :: ksp_solver, precon_type
 
-    r = 1.0_rp
     call nekotop_continuation%json_get_or_register(json, 'r', this%r, r)
     call json_get_or_default(json, 'tol', tol, 0.0000000001_rp)
     call json_get_or_default(json, 'max_iter', max_iter, 200)

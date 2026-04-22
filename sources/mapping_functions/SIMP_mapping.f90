@@ -44,6 +44,7 @@ module SIMP_mapping
   use SIMP_mapping_cpu, only: SIMP_mapping_apply_cpu, &
        SIMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -83,8 +84,9 @@ contains
     real(kind=rp) :: f_min, f_max, p
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
-    call json_get(json, 'f_max', f_max)
-    call json_get_or_default(json, 'p', p, 1.0_rp)
+    call nekotop_continuation%json_get_or_register(json, 'f_max', this%f_max, &
+         f_max)
+    call nekotop_continuation%json_get_or_register(json, 'p', this%p, p, 1.0_rp)
 
     call this%init_base(json, coef, "SIMP_mapping")
     call this%init_from_attributes(coef, f_min, f_max, p)

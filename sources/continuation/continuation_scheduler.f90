@@ -36,7 +36,7 @@
 module continuation_scheduler
   use num_types, only: rp
   use json_module, only: json_file
-  use json_utils, only: json_get_or_default, json_get_or_lookup
+  use json_utils, only: json_get_or_default, json_get_or_lookup, json_get
   use utils, only: neko_error
   implicit none
   private
@@ -109,17 +109,25 @@ contains
   end subroutine free_scheduler
 
   !> Read a parameter from JSON and optionally register it for continuation.
+  !! If the parameter is given as a scalar, its value is returned.
+  !! If it is given as an array, the first entry is used as the initial value
+  !! and the full array is registered for continuation.
+  !! If the parameter is not found and no default_value is provided,
+  !! the routine terminates with an error.
   !! @param this The continuation scheduler instance.
   !! @param json The json_file object.
   !! @param name The parameter name.
-  !! @param target The pointer to the value that we possibly want to register.
-  !! @param default_value Default scalar value if parameter not found.
-  subroutine json_get_or_register(this, json, name, target, default_value)
+  !! @param target Variable that may be registered for continuation.
+  !! @param value Returned value of the parameter.
+  !! @param default_value Optional default value if the parameter is not found.
+  subroutine json_get_or_register(this, json, name, target, value, &
+       default_value)
     class(continuation_scheduler_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
     character(len=*), intent(in) :: name
     real(kind=rp), target, intent(inout) :: target
-    real(kind=rp), intent(inout) :: default_value
+    real(kind=rp), intent(out) :: value
+    real(kind=rp), intent(in), optional :: default_value
     real(kind=rp), allocatable :: values(:)
     real(kind=rp) :: scalar_parameter
     logical :: found
@@ -128,12 +136,21 @@ contains
     ! Inspect JSON for the parameter
     call json%info(name, found=found, var_type=var_type)
     if (.not. found) then
+       if (present(default_value)) then
+          value = default_value
+       else
+          call neko_error(trim(name)//" not found and no default provided")
+       end if
     else if (var_type == 6) then ! scalar
-       call json_get_or_default(json, name, scalar_parameter, default_value)
-       default_value = scalar_parameter
+       if (present(default_value)) then
+          call json_get_or_default(json, name, scalar_parameter, default_value)
+       else
+          call json_get(json, name, scalar_parameter)
+       end if
+       value = scalar_parameter
     else if (var_type == 3) then ! array
        call json_get_or_lookup(json, name, values)
-       default_value = values(1)
+       value = values(1)
        ! Read optional iterations per parameter step
        call json_get_or_default(json, trim(name)//'_iterations', iter, &
             this%default_iterations)
