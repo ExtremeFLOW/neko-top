@@ -91,9 +91,6 @@ contains
     type(coef_t), intent(inout) :: coef
     real(kind=rp) :: eta, beta
 
-    ! default value for beta
-    beta = 1.0_rp
-
     call json_get_or_default(json, 'eta', eta, 0.5_rp)
 
     call nekotop_continuation%json_get_or_register(json, 'beta', this%beta, &
