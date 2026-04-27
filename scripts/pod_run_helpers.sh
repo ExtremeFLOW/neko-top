@@ -307,6 +307,196 @@ function pod_case_is_pod() {
     grep -q '"type"[[:space:]]*:[[:space:]]*"pod"' "${case_path}"
 }
 
+function pod_parse_first_int() {
+    local value=${1:-}
+
+    if [[ "${value}" =~ ^([0-9]+) ]]; then
+        printf '%s\n' "${BASH_REMATCH[1]}"
+        return 0
+    fi
+
+    return 1
+}
+
+function pod_csv_count() {
+    local csv=${1:-}
+    local -a values=()
+
+    if [ -z "${csv}" ]; then
+        printf '0\n'
+        return 0
+    fi
+
+    IFS=',' read -r -a values <<< "${csv}"
+    printf '%s\n' "${#values[@]}"
+}
+
+function pod_launch_shared_mpi_bound() {
+    local case_path=$1
+    local py_script=$2
+    local neko_exe=$3
+    local py_ranks=$4
+    local neko_ranks=$5
+    local log_file=$6
+
+    local node_count
+    local pyexe
+    local startup_delay
+    local neko_ranks_per_node
+    local py_ranks_per_node
+    local gpu_core_count
+    local cpu_core_count
+    local total_ranks
+    local expected_total_ranks
+    local ranks_per_node
+    local abs_case_path
+    local abs_py_script
+    local abs_neko_exe
+    local launcher_file
+    local conf_file
+    local rc
+    local node_idx
+    local node_rank_base
+    local world_rank
+    local i
+
+    node_count=$(pod_parse_first_int "${SLURM_JOB_NUM_NODES:-${SLURM_NNODES:-}}") || {
+        echo "Error: could not determine the number of Slurm nodes." >&2
+        return 1
+    }
+
+    pyexe=$(pod_python_exe) || {
+        echo "Error: could not find python in PATH." >&2
+        return 1
+    }
+
+    startup_delay=${POD_NEKO_STARTUP_DELAY:-20}
+    total_ranks=$((py_ranks + neko_ranks))
+
+    neko_ranks_per_node=${NEKO_RANKS_PER_NODE:-}
+    if [ -z "${neko_ranks_per_node}" ]; then
+        if [ $((neko_ranks % node_count)) -ne 0 ]; then
+            echo "Error: NEKO_RANKS=${neko_ranks} is not divisible by ${node_count} nodes." >&2
+            return 1
+        fi
+        neko_ranks_per_node=$((neko_ranks / node_count))
+    fi
+
+    py_ranks_per_node=${PY_RANKS_PER_NODE:-}
+    if [ -z "${py_ranks_per_node}" ]; then
+        if [ $((py_ranks % node_count)) -ne 0 ]; then
+            echo "Error: PY_RANKS=${py_ranks} is not divisible by ${node_count} nodes." >&2
+            return 1
+        fi
+        py_ranks_per_node=$((py_ranks / node_count))
+    fi
+
+    if [ $((neko_ranks_per_node * node_count)) -ne "${neko_ranks}" ]; then
+        echo "Error: NEKO_RANKS_PER_NODE=${neko_ranks_per_node} does not match NEKO_RANKS=${neko_ranks} across ${node_count} nodes." >&2
+        return 1
+    fi
+
+    if [ $((py_ranks_per_node * node_count)) -ne "${py_ranks}" ]; then
+        echo "Error: PY_RANKS_PER_NODE=${py_ranks_per_node} does not match PY_RANKS=${py_ranks} across ${node_count} nodes." >&2
+        return 1
+    fi
+
+    gpu_core_count=$(pod_csv_count "${GPU_CORES:-}")
+    if [ "${gpu_core_count}" -lt "${neko_ranks_per_node}" ]; then
+        echo "Error: GPU_CORES defines ${gpu_core_count} cores but ${neko_ranks_per_node} GPU ranks per node were requested." >&2
+        return 1
+    fi
+
+    cpu_core_count=$(pod_csv_count "${CPU_CORES:-}")
+    if [ "${cpu_core_count}" -lt "${py_ranks_per_node}" ]; then
+        echo "Error: CPU_CORES defines ${cpu_core_count} cores but ${py_ranks_per_node} Python ranks per node were requested." >&2
+        return 1
+    fi
+
+    ranks_per_node=$((neko_ranks_per_node + py_ranks_per_node))
+    expected_total_ranks=$((ranks_per_node * node_count))
+    if [ "${expected_total_ranks}" -ne "${total_ranks}" ]; then
+        echo "Error: expected ${expected_total_ranks} total ranks from the per-node layout, but got ${total_ranks}." >&2
+        return 1
+    fi
+
+    abs_case_path=$(realpath "${case_path}")
+    abs_py_script=$(realpath "${py_script}")
+    abs_neko_exe=$(realpath "${neko_exe}")
+    launcher_file="$(mktemp "${TMPDIR:-/tmp}/pod_mpmd_launcher.XXXXXX.sh")"
+    conf_file="$(mktemp "${TMPDIR:-/tmp}/pod_mpmd.XXXXXX.conf")"
+
+    export POD_CASE_FILE="${abs_case_path}"
+    export POD_PY_SCRIPT="${abs_py_script}"
+    export POD_NEKO_EXE="${abs_neko_exe}"
+    export POD_PYTHON_EXE="${pyexe}"
+    export POD_NEKO_STARTUP_DELAY="${startup_delay}"
+    export NEKO_RANKS_PER_NODE="${neko_ranks_per_node}"
+    export PY_RANKS_PER_NODE="${py_ranks_per_node}"
+
+    cat > "${launcher_file}" <<'EOF'
+#!/bin/bash
+set -euo pipefail
+
+local_rank=${SLURM_LOCALID:?}
+role=${1:?}
+
+IFS=',' read -r -a gpu_cores_arr <<< "${GPU_CORES:-}"
+IFS=',' read -r -a cpu_cores_arr <<< "${CPU_CORES:-}"
+
+if [ "${role}" = "neko" ]; then
+    if [ "${local_rank}" -ge "${NEKO_RANKS_PER_NODE}" ]; then
+        echo "Error: local Neko rank ${local_rank} exceeds NEKO_RANKS_PER_NODE=${NEKO_RANKS_PER_NODE}." >&2
+        exit 1
+    fi
+
+    core="${gpu_cores_arr[local_rank]}"
+    export ROCR_VISIBLE_DEVICES="${local_rank}"
+    sleep "${POD_NEKO_STARTUP_DELAY}"
+    exec taskset -c "${core}" "${POD_NEKO_EXE}" "${POD_CASE_FILE}"
+fi
+
+python_rank=$((local_rank - NEKO_RANKS_PER_NODE))
+if [ "${python_rank}" -lt 0 ] || [ "${python_rank}" -ge "${PY_RANKS_PER_NODE}" ]; then
+    echo "Error: local Python rank ${local_rank} is outside the configured CPU-rank range." >&2
+    exit 1
+fi
+
+core="${cpu_cores_arr[python_rank]}"
+exec taskset -c "${core}" "${POD_PYTHON_EXE}" "${POD_PY_SCRIPT}" "${POD_CASE_FILE}"
+EOF
+
+    chmod +x "${launcher_file}"
+
+    {
+        for ((node_idx=0; node_idx<node_count; node_idx++)); do
+            node_rank_base=$((node_idx * ranks_per_node))
+
+            for ((i=0; i<neko_ranks_per_node; i++)); do
+                world_rank=$((node_rank_base + i))
+                echo "${world_rank} /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=${neko_ranks_per_node} ${launcher_file} neko"
+            done
+
+            for ((i=0; i<py_ranks_per_node; i++)); do
+                world_rank=$((node_rank_base + neko_ranks_per_node + i))
+                echo "${world_rank} /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=0 ${launcher_file} python"
+            done
+        done
+    } > "${conf_file}"
+
+    echo "Running bound MPMD job with ${total_ranks} ranks"
+    echo "Nodes:   ${node_count}"
+    echo "Layout:  ${neko_ranks_per_node} Neko GPU ranks/node + ${py_ranks_per_node} Python ranks/node"
+    echo "Config:  ${conf_file}"
+    echo "Output:  ${log_file}"
+
+    srun --cpu-bind=none --distribution=block:block --multi-prog "${conf_file}" > "${log_file}" 2>&1
+    rc=$?
+
+    rm -f "${launcher_file}" "${conf_file}"
+    return ${rc}
+}
+
 function pod_launch_shared_mpi() {
     local case_path=$1
     local py_script=$2
@@ -320,19 +510,33 @@ function pod_launch_shared_mpi() {
     local abs_case_path
     local abs_py_script
     local abs_neko_exe
+    local pyexe
+    local startup_delay
 
     abs_case_path=$(realpath "${case_path}")
     abs_py_script=$(realpath "${py_script}")
     abs_neko_exe=$(realpath "${neko_exe}")
+
+    if [ -n "${SLURM_JOB_ID:-}" ] && [ -n "${GPU_CORES:-}" ] && [ -n "${CPU_CORES:-}" ]; then
+        pod_launch_shared_mpi_bound "${case_path}" "${py_script}" "${neko_exe}" \
+            "${py_ranks}" "${neko_ranks}" "${log_file}"
+        return $?
+    fi
+
+    pyexe=$(pod_python_exe) || {
+        echo "Error: could not find python in PATH." >&2
+        return 1
+    }
+    startup_delay=${POD_NEKO_STARTUP_DELAY:-20}
     conf_file="$(mktemp "${TMPDIR:-/tmp}/pod_mpmd.XXXXXX.conf")"
 
     {
         for ((i=0; i<py_ranks; i++)); do
-            echo "${i} /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=${py_ranks} python ${abs_py_script} ${abs_case_path}"
+            echo "${i} /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=${py_ranks} ${pyexe} ${abs_py_script} ${abs_case_path}"
         done
 
         for ((i=py_ranks; i<total_ranks; i++)); do
-        	   echo "${i} /bin/bash -lc 'sleep 20; exec /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=0 \"${abs_neko_exe}\" \"${abs_case_path}\"'"
+            echo "${i} /bin/bash -lc 'sleep ${startup_delay}; exec /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=0 \"${abs_neko_exe}\" \"${abs_case_path}\"'"
         done
     } > "${conf_file}"
 
