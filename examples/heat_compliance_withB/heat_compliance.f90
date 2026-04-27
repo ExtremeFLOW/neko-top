@@ -393,18 +393,18 @@ contains
     call field_addcol3(grad_phi_x, grad_phi_z, grad_phi_z)
 
     call field_cmult(grad_phi_x, -1.0_rp)
-    call field_cmult(grad_phi_x, this%avg_B)
-      ! if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_col2(grad_phi_x%x_d, this%coef%B_d, n)
-      !  else
-      !     call col2(grad_phi_x%x, this%coef%B, n)
-      !  end if
-      !  call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
-      !  if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
-      !  else
-      !     call col2(grad_phi_x%x, this%coef%Binv, n)
-      !  end if      
+    !call field_cmult(grad_phi_x, this%avg_B)
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+           call device_col2(grad_phi_x%x_d, this%coef%B_d, n)
+       else
+           call col2(grad_phi_x%x, this%coef%B, n)
+       end if
+       !call this%coef%gs_h%op(grad_phi_x, GS_OP_ADD)
+       !if (NEKO_BCKND_DEVICE .eq. 1) then
+       !   call device_col2(grad_phi_x%x_d, this%coef%Binv_d, n)
+       !else
+       !   call col2(grad_phi_x%x, this%coef%Binv, n)
+       !end if      
 
     select type(design)
     type is (thermal_conductivity_design_t)
@@ -626,36 +626,37 @@ contains
     ! Initialize value and sensitivity
     call this%update_value(design)
 
-      !  ! Sensitivity: d/d rho = -B / |Omega|   (flip sign if is_max)
-      !  if (NEKO_BCKND_DEVICE .eq. 1) then
-      !     call device_copy(this%sensitivity%x_d, this%coef%B_d, n)
-      !     call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, n)
-      !     if (this%is_max) then
-      !        call device_cmult(this%sensitivity%x_d, -1.0_rp, n)
-      !     end if
-      !  else
-      !     call copy(this%sensitivity%x, this%coef%B, n)
-      !     call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, n)
-      !     if (this%is_max) then
-      !        call cmult(this%sensitivity%x, -1.0_rp, n)
-      !     end if
-      !  end if
+        ! Sensitivity: d/d rho = -B / |Omega|   (flip sign if is_max)
+        if (NEKO_BCKND_DEVICE .eq. 1) then
+           call device_copy(this%sensitivity%x_d, this%coef%B_d, n)
+           call device_cmult(this%sensitivity%x_d, -1.0_rp / this%volume_domain, n)
+           if (this%is_max) then
+              call device_cmult(this%sensitivity%x_d, -1.0_rp, n)
+           end if
+        else
+           call copy(this%sensitivity%x, this%coef%B, n)
+           call cmult(this%sensitivity%x, -1.0_rp / this%volume_domain, n)
+           if (this%is_max) then
+              call cmult(this%sensitivity%x, -1.0_rp, n)
+           end if
+        end if
    ! Sensitivity: d/d rho = -1 / |Omega|   (flip sign if is_max)
    ! scaled by average B
-   call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
-   avg_B = glsum(this%coef%B, n)/n_global
-   call vector_rone(this%sensitivity, n)
-   call vector_cmult(this%sensitivity, -avg_B / this%volume_domain, n)
-
+   !call MPI_Allreduce(n, n_global, 1, MPI_INTEGER, MPI_SUM, NEKO_COMM, ierr)
+   !avg_B = glsum(this%coef%B, n)/n_global
+   !call vector_rone(this%sensitivity, n)
+   !call vector_cmult(this%sensitivity, -avg_B / this%volume_domain, n)
+   !if (this%is_max) then
+   !   call vector_cmult(this%sensitivity, -1.0_rp, n)
+   !end if
+   
    if (this%has_mapping) then
       call beforemapping%init(n)
       call vector_copy(beforemapping, this%sensitivity, n)
       call this%constraint_mapping%apply_backward(this%sensitivity, beforemapping)
       call beforemapping%free()
    end if
-   if (this%is_max) then
-      call vector_cmult(this%sensitivity, -1.0_rp, n)
-   end if
+
    
 
   end subroutine thermal_volume_constraint_init
