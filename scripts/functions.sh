@@ -8,6 +8,7 @@ function run {
 
     # Find the case file and define the log file
     casefile=($(find . -name "*.case" -or -name "*.json"))
+    local run_rc
     if [[ ${#casefile[@]} -eq 0 ]]; then
         printf >&2 "ERROR: No case file found.\n"
         return 1
@@ -43,12 +44,15 @@ function run {
     TIME_START=$(date +%s)
     if [ -f "run.sh" ]; then
         ./run.sh 2>error.log
+        run_rc=$?
 
     elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
         srun --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
+        run_rc=$?
 
     elif command -v srun 2>&1 1>/dev/null; then
         srun $neko $casefile 2>error.log
+        run_rc=$?
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use
@@ -69,6 +73,7 @@ function run {
         fi
 
         mpirun --tag-output -n $ncores $neko $casefile 2>error.log
+        run_rc=$?
 
         # Remove all lines printed from mpi rank > 0 and remove the mpi tag
         sed -i '/^\[[0-9]*,[1-9]*\]/d' error.log
@@ -76,12 +81,23 @@ function run {
 
     else
         $neko $casefile 2>error.log
+        run_rc=$?
 
     fi
     TIME_END=$(date +%s)
 
     # ------------------------------------------------------------------------ #
     # Check for errors and normal end
+
+    if [ "${run_rc}" -ne 0 ]; then
+        printf "ERROR: Example exited with status %s.\n" "${run_rc}"
+        if [ -s ./error.log ]; then
+            printf "See error.log for details.\n"
+        else
+            printf "Check the example output for details.\n"
+        fi
+        return "${run_rc}"
+    fi
 
     if [ -s ./error.log ]; then
         printf "ERROR: An error occurred during execution.\n"

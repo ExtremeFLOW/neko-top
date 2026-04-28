@@ -331,6 +331,76 @@ function pod_csv_count() {
     printf '%s\n' "${#values[@]}"
 }
 
+function pod_current_allowed_cpu_list() {
+    local cpu_list
+
+    cpu_list=$(awk -F: '/^Cpus_allowed_list:/ {gsub(/[[:space:]]/, "", $2); print $2; exit}' \
+        /proc/self/status 2>/dev/null)
+
+    if [ -n "${cpu_list}" ]; then
+        printf '%s\n' "${cpu_list}"
+        return 0
+    fi
+
+    return 1
+}
+
+function pod_cpu_list_contains() {
+    local cpu_list=$1
+    local cpu=$2
+    local -a spans=()
+    local span
+    local first
+    local last
+
+    if [ -z "${cpu_list}" ] || [ -z "${cpu}" ]; then
+        return 1
+    fi
+
+    IFS=',' read -r -a spans <<< "${cpu_list}"
+    for span in "${spans[@]}"; do
+        span=${span//[[:space:]]/}
+
+        if [[ "${span}" =~ ^([0-9]+)-([0-9]+)$ ]]; then
+            first=${BASH_REMATCH[1]}
+            last=${BASH_REMATCH[2]}
+
+            if [ "${cpu}" -ge "${first}" ] && [ "${cpu}" -le "${last}" ]; then
+                return 0
+            fi
+        elif [[ "${span}" =~ ^([0-9]+)$ ]]; then
+            if [ "${cpu}" -eq "${BASH_REMATCH[1]}" ]; then
+                return 0
+            fi
+        fi
+    done
+
+    return 1
+}
+
+function pod_requested_cores_available() {
+    local allowed_cpu_list=$1
+    local requested_csv=$2
+    local -a requested=()
+    local cpu
+
+    if [ -z "${requested_csv}" ]; then
+        return 0
+    fi
+
+    IFS=',' read -r -a requested <<< "${requested_csv}"
+    for cpu in "${requested[@]}"; do
+        cpu=${cpu//[[:space:]]/}
+        [ -z "${cpu}" ] && continue
+
+        if ! pod_cpu_list_contains "${allowed_cpu_list}" "${cpu}"; then
+            return 1
+        fi
+    done
+
+    return 0
+}
+
 function pod_launch_shared_mpi_bound() {
     local case_path=$1
     local py_script=$2
@@ -354,6 +424,11 @@ function pod_launch_shared_mpi_bound() {
     local abs_neko_exe
     local launcher_file
     local conf_file
+    local allowed_cpu_list
+    local taskset_mode
+    local use_taskset
+    local srun_cpu_bind
+    local errexit_was_set
     local rc
     local node_idx
     local node_rank_base
@@ -420,6 +495,49 @@ function pod_launch_shared_mpi_bound() {
         return 1
     fi
 
+    taskset_mode=${POD_TASKSET_MODE:-auto}
+    use_taskset=0
+    srun_cpu_bind=cores
+
+    case "${taskset_mode}" in
+        auto)
+            if allowed_cpu_list=$(pod_current_allowed_cpu_list); then
+                if pod_requested_cores_available "${allowed_cpu_list}" "${GPU_CORES:-}" &&
+                   pod_requested_cores_available "${allowed_cpu_list}" "${CPU_CORES:-}"; then
+                    use_taskset=1
+                else
+                    echo "Warning: requested taskset CPU bindings are outside the current CPU allocation (${allowed_cpu_list})."
+                    echo "         Falling back to Slurm CPU binding for this run."
+                fi
+            else
+                echo "Warning: could not determine the current CPU allocation."
+                echo "         Falling back to Slurm CPU binding for this run."
+            fi
+            ;;
+        always)
+            allowed_cpu_list=$(pod_current_allowed_cpu_list || true)
+            if [ -n "${allowed_cpu_list}" ] && \
+               { ! pod_requested_cores_available "${allowed_cpu_list}" "${GPU_CORES:-}" || \
+                 ! pod_requested_cores_available "${allowed_cpu_list}" "${CPU_CORES:-}"; }; then
+                echo "Error: requested taskset CPU bindings are outside the current CPU allocation (${allowed_cpu_list})." >&2
+                echo "       Use POD_TASKSET_MODE=auto to allow Slurm binding, or request a larger CPU allocation." >&2
+                return 1
+            fi
+            use_taskset=1
+            ;;
+        never)
+            use_taskset=0
+            ;;
+        *)
+            echo "Error: POD_TASKSET_MODE must be one of: auto, always, never." >&2
+            return 1
+            ;;
+    esac
+
+    if [ "${use_taskset}" -eq 1 ]; then
+        srun_cpu_bind=none
+    fi
+
     abs_case_path=$(realpath "${case_path}")
     abs_py_script=$(realpath "${py_script}")
     abs_neko_exe=$(realpath "${neko_exe}")
@@ -433,6 +551,7 @@ function pod_launch_shared_mpi_bound() {
     export POD_NEKO_STARTUP_DELAY="${startup_delay}"
     export NEKO_RANKS_PER_NODE="${neko_ranks_per_node}"
     export PY_RANKS_PER_NODE="${py_ranks_per_node}"
+    export POD_USE_TASKSET="${use_taskset}"
 
     cat > "${launcher_file}" <<'EOF'
 #!/bin/bash
@@ -450,10 +569,15 @@ if [ "${role}" = "neko" ]; then
         exit 1
     fi
 
-    core="${gpu_cores_arr[local_rank]}"
     export ROCR_VISIBLE_DEVICES="${local_rank}"
     sleep "${POD_NEKO_STARTUP_DELAY}"
-    exec taskset -c "${core}" "${POD_NEKO_EXE}" "${POD_CASE_FILE}"
+
+    if [ "${POD_USE_TASKSET:-0}" = "1" ]; then
+        core="${gpu_cores_arr[local_rank]}"
+        exec taskset -c "${core}" "${POD_NEKO_EXE}" "${POD_CASE_FILE}"
+    fi
+
+    exec "${POD_NEKO_EXE}" "${POD_CASE_FILE}"
 fi
 
 python_rank=$((local_rank - NEKO_RANKS_PER_NODE))
@@ -462,8 +586,12 @@ if [ "${python_rank}" -lt 0 ] || [ "${python_rank}" -ge "${PY_RANKS_PER_NODE}" ]
     exit 1
 fi
 
-core="${cpu_cores_arr[python_rank]}"
-exec taskset -c "${core}" "${POD_PYTHON_EXE}" "${POD_PY_SCRIPT}" "${POD_CASE_FILE}"
+if [ "${POD_USE_TASKSET:-0}" = "1" ]; then
+    core="${cpu_cores_arr[python_rank]}"
+    exec taskset -c "${core}" "${POD_PYTHON_EXE}" "${POD_PY_SCRIPT}" "${POD_CASE_FILE}"
+fi
+
+exec "${POD_PYTHON_EXE}" "${POD_PY_SCRIPT}" "${POD_CASE_FILE}"
 EOF
 
     chmod +x "${launcher_file}"
@@ -487,11 +615,30 @@ EOF
     echo "Running bound MPMD job with ${total_ranks} ranks"
     echo "Nodes:   ${node_count}"
     echo "Layout:  ${neko_ranks_per_node} Neko GPU ranks/node + ${py_ranks_per_node} Python ranks/node"
+    if [ "${use_taskset}" -eq 1 ]; then
+        echo "CPU bind: taskset (${GPU_CORES} | ${CPU_CORES})"
+    else
+        echo "CPU bind: Slurm (--cpu-bind=${srun_cpu_bind})"
+    fi
     echo "Config:  ${conf_file}"
     echo "Output:  ${log_file}"
 
-    srun --cpu-bind=none --distribution=block:block --multi-prog "${conf_file}" > "${log_file}" 2>&1
+    errexit_was_set=0
+    if [[ $- == *e* ]]; then
+        errexit_was_set=1
+        set +e
+    fi
+
+    srun --cpu-bind="${srun_cpu_bind}" --distribution=block:block --multi-prog "${conf_file}" > "${log_file}" 2>&1
     rc=$?
+
+    if [ "${errexit_was_set}" -eq 1 ]; then
+        set -e
+    fi
+
+    if [ "${rc}" -ne 0 ]; then
+        echo "Error: shared MPMD launch failed. See ${log_file}." >&2
+    fi
 
     rm -f "${launcher_file}" "${conf_file}"
     return ${rc}
@@ -512,6 +659,7 @@ function pod_launch_shared_mpi() {
     local abs_neko_exe
     local pyexe
     local startup_delay
+    local errexit_was_set
 
     abs_case_path=$(realpath "${case_path}")
     abs_py_script=$(realpath "${py_script}")
@@ -544,8 +692,22 @@ function pod_launch_shared_mpi() {
     echo "Config:  ${conf_file}"
     echo "Output:  ${log_file}"
 
+    errexit_was_set=0
+    if [[ $- == *e* ]]; then
+        errexit_was_set=1
+        set +e
+    fi
+
     srun --multi-prog "${conf_file}" > "${log_file}" 2>&1
     local rc=$?
+
+    if [ "${errexit_was_set}" -eq 1 ]; then
+        set -e
+    fi
+
+    if [ "${rc}" -ne 0 ]; then
+        echo "Error: shared MPMD launch failed. See ${log_file}." >&2
+    fi
 
     rm -f "${conf_file}"
     return ${rc}
@@ -557,6 +719,7 @@ function pod_launch_neko_only() {
     local neko_ranks=$3
     local log_file=$4
     local mpirun_cmd
+    local errexit_was_set
 
     mpirun_cmd=(
         mpirun
@@ -569,5 +732,23 @@ function pod_launch_neko_only() {
     printf '  %q' "${mpirun_cmd[@]}"
     printf '\n'
     echo "Output:            ${log_file}"
+
+    errexit_was_set=0
+    if [[ $- == *e* ]]; then
+        errexit_was_set=1
+        set +e
+    fi
+
     "${mpirun_cmd[@]}" > "${log_file}" 2>&1
+    local rc=$?
+
+    if [ "${errexit_was_set}" -eq 1 ]; then
+        set -e
+    fi
+
+    if [ "${rc}" -ne 0 ]; then
+        echo "Error: MPI launch failed. See ${log_file}." >&2
+    fi
+
+    return ${rc}
 }

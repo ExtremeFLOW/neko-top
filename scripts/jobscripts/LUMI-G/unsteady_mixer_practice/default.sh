@@ -54,12 +54,13 @@ source functions.sh
 export MPICH_GPU_SUPPORT_ENABLED=1
 export ATP_ENABLED=true
 
+# Set these explicitly if you want a different case, Python executable, or
+# recovery script than the defaults in examples/unsteady_mixer_practice/run.sh.
+export CASE_FILE="${CASE_FILE:-unsteady_mixer_practice.case}"
+export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
+export PYTHON_SCRIPT="${PYTHON_SCRIPT:-${MAIN_DIR}/scripts/python/pod_state_recover.py}"
 export NEKO_RANKS="${NEKO_RANKS:-1}"
 export PY_RANKS="${PY_RANKS:-4}"
-export NEKO_RANKS_PER_NODE="${NEKO_RANKS_PER_NODE:-1}"
-export PY_RANKS_PER_NODE="${PY_RANKS_PER_NODE:-4}"
-
-export GPU_CORES="${GPU_CORES:-49}"
-export CPU_CORES="${CPU_CORES:-2,3,4,5}"
+export NEKO_STARTUP_DELAY="${NEKO_STARTUP_DELAY:-20}"
 
 run $example
