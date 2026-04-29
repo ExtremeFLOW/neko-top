@@ -84,7 +84,7 @@ function pod_validate_python_runtime() {
         return 1
     fi
 
-    export PYTHON_BIN="$(realpath "${pyexe}")"
+    export PYTHON_BIN="${pyexe}"
 }
 
 function pod_prepare_python_runtime() {

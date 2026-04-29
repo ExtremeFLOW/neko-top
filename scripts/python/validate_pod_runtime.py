@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import traceback
+
+os.environ.setdefault("MPI4PY_RC_INITIALIZE", "0")
+os.environ.setdefault("MPI4PY_RC_FINALIZE", "0")
+
+try:
+    import mpi4py
+
+    mpi4py.rc.initialize = False
+    mpi4py.rc.finalize = False
+except Exception:
+    pass
 
 
 CHECKS = (

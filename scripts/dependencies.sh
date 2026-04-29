@@ -36,10 +36,18 @@ function check_system_dependencies() {
 
 function find_python_executable() {
     local candidate
+    local python_path
 
     if [ -n "${PYTHON_BIN:-}" ]; then
         if [ -x "${PYTHON_BIN}" ]; then
-            realpath "${PYTHON_BIN}"
+            if [[ "${PYTHON_BIN}" = /* ]]; then
+                printf '%s\n' "${PYTHON_BIN}"
+            elif [[ "${PYTHON_BIN}" == */* ]]; then
+                python_path=$(cd "$(dirname "${PYTHON_BIN}")" && pwd)
+                printf '%s/%s\n' "${python_path}" "$(basename "${PYTHON_BIN}")"
+            else
+                command -v "${PYTHON_BIN}"
+            fi
             return 0
         elif command -v "${PYTHON_BIN}" >/dev/null 2>&1; then
             command -v "${PYTHON_BIN}"
@@ -501,7 +509,7 @@ function find_pod_python_runtime() {
         return 1
     }
 
-    export PYTHON_BIN=$(realpath "${pyexe}")
+    export PYTHON_BIN="${pyexe}"
     find_adios2 "${ADIOS2_DIR:-}" || return 1
 
     validator="${repo_root}/scripts/python/validate_pod_runtime.py"
