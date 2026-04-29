@@ -250,10 +250,6 @@ contains
     ! Allocate a single scalar field
     allocate(adjoint_scalar_pnpn_t::this%adjoint_scalar_fields(1))
 
-    ! The default for primal scalar name will be s, so we force these two
-    call params_adjoint%add('name', 's_adj')
-    call params_adjoint%add('primal_name', 's')
-
     ! TODO, there may be a corner case with multiple primal and a single adjoint
     ! we'll need to catch that before entering this subroutine.
 
