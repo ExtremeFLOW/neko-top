@@ -66,6 +66,8 @@ for file_name in [
 
             if val_reference == 0.0:
                 rmsre = 0.0 if val_current == 0.0 else float("inf")
+            elif abs(val_current - val_reference) <= 1e-12:
+                rmsre = 0.0
             else:
                 rmsre = math.sqrt(
                     ((val_current - val_reference) / val_reference)**2)
