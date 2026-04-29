@@ -1,2 +1,0 @@
-# Ignore all target files, they are machine dependent
-**/target_*.txt

@@ -280,10 +280,11 @@ contains
     this%rho => rho
 
     ! get the primal adjoint's name
-    call json_get(params_adjoint, 'primal_name', this%primal_name)
+    call json_get_or_default(params_adjoint, 'primal_name', this%primal_name, &
+         's')
     ! Assign a name
     call json_get_or_default(params_adjoint, 'name', this%name, &
-         'scalar adjoint')
+         this%primal_name // '_adj')
 
     call neko_log%section('Adjoint scalar')
     params_selected => json_key_fallback(params_adjoint, params_primal, &
