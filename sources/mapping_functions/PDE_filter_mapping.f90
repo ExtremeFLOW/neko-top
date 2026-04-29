@@ -33,7 +33,7 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> A PDE based filter
-module PDE_filter
+module PDE_filter_mapping
   use num_types, only: rp
   use json_module, only: json_file
   use registry, only: neko_registry
@@ -418,4 +418,4 @@ contains
 
   end subroutine filter_precon_factory
 
-end module PDE_filter
+end module PDE_filter_mapping
