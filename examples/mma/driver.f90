@@ -145,11 +145,11 @@ program usrneko
   ! -------------------------------------------------------------------------- !
   ! Clean up the components
 
-  call neko_finalize(neko_case)
   call opt%free()
   call prob%free()
   call des%free()
 
   if (allocated(opt)) deallocate(opt)
 
+  call neko_finalize(neko_case)
 end program usrneko

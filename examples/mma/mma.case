@@ -18,11 +18,7 @@
             "Re": 100.0,
             "initial_condition": {
                 "type": "uniform",
-                "value": [
-                    1.0,
-                    0.0,
-                    0.0
-                ]
+                "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
                 "type": "cg",
@@ -57,7 +53,7 @@
                     "zone_indices": [ 4, 5, 6 ]
                 }
             ]
-        },
+        }
     },
     "optimization": {
         "solver": {
@@ -79,7 +75,6 @@
                 "c": 1000.0,
                 "d": 1.0
             }
-        },
-    },
-
+        }
+    }
 }
