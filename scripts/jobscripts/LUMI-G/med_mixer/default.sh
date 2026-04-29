@@ -49,6 +49,16 @@ fi
 
 ml craype-accel-amd-gfx90a rocm
 
+cat <<'EOF' > select_gpu
+#!/bin/bash
+
+export ROCR_VISIBLE_DEVICES=${SLURM_LOCALID:-0}
+exec "$@"
+EOF
+
+chmod +x ./select_gpu
+trap 'rm -f ./select_gpu' EXIT
+
 source functions.sh
 
 export MPICH_GPU_SUPPORT_ENABLED=1
