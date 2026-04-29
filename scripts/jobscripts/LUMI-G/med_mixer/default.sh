@@ -65,10 +65,18 @@ source functions.sh
 export MPICH_GPU_SUPPORT_ENABLED=1
 export ATP_ENABLED=true
 
+if [ -f "${MAIN_DIR}/build/pod_runtime.env" ]; then
+    source "${MAIN_DIR}/build/pod_runtime.env"
+else
+    echo "Error: missing ${MAIN_DIR}/build/pod_runtime.env" >&2
+    echo "Run ./setup.sh -e after activating the target Python environment." >&2
+    exit 1
+fi
+
 # Set these explicitly if you want a different case, Python executable, or
 # recovery script than the defaults in examples/med_mixer/run.sh.
 export CASE_FILE="${CASE_FILE:-unsteady_mixer_practice.case}"
-export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
+export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3 || command -v python)}"
 export PYTHON_SCRIPT="${PYTHON_SCRIPT:-${MAIN_DIR}/scripts/python/pod_state_recover.py}"
 export NEKO_RANKS="${NEKO_RANKS:-8}"
 export PY_RANKS="${PY_RANKS:-48}"

@@ -47,11 +47,11 @@ function run {
         run_rc=$?
 
     elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
-        srun --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
+        srun --unbuffered --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
         run_rc=$?
 
     elif command -v srun 2>&1 1>/dev/null; then
-        srun $neko $casefile 2>error.log
+        srun --unbuffered $neko $casefile 2>error.log
         run_rc=$?
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
