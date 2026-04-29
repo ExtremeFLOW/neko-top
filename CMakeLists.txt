@@ -81,6 +81,7 @@ find_package(LAPACK QUIET)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
+find_package(OpenMP REQUIRED COMPONENTS Fortran)
 
 # We need PKG Config to find the JSON-Fortran and Neko libraries
 find_package(PkgConfig REQUIRED)
