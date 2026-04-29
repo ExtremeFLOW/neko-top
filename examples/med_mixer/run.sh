@@ -8,8 +8,8 @@ fi
 CASE_FILE=${CASE_FILE:-unsteady_mixer_practice.case}
 PYTHON_SCRIPT=${PYTHON_SCRIPT:-"${MAIN_DIR}/scripts/python/pod_state_recover.py"}
 NEKO_EXE=${NEKO_BIN:-./neko}
-NEKO_RANKS=${NEKO_RANKS:-2}
-PY_RANKS=${PY_RANKS:-8}
+NEKO_RANKS=${NEKO_RANKS:-8}
+PY_RANKS=${PY_RANKS:-48}
 LOG_FILE=${LOG_FILE:-mpmd.log}
 
 if [ -z "${PYTHON_BIN:-}" ]; then

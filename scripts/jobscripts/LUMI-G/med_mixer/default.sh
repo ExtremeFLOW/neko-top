@@ -9,12 +9,13 @@
 # -- Technical options
 
 # Queue name
-#SBATCH --partition=dev-g
+#SBATCH --partition=standard-g
 
-# Ask for two GPU-backed Neko ranks and eight CPU-only Python ranks.
+# Ask for a full-node layout on LUMI-G: eight GPU-backed Neko ranks and
+# forty-eight CPU-only Python ranks, matching the 56 usable CPU cores/node.
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=10
-#SBATCH --gpus-per-node=2
+#SBATCH --ntasks-per-node=56
+#SBATCH --gpus-per-node=8
 #SBATCH --mem=480GB
 
 # Time specifications (dd-hh:mm:ss)
@@ -69,8 +70,8 @@ export ATP_ENABLED=true
 export CASE_FILE="${CASE_FILE:-unsteady_mixer_practice.case}"
 export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
 export PYTHON_SCRIPT="${PYTHON_SCRIPT:-${MAIN_DIR}/scripts/python/pod_state_recover.py}"
-export NEKO_RANKS="${NEKO_RANKS:-2}"
-export PY_RANKS="${PY_RANKS:-8}"
+export NEKO_RANKS="${NEKO_RANKS:-8}"
+export PY_RANKS="${PY_RANKS:-48}"
 export NEKO_STARTUP_DELAY="${NEKO_STARTUP_DELAY:-20}"
 
 run $example
