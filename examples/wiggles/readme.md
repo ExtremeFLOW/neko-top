@@ -1,7 +1,7 @@
 ## CFL
-$$
+\f[
     C = dt \cdot \sum_{i=1}^{d} \frac{u_i}{dx_i} <= C_{max}
-$$
+\f]
 
 
 ### Experiments
