@@ -8,8 +8,8 @@ fi
 CASE_FILE=${CASE_FILE:-unsteady_mixer_practice.case}
 PYTHON_SCRIPT=${PYTHON_SCRIPT:-"${MAIN_DIR}/scripts/python/pod_state_recover.py"}
 NEKO_EXE=${NEKO_BIN:-./neko}
-NEKO_RANKS=${NEKO_RANKS:-1}
-PY_RANKS=${PY_RANKS:-4}
+NEKO_RANKS=${NEKO_RANKS:-2}
+PY_RANKS=${PY_RANKS:-8}
 LOG_FILE=${LOG_FILE:-mpmd.log}
 
 if [ -z "${PYTHON_BIN:-}" ]; then
@@ -33,12 +33,12 @@ fi
 
 if [ ! -x "${NEKO_EXE}" ]; then
     echo "Error: Neko executable not found or not executable: ${NEKO_EXE}" >&2
-    echo "Build examples/unsteady_mixer_practice or set NEKO_BIN explicitly." >&2
+    echo "Build examples/med_mixer or set NEKO_BIN explicitly." >&2
     exit 1
 fi
 
-if [ "${NEKO_RANKS}" -ne 1 ]; then
-    echo "Error: this practice launcher expects NEKO_RANKS=1." >&2
+if [ "${NEKO_RANKS}" -lt 1 ]; then
+    echo "Error: NEKO_RANKS must be at least 1." >&2
     exit 1
 fi
 
@@ -69,15 +69,17 @@ EOF
 
 chmod +x ./select_gpu
 
-cat <<EOF > mpmd.conf
-0 /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=${NEKO_RANKS} ./select_gpu ${NEKO_EXE} ${CASE_FILE}
-EOF
+rm -f ./mpmd.conf
 
-for ((rank=1; rank<=PY_RANKS; rank++)); do
+for ((rank=0; rank<NEKO_RANKS; rank++)); do
+    echo "${rank} /usr/bin/env NEKO_COMM_ID=0 NEKO_CTRL_PEER_ROOT=${NEKO_RANKS} ./select_gpu ${NEKO_EXE} ${CASE_FILE}" >> mpmd.conf
+done
+
+for ((rank=NEKO_RANKS; rank<NEKO_RANKS + PY_RANKS; rank++)); do
     echo "${rank} /usr/bin/env NEKO_COMM_ID=1 NEKO_CTRL_PEER_ROOT=0 ${PYTHON_BIN} ${PYTHON_SCRIPT} ${CASE_FILE}" >> mpmd.conf
 done
 
-echo "Launching 1 Neko GPU rank and ${PY_RANKS} Python ranks"
+echo "Launching ${NEKO_RANKS} Neko GPU ranks and ${PY_RANKS} Python ranks"
 echo "Case:   ${CASE_FILE}"
 echo "Neko:   ${NEKO_EXE}"
 echo "Python: ${PYTHON_BIN} ${PYTHON_SCRIPT}"

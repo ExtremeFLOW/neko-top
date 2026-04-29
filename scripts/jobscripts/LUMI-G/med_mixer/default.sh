@@ -1,7 +1,7 @@
 #!/bin/bash -l
 
 # In this file make changes to the SBATCH variables to control the LUMI
-# hpc settings for the unsteady mixer POD practice run.
+# hpc settings for the med_mixer POD run.
 
 # =============================================================================
 # Define the SBATCH options here.
@@ -11,10 +11,10 @@
 # Queue name
 #SBATCH --partition=dev-g
 
-# Ask for one GPU-backed Neko rank and four CPU-only Python ranks.
+# Ask for two GPU-backed Neko ranks and eight CPU-only Python ranks.
 #SBATCH --nodes=1
-#SBATCH --ntasks-per-node=5
-#SBATCH --gpus-per-node=1
+#SBATCH --ntasks-per-node=10
+#SBATCH --gpus-per-node=2
 #SBATCH --mem=480GB
 
 # Time specifications (dd-hh:mm:ss)
@@ -55,12 +55,12 @@ export MPICH_GPU_SUPPORT_ENABLED=1
 export ATP_ENABLED=true
 
 # Set these explicitly if you want a different case, Python executable, or
-# recovery script than the defaults in examples/unsteady_mixer_practice/run.sh.
+# recovery script than the defaults in examples/med_mixer/run.sh.
 export CASE_FILE="${CASE_FILE:-unsteady_mixer_practice.case}"
 export PYTHON_BIN="${PYTHON_BIN:-$(command -v python3)}"
 export PYTHON_SCRIPT="${PYTHON_SCRIPT:-${MAIN_DIR}/scripts/python/pod_state_recover.py}"
-export NEKO_RANKS="${NEKO_RANKS:-1}"
-export PY_RANKS="${PY_RANKS:-4}"
+export NEKO_RANKS="${NEKO_RANKS:-2}"
+export PY_RANKS="${PY_RANKS:-8}"
 export NEKO_STARTUP_DELAY="${NEKO_STARTUP_DELAY:-20}"
 
 run $example
