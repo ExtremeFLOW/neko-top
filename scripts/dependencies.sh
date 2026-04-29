@@ -534,57 +534,59 @@ function find_pod_python_runtime() {
 
 function find_parmetis() {
 
-    # Determine the Parmetis installation directory
-    check_external_dir
-    if [[ $# -ge 1 ]]; then
-        PARMETIS_DIR="$1"
-    elif [ -z "$PARMETIS_DIR" ]; then
-        PARMETIS_DIR="parmetis"
-    fi
+    echo "skipping parmetis"
 
-    if [[ "${PARMETIS_DIR:0:1}" != "/" && "${PARMETIS_DIR:0:1}" != "~" ]]; then
-        PARMETIS_DIR="$(realpath $EXTERNAL_DIR/$PARMETIS_DIR)"
-    fi
+    # # Determine the Parmetis installation directory
+    # check_external_dir
+    # if [[ $# -ge 1 ]]; then
+    #     PARMETIS_DIR="$1"
+    # elif [ -z "$PARMETIS_DIR" ]; then
+    #     PARMETIS_DIR="parmetis"
+    # fi
 
-    if [[ -z "$(find $PARMETIS_DIR -name libparmetis.a)" ]]; then
-        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
-        CMAKE_GENERATOR_OLD=$CMAKE_GENERATOR
-        CMAKE_GENERATOR="Unix Makefiles"
+    # if [[ "${PARMETIS_DIR:0:1}" != "/" && "${PARMETIS_DIR:0:1}" != "~" ]]; then
+    #     PARMETIS_DIR="$(realpath $EXTERNAL_DIR/$PARMETIS_DIR)"
+    # fi
 
-        # Download and install ParMETIS
-        mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
-        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
-        tar xzf parmetis-4.0.3.tar.gz
-        cd parmetis-4.0.3
+    # if [[ -z "$(find $PARMETIS_DIR -name libparmetis.a)" ]]; then
+    #     [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+    #     CMAKE_GENERATOR_OLD=$CMAKE_GENERATOR
+    #     CMAKE_GENERATOR="Unix Makefiles"
 
-        # Compile the bundled metis library
-        cd metis
-        make config prefix=${PARMETIS_DIR}
-        make -j && make install
-        cd ../
+    #     # Download and install ParMETIS
+    #     mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
+    #     wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
+    #     tar xzf parmetis-4.0.3.tar.gz
+    #     cd parmetis-4.0.3
 
-        # Compile parmetis
-        make config prefix=${PARMETIS_DIR}
-        make -j && make install
-        cd ../
-        rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
-        CMAKE_GENERATOR=$CMAKE_GENERATOR_OLD
-        cd $CURRENT_DIR
-    fi
+    #     # Compile the bundled metis library
+    #     cd metis
+    #     make config prefix=${PARMETIS_DIR}
+    #     make -j && make install
+    #     cd ../
 
-    PARMETIS_LIB=$(find $PARMETIS_DIR -type d -name 'lib*' \
-        -exec test -f '{}'/libparmetis.a \; -print)
-    if [ -z "$PARMETIS_LIB" ]; then
-        error "ParMETIS not found at:"
-        error "\t$PARMETIS_DIR"
-        error "Please set PARMETIS_DIR to the directory containing"
-        error "the ParMETIS source code."
-        error "You can download the source code from:"
-        error "\thttps://github.com/KarypisLab/ParMETIS.git"
-        exit 1
-    fi
+    #     # Compile parmetis
+    #     make config prefix=${PARMETIS_DIR}
+    #     make -j && make install
+    #     cd ../
+    #     rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
+    #     CMAKE_GENERATOR=$CMAKE_GENERATOR_OLD
+    #     cd $CURRENT_DIR
+    # fi
 
-    export PARMETIS_DIR=$(realpath $PARMETIS_DIR)
+    # PARMETIS_LIB=$(find $PARMETIS_DIR -type d -name 'lib*' \
+    #     -exec test -f '{}'/libparmetis.a \; -print)
+    # if [ -z "$PARMETIS_LIB" ]; then
+    #     error "ParMETIS not found at:"
+    #     error "\t$PARMETIS_DIR"
+    #     error "Please set PARMETIS_DIR to the directory containing"
+    #     error "the ParMETIS source code."
+    #     error "You can download the source code from:"
+    #     error "\thttps://github.com/KarypisLab/ParMETIS.git"
+    #     exit 1
+    # fi
+
+    # export PARMETIS_DIR=$(realpath $PARMETIS_DIR)
 }
 
 # ============================================================================ #
