@@ -39,6 +39,7 @@ module mapping
   use coefs, only: coef_t
   use field, only: field_t
   use field_math, only: field_copy
+  use registry, only: neko_registry
   implicit none
   private
 
@@ -47,7 +48,7 @@ module mapping
      !> Coefficients for the SEM.
      type(coef_t), pointer :: coef => null()
      !> A copy of the unmapped field (often used for chain rule)
-     type(field_t) :: X_in
+     type(field_t), pointer :: X_in => null()
      !> A name for the field
      character(len=80) :: fld_name = ""
 
@@ -158,7 +159,8 @@ contains
     this%coef => coef
     this%fld_name = fld_name
     ! The mapping handler will take care of naming this field
-    call this%X_in%init(coef%dof)
+    call neko_registry%add_field(coef%dof, this%fld_name)
+    this%X_in => neko_registry%get_field(this%fld_name)
 
   end subroutine mapping_init_base
 
@@ -166,7 +168,7 @@ contains
   subroutine mapping_free_base(this)
     class(mapping_t), intent(inout) :: this
 
-    call this%X_in%free()
+    nullify(this%X_in)
     nullify(this%coef)
 
   end subroutine mapping_free_base
