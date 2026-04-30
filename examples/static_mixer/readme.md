@@ -26,11 +26,11 @@ non-dimensional parameters are the Reynolds number **Re** and the Peclet number
 
 **Velocity**
 
-| Boundary                                | Condition                                                                                                                                          |
-| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Inlet (`x = 0`, zone 1)                 | Smooth parabolic profile - smooth-step blending in `y` and `z`, `u_max = 1`, `v = w = 0`. The boundary layer thickness scales as `0.2 / sqrt(Re)`. |
-| Outlet (`x = 4`, zone 2)                | Pressure outflow (outflow+dong)                                                                                                                    |
-| Walls (`y = 0/1`, `z = 0/1`, zones 3-6) | No-slip                                                                                                                                            |
+| Boundary                                | Condition                                                                                                                                                                                                                      |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Inlet (`x = 0`, zone 1)                 | Smooth parabolic profile - smooth-step blending in `y` and `z`, `u_max = 1`, `v = w = 0`. The boundary layer thickness is `max(1.0 / sqrt(Re), element_size)`, ensuring the blending region is at least one mesh element wide. |
+| Outlet (`x = 4`, zone 2)                | Pressure outflow (outflow+dong)                                                                                                                                                                                                |
+| Walls (`y = 0/1`, `z = 0/1`, zones 3-6) | No-slip                                                                                                                                                                                                                        |
 
 **Temperature (passive scalar)**
 
