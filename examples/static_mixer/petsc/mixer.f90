@@ -4,7 +4,7 @@ module user
   use field_math, only: field_rzero
   implicit none
 
-  real(kind=rp) :: Re
+  real(kind=rp) :: Re, element_size
 
 contains
 
@@ -19,6 +19,7 @@ contains
   subroutine startup(params)
     type(json_file), intent(inout) :: params
     call json_get(params, "case.fluid.Re", Re)
+    call json_get(params, "case.element_size", element_size)
   end subroutine startup
 
   !> User initial condition
@@ -41,14 +42,11 @@ contains
        u => fields%get("u")
        v => fields%get("v")
        w => fields%get("w")
+
        call field_cfill(u, 1.0_rp)
        call field_subcol3(u, u, brinkman_indicator)
        call field_rzero(v)
        call field_rzero(w)
-
-       call u%copy_from(DEVICE_TO_HOST, .false.)
-       call v%copy_from(DEVICE_TO_HOST, .false.)
-       call w%copy_from(DEVICE_TO_HOST, .true.)
     end if
   end subroutine initial_conditions
 
@@ -76,10 +74,8 @@ contains
        v => fields%get("v")
        w => fields%get("w")
 
-       call field_rzero(v)
-       call field_rzero(w)
-
-       band_size = 0.2_rp / sqrt(Re)
+       band_size = 1.0_rp / sqrt(Re)
+       band_size = max(band_size, element_size)
 
        do i = 1, bc%msk(0)
           y = bc%dof%y(bc%msk(i), 1, 1, 1)
@@ -93,9 +89,9 @@ contains
           u%x(bc%msk(i), 1, 1, 1) = val_y0 * val_z0 * val_y1 * val_z1
        end do
 
-       call u%copy_from(HOST_TO_DEVICE, .false.)
-       call v%copy_from(HOST_TO_DEVICE, .false.)
-       call w%copy_from(HOST_TO_DEVICE, .true.)
+       call u%copy_from(HOST_TO_DEVICE, .true.)
+       call field_rzero(v)
+       call field_rzero(w)
     end if
 
     ! ------------------------------------------------------------------------ !
