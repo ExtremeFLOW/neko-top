@@ -51,11 +51,9 @@ for pe in ${Pe[@]}; do
             sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/petsc/cache_${n}_\",|g" ${case_file}
             sed -i "s|\"radius\": .*|\"radius\": ${pde_r},|g" ${case_file}
 
-            if [ "$re" == 1 ]; then
-                sed -i "s|\"limits\": .*|\"limits\": [0.0, 1000.0],|g" ${case_file}
-            else
-                sed -i "s|\"limits\": .*|\"limits\": [0.0, 500.0],|g" ${case_file}
-            fi
+            # Rule of thumb, Brinkman penalization should be 1e6 / Re.
+            brinkman=$(printf "%.2e" $(echo "scale=2; 1e6 / $re" | bc -l))
+            sed -i "s|\"limits\": .*|\"limits\": [0.0, ${brinkman}],|g" ${case_file}
 
             cp ${example_path}/petsc/job.template ${job_file}
             echo $(basename ${job_file}) >> $job_path/.gitignore

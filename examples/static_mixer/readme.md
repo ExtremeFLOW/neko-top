@@ -8,6 +8,7 @@ design by Casper Schousboe Andreasen is here for reference.
 Details:
 
 - Domain: Duct of dimension 4 x 1 x 1
+- Resolution: Defined by user, but typically 128 x 32 x 32
 - BCs:
     - Inlet (x=0): Parabolic velocity profile, u_max = 1, v = w = 0
       (Currently constant)
@@ -17,8 +18,8 @@ Details:
     - Walls (y=0, y=1, z=0, z=1): No-slip, Neumann for thermal.
     - Outlet (x=4): Pressure outflow.
     - Initial condition: Fluid at constant velocity u = 1, v = w = 0
-- Re = 0
-- Pe = 2000
+- Re = User defined
+- Pe = Mirror of Re
 - Brinkman IBM for solid obstacles.
-    - Max restriction = 100
+    - Max restriction = 1e6 / Re
     - Min restriction = 0
