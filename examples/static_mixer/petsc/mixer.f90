@@ -81,11 +81,6 @@ contains
           y = bc%dof%y(bc%msk(i), 1, 1, 1)
           z = bc%dof%z(bc%msk(i), 1, 1, 1)
 
-          ! val_y0 = min(1.0_rp, (abs(0.0_rp - y) / band_size)**2)
-          ! val_z0 = min(1.0_rp, (abs(0.0_rp - z) / band_size)**2)
-          ! val_y1 = min(1.0_rp, (abs(1.0_rp - y) / band_size)**2)
-          ! val_z1 = min(1.0_rp, (abs(1.0_rp - z) / band_size)**2)
-
           val_y0 = smooth_step(y, 0.0_rp, band_size)
           val_z0 = smooth_step(z, 0.0_rp, band_size)
           val_y1 = smooth_step(y, 1.0_rp, 1.0_rp - band_size)
