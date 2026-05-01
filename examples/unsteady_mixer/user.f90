@@ -32,7 +32,7 @@ module user
   !! $ \frac{L}{1 + exp{-k(z-z_0)}}$
   real(kind=rp), parameter :: L = 1.0_rp
   real(kind=rp), parameter :: k = 20.0_rp
-  real(kind=rp), parameter :: z_0 = 1.0_rp
+  real(kind=rp), parameter :: z_0 = 0.5_rp
 
 contains
 
