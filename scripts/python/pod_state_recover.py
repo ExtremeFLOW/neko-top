@@ -14,6 +14,7 @@ from mpi4py import MPI
 from pysemtools.datatypes.coef import Coef
 from pysemtools.datatypes.msh import Mesh
 from pysemtools.io.adios2.stream import DataStreamer
+from pysemtools.io.hdf.vtkhdf import VTKHDFFile
 from pysemtools.io.utils import get_fld_from_ndarray
 from pysemtools.io.wrappers import write_data
 from pysemtools.rom.io_help import IoHelp
@@ -637,16 +638,25 @@ def write_modes_to_vtkhdf(
         n_avail,
     )
 
-    write_data(
+    vtk_file = VTKHDFFile(
         comm,
-        fname=vtk_path,
-        data_dict=mode_data,
-        parallel_io=comm.Get_size() > 1,
-        dtype=cfg.mode_output_dtype,
-        msh=[mesh.x, mesh.y, mesh.z],
-        write_mesh=output_index == 0,
-        fname_of_mesh_file=None if output_index == 0 else mesh_link,
+        vtk_path,
+        "w",
+        parallel=comm.Get_size() > 1,
     )
+
+    if output_index == 0:
+        vtk_file.write_mesh_data(mesh.x, mesh.y, mesh.z)
+    else:
+        vtk_file.link_to_existing_mesh(mesh_link)
+
+    for name, field in mode_data.items():
+        vtk_file.write_point_data(
+            name,
+            field.astype(cfg.mode_output_dtype),
+        )
+
+    vtk_file.close()
     return output_index + 1
 
 
