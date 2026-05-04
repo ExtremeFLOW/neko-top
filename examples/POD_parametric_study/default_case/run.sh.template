@@ -5,10 +5,10 @@ if [ -z "${MAIN_DIR:-}" ]; then
     MAIN_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../.." && pwd)
 fi
 
-source "${MAIN_DIR}/scripts/pod_run_helpers.sh"
+source "${MAIN_DIR}/scripts/mpmd_run_helpers.sh"
 
 CASE_DIR=$(pwd)
-CASE_FILE=$(pod_resolve_case_file "${CASE_DIR}" "${1:-}")
+CASE_FILE=$(mpmd_resolve_case_file "${CASE_DIR}" "${1:-}")
 PY_SCRIPT=${2:-"${MAIN_DIR}/scripts/python/pod_state_recover.py"}
 
 NEKO_RANKS=${NEKO_RANKS:-5}
@@ -34,19 +34,19 @@ fi
 CASE_NAME="$(basename "${CASE_FILE}")"
 CASE_BASE="${CASE_NAME%.case}"
 
-if pod_case_is_pod "${CASE_FILE}"; then
-    pod_ensure_adios2_python "${MAIN_DIR}"
+if mpmd_case_needs_python_driver "${CASE_FILE}"; then
+    mpmd_ensure_adios2_python "${MAIN_DIR}"
     LOG_FILE=${LOG_FILE:-"mpmd_${CASE_BASE}.log"}
 else
     LOG_FILE=${LOG_FILE:-"neko_${CASE_BASE}.log"}
 fi
 
-pod_print_runtime_env
+mpmd_print_runtime_env
 
-if pod_case_is_pod "${CASE_FILE}"; then
-    pod_launch_shared_mpi "${CASE_FILE}" "${PY_SCRIPT}" "${NEKO_EXE}" \
+if mpmd_case_needs_python_driver "${CASE_FILE}"; then
+    mpmd_launch_shared "${CASE_FILE}" "${PY_SCRIPT}" "${NEKO_EXE}" \
         "${PY_RANKS}" "${NEKO_RANKS}" "${LOG_FILE}"
 else
-    pod_launch_neko_only "${CASE_FILE}" "${NEKO_EXE}" \
+    mpmd_launch_neko_only "${CASE_FILE}" "${NEKO_EXE}" \
         "${NEKO_RANKS}" "${LOG_FILE}"
 fi

@@ -173,12 +173,14 @@
             {
                 "type": "viscous_dissipation",
                 "mask_name": "objective_domain",
-                "weight": 1.0
+                "weight": 1.0,
+                "start_time": 10.0,
             },
             {
                 "type": "brinkman_dissipation",
                 "mask_name": "optimization_domain",
                 "weight": 1.0
+                "start_time": 10.0,
             }
         ],
         "constraints": [
