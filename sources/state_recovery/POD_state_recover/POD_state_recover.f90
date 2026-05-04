@@ -93,8 +93,7 @@ module simulation_POD_state_recover
      type(matrix_t) :: time_coefs
      type(vector_t) :: a_interp
 
-     ! optional output
-     type(field_output_t) :: output
+     ! optional mode output configuration
      integer :: mode_output_precision = sp
      character(len=32) :: mode_output_format = 'fld'
      character(len=80) :: mode_file_name = 'POD_modes'
@@ -108,7 +107,6 @@ module simulation_POD_state_recover
      real(kind=rp) :: recon_output_value = 0.0_rp
      real(kind=rp) :: recon_time_interval = 0.0_rp
      integer :: recon_nsteps = 0
-     integer :: i_output = 0
 
      ! Control state
      type(ctrl_stream_t) :: ctrl
@@ -232,7 +230,7 @@ contains
   !! @param[in] i_stream Snapshot stride.
   !! @param[in] n_modes Number of POD modes to keep.
   !! @param[in] dtype POD floating-point precision.
-  !! @param[in] write_modes Whether to write modes to output.
+  !! @param[in] write_modes Whether Python should persist POD modes.
   !! @param[in] output_reconstruction Whether to output reconstructions.
   !! @param[in] output_control Reconstruction output cadence control.
   !! @param[in] output_value Reconstruction cadence value.
@@ -343,31 +341,19 @@ contains
     allocate(this%w_modes(this%n_modes))
     if (this%include_scalar) allocate(this%s_modes(this%n_modes))
 
-    call this%output%init(trim(this%mode_file_name), &
-         this%n_flds * this%n_modes, &
-         precision = this%mode_output_precision, &
-         format = trim(this%mode_output_format))
     do i = 1, this%n_modes
        write(str, '(A,I0)') "u_mode_", i
        call this%u_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 1, &
-            this%u_modes(i))
 
        write(str, '(A,I0)') "v_mode_", i
        call this%v_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 2, &
-            this%v_modes(i))
 
        write(str, '(A,I0)') "w_mode_", i
        call this%w_modes(i)%init(this%coef%dof, trim(str))
-       call this%output%fields%assign_to_field(this%n_flds*(i-1) + 3, &
-            this%w_modes(i))
 
        if (this%include_scalar) then
           write(str, '(A,I0)') "s_mode_", i
           call this%s_modes(i)%init(this%s%dof, trim(str))
-          call this%output%fields%assign_to_field(this%n_flds*(i-1) + 4, &
-               this%s_modes(i))
        end if
     end do
 
@@ -486,7 +472,6 @@ contains
        deallocate(this%s_modes)
     end if
 
-    call this%output%free()
     call this%recon_output%free()
     call this%dstream%free()
     call this%csv_reader%free()
@@ -504,7 +489,6 @@ contains
     this%recon_file_name = 'pod_reconstruction'
     nullify(this%s)
     this%enabled = .false.
-    this%i_output = 0
   end subroutine POD_state_recover_free
 
 
@@ -678,11 +662,6 @@ contains
                   n, HOST_TO_DEVICE, sync=.true.)
           end if
        end do
-    end if
-
-    if (this%write_modes) then
-       call this%output%sample(real(this%i_output, kind=rp))
-       this%i_output = this%i_output + 1
     end if
 
     ! Read CSV once
