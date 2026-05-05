@@ -18,9 +18,9 @@
 
 # Ask for n cores placed on R host.
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
-#SBATCH --tasks-per-node=8
+#SBATCH --ntasks-per-node=8
 #SBATCH --gpus-per-node=8
+#SBATCH --cpus-per-task=6
 
 # Time specifications (dd-hh:mm:ss)
 #SBATCH --time 02-00:00:00
@@ -62,8 +62,15 @@ exec \$*
 EOF
 
 chmod +x ./select_gpu
-export CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
+CPU_BIND="mask_cpu:7e000000000000,7e00000000000000"
+CPU_BIND="${CPU_BIND},7e0000,7e000000"
+CPU_BIND="${CPU_BIND},7e,7e00"
+CPU_BIND="${CPU_BIND},7e00000000,7e0000000000"
+
+export CPU_BIND="${CPU_BIND}"
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
+export NEKO_GS_STRTGY=3
 
 run $example
 

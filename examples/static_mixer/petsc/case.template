@@ -13,6 +13,7 @@
             "end_time": 12.0,
             "variable_timestep": true,
             "target_cfl": 0.1,
+            "init_timestep": 1e-4,
             "max_timestep": 4e-3
         },
         "numerics": {
@@ -41,7 +42,7 @@
             "initial_condition": {
                 "type": "user"
             },
-            "boundary_conditions ": [
+            "boundary_conditions": [
                 {
                     "type": "user_velocity",
                     "zone_indices": [ 1 ]
@@ -95,6 +96,10 @@
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 100
             },
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
+            },
             "boundary_conditions": [
                 {
                     "type": "user_dirichlet",
@@ -106,11 +111,7 @@
                     "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
-            ],
-            "initial_condition": {
-                "type": "uniform",
-                "value": 0.0
-            }
+            ]
         }
     }
 }
