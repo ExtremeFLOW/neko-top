@@ -388,9 +388,16 @@ function find_neko() {
 
         # Apply Cray-specific patches before building on Cray systems
         if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
-            git -C "$NEKO_DIR" apply patches/cce_stack.patch
-            git -C "$NEKO_DIR" apply patches/cce_time_state.patch
-            git -C "$NEKO_DIR" apply patches/cce_openmp.patch
+            cray_patches=(
+                "patches/cce_stack.patch"
+                "patches/cce_time_state.patch"
+                "patches/cce_openmp.patch"
+            )
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply "$patch"
+                fi
+            done
         fi
 
         # Determine available features
