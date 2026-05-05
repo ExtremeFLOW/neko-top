@@ -45,12 +45,12 @@ module optimizer
   use num_types, only: rp
   use logger, only: neko_log
   use profiler, only: profiler_start_region, profiler_end_region
-  use mpi_f08, only: MPI_Wtime
+  use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX
   use utils, only: neko_error, filename_suffix
   use csv_file, only: csv_file_t
   use vector, only: vector_t
   use json_utils, only: json_get_or_default
-  use comm, only: pe_rank
+  use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
   use continuation_scheduler, only: nekotop_continuation
 
   implicit none
@@ -433,6 +433,10 @@ contains
 
     do while (this%current_iteration .lt. this%max_iterations)
        this%current_iteration = this%current_iteration + 1
+       if (pe_rank .eq. 0) then
+          write(*,*) 'Starting iteration ', this%current_iteration
+       end if
+
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
 
@@ -525,7 +529,7 @@ contains
     class(optimizer_t), intent(inout) :: this
     real(kind=rp), intent(in) :: step_time
     logical :: out_of_time
-    real(kind=rp) :: elapsed_time, old_avg_weight
+    real(kind=rp) :: elapsed_time, time, old_avg_weight
 
     out_of_time = .false.
 
@@ -533,12 +537,15 @@ contains
        return
     end if
 
+    call MPI_Allreduce(step_time, time, 1, MPI_REAL_PRECISION, MPI_MAX, &
+         NEKO_COMM)
+
     elapsed_time = MPI_Wtime() - this%start_time
     this%step_count = this%step_count + 1.0_rp
     old_avg_weight = (this%step_count - 1) / this%step_count
 
     ! Estimate Cumulative Average iteration time
-    this%average_time = step_time / this%step_count + &
+    this%average_time = time / this%step_count + &
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
