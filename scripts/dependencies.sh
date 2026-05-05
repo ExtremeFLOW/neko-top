@@ -467,6 +467,15 @@ function find_neko() {
         make install
 
         cd $CURRENT_DIR
+
+        # Revert the patches to keep the repository clean
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --reverse --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply --reverse "$patch"
+                fi
+            done
+        fi
     fi
 
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
