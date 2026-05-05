@@ -490,7 +490,7 @@ BrinkmanClipDisplay_vel.Set(
     ColorArrayName=['POINTS', ''],
     ComputePointNormals=1,
     FeatureAngle=45.0,
-    Scale=[0.999999, 0.999999, 0.999999],
+    Scale=[0.99999, 0.99999, 0.99999],
     DataAxesGrid='Grid Axes Representation',
     PolarAxes='Polar Axes Representation',
 )
@@ -506,7 +506,7 @@ BrinkmanClipDisplay_vel.OpacityTransferFunction.Points = [
 ]
 
 # init the 'Polar Axes Representation' selected for 'PolarAxes'
-BrinkmanClipDisplay_vel.PolarAxes.Scale = [0.999999, 0.999999, 0.999999]
+BrinkmanClipDisplay_vel.PolarAxes.Scale = [0.99999, 0.99999, 0.99999]
 
 # show data from BrinkmanClip
 BrinkmanClip_1Display_vel = Show(OutputPort(BrinkmanClip, 1), velocityView,
@@ -665,7 +665,7 @@ BrinkmanClipDisplay_temp.Set(
     ColorArrayName=['POINTS', ''],
     ComputePointNormals=1,
     FeatureAngle=45.0,
-    Scale=[0.999999, 0.999999, 0.999999],
+    Scale=[0.99999, 0.99999, 0.99999],
     DataAxesGrid='Grid Axes Representation',
     PolarAxes='Polar Axes Representation',
 )
@@ -675,7 +675,7 @@ BrinkmanClipDisplay_temp.ScaleTransferFunction.Points = [
 BrinkmanClipDisplay_temp.OpacityTransferFunction.Points = [
     0.13141125440597534, 0.0, 0.5, 0.0, 0.9962556958198547, 1.0, 0.5, 0.0
 ]
-BrinkmanClipDisplay_temp.PolarAxes.Scale = [0.999999, 0.999999, 0.999999]
+BrinkmanClipDisplay_temp.PolarAxes.Scale = [0.99999, 0.99999, 0.99999]
 
 # show secondary output of Brinkman clip
 BrinkmanClip_1Display_temp = Show(OutputPort(BrinkmanClip, 1), temperatureView,
@@ -826,6 +826,8 @@ for step_idx, t in enumerate(timesteps[::stride]):
             print(f'Skipping step {raw_idx} (output files already exist; '
                   f'use --overwrite to force regeneration)')
         continue
+    elif mpi_rank == 0:
+        print(f'Processing step {raw_idx} (t={t:.2f})...')
 
     animationScene.AnimationTime = t
     SaveScreenshot(
