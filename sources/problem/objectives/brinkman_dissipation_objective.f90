@@ -146,7 +146,7 @@ contains
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "name", name, "Out of plane stresses")
+    call json_get_or_default(json, "name", name, "Brinkman dissipation")
     call json_get_or_default(json, "dealias_sensitivity", &
          dealias_sensitivity, .true.)
     call json_get_or_default(json, "dealias_forcing", &
