@@ -156,7 +156,7 @@ contains
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "name", name, "Dissipation")
+    call json_get_or_default(json, "name", name, "Viscous dissipation")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 
