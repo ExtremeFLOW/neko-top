@@ -188,8 +188,8 @@ if [ -d "${hpc_path}/${CLUSTER}/benchmark/${TAG}" ]; then
     find "${hpc_path}/${CLUSTER}/benchmark/${TAG}" -type f -name "*.sh" -delete
 fi
 
-if [ ! -f "${example_path}/${TAG}/.gitignore" ]; then
-    echo "*" > "${example_path}/${TAG}/.gitignore"
+if [ ! -f "${example_path}/.gitignore" ]; then
+    echo "*" > "${example_path}/.gitignore"
 fi
 
 # Update template files in case they have changed
