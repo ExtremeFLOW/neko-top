@@ -76,7 +76,7 @@ export data_path="${MAIN_DIR}/data_local/static_mixer"
 export example_path="${MAIN_DIR}/examples/benchmark"
 export template_path="${BENCH_DIR}/templates"
 
-export experiment_path="${BENCH_DIR}/experiments"
+export experiment_path="${MAIN_DIR}/results/benchmark/experiments"
 
 [ ! -d "${data_path}" ] && mkdir -p "${data_path}"
 [ ! -d "${example_path}/${TAG}" ] && mkdir -p "${example_path}/${TAG}"
@@ -141,6 +141,11 @@ function create_case() {
            -o "${data_path}" -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
     fi
 
+    # # If we have multiple partitions update the mesh name
+    # if [ "$n_parts" -gt 1 ]; then
+    #     mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}_${n_parts}.nmsh"
+    # fi
+
     # Create the cases from the templates
     cp "${template_path}/case.template" "${case_file}"
     sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${mesh_file}\",|g" "${case_file}"
@@ -148,7 +153,6 @@ function create_case() {
     sed -i "s|\"keep_checkpoints\": .*|\"keep_checkpoints\": ${keep_files}|g" "${case_file}"
     sed -i "s|\"r\": .*|\"r\": ${element_size}|g" "${case_file}"
     [ -n "${end_time}" ] && sed -i "s|\"end_time\": .*|\"end_time\": ${end_time},|g" "${case_file}"
-
 
     # Create the jobscript
     if [ "${CLUSTER}" != "LOCAL" ]; then
@@ -198,9 +202,14 @@ rsync -u "${template_path}/mixer.f90" "${template_path}/CMakeLists.txt" \
 
 experiment="single_node"
 create_case ${experiment}  64  32  32  1 100
+create_case ${experiment}  64  32  32  1 250
+create_case ${experiment}  64  32  32  1 500
+create_case ${experiment}  64  32  32  1 1000
+
 create_case ${experiment} 128  32  32  1 100
-create_case ${experiment} 256  32  32  1 100
-create_case ${experiment} 128  64  64  1 100
+create_case ${experiment} 128  32  32  1 250
+create_case ${experiment} 128  32  32  1 500
+create_case ${experiment} 128  32  32  1 1000
 
 experiment="weak_scaling"
 create_case ${experiment} 128  32  32  1 100
