@@ -149,14 +149,14 @@ function create_case() {
     sed -i "s|\"r\": .*|\"r\": ${element_size}|g" "${case_file}"
     [ -n "${end_time}" ] && sed -i "s|\"end_time\": .*|\"end_time\": ${end_time},|g" "${case_file}"
 
-    [ ! -d "${job_path}" ] && mkdir -p ${job_path}
-    if [ ! -f ${job_path}/.gitignore ]; then
-        echo "*.sh" > ${job_path}/.gitignore
-        echo ".gitignore" >> ${job_path}/.gitignore
-    fi
 
     # Create the jobscript
     if [ "${CLUSTER}" != "LOCAL" ]; then
+        [ ! -d "${job_path}" ] && mkdir -p ${job_path}
+        if [ ! -f ${job_path}/.gitignore ]; then
+            echo "*.sh" > ${job_path}/.gitignore
+            echo ".gitignore" >> ${job_path}/.gitignore
+        fi
         cp "${template_path}/${CLUSTER}.sh" "${job_path}/${case_name}.sh"
         sed -i "s|--nodes=.*|--nodes=${nodes}|g" "${job_path}/${case_name}.sh"
     fi
