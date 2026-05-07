@@ -76,7 +76,7 @@ export data_path="${MAIN_DIR}/data_local/static_mixer"
 export example_path="${MAIN_DIR}/examples/benchmark"
 export template_path="${BENCH_DIR}/templates"
 
-export experiment_path="${MAIN_DIR}/results/benchmark/experiments"
+export experiment_path="${MAIN_DIR}/results/benchmark/experiments/${TAG}/"
 
 [ ! -d "${data_path}" ] && mkdir -p "${data_path}"
 [ ! -d "${example_path}/${TAG}" ] && mkdir -p "${example_path}/${TAG}"
