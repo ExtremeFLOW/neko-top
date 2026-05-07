@@ -30,7 +30,7 @@
                 "max_iterations": 800
             },
             "velocity_solver": {
-                "type": "cg",
+                "type": "fused_cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
