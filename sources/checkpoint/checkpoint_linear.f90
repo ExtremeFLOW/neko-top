@@ -54,7 +54,7 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    integer :: index, tstep, counter
+    integer :: index, tstep, counter, n_total
     real(kind=rp) :: time
 
     time = neko_case%time%t
@@ -62,8 +62,6 @@ contains
 
     ! We save to disc only every n_saves_memory time steps
     index = modulo(tstep, this%n_saves_memory)
-
-    ! Sample the checkpoint if needed
     if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
        this%loaded_checkpoint = tstep
 
@@ -75,7 +73,14 @@ contains
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
-    call this%save_data(index + 1)
+    ! Only save to RAM for the last n_saves_memory timesteps. With fixed
+    ! timesteps, the total count is known from the time object.
+    n_total = nint((neko_case%time%end_time - neko_case%time%start_time) &
+         / neko_case%time%dt)
+    if (tstep .gt. n_total - this%n_saves_memory) then
+       call this%save_data(index + 1)
+    end if
+
   end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state in a linear fashion.

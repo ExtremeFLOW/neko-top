@@ -151,6 +151,7 @@ program checkpointing_test
 
   call dt_controller%init(sim%neko_case%params)
   call simulation_init(sim%neko_case, dt_controller)
+  sim%neko_case%time%end_time = real(n_timesteps, dp) * sim%neko_case%time%dt
 
   loop_start = MPI_Wtime()
 
