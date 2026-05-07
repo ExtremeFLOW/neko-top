@@ -14,7 +14,7 @@
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 7,
+            "polynomial_order": 5,
             "dealias": false
         },
         "fluid": {
@@ -34,7 +34,7 @@
                 "preconditioner": {
                     "type": "jacobi"
                 },
-                "absolute_tolerance": 1e-6,
+                "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
             "initial_condition": {
