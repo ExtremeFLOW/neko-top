@@ -204,16 +204,22 @@ experiment="single_node"
 create_case ${experiment}  64  32  32  1 100
 create_case ${experiment}  64  32  32  1 250
 create_case ${experiment}  64  32  32  1 500
-create_case ${experiment}  64  32  32  1 1000
+# create_case ${experiment}  64  32  32  1 1000 # OOM
 
 create_case ${experiment} 128  32  32  1 100
 create_case ${experiment} 128  32  32  1 250
-create_case ${experiment} 128  32  32  1 500
-create_case ${experiment} 128  32  32  1 1000
+# create_case ${experiment} 128  32  32  1 500  # OOM
+# create_case ${experiment} 128  32  32  1 1000 # OOM
 
 experiment="weak_scaling"
-create_case ${experiment} 128  32  32  1 100
-create_case ${experiment} 256  32  32  2 100
-create_case ${experiment} 128  64  64  4 100
-create_case ${experiment} 256  64  64  8 100
-create_case ${experiment} 512  64  64 16 100
+create_case ${experiment}  64  32  32  1 500
+create_case ${experiment} 128  32  32  2 500
+create_case ${experiment} 256  32  32  4 500
+create_case ${experiment} 128  64  64  8 500
+create_case ${experiment} 256  64  64 16 500
+
+create_case ${experiment} 128  32  32  1 250
+create_case ${experiment} 256  32  32  2 250
+create_case ${experiment} 128  64  64  4 250
+create_case ${experiment} 256  64  64  8 250
+create_case ${experiment} 512  64  64 16 250
