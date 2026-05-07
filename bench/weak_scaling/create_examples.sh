@@ -196,8 +196,13 @@ fi
 rsync -u "${template_path}/mixer.f90" "${template_path}/CMakeLists.txt" \
     "${example_path}/${TAG}/"
 
+experiment="single_node"
+create_case ${experiment}  64  32  32  1 100
+create_case ${experiment} 128  32  32  1 100
+create_case ${experiment} 256  32  32  1 100
+create_case ${experiment} 128  64  64  1 100
+
 experiment="weak_scaling"
-create_case ${experiment} 32 8 8       1 100
 create_case ${experiment} 128  32  32  1 100
 create_case ${experiment} 256  32  32  2 100
 create_case ${experiment} 128  64  64  4 100
