@@ -132,7 +132,7 @@ function create_case() {
     local mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
     local case_file="${example_path}/${TAG}/${case_name}.case"
     local job_path="${hpc_path}/${CLUSTER}/benchmark/${TAG}"
-    local experiment_file="${experiment_path}/${TAG,,}_${experiment}.csv"
+    local experiment_file="${experiment_path}/${experiment}.csv"
 
     # Create the mesh if it does not exist
     if [[ "$MESH" == "true" ]]; then
