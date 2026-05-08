@@ -387,15 +387,23 @@ contains
     class(problem_t), intent(in) :: problem
     class(design_t), intent(in) :: design
 
-    type(vector_t), pointer :: constraint_values
-    integer :: ind
+    type(vector_t), pointer :: constraint_values, all_objective_values
+    integer :: ind, objind
 
     call neko_scratch_registry%request(constraint_values, ind, &
          problem%get_n_constraints(), .false.)
+    call neko_scratch_registry%request(all_objective_values, objind, &
+         problem%get_n_objectives(), .false.)
 
     call problem%get_constraint_values(constraint_values)
+    call problem%get_all_objective_values(all_objective_values)
     call constraint_values%copy_from(DEVICE_TO_HOST, sync = .true.)
+    call all_objective_values%copy_from(DEVICE_TO_HOST, sync = .true.)
 
+    if (pe_rank == 0) then
+       print *, "final obj=", all_objective_values%x, "final con=", &
+           constraint_values%x
+    end if
     if (any(constraint_values%x .gt. 0.0_rp)) then
        call neko_error('MMA optimizer validation failed: ' // &
             'Constraints are not satisfied.')
@@ -403,6 +411,7 @@ contains
 
     ! Free local resources
     call neko_scratch_registry%relinquish(ind)
+    call neko_scratch_registry%relinquish(objind)
 
   end subroutine mma_optimizer_validate
 

@@ -96,6 +96,7 @@ module heat_compliance
      real(kind=rp) :: writting_counter
      type(fld_file_output_t), private :: output
      real(kind=rp) :: avg_B
+     logical :: enable_output
    contains
      procedure, public :: init_from_attributes => heat_compliance_init
      procedure, public, pass(this) :: heat_compliance_init
@@ -162,11 +163,17 @@ contains
     integer, parameter :: DIRICHLET_ZONE_ID = 2
     type(json_file) :: dummy_json
     real(kind=rp) :: glsumB
+    logical :: enable_output
 
 
     call this%init_base(name, design%size(), 1.0_rp)
     this%coef => coef
     this%writting_counter = 1.0_rp
+
+    call json_get_or_default(parameters, 'optimization.solver.enable_output', &
+         enable_output, .true.)
+    this%enable_output = enable_output
+
 
     ! Design-to-conductivity mapping
     call this%mapping%init_base(coef)
@@ -338,6 +345,8 @@ contains
 
        ! Solve Helmholtz equation for phi
        call profiler_start_region('Forward solve')
+       ! Update preconditioner (if needed)
+       call this%pc%update()
        this%ksp_results(1) = &
             this%ksp%solve(this%Ax, delta_phi, RHS%x, n, this%coef, &
             this%bclst, this%coef%gs_h)
@@ -346,8 +355,6 @@ contains
        ! add result
        call field_add2(this%phi, delta_phi)
 
-       ! Update preconditioner (if needed)
-       call this%pc%update()
 
        call neko_log%message('Forward problem')
        write(log_buf, '(A,A,A)') 'Iterations:   ', &
@@ -420,8 +427,10 @@ contains
     end select
 
     call neko_scratch_registry%relinquish_field(temp_indices)
-    call this%output%sample(this%writting_counter)
-    this%writting_counter = this%writting_counter + 1
+    if (this%enable_output) then
+      call this%output%sample(this%writting_counter)
+      this%writting_counter = this%writting_counter + 1
+    end if
   end subroutine heat_compliance_update_sensitivity
 
   !=========================================================================!

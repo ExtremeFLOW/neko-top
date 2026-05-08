@@ -517,16 +517,20 @@ contains
     select case (this%bcknd)
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
+          call profiler_start_region('Extra DEVICE_HOST comm in MMA')
           call x%copy_from(DEVICE_TO_HOST, sync = .false.)
           call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
           call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
           call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
+          call profiler_end_region('Extra DEVICE_HOST comm in MMA')
        end if
 
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
+          call profiler_start_region('Extra DEVICE_HOST comm in MMA')
           call x%copy_from(HOST_TO_DEVICE, sync = .true.)
+          call profiler_end_region('Extra DEVICE_HOST comm in MMA')
        end if
 
     case ("device")
