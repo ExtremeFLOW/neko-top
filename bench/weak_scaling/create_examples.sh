@@ -136,15 +136,9 @@ function create_case() {
 
     # Create the mesh if it does not exist
     if [[ "$MESH" == "true" ]]; then
-        n_parts=$(($nodes * $Np))
-        ${MAIN_DIR}/mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz -p $n_parts \
+        ${MAIN_DIR}/mesh.sh -b 0 4 0 1 0 1 $Nx $Ny $Nz \
            -o "${data_path}" -f ${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh
     fi
-
-    # # If we have multiple partitions update the mesh name
-    # if [ "$n_parts" -gt 1 ]; then
-    #     mesh_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}_${n_parts}.nmsh"
-    # fi
 
     # Create the cases from the templates
     cp "${template_path}/case.template" "${case_file}"
