@@ -9,7 +9,7 @@
 # -- Technical options
 
 # Queue name
-#SBATCH --partition=standard-g
+#SBATCH --partition=small-g
 
 # Ask for a full-node layout on LUMI-G: eight GPU-backed Neko ranks and
 # forty-eight CPU-only Python ranks, matching the 56 usable CPU cores/node.

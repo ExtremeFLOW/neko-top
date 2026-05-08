@@ -622,6 +622,21 @@ function find_neko() {
 
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+
+        fi
+
+        # Apply Cray-specific patches before building on Cray systems
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            cray_patches=(
+                "patches/cce_stack.patch"
+                "patches/cce_time_state.patch"
+                "patches/cce_openmp.patch"
+            )
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply "$patch"
+                fi
+            done
         fi
 
         # Determine available features
@@ -692,6 +707,15 @@ function find_neko() {
         make install
 
         cd $CURRENT_DIR
+
+        # Revert the patches to keep the repository clean
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --reverse --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply --reverse "$patch"
+                fi
+            done
+        fi
     fi
 
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \

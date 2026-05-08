@@ -442,6 +442,13 @@ for case in ${example_list[@]}; do
 
         find $log -maxdepth 1 -not -empty -type f -name "*.log" \
             -exec mv -ft $log/$old_run {} \;
+
+        touch $log/output.log $log/error.log
+
+        [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Restarting:" "$example"
+        QUEUE="$QUEUE $example"
+        continue
+
     elif [[ -f "$log/output.log" ]]; then
         printf '\t\e[1;33m%-12s\e[m %s %-s\n' "Skipped:" "$example"
         continue

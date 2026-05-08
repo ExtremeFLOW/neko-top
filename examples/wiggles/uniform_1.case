@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 12.0,
-            "timestep": 4.0e-5
+            "end_time": 10.0,
+            "timestep": 4.0e-4
         },
         "numerics": {
             "time_order": 3,
@@ -15,25 +15,29 @@
             "dealias": false
         },
         "fluid": {
+            "name": "Fluid",
             "scheme": "pnpn",
-            "Re": 1000.0,
-            "output_control": "never",
-            "output_format": "vtkhdf",
-            "pressure_solver": {
-                "type": "gmres",
-                "preconditioner": { "type": "hsmg" },
-                "absolute_tolerance": 1e-7,
-                "max_iterations": 800
-            },
-            "velocity_solver": {
-                "type": "fused_cg",
-                "preconditioner": { "type": "jacobi" },
-                "absolute_tolerance": 1e-6,
-                "max_iterations": 800
-            },
+            "Re": 10000.0,
+            "strict_convergence": true,
             "initial_condition": {
                 "type": "uniform",
-                "value": [ 0.0, 0.0, 0.0 ]
+                "value": [ 1.0, 0.0, 0.0 ]
+            },
+            "velocity_solver": {
+                "type": "fused_coupled_cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-4,
+                "max_iterations": 100
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-3,
+                "max_iterations": 100
             },
             "boundary_conditions": [
                 {
@@ -45,12 +49,16 @@
                     "zone_indices": [ 3, 4, 5, 6 ]
                 },
                 {
-                    "type": "outflow+dong",
+                    "type": "outflow",
                     "zone_indices": [ 2 ]
                 }
-            ]
+            ],
+            "output_control": "tsteps",
+            "output_value": 100,
+            "output_format": "vtkhdf"
         },
         "scalar": {
+            "name": "Scalar",
             "enabled": true,
             "Pe": 1000.0,
             "solver": {
@@ -62,8 +70,7 @@
                 "max_iterations": 100
             },
             "initial_condition": {
-                "type": "uniform",
-                "value": 0.0
+                "type": "user"
             },
             "boundary_conditions": [
                 {
@@ -79,6 +86,7 @@
         },
         "adjoint_scalar": {
             "enabled": true,
+            "primal_name": "Scalar",
             "boundary_conditions": [
                 {
                     "type": "dirichlet",
@@ -118,23 +126,23 @@
             {
                 "name": "optimization_domain",
                 "geometry": "box",
-                "x_bounds": [ 1.0, 3.0 ],
-                "y_bounds": [ 0.0, 1.0 ],
-                "z_bounds": [ 0.0, 1.0 ]
+                "x_bounds": [ 0.5, 3.5 ],
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "objective_domain",
                 "geometry": "box",
                 "x_bounds": [ 3.5, 6.5 ],
-                "y_bounds": [ 0.0, 1.0 ],
-                "z_bounds": [ 0.0, 1.0 ]
+                "y_bounds": [ -1.0, 3.0 ],
+                "z_bounds": [ -1.0, 3.0 ]
             },
             {
                 "name": "asym_IC",
                 "geometry": "box",
-                "x_bounds": [ 1.7, 2.0 ],
-                "y_bounds": [ 0.2, 0.5 ],
-                "z_bounds": [ 0.2, 0.5 ]
+                "x_bounds": [ 1.5, 2.5 ],
+                "y_bounds": [ -1.0, 1.0 ],
+                "z_bounds": [ -1.0, 1.0 ]
             }
         ],
         "simulation_components": [
@@ -146,13 +154,14 @@
             }
         ]
     },
-    "unsteady": true,
+    "unsteady": false,
     "checkpoints": {
-        "enabled": true,
+        "enabled": false,
         "format": "hdf5",
         "n_memory": 300
     },
     "optimization": {
+        "zero": false,
         "design": {
             "type": "brinkman",
             "verbose_design": true,
@@ -161,12 +170,12 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 6.00e-02,
+                    "r": 0.25,
                     "tol": 1e-15
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 1.0e3,
+                    "f_max": 1000.0,
                     "q": 3.0,
                     "convex_up": true
                 }
@@ -184,8 +193,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 200,
-            "max_runtime": 171900.0,
+            "max_iterations": 0,
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,

@@ -47,12 +47,10 @@ function run {
         run_rc=$?
 
     elif [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
-        srun --unbuffered --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
-        run_rc=$?
+        srun -u --cpu-bind=${CPU_BIND} $neko $casefile 2>error.log
 
     elif command -v srun 2>&1 1>/dev/null; then
-        srun --unbuffered $neko $casefile 2>error.log
-        run_rc=$?
+        srun -u $neko $casefile 2>error.log
 
     elif [ -n "$(which mpirun 2>/dev/null)" ]; then
         # Look for the number of cores to use

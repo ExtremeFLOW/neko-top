@@ -10,6 +10,8 @@ get_target_property(NEKO_TOP_MOD_DIR neko-top Fortran_MODULE_DIRECTORY)
 
 # Use a private .mod folder to avoid clashes with unit targets
 set(LOCAL_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set(CMAKE_Fortran_MODULE_DIRECTORY ${LOCAL_MOD_DIR} CACHE PATH
+    "Fortran module directory" FORCE)
 
 # --------------------------------------------------------------------------- #
 # Build the single driver executable for regression
@@ -33,5 +35,8 @@ set_target_properties(reg_mma_bin
 
 # Let the umbrella target trigger both build+prepare steps (if present)
 add_dependencies(Regression reg_mma_bin)
+
+set(CMAKE_Fortran_MODULE_DIRECTORY ${NEKO_TOP_MOD_DIR} CACHE PATH
+    "Fortran module directory" FORCE)
 
 # --------------------------------------------------------------------------- #

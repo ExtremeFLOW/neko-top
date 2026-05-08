@@ -146,9 +146,9 @@
             }
         ]
     },
-    "unsteady": true,
+    "unsteady": false,
     "checkpoints": {
-        "enabled": true,
+        "enabled": false,
         "format": "hdf5",
         "n_memory": 300
     },
