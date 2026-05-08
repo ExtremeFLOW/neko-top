@@ -161,15 +161,15 @@ function create_case() {
 
     # Create the experiment entry
     if [ ! -f ${experiment_file} ]; then
-        header="case_name, cluster, Nx, Ny, Nz, nodes, Np"
+        header="tag, case_name, cluster, Nx, Ny, Nz, nodes, Np"
         [ -n "${N_memory}" ] && header+=", N_memory"
 
         echo "$header" >> ${experiment_file}
     fi
 
-    if ! grep -q "^${case_name}\," "${experiment_file}"; then
+    if ! grep -q "^${TAG}, ${case_name}\," "${experiment_file}"; then
         # Determine the data line
-        data_line="${case_name}, ${CLUSTER}, ${Nx}, ${Ny}, ${Nz}, ${nodes}, ${Np}"
+        data_line="${TAG}, ${case_name}, ${CLUSTER}, ${Nx}, ${Ny}, ${Nz}, ${nodes}, ${Np}"
         [ -n "${N_memory}" ] && data_line+=", ${N_memory}"
         printf "${data_line}\n" >> "${experiment_file}"
     fi
