@@ -73,11 +73,12 @@ contains
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
-    ! Only save to RAM for the last n_saves_memory timesteps. With fixed
-    ! timesteps, the total count is known from the time object.
+    ! Only save to RAM from the last disc checkpoint to the end of the forward
+    ! simulation. With fixed timesteps, the total count and the last disc-save
+    ! timestep are known from the time object.
     n_total = nint((neko_case%time%end_time - neko_case%time%start_time) &
          / neko_case%time%dt)
-    if (tstep .gt. n_total - this%n_saves_memory) then
+    if (tstep .ge. n_total - modulo(n_total, this%n_saves_memory)) then
        call this%save_data(index + 1)
     end if
 
