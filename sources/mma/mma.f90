@@ -82,6 +82,7 @@ module mma
   use logger, only: neko_log
   use mpi_f08, only: MPI_SUM, MPI_Allreduce, MPI_INTEGER
   use scratch_registry, only: scratch_registry_t
+  use profiler, only: profiler_start_region, profiler_end_region
 
   implicit none
   private
