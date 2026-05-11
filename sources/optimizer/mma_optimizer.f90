@@ -332,14 +332,17 @@ contains
        call vector_cmult(constraint_value, this%scaling_factor)
        call matrix_cmult(constraint_sensitivities, this%scaling_factor)
     end if
-    ! print the max value for sensitivity
-    maxobjsen = vector_glmax(objective_sensitivities)
-    minobjsen = vector_glmin(objective_sensitivities)
-    maxconsen = matrix_glmax(constraint_sensitivities)
-    maxconsen = matrix_glmin(constraint_sensitivities)
-    if (pe_rank == 0) then
-       print *, "iter", iter, "maxobj sen=", maxobjsen , "minob sen=", &
-            minobjsen, "maxC sen=", maxconsen, "minC sen=", minconsen
+
+    if (this%enable_output) then
+       ! print the max value for sensitivity
+       maxobjsen = vector_glmax(objective_sensitivities)
+       minobjsen = vector_glmin(objective_sensitivities)
+       maxconsen = matrix_glmax(constraint_sensitivities)
+       maxconsen = matrix_glmin(constraint_sensitivities)
+       if (pe_rank == 0) then
+          print *, "iter", iter, "maxobj sen=", maxobjsen , "minob sen=", &
+               minobjsen, "maxC sen=", maxconsen, "minC sen=", minconsen
+       end if
     end if
 
     ! Update the design variable

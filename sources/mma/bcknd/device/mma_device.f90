@@ -75,6 +75,8 @@ contains
        call neko_error("The MMA object is not initialized.")
     end if
 
+    call profiler_start_region("MMA update")
+
     call profiler_start_region("MMA gensub")
     ! generate a convex approximation of the problem
     call mma_gensub_device(this, iter, x, df0dx, fval, dfdx)
@@ -90,6 +92,8 @@ contains
        call neko_error("Unrecognized subsolver for MMA in mma_device.")
     end if
     call profiler_end_region("MMA subsolve")
+
+    call profiler_end_region("MMA update")
 
     this%is_updated = .true.
   end subroutine mma_update_device

@@ -299,6 +299,8 @@ function find_hdf5() {
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
+    echo "Skipping ParMETIS setup..."
+    return 0
 
     # Determine the Parmetis installation directory
     check_external_dir

@@ -514,30 +514,28 @@ contains
     type(vector_t), intent(inout) :: df0dx, fval
     type(matrix_t), intent(inout) :: dfdx
 
+    call profiler_start_region('FullMMAupdate')
     ! Select backend type
     select case (this%bcknd)
+
     case ("cpu")
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call profiler_start_region('Extra DEVICE_HOST comm in MMA')
           call x%copy_from(DEVICE_TO_HOST, sync = .false.)
           call df0dx%copy_from(DEVICE_TO_HOST, sync = .false.)
           call fval%copy_from(DEVICE_TO_HOST, sync = .false.)
           call dfdx%copy_from(DEVICE_TO_HOST, sync = .true.)
-          call profiler_end_region('Extra DEVICE_HOST comm in MMA')
        end if
 
        call mma_update_cpu(this, iter, x%x, df0dx%x, fval%x, dfdx%x)
 
        if (NEKO_BCKND_DEVICE .eq. 1) then
-          call profiler_start_region('Extra DEVICE_HOST comm in MMA')
           call x%copy_from(HOST_TO_DEVICE, sync = .true.)
-          call profiler_end_region('Extra DEVICE_HOST comm in MMA')
        end if
 
     case ("device")
        call mma_update_device(this, iter, x%x_d, df0dx%x_d, fval%x_d, dfdx%x_d)
     end select
-
+    call profiler_end_region('FullMMAupdate')
   end subroutine mma_update_vector
 
   !> Call the KKT ckeck function based on the backend
