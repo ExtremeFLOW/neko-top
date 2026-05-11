@@ -47,9 +47,11 @@ module simulation_POD_state_recover
   use profiler, only: profiler_start_region, profiler_end_region
   use state_recover, only: state_recover_t
   use time_state, only: time_state_t
+  use simulation, only: simulation_step
+  use time_step_controller, only: time_step_controller_t
   use logger, only : neko_log
   use comm, only: neko_comm, mpi_real_precision
-  use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM
+  use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_SUM, MPI_WTIME
 
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: DEVICE_TO_HOST, device_memcpy, HOST_TO_DEVICE
@@ -75,8 +77,11 @@ module simulation_POD_state_recover
      integer :: i_stream
      integer :: n_modes
      integer :: n_flds = 3
+     integer :: pod_tstep = 0
      logical :: include_scalar = .false.
      character(len=16) :: dtype = "double"
+     real(kind=rp) :: transience_time = 0.0_rp
+     real(kind=rp) :: time_shift = 0.0_rp
 
      type(coef_t), pointer :: coef => null()
 
@@ -114,6 +119,7 @@ module simulation_POD_state_recover
      logical :: have_received_modes = .false.
      logical :: adjoint_started = .false.
      logical :: adj_running_sent = .false.
+     logical :: transience_applied = .true.
 
    contains
      procedure, public, pass(this) :: init => POD_state_recover_init_from_json
@@ -141,6 +147,7 @@ contains
     logical :: write_modes
     logical :: debug
     logical :: output_reconstruction
+    real(kind=rp) :: transience_time
     character(len=:), allocatable :: recon_output_precision_str
     character(len=:), allocatable :: output_control
     real(kind=rp) :: output_value
@@ -155,6 +162,12 @@ contains
 
     call json_get(params, "i_stream", i_stream)
     call json_get(params, "n_modes", n_modes)
+    call json_get_or_default(params, "transience_time", transience_time, &
+         0.0_rp)
+    if (transience_time .lt. 0.0_rp) then
+       call neko_error("transience_time must be non-negative.")
+    end if
+    this%transience_time = transience_time
     call json_get_or_default(params, "dtype", dtype, "double")
     call json_get_or_default(params, "write_modes", write_modes, .false.)
     call json_get_or_default(params, "debug", debug, .false.)
@@ -267,6 +280,9 @@ contains
     this%enabled = .true.
     this%i_stream = i_stream
     this%n_modes = n_modes
+    if (this%transience_time .lt. 0.0_rp) then
+       call neko_error("transience_time must be non-negative.")
+    end if
     this%dtype = adjustl(dtype)
     this%write_modes = write_modes
     this%output_reconstruction = output_reconstruction
@@ -281,6 +297,9 @@ contains
     this%mode_output_format = 'fld'
     this%mode_file_name = 'POD_modes'
     this%n_flds = 3
+    this%pod_tstep = 0
+    this%time_shift = 0.0_rp
+    this%transience_applied = this%transience_time .le. 0.0_rp
     this%coef => neko_case%fluid%c_Xh
 
     this%include_scalar = allocated(neko_case%scalars)
@@ -406,31 +425,10 @@ contains
     call this%dstream%stream(this%coef%dof%y)
     call this%dstream%stream(this%coef%dof%z)
 
-    ! Stream initial condition once (t=0 snapshot)
-    block
-      type(field_t), pointer :: u, v, w, s
-      integer :: n
-
-      u => neko_case%fluid%u
-      v => neko_case%fluid%v
-      w => neko_case%fluid%w
-      if (this%include_scalar) s => this%s
-      n = u%dof%size()
-
-      if (NEKO_BCKND_DEVICE .eq. 1) then
-         call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
-         call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, sync=.true.)
-         call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, sync=.true.)
-         if (this%include_scalar) then
-            call device_memcpy(s%x, s%x_d, n, DEVICE_TO_HOST, sync=.true.)
-         end if
-      end if
-
-      call this%dstream%stream(u%x)
-      call this%dstream%stream(v%x)
-      call this%dstream%stream(w%x)
-      if (this%include_scalar) call this%dstream%stream(s%x)
-    end block
+    ! Stream the initial condition only when sampling starts immediately.
+    if (this%transience_applied) then
+       call POD_state_recover_stream_fields(this, neko_case)
+    end if
 
     ! Control init for root-to-root MPI coordination with Python.
     if (present(debug)) then
@@ -440,6 +438,7 @@ contains
 
     ! Fire an init tick (python might miss it; harmless)
     call this%ctrl%send(MODE_IDLE, PHASE_INIT, 0_c_int, 0.0_c_double)
+    call this%set_n_timesteps(0)
 
   end subroutine POD_state_recover_init_from_components
 
@@ -481,6 +480,10 @@ contains
     call this%ctrl%free()
 
     this%include_scalar = .false.
+    this%pod_tstep = 0
+    this%time_shift = 0.0_rp
+    this%transience_time = 0.0_rp
+    this%transience_applied = .true.
     this%mode_output_precision = sp
     this%mode_output_format = 'fld'
     this%mode_file_name = 'POD_modes'
@@ -509,6 +512,7 @@ contains
     this%have_received_modes = .false.
     this%adjoint_started = .false.
     this%adj_running_sent = .false.
+    this%pod_tstep = 0
 
     call this%set_n_timesteps(0)
 
@@ -521,39 +525,50 @@ contains
 
   end subroutine POD_state_recover_reset
 
-
-  !> Stream forward state for POD updates.
-  !! @param[inout] this POD state recovery instance.
-  !! @param[inout] neko_case Case data structure.
-  !! @param[in] time Current time state.
-  subroutine POD_state_recover_save(this, neko_case, time)
+  subroutine POD_state_recover_apply_transience(this, neko_case)
     class(POD_state_recover_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    type(time_state_t), intent(in) :: time
+    type(time_step_controller_t) :: dt_controller
+    real(kind=dp) :: loop_start
+    real(kind=rp) :: target_time
+
+    if (this%transience_applied) return
+
+    call neko_log%message(" ")
+    call neko_log%message("------------------------------")
+    call neko_log%message("Advancing POD transience phase")
+    call neko_log%message("------------------------------")
+    call neko_log%message(" ")
+
+    call profiler_start_region("POD transience")
+
+    call dt_controller%init(neko_case%params)
+    target_time = neko_case%time%start_time + this%transience_time
+    loop_start = MPI_WTIME()
+
+    do while (neko_case%time%t .lt. target_time)
+       call simulation_step(neko_case, dt_controller, loop_start)
+    end do
+
+    this%time_shift = neko_case%time%t
+    this%pod_tstep = 0
+    call this%set_n_timesteps(0)
+    this%transience_applied = .true.
+
+    call profiler_end_region("POD transience")
+  end subroutine POD_state_recover_apply_transience
+
+  subroutine POD_state_recover_stream_fields(this, neko_case)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), intent(inout) :: neko_case
     type(field_t), pointer :: u, v, w, s
     integer :: n
-
-    if (.not. this%enabled) return
-    if (mod(time%tstep, this%i_stream) .ne. 0) return
-
-    call neko_log%message(" ")
-    call neko_log%message("----------------")
-    call neko_log%message("Streaming fields")
-    call neko_log%message("----------------")
-    call neko_log%message(" ")
 
     u => neko_case%fluid%u
     v => neko_case%fluid%v
     w => neko_case%fluid%w
     if (this%include_scalar) s => this%s
     n = u%dof%size()
-
-    call profiler_start_region("POD save")
-
-    if (this%ctrl%inited) then
-       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_RUNNING, &
-            int(time%tstep, c_int), real(time%t, c_double))
-    end if
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(u%x, u%x_d, n, DEVICE_TO_HOST, sync=.true.)
@@ -568,6 +583,49 @@ contains
     call this%dstream%stream(v%x)
     call this%dstream%stream(w%x)
     if (this%include_scalar) call this%dstream%stream(s%x)
+  end subroutine POD_state_recover_stream_fields
+
+
+  !> Stream forward state for POD updates.
+  !! @param[inout] this POD state recovery instance.
+  !! @param[inout] neko_case Case data structure.
+  !! @param[in] time Current time state.
+  subroutine POD_state_recover_save(this, neko_case, time)
+    class(POD_state_recover_t), intent(inout) :: this
+    class(case_t), intent(inout) :: neko_case
+    type(time_state_t), intent(in) :: time
+    if (.not. this%enabled) return
+
+    if (.not. this%transience_applied) then
+       call POD_state_recover_apply_transience(this, neko_case)
+       ! Python blocks on the initial field snapshot before it enters the
+       ! control loop, so we delay that first snapshot until the transience
+       ! has been skipped.
+       call POD_state_recover_stream_fields(this, neko_case)
+       return
+    end if
+
+    if (time%t .le. this%time_shift) return
+
+    this%pod_tstep = this%pod_tstep + 1
+    call this%set_n_timesteps(max(this%get_n_timesteps(), this%pod_tstep))
+    if (mod(this%pod_tstep, this%i_stream) .ne. 0) return
+
+    call neko_log%message(" ")
+    call neko_log%message("----------------")
+    call neko_log%message("Streaming fields")
+    call neko_log%message("----------------")
+    call neko_log%message(" ")
+
+    call profiler_start_region("POD save")
+
+    if (this%ctrl%inited) then
+       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_RUNNING, &
+            int(this%pod_tstep, c_int), &
+            real(neko_case%time%t - this%time_shift, c_double))
+    end if
+
+    call POD_state_recover_stream_fields(this, neko_case)
 
     call profiler_end_region("POD save")
   end subroutine POD_state_recover_save
@@ -582,6 +640,7 @@ contains
     class(case_t), target, intent(inout) :: neko_case
     type(time_state_t), intent(in) :: time
     type(time_state_t) :: time_out
+    real(kind=rp) :: t_pod
 
     if (.not. this%enabled) return
 
@@ -598,7 +657,8 @@ contains
     end if
 
     call profiler_start_region("POD restore")
-    call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, time%t)
+    t_pod = time%t - this%time_shift
+    call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, t_pod)
     call reconstruct_from_coeffs(this, neko_case, this%a_interp)
     if (this%output_reconstruction) then
        if (recon_should_output(this, time, time_out)) then
@@ -621,7 +681,7 @@ contains
 
     if (this%ctrl%inited) then
       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_DONE, &
-           int(time%tstep, c_int), real(time%t, c_double))
+           int(time%tstep, c_int), real(time%t - this%time_shift, c_double))
 
       mode_cmd  = MODE_FORWARD
       phase_cmd = PHASE_FWD_DONE
