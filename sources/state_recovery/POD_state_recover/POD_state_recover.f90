@@ -657,7 +657,7 @@ contains
     end if
 
     call profiler_start_region("POD restore")
-    t_pod = time%t - this%time_shift
+    t_pod = time%t
     call interpolate_time_coeffs_vec(this%a_interp, this%time_coefs, t_pod)
     call reconstruct_from_coeffs(this, neko_case, this%a_interp)
     if (this%output_reconstruction) then
@@ -681,7 +681,7 @@ contains
 
     if (this%ctrl%inited) then
       call this%ctrl%send(MODE_FORWARD, PHASE_FWD_DONE, &
-           int(time%tstep, c_int), real(time%t - this%time_shift, c_double))
+           int(time%tstep, c_int), real(time%t, c_double))
 
       mode_cmd  = MODE_FORWARD
       phase_cmd = PHASE_FWD_DONE
