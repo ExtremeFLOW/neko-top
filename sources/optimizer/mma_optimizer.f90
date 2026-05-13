@@ -292,7 +292,7 @@ contains
     type(matrix_t), pointer :: constraint_sensitivities
     integer :: n_design, n_constraint, indices(4)
 
-    logical :: converged, ierr
+    logical :: converged
     real(kind=rp) :: maxobjsen, minobjsen, maxconsen, minconsen
 
     n_design = design%size()
