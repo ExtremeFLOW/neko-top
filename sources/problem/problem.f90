@@ -570,8 +570,9 @@ contains
     end if
     n_timesteps = simulation%state_recover%get_n_timesteps()
 
-    ! Total time of the forward simulation
-    total_time = n_timesteps * simulation%adjoint_case%time%dt
+    ! this is a bit sketchy if dt is not a perfect multiple, to be looked at
+    ! more closely!
+    total_time = simulation%neko_case%time%end_time
 
     call profiler_start_region("Adjoint simulation")
 
