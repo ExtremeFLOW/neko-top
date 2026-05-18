@@ -1,7 +1,7 @@
 #!/bin/bash
 
 example_list=(petsc petsc_phmg)
-N=(32 64 128)
+N=(64 128)
 Re=(1000 1500 3000)
 
 example_path=examples/static_mixer

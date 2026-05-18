@@ -10,10 +10,9 @@
         "checkpoint_control": "simulationtime",
         "checkpoint_value": 2.0,
         "time": {
-            "end_time": 0.5,
+            "end_time": 12.0,
             "variable_timestep": true,
-            "target_cfl": 0.4,
-            "timestep": 1e-8,
+            "target_cfl": 1.0,
             "max_timestep": 4e-3
         },
         "numerics": {
