@@ -45,14 +45,23 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 source ~/Software/load.sh
 cd ~/Projects/neko-top
 
-result_root=results/static_mixer/petsc
+result_root=results/static_mixer
 gifmaker=scripts/python/gif_maker.py
 visualiser=examples/static_mixer/visualise.py
 
 experiments=(
-    64_re_1000_pe_1000
-    128_re_1000_pe_1000
-    128_re_1500_pe_1500
+    petsc/128_re_1000_pe_1000
+    petsc/128_re_1500_pe_1500
+    petsc/64_re_1000_pe_1000
+    petsc/128_re_3000_pe_3000
+    petsc/64_re_1500_pe_1500
+    petsc/64_re_3000_pe_3000
+    petsc_phmg/128_re_1000_pe_1000
+    petsc_phmg/128_re_1500_pe_1500
+    petsc_phmg/128_re_3000_pe_3000
+    petsc_phmg/64_re_1000_pe_1000
+    petsc_phmg/64_re_1500_pe_1500
+    petsc_phmg/64_re_3000_pe_3000
 )
 colors=(
     black
