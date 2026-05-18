@@ -322,7 +322,7 @@ function Submit() {
     if [ -n "$(which bsub 2>/dev/null)" ]; then
         bsub -J $1 -env "all" <job_script.sh
     elif [ -n "$(which sbatch 2>/dev/null)" ]; then
-        if [ "$(squeue -h --name=$1 | wc -l)" -gt 0 ]; then
+        if [ "$(squeue -h --name=$1 --me | wc -l)" -gt 0 ]; then
             printf '\t%-12s %-s\n' "In queue:" "$1"
             cd $CURRENT_DIR
             return
@@ -396,7 +396,7 @@ for case in ${example_list[@]}; do
 
     case "$CLUSTER" in
         "MN5" | "LUMI-C" | "LUMI-G")
-            if [[ "$(squeue -h --name=$example | wc -l)" -gt 0 ]]; then
+            if [[ "$(squeue -h --name=$example --me | wc -l)" -gt 0 ]]; then
                 printf '\t\e[1;33m%-12s\e[m %s %-s\n' "In queue:" "$example"
                 continue
             fi
