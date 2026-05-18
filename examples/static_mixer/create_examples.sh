@@ -1,6 +1,6 @@
 #!/bin/bash
 
-example_list=(petsc petsc_phmg_oifs)
+example_list=(petsc petsc_phmg)
 N=(32 64 128)
 Re=(1000 1500 3000)
 

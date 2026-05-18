@@ -1,53 +1,4 @@
 {
-ERROR MESSAGE
- *** ERROR: Device pointer already associated ***
-Note: The following floating-point exceptions are signalling: IEEE_DIVIDE_BY_ZERO IEEE_DENORMAL
-ERROR STOP
-
-Error termination. Backtrace:
-#0  0x7c58e2a23e59 in ???
-#1  0x7c58e2a24a71 in ???
-#2  0x7c58e2a2610b in ???
-#3  0x586b5452f3d1 in __utils_MOD_neko_error_msg
-	at common/utils.f90:349
-#4  0x586b546c7a3e in __device_MOD_device_map_r1
-	at device/device.F90:828
-#5  0x586b545a0b22 in __opr_device_MOD_opr_device_convect_scalar
-	at math/bcknd/device/opr_device.F90:658
-#6  0x586b5459c5bb in convect_scalar
-	at math/operators.f90:376
-#7  0x586b5459e51f in __operators_MOD_runge_kutta
-	at math/operators.f90:660
-#8  0x586b546981b5 in __adv_oifs_MOD_adv_oifs_compute
-	at fluid/bcknd/advection/adv_oifs.f90:520
-#9  0x586b54680094 in __fluid_pnpn_MOD_fluid_pnpn_step
-	at fluid/fluid_pnpn.f90:738
-#10  0x586b54875217 in __simulation_MOD_simulation_step
-	at /home/tife/Projects/neko-top/external/neko/src/simulation.f90:157
-#11  0x586b547084c6 in __neko_MOD_neko_solve
-	at /home/tife/Projects/neko-top/external/neko/src/neko.f90:259
-#12  0x586b544972e6 in ???
-#13  0x586b5449733c in ???
-#14  0x7c58e262a1c9 in __libc_start_call_main
-	at ../sysdeps/nptl/libc_start_call_main.h:58
-#15  0x7c58e262a28a in __libc_start_main_impl
-	at ../csu/libc-start.c:360
-#16  0x586b54496374 in ???
-#17  0xffffffffffffffff in ???
---------------------------------------------------------------------------
-Primary job  terminated normally, but 1 process returned
-a non-zero exit code. Per user-direction, the job has been aborted.
---------------------------------------------------------------------------
---------------------------------------------------------------------------
-mpirun detected that one or more processes exited with non-zero status, thus causing
-the job to be terminated. The first process to do so was:
-
-  Process name: [[9353,1],0]
-  Exit code:    1
---------------------------------------------------------------------------
-
-
-
     "version": 1.0,
     "case": {
         "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
@@ -61,14 +12,13 @@ the job to be terminated. The first process to do so was:
         "time": {
             "end_time": 0.5,
             "variable_timestep": true,
-            "init_timestep": 1e-4,
+            "target_cfl": 0.4,
+            "timestep": 1e-8,
             "max_timestep": 4e-3
         },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
-            "oifs": true,
-            "oifs_target_cfl": 1.9,
             "dealias": false
         },
         "fluid": {
