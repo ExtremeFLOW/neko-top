@@ -72,6 +72,8 @@ for exp in "${experiments[@]}"; do
     if [[ ! -d "$result_root/$exp" ]]; then
         echo "Results for experiment $exp not found. Skipping visualization."
         continue
+    else
+        echo "Visualizing results for experiment $exp."
     fi
 
     for color in "${colors[@]}"; do
