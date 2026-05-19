@@ -13,7 +13,8 @@
             "end_time": 12.0,
             "variable_timestep": true,
             "target_cfl": 1.0,
-            "max_timestep": 4e-3
+            "max_timestep": 4e-3,
+            "min_timestep": 1e-6
         },
         "numerics": {
             "time_order": 3,
