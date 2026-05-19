@@ -4,3 +4,4 @@
 4. LimitRAMCheckpoints
 5. trento_module
 6. load_balancing
+7. phmg

@@ -5,7 +5,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
-        "load_balancing": true,
+        "load_balancing": false,
         "runtime_statistics": {
             "enabled": true
         },
@@ -25,7 +25,11 @@
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
-                    "type": "hsmg"
+                    "type": "phmg",
+                    "pcoarsening_schedule": [3, 1],
+                    "coarse_grid":{
+                        "solver": "tamg"
+                    }
                 },
                 "absolute_tolerance": 1e-5,
                 "max_iterations": 800
