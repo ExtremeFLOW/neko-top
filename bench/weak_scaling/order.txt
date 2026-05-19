@@ -2,3 +2,4 @@
 2. fused_cg
 3. OpenMP
 4. LimitRAMCheckpoints
+5. trento_module
