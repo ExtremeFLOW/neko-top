@@ -3,3 +3,4 @@
 3. OpenMP
 4. LimitRAMCheckpoints
 5. trento_module
+6. load_balancing

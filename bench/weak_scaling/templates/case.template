@@ -5,6 +5,7 @@
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
+        "load_balancing": true,
         "runtime_statistics": {
             "enabled": true
         },
