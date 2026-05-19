@@ -1,0 +1,4 @@
+1. baseline
+2. fused_cg
+3. OpenMP
+4. LimitRAMCheckpoints
