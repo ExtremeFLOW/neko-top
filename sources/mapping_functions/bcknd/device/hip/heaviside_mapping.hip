@@ -59,7 +59,7 @@ void hip_heaviside_mapping_apply(real* beta, real* eta,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(heaviside_mapping_apply_kernel<real>,
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(heaviside_mapping_apply_kernel<real>),
         nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         *beta, *eta, (real*)X_out_d, (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
@@ -74,7 +74,7 @@ void hip_heaviside_mapping_apply_backward(real* beta, real* eta,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(heaviside_mapping_apply_backward_kernel<real>,
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(heaviside_mapping_apply_backward_kernel<real>),
         nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         *beta, *eta, (real*)sens_out_d, (real*)sens_in_d, (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());

@@ -323,6 +323,12 @@ function find_parmetis() {
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
+        # Modify the minimum requirement of cmake
+        cmake_lists=$(find . -name CMakeLists.txt)
+        for file in $cmake_lists; do
+            sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
+        done
+
         # Compile the bundled metis library
         cd metis
         make config prefix=${PARMETIS_DIR}
