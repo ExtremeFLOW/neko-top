@@ -5,3 +5,4 @@
 5. trento_module
 6. load_balancing
 7. phmg
+8. hdf5_checkpoint
