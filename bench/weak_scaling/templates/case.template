@@ -149,7 +149,7 @@
     "unsteady": true,
     "checkpoints": {
         "enabled": true,
-        "format": "hdf5",
+        "format": "chkp",
         "n_memory": 100,
         "keep_checkpoints": false
     },

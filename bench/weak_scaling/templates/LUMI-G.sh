@@ -72,6 +72,9 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
 export NEKO_GS_STRTGY=3
 
+mkdir checkpoints
+lfs setstripe -c $SLURM_NTASKS -S 4M checkpoints
+
 run $example
 
 # ==============================   End of File   ==============================

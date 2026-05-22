@@ -6,3 +6,4 @@
 6. load_balancing
 7. phmg
 8. hdf5_checkpoint
+9. stripe_by_tasks
