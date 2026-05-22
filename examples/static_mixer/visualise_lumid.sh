@@ -14,8 +14,10 @@
 # --  Technical Options
 
 # Queue name
+#SBATCH --job-name=static_mixer_vis
 #SBATCH --account=project_465002485
 #SBATCH --partition=lumid
+#SBATCH --dependency=singleton
 
 # Ask for n cores placed on R host.
 #SBATCH --tasks=8
