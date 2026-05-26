@@ -73,7 +73,7 @@ export MPICH_GPU_SUPPORT_ENABLED=1
 export NEKO_GS_STRTGY=3
 
 mkdir checkpoints
-lfs setstripe -c $SLURM_NTASKS -S 4M checkpoints
+lfs setstripe -c -1 -S 4M checkpoints
 
 run $example
 
