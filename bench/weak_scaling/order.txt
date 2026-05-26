@@ -9,3 +9,4 @@
 9. stripe_by_tasks
 10. stripe_minus_one
 11. chunk_size_2M
+12. chunk_size_8M
