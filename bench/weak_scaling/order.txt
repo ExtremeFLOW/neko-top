@@ -8,3 +8,4 @@
 8. hdf5_checkpoint
 9. stripe_by_tasks
 10. stripe_minus_one
+11. chunk_size_2M
