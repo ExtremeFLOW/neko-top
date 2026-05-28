@@ -22,6 +22,7 @@
             "scheme": "pnpn",
             "Re": 1000.0,
             "output_control": "never",
+            "output_format": "vtkhdf",
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
@@ -107,6 +108,7 @@
             }
         },
         "adjoint_fluid": {
+            "output_format": "vtkhdf",
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -156,6 +158,7 @@
     "optimization": {
         "design": {
             "type": "brinkman",
+            "output_format": "vtkhdf",
             "mapping": [
                 {
                     "type": "PDE_filter",
