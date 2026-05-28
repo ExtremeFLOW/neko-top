@@ -233,8 +233,8 @@ contains
        call this%scratch_GL%request_field(s_GL, temp_indices_GL(3), .false.)
        call this%scratch_GL%request_field(s_adj_GL, temp_indices_GL(4), .false.)
 
-       call this%GLL_to_GL%map(s_GL%x, this%s%x, nel, this%Xh_GL)
-       call this%GLL_to_GL%map(s_adj_GL%x, this%s_adj%x, nel, this%Xh_GL)
+       call this%GLL_to_GL%map_field(s_GL, this%s, nel, this%Xh_GL)
+       call this%GLL_to_GL%map_field(s_adj_GL, this%s_adj, nel, this%Xh_GL)
 
        ! u
        call dudxyz(fld_GL%x, s_GL%x, this%c_Xh_GL%drdx, &
@@ -243,11 +243,11 @@ contains
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fu, work)
@@ -259,11 +259,11 @@ contains
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fv, work)
@@ -275,11 +275,11 @@ contains
        ! Evaluate term on GL and preempt the GLL premultiplication
        if (NEKO_BCKND_DEVICE .eq. 1) then
           call device_col2(accumulate%x_d, this%c_Xh_GL%B_d, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call device_invcol2(work%x_d, this%coef%B_d, work%size())
        else
           call col2(accumulate%x, this%c_Xh_GL%B, n_GL)
-          call this%GLL_to_GL%map(work%x, accumulate%x, nel, this%Xh_GLL)
+          call this%GLL_to_GL%map_field(work, accumulate, nel, this%Xh_GLL)
           call invcol2(work%x, this%coef%B, work%size())
        end if
        call field_sub2(fw, work)

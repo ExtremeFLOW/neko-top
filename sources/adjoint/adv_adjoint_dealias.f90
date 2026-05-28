@@ -164,15 +164,15 @@ contains
     nel = coef%msh%nelv
     n_GL = nel*this%Xh_GL%lxyz
     n = nel*coef%Xh%lxyz
-    call this%GLL_to_GL%map(this%coef_GL%drdx, coef%drdx, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dsdx, coef%dsdx, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dtdx, coef%dtdx, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%drdy, coef%drdy, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dsdy, coef%dsdy, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dtdy, coef%dtdy, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%drdz, coef%drdz, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dsdz, coef%dsdz, nel, this%Xh_GL)
-    call this%GLL_to_GL%map(this%coef_GL%dtdz, coef%dtdz, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%drdx, coef%drdx, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dsdx, coef%dsdx, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dtdx, coef%dtdx, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%drdy, coef%drdy, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dsdy, coef%dsdy, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dtdy, coef%dtdy, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%drdz, coef%drdz, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dsdz, coef%dsdz, nel, this%Xh_GL)
+    call this%GLL_to_GL%map_old(this%coef_GL%dtdz, coef%dtdz, nel, this%Xh_GL)
 
     if ((NEKO_BCKND_HIP .eq. 1) .or. (NEKO_BCKND_CUDA .eq. 1) .or. &
          (NEKO_BCKND_OPENCL .eq. 1) .or. (NEKO_BCKND_SX .eq. 1) .or. &
@@ -278,14 +278,14 @@ contains
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
          ! Map baseflow to GL
-         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%txb_d, vxb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tyb_d, vyb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tzb_d, vzb%x_d, nel, this%Xh_GL)
 
          ! Map adjoint velocity to GL
-         call this%GLL_to_GL%map(this%tx, vx%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%ty, vy%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tz, vz%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tx_d, vx%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%ty_d, vy%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tz_d, vz%x_d, nel, this%Xh_GL)
 
 
          ! u . grad U_b^T
@@ -298,17 +298,17 @@ contains
          ! traspose and multiply
          call device_vdot3(this%vr_d, this%tx_d, this%ty_d, this%tz_d, &
               this%duxb_d, this%dvxb_d, this%dwxb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%vr, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%vr_d, nel, this%Xh_GLL)
          call device_sub2(fx%x_d, this%temp_d, n)
 
          call device_vdot3(this%vr_d, this%tx_d, this%ty_d, this%tz_d, &
               this%duyb_d, this%dvyb_d, this%dwyb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%vr, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%vr_d, nel, this%Xh_GLL)
          call device_sub2(fy%x_d, this%temp_d, n)
 
          call device_vdot3(this%vr_d, this%tx_d, this%ty_d, this%tz_d, &
               this%duzb_d, this%dvzb_d, this%dwzb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%vr, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%vr_d, nel, this%Xh_GLL)
          call device_sub2(fz%x_d, this%temp_d, n)
 
          ! \int \grad v . U_b ^ u    with ^ an outer product
@@ -327,7 +327,7 @@ contains
 
          ! reuse duxb as a temp
          call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%duxb_d, nel, this%Xh_GLL)
          call device_sub2(fx%x_d, this%temp_d, n)
 
 
@@ -345,7 +345,7 @@ contains
 
          ! reuse duxb as a temp
          call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%duxb_d, nel, this%Xh_GLL)
          call device_sub2(fy%x_d, this%temp_d, n)
 
          ! (z)
@@ -362,7 +362,7 @@ contains
 
          ! reuse duxb as a temp
          call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%duxb_d, nel, this%Xh_GLL)
          call device_sub2(fz%x_d, this%temp_d, n)
       else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
          !TODO
@@ -372,14 +372,14 @@ contains
 
          do e = 1, coef%msh%nelv
             ! Map baseflow to GL
-            call this%GLL_to_GL%map(txb, vxb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tyb, vyb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tzb, vzb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(txb, vxb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tyb, vyb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tzb, vzb%x(1,1,1,e), 1, this%Xh_GL)
 
             ! Map adjoint velocity to GL
-            call this%GLL_to_GL%map(tx, vx%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(ty, vy%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tz, vz%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tx, vx%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(ty, vy%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tz, vz%x(1,1,1,e), 1, this%Xh_GL)
 
 
             ! u . grad U_b^T
@@ -396,9 +396,9 @@ contains
             end do
 
             ! map back to GLL
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempy, tfy, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempy, tfy, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempz, tfz, 1, this%Xh_GLL)
 
             ! accumulate
             idx = (e-1)*this%Xh_GLL%lxyz+1
@@ -424,7 +424,7 @@ contains
             end do
 
             ! map back to GLL
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
             call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
 
             ! (y)
@@ -445,7 +445,7 @@ contains
             end do
 
             ! map back to GLL
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
             call sub2(fy%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
 
             ! (z)
@@ -465,7 +465,7 @@ contains
             end do
 
             ! map back to GLL
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
             call sub2(fz%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
 
          end do
@@ -517,116 +517,116 @@ contains
 
       if (NEKO_BCKND_DEVICE .eq. 1) then
          ! Map baseflow to GL
-         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%txb_d, vxb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tyb_d, vyb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tzb_d, vzb%x_d, nel, this%Xh_GL)
 
          ! Map perturbed velocity to GL
-         call this%GLL_to_GL%map(this%tx, vx%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%ty, vy%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tz, vz%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tx_d, vx%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%ty_d, vy%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tz_d, vz%x_d, nel, this%Xh_GL)
 
          ! u'.grad U
          call opgrad(this%vr, this%vs, this%vt, this%txb, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%tx_d, this%ty_d, this%tz_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fx%x_d, this%temp_d, n)
 
 
          call opgrad(this%vr, this%vs, this%vt, this%tyb, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%tx_d, this%ty_d, this%tz_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fy%x_d, this%temp_d, n)
 
          call opgrad(this%vr, this%vs, this%vt, this%tzb, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%tx_d, this%ty_d, this%tz_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fz%x_d, this%temp_d, n)
 
          ! U.grad u'
          call opgrad(this%vr, this%vs, this%vt, this%tx, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%txb_d, this%tyb_d, this%tzb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fx%x_d, this%temp_d, n)
 
 
          call opgrad(this%vr, this%vs, this%vt, this%ty, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%txb_d, this%tyb_d, this%tzb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fy%x_d, this%temp_d, n)
 
          call opgrad(this%vr, this%vs, this%vt, this%tz, c_GL)
          call device_vdot3(this%tbf_d, this%vr_d, this%vs_d, this%vt_d, &
               this%txb_d, this%tyb_d, this%tzb_d, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%tbf_d, nel, this%Xh_GLL)
          call device_sub2(fz%x_d, this%temp_d, n)
 
       else if ((NEKO_BCKND_SX .eq. 1) .or. (NEKO_BCKND_XSMM .eq. 1)) then
          ! Map baseflow to GL
-         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%txb, vxb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%tyb, vyb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%tzb, vzb%x, nel, this%Xh_GL)
 
          ! Map perturbed velocity to GL
-         call this%GLL_to_GL%map(this%tx, vx%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%ty, vy%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tz, vz%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%tx, vx%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%ty, vy%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_old(this%tz, vz%x, nel, this%Xh_GL)
 
          ! u'.grad U
          call opgrad(this%vr, this%vs, this%vt, this%txb, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%tx, this%ty, this%tz, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fx%x, this%temp, n)
 
 
          call opgrad(this%vr, this%vs, this%vt, this%tyb, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%tx, this%ty, this%tz, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fy%x, this%temp, n)
 
          call opgrad(this%vr, this%vs, this%vt, this%tzb, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%tx, this%ty, this%tz, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fz%x, this%temp, n)
 
          ! U.grad u'
          call opgrad(this%vr, this%vs, this%vt, this%tx, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%txb, this%tyb, this%tzb, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fx%x, this%temp, n)
 
 
          call opgrad(this%vr, this%vs, this%vt, this%ty, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%txb, this%tyb, this%tzb, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fy%x, this%temp, n)
 
          call opgrad(this%vr, this%vs, this%vt, this%tz, c_GL)
          call vdot3(this%tbf, this%vr, this%vs, this%vt, &
               this%txb, this%tyb, this%tzb, n_GL)
-         call this%GLL_to_GL%map(this%temp, this%tbf, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_old(this%temp, this%tbf, nel, this%Xh_GLL)
          call sub2(fz%x, this%temp, n)
       else
 
          do e = 1, coef%msh%nelv
             ! Map baseflow to GL
-            call this%GLL_to_GL%map(txb, vxb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tyb, vyb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tzb, vzb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(txb, vxb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tyb, vyb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tzb, vzb%x(1,1,1,e), 1, this%Xh_GL)
             ! Map perturbed velocity to GL
-            call this%GLL_to_GL%map(tx, vx%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(ty, vy%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(tz, vz%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tx, vx%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(ty, vy%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(tz, vz%x(1,1,1,e), 1, this%Xh_GL)
 
             ! u'.grad U
             call opgrad(vr, vs, vt, txb, c_GL, e, e)
@@ -644,9 +644,9 @@ contains
                tfz(i) = tx(i)*vr(i) + ty(i)*vs(i) + tz(i)*vt(i)
             end do
 
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempy, tfy, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempy, tfy, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempz, tfz, 1, this%Xh_GLL)
 
             idx = (e-1)*this%Xh_GLL%lxyz+1
             call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
@@ -669,9 +669,9 @@ contains
                tfz(i) = txb(i)*vr(i) + tyb(i)*vs(i) + tzb(i)*vt(i)
             end do
 
-            call this%GLL_to_GL%map(tempx, tfx, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempy, tfy, 1, this%Xh_GLL)
-            call this%GLL_to_GL%map(tempz, tfz, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempx, tfx, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempy, tfy, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(tempz, tfz, 1, this%Xh_GLL)
 
             idx = (e-1)*this%Xh_GLL%lxyz+1
             call sub2(fx%x(idx, 1, 1, 1), tempx, this%Xh_GLL%lxyz)
@@ -720,12 +720,12 @@ contains
     associate(c_GL => this%coef_GL)
       if (NEKO_BCKND_DEVICE .eq. 1) then
          ! Map baseflow to GL
-         call this%GLL_to_GL%map(this%txb, vxb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tyb, vyb%x, nel, this%Xh_GL)
-         call this%GLL_to_GL%map(this%tzb, vzb%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%txb_d, vxb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tyb_d, vyb%x_d, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tzb_d, vzb%x_d, nel, this%Xh_GL)
 
          ! Map adjoint scalar to GL (use tx as adjoint scalar array)
-         call this%GLL_to_GL%map(this%tx, s%x, nel, this%Xh_GL)
+         call this%GLL_to_GL%map_device(this%tx_d, s%x_d, nel, this%Xh_GL)
 
          ! Outer product (use duxb, duyb, duzb as temporary arrays)
          call device_col3(this%duxb_d, this%tx_d, this%txb_d, n_GL)
@@ -742,7 +742,7 @@ contains
          call device_add4(this%duxb_d, this%vr_d, this%vs_d, this%vt_d, n_GL)
 
          ! map back to GLL
-         call this%GLL_to_GL%map(this%temp, this%duxb, nel, this%Xh_GLL)
+         call this%GLL_to_GL%map_device(this%temp_d, this%duxb_d, nel, this%Xh_GLL)
 
          !apply
          call device_sub2(fs%x_d, this%temp_d, n)
@@ -753,12 +753,12 @@ contains
       else
          do e = 1, coef%msh%nelv
             ! Map baseflow to GL
-            call this%GLL_to_GL%map(vx_GL, vxb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(vy_GL, vyb%x(1,1,1,e), 1, this%Xh_GL)
-            call this%GLL_to_GL%map(vz_GL, vzb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(vx_GL, vxb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(vy_GL, vyb%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(vz_GL, vzb%x(1,1,1,e), 1, this%Xh_GL)
 
             ! Map passive scalar velocity to GL
-            call this%GLL_to_GL%map(s_GL, s%x(1,1,1,e), 1, this%Xh_GL)
+            call this%GLL_to_GL%map_old(s_GL, s%x(1,1,1,e), 1, this%Xh_GL)
 
             do i = 1, this%Xh_GL%lxyz
                work1(i) = s_GL(i)*vx_GL(i)
@@ -778,7 +778,7 @@ contains
 
             ! map back to GLL
             idx = (e-1)*this%Xh_GLL%lxyz+1
-            call this%GLL_to_GL%map(temp, f_GL, 1, this%Xh_GLL)
+            call this%GLL_to_GL%map_old(temp, f_GL, 1, this%Xh_GLL)
             call sub2(fs%x(idx, 1, 1, 1), temp, this%Xh_GLL%lxyz)
 
          end do
