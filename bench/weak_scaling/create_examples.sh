@@ -66,6 +66,14 @@ TAG="$1"
 # Make sure Cluster is not case-sensitive
 CLUSTER="${CLUSTER^^}"
 
+# Check if the cluster is supported and load the corresponding modules
+if [ "${CLUSTER}" == "LUMI-G" ]; then
+    command -v python >/dev/null 2>&1 || module load cray-python
+else
+    echo "Unsupported cluster: ${CLUSTER}" >&2
+    exit 1
+fi
+
 # ============================================================================ #
 # Set up the directories and paths for the experiment
 
