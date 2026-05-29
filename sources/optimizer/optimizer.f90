@@ -726,7 +726,6 @@ contains
             trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
     end if
 
-
     call neko_log%message('Save general optimizer components')
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')

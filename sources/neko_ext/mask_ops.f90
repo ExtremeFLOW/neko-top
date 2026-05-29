@@ -41,7 +41,7 @@ module mask_ops
   use point_zone, only: point_zone_t
   use scratch_registry, only: neko_scratch_registry
   use field_math, only: field_cfill, field_copy, field_rone
-  use device_math, only: device_copy, device_glsc2, device_masked_gather_copy_aligned
+  use device_math, only: device_copy, device_glsc2, device_masked_copy_0
   use math_ext, only: copy_mask
   use math, only: copy, glsc2
   use vector, only: vector_t
@@ -93,7 +93,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_masked_gather_copy_aligned(work%x_d, vec%x_d, &
+       call device_masked_copy_0(work%x_d, vec%x_d, &
             zone%mask%get_d(), work%size(), zone%size)
     else
        do i = 1, zone%size
@@ -130,7 +130,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_masked_gather_copy_aligned(work%x_d, fld%x_d, &
+       call device_masked_copy_0(work%x_d, fld%x_d, &
             zone%mask%get_d(), fld%size(), zone%size)
     else
        call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
@@ -161,7 +161,7 @@ contains
 
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_masked_gather_copy_aligned(work%x_d, fld%x_d, &
+       call device_masked_copy_0(work%x_d, fld%x_d, &
             zone%mask%get_d(), fld%size(), zone%size)
     else
        call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
