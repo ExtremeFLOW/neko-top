@@ -52,20 +52,6 @@
 
 extern "C" {
 
-/** Fortran wrapper for copy_mask
- * Copy a vector \f$ a_i = b_i, for i \in mask \f$
- */
-void hip_copy_mask(void* a, void* b, int* size, int* mask, int* mask_size) {
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*mask_size) + 1024 - 1) / 1024, 1, 1);
-
-    if(*mask_size == 0) return;
-    hipLaunchKernelGGL(copy_mask_kernel<real>, nblcks, nthrds, 0,
-         (hipStream_t)glb_cmd_queue,
-         (real*)a, (real*)b, *size, mask, *mask_size);
-    HIP_CHECK(hipGetLastError());
-}
-
 /** Fortran wrapper for cadd_mask
  * Add a scalar to vector \f$ a_i = a_i + s, for i \in mask \f$
  */

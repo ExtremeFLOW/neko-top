@@ -252,14 +252,12 @@ contains
     class(design_t), intent(in) :: design
     !> Sensitivity field
     type(field_t), pointer :: unmapped, mapped
-    integer :: temp_indices(2)
+    integer :: idx(2)
 
     if (this%if_mapping) then
        ! Recompute and map backward
-       call neko_scratch_registry%request(unmapped, temp_indices(1), &
-            .false.)
-       call neko_scratch_registry%request(mapped, temp_indices(2), &
-            .false.)
+       call neko_scratch_registry%request(unmapped, idx(1), .false.)
+       call neko_scratch_registry%request(mapped, idx(2), .false.)
        call field_cfill(unmapped, -1.0_rp / this%volume_domain)
        if (this%is_max) then
           call field_cmult(unmapped, -1.0_rp)
@@ -270,9 +268,12 @@ contains
        end if
        ! map backwards
        call this%mapping%apply_backward(mapped, unmapped)
+       if (this%has_mask) then
+          call mask_exterior_const(mapped, this%mask, 0.0_rp)
+       end if
        call field_to_vector(this%sensitivity, mapped)
 
-       call neko_scratch_registry%relinquish(temp_indices)
+       call neko_scratch_registry%relinquish(idx)
 
     else
        ! Sensitivity is just a constant so it should not be updated
