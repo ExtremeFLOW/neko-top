@@ -94,7 +94,7 @@ contains
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_masked_gather_copy_aligned(work%x_d, vec%x_d, &
-       zone%mask%get_d(), work%size(),             zone%size)
+            zone%mask%get_d(), work%size(), zone%size)
     else
        do i = 1, zone%size
           work%x(zone%mask%get(i), 1, 1, 1) = vec%x(zone%mask%get(i))
@@ -131,7 +131,7 @@ contains
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_masked_gather_copy_aligned(work%x_d, fld%x_d, &
-       zone%mask%get_d(), fld%size(),             zone%size)
+            zone%mask%get_d(), fld%size(), zone%size)
     else
        call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
     end if
@@ -162,7 +162,7 @@ contains
     ! copy the fld in the masked region
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_masked_gather_copy_aligned(work%x_d, fld%x_d, &
-       zone%mask%get_d(), fld%size(),             zone%size)
+            zone%mask%get_d(), fld%size(), zone%size)
     else
        call copy_mask(work%x, fld%x, fld%size(), zone%mask%get(), zone%size)
     end if
