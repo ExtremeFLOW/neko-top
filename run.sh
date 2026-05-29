@@ -428,6 +428,7 @@ for case in ${example_list[@]}; do
             -exec mv -ft $log/$old_run {} \;
 
         touch $log/output.log $log/error.log
+        echo "Ready" >$log/output.log
 
         [ -n "$CLUSTER" ] && printf '\t%-12s %-s\n' "Restarting:" "$example"
         QUEUE="$QUEUE $example"
