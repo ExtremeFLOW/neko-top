@@ -688,9 +688,9 @@ contains
     t_start = MPI_Wtime()
 
     ! Set default behaviour
-     file_path = trim(this%checkpoint_path)
-     file_base = trim(this%checkpoint_base)
-     checkpoint_format = trim(this%checkpoint_format)
+    file_path = trim(this%checkpoint_path)
+    file_base = trim(this%checkpoint_base)
+    checkpoint_format = trim(this%checkpoint_format)
 
     ! Overwrite any user supplied components
     if (present(path)) file_path = trim(path)
@@ -743,7 +743,7 @@ contains
     call design%save_checkpoint(file_full, overwrite)
 
     t_total = MPI_Wtime() - t_start
-    write(msg, *) "Checkpoint time: ", t_total
+    write(msg, '(A,F6.2)') "Checkpoint time: ", t_total
     call neko_log%end_section(msg)
 
   end subroutine optimizer_save_checkpoint
