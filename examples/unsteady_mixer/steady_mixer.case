@@ -1,7 +1,7 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "box.nmsh",
+        "mesh_file": "data_local/static_mixer/mixer_256x64x64.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
@@ -21,7 +21,13 @@
             "output_format": "vtkhdf",
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": { "type": "hsmg" },
+                "preconditioner": {
+                    "type": "phmg",
+                    "pcoarsening_schedule": [ 5, 3, 1 ],
+                    "coarse_grid": {
+                        "solver": "tamg"
+                    }
+                },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
@@ -149,8 +155,8 @@
     "unsteady": false,
     "checkpoints": {
         "enabled": false,
-        "format": "hdf5",
-        "n_memory": 300
+        "format": "chkp",
+        "n_memory": 500
     },
     "optimization": {
         "design": {
