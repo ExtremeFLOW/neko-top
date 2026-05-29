@@ -13,7 +13,7 @@ with finalized memory and IO layout.
 
 We want to fill out our memory space. So question will be how to balance the IO
 with the memory. We want to save enough in memory to retain IO performance, but
-as little as possibly to allow a larger case overall.
+as little as possible to allow a larger case overall.
 
 ## IO performance
 
