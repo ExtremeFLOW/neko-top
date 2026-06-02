@@ -314,6 +314,7 @@ contains
     call this%scheme_free()
 
     call this%bclst_ds%free()
+    call this%bc_res%free()
     call this%proj_s%free()
 
     call this%s_adj_res%free()
