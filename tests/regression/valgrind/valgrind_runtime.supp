@@ -1,0 +1,126 @@
+# Runtime-only suppressions for clean-exit leak audits in unsteady_mixer.
+# These entries target OpenMPI/hwloc/libevent/CUDA initialization allocations
+# that persist at process teardown and are outside project ownership.
+
+{
+   openmpi_ompi_op_init
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:ompi_op_base_op_select
+   fun:ompi_op_init
+   fun:ompi_mpi_init
+   fun:PMPI_Init_thread
+   fun:mpi_init_thread
+   fun:mpi_init_thread_f08_
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_orte_init_hwloc
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:orte_init
+   fun:ompi_mpi_init
+   fun:PMPI_Init_thread
+   fun:mpi_init_thread
+   fun:mpi_init_thread_f08_
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_mca_framework_open
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:mca_base_framework_open
+   fun:ompi_mpi_init
+   fun:PMPI_Init_thread
+   fun:mpi_init_thread
+   fun:mpi_init_thread_f08_
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_mca_btl_base_select
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:mca_btl_base_select
+   ...
+   fun:ompi_mpi_init
+   fun:PMPI_Init_thread
+   fun:mpi_init_thread
+   fun:mpi_init_thread_f08_
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_libevent_worker
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:event_base_loop
+   ...
+   fun:start_thread
+   fun:clone
+}
+
+{
+   openmpi_dl_open_worker
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:call_init*
+   fun:_dl_init
+   ...
+   fun:dl_open_worker*
+}
+
+{
+   cuda_cugetprocaddress_malloc
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:cuGetProcAddress_v2
+   ...
+   fun:__cuda_intf_MOD_cuda_init
+}
+
+{
+   cuda_cugetprocaddress_calloc
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:calloc
+   ...
+   fun:cuGetProcAddress_v2
+   ...
+   fun:__cuda_intf_MOD_cuda_init
+}
+
+{
+   openmpi_mpi_file_open_dlopen_scope
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   ...
+   fun:resize_scopes
+   ...
+   fun:dl_open_worker*
+   ...
+   fun:mca_base_framework_open
+   fun:mca_io_base_file_select
+   fun:ompi_file_open
+   fun:PMPI_File_open
+   fun:MPI_FILE_OPEN
+   fun:mpi_file_open_f08_
+   fun:__nmsh_file_MOD_nmsh_file_read
+}
