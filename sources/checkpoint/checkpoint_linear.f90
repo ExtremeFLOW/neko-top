@@ -89,15 +89,8 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     integer :: k, previous_save, next_save, local_idx, counter
-    type(field_t), pointer :: u, v, w, p, s
 
     loop_start = MPI_WTIME()
-
-    u => neko_case%fluid%u
-    v => neko_case%fluid%v
-    w => neko_case%fluid%w
-    p => neko_case%fluid%p
-    s => null()
 
     ! Determine the nearest save states on both sides
     previous_save = tstep - modulo(tstep, this%n_saves_memory)
