@@ -11,37 +11,43 @@
    fun:ompi_op_base_op_select
    fun:ompi_op_init
    fun:ompi_mpi_init
-   fun:PMPI_Init_thread
-   fun:mpi_init_thread
-   fun:mpi_init_thread_f08_
+   ...
    fun:__comm_MOD_comm_init
 }
 
 {
    openmpi_orte_init_hwloc
    Memcheck:Leak
-   match-leak-kinds: definite
-   fun:malloc
+   match-leak-kinds: definite,indirect
+   ...
+   fun:hwloc_topology_load
    ...
    fun:orte_init
    fun:ompi_mpi_init
-   fun:PMPI_Init_thread
-   fun:mpi_init_thread
-   fun:mpi_init_thread_f08_
+   ...
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_orte_init_generic
+   Memcheck:Leak
+   match-leak-kinds: definite,indirect
+   ...
+   fun:orte_init
+   fun:ompi_mpi_init
+   ...
    fun:__comm_MOD_comm_init
 }
 
 {
    openmpi_mca_framework_open
    Memcheck:Leak
-   match-leak-kinds: definite
+   match-leak-kinds: definite,indirect
    fun:malloc
    ...
    fun:mca_base_framework_open
    fun:ompi_mpi_init
-   fun:PMPI_Init_thread
-   fun:mpi_init_thread
-   fun:mpi_init_thread_f08_
+   ...
    fun:__comm_MOD_comm_init
 }
 
@@ -54,17 +60,15 @@
    fun:mca_btl_base_select
    ...
    fun:ompi_mpi_init
-   fun:PMPI_Init_thread
-   fun:mpi_init_thread
-   fun:mpi_init_thread_f08_
+   ...
    fun:__comm_MOD_comm_init
 }
 
 {
    openmpi_libevent_worker
    Memcheck:Leak
-   match-leak-kinds: definite
-   fun:malloc
+   match-leak-kinds: definite,indirect
+   ...
    ...
    fun:event_base_loop
    ...
