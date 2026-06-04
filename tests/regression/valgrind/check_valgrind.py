@@ -55,8 +55,20 @@ def main() -> int:
     parser.add_argument(
         "--max-indirect-bytes",
         type=int,
-        default=256,
+        default=0,
         help="Maximum allowed indirectly-lost bytes",
+    )
+    parser.add_argument(
+        "--max-possible-bytes",
+        type=int,
+        default=2640,
+        help="Maximum allowed possibly-lost bytes",
+    )
+    parser.add_argument(
+        "--max-reachable-bytes",
+        type=int,
+        default=495892,
+        help="Maximum allowed still-reachable bytes",
     )
     args = parser.parse_args()
 
@@ -104,6 +116,14 @@ def main() -> int:
     if indirectly_bytes > args.max_indirect_bytes:
         errors.append("indirectly-lost bytes exceeded threshold: "
                       f"{indirectly_bytes} > {args.max_indirect_bytes}")
+
+    if possibly_bytes > args.max_possible_bytes:
+        errors.append("possibly-lost bytes exceeded threshold: "
+                      f"{possibly_bytes} > {args.max_possible_bytes}")
+
+    if reachable_bytes > args.max_reachable_bytes:
+        errors.append("still-reachable bytes exceeded threshold: "
+                      f"{reachable_bytes} > {args.max_reachable_bytes}")
 
     if errors:
         print("Valgrind regression check failed:", file=sys.stderr)

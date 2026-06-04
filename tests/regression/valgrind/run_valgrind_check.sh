@@ -71,6 +71,8 @@ fi
 python3 ./check_valgrind.py \
     --log valgrind_regression.log \
     --max-definite-bytes "${VALGRIND_MAX_DEFINITE_BYTES:-0}" \
-    --max-indirect-bytes "${VALGRIND_MAX_INDIRECT_BYTES:-256}"
+    --max-indirect-bytes "${VALGRIND_MAX_INDIRECT_BYTES:-0}" \
+    --max-possible-bytes "${VALGRIND_MAX_POSSIBLE_BYTES:-2640}" \
+    --max-reachable-bytes "${VALGRIND_MAX_REACHABLE_BYTES:-495892}"
 
 echo "Valgrind regression test passed."
