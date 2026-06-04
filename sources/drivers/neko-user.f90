@@ -36,13 +36,16 @@ program usrneko
   use neko, only: neko_init, neko_solve, neko_finalize
   use case, only: case_t
   use user, only: user_setup
+  use user_access_singleton, only: neko_user_access
   use neko_top, only: neko_top_register_types
+  implicit none
 
   type(case_t), target :: C
 
   call neko_top_register_types()
   call user_setup(C%user)
   call neko_init(C)
+  call neko_user_access%init(C)
   call neko_solve(C)
   call neko_finalize(C)
 
