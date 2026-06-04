@@ -47,11 +47,11 @@ add_test(NAME unsteady_mixer_valgrind_regression
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
         NEKO_DIR=${neko_PREFIX}
         NEKO_LOG_FILE=neko_valgrind.log
-        OMP_NUM_THREADS=1
+        OMP_NUM_THREADS=8
         OPENBLAS_NUM_THREADS=1
-        VALGRIND_MESH_NX=16
-        VALGRIND_MESH_NY=4
-        VALGRIND_MESH_NZ=4
+        VALGRIND_MESH_NX=8
+        VALGRIND_MESH_NY=2
+        VALGRIND_MESH_NZ=2
         bash ${CMAKE_CURRENT_SOURCE_DIR}/run_valgrind_check.sh
         $<TARGET_FILE:reg_valgrind_bin>
         ${CMAKE_CURRENT_SOURCE_DIR}/cases/steady_mixer_valgrind_cpu.case
@@ -74,11 +74,11 @@ add_test(NAME unsteady_mixer_valgrind_unsteady_regression
         LD_LIBRARY_PATH=${neko_LD_LIBRARY_PATH}
         NEKO_DIR=${neko_PREFIX}
         NEKO_LOG_FILE=neko_valgrind.log
-        OMP_NUM_THREADS=1
+        OMP_NUM_THREADS=8
         OPENBLAS_NUM_THREADS=1
-        VALGRIND_MESH_NX=16
-        VALGRIND_MESH_NY=4
-        VALGRIND_MESH_NZ=4
+        VALGRIND_MESH_NX=8
+        VALGRIND_MESH_NY=2
+        VALGRIND_MESH_NZ=2
         bash ${CMAKE_CURRENT_SOURCE_DIR}/run_valgrind_check.sh
         $<TARGET_FILE:reg_valgrind_bin>
         ${CMAKE_CURRENT_SOURCE_DIR}/cases/unsteady_mixer_valgrind_cpu.case

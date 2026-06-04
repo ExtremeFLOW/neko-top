@@ -6,8 +6,8 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 4.0e-4,
-            "timestep": 4.0e-5
+            "end_time": 5.0e-5,
+            "timestep": 1.0e-5
         },
         "numerics": {
             "time_order": 3,
@@ -180,13 +180,9 @@
         "solver": {
             "type": "mma",
             "max_iterations": 2,
-            "max_runtime": 171900.0,
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
-                "asyinit": 0.25,
-                "asyincr": 1.3,
-                "asydecr": 0.7,
                 "xmin": 0.0,
                 "xmax": 1.0
             },
