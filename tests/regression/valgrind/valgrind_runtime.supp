@@ -128,3 +128,150 @@
    fun:mpi_file_open_f08_
    fun:__nmsh_file_MOD_nmsh_file_read
 }
+
+{
+   openmpi_orte_finalize_generic
+   Memcheck:Leak
+   match-leak-kinds: definite
+   ...
+   fun:orte_finalize
+   fun:ompi_mpi_finalize
+   ...
+   fun:__comm_MOD_comm_free
+}
+
+{
+   cuda_culibraryloaddata_runtime
+   Memcheck:Leak
+   match-leak-kinds: possible,reachable
+   ...
+   fun:cuLibraryLoadData
+   ...
+}
+
+{
+   cuda_cuinit_runtime
+   Memcheck:Leak
+   match-leak-kinds: possible,reachable
+   ...
+   fun:cuInit
+   ...
+   fun:cudaGetDevice
+   ...
+   fun:__cuda_intf_MOD_cuda_init
+}
+
+{
+   openmp_allocate_tls_possible
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   fun:allocate_dtv
+   fun:_dl_allocate_tls
+   ...
+   fun:GOMP_parallel
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmp_allocate_tls_possible_generic
+   Memcheck:Leak
+   match-leak-kinds: possible
+   fun:calloc
+   ...
+   fun:GOMP_parallel
+   fun:__comm_MOD_comm_init
+}
+
+{
+   cuda_cuctxgetdevice_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   ...
+   fun:cuCtxGetDevice
+   ...
+   fun:cudaGetDevice
+   ...
+   fun:__cuda_intf_MOD_cuda_init
+}
+
+{
+   cuda_cuctxsetcurrent_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:calloc
+   fun:pthread_setspecific*
+   ...
+   fun:cuCtxSetCurrent
+   ...
+   fun:cudaSetDevice
+   ...
+   fun:__cuda_intf_MOD_cuda_init._omp_fn.1
+}
+
+{
+   cuda_cusparse_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libcusparse.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}
+
+{
+   cuda_cusolver_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libcusolver.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}
+
+{
+   cuda_cublaslt_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libcublasLt.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}
+
+{
+   cuda_cublas_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libcublas.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}
+
+{
+   cuda_nvjitlink_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libnvJitLink.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}
+
+{
+   cuda_stdcpp_call_init_runtime
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   obj:*/libstdc++.so*
+   ...
+   fun:call_init*
+   fun:_dl_init
+}

@@ -61,13 +61,13 @@ def main() -> int:
     parser.add_argument(
         "--max-possible-bytes",
         type=int,
-        default=2640,
+        default=0,
         help="Maximum allowed possibly-lost bytes",
     )
     parser.add_argument(
         "--max-reachable-bytes",
         type=int,
-        default=495892,
+        default=425828,
         help="Maximum allowed still-reachable bytes",
     )
     args = parser.parse_args()
