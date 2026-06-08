@@ -73,6 +73,10 @@ add_custom_command(
 add_custom_target(checkpointing_cleanup
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
 )
+add_dependencies(checkpointing_cleanup checkpointing_case)
+if (TARGET checkpointing_prepare)
+    add_dependencies(checkpointing_cleanup checkpointing_prepare)
+endif()
 
 # ============================================================================ #
 # Define pFUnit checkpointing tests
@@ -121,11 +125,9 @@ add_dependencies(Unit checkpoint_restore_consistency)
 add_dependencies(Unit checkpoint_end_of_run_gating)
 
 add_dependencies(checkpoint_restore_consistency
-    checkpointing_cleanup
     checkpointing_case
 )
 add_dependencies(checkpoint_end_of_run_gating
-    checkpointing_cleanup
     checkpointing_case
 )
 
