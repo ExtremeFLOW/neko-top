@@ -64,8 +64,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E rm -f
         ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.log
         ${CMAKE_CURRENT_BINARY_DIR}/checkpoint_*.log
-        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint*.chkp
-        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint*.h5
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.chkp
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.h5
         ${CMAKE_CURRENT_BINARY_DIR}/neko.log
     COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
