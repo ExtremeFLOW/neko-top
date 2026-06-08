@@ -18,7 +18,7 @@
             "scheme": "pnpn",
             "Re": 1000.0,
             "output_control": "never",
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": { "type": "hsmg" },
@@ -98,7 +98,7 @@
         },
         "adjoint_fluid": {
             "output_control": "never",
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -149,7 +149,7 @@
             "type": "brinkman",
             "verbose_design": true,
             "verbose_sensitivity": true,
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "mapping": [
                 {
                     "type": "PDE_filter",
@@ -182,9 +182,6 @@
                 "scale": 1.0,
                 "xmin": 0.0,
                 "xmax": 1.0
-            },
-            "checkpoint": {
-                "interval": 1
             }
         },
         "objectives": [
