@@ -1,7 +1,7 @@
 # CMakeLists.txt for optimizer_checkpoint unit test
 # This file requires HDF5 support to be enabled.
 
-if (NOT hdf5_FOUND)
+if (NOT HAVE_HDF5)
     message(STATUS "Skipping optimizer_checkpoint test since HDF5 is not found")
     return()
 endif()
@@ -76,7 +76,7 @@ add_pfunit_ctest(optimizer_checkpoint
 
 # Set test properties
 set_tests_properties(optimizer_checkpoint PROPERTIES
-    LABELS "unit;optimizer"
+    LABELS "unit;optimizer;hdf5"
     ENVIRONMENT "NEKO_LOG_FILE=optimizer_checkpoint.log"
     TIMEOUT 300
 )
