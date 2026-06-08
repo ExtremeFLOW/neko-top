@@ -55,3 +55,8 @@ add_subdirectory(${EXAMPLES_DIR}/wiggles)
 if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)
     add_subdirectory(${EXAMPLES_DIR}/benchmark_mixer)
 endif()
+
+# Add the benchmark directory if it exists.
+if (EXISTS ${EXAMPLES_DIR}/benchmark/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/benchmark)
+endif()

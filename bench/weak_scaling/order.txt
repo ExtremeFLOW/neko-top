@@ -1,0 +1,13 @@
+1. baseline
+2. fused_cg
+3. OpenMP
+4. LimitRAMCheckpoints
+5. trento_module
+6. load_balancing
+7. phmg
+8. hdf5_checkpoint
+9. stripe_by_tasks
+10. stripe_minus_one
+11. chunk_size_2M
+12. chunk_size_8M
+13. vtkhdf
