@@ -603,7 +603,17 @@ contains
     call this%bc_prs_surface%free()
     call this%bc_sym_surface%free()
     call this%bc_curl_curl%free()
+
+    call this%bc_vel_res%free()
+    call this%bc_du%free()
+    call this%bc_dv%free()
+    call this%bc_dw%free()
+    call this%bc_dp%free()
+
     call this%bclst_vel_res%free()
+    call this%bclst_du%free()
+    call this%bclst_dv%free()
+    call this%bclst_dw%free()
     call this%bclst_dp%free()
     call this%proj_prs%free()
     call this%proj_vel%free()
