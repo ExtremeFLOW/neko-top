@@ -64,8 +64,8 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E rm -f
         ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.log
         ${CMAKE_CURRENT_BINARY_DIR}/checkpoint_*.log
-        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint*.chkp
-        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint*.h5
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.chkp
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.h5
         ${CMAKE_CURRENT_BINARY_DIR}/neko.log
     COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
@@ -73,6 +73,10 @@ add_custom_command(
 add_custom_target(checkpointing_cleanup
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
 )
+add_dependencies(checkpointing_cleanup checkpointing_case)
+if (TARGET checkpointing_prepare)
+    add_dependencies(checkpointing_cleanup checkpointing_prepare)
+endif()
 
 # ============================================================================ #
 # Define pFUnit checkpointing tests
@@ -90,15 +94,6 @@ add_pfunit_ctest(checkpoint_restore_consistency
     MAX_PES 2
 )
 
-add_pfunit_ctest(checkpoint_restore_consistency_hdf5
-    TEST_SOURCES
-        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
-        ${CHECKPOINT_COMMON_SOURCES}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    LINK_LIBRARIES Neko-TOP::neko-top
-    MAX_PES 2
-)
-
 add_pfunit_ctest(checkpoint_end_of_run_gating
     TEST_SOURCES
         ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_end_of_run_gating.pf
@@ -110,8 +105,6 @@ add_pfunit_ctest(checkpoint_end_of_run_gating
 
 set(CHECKPOINT_RESTORE_ENV
     "NEKO_LOG_FILE=checkpoint_restore_consistency.log;OMP_NUM_THREADS=1")
-set(CHECKPOINT_RESTORE_HDF5_ENV
-    "NEKO_LOG_FILE=checkpoint_restore_consistency_hdf5.log;OMP_NUM_THREADS=1")
 set(CHECKPOINT_GATING_ENV
     "NEKO_LOG_FILE=checkpoint_end_of_run_gating.log;OMP_NUM_THREADS=1")
 
@@ -121,11 +114,6 @@ set_tests_properties(checkpoint_restore_consistency PROPERTIES
     TIMEOUT 300
 )
 
-set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
-    LABELS "unit;checkpointing"
-    ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"
-    TIMEOUT 300
-)
 
 set_tests_properties(checkpoint_end_of_run_gating PROPERTIES
     LABELS "unit;checkpointing"
@@ -134,25 +122,17 @@ set_tests_properties(checkpoint_end_of_run_gating PROPERTIES
 )
 
 add_dependencies(Unit checkpoint_restore_consistency)
-add_dependencies(Unit checkpoint_restore_consistency_hdf5)
 add_dependencies(Unit checkpoint_end_of_run_gating)
 
 add_dependencies(checkpoint_restore_consistency
-    checkpointing_cleanup
-    checkpointing_case
-)
-add_dependencies(checkpoint_restore_consistency_hdf5
-    checkpointing_cleanup
     checkpointing_case
 )
 add_dependencies(checkpoint_end_of_run_gating
-    checkpointing_cleanup
     checkpointing_case
 )
 
 if (TARGET checkpointing_prepare)
     add_dependencies(checkpoint_restore_consistency checkpointing_prepare)
-    add_dependencies(checkpoint_restore_consistency_hdf5 checkpointing_prepare)
     add_dependencies(checkpoint_end_of_run_gating checkpointing_prepare)
 endif()
 
@@ -161,10 +141,43 @@ if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
     target_compile_options(checkpoint_restore_consistency PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
-    target_compile_options(checkpoint_restore_consistency_hdf5 PRIVATE
-        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
-    )
     target_compile_options(checkpoint_end_of_run_gating PRIVATE
         $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
     )
+endif()
+
+# ============================================================================ #
+# Define the HDF5 checkpointing test
+
+if (HAVE_HDF5)
+    add_pfunit_ctest(checkpoint_restore_consistency_hdf5
+        TEST_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
+            ${CHECKPOINT_COMMON_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 2
+    )
+    set(CHECKPOINT_RESTORE_HDF5_ENV
+        "NEKO_LOG_FILE=checkpoint_restore_consistency_hdf5.log;OMP_NUM_THREADS=1")
+    set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
+        LABELS "unit;checkpointing;hdf5"
+        ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"
+        TIMEOUT 300
+    )
+    add_dependencies(Unit checkpoint_restore_consistency_hdf5)
+    add_dependencies(checkpoint_restore_consistency_hdf5
+        checkpointing_cleanup
+        checkpointing_case
+    )
+    if (TARGET checkpointing_prepare)
+        add_dependencies(checkpoint_restore_consistency_hdf5 checkpointing_prepare)
+    endif()
+
+    # Disable treating unused-variable as error for pfunit tests
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(checkpoint_restore_consistency_hdf5 PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
 endif()
