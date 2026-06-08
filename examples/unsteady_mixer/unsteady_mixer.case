@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 12.0,
-            "timestep": 4.0e-5
+            "timestep": 1.0e-4
         },
         "numerics": {
             "time_order": 3,
@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 1000.0,
+            "Re": 200.0,
             "output_control": "never",
             "output_format": "vtkhdf",
             "pressure_solver": {
@@ -58,7 +58,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 1000.0,
+            "Pe": 200.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
@@ -68,7 +68,7 @@
                 "max_iterations": 100
             },
             "initial_condition": {
-                "type": "uniform",
+                "type": "user",
                 "value": 0.0
             },
             "boundary_conditions": [
@@ -159,7 +159,7 @@
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 6.00e-02,
+                    "r": 0.015625,
                     "tol": 1e-15
                 },
                 {
@@ -187,9 +187,6 @@
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
-                "asyinit": 0.25,
-                "asyincr": 1.3,
-                "asydecr": 0.7,
                 "xmin": 0.0,
                 "xmax": 1.0
             },
