@@ -288,7 +288,9 @@ function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
     source functions.sh
-    run $1 1>output.log 2>error.log
+
+    #! REMOVE APPENDING TO LOG FILES BEFORE FINALIZING PR
+    run $1 1>>output.log 2>>error.log
     cd $CURRENT_DIR
 }
 
@@ -505,6 +507,8 @@ if [ "$DRY" == true ]; then
     exit $?
 fi
 
+#! REMOVE EXTRA LOOP BEFORE FINALIZING PR
+for i in {1..2}; do
 for example in $QUEUE; do
 
     # Move to the log folder and submit the job
@@ -515,6 +519,7 @@ for example in $QUEUE; do
     else
         Run $example
     fi
+done
 done
 
 if [ -z "$CLUSTER" ]; then

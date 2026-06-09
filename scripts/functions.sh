@@ -18,6 +18,24 @@ function run {
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
+    if [ -f "$logfile" ]; then
+        # Move old log files to folder with counter padded to 2 digits
+
+        old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p ./$old_run
+
+        find ./ -maxdepth 1 -not -empty -type f -name "*.log" \
+            -exec cp -ft ./$old_run {} \;
+
+        printf "Ready" >./output.log
+        printf "" > ./error.log
+        printf "" > $logfile
+        printf "Moved old log files to %s.\n" ./$old_run
+
+        return 1
+    fi
+
     # Run the example
     printf "Executing Neko.\n"
     printf "See $logfile for the status output.\n"
