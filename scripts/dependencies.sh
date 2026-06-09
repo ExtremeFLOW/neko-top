@@ -379,7 +379,7 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
 
@@ -484,11 +484,11 @@ function find_neko() {
         fi
     fi
 
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [ ! -d "$NEKO_LIB" ]; then
         error "Neko not found at:"
-        error "\$tNEKO_DIR"
+        error "\t$NEKO_DIR"
         error "Please set NEKO_DIR to the directory containing"
         error "the Neko source code."
         error "You can download the source code from:"
