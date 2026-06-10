@@ -260,9 +260,9 @@ contains
     call json_get_or_default(json, 'mma.max_iter', max_iter, 100)
 
     ! Following parameters are set based on eq.3.8:--------
-    call json_get_or_default(json, 'mma.asyinit', asyinit, 0.5_rp)
-    call json_get_or_default(json, 'mma.asyincr', asyincr, 1.2_rp)
-    call json_get_or_default(json, 'mma.asydecr', asydecr, 0.7_rp)
+    call json_get_or_default(json, 'mma.asyinit', asyinit, 0.2_rp)
+    call json_get_or_default(json, 'mma.asyincr', asyincr, 1.05_rp)
+    call json_get_or_default(json, 'mma.asydecr', asydecr, 0.65_rp)
 
     call json_get_or_default(json, 'mma.backend', bcknd, bcknd_default)
     call json_get_or_default(json, 'mma.subsolver', subsolver, 'dip')
@@ -431,9 +431,9 @@ contains
     end if
 
     ! Following parameters are set based on eq.3.8
-    if (.not. present(asyinit)) this%asyinit = 0.5_rp
-    if (.not. present(asyincr)) this%asyincr = 1.2_rp
-    if (.not. present(asydecr)) this%asydecr = 0.7_rp
+    if (.not. present(asyinit)) this%asyinit = 0.2_rp
+    if (.not. present(asyincr)) this%asyincr = 1.05_rp
+    if (.not. present(asydecr)) this%asydecr = 0.65_rp
 
     ! Set default backend based on NEKO_BCKND_DEVICE
     if (.not. present(bcknd) .and. NEKO_BCKND_DEVICE .eq. 0) then

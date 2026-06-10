@@ -33,7 +33,7 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> A PDE based filter
-module PDE_filter
+module PDE_filter_mapping
   use num_types, only: rp
   use json_module, only: json_file
   use registry, only: neko_registry
@@ -62,6 +62,7 @@ module PDE_filter
   use utils, only: neko_error
   use device_math, only: device_cfill, device_subcol3, device_cmult
   use json_utils, only: json_get, json_get_or_default
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -129,7 +130,7 @@ contains
     integer :: max_iter
     character(len=:), allocatable :: ksp_solver, precon_type
 
-    call json_get(json, 'r', r)
+    call nekotop_continuation%json_get_or_register(json, 'r', this%r, r)
     call json_get_or_default(json, 'tol', tol, 0.0000000001_rp)
     call json_get_or_default(json, 'max_iter', max_iter, 200)
     call json_get_or_default(json, 'solver', ksp_solver, "cg")
@@ -151,7 +152,7 @@ contains
     character(len=*), intent(in) :: ksp_solver, precon_type
     integer :: n
 
-    this%r = r / (2.0_rp * sqrt(3.0_rp))
+    this%r = r
     this%abstol_filt = tol
     this%ksp_max_iter = max_iter
     this%ksp_solver = ksp_solver
@@ -230,11 +231,11 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h1_d, (this%r / (2.0_rp * sqrt(3.0_rp)))**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
     else
        ! h1 is already negative in its definition
-       this%coef%h1 = this%r**2
+       this%coef%h1 = (this%r / (2.0_rp * sqrt(3.0_rp)))**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
     end if
@@ -329,11 +330,11 @@ contains
 
     ! set up Helmholtz operators and RHS
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_cfill(this%coef%h1_d, this%r**2, n)
+       call device_cfill(this%coef%h1_d, (this%r / (2.0_rp * sqrt(3.0_rp)))**2, n)
        call device_cfill(this%coef%h2_d, 1.0_rp, n)
     else
        ! h1 is already negative in its definition
-       this%coef%h1 = this%r**2
+       this%coef%h1 = (this%r / (2.0_rp * sqrt(3.0_rp)))**2
        ! ax_helm includes the mass matrix in h2
        this%coef%h2 = 1.0_rp
     end if
@@ -417,4 +418,4 @@ contains
 
   end subroutine filter_precon_factory
 
-end module PDE_filter
+end module PDE_filter_mapping
