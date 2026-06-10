@@ -138,6 +138,16 @@ jobs:
       hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
       neko-top-version: ${{ github.head_ref || github.ref_name }}
 
+  check_valgrind:
+    name: Valgrind Regression
+    needs: prepare
+    uses: ./.github/workflows/check_valgrind.yml
+    with:
+      neko-version: ${{ needs.prepare.outputs.neko-version }}
+      json-fortran-version: ${{ needs.prepare.outputs.json-fortran-version }}
+      pfunit-version: ${{ needs.prepare.outputs.pfunit-version }}
+      hdf5-version: ${{ needs.prepare.outputs.hdf5-version }}
+
   # -------------------------------------------------------------------------- #
   # Check if all previous jobs passed. If any of the previous jobs failed, the
   # Complete job will fail and print out the failed jobs.
@@ -154,6 +164,7 @@ jobs:
       # Neko-TOP library checks
       - check_compile
       - check_scripts
+      - check_valgrind
 
     runs-on: ubuntu-latest
     env:
@@ -163,6 +174,7 @@ jobs:
       documentation_status: ${{ needs.check_documentation.result }}
       compile_status: ${{ needs.check_compile.result }}
       scripts_status: ${{ needs.check_scripts.result }}
+      valgrind_status: ${{ needs.check_valgrind.result }}
 
     steps:
       - name: Check status of previous jobs
@@ -203,6 +215,11 @@ jobs:
 
           if [ "$scripts_status" != "success" ]; then
             fail+=("\t- Scripts check: $scripts_status")
+            success=false
+          fi
+
+          if [ "$valgrind_status" != "success" ]; then
+            fail+=("\t- Valgrind regression check: $valgrind_status")
             success=false
           fi
 
