@@ -307,7 +307,7 @@ function Submit() {
             printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$MN5_ACCOUNT"
+            SLURM_ACCOUNT="$MN5_ACCOUNT"
         fi
 
     elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
@@ -317,7 +317,7 @@ function Submit() {
             printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$LUMI_ACCOUNT"
+            SLURM_ACCOUNT="$LUMI_ACCOUNT"
         fi
     fi
 
@@ -330,14 +330,23 @@ function Submit() {
             return
         fi
 
-        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh 1>/dev/null 2>error.log
         if [ "$SEQUENTIAL" == true ]; then
-            job_list=$(squeue -ho "%i" -S "i" --me | tail -n 1)
-            if [ -n "$job_list" ]; then
-                DEPENDENCY="--dependency=afterany:$job_list"
+            sub=$(sbatch -J $1 $DEPENDENCY job_script.sh)
+            id=$(echo $sub | awk '{print $NF}')
+            if [ -n "$id" ]; then
+                DEPENDENCY="--dependency=afterany:$id"
             else
-                DEPENDENCY=""
+                printf '\t%-12s %-s\n' "Submitted:" "$1 (Job ID: Unknown)"
             fi
+        elif [ "$N_JOBS" -gt 0 ]; then
+            DEPENDENCY=""
+            for i in $(seq 1 $N_JOBS); do
+                sub=$(sbatch -J $1 $DEPENDENCY job_script.sh)
+                id=$(echo $sub | awk '{print $NF}')
+                if [ -n "$id" ]; then
+                    DEPENDENCY="--dependency=afternotok:$id"
+                fi
+            done
         fi
     else
         printf >&2 "Unknown submission system.\n"
