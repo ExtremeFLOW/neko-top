@@ -26,11 +26,13 @@ function run {
         mkdir -p ./$old_run
 
         find ./ -maxdepth 1 -not -empty -type f -name "*.log" \
-            -exec cp -ft ./$old_run {} \;
+            -not -name "output.log" -not -name "error.log" \
+            -exec mv -ft ./$old_run {} \;
+        cp -ft ./$old_run output.log error.log
 
+        # Reset the log files
         printf "Ready" >./output.log
         printf "" > ./error.log
-        printf "" > $logfile
     fi
 
     # Run the example
