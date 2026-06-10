@@ -64,6 +64,7 @@ CLUSTER=""
 SEQUENTIAL=false
 DRY=false
 RERUN=false
+N_JOBS=1
 
 # List possible options
 OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:,njobs:
@@ -308,7 +309,7 @@ function Submit() {
             printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            SLURM_ACCOUNT="$MN5_ACCOUNT"
+            export SBATCH_ACCOUNT="$MN5_ACCOUNT"
         fi
 
     elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
@@ -318,7 +319,7 @@ function Submit() {
             printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            SLURM_ACCOUNT="$LUMI_ACCOUNT"
+            export SBATCH_ACCOUNT="$LUMI_ACCOUNT"
         fi
     fi
 
@@ -331,24 +332,42 @@ function Submit() {
             return
         fi
 
-        if [ "$SEQUENTIAL" == true ]; then
+        N_DEPENDENCY=""
+        for i in $(seq 1 $N_JOBS); do
+            echo "Submitting job $i for example $1"
+            echo "N_DEPENDENCY: $N_DEPENDENCY"
+            echo "S_DEPENDENCY: $S_DEPENDENCY"
+
+            if [[ -n "$N_DEPENDENCY" || -n "$S_DEPENDENCY" ]]; then
+                DEPENDENCY="--dependency="
+                if [ -n "$N_DEPENDENCY" ]; then
+                    DEPENDENCY="${DEPENDENCY}afternotok:$N_DEPENDENCY"
+                fi
+                if [ -n "$S_DEPENDENCY" ]; then
+                    if [ -n "$N_DEPENDENCY" ]; then
+                        DEPENDENCY="${DEPENDENCY},"
+                    fi
+                    DEPENDENCY="${DEPENDENCY}afterany:$S_DEPENDENCY"
+                fi
+            fi
+            echo "sbatch -J $1 $DEPENDENCY job_script.sh"
             sub=$(sbatch -J $1 $DEPENDENCY job_script.sh)
             id=$(echo $sub | awk '{print $NF}')
+
+            echo "Submitted job with id $id"
+
             if [ -n "$id" ]; then
-                DEPENDENCY="--dependency=afterany:$id"
-            else
-                printf '\t%-12s %-s\n' "Submitted:" "$1 (Job ID: Unknown)"
+                N_DEPENDENCY="$id"
             fi
-        elif [ "$N_JOBS" -gt 0 ]; then
-            DEPENDENCY=""
-            for i in $(seq 1 $N_JOBS); do
-                sub=$(sbatch -J $1 $DEPENDENCY job_script.sh)
-                id=$(echo $sub | awk '{print $NF}')
-                if [ -n "$id" ]; then
-                    DEPENDENCY="--dependency=afternotok:$id"
+
+            if [ "$SEQUENTIAL" == true ]; then
+                if [ -n "$S_DEPENDENCY" ]; then
+                    S_DEPENDENCY="$S_DEPENDENCY:$id"
+                else
+                    S_DEPENDENCY="$id"
                 fi
-            done
-        fi
+            fi
+        done
     else
         printf >&2 "Unknown submission system.\n"
         exit 1
