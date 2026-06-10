@@ -67,7 +67,7 @@ def main() -> int:
     parser.add_argument(
         "--max-reachable-bytes",
         type=int,
-        default=460000,
+        default=0,
         help="Maximum allowed still-reachable bytes",
     )
     args = parser.parse_args()
