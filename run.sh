@@ -31,6 +31,8 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
     printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
+    printf "  -%-1s, --%-10s %-60s\n" " " "sequential" "Submit the examples sequentially."
+    printf "  -%-1s, --%-10s %-60s\n" " " "njobs" "Number of jobs to submit per example when not submitting sequentially."
 
     printf "\n\e[4mEnvironment:\e[0m\n"
     printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
@@ -64,7 +66,7 @@ DRY=false
 RERUN=false
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:,njobs:
 OPT=a,c,h,n,s:,d,r,p:
 
 # Parse the inputs for options
@@ -86,6 +88,7 @@ while true; do
     # Long option with no short option
     "--dry-run") DRY=true && shift ;;             # Dry run
     "--sequential") SEQUENTIAL=true && shift ;;   # Submit sequentially
+    "--njobs") N_JOBS="$2" && shift 2 ;;          # Number of jobs to submit per example
 
     # End of options
     "--") shift && break ;;
@@ -288,9 +291,7 @@ function Run() {
     cd $LPATH/$example
     printf '\t%-12s %-s\n' "Started:" "$1"
     source functions.sh
-
-    #! REMOVE APPENDING TO LOG FILES BEFORE FINALIZING PR
-    run $1 1>>output.log 2>>error.log
+    run $1 1>output.log 2>error.log
     cd $CURRENT_DIR
 }
 
@@ -516,8 +517,6 @@ if [ "$DRY" == true ]; then
     exit $?
 fi
 
-#! REMOVE EXTRA LOOP BEFORE FINALIZING PR
-for i in {1..2}; do
 for example in $QUEUE; do
 
     # Move to the log folder and submit the job
@@ -528,7 +527,6 @@ for example in $QUEUE; do
     else
         Run $example
     fi
-done
 done
 
 if [ -z "$CLUSTER" ]; then
