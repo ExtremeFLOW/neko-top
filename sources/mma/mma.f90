@@ -92,6 +92,7 @@ module mma
      integer :: n, m, n_global, max_iter
      real(kind=rp) :: a0, asyinit, asyincr, asydecr, epsimin, &
           residumax, residunorm
+     real(kind=rp) :: move_limit = 0.2_rp
      type(vector_t) :: xold1, xold2, low, upp, alpha, beta, a, c, d, xmax, xmin
      logical :: is_initialized = .false.
      logical :: is_updated = .false.
@@ -238,6 +239,7 @@ contains
 
     ! For reading the values from json and then set the value for the arrays
     real(kind=rp) :: a0 , xmax_const, xmin_const, a_const, c_const, d_const
+    real(kind=rp) :: move_limit
 
     integer :: max_iter, n_global, ierr
     real(kind=rp) :: epsimin, asyinit, asyincr, asydecr
@@ -273,6 +275,7 @@ contains
     call json_get_or_default(json, 'mma.a', a_const, 0.0_rp)
     call json_get_or_default(json, 'mma.c', c_const, 100.0_rp)
     call json_get_or_default(json, 'mma.d', d_const, 0.0_rp)
+    call json_get_or_default(json, 'mma.move_limit', move_limit, 0.2_rp)
 
     call json_get_or_default(json, 'mma.scale', scale, 10.0_rp)
     call json_get_or_default(json, 'mma.auto_scale', auto_scale, .false.)
@@ -288,7 +291,8 @@ contains
     ! Initialize the MMA object with the parameters read from json
 
     call this%init(x, n, m, a0, a, c, d, xmin, xmax, &
-         max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
+         max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver, &
+         move_limit)
 
   end subroutine mma_init_from_json
 
@@ -328,7 +332,8 @@ contains
 
   !> Initialize the mma object based on the attributes from the json file
   subroutine mma_init_from_components(this, x, n, m, a0, a, c, d, xmin, xmax, &
-       max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver)
+       max_iter, epsimin, asyinit, asyincr, asydecr, bcknd, subsolver, &
+       move_limit)
     ! ----------------------------------------------------- !
     ! Initializing the mma object and all the parameters    !
     ! required for MMA method. (a_i, c_i, d_i, ...)         !
@@ -355,6 +360,7 @@ contains
     real(kind=rp), intent(in) :: a0
     integer, intent(in), optional :: max_iter
     real(kind=rp), intent(in), optional :: epsimin, asyinit, asyincr, asydecr
+    real(kind=rp), intent(in), optional :: move_limit
     character(len=*), intent(in), optional :: bcknd, subsolver
     character(len=256) :: log_msg
     integer :: i, ierr
@@ -444,6 +450,7 @@ contains
 
     ! Set default subsolver
     if (.not. present(subsolver)) this%subsolver = "dip"
+    if (.not. present(move_limit)) this%move_limit = 0.2_rp
 
     ! Assign values from inputs when present
     if (present(max_iter)) this%max_iter = max_iter
@@ -451,6 +458,7 @@ contains
     if (present(asyinit)) this%asyinit = asyinit
     if (present(asyincr)) this%asyincr = asyincr
     if (present(asydecr)) this%asydecr = asydecr
+    if (present(move_limit)) this%move_limit = move_limit
     if (present(bcknd)) this%bcknd = bcknd
     if (present(subsolver)) this%subsolver = subsolver
 
@@ -478,6 +486,8 @@ contains
     write(log_msg, '(A10,1X,E11.5)') 'asydecr   ', this%asydecr
     call neko_log%message(log_msg)
     write(log_msg, '(A10,1X,E11.5)') 'a0        ', this%a0
+    call neko_log%message(log_msg)
+    write(log_msg, '(A10,1X,E11.5)') 'movelimit ', this%move_limit
     call neko_log%message(log_msg)
 
     call neko_log%message('Parameters a')
