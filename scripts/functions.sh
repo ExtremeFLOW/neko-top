@@ -31,9 +31,6 @@ function run {
         printf "Ready" >./output.log
         printf "" > ./error.log
         printf "" > $logfile
-        printf "Moved old log files to %s.\n" ./$old_run
-
-        return 1
     fi
 
     # Run the example
