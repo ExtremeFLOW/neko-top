@@ -332,40 +332,20 @@ function Submit() {
             return
         fi
 
-        N_DEPENDENCY=""
+        # Deal with sequential submission and job dependencies
+        id=""
         for i in $(seq 1 $N_JOBS); do
-            echo "Submitting job $i for example $1"
-            echo "N_DEPENDENCY: $N_DEPENDENCY"
-            echo "S_DEPENDENCY: $S_DEPENDENCY"
-
-            if [[ -n "$N_DEPENDENCY" || -n "$S_DEPENDENCY" ]]; then
-                DEPENDENCY="--dependency="
-                if [ -n "$N_DEPENDENCY" ]; then
-                    DEPENDENCY="${DEPENDENCY}afternotok:$N_DEPENDENCY"
-                fi
-                if [ -n "$S_DEPENDENCY" ]; then
-                    if [ -n "$N_DEPENDENCY" ]; then
-                        DEPENDENCY="${DEPENDENCY},"
-                    fi
-                    DEPENDENCY="${DEPENDENCY}afterany:$S_DEPENDENCY"
-                fi
-            fi
-            echo "sbatch -J $1 $DEPENDENCY job_script.sh"
-            sub=$(sbatch -J $1 $DEPENDENCY job_script.sh)
-            id=$(echo $sub | awk '{print $NF}')
-
-            echo "Submitted job with id $id"
-
-            if [ -n "$id" ]; then
-                N_DEPENDENCY="$id"
+            if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
+                DEP="--dependency=afternotok:$id,afterany:$SEQ_DEP"
+            elif [ -n "$id" ]; then
+                DEP="--dependency=afternotok:$id"
+            elif [ -n "$SEQ_DEP" ]; then
+                DEP="--dependency=afterany:$SEQ_DEP"
             fi
 
+            id=$(sbatch --parsable -J $1 $DEP job_script.sh)
             if [ "$SEQUENTIAL" == true ]; then
-                if [ -n "$S_DEPENDENCY" ]; then
-                    S_DEPENDENCY="$S_DEPENDENCY:$id"
-                else
-                    S_DEPENDENCY="$id"
-                fi
+                SEQ_DEP="$SEQ_DEP:$id"
             fi
         done
     else
