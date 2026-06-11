@@ -243,10 +243,18 @@ contains
     real(kind=rp), dimension(this%m, this%n), intent(in) :: dfdx
     integer, intent(in) :: iter
     integer :: i, j, ierr
+    real(kind=rp), dimension(this%n) :: xmin_eff, xmax_eff
     real(kind=rp), dimension(this%n) :: x_diff
     real(kind=rp) :: asy_factor
 
-    x_diff = this%xmax%x - this%xmin%x
+    xmin_eff = this%xmin%x
+    xmax_eff = this%xmax%x
+    if (this%move_limit .gt. 0.0_rp) then
+       xmin_eff = max(xmin_eff, x - this%move_limit)
+       xmax_eff = min(xmax_eff, x + this%move_limit)
+    end if
+
+    x_diff = max(xmax_eff - xmin_eff, 1.0e-5_rp)
 
     ! ------------------------------------------------------------------------ !
     ! Setup the current asymptotes
@@ -293,7 +301,7 @@ contains
     ! eq (2.8) and (2.9)
 
     associate(alpha => this%alpha%x, beta => this%beta%x, &
-         xmin => this%xmin%x, xmax => this%xmax%x, &
+         xmin => xmin_eff, xmax => xmax_eff, &
          low => this%low%x, upp => this%upp%x, x => x)
 
       alpha = max(xmin, low + 0.1_rp*(x - low), x - 0.5_rp*x_diff)
@@ -876,7 +884,7 @@ contains
          z = max(0.0_rp,dot_product(lambda, a) - a0)
 
          ! Comput the value of x that minimizes L_x for the current λ
-         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} λ_i *
+         ! minimize( sum_{j=1}^{n} [ (p_{0j} + sum_{i=1}^{m} ��_i *
          ! p_{ij}) / (u_j - x_j) + (q_{0j} + sum_{i=1}^{m} λ_i * q_{ij}) /
          ! (x_j - l_j) ] - sum_{i=1}^{m} λ_i * b_i)
          pjlambda = (p0j + matmul(transpose(pij), lambda))
