@@ -68,6 +68,7 @@
                 "asyinit": 0.5,
                 "asyincr": 1.2,
                 "asydecr": 0.7,
+                "move_limit": -1.0,
                 "scale": 1.0,
                 "auto_scale": false,
                 "xmin": 0.0,

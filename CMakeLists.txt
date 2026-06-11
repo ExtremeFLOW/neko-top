@@ -81,6 +81,7 @@ find_package(LAPACK QUIET)
 
 # Check for the optional libraries.
 find_package(MPI REQUIRED)
+find_package(OpenMP REQUIRED COMPONENTS Fortran)
 
 # We need PKG Config to find the JSON-Fortran and Neko libraries
 find_package(PkgConfig REQUIRED)
@@ -143,12 +144,14 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 # ............................................................................ #
 # HDF5 Support
 
-if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
-    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
-        "Path to the HDF5 installation")
-elseif(DEFINED ENV{HDF5_DIR})
-    set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
-        CACHE STRING "Path to the HDF5 installation")
+if (NOT DEFINED HDF5_DIR)
+    if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
+        set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
+            "Path to the HDF5 installation")
+    elseif(DEFINED ENV{HDF5_DIR})
+        set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
+            CACHE STRING "Path to the HDF5 installation")
+    endif()
 endif()
 
 if (DEFINED HDF5_DIR)

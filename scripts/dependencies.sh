@@ -323,6 +323,12 @@ function find_parmetis() {
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
+        # Modify the minimum requirement of cmake
+        cmake_lists=$(find . -name CMakeLists.txt)
+        for file in $cmake_lists; do
+            sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
+        done
+
         # Compile the bundled metis library
         cd metis
         make config prefix=${PARMETIS_DIR}
@@ -373,7 +379,7 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
 
@@ -383,6 +389,21 @@ function find_neko() {
 
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+
+        fi
+
+        # Apply Cray-specific patches before building on Cray systems
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            cray_patches=(
+                "patches/cce_stack.patch"
+                "patches/cce_time_state.patch"
+                "patches/cce_openmp.patch"
+            )
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply "$patch"
+                fi
+            done
         fi
 
         # Determine available features
@@ -452,13 +473,22 @@ function find_neko() {
         make install
 
         cd $CURRENT_DIR
+
+        # Revert the patches to keep the repository clean
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --reverse --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply --reverse "$patch"
+                fi
+            done
+        fi
     fi
 
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [ ! -d "$NEKO_LIB" ]; then
         error "Neko not found at:"
-        error "\$tNEKO_DIR"
+        error "\t$NEKO_DIR"
         error "Please set NEKO_DIR to the directory containing"
         error "the Neko source code."
         error "You can download the source code from:"

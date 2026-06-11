@@ -46,6 +46,7 @@ module simulation_adjoint
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
   use field_math, only: field_rzero
+  use scratch_registry, only: neko_scratch_registry
   use device_math, only: device_glsc3
   use math, only: glsc3
   use vector, only: vector_t
@@ -284,9 +285,9 @@ contains
   subroutine simulation_adjoint_norm_output(C, time_output)
     type(adjoint_case_t), intent(inout) :: C
     type(time_state_t), intent(in) :: time_output
-    type(vector_t) :: data_line
+    type(vector_t), pointer :: data_line
     real(kind=rp) :: norm_l2
-    integer :: n
+    integer :: n, idx
 
     if (.not. C%norm_output_enabled) return
     if (.not. C%norm_output_ctrl%check(time_output)) return
@@ -310,10 +311,10 @@ contains
 
     norm_l2 = sqrt(norm_l2) / C%fluid_adj%c_Xh%volume
 
-    call data_line%init(1)
+    call neko_scratch_registry%request(data_line, idx, 1, .false.)
     data_line%x = [norm_l2]
     call C%norm_output_file%write(data_line, time_output%t)
-    call data_line%free()
+    call neko_scratch_registry%relinquish(idx)
     call C%norm_output_ctrl%register_execution()
   end subroutine simulation_adjoint_norm_output
 

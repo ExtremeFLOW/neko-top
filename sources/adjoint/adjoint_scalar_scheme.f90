@@ -286,10 +286,11 @@ contains
     this%rho => rho
 
     ! get the primal adjoint's name
-    call json_get(params_adjoint, 'primal_name', this%primal_name)
+    call json_get_or_default(params_adjoint, 'primal_name', this%primal_name, &
+         's')
     ! Assign a name
     call json_get_or_default(params_adjoint, 'name', this%name, &
-         'scalar adjoint')
+         this%primal_name // '_adj')
 
     call neko_log%section('Adjoint scalar')
     params_selected => json_key_fallback(params_adjoint, params_primal, &
@@ -404,6 +405,10 @@ contains
   !> Deallocate a scalar formulation
   subroutine adjoint_scalar_scheme_free(this)
     class(adjoint_scalar_scheme_t), intent(inout) :: this
+    class(bc_t), pointer :: bc
+    integer :: i
+
+    bc => null()
 
     nullify(this%Xh)
     nullify(this%dm_Xh)
@@ -423,11 +428,27 @@ contains
 
     call this%source_term%free()
 
+    if (associated(this%f_Xh)) then
+       call this%f_Xh%free()
+       deallocate(this%f_Xh)
+       nullify(this%f_Xh)
+    end if
+
+    do i = 1, this%bcs%size()
+       bc => this%bcs%get(i)
+       if (associated(bc)) then
+          call bc%free()
+          deallocate(bc)
+       end if
+    end do
+
     call this%bcs%free()
 
     call this%cp%free()
     call this%lambda%free()
     call this%s_adj_lag%free()
+
+    nullify(bc)
 
   end subroutine adjoint_scalar_scheme_free
 

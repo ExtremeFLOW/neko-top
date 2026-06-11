@@ -50,6 +50,7 @@ module RAMP_mapping
        convex_up_RAMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
   use logger, only: neko_log
+  use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
 
@@ -117,8 +118,9 @@ contains
     logical :: convex_up
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
-    call json_get(json, 'f_max', f_max)
-    call json_get_or_default(json, 'q', q, 1.0_rp)
+    call nekotop_continuation%json_get_or_register(json, 'f_max', this%f_max, &
+         f_max)
+    call nekotop_continuation%json_get_or_register(json, 'q', this%q, q, 1.0_rp)
     call json_get_or_default(json, 'convex_up', convex_up, .false.)
 
     call this%init_base(json, coef, "RAMP_mapping")
