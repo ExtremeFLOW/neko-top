@@ -185,7 +185,7 @@ function prepare {
         fi
 
         if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
-            srun --ntasks=1 $prep_sh
+            srun --nodes=1 --ntasks=1 $prep_sh
             sleep 1 # Make sure SLURM have time to clean up.
         else
             $prep_sh
