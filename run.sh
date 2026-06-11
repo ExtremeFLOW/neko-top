@@ -334,6 +334,7 @@ function Submit() {
 
         # Deal with sequential submission and job dependencies
         id=""
+        DEP=""
         for i in $(seq 1 $N_JOBS); do
             if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
                 DEP="--dependency=afternotok:$id,afterany:$SEQ_DEP"
