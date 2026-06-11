@@ -1,13 +1,13 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/static_mixer/mixer_16x8x8.nmsh",
+        "mesh_file": "box.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 1e-3,
-            "timestep": 1.0e-4
+            "end_time": 5.0e-5,
+            "timestep": 1.0e-5
         },
         "numerics": {
             "time_order": 3,
@@ -16,24 +16,17 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200.0,
+            "Re": 1000.0,
             "output_control": "never",
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "pressure_solver": {
                 "type": "gmres",
-                "preconditioner": {
-                    "type": "hsmg",
-                    // "type": "phmg",
-                    // "pcoarsening_schedule": [ 5, 3, 1 ],
-                    // "coarse_grid": {
-                    //     "solver": "tamg"
-                    // }
-                },
+                "preconditioner": { "type": "hsmg" },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
             },
             "velocity_solver": {
-                "type": "fused_cg",
+                "type": "cg",
                 "preconditioner": { "type": "jacobi" },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
@@ -59,17 +52,17 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 200.0,
+            "Pe": 1000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 100
+                "max_iterations": 10
             },
             "initial_condition": {
-                "type": "user",
+                "type": "uniform",
                 "value": 0.0
             },
             "boundary_conditions": [
@@ -105,7 +98,7 @@
         },
         "adjoint_fluid": {
             "output_control": "never",
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "initial_condition": {
                 "type": "uniform",
                 "value": [ 0.0, 0.0, 0.0 ]
@@ -149,20 +142,21 @@
                 "type": "steady",
                 "tol": 1e-6,
                 "compute_control": "tsteps",
-                "compute_value": 5
+                "compute_value": 4
             }
         ]
     },
+    "unsteady": false,
     "optimization": {
         "design": {
             "type": "brinkman",
             "verbose_design": true,
             "verbose_sensitivity": true,
-            "output_format": "vtkhdf",
+            "output_format": "fld",
             "mapping": [
                 {
                     "type": "PDE_filter",
-                    "r": 0.015625,
+                    "r": 6.00e-02,
                     "tol": 1e-15
                 },
                 {
@@ -185,16 +179,12 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 200,
-            "max_runtime": 60.0,
+            "max_iterations": 2,
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
                 "xmin": 0.0,
                 "xmax": 1.0
-            },
-            "checkpoint": {
-                "interval": 1
             }
         },
         "objectives": [

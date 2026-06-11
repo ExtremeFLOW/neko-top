@@ -39,22 +39,6 @@
 #define __NEKO_CUDA_MATH_EXT_KERNELS__
 
 /**
- * Device kernel for copy_mask
- */
-template <typename T>
-__global__ void copy_mask_kernel(
-    T* __restrict__ a, T* __restrict__ b, const int size,
-    int* __restrict__ mask, const int mask_size) {
-
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    const int str = blockDim.x * gridDim.x;
-
-    for (int i = idx; i < mask_size; i += str) {
-        a[mask[i]] = b[mask[i]];
-    }
-}
-
-/**
  * Device kernel for cadd_mask
  */
 template <typename T>
