@@ -2,24 +2,10 @@
 set(CMAKE_FOLDER "Tests/Unit/Checkpointing")
 
 # ============================================================================ #
-# Define the executable used for the checkpointing test
+# Define reference case information
 set(BASE_EXAMPLE "rugby_ball")
 set(BASE_CASE_NAME "rugby_ball.case")
 set(BASE_EXAMPLE_DIR "${CMAKE_SOURCE_DIR}/examples/${BASE_EXAMPLE}")
-
-add_executable(checkpointing_exe EXCLUDE_FROM_ALL
-    ${CMAKE_CURRENT_SOURCE_DIR}/driver.f90
-)
-add_dependencies(Unit checkpointing_exe)
-target_link_libraries(checkpointing_exe
-    PRIVATE
-        PkgConfig::neko
-        PkgConfig::json-fortran
-        Neko-TOP::neko-top
-        MPI::MPI_Fortran
-        $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
-        $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-)
 
 # Ensure the Neko binaries can be added to the PATH and the library directories
 set(neko_PATH "${neko_PREFIX}/bin:$ENV{PATH}")
@@ -47,7 +33,6 @@ add_custom_command(
 add_custom_target(checkpointing_case
     DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.case
 )
-add_dependencies(checkpointing_exe checkpointing_case)
 
 # If a prepare script exists, copy it to the test directory and run it
 if (EXISTS "${BASE_EXAMPLE_DIR}/prepare.sh")
@@ -66,22 +51,133 @@ if (EXISTS "${BASE_EXAMPLE_DIR}/prepare.sh")
     add_custom_target(checkpointing_prepare
         DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/prepare.sh
     )
-    add_dependencies(checkpointing_exe checkpointing_prepare)
 else()
     message(WARNING "No prepare script found in ${BASE_EXAMPLE_DIR}.")
 endif()
 
 # ============================================================================ #
-# Define the test itself
+# Define a cleanup step so stale files do not leak between runs
 
-# Add the test to CTest
-add_test(NAME checkpointing_test
-    COMMAND $<TARGET_FILE:checkpointing_exe> checkpoint.case
+add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
+    COMMENT "Cleaning checkpointing unit test artifacts"
+    COMMAND ${CMAKE_COMMAND} -E rm -f
+        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint.log
+        ${CMAKE_CURRENT_BINARY_DIR}/checkpoint_*.log
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.chkp
+        ${CMAKE_CURRENT_BINARY_DIR}/*/checkpoint*.h5
+        ${CMAKE_CURRENT_BINARY_DIR}/neko.log
+    COMMAND ${CMAKE_COMMAND} -E touch ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 )
-# Set the environment variables for the test
-set_tests_properties(checkpointing_test PROPERTIES
-    ENVIRONMENT "NEKO_LOG_FILE=neko.log"
+add_custom_target(checkpointing_cleanup
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/cleanup.done
+)
+add_dependencies(checkpointing_cleanup checkpointing_case)
+if (TARGET checkpointing_prepare)
+    add_dependencies(checkpointing_cleanup checkpointing_prepare)
+endif()
+
+# ============================================================================ #
+# Define pFUnit checkpointing tests
+
+set(CHECKPOINT_COMMON_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/checkpointing_test_utils.f90
+)
+
+add_pfunit_ctest(checkpoint_restore_consistency
+    TEST_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency.pf
+        ${CHECKPOINT_COMMON_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+
+add_pfunit_ctest(checkpoint_end_of_run_gating
+    TEST_SOURCES
+        ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_end_of_run_gating.pf
+        ${CHECKPOINT_COMMON_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+    LINK_LIBRARIES Neko-TOP::neko-top
+    MAX_PES 2
+)
+
+set(CHECKPOINT_RESTORE_ENV
+    "NEKO_LOG_FILE=checkpoint_restore_consistency.log;OMP_NUM_THREADS=1")
+set(CHECKPOINT_GATING_ENV
+    "NEKO_LOG_FILE=checkpoint_end_of_run_gating.log;OMP_NUM_THREADS=1")
+
+set_tests_properties(checkpoint_restore_consistency PROPERTIES
     LABELS "unit;checkpointing"
+    ENVIRONMENT "${CHECKPOINT_RESTORE_ENV}"
     TIMEOUT 300
 )
+
+
+set_tests_properties(checkpoint_end_of_run_gating PROPERTIES
+    LABELS "unit;checkpointing"
+    ENVIRONMENT "${CHECKPOINT_GATING_ENV}"
+    TIMEOUT 300
+)
+
+add_dependencies(Unit checkpoint_restore_consistency)
+add_dependencies(Unit checkpoint_end_of_run_gating)
+
+add_dependencies(checkpoint_restore_consistency
+    checkpointing_case
+)
+add_dependencies(checkpoint_end_of_run_gating
+    checkpointing_case
+)
+
+if (TARGET checkpointing_prepare)
+    add_dependencies(checkpoint_restore_consistency checkpointing_prepare)
+    add_dependencies(checkpoint_end_of_run_gating checkpointing_prepare)
+endif()
+
+# Disable treating unused-variable as error for pfunit tests
+if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(checkpoint_restore_consistency PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+    target_compile_options(checkpoint_end_of_run_gating PRIVATE
+        $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+    )
+endif()
+
+# ============================================================================ #
+# Define the HDF5 checkpointing test
+
+if (HAVE_HDF5)
+    add_pfunit_ctest(checkpoint_restore_consistency_hdf5
+        TEST_SOURCES
+            ${CMAKE_CURRENT_SOURCE_DIR}/test_checkpoint_restore_consistency_hdf5.pf
+            ${CHECKPOINT_COMMON_SOURCES}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        LINK_LIBRARIES Neko-TOP::neko-top
+        MAX_PES 2
+    )
+    set(CHECKPOINT_RESTORE_HDF5_ENV
+        "NEKO_LOG_FILE=checkpoint_restore_consistency_hdf5.log;OMP_NUM_THREADS=1")
+    set_tests_properties(checkpoint_restore_consistency_hdf5 PROPERTIES
+        LABELS "unit;checkpointing;hdf5"
+        ENVIRONMENT "${CHECKPOINT_RESTORE_HDF5_ENV}"
+        TIMEOUT 300
+    )
+    add_dependencies(Unit checkpoint_restore_consistency_hdf5)
+    add_dependencies(checkpoint_restore_consistency_hdf5
+        checkpointing_cleanup
+        checkpointing_case
+    )
+    if (TARGET checkpointing_prepare)
+        add_dependencies(checkpoint_restore_consistency_hdf5 checkpointing_prepare)
+    endif()
+
+    # Disable treating unused-variable as error for pfunit tests
+    if (CMAKE_Fortran_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(checkpoint_restore_consistency_hdf5 PRIVATE
+            $<$<COMPILE_LANGUAGE:Fortran>:-Wno-unused-variable>
+        )
+    endif()
+endif()

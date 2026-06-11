@@ -159,16 +159,6 @@ contains
        call neko_error('Sensitivity output field is not associated')
     end if
 
-    call this%design_output%free()
-    call this%sensitivity_output%free()
-
-    if (allocated(this%sensitivity_stages)) then
-       do i = 1, size(this%sensitivity_stages)
-          call this%sensitivity_stages(i)%free()
-       end do
-       deallocate(this%sensitivity_stages)
-    end if
-
     n_mappings = 0
     if (allocated(this%mapping_cascade)) n_mappings = size(this%mapping_cascade)
 
@@ -185,21 +175,24 @@ contains
        end if
     end if
 
+    call this%set_stage_names()
+
     call this%design_output%init(trim(this%forward_file_name), n_fields, &
          precision = this%output_precision, &
          format = trim(this%output_format))
-    if (this%verbose_design .and. n_mappings .gt. 0) then
+
+    if (this%verbose_design) then
        do i = 1, n_mappings
           call this%design_output%fields%assign_to_field(i, &
                this%mapping_cascade(i)%mapping%X_in)
        end do
        call this%design_output%fields%assign_to_field(n_fields, this%design_out)
-    else if (n_mappings .gt. 0) then
+    else if (n_mappings .eq. 0) then
+       call this%design_output%fields%assign_to_field(1, this%design_out)
+    else
        call this%design_output%fields%assign_to_field(1, &
             this%mapping_cascade(1)%mapping%X_in)
        call this%design_output%fields%assign_to_field(2, this%design_out)
-    else
-       call this%design_output%fields%assign_to_field(1, this%design_out)
     end if
 
     if (this%verbose_sensitivity) then
@@ -209,7 +202,6 @@ contains
        do i = 1, n_mappings + 1
           call this%sensitivity_stages(i)%init(this%coef%dof)
        end do
-       call this%set_stage_names()
        call this%sensitivity_output%init( &
             trim(this%sensitivity_file_name), n_fields, &
             precision = this%output_precision, &
@@ -221,7 +213,6 @@ contains
        call this%sensitivity_output%fields%assign_to_field(n_fields, &
             this%sensitivity_out)
     else
-       call this%set_stage_names()
        call this%sensitivity_output%init( &
             trim(this%sensitivity_file_name), 1, &
             precision = this%output_precision, &
@@ -263,10 +254,10 @@ contains
        end do
        deallocate(this%sensitivity_stages)
     end if
-    if (this%outputs_initialized) then
-       call this%design_output%free()
-       call this%sensitivity_output%free()
-    end if
+
+    call this%design_output%free()
+    call this%sensitivity_output%free()
+
     this%outputs_initialized = .false.
     this%output_fields_set = .false.
     this%output_precision = sp
@@ -524,7 +515,7 @@ contains
   subroutine mapping_handler_set_stage_names(this)
     class(mapping_handler_t), intent(inout) :: this
     integer :: i, j
-    character(len=80) :: previous_name
+    character(len=80) :: previous_name, current_name
 
     ! Since each mapping stores their unmapped field (for chain rule purposes)
     ! and stores the name for the mapped field, we need to loop through and
@@ -532,8 +523,9 @@ contains
     previous_name = trim(this%design_in%name)
     if (allocated(this%mapping_cascade)) then
        do i = 1, size(this%mapping_cascade)
+          current_name = trim(this%mapping_cascade(i)%mapping%fld_name)
           this%mapping_cascade(i)%mapping%X_in%name = trim(previous_name)
-          previous_name = trim(this%mapping_cascade(i)%mapping%fld_name)
+          previous_name = trim(current_name)
        end do
     end if
 

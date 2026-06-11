@@ -43,14 +43,14 @@ module optimizer
   use problem, only: problem_t
   use design, only: design_t
   use num_types, only: rp
-  use logger, only: neko_log
+  use logger, only: neko_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
-  use mpi_f08, only: MPI_Wtime
+  use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX
   use utils, only: neko_error, filename_suffix
   use csv_file, only: csv_file_t
   use vector, only: vector_t
   use json_utils, only: json_get_or_default
-  use comm, only: pe_rank
+  use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
   use continuation_scheduler, only: nekotop_continuation
 
   implicit none
@@ -433,6 +433,10 @@ contains
 
     do while (this%current_iteration .lt. this%max_iterations)
        this%current_iteration = this%current_iteration + 1
+       if (pe_rank .eq. 0) then
+          write(*,*) 'Starting iteration ', this%current_iteration
+       end if
+
        call profiler_start_region('Optimizer iteration')
        iteration_time = MPI_Wtime()
 
@@ -525,7 +529,7 @@ contains
     class(optimizer_t), intent(inout) :: this
     real(kind=rp), intent(in) :: step_time
     logical :: out_of_time
-    real(kind=rp) :: elapsed_time, old_avg_weight
+    real(kind=rp) :: elapsed_time, time, old_avg_weight
 
     out_of_time = .false.
 
@@ -533,12 +537,15 @@ contains
        return
     end if
 
+    call MPI_Allreduce(step_time, time, 1, MPI_REAL_PRECISION, MPI_MAX, &
+         NEKO_COMM)
+
     elapsed_time = MPI_Wtime() - this%start_time
     this%step_count = this%step_count + 1.0_rp
     old_avg_weight = (this%step_count - 1) / this%step_count
 
     ! Estimate Cumulative Average iteration time
-    this%average_time = step_time / this%step_count + &
+    this%average_time = time / this%step_count + &
          this%average_time * old_avg_weight
 
     ! Determine if next iteration would exceed max runtime
@@ -673,13 +680,19 @@ contains
     character(len=*), intent(in), optional :: format
     character(len=:), allocatable :: checkpoint_format
     character(len=256) :: file_path, file_base, file_ext, file_full
+    character(len=LOG_SIZE) :: msg
+    real(kind=rp) :: t_start, t_total
     logical :: exist
 
-    ! Set default behaviour, read from object if not provided
-    if (.not. present(path)) file_path = trim(this%checkpoint_path)
-    if (.not. present(basename)) file_base = trim(this%checkpoint_base)
-    if (.not. present(format)) checkpoint_format = trim(this%checkpoint_format)
+    call neko_log%section('Optimizer checkpoint')
+    t_start = MPI_Wtime()
 
+    ! Set default behaviour
+    file_path = trim(this%checkpoint_path)
+    file_base = trim(this%checkpoint_base)
+    checkpoint_format = trim(this%checkpoint_format)
+
+    ! Overwrite any user supplied components
     if (present(path)) file_path = trim(path)
     if (present(basename)) file_base = trim(basename)
     if (present(format)) checkpoint_format = trim(format)
@@ -713,6 +726,7 @@ contains
             trim(file_path), trim(file_base), "_", iter, ".", trim(file_ext)
     end if
 
+    call neko_log%message('Save general optimizer components')
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')
        call optimizer_save_checkpoint_hdf5(this, file_full, iter, overwrite)
@@ -721,8 +735,15 @@ contains
             trim(file_ext) // '"')
     end select
 
+    call neko_log%message('Saving components of ' // this%optimizer_type)
     call this%save_checkpoint_components(file_full, overwrite)
+
+    call neko_log%message('Save design checkpoint')
     call design%save_checkpoint(file_full, overwrite)
+
+    t_total = MPI_Wtime() - t_start
+    write(msg, '(A,F6.2)') "Checkpoint time: ", t_total
+    call neko_log%end_section(msg)
 
   end subroutine optimizer_save_checkpoint
 

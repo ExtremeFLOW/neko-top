@@ -2,29 +2,31 @@
     "version": 1.0,
     "case": {
         "mesh_file": "data_local/static_mixer/mixer_8x2x2.nmsh",
+        "element_size": 0.05,
         "output_directory": "fields",
         "output_boundary": false,
         "output_at_end": false,
-        "output_checkpoints": false,
+        "output_checkpoints": true,
+        "checkpoint_control": "simulationtime",
+        "checkpoint_value": 2.0,
         "time": {
             "end_time": 12.0,
             "variable_timestep": true,
-            "target_cfl": 0.2,
+            "target_cfl": 0.1,
+            "init_timestep": 1e-4,
             "max_timestep": 4e-3
         },
         "numerics": {
             "time_order": 3,
             "polynomial_order": 7,
-            "dealias": true
+            "dealias": false
         },
         "fluid": {
             "scheme": "pnpn",
             "Re": 500.0,
             "output_control": "simulationtime",
             "output_value": 4e-2,
-            "initial_condition": {
-                "type": "user"
-            },
+            "output_format": "vtkhdf",
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": { "type": "hsmg" },
@@ -32,18 +34,21 @@
                 "max_iterations": 800
             },
             "velocity_solver": {
-                "type": "cg",
+                "type": "fused_cg",
                 "preconditioner": { "type": "jacobi" },
                 "absolute_tolerance": 1e-6,
                 "max_iterations": 800
             },
-            "boundary_conditions ": [
+            "initial_condition": {
+                "type": "user"
+            },
+            "boundary_conditions": [
                 {
                     "type": "user_velocity",
                     "zone_indices": [ 1 ]
                 },
                 {
-                    "type": "outflow",
+                    "type": "outflow+dong",
                     "zone_indices": [ 2 ]
                 },
                 {
@@ -54,6 +59,16 @@
             "source_terms": [
                 {
                     "type": "brinkman",
+                    "limits": [ 0.0, 1000.0 ],
+                    "penalty": 3.0,
+                    "output": {
+                         "enable": true,
+                         "format": "vtkhdf"
+                    },
+                    "filter": {
+                        "type": "PDE",
+                        "radius": 0.01
+                    },
                     "objects": [
                         {
                             "type": "boundary_mesh",
@@ -65,11 +80,7 @@
                                 "value": 0.01
                             }
                         }
-                    ],
-                    "brinkman": {
-                        "limits": [ 0.0, 1000.0 ],
-                        "penalty": 1.0
-                    }
+                    ]
                 }
             ]
         },
@@ -83,24 +94,24 @@
                     "type": "jacobi"
                 },
                 "absolute_tolerance": 1e-6,
-                "max_iterations": 800
+                "max_iterations": 100
+            },
+            "initial_condition": {
+                "type": "uniform",
+                "value": 0.0
             },
             "boundary_conditions": [
                 {
-                    "type": "user",
-                    "value": 1,
+                    "type": "user_dirichlet",
+                    "value": 1.0,
                     "zone_indices": [ 1 ]
                 },
                 {
                     "type": "neumann",
-                    "flux": 0,
+                    "flux": 0.0,
                     "zone_indices": [ 2, 3, 4, 5, 6 ]
                 }
-            ],
-            "initial_condition": {
-                "type": "uniform",
-                "value": 0.0
-            }
+            ]
         }
     }
 }

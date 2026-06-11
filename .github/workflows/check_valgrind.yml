@@ -1,0 +1,106 @@
+# This workflow runs valgrind regression checks for Neko-TOP.
+
+name: Check valgrind regression
+
+on:
+  workflow_call:
+    inputs:
+      neko-version:
+        description: "The version of Neko to use."
+        required: true
+        type: string
+      json-fortran-version:
+        description: "The version of json-fortran to use."
+        required: true
+        type: string
+      pfunit-version:
+        description: "The version of pFUnit to use."
+        required: true
+        type: string
+      hdf5-version:
+        description: "The version of HDF5 to use."
+        required: true
+        type: string
+
+jobs:
+  valgrind-regression:
+    name: Valgrind regression (CPU)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake gfortran gcc libopenblas-dev \
+            libopenmpi-dev openmpi-bin pkg-config liblapack-dev \
+            ninja-build python3 valgrind
+
+      - name: Get json-fortran
+        id: get-json-fortran
+        uses: ./.github/actions/setup_json-fortran
+        with:
+          version: ${{ inputs.json-fortran-version }}
+          compiler: gfortran
+
+      - name: Get ParMETIS
+        id: get-parmetis
+        uses: ./.github/actions/setup_parmetis
+        with:
+          compiler: gfortran
+
+      - name: Get HDF5
+        id: get-hdf5
+        uses: ./.github/actions/setup_hdf5
+        with:
+          version: ${{ inputs.hdf5-version }}
+          compiler: gfortran
+          c-compiler: gcc
+
+      - name: Get neko
+        id: get-neko
+        uses: ./.github/actions/setup_neko
+        with:
+          json-fortran-dir: ${{ steps.get-json-fortran.outputs.install-dir }}
+          parmetis-dir: ${{ steps.get-parmetis.outputs.install-dir }}
+          hdf5-dir: ${{ steps.get-hdf5.outputs.install-dir }}
+          version: ${{ inputs.neko-version }}
+          precision: dp
+          compiler: gfortran
+          backend: CPU
+
+      - name: Get pfunit
+        id: get-pfunit
+        uses: ./.github/actions/setup_pfunit
+        with:
+          version: ${{ inputs.pfunit-version }}
+
+      - name: Configuration
+        env:
+          JSON_FORTRAN_DIR: ${{ steps.get-json-fortran.outputs.install-dir }}
+          NEKO_DIR: ${{ steps.get-neko.outputs.install-dir }}
+          PFUNIT_DIR: ${{ steps.get-pfunit.outputs.install-dir }}
+        run: |
+          cmake -B build -S . -G Ninja --fresh \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DBUILD_TESTING=ON
+
+      - name: Run valgrind regression ctests
+        env:
+          CTEST_OUTPUT_ON_FAILURE: 1
+        run: |
+          ctest --test-dir build -L valgrind --parallel 1
+
+      - name: Save valgrind logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: valgrind-regression-logs
+          path: |
+            build/Testing/Temporary/
+            build/tests/regression/valgrind/
+          overwrite: true
+          if-no-files-found: ignore

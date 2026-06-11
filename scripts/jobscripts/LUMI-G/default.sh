@@ -14,16 +14,15 @@
 # --  Technical Options
 
 # Queue name
-#SBATCH --partition=standard-g
+#SBATCH --partition=small-g
 
 # Ask for n cores placed on R host.
-#SBATCH --nodes=1
-#SBATCH --ntasks=8
-#SBATCH --tasks-per-node=8
-#SBATCH --gpus-per-node=8
+#SBATCH --ntasks=1
+#SBATCH --gpus-per-task=1
+#SBATCH --cpus-per-task=6
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 00-00:05:00
+#SBATCH --time 00-00:10:00
 
 # -- Notification options
 
@@ -54,16 +53,9 @@ fi
 # Select which GPU to map to which core
 source functions.sh
 
-cat <<EOF >select_gpu
-#!/bin/bash
-
-export ROCR_VISIBLE_DEVICES=\$SLURM_LOCALID
-exec \$*
-EOF
-
-chmod +x ./select_gpu
-export CPU_BIND="map_cpu:49,57,17,25,1,9,33,41"
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK
 export MPICH_GPU_SUPPORT_ENABLED=1
+export NEKO_GS_STRTGY=3
 
 run $example
 

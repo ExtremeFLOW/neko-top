@@ -10,10 +10,10 @@ function help() {
     echo -e "  directions, respectively."
     echo -e ""
     echo -e "  If no input arguments are provided, the default mesh size is"
-    echo -e "  32x8x8."
+    echo -e "  256x32x32."
     echo -e ""
     echo -e "  Example usage:"
-    echo -e "    run.sh -x32 -y8 -z8"
+    echo -e "    run.sh -x256 -y32 -z32"
     echo -e ""
     echo -e " Options:"
     echo -e "  -h, --help  Show this help message and exit."
@@ -26,7 +26,7 @@ function help() {
 }
 
 # Handle options
-Nx=20 && Ny=20 && Nz=1
+Nx=256 && Ny=64 && Nz=64
 for arg in "$@"; do
     if [ "${arg:0:2}" == "--" ]; then
         case ${arg:2} in
@@ -61,8 +61,13 @@ fi
 # ============================================================================ #
 # Generate mesh and run case
 
-echo "Generating mesh with dimensions: $Nx $Ny $Nz"
-genmeshbox 0 1 0 1 0 1 $Nx $Ny $Nz .false. .true. .true.
+# echo "Generating mesh with dimensions: $Nx $Ny $Nz"
+
+# if [ ! -f "box.nmsh" ]; then
+#     genmeshbox 0 4 0 1 0 1 $Nx $Ny $Nz .false. .false. .false.
+# else
+#     echo "Mesh file 'box.nmsh' already exists. Skipping mesh generation."
+# fi
 
 # End of file
 # ============================================================================ #

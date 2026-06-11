@@ -54,7 +54,7 @@ contains
   module subroutine checkpoint_save_linear(this, neko_case)
     class(simulation_checkpoint_t), intent(inout) :: this
     class(case_t), intent(inout) :: neko_case
-    integer :: index, tstep, counter
+    integer :: index, tstep, counter, n_total
     real(kind=rp) :: time
 
     time = neko_case%time%t
@@ -62,8 +62,6 @@ contains
 
     ! We save to disc only every n_saves_memory time steps
     index = modulo(tstep, this%n_saves_memory)
-
-    ! Sample the checkpoint if needed
     if (index .eq. 0 .or. tstep .le. this%first_valid_timestep) then
        this%loaded_checkpoint = tstep
 
@@ -75,7 +73,18 @@ contains
        this%n_saves_disc = this%n_saves_disc + 1
     end if
 
-    call this%save_data(index + 1)
+    ! Only save to RAM from the last disc checkpoint to the end of the forward
+    ! simulation. With fixed timesteps, the total count and the last disc-save
+    ! timestep are known from the time object.
+    ! Note: the plus 0.5 is to round up to the next integer, as the division can
+    ! be slightly smaller than the actual number of steps due to floating point
+    ! errors.
+    n_total = int(((neko_case%time%end_time - neko_case%time%start_time) &
+         / neko_case%time%dt) + 0.5_rp)
+    if (tstep .ge. n_total - modulo(n_total, this%n_saves_memory)) then
+       call this%save_data(index + 1)
+    end if
+
   end subroutine checkpoint_save_linear
 
   !> Restore the forward simulation state in a linear fashion.
@@ -89,15 +98,8 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     integer :: k, previous_save, next_save, local_idx, counter
-    type(field_t), pointer :: u, v, w, p, s
 
     loop_start = MPI_WTIME()
-
-    u => neko_case%fluid%u
-    v => neko_case%fluid%v
-    w => neko_case%fluid%w
-    p => neko_case%fluid%p
-    s => null()
 
     ! Determine the nearest save states on both sides
     previous_save = tstep - modulo(tstep, this%n_saves_memory)
