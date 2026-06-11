@@ -136,6 +136,8 @@ contains
           call neko_error('steady simcomp only works for a single scalar')
        end if
        this%s => this%case%scalars%scalar_fields(1)%scalar%s
+    else
+       nullify(this%s)
     end if
 
     ! initialize the logger
