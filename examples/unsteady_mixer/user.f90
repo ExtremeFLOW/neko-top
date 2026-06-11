@@ -83,7 +83,7 @@ contains
        nullify(u, v, w)
     else
        s => fields%get("s")
-         call s%copy_from(DEVICE_TO_HOST, sync = .true.)
+       call s%copy_from(DEVICE_TO_HOST, sync = .true.)
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
@@ -92,7 +92,7 @@ contains
           s%x(idx, 1, 1, 1) = L / (1.0_rp + exp(-k*(z - z_0)))
        end do
 
-         call s%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call s%copy_from(HOST_TO_DEVICE, sync = .true.)
        nullify(s)
     end if
   end subroutine user_bc
