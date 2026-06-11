@@ -15,7 +15,7 @@ module user
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
   use scratch_registry, only : neko_scratch_registry
-  use device, only: HOST_TO_DEVICE, device_memcpy
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST, device_memcpy
   implicit none
   !> Case parameters
   ! To define the initial boundary conditions we don't wish to introduce a
