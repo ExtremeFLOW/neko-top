@@ -1,12 +1,12 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/static_mixer/mixer_16x8x8.nmsh",
+        "mesh_file": "data_local/static_mixer/mixer_256x64x64.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 1e-3,
+            "end_time": 12.0,
             "timestep": 1.0e-4
         },
         "numerics": {
@@ -22,12 +22,11 @@
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
-                    "type": "hsmg",
-                    // "type": "phmg",
-                    // "pcoarsening_schedule": [ 5, 3, 1 ],
-                    // "coarse_grid": {
-                    //     "solver": "tamg"
-                    // }
+                    "type": "phmg",
+                    "pcoarsening_schedule": [ 5, 3, 1 ],
+                    "coarse_grid": {
+                        "solver": "tamg"
+                    }
                 },
                 "absolute_tolerance": 1e-7,
                 "max_iterations": 800
@@ -186,7 +185,7 @@
         "solver": {
             "type": "mma",
             "max_iterations": 200,
-            "max_runtime": 60.0,
+            "max_runtime": 171900.0,
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
