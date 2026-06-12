@@ -14,6 +14,13 @@ if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
     find_package(CUDAToolkit REQUIRED)
+
+    if(DEFINED ENV{CUDA_ARCH})
+        set(CMAKE_CUDA_ARCHITECTURES "$ENV{CUDA_ARCH}")
+    endif()
+
+    message(STATUS "CUDA architecture(s) set to: ${CMAKE_CUDA_ARCHITECTURES}")
+
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
     enable_language(C)

@@ -424,6 +424,16 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+
+            if [ -n "$NEKO_CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=$NEKO_CUDA_ARCH"
+            elif [ -n "$CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=-arch=sm_$CUDA_ARCH"
+            else
+                error "CUDA architecture not set."
+                exit 1
+            fi
+
         elif [ "$DEVICE_TYPE" == "HIP" ]; then
             if [ -d "$HIP_DIR" ]; then
                 FEATURES+=" --with-hip=$HIP_DIR"
