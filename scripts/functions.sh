@@ -18,6 +18,15 @@ function run {
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
+    # Check for recoverable errors in the error log
+    if [ -s error.log ]; then
+        grep " ERROR: Optimizer stopped after reaching the maximum runtime" \
+            error.log >/dev/null
+        if [ $? -ne 0 ]; then
+            return 1
+        fi
+    fi
+
     if [ -f "$logfile" ]; then
         # Move old log files to folder with counter padded to 2 digits
 

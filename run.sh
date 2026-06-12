@@ -337,9 +337,9 @@ function Submit() {
         DEP=""
         for i in $(seq 1 $N_JOBS); do
             if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
-                DEP="--dependency=afternotok:$id,afterany:$SEQ_DEP"
+                DEP="--dependency=afterany:$id:$SEQ_DEP"
             elif [ -n "$id" ]; then
-                DEP="--dependency=afternotok:$id"
+                DEP="--dependency=afterany:$id"
             elif [ -n "$SEQ_DEP" ]; then
                 DEP="--dependency=afterany:$SEQ_DEP"
             fi
