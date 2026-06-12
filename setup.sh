@@ -102,6 +102,7 @@ if [ -z "$MPICXX" ]; then export MPICXX=$(which mpicxx); else export MPICXX; fi
 # Device specific compilers
 if [ "$DEVICE_TYPE" == "CUDA" ]; then
     if [ -z "$NVCC" ]; then export NVCC=$(which nvcc); else export NVCC; fi
+    if [ -z "$CUDA_ARCH" ]; then echo >&2 "CUDA_ARCH is not set."; exit 1; fi
 elif [ "$DEVICE_TYPE" == "HIP" ]; then
     if [ -z "$HIPCC" ]; then export HIPCC=$(which hipcc); else export HIPCC; fi
 fi
