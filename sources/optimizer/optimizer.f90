@@ -46,7 +46,7 @@ module optimizer
   use logger, only: neko_log, LOG_SIZE
   use profiler, only: profiler_start_region, profiler_end_region
   use mpi_f08, only: MPI_Wtime, MPI_Allreduce, MPI_MAX
-  use utils, only: neko_error, filename_suffix
+  use utils, only: neko_error, filename_suffix, read_duration
   use csv_file, only: csv_file_t
   use vector, only: vector_t
   use json_utils, only: json_get_or_default
@@ -343,12 +343,11 @@ contains
     class(optimizer_t), intent(inout) :: this
     type(json_file), intent(inout) :: solver_params
     integer :: read_int
-    real(kind=rp) :: read_real
     character(len=:), allocatable :: read_str
 
-    call json_get_or_default(solver_params, 'max_runtime', read_real, &
-         this%max_runtime)
-    this%max_runtime = read_real
+    call json_get_or_default(solver_params, 'max_runtime', read_str, "")
+    call read_duration(read_str, this%max_runtime)
+
     call json_get_or_default(solver_params, 'restart_file', read_str, &
          this%checkpoint_file)
     this%checkpoint_file = read_str
@@ -367,7 +366,6 @@ contains
     this%checkpoint_interval = read_int
 
   end subroutine optimizer_read_base_settings
-
 
   ! -------------------------------------------------------------------------- !
   ! Optimization loop routine
