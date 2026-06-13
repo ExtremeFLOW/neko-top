@@ -32,7 +32,7 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
     printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
     printf "  -%-1s, --%-10s %-60s\n" " " "sequential" "Submit the examples sequentially."
-    printf "  -%-1s, --%-10s %-60s\n" " " "njobs" "Number of jobs to submit per example when not submitting sequentially."
+    printf "  -%-1s, --%-10s %-60s\n" " " "njobs" "Number of jobs to submit per example."
 
     printf "\n\e[4mEnvironment:\e[0m\n"
     printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
