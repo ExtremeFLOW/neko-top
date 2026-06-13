@@ -20,11 +20,11 @@ function run {
 
     # Check for recoverable errors in the error log
     if [ -s error.log ]; then
-        grep " ERROR: Optimizer stopped after reaching the maximum runtime" \
-            error.log >/dev/null
-        if [ $? -ne 0 ]; then
-            return 1
-        fi
+        grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
+            error.log >/dev/null || return 1
+
+        # If the error is recoverable, clear the error log and continue
+        echo "" > error.log
     fi
 
     if [ -f "$logfile" ]; then
@@ -37,15 +37,15 @@ function run {
         find ./ -maxdepth 1 -not -empty -type f -name "*.log" \
             -not -name "output.log" -not -name "error.log" \
             -exec mv -ft ./$old_run {} \;
-        cp -ft ./$old_run output.log error.log
+        cp -ft ./$old_run output.log
+        [ -s error.log ] && cp -ft ./$old_run error.log
 
         # Reset the log files
         printf "Ready" >./output.log
-        printf "" > ./error.log
     fi
 
     # Run the example
-    printf "Executing Neko.\n"
+    printf "Executing Neko.\n" > ./output.log
     printf "See $logfile for the status output.\n"
     export NEKO_LOG_FILE=$logfile
 
