@@ -54,7 +54,7 @@ mesh_nz="${VALGRIND_MESH_NZ:-4}"
 bash ./prepare.sh -x"${mesh_nx}" -y"${mesh_ny}" -z"${mesh_nz}" > prepare.log
 
 # Execute the case with valgrind and parse leak summary.
-if ! valgrind -s \
+if ! valgrind \
     --leak-check=full \
     --show-leak-kinds=all \
     --undef-value-errors=no \

@@ -342,6 +342,7 @@ contains
     class(brinkman_design_t), intent(inout) :: this
 
     call this%free_base()
+    call this%mapping%free()
     nullify(this%brinkman_amplitude)
     nullify(this%design_indicator)
     nullify(this%sensitivity)
