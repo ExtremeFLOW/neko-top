@@ -1,0 +1,26 @@
+name = "LightKrylov"
+version = "0.1.0"
+license = "BSD-3-Clause"
+author = "Jean-Christophe Loiseau"
+maintainer = "jean-christophe.loiseau@ensam.eu"
+copyright = "Copyright 2023, Jean-Christophe Loiseau"
+description = "Lightweight fortran implementation of Krylov subspace techniques"
+
+[build]
+auto-executables = false
+auto-tests = false
+auto-examples = false
+module-naming = false
+external-modules = "mpi_f08"
+
+[install]
+library = true
+
+[fortran]
+implicit-typing = false
+implicit-external = true
+source-form = "free"
+
+[dependencies]
+stdlib = "*"
+FACE = {git = "https://github.com/szaghi/FACE.git"}
