@@ -251,7 +251,8 @@ contains
 
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    this%value = this%value_old + this%value * time%dt
+    this%value = this%value_old + this%value * time%dt / &
+         (time%end_time - time%start_time)
   end subroutine functional_accumulate_value
 
   !> Accumulate the sensitivity of the function
@@ -267,6 +268,7 @@ contains
 
     ! could potentially use higher order trapezoidal/Simpson etc, but this
     ! should suffice
-    call vector_add2s1(this%sensitivity, this%sensitivity_old, time%dt)
+    call vector_add2s1(this%sensitivity, this%sensitivity_old, time%dt / &
+         (time%end_time - time%start_time))
   end subroutine functional_accumulate_sensitivity
 end module base_functional
