@@ -365,7 +365,9 @@ contains
     ! Check the KKT conditions and check for convergence
     call this%mma%KKT(x, objective_sensitivities, &
          constraint_value, constraint_sensitivities)
+
     converged = this%mma%get_residumax() .lt. this%tolerance
+    this%max_change
 
     ! Free local resources
     call neko_scratch_registry%relinquish(indices)

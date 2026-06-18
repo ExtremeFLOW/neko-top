@@ -65,6 +65,10 @@ module optimizer
      integer, private :: max_iterations = 0
      !> The current iteration number
      integer, private :: current_iteration = 0
+     !> The smallest change in design variables.
+     real(kind=rp), private :: stop_design_change = -1.0_rp
+     !> The maximum observed design change.
+     real(kind=rp), private :: max_design_change = huge(0.0_rp)
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
@@ -83,6 +87,7 @@ module optimizer
      real(kind=rp), private :: start_time = 0.0_rp
      real(kind=rp), private :: average_time = 0.0_rp
      real(kind=rp), private :: step_count = 0.0_rp
+
      ! Logging state
      logical, private :: log_initialized = .false.
      logical, private :: log_include_constraints = .true.
@@ -282,12 +287,13 @@ contains
   !! @param checkpoint_interval The interval for saving checkpoints in
   !!        iterations.
   subroutine optimizer_init_base(this, optimizer_type, max_iterations, &
-       max_runtime, checkpoint_file, checkpoint_path, checkpoint_base, &
-       checkpoint_format, checkpoint_interval)
+       max_runtime, stop_design_change, checkpoint_file, checkpoint_path, &
+       checkpoint_base, checkpoint_format, checkpoint_interval)
     class(optimizer_t), intent(inout) :: this
     character(len=*), intent(in) :: optimizer_type
     integer, intent(in) :: max_iterations
     real(kind=rp), intent(in), optional :: max_runtime
+    real(kind=rp), intent(in), optional :: stop_design_change
     character(len=*), intent(in), optional :: checkpoint_file
     character(len=*), intent(in), optional :: checkpoint_path
     character(len=*), intent(in), optional :: checkpoint_base
@@ -300,6 +306,7 @@ contains
 
     ! Optional settings
     if (present(max_runtime)) this%max_runtime = max_runtime
+    if (present(stop_design_change)) this%stop_design_change = stop_design_change
     if (present(checkpoint_file)) this%checkpoint_file = checkpoint_file
     if (present(checkpoint_path)) this%checkpoint_path = checkpoint_path
     if (present(checkpoint_base)) this%checkpoint_base = checkpoint_base
@@ -321,6 +328,8 @@ contains
     this%optimizer_type = ''
     this%max_iterations = 0
     this%max_runtime = -1.0_rp
+    this%stop_design_change = -1.0_rp
+    this%max_design_change = 0.0_rp
     this%checkpoint_file = ''
     this%checkpoint_path = './checkpoints/'
     this%checkpoint_base = 'optimizer_checkpoint'
@@ -463,10 +472,16 @@ contains
        if (converged) then
           stop_flag = 0
           exit
+       else if (this%current_iteration .ge. this%max_iterations) then
+          stop_flag = 1
+          exit
+       else if (this%max_design_change .lt. this%stop_design_change) then
+          stop_flag = 2
+          exit
        else if (this%out_of_time(iteration_time)) then
           call this%save_checkpoint(this%current_iteration, design, .true., &
                basename = 'optimizer_rt_checkpoint')
-          stop_flag = 2
+          stop_flag = -1
           exit
        end if
     end do
