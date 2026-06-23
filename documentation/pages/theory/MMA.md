@@ -177,7 +177,7 @@ The update is governed by:
 
 ## Subproblem Solution
 
-The convex subproblem is solved using a **primal-dual interior point method `"dpip"` ** and a pure **dual interior point method `"dip"`**.
+The convex subproblem is solved using a **primal-dual interior point method** `"pdip"`  and a pure **dual interior point method** `"dip"`.
 
 In this implementation both subsolvers support both **CPU and device (GPU)** execution
 
@@ -201,10 +201,11 @@ The implementation is encapsulated in the `mma_t` type and includes the followin
 | Name | Description | Default |
 |------|-------------|---------|
 | `mma.max_iter` | Max iterations for subproblem | `100` |
-| `mma.epsimin` | KKT tolerance scaling | auto |
-| `mma.asyinit` | Initial asymptote distance | `0.5` |
-| `mma.asyincr` | Asymptote expansion | `1.2` |
-| `mma.asydecr` | Asymptote contraction | `0.7` |
+| `mma.epsimin` | KKT tolerance scaling | \f$ 10^{-9} \sqrt{m + n} \f$ |
+| `mma.asyinit` | Initial asymptote distance | `0.2` |
+| `mma.asyincr` | Asymptote expansion | `1.05` |
+| `mma.asydecr` | Asymptote contraction | `0.65` |
+| `mma.move_limit` | Move limit for updating the design variables | `0.2` |
 | `mma.a0` | MMA param | `1.0` |
 | `mma.a` | MMA param | `0.0` |
 | `mma.c` | MMA param | `1000.0` |
