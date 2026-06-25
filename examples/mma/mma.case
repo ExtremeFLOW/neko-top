@@ -59,7 +59,7 @@
         "solver": {
             "type": "mma",
             "max_iterations": 100,
-            "tolerance": 1.0e-4,
+            "tolerance": 1.0e-6,
             "mma": {
                 "max_iter": 100,
                 "subsolver": "dip",
