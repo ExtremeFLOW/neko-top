@@ -55,8 +55,8 @@ module device_mma_math
        mma_gensub3_hip, mma_gensub4_hip, mattrans_v_mul_hip, &
        mma_dipsolvesub1_hip, mma_Ljjxinv_hip, hip_Hess, delta_1dbeam_hip, &
        hip_custom_solver, mma_prepare_hessian_hip, &
-       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip!, &
-      ! mma_unconstrained_kkt_hip
+       mma_prepare_aa_matrix_hip, hipSOLVER_wrapper, mma_update_hessian_z_hip, &
+       mma_unconstrained_kkt_hip
 
   implicit none
   private
@@ -80,7 +80,7 @@ contains
     real(c_rp), intent(in) :: eps
     integer, value :: n
 #if HAVE_HIP
-    !call mma_unconstrained_kkt_hip(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
+    call mma_unconstrained_kkt_hip(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
 #elif HAVE_CUDA
     call mma_unconstrained_kkt_cuda(rex_d, x_d, xmin_d, xmax_d, df0dx_d, eps, n)
 #elif HAVE_OPENCL
