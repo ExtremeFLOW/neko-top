@@ -48,7 +48,7 @@ module cuda_mma_math
        integer(c_int) :: n
      end subroutine mma_unconstrained_kkt_cuda
 
-     
+
      subroutine mma_update_hessian_z_cuda(Hess_d, a_d, m) &
           bind(C, name="mma_update_hessian_z_cuda")
        use iso_c_binding

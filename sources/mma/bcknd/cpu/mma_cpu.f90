@@ -141,11 +141,11 @@ contains
     ! Compute the stationarity residual projected onto the box bounds
     do j = 1, this%n
        if (x(j) - this%xmin%x(j) .le. NEKO_EPS) then
-          ! At lower bound: residual is non-zero only if gradient is negative 
+          ! At lower bound: residual is non-zero only if gradient is negative
           ! (trying to decrease x further)
           rex(j) = min(0.0_rp, df0dx(j))
        else if (this%xmax%x(j) - x(j) .le. NEKO_EPS) then
-          ! At upper bound: residual is non-zero only if gradient is positive 
+          ! At upper bound: residual is non-zero only if gradient is positive
           ! (trying to increase x further)
           rex(j) = max(0.0_rp, df0dx(j))
        else
@@ -1146,7 +1146,7 @@ contains
            (sqrt(p0j) + sqrt(q0j))
 
       x = merge(alpha, x, x .lt. alpha)
-      x = merge(beta,  x, x .gt. beta)
+      x = merge(beta, x, x .gt. beta)
     end associate
 
     ! Update history

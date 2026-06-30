@@ -84,7 +84,7 @@ contains
 
     !solve the approximation problem using interior point method
     call profiler_start_region("MMA subsolve")
-    
+
     if (this%unconstrained_problem) then
        call mma_subsolve_unconstrained_device(this, x)
     elseif (this%subsolver .eq. "dip") then
@@ -146,7 +146,7 @@ contains
 
     ! Release scratch memory
     call this%scratch%relinquish(ind)
-  end subroutine mma_unconstrained_KKT_device  
+  end subroutine mma_unconstrained_KKT_device
 
   !> Implementation of the KKT residual computation for dual interior
   ! point method (dip) subsolve of MMA algorithm.
@@ -1109,7 +1109,7 @@ contains
       call device_mma_dipsolvesub1(x%x_d, p0j%x_d, q0j%x_d, &
            low%x_d, upp%x_d, alpha%x_d, beta%x_d, this%n)
       ! Closed-form primal solution for unconstrained MMA subproblem
-      
+
     end associate
 
     ! Save the new designx
