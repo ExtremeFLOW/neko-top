@@ -1100,7 +1100,7 @@ contains
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: designx_d
     type(vector_t), pointer :: x
-    integer :: info, ind(1)
+    integer :: ind(1)
 
     call this%scratch%request(x, ind(1), this%n, .false.)
     associate(p0j => this%p0j, q0j => this%q0j, &
