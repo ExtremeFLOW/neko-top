@@ -68,7 +68,7 @@ module optimizer
      !> The smallest change in design variables.
      real(kind=rp), private :: stop_design_change = -1.0_rp
      !> The maximum observed design change.
-     real(kind=rp), private :: max_design_change = huge(0.0_rp)
+     real(kind=rp), public :: max_design_change = huge(0.0_rp)
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
