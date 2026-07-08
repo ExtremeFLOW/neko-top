@@ -280,6 +280,7 @@ contains
   !! @param optimizer_type The type of the optimizer.
   !! @param max_iterations The maximum number of iterations.
   !! @param max_runtime The maximum runtime in seconds.
+  !! @param stop_design_change The stopping criteria for design change.
   !! @param checkpoint_file The checkpoint file to restart from.
   !! @param checkpoint_path The path for saving checkpoint files.
   !! @param checkpoint_base The base name for checkpoint files.
