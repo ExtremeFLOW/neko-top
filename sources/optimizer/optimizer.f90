@@ -68,7 +68,7 @@ module optimizer
      !> The smallest change in design variables.
      real(kind=rp), private :: stop_design_change = -1.0_rp
      !> The maximum observed design change.
-     real(kind=rp), public :: max_design_change = huge(0.0_rp)
+     real(kind=rp), public :: max_design_change = 0.0_rp
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
@@ -590,14 +590,13 @@ contains
     if (present(include_constraints)) then
        this%log_include_constraints = include_constraints
     end if
+
     n_cont = nekotop_continuation%get_n_params()
-
     base_size = problem%get_log_size(this%log_include_constraints)
-
     this%log_extra_size = 0
     if (present(extra_headers)) this%log_extra_size = size(extra_headers)
 
-    total_size = 1 + base_size + this%log_extra_size + n_cont
+    total_size = 1 + base_size + this%log_extra_size + 1 + n_cont
     call this%log_data%init(total_size)
 
     if (present(filename)) then
@@ -618,6 +617,8 @@ contains
           header = trim(header) // ', ' // trim(extra_headers(i))
        end do
     end if
+
+    header = trim(header) // ', max_design_change'
 
     ! continuation parameters
     do i = 1, n_cont
@@ -661,9 +662,14 @@ contains
        this%log_data%x(offset:offset + size(extra_values) - 1) = extra_values
     end if
 
+    ! Save maximum design change
+    offset = offset + this%log_extra_size
+    this%log_data%x(offset:offset + 1 - 1) = this%max_design_change
+
     ! Continuation parameter values
+    offset = offset + 1
     do i = 1, n_cont
-       this%log_data%x(offset + size(extra_values) - 1 + i) = &
+       this%log_data%x(offset + i) = &
             nekotop_continuation%params(i)%target
     end do
 
