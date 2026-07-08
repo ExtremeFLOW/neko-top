@@ -13,4 +13,4 @@ Notebook to ensure we can monitor the run and its progress.
   Unconstrained: KKT is norm and max of the gradient, so should be golden.
 - Objective function history, weighted history plot of total and individuals,
   and the unweighted history plot of individuals.
-
+- MND: measure of non-discreteness.
