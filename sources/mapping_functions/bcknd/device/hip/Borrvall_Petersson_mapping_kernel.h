@@ -1,5 +1,5 @@
 /**
- * @file Borrvall_Peterson_mapping_kernel.h
+ * @file Borrvall_Petersson_mapping_kernel.h
  * @copyright
  * Copyright (c) 2024-2026, The Neko-TOP Authors
  * All rights reserved.
@@ -34,14 +34,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __NEKO_HIP_BORRVALL_PETERSON_MAPPING_KERNELS__
-#define __NEKO_HIP_BORRVALL_PETERSON_MAPPING_KERNELS__
+#ifndef __NEKO_HIP_BORRVALL_PETERSSON_MAPPING_KERNELS__
+#define __NEKO_HIP_BORRVALL_PETERSSON_MAPPING_KERNELS__
 
 /**
- * Device kernel for Borrvall & Peterson mapping
+ * Device kernel for Borrvall & Petersson mapping
  */
 template <typename T>
-__global__ void Borrvall_Peterson_mapping_apply_kernel(
+__global__ void Borrvall_Petersson_mapping_apply_kernel(
     const T f_min, const T f_max, const T q, T* __restrict__ X_out_d,
     T* __restrict__ X_in_d, const int n) {
 
@@ -55,10 +55,10 @@ __global__ void Borrvall_Peterson_mapping_apply_kernel(
 }
 
 /**
- * Device kernel for Borrvall & Peterson chain rule
+ * Device kernel for Borrvall & Petersson chain rule
  */
 template <typename T>
-__global__ void Borrvall_Peterson_mapping_apply_backward_kernel(
+__global__ void Borrvall_Petersson_mapping_apply_backward_kernel(
     const T f_min, const T f_max, const T q, T* __restrict__ sens_out_d,
     T* __restrict__ sens_in_d, T* __restrict__ X_in_d, const int n) {
 
@@ -70,4 +70,4 @@ __global__ void Borrvall_Peterson_mapping_apply_backward_kernel(
             * (q + 1.0) / ( (X_in_d[i] + q) * (X_in_d[i] + q)) * sens_in_d[i];
     }
 }
-#endif // __NEKO_HIP_BORRVALL_PETERSON_MAPPING_KERNELS__
+#endif // __NEKO_HIP_BORRVALL_PETERSSON_MAPPING_KERNELS__

@@ -1,6 +1,6 @@
 # CMakeLists.txt for the mapping-function unit tests.
 #
-# Finite-difference verification of the RAMP and Borrvall & Peterson mappings:
+# Finite-difference verification of the RAMP and Borrvall & Petersson mappings:
 # each forward mapping is central-differenced and compared against the
 # corresponding backward (chain-rule) mapping.
 

@@ -107,7 +107,7 @@ contains
        call neko_error("RAMP mapping's 'convex_up' option has been " // &
             "removed -- plain RAMP is now always the down/increasing form " // &
             "(x=0:fluid, x=1:solid). For the x=0:solid/x=1:fluid form, " // &
-            "use type 'Borrvall_Peterson' instead.")
+            "use type 'Borrvall_Petersson' instead.")
     end if
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)

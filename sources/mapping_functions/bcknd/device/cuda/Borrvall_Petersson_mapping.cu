@@ -1,5 +1,5 @@
 /**
- * @file Borrvall_Peterson_mapping.cu
+ * @file Borrvall_Petersson_mapping.cu
  * @copyright
  * Copyright (c) 2024-2026, The Neko-TOP Authors
  * All rights reserved.
@@ -46,33 +46,33 @@
 #include <neko/device/device_config.h>
 
 // Local includes
-#include "Borrvall_Peterson_mapping_kernel.h"
+#include "Borrvall_Petersson_mapping_kernel.h"
 
 extern "C" {
 
-/** Fortran wrapper for Borrvall & Peterson mapping
+/** Fortran wrapper for Borrvall & Petersson mapping
  */
-void cuda_Borrvall_Peterson_mapping_apply(real* f_min, real* f_max, real* q,
+void cuda_Borrvall_Petersson_mapping_apply(real* f_min, real* f_max, real* q,
     void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    Borrvall_Peterson_mapping_apply_kernel<real>
+    Borrvall_Petersson_mapping_apply_kernel<real>
         <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
         (*f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
     CUDA_CHECK(cudaGetLastError());
 }
 
-/** Fortran wrapper for Borrvall & Peterson chain rule
+/** Fortran wrapper for Borrvall & Petersson chain rule
  */
-void cuda_Borrvall_Peterson_mapping_apply_backward(real* f_min, real* f_max,
+void cuda_Borrvall_Petersson_mapping_apply_backward(real* f_min, real* f_max,
     real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    Borrvall_Peterson_mapping_apply_backward_kernel<real>
+    Borrvall_Petersson_mapping_apply_backward_kernel<real>
         <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
         (*f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
         (real*)X_in_d, *n);
