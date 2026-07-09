@@ -6,12 +6,12 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 12.0,
-            "timestep": 1.0e-4
+            "end_time": 4.0,
+            "timestep": 5.0e-4
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 7,
+            "polynomial_order": 5,
             "dealias": false
         },
         "fluid": {
@@ -19,11 +19,12 @@
             "Re": 200.0,
             "output_control": "never",
             "output_format": "vtkhdf",
+            "strict_convergence": true,
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
                     "type": "phmg",
-                    "pcoarsening_schedule": [ 5, 3, 1 ],
+                    "pcoarsening_schedule": [ 3, 2, 1 ],
                     "coarse_grid": {
                         "solver": "tamg"
                     }
