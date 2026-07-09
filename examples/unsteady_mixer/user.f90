@@ -71,7 +71,7 @@ contains
           z = u%dof%z(idx, 1, 1, 1)
 
           ! Inflow velocity profile is a paraboloid
-          u%x(idx, 1, 1, 1) = - (y - 0.5_rp)**2 - (z - 0.5_rp)**2 + 1.0_rp
+          u%x(idx, 1, 1, 1) = 36.0_rp * y*(y-1.0_rp) * z*(z-1.0_rp)
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
@@ -83,7 +83,7 @@ contains
        nullify(u, v, w)
     else
        s => fields%get("s")
-         call s%copy_from(DEVICE_TO_HOST, sync = .true.)
+       call s%copy_from(DEVICE_TO_HOST, sync = .true.)
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
@@ -92,7 +92,7 @@ contains
           s%x(idx, 1, 1, 1) = L / (1.0_rp + exp(-k*(z - z_0)))
        end do
 
-         call s%copy_from(HOST_TO_DEVICE, sync = .true.)
+       call s%copy_from(HOST_TO_DEVICE, sync = .true.)
        nullify(s)
     end if
   end subroutine user_bc
