@@ -6,12 +6,12 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 12.0,
-            "timestep": 1.0e-4
+            "end_time": 4.0,
+            "timestep": 5.0e-4
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 7,
+            "polynomial_order": 5,
             "dealias": false
         },
         "fluid": {
@@ -19,11 +19,12 @@
             "Re": 200.0,
             "output_control": "never",
             "output_format": "vtkhdf",
+            "strict_convergence": true,
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
                     "type": "phmg",
-                    "pcoarsening_schedule": [ 5, 3, 1 ],
+                    "pcoarsening_schedule": [ 3, 2, 1 ],
                     "coarse_grid": {
                         "solver": "tamg"
                     }
@@ -58,7 +59,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 200.0,
+            "Pe": 1000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
@@ -142,13 +143,15 @@
                 "y_bounds": [ 0.2, 0.5 ],
                 "z_bounds": [ 0.2, 0.5 ]
             }
+        ],
+        "simulation_components": [
+            {
+                "type": "steady",
+                "tol": 1e-6,
+                "compute_control": "tsteps",
+                "compute_value": 5
+            }
         ]
-    },
-    "unsteady": true,
-    "checkpoints": {
-        "enabled": true,
-        "format": "chkp",
-        "n_memory": 500
     },
     "optimization": {
         "design": {
@@ -165,8 +168,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 1.0e3,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 10.0
                 }
             ],
             "initial_distribution": {
@@ -183,7 +185,7 @@
         "solver": {
             "type": "mma",
             "max_iterations": 200,
-            "max_runtime": 171900.0,
+            "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,

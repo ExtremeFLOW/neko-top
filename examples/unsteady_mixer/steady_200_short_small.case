@@ -1,17 +1,17 @@
 {
     "version": 1.0,
     "case": {
-        "mesh_file": "data_local/static_mixer/mixer_256x64x64.nmsh",
+        "mesh_file": "data_local/static_mixer/mixer_64x16x16.nmsh",
         "output_checkpoints": false,
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 12.0,
-            "timestep": 1.0e-4
+            "end_time": 4.0,
+            "timestep": 5.0e-4
         },
         "numerics": {
             "time_order": 3,
-            "polynomial_order": 7,
+            "polynomial_order": 5,
             "dealias": false
         },
         "fluid": {
@@ -19,11 +19,12 @@
             "Re": 200.0,
             "output_control": "never",
             "output_format": "vtkhdf",
+            "strict_convergence": true,
             "pressure_solver": {
                 "type": "gmres",
                 "preconditioner": {
                     "type": "phmg",
-                    "pcoarsening_schedule": [ 5, 3, 1 ],
+                    "pcoarsening_schedule": [ 3, 2, 1 ],
                     "coarse_grid": {
                         "solver": "tamg"
                     }
@@ -58,7 +59,7 @@
         },
         "scalar": {
             "enabled": true,
-            "Pe": 200.0,
+            "Pe": 1000.0,
             "solver": {
                 "type": "cg",
                 "preconditioner": {
@@ -167,8 +168,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 1.0e3,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 10.0
                 }
             ],
             "initial_distribution": {
@@ -184,8 +184,8 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 200,
-            "max_runtime": 171900.0,
+            "max_iterations": 10,
+            "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
@@ -201,15 +201,15 @@
                 "type": "scalar_mixing",
                 "mask_name": "objective_domain",
                 "phi_ref": 0.5,
-                "weight": 1.0
+                "weight": 10.8336275609
             },
             {
                 "type": "viscous_dissipation",
-                "weight": 0.1
+                "weight": 1.19703784706
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 0.1
+                "weight": 45.10107562188 
             }
         ]
     }
