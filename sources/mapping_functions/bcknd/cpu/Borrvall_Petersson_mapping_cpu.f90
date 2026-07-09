@@ -1,4 +1,4 @@
-!> @file Borrvall_Peterson_mapping_cpu.f90
+!> @file Borrvall_Petersson_mapping_cpu.f90
 !! @copyright
 !! Copyright (c) 2026, The Neko-TOP Authors
 !! All rights reserved.
@@ -32,36 +32,36 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-!> CPU backend for Borrvall & Peterson mapping operations.
-module Borrvall_Peterson_mapping_cpu
+!> CPU backend for Borrvall & Petersson mapping operations.
+module Borrvall_Petersson_mapping_cpu
   use num_types, only: rp
   implicit none
   private
 
-  public :: Borrvall_Peterson_mapping_apply_cpu
-  public :: Borrvall_Peterson_mapping_apply_backward_cpu
+  public :: Borrvall_Petersson_mapping_apply_cpu
+  public :: Borrvall_Petersson_mapping_apply_backward_cpu
 
 contains
 
-  !> @brief Apply Borrvall & Peterson forward mapping on CPU.
+  !> @brief Apply Borrvall & Petersson forward mapping on CPU.
   !! @param[in] f_min Minimum mapped value.
   !! @param[in] f_max Maximum mapped value.
   !! @param[in] q penalty parameter.
   !! @param[out] X_out Mapped field values.
   !! @param[in] X_in Unmapped field values.
   !! @param[in] n Number of degrees of freedom.
-  subroutine Borrvall_Peterson_mapping_apply_cpu(f_min, f_max, q, X_out, &
+  subroutine Borrvall_Petersson_mapping_apply_cpu(f_min, f_max, q, X_out, &
        X_in, n)
     integer, intent(in) :: n
     real(kind=rp), intent(in) :: f_min, f_max, q
     real(kind=rp), dimension(n), intent(out) :: X_out
     real(kind=rp), dimension(n), intent(in) :: X_in
 
-    X_out = Borrvall_Peterson_mapping_kernel(f_min, f_max, q, X_in)
+    X_out = Borrvall_Petersson_mapping_kernel(f_min, f_max, q, X_in)
 
-  end subroutine Borrvall_Peterson_mapping_apply_cpu
+  end subroutine Borrvall_Petersson_mapping_apply_cpu
 
-  !> @brief Apply Borrvall & Peterson chain rule on CPU.
+  !> @brief Apply Borrvall & Petersson chain rule on CPU.
   !! @param[in] f_min Minimum mapped value.
   !! @param[in] f_max Maximum mapped value.
   !! @param[in] q penalty parameter.
@@ -69,7 +69,7 @@ contains
   !! @param[in] sens_in Sensitivity with respect to the mapped field.
   !! @param[in] X_in Unmapped field values.
   !! @param[in] n Number of degrees of freedom.
-  subroutine Borrvall_Peterson_mapping_apply_backward_cpu(f_min, f_max, q, &
+  subroutine Borrvall_Petersson_mapping_apply_backward_cpu(f_min, f_max, q, &
        sens_out, sens_in, X_in, n)
     integer, intent(in) :: n
     real(kind=rp), intent(in) :: f_min, f_max, q
@@ -77,18 +77,18 @@ contains
     real(kind=rp), dimension(n), intent(in) :: sens_in
     real(kind=rp), dimension(n), intent(in) :: X_in
 
-    sens_out = Borrvall_Peterson_mapping_backward_kernel(f_min, f_max, q, &
+    sens_out = Borrvall_Petersson_mapping_backward_kernel(f_min, f_max, q, &
          sens_in, X_in)
 
-  end subroutine Borrvall_Peterson_mapping_apply_backward_cpu
+  end subroutine Borrvall_Petersson_mapping_apply_backward_cpu
 
-  !> @brief Elemental kernel for Borrvall & Peterson forward mapping.
+  !> @brief Elemental kernel for Borrvall & Petersson forward mapping.
   !! @param[in] f_min Minimum mapped value.
   !! @param[in] f_max Maximum mapped value.
   !! @param[in] q penalty parameter.
   !! @param[in] X_in Unmapped scalar value.
   !! @return Mapped scalar value.
-  elemental function Borrvall_Peterson_mapping_kernel(f_min, f_max, q, X_in) &
+  elemental function Borrvall_Petersson_mapping_kernel(f_min, f_max, q, X_in) &
        result(X_out)
     real(kind=rp), intent(in) :: f_min, f_max, q
     real(kind=rp), intent(in) :: X_in
@@ -96,16 +96,16 @@ contains
 
     X_out = f_min + (f_max - f_min) * X_in * (1.0_rp + q) / (X_in + q)
 
-  end function Borrvall_Peterson_mapping_kernel
+  end function Borrvall_Petersson_mapping_kernel
 
-  !> @brief Elemental kernel for Borrvall & Peterson chain rule.
+  !> @brief Elemental kernel for Borrvall & Petersson chain rule.
   !! @param[in] f_min Minimum mapped value.
   !! @param[in] f_max Maximum mapped value.
   !! @param[in] q penalty parameter.
   !! @param[in] sens_in Sensitivity with respect to mapped scalar value.
   !! @param[in] X_in Unmapped scalar value.
   !! @return Sensitivity with respect to unmapped scalar value.
-  elemental function Borrvall_Peterson_mapping_backward_kernel(f_min, f_max, &
+  elemental function Borrvall_Petersson_mapping_backward_kernel(f_min, f_max, &
        q, sens_in, X_in) result(sens_out)
     real(kind=rp), intent(in) :: f_min, f_max, q
     real(kind=rp), intent(in) :: sens_in, X_in
@@ -113,6 +113,6 @@ contains
 
     sens_out = sens_in * (f_max - f_min) * (q + 1.0_rp) * q / ((X_in + q)**2)
 
-  end function Borrvall_Peterson_mapping_backward_kernel
+  end function Borrvall_Petersson_mapping_backward_kernel
 
-end module Borrvall_Peterson_mapping_cpu
+end module Borrvall_Petersson_mapping_cpu

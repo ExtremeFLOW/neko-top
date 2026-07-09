@@ -65,7 +65,7 @@ The following mappings are currently implemented in `Neko-top`.
 1. [PDE filter](@ref mapping_PDE_filter)
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
-4. [Borrvall & Peterson mapping](@ref mapping_Borrvall_Peterson)
+4. [Borrvall & Petersson mapping](@ref mapping_Borrvall_Petersson)
 5. [SIMP mapping](@ref mapping_SIMP)
 6. [Heaviside mapping](@ref mapping_heaviside_mapping)
 
@@ -102,13 +102,13 @@ The filter can be selected by prescribing `"type": "PDE_filter"` and has the
 following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `r` | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real | - |
-| `tol`| The desired tolerance used when solving the system. | Real | `0.0000000001` |
-| `max_iter` | Maximum number of iterations when solving the system. | Integer | `200` |
-| `solver` | Numerical solver used to solve the system. | `cg`,`gmres`, `gmres` | `cg` |
-| `preconditioner` | Pre-conditioner used to solve the system. | `ident`, `hsmg`, `jacobi` | `jacobi`  |
+| Name             | Description                                                       | Admissible values         | Default value  |
+| ---------------- | ----------------------------------------------------------------- | ------------------------- | -------------- |
+| `r`              | Physical filter radius. Internally scaled as \f$r/(2\sqrt{3})\f$. | Real                      | -              |
+| `tol`            | The desired tolerance used when solving the system.               | Real                      | `0.0000000001` |
+| `max_iter`       | Maximum number of iterations when solving the system.             | Integer                   | `200`          |
+| `solver`         | Numerical solver used to solve the system.                        | `cg`,`gmres`, `gmres`     | `cg`           |
+| `preconditioner` | Pre-conditioner used to solve the system.                         | `ident`, `hsmg`, `jacobi` | `jacobi`       |
 
 Since the Helmholtz operator is Symmetric Positive Definite (SPD), `CG` is recommended.
 The convergence rate is highly dependent on the filter radius; larger radii typically improve the condition number.
@@ -123,10 +123,10 @@ The mapping can be selected by prescribing `"type": "linear"` and has the
 following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real | - |
-| `f_min`| \f$f_\text{min}\f$ in the above equation. | Real | `0.0` |
+| Name    | Description                               | Admissible values | Default value |
+| ------- | ----------------------------------------- | ----------------- | ------------- |
+| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real              | -             |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real              | `0.0`         |
 
 ## RAMP mapping {#mapping_RAMP}
 A mapping based on the [RAMP](10.1007/s001580100129) taking the form
@@ -138,22 +138,22 @@ where \f$q\f$ is a penalty parameter.
 This is increasing, with \f$X_\text{out}(0) = f_\text{min}\f$ (fluid) and
 \f$X_\text{out}(1) = f_\text{max}\f$ (solid), for the convention
 x=0: fluid, x=1: solid. For the converse convention (x=0: solid,
-x=1: fluid) use the [Borrvall & Peterson mapping](@ref mapping_Borrvall_Peterson)
+x=1: fluid) use the [Borrvall & Petersson mapping](@ref mapping_Borrvall_Petersson)
 instead.
 
 The mapping can be selected by prescribing `"type": "RAMP"` and has the
 following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
-| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
-| `q` | \f$q\f$ in the above equation. | Real | `1.0`|
+| Name    | Description                               | Admissible values | Default value |
+| ------- | ----------------------------------------- | ----------------- | ------------- |
+| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real              | -             |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real              | `0.0`         |
+| `q`     | \f$q\f$ in the above equation.            | Real              | `1.0`         |
 
-## Borrvall & Peterson mapping {#mapping_Borrvall_Peterson}
+## Borrvall & Petersson mapping {#mapping_Borrvall_Petersson}
 A mapping based on the material interpolation of
-[Borrvall & Peterson](https://doi.org/10.1002/fld.1964) taking the form
+[Borrvall & Petersson](https://doi.org/10.1002/fld.426) taking the form
 \f[
     X_\text{out} = f_\text{max} + (f_\text{min} - f_\text{max}) \frac{X_\text{in}(q + 1)}{X_\text{in} + q},
 \f]
@@ -164,15 +164,15 @@ This is decreasing, with \f$X_\text{out}(0) = f_\text{max}\f$ (solid) and
 \f$X_\text{in} \to 0\f$, for the convention x=0: solid, x=1: fluid. It is the
 converse of the ordinary RAMP mapping and uses the same shape function.
 
-The mapping can be selected by prescribing `"type": "Borrvall_Peterson"` and
+The mapping can be selected by prescribing `"type": "Borrvall_Petersson"` and
 has the following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
-| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
-| `q` | \f$q\f$ in the above equation. | Real | `1.0`|
+| Name    | Description                               | Admissible values | Default value |
+| ------- | ----------------------------------------- | ----------------- | ------------- |
+| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real              | -             |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real              | `0.0`         |
+| `q`     | \f$q\f$ in the above equation.            | Real              | `1.0`         |
 
 ## SIMP mapping {#mapping_SIMP}
 A mapping based on the [SIMP](https://doi.org/10.1007/BF01650949) taking the following form
@@ -187,11 +187,11 @@ The mapping can be selected by prescribing `"type": "SIMP"` and has the
 following input parameters:
 
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
-| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
-| `p` | \f$p\f$ in the above equation. | Real | `1.0`|
+| Name    | Description                               | Admissible values | Default value |
+| ------- | ----------------------------------------- | ----------------- | ------------- |
+| `f_max` | \f$f_\text{max}\f$ in the above equation. | Real              | -             |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real              | `0.0`         |
+| `p`     | \f$p\f$ in the above equation.            | Real              | `1.0`         |
 
 ## Heaviside mapping {#mapping_heaviside_mapping}
 A smooth Heaviside mapping taking the form,
@@ -206,7 +206,7 @@ the threshold.
 The mapping can be selected by prescribing `"type": "heaviside_mapping"` and
 has the following input parameters:
 
-| Name | Description  | Admissible values | Default value |
-|------|--------------|-------------------|---------------|
-| `beta` | Projection sharpness parameter \f$\beta\f$. | Real, `> 0` | `8.0` |
-| `eta` | Projection threshold parameter \f$\eta\f$. | Real in `[0,1]` | `0.5` |
+| Name   | Description                                 | Admissible values | Default value |
+| ------ | ------------------------------------------- | ----------------- | ------------- |
+| `beta` | Projection sharpness parameter \f$\beta\f$. | Real, `> 0`       | `8.0`         |
+| `eta`  | Projection threshold parameter \f$\eta\f$.  | Real in `[0,1]`   | `0.5`         |

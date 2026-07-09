@@ -68,7 +68,7 @@ module RAMP_mapping
   !!  |_________
   !!
   !! For the converse convention (x=0: solid, x=1: fluid) use the
-  !! Borrvall & Peterson mapping instead.
+  !! Borrvall & Petersson mapping instead.
 
   type, public, extends(mapping_t) :: RAMP_mapping_t
      !> minimum value (the fluid-side value)

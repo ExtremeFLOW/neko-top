@@ -38,7 +38,7 @@ submodule (mapping) mapping_fctry
   use linear_mapping, only : linear_mapping_t
   use PDE_filter_mapping, only: PDE_filter_t
   use RAMP_mapping, only: RAMP_mapping_t
-  use Borrvall_Peterson_mapping, only: Borrvall_Peterson_mapping_t
+  use Borrvall_Petersson_mapping, only: Borrvall_Petersson_mapping_t
   use heaviside_mapping, only: heaviside_mapping_t
   use SIMP_mapping, only: SIMP_mapping_t
   use json_utils, only : json_get
@@ -50,7 +50,7 @@ submodule (mapping) mapping_fctry
        "linear", &
        "PDE_filter", &
        "RAMP", &
-       "Borrvall_Peterson", &
+       "Borrvall_Petersson", &
        "SIMP", &
        "heaviside_mapping"]
 
@@ -74,8 +74,8 @@ contains
        allocate(PDE_filter_t::object)
     case ("RAMP")
        allocate(RAMP_mapping_t::object)
-    case ("Borrvall_Peterson")
-       allocate(Borrvall_Peterson_mapping_t::object)
+    case ("Borrvall_Petersson")
+       allocate(Borrvall_Petersson_mapping_t::object)
     case ("SIMP")
        allocate(SIMP_mapping_t::object)
     case ("heaviside_mapping", "heaviside_projection")
