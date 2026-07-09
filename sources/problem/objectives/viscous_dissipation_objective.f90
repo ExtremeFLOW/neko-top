@@ -36,7 +36,7 @@
 !
 ! I promise I'll write this document properly in the future...
 !
-! But the Borval Peterson (I think) paper had an objective function
+! But the Borrvall & Petersson (I think) paper had an objective function
 ! that had 2 terms, dissipation and this term they claimed represented
 ! out of plane stresses.
 ! I never really understood that extra term, I also don't think it
