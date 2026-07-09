@@ -54,7 +54,7 @@ module Borrvall_Petersson_mapping
 
   !> A Borrvall & Petersson mapping of coefficients
   !! This is the material interpolation described by Borrvall & Petersson
-  !! https://doi.org/10.1002/fld.1964
+  !! https://doi.org/10.1002/fld.426
   !!
   !! It reuses the shape function
   !! \f$S(x) = x \frac{q + 1}{x + q}\f$ (with \f$S(0)=0\f$, \f$S(1)=1\f$),
