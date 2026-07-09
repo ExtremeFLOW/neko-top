@@ -78,33 +78,4 @@ void cuda_convex_down_RAMP_mapping_apply_backward(real* f_min, real* f_max,
         (real*)X_in_d, *n);
     CUDA_CHECK(cudaGetLastError());
 }
-
-/** Fortran wrapper for RAMP (convex up) mapping
- */
-void cuda_convex_up_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
-    void* X_out_d, void* X_in_d, int* n) {
-
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-
-    convex_up_RAMP_mapping_apply_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
-}
-
-/** Fortran wrapper for RAMP (convex up) chain rule
- */
-void cuda_convex_up_RAMP_mapping_apply_backward(real* f_min, real* f_max,
-    real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
-
-    const dim3 nthrds(1024, 1, 1);
-    const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
-
-    convex_up_RAMP_mapping_apply_backward_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
-        (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
-}
 }
