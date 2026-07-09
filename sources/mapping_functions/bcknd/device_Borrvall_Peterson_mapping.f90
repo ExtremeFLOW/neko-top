@@ -1,6 +1,6 @@
-!> @file device_RAMP_mapping.f90
+!> @file device_Borrvall_Peterson_mapping.f90
 !! @copyright
-!! Copyright (c) 2025, The Neko-TOP Authors
+!! Copyright (c) 2025-2026, The Neko-TOP Authors
 !! All rights reserved.
 !!
 !! Redistribution and use in source and binary forms, with or without
@@ -32,22 +32,22 @@
 !! ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 !! POSSIBILITY OF SUCH DAMAGE.
 !
-module device_RAMP_mapping
+module device_Borrvall_Peterson_mapping
   use utils, only: neko_error
   use num_types, only: rp, c_rp
   use, intrinsic :: iso_c_binding, only: c_ptr, c_int
   implicit none
   private
 
-  public :: device_convex_down_RAMP_mapping_apply, &
-       device_convex_down_RAMP_mapping_apply_backward
+  public :: device_Borrvall_Peterson_mapping_apply, &
+       device_Borrvall_Peterson_mapping_apply_backward
 
 #if HAVE_HIP
 
   interface
-     subroutine hip_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+     subroutine hip_Borrvall_Peterson_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
-          bind(c, name = 'hip_convex_down_RAMP_mapping_apply')
+          bind(c, name = 'hip_Borrvall_Peterson_mapping_apply')
        import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -55,13 +55,13 @@ module device_RAMP_mapping
        type(c_ptr), value :: X_out_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine hip_convex_down_RAMP_mapping_apply
+     end subroutine hip_Borrvall_Peterson_mapping_apply
   end interface
 
   interface
-     subroutine hip_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+     subroutine hip_Borrvall_Peterson_mapping_apply_backward(f_min, f_max, q, &
           sense_out_d, sens_in_d, X_in_d, n) &
-          bind(c, name = 'hip_convex_down_RAMP_mapping_apply_backward')
+          bind(c, name = 'hip_Borrvall_Peterson_mapping_apply_backward')
        import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -70,15 +70,15 @@ module device_RAMP_mapping
        type(c_ptr), value :: sens_in_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine hip_convex_down_RAMP_mapping_apply_backward
+     end subroutine hip_Borrvall_Peterson_mapping_apply_backward
   end interface
 
 #elif HAVE_CUDA
 
   interface
-     subroutine cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+     subroutine cuda_Borrvall_Peterson_mapping_apply(f_min, f_max, q, &
           X_out_d, X_in_d, n) &
-          bind(c, name = 'cuda_convex_down_RAMP_mapping_apply')
+          bind(c, name = 'cuda_Borrvall_Peterson_mapping_apply')
        import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -86,13 +86,13 @@ module device_RAMP_mapping
        type(c_ptr), value :: X_out_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine cuda_convex_down_RAMP_mapping_apply
+     end subroutine cuda_Borrvall_Peterson_mapping_apply
   end interface
 
   interface
-     subroutine cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+     subroutine cuda_Borrvall_Peterson_mapping_apply_backward(f_min, f_max, q, &
           sense_out_d, sens_in_d, X_in_d, n) &
-          bind(c, name = 'cuda_convex_down_RAMP_mapping_apply_backward')
+          bind(c, name = 'cuda_Borrvall_Peterson_mapping_apply_backward')
        import c_rp, c_ptr, c_int
        real(c_rp) :: f_min
        real(c_rp) :: f_max
@@ -101,7 +101,7 @@ module device_RAMP_mapping
        type(c_ptr), value :: sens_in_d
        type(c_ptr), value :: X_in_d
        integer(c_int) :: n
-     end subroutine cuda_convex_down_RAMP_mapping_apply_backward
+     end subroutine cuda_Borrvall_Peterson_mapping_apply_backward
   end interface
 
 #elif HAVE_OPENCL
@@ -110,7 +110,7 @@ module device_RAMP_mapping
 
 contains
 
-  subroutine device_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+  subroutine device_Borrvall_Peterson_mapping_apply(f_min, f_max, q, &
        X_out_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
@@ -119,17 +119,17 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_HIP
-    call hip_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+    call hip_Borrvall_Peterson_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #elif HAVE_CUDA
-    call cuda_convex_down_RAMP_mapping_apply(f_min, f_max, q, &
+    call cuda_Borrvall_Peterson_mapping_apply(f_min, f_max, q, &
          X_out_d, X_in_d, n)
 #else
     call neko_error('No device backend configured')
 #endif
-  end subroutine device_convex_down_RAMP_mapping_apply
+  end subroutine device_Borrvall_Peterson_mapping_apply
 
-  subroutine device_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+  subroutine device_Borrvall_Peterson_mapping_apply_backward(f_min, f_max, q, &
        sense_out_d, sens_in_d, X_in_d, n)
     real(kind=rp), intent(in) :: f_min
     real(kind=rp), intent(in) :: f_max
@@ -139,13 +139,13 @@ contains
     type(c_ptr) :: X_in_d
     integer :: n
 #if HAVE_HIP
-    call hip_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+    call hip_Borrvall_Peterson_mapping_apply_backward(f_min, f_max, q, &
          sense_out_d, sens_in_d, X_in_d, n)
 #elif HAVE_CUDA
-    call cuda_convex_down_RAMP_mapping_apply_backward(f_min, f_max, q, &
+    call cuda_Borrvall_Peterson_mapping_apply_backward(f_min, f_max, q, &
          sense_out_d, sens_in_d, X_in_d, n)
 #else
     call neko_error('No device backend configured')
 #endif
-  end subroutine device_convex_down_RAMP_mapping_apply_backward
-end module device_RAMP_mapping
+  end subroutine device_Borrvall_Peterson_mapping_apply_backward
+end module device_Borrvall_Peterson_mapping

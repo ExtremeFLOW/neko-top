@@ -1,0 +1,274 @@
+! Finite-difference verification of the RAMP and Borrvall & Peterson mappings.
+!
+! For a handful of representative points x strictly inside (0, 1) the forward
+! mapping is central-differenced,
+!     (f(x + eps) - f(x - eps)) / (2 eps),
+! and compared against the analytic derivative produced by the backward
+! (chain-rule) mapping (evaluated with a unit incoming sensitivity). This
+! locks in forward/backward consistency for both mapping types.
+!
+! In addition the closed-form endpoints are asserted directly:
+!   * RAMP is increasing: f(0) = f_min, f(1) = f_max.
+!   * Borrvall & Peterson is decreasing: f(0) = f_max, f(1) = f_min.
+! These endpoints differ, confirming the f_min/f_max assembly is genuinely
+! swapped between the two mappings and not merely renamed.
+module mapping_finite_difference
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use mesh, only: mesh_t
+  use point, only: point_t
+  use space, only: space_t, GLL
+  use field, only: field_t
+  use coefs, only: coef_t
+  use mapping, only: mapping_t
+  use RAMP_mapping, only: RAMP_mapping_t
+  use Borrvall_Peterson_mapping, only: Borrvall_Peterson_mapping_t
+  use json_module, only: json_file
+  use comm, only: NEKO_COMM, pe_rank, pe_size, comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE, DEVICE_TO_HOST
+  implicit none
+
+  !> Central-difference step.
+  real(kind=rp), parameter :: fd_eps = 1.0e-6_rp
+  !> Relative tolerance for the finite-difference comparison.
+  real(kind=rp), parameter :: fd_tol = 1.0e-4_rp
+  !> Absolute tolerance for the closed-form endpoint comparison.
+  real(kind=rp), parameter :: end_tol = 1.0e-8_rp
+  !> Polynomial order of the test space.
+  integer, parameter :: LX = 3
+
+  @TestCase
+  type, extends(MPITestCase) :: test_mapping
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_mapping
+
+contains
+
+  subroutine setUp(this)
+    class(test_mapping), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call comm_init
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_mapping), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> Build a minimal two-element hex mesh (copied from Neko's field test).
+  subroutine gen_msh(msh)
+    type(mesh_t), intent(inout) :: msh
+    type(point_t) :: p(12)
+
+    call p(1)%init(0d0, 0d0, 0d0)
+    call p(1)%set_id(1)
+    call p(2)%init(1d0, 0d0, 0d0)
+    call p(2)%set_id(2)
+    call p(3)%init(0d0, 1d0, 0d0)
+    call p(3)%set_id(4)
+    call p(4)%init(1d0, 1d0, 0d0)
+    call p(4)%set_id(3)
+    call p(5)%init(2d0, 0d0, 0d0)
+    call p(5)%set_id(5)
+    call p(6)%init(2d0, 1d0, 0d0)
+    call p(6)%set_id(6)
+    call p(7)%init(0d0, 0d0, 1d0)
+    call p(7)%set_id(7)
+    call p(8)%init(1d0, 0d0, 1d0)
+    call p(8)%set_id(8)
+    call p(9)%init(1d0, 1d0, 1d0)
+    call p(9)%set_id(9)
+    call p(10)%init(0d0, 1d0, 1d0)
+    call p(10)%set_id(10)
+    call p(11)%init(2d0, 0d0, 1d0)
+    call p(11)%set_id(11)
+    call p(12)%init(2d0, 1d0, 1d0)
+    call p(12)%set_id(12)
+
+    call msh%init(3, 2)
+    call msh%add_element(1, 1, p(1), p(2), p(4), p(3), &
+         p(7), p(8), p(9), p(10))
+    call msh%add_element(2, 2, p(2), p(5), p(6), p(4), &
+         p(8), p(11), p(12), p(9))
+    call msh%generate_conn()
+
+  end subroutine gen_msh
+
+  !> Fill a field with a uniform value (on host and device).
+  subroutine fill_field(f, val)
+    type(field_t), intent(inout) :: f
+    real(kind=rp), intent(in) :: val
+
+    f = val
+
+  end subroutine fill_field
+
+  !> Read back the first entry of a field, copying from device if needed.
+  function first_value(f) result(val)
+    type(field_t), intent(inout) :: f
+    real(kind=rp) :: val
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, f%size(), DEVICE_TO_HOST, .true.)
+    end if
+    val = f%x(1, 1, 1, 1)
+
+  end function first_value
+
+  !> Run the finite-difference and endpoint checks for a single mapping.
+  !! @param map The mapping under test.
+  !! @param msh The mesh backing the test fields.
+  !! @param Xh The function space backing the test fields.
+  !! @param f_at_0 Expected mapped value at x = 0.
+  !! @param f_at_1 Expected mapped value at x = 1.
+  subroutine run_checks(map, msh, Xh, f_at_0, f_at_1)
+    class(mapping_t), intent(inout) :: map
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    real(kind=rp), intent(in) :: f_at_0, f_at_1
+
+    type(field_t) :: X_in, X_out_p, X_out_m, sens_in, sens_out
+    real(kind=rp), dimension(3), parameter :: x_test = &
+         [0.2_rp, 0.5_rp, 0.8_rp]
+    real(kind=rp) :: x, fd, analytic
+    integer :: ip
+
+    call X_in%init(msh, Xh, 'X_in')
+    call X_out_p%init(msh, Xh, 'X_out_p')
+    call X_out_m%init(msh, Xh, 'X_out_m')
+    call sens_in%init(msh, Xh, 'sens_in')
+    call sens_out%init(msh, Xh, 'sens_out')
+
+    do ip = 1, size(x_test)
+       x = x_test(ip)
+
+       ! Analytic derivative via the backward mapping with a unit sensitivity:
+       ! sens_out = sens_in * df/dx = df/dx at x.
+       call fill_field(X_in, x)
+       call fill_field(sens_in, 1.0_rp)
+       call map%backward_mapping(sens_out, sens_in, X_in)
+       analytic = first_value(sens_out)
+
+       ! Central difference of the forward mapping.
+       call fill_field(X_in, x + fd_eps)
+       call map%forward_mapping(X_out_p, X_in)
+       call fill_field(X_in, x - fd_eps)
+       call map%forward_mapping(X_out_m, X_in)
+       fd = (first_value(X_out_p) - first_value(X_out_m)) / (2.0_rp * fd_eps)
+
+       @assertRelativelyEqual(analytic, fd, fd_tol)
+    end do
+
+    ! Closed-form endpoints.
+    call fill_field(X_in, 0.0_rp)
+    call map%forward_mapping(X_out_p, X_in)
+    @assertEqual(f_at_0, first_value(X_out_p), end_tol)
+
+    call fill_field(X_in, 1.0_rp)
+    call map%forward_mapping(X_out_p, X_in)
+    @assertEqual(f_at_1, first_value(X_out_p), end_tol)
+
+    call X_in%free()
+    call X_out_p%free()
+    call X_out_m%free()
+    call sens_in%free()
+    call sens_out%free()
+
+  end subroutine run_checks
+
+  ! ========================================================================== !
+  ! RAMP mapping: increasing, f(0) = f_min, f(1) = f_max.
+
+  @test(npes=[1])
+  subroutine test_ramp(this)
+    class(test_mapping), intent(inout) :: this
+    type(space_t) :: Xh
+    type(mesh_t) :: msh
+    type(coef_t) :: coef
+    type(RAMP_mapping_t) :: map
+    real(kind=rp), parameter :: f_min = 1.0_rp, f_max = 100.0_rp
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call gen_msh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+
+    ! q /= 1 so the RAMP and Borrvall & Peterson shapes are distinguishable.
+    call map%init_from_attributes(coef, f_min, f_max, 3.0_rp)
+    call run_checks(map, msh, Xh, f_min, f_max)
+
+    call map%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine test_ramp
+
+  ! ========================================================================== !
+  ! Borrvall & Peterson mapping: decreasing, f(0) = f_max, f(1) = f_min.
+
+  @test(npes=[1])
+  subroutine test_borrvall_peterson(this)
+    class(test_mapping), intent(inout) :: this
+    type(space_t) :: Xh
+    type(mesh_t) :: msh
+    type(coef_t) :: coef
+    type(Borrvall_Peterson_mapping_t) :: map
+    real(kind=rp), parameter :: f_min = 1.0_rp, f_max = 100.0_rp
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call gen_msh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+
+    call map%init_from_attributes(coef, f_min, f_max, 3.0_rp)
+    ! Note the swapped endpoints relative to RAMP.
+    call run_checks(map, msh, Xh, f_max, f_min)
+
+    call map%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine test_borrvall_peterson
+
+  ! ========================================================================== !
+  ! Lock in the detection that gates the removed 'convex_up' option. The RAMP
+  ! JSON constructor raises neko_error when 'convex_up' is present; that path
+  ! aborts via `error stop` and so cannot be caught in-process by pFUnit.
+  ! Instead we assert the exact predicate that gates the error, json%valid_path,
+  ! behaves as the constructor relies on.
+
+  @test(npes=[1])
+  subroutine test_convex_up_detection(this)
+    class(test_mapping), intent(inout) :: this
+    type(json_file) :: json_with, json_without
+
+    call json_with%initialize()
+    call json_with%add('type', 'RAMP')
+    call json_with%add('convex_up', .true.)
+    @assertTrue(json_with%valid_path('convex_up'))
+
+    call json_without%initialize()
+    call json_without%add('type', 'RAMP')
+    @assertFalse(json_without%valid_path('convex_up'))
+
+    call json_with%destroy()
+    call json_without%destroy()
+
+  end subroutine test_convex_up_detection
+
+end module mapping_finite_difference

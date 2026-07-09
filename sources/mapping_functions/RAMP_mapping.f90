@@ -41,15 +41,12 @@ module RAMP_mapping
   use coefs, only: coef_t
   use neko_config, only: NEKO_BCKND_DEVICE
   use device_RAMP_mapping, only: device_convex_down_RAMP_mapping_apply, &
-       device_convex_down_RAMP_mapping_apply_backward, &
-       device_convex_up_RAMP_mapping_apply, &
-       device_convex_up_RAMP_mapping_apply_backward
+       device_convex_down_RAMP_mapping_apply_backward
   use RAMP_mapping_cpu, only: convex_down_RAMP_mapping_apply_cpu, &
-       convex_down_RAMP_mapping_apply_backward_cpu, &
-       convex_up_RAMP_mapping_apply_cpu, &
-       convex_up_RAMP_mapping_apply_backward_cpu
+       convex_down_RAMP_mapping_apply_backward_cpu
   use json_utils, only: json_get, json_get_or_default
   use logger, only: neko_log
+  use utils, only: neko_error
   use continuation_scheduler, only: nekotop_continuation
   implicit none
   private
@@ -60,6 +57,8 @@ module RAMP_mapping
   !!
   !! \f$f(x) = f_{min} + (f_{max} - f_{min}) \frac{x}{1 + q(1 - x)}\f$
   !!
+  !! This is increasing, with \f$f(0) = f_{min}\f$ (fluid) and
+  !! \f$f(1) = f_{max}\f$ (solid), for the convention x=0: fluid, x=1: solid.
   !!
   !!  |        .
   !!  |        .
@@ -68,30 +67,16 @@ module RAMP_mapping
   !!  |  ...
   !!  |_________
   !!
-  !! or a convex up equivelent used by Borrvall & Peterson
-  !! https://doi.org/10.1002/fld.1964
-  !!
-  !! \f$f(x) = f_{min} + (f_{max} - f_{min}) x \frac{q + 1}{q + x}\f$
-  !!
-  !! It seems very similar to RAMP but with the convexity the other way
-  !!
-  !!  |       ...
-  !!  |    ..
-  !!  |  .
-  !!  | .
-  !!  |.
-  !!  |_________
+  !! For the converse convention (x=0: solid, x=1: fluid) use the
+  !! Borrvall & Peterson mapping instead.
 
   type, public, extends(mapping_t) :: RAMP_mapping_t
-     !> minimum value
+     !> minimum value (the fluid-side value)
      real(kind=rp) :: f_min
-     !> maximum value
+     !> maximum value (the solid-side value)
      real(kind=rp) :: f_max
      !> penalty parameter
      real(kind=rp) :: q
-     !> Convexity of the mapping (with lower being the standard RAMP and
-     !! upper being that used by Borrvall & Peterson)
-     logical :: convex_up
 
    contains
      !> Constructor from json.
@@ -115,33 +100,36 @@ contains
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout) :: coef
     real(kind=rp) :: f_min, f_max, q
-    logical :: convex_up
+
+    ! The 'convex_up' option has been removed. Fail loud rather than silently
+    ! reinterpreting old case files.
+    if (json%valid_path('convex_up')) then
+       call neko_error("RAMP mapping's 'convex_up' option has been " // &
+            "removed -- plain RAMP is now always the down/increasing form " // &
+            "(x=0:fluid, x=1:solid). For the x=0:solid/x=1:fluid form, " // &
+            "use type 'Borrvall_Peterson' instead.")
+    end if
 
     call json_get_or_default(json, 'f_min', f_min, 0.0_rp)
     call nekotop_continuation%json_get_or_register(json, 'f_max', this%f_max, &
          f_max)
     call nekotop_continuation%json_get_or_register(json, 'q', this%q, q, 1.0_rp)
-    call json_get_or_default(json, 'convex_up', convex_up, .false.)
 
     call this%init_base(json, coef, "RAMP_mapping")
-    call this%init_from_attributes(coef, f_min, f_max, q, &
-         convex_up)
+    call this%init_from_attributes(coef, f_min, f_max, q)
 
   end subroutine RAMP_mapping_init_from_json
 
   !> Actual constructor.
-  subroutine RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q, &
-       convex_up)
+  subroutine RAMP_mapping_init_from_attributes(this, coef, f_min, f_max, q)
     class(RAMP_mapping_t), intent(inout) :: this
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: f_min, f_max, q
-    logical, intent(in) :: convex_up
     character(len=256) :: msg
 
     this%f_min = f_min
     this%f_max = f_max
     this%q = q
-    this%convex_up = convex_up
 
     call neko_log%section('RAMP Mapping')
     write(msg, '(A,F8.4)') '  f_min: ', this%f_min
@@ -150,11 +138,6 @@ contains
     call neko_log%message(msg)
     write(msg, '(A,F8.4)') '  q:     ', this%q
     call neko_log%message(msg)
-    if (this%convex_up .eqv. .true.) then
-       call neko_log%message('  convexity: up (Borrvall & Peterson)')
-    else
-       call neko_log%message('  convexity: down (standard RAMP)')
-    end if
     call neko_log%end_section()
 
   end subroutine RAMP_mapping_init_from_attributes
@@ -176,13 +159,8 @@ contains
     type(field_t), intent(in) :: X_in
     type(field_t), intent(inout) :: X_out
 
-    if (this%convex_up .eqv. .true.) then
-       call convex_up_RAMP_mapping_apply(this%f_min, this%f_max, &
-            this%q, X_out, X_in)
-    else
-       call convex_down_RAMP_mapping_apply(this%f_min, this%f_max, &
-            this%q, X_out, X_in)
-    end if
+    call convex_down_RAMP_mapping_apply(this%f_min, this%f_max, &
+         this%q, X_out, X_in)
 
   end subroutine RAMP_forward_mapping
 
@@ -198,13 +176,8 @@ contains
     type(field_t), intent(in) :: sens_in
     type(field_t), intent(inout) :: sens_out
 
-    if (this%convex_up .eqv. .true.) then
-       call convex_up_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-            this%q, sens_out, sens_in, X_in)
-    else
-       call convex_down_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
-            this%q, sens_out, sens_in, X_in)
-    end if
+    call convex_down_RAMP_mapping_apply_backward(this%f_min, this%f_max, &
+         this%q, sens_out, sens_in, X_in)
 
   end subroutine RAMP_backward_mapping
 
@@ -251,7 +224,7 @@ contains
 
     ! df/dx_in = df/dx_out * dx_out/dx_in
 
-    ! dx_out/dx_in = (f_min - f_max) * (q + 1) / (1 - q*(x - 1))**2
+    ! dx_out/dx_in = (f_max - f_min) * (q + 1) / (1 - q*(x - 1))**2
 
     n = X_in%dof%size()
 
@@ -265,62 +238,4 @@ contains
 
   end subroutine convex_down_RAMP_mapping_apply_backward
 
-  !> Apply the mapping
-  !! @param f_min minimum value
-  !! @param f_max maximum value
-  !! @param q penalty parameter
-  !! @param X_out mapped field
-  !! @param X_in unmapped field
-  subroutine convex_up_RAMP_mapping_apply(f_min, f_max, q, X_out, X_in)
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    type(field_t), intent(in) :: X_in
-    type(field_t), intent(inout) :: X_out
-    integer :: n
-
-    ! x_out = f_min + (f_max - f_min) * x_in * (q + 1) / (x_in + q)
-
-    n = X_in%dof%size()
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_convex_up_RAMP_mapping_apply(f_min, f_max, q, &
-            X_out%x_d, X_in%x_d, n)
-    else
-       call convex_up_RAMP_mapping_apply_cpu(f_min, f_max, q, &
-            X_out%x, X_in%x, n)
-    end if
-
-
-  end subroutine convex_up_RAMP_mapping_apply
-
-
-  !> Apply the  chain rule
-  !! @param f_min minimum value
-  !! @param f_max maximum value
-  !! @param q penalty parameter
-  !! @param X_in unmapped field
-  !! @param sens_out is the sensitivity with respect to the unfiltered design
-  !! @param sens_in is the sensitivity with respect to the filtered design
-  subroutine convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
-       sens_out, sens_in, X_in)
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    type(field_t), intent(in) :: X_in
-    type(field_t), intent(in) :: sens_in
-    type(field_t), intent(inout) :: sens_out
-    integer :: n
-
-    ! df/dx_in = df/dx_out * dx_out/dx_in
-
-    ! dx_out/dx_in = (f_min - f_max) * (q + 1) * q / (q + x)**2
-
-    n = X_in%dof%size()
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_convex_up_RAMP_mapping_apply_backward(f_min, f_max, q, &
-            sens_out%x_d, sens_in%x_d, X_in%x_d, n)
-    else
-       call convex_up_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
-            sens_out%x, sens_in%x, X_in%x, n)
-    end if
-
-  end subroutine convex_up_RAMP_mapping_apply_backward
 end module RAMP_mapping

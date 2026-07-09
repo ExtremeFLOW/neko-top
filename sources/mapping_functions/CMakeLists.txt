@@ -3,7 +3,8 @@
 #
 # Currently we only have
 # - linear
-# - RAMP (both convexities)
+# - RAMP
+# - Borrvall & Peterson
 # - PDE filter
 # - SIMP
 # - Heaviside mapping
@@ -20,9 +21,12 @@ target_sources(neko-top
         ${CMAKE_CURRENT_SOURCE_DIR}/linear_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/RAMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_RAMP_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/Borrvall_Peterson_mapping.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_Borrvall_Peterson_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_SIMP_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/RAMP_mapping_cpu.f90
+        ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/Borrvall_Peterson_mapping_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/cpu/SIMP_mapping_cpu.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/heaviside_mapping.f90
         ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device_heaviside_mapping.f90
@@ -33,6 +37,7 @@ if(DEVICE_TYPE STREQUAL "CUDA")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/RAMP_mapping.cu
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/Borrvall_Peterson_mapping.cu
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/SIMP_mapping.cu
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/cuda/heaviside_mapping.cu
     )
@@ -46,6 +51,7 @@ elseif(DEVICE_TYPE STREQUAL "HIP")
     target_sources(neko-top
         PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/RAMP_mapping.hip
+            ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/Borrvall_Peterson_mapping.hip
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/SIMP_mapping.hip
             ${CMAKE_CURRENT_SOURCE_DIR}/bcknd/device/hip/heaviside_mapping.hip
     )

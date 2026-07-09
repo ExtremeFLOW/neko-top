@@ -65,8 +65,9 @@ The following mappings are currently implemented in `Neko-top`.
 1. [PDE filter](@ref mapping_PDE_filter)
 2. [Linear mapping](@ref mapping_linear)
 3. [RAMP mapping](@ref mapping_RAMP)
-4. [SIMP mapping](@ref mapping_SIMP)
-5. [Heaviside mapping](@ref mapping_heaviside_mapping)
+4. [Borrvall & Peterson mapping](@ref mapping_Borrvall_Peterson)
+5. [SIMP mapping](@ref mapping_SIMP)
+6. [Heaviside mapping](@ref mapping_heaviside_mapping)
 
 ## PDE based filter {#mapping_PDE_filter}
 A filter based on the work of   [B. S. Lazarov, O. Sigmund]( https://doi.org/10.1002/nme.3072)
@@ -128,20 +129,17 @@ following input parameters:
 | `f_min`| \f$f_\text{min}\f$ in the above equation. | Real | `0.0` |
 
 ## RAMP mapping {#mapping_RAMP}
-A mapping based on the [RAMP](10.1007/s001580100129) taking the following two
-forms depending on the convexity,
-
-concave up:
+A mapping based on the [RAMP](10.1007/s001580100129) taking the form
 \f[
     X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}}{1 +q(1 - X_\text{in})},
 \f]
-
-concave down:
-\f[
-    X_\text{out} = f_\text{min} + (f_\text{max} - f_\text{min})  \frac{X_\text{in}(q + 1)}{q + X_\text{in}},
-\f]
-
 where \f$q\f$ is a penalty parameter.
+
+This is increasing, with \f$X_\text{out}(0) = f_\text{min}\f$ (fluid) and
+\f$X_\text{out}(1) = f_\text{max}\f$ (solid), for the convention
+x=0: fluid, x=1: solid. For the converse convention (x=0: solid,
+x=1: fluid) use the [Borrvall & Peterson mapping](@ref mapping_Borrvall_Peterson)
+instead.
 
 The mapping can be selected by prescribing `"type": "RAMP"` and has the
 following input parameters:
@@ -152,7 +150,29 @@ following input parameters:
 | `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
 | `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
 | `q` | \f$q\f$ in the above equation. | Real | `1.0`|
-| `convex_up` | The convexity used in the above equation. | `.true.` or `.false.` | `.true.` |
+
+## Borrvall & Peterson mapping {#mapping_Borrvall_Peterson}
+A mapping based on the material interpolation of
+[Borrvall & Peterson](https://doi.org/10.1002/fld.1964) taking the form
+\f[
+    X_\text{out} = f_\text{max} + (f_\text{min} - f_\text{max}) \frac{X_\text{in}(q + 1)}{X_\text{in} + q},
+\f]
+where \f$q\f$ is a penalty parameter.
+
+This is decreasing, with \f$X_\text{out}(0) = f_\text{max}\f$ (solid) and
+\f$X_\text{out}(1) = f_\text{min}\f$ (fluid), steepest near
+\f$X_\text{in} \to 0\f$, for the convention x=0: solid, x=1: fluid. It is the
+converse of the ordinary RAMP mapping and uses the same shape function.
+
+The mapping can be selected by prescribing `"type": "Borrvall_Peterson"` and
+has the following input parameters:
+
+
+| Name | Description  | Admissible values | Default value |
+|------|--------------|-------------------|---------------|
+| `f_max`| \f$f_\text{max}\f$ in the above equation.| Real | - |
+| `f_min` | \f$f_\text{min}\f$ in the above equation. | Real | `0.0`|
+| `q` | \f$q\f$ in the above equation. | Real | `1.0`|
 
 ## SIMP mapping {#mapping_SIMP}
 A mapping based on the [SIMP](https://doi.org/10.1007/BF01650949) taking the following form

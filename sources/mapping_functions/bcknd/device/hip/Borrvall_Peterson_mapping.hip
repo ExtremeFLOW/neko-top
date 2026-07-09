@@ -1,25 +1,25 @@
 /**
- * @file RAMP_mapping.cu
+ * @file Borrvall_Peterson_mapping.hip
  * @copyright
- * Copyright (c) 2024-2025, The Neko-TOP Authors
+ * Copyright (c) 2024-2026, The Neko-TOP Authors
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright
  *     notice, this list of conditions and the following disclaimer.
- * 
+ *
  *   * Redistributions in binary form must reproduce the above
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- * 
+ *
  *   * Neither the name of the authors nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -39,43 +39,45 @@
 #include <stdlib.h>
 
 // Device includes
-#include <cuda_runtime.h>
+#include <hip/hip_runtime.h>
 
 // Neko includes
-#include <neko/device/cuda/check.h>
 #include <neko/device/device_config.h>
+#include <neko/device/hip/check.h>
 
 // Local includes
-#include "RAMP_mapping_kernel.h"
+#include "Borrvall_Peterson_mapping_kernel.h"
 
 extern "C" {
 
-/** Fortran wrapper for RAMP (convex down) mapping
+/** Fortran wrapper for Borrvall & Peterson mapping
  */
-void cuda_convex_down_RAMP_mapping_apply(real* f_min, real* f_max, real* q,
+void hip_Borrvall_Peterson_mapping_apply(real* f_min, real* f_max, real* q,
     void* X_out_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_down_RAMP_mapping_apply_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(Borrvall_Peterson_mapping_apply_kernel<real>),
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)X_out_d, (real*)X_in_d, *n);
+    HIP_CHECK(hipGetLastError());
 }
 
-/** Fortran wrapper for RAMP (convex down) chain rule
+/** Fortran wrapper for Borrvall & Peterson chain rule
  */
-void cuda_convex_down_RAMP_mapping_apply_backward(real* f_min, real* f_max,
+void hip_Borrvall_Peterson_mapping_apply_backward(real* f_min, real* f_max,
     real* q, void* sens_out_d, void* sens_in_d, void* X_in_d, int* n) {
 
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    convex_down_RAMP_mapping_apply_backward_kernel<real>
-        <<<nblcks, nthrds, 0, (cudaStream_t)glb_cmd_queue>>>
-        (*f_min, *f_max, *q, (real*)sens_out_d,(real*)sens_in_d,
+    hipLaunchKernelGGL(
+        HIP_KERNEL_NAME(Borrvall_Peterson_mapping_apply_backward_kernel<real>),
+        nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
+        *f_min, *f_max, *q, (real*)sens_out_d, (real*)sens_in_d,
         (real*)X_in_d, *n);
-    CUDA_CHECK(cudaGetLastError());
+    HIP_CHECK(hipGetLastError());
 }
 }
