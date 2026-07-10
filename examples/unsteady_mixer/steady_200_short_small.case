@@ -184,7 +184,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 10,
+            "max_iterations": 200,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
@@ -209,7 +209,7 @@
             },
             {
                 "type": "brinkman_dissipation",
-                "weight": 45.10107562188 
+                "weight": 45.10107562188
             }
         ]
     }
