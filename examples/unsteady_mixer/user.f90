@@ -71,7 +71,7 @@ contains
           z = u%dof%z(idx, 1, 1, 1)
 
           ! Inflow velocity profile is a paraboloid
-          u%x(idx, 1, 1, 1) = - (y - 0.5_rp)**2 - (z - 0.5_rp)**2 + 1.0_rp
+          u%x(idx, 1, 1, 1) = 36.0_rp * y*(y-1.0_rp) * z*(z-1.0_rp)
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
