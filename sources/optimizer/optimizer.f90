@@ -484,7 +484,7 @@ contains
        else if (this%out_of_time(iteration_time)) then
           call this%save_checkpoint(this%current_iteration, design, .true., &
                basename = 'optimizer_rt_checkpoint')
-          stop_flag = -1
+          stop_flag = 3
           exit
        end if
     end do
@@ -528,6 +528,9 @@ contains
        write(msg, '(A,A,F8.2,A)') 'Optimizer stopped after reaching the ', &
             'maximum runtime of ', this%max_runtime, ' seconds.'
        call neko_error(trim(msg))
+    case (3)
+       write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
+       call neko_error(msg)
 
     case default
        write(msg, '(A)') 'Optimizer stopped for an unknown reason.'
