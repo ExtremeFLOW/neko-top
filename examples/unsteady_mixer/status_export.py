@@ -24,8 +24,9 @@ def _parse_args() -> argparse.Namespace:
         "Execute a Jupyter notebook and export markdown with images.", )
     parser.add_argument(
         "--notebook",
-        default="status.ipynb",
-        help="Notebook file to export (default: status.ipynb)",
+        default=None,
+        help=("Notebook file to export. If omitted, uses status.ipynb next to "
+              "this script."),
     )
     parser.add_argument(
         "--markdown",
@@ -57,9 +58,10 @@ def main() -> int:
     args = _parse_args()
 
     script_dir = Path(__file__).resolve().parent
-    notebook_arg = Path(args.notebook)
-    notebook_path = (notebook_arg.resolve() if notebook_arg.is_absolute() else
-                     (script_dir / notebook_arg).resolve())
+    if args.notebook is None:
+        notebook_path = (script_dir / "status.ipynb").resolve()
+    else:
+        notebook_path = Path(args.notebook).expanduser().resolve()
     if not notebook_path.exists():
         print(f"Notebook not found: {notebook_path}", file=sys.stderr)
         return 1
