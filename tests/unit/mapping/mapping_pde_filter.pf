@@ -1,0 +1,470 @@
+! Verification of PDE_filter_mapping_t (a Helmholtz-PDE based filter, solved
+! via a Krylov solve -- not a pointwise mapping) against its own linearity and
+! against the mass ("B")-weighted adjoint identity that the rest of
+! Neko-TOP's sensitivity code relies on (see design_brinkman.f90,
+! volume_constraint.f90).
+!
+! Three checks are performed, using a real, fully-initialized coef_t built on
+! a two-element hex mesh at polynomial order 7 (lx = 8):
+!
+!   1. Linearity / JVP check. The forward map is exactly linear in its input,
+!      so for any step h,
+!        (forward(X0 + h delta) - forward(X0 - h delta)) / (2h) = forward(delta)
+!      up to Krylov solver tolerance. h = 1 is used (not a tiny step) since
+!      exact linearity means no truncation error to trade off against
+!      cancellation error.
+!   2. B-weighted transpose/adjoint check (the critical, discriminating
+!      test -- it mixes forward and backward, so it can catch a bug specific
+!      to backward_mapping that a forward-only symmetry check could not):
+!        glsc3(forward(w), B, v) ~= glsc3(w, B, backward(v, X_in))
+!      for impulse fields v, w. This is exactly the mass-weighted adjoint
+!      identity assumed by the rest of the sensitivity code.
+!   3. Secondary regression guard (NOT proof of adjointness on its own):
+!      backward_mapping(v, X_in) ~= forward_mapping(v) elementwise, since
+!      PDE_filter_backward_mapping runs a structurally identical Helmholtz
+!      solve to PDE_filter_forward_mapping (it does not use its X_in argument
+!      at all -- see the comments in PDE_filter_mapping.f90 around
+!      backward_mapping, lines ~297-315).
+!
+! Two impulse-field variants are used throughout: an "interior" impulse,
+! nonzero only at a node strictly inside element 1, and an "interface"
+! impulse, nonzero (with a consistently-set value) at both local copies of a
+! shared node on the element 1 / element 2 interface.
+module mapping_pde_filter
+  use mpi
+  use pfunit
+  use num_types, only: rp
+  use mesh, only: mesh_t
+  use point, only: point_t
+  use space, only: space_t, GLL
+  use dofmap, only: dofmap_t
+  use gather_scatter, only: gs_t
+  use field, only: field_t
+  use coefs, only: coef_t
+  use math, only: glsc3
+  use field_math, only: field_copy, field_cmult, field_add2s2, field_sub3
+  use PDE_filter_mapping, only: PDE_filter_t
+  use scratch_registry, only: neko_scratch_registry
+  use comm, only: NEKO_COMM, pe_rank, pe_size, comm_init
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use device, only: device_init, device_finalize, device_memcpy, &
+       HOST_TO_DEVICE, DEVICE_TO_HOST
+  use field_math, only: field_cfill
+  implicit none
+
+  !> Polynomial order of the test space (order 7 => lx = 8).
+  integer, parameter :: LX = 8
+
+  !> Filter attributes.
+  real(kind=rp), parameter :: filter_r = 0.2_rp
+  real(kind=rp), parameter :: filter_tol = 1.0e-10_rp
+  integer, parameter :: filter_max_iter = 200
+
+  !> Base field value and impulse amplitude.
+  real(kind=rp), parameter :: x0_val = 0.5_rp
+  real(kind=rp), parameter :: impulse_amp = 1.0_rp
+
+  !> JVP step (the filter is exactly linear, so any h works up to Krylov
+  !! tolerance; a large h avoids cancellation error).
+  real(kind=rp), parameter :: jvp_h = 1.0_rp
+
+  !> Tolerances for the three checks.
+  real(kind=rp), parameter :: linearity_rtol = 1.0e-6_rp
+  real(kind=rp), parameter :: adjoint_rtol = 1.0e-6_rp
+  real(kind=rp), parameter :: regression_rtol = 1.0e-10_rp
+
+  @TestCase
+  type, extends(MPITestCase) :: test_pde_filter
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_pde_filter
+
+contains
+
+  subroutine setUp(this)
+    class(test_pde_filter), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_init
+    end if
+    call comm_init
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_pde_filter), intent(inout) :: this
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_finalize
+    end if
+  end subroutine tearDown
+
+  !> Build a minimal two-element hex mesh (copied from Neko's field test).
+  !! Element 1 spans x in [0, 1], element 2 spans x in [1, 2], sharing the
+  !! x = 1 face.
+  subroutine gen_msh(msh)
+    type(mesh_t), intent(inout) :: msh
+    type(point_t) :: p(12)
+
+    call p(1)%init(0d0, 0d0, 0d0)
+    call p(1)%set_id(1)
+    call p(2)%init(1d0, 0d0, 0d0)
+    call p(2)%set_id(2)
+    call p(3)%init(0d0, 1d0, 0d0)
+    call p(3)%set_id(4)
+    call p(4)%init(1d0, 1d0, 0d0)
+    call p(4)%set_id(3)
+    call p(5)%init(2d0, 0d0, 0d0)
+    call p(5)%set_id(5)
+    call p(6)%init(2d0, 1d0, 0d0)
+    call p(6)%set_id(6)
+    call p(7)%init(0d0, 0d0, 1d0)
+    call p(7)%set_id(7)
+    call p(8)%init(1d0, 0d0, 1d0)
+    call p(8)%set_id(8)
+    call p(9)%init(1d0, 1d0, 1d0)
+    call p(9)%set_id(9)
+    call p(10)%init(0d0, 1d0, 1d0)
+    call p(10)%set_id(10)
+    call p(11)%init(2d0, 0d0, 1d0)
+    call p(11)%set_id(11)
+    call p(12)%init(2d0, 1d0, 1d0)
+    call p(12)%set_id(12)
+
+    call msh%init(3, 2)
+    call msh%add_element(1, 1, p(1), p(2), p(4), p(3), &
+         p(7), p(8), p(9), p(10))
+    call msh%add_element(2, 2, p(2), p(5), p(6), p(4), &
+         p(8), p(11), p(12), p(9))
+    call msh%generate_conn()
+
+  end subroutine gen_msh
+
+  !> Build the full SEM coefficient chain: mesh -> space -> dofmap -> gs ->
+  !! coef, and hook up the scratch registry the filter's forward/backward
+  !! mapping relies on for temporaries.
+  subroutine build_fixture(msh, Xh, dof, gs, coef)
+    type(mesh_t), intent(inout) :: msh
+    type(space_t), intent(inout) :: Xh
+    type(dofmap_t), intent(inout) :: dof
+    type(gs_t), intent(inout) :: gs
+    type(coef_t), intent(inout) :: coef
+
+    call gen_msh(msh)
+    call Xh%init(GLL, LX, LX, LX)
+    call dof%init(msh, Xh)
+    call gs%init(dof)
+    call coef%init(gs)
+    call neko_scratch_registry%init(dof = dof)
+
+  end subroutine build_fixture
+
+  !> Attach coef to the mapping and construct it from attributes. `coef` must
+  !! be declared `target` at the call site, since PDE_filter_init_from_json's
+  !! usual `this%coef => coef` wiring (normally done by mapping_init_base) is
+  !! bypassed here in favour of calling init_from_attributes directly.
+  subroutine build_map(map, coef)
+    type(PDE_filter_t), intent(inout) :: map
+    type(coef_t), target, intent(inout) :: coef
+
+    map%coef => coef
+    call map%init_from_attributes(coef, filter_r, filter_tol, &
+         filter_max_iter, "cg", "jacobi")
+
+  end subroutine build_map
+
+  !> Set a single field entry (on host and device).
+  subroutine set_point(f, i, j, k, e, val)
+    type(field_t), intent(inout) :: f
+    integer, intent(in) :: i, j, k, e
+    real(kind=rp), intent(in) :: val
+
+    f%x(i, j, k, e) = val
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(f%x, f%x_d, f%size(), HOST_TO_DEVICE, .true.)
+    end if
+
+  end subroutine set_point
+
+  !> Interior-impulse field: nonzero only at (4,4,4,1), an interior node of
+  !! element 1, away from every face (all local indices in [2,7]).
+  subroutine make_interior_impulse(f, amp)
+    type(field_t), intent(inout) :: f
+    real(kind=rp), intent(in) :: amp
+
+    call field_cfill(f, 0.0_rp)
+    call set_point(f, 4, 4, 4, 1, amp)
+
+  end subroutine make_interior_impulse
+
+  !> Interface-impulse field: nonzero, with a consistently-set value, at both
+  !! local copies -- (8,4,4,1) and (1,4,4,2) -- of the shared global dof at
+  !! the x = 1 face between element 1 and element 2, at a general
+  !! face-interior point (not a corner).
+  subroutine make_interface_impulse(f, amp)
+    type(field_t), intent(inout) :: f
+    real(kind=rp), intent(in) :: amp
+
+    call field_cfill(f, 0.0_rp)
+    call set_point(f, 8, 4, 4, 1, amp)
+    call set_point(f, 1, 4, 4, 2, amp)
+
+  end subroutine make_interface_impulse
+
+  !> Assert that two fields agree to a relative tolerance under the
+  !! mass-weighted (B) L2 norm: || actual - expected ||_B / || expected ||_B.
+  subroutine assert_fields_relatively_equal(actual, expected, coef, rtol)
+    type(field_t), intent(inout) :: actual, expected
+    type(coef_t), intent(inout) :: coef
+    real(kind=rp), intent(in) :: rtol
+
+    type(field_t) :: diff
+    real(kind=rp) :: norm_diff, norm_ref
+    integer :: n
+
+    n = coef%dof%size()
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(actual%x, actual%x_d, n, DEVICE_TO_HOST, .true.)
+       call device_memcpy(expected%x, expected%x_d, n, DEVICE_TO_HOST, .true.)
+    end if
+
+    call diff%init(coef%dof, 'diff')
+    call field_sub3(diff, actual, expected)
+
+    norm_diff = sqrt(glsc3(diff%x, coef%B, diff%x, n))
+    norm_ref = sqrt(glsc3(expected%x, coef%B, expected%x, n))
+
+    @assertEqual(0.0_rp, norm_diff / norm_ref, tolerance = rtol)
+
+    call diff%free()
+
+  end subroutine assert_fields_relatively_equal
+
+  ! ========================================================================== !
+  ! Check 1: Linearity / JVP check.
+
+  subroutine check_linearity(map, coef, delta)
+    type(PDE_filter_t), intent(inout) :: map
+    type(coef_t), intent(inout) :: coef
+    type(field_t), intent(inout) :: delta
+
+    type(field_t) :: X0, Xp, Xm, Fp, Fm, Fd, jvp
+
+    call X0%init(coef%dof, 'X0')
+    call Xp%init(coef%dof, 'Xp')
+    call Xm%init(coef%dof, 'Xm')
+    call Fp%init(coef%dof, 'Fp')
+    call Fm%init(coef%dof, 'Fm')
+    call Fd%init(coef%dof, 'Fd')
+    call jvp%init(coef%dof, 'jvp')
+
+    call field_cfill(X0, x0_val)
+
+    call field_copy(Xp, X0)
+    call field_add2s2(Xp, delta, jvp_h)
+    call field_copy(Xm, X0)
+    call field_add2s2(Xm, delta, -jvp_h)
+
+    call map%forward_mapping(Fp, Xp)
+    call map%forward_mapping(Fm, Xm)
+    call map%forward_mapping(Fd, delta)
+
+    call field_sub3(jvp, Fp, Fm)
+    call field_cmult(jvp, 1.0_rp / (2.0_rp * jvp_h))
+
+    call assert_fields_relatively_equal(jvp, Fd, coef, linearity_rtol)
+
+    call X0%free()
+    call Xp%free()
+    call Xm%free()
+    call Fp%free()
+    call Fm%free()
+    call Fd%free()
+    call jvp%free()
+
+  end subroutine check_linearity
+
+  ! ========================================================================== !
+  ! Check 2: B-weighted transpose/adjoint check.
+
+  subroutine check_adjoint(map, coef)
+    type(PDE_filter_t), intent(inout) :: map
+    type(coef_t), intent(inout) :: coef
+
+    type(field_t) :: v, w, X0, Fw, Bv
+    real(kind=rp) :: lhs, rhs
+    integer :: n
+
+    n = coef%dof%size()
+
+    call v%init(coef%dof, 'v')
+    call w%init(coef%dof, 'w')
+    call X0%init(coef%dof, 'X0')
+    call Fw%init(coef%dof, 'Fw')
+    call Bv%init(coef%dof, 'Bv')
+
+    call make_interior_impulse(v, impulse_amp)
+    call make_interface_impulse(w, impulse_amp)
+    call field_cfill(X0, x0_val)
+
+    ! glsc3(forward(w), B, v)
+    call map%forward_mapping(Fw, w)
+
+    ! glsc3(w, B, backward(v, X_in = X0))
+    call map%backward_mapping(Bv, v, X0)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_memcpy(Fw%x, Fw%x_d, n, DEVICE_TO_HOST, .true.)
+       call device_memcpy(v%x, v%x_d, n, DEVICE_TO_HOST, .true.)
+       call device_memcpy(w%x, w%x_d, n, DEVICE_TO_HOST, .true.)
+       call device_memcpy(Bv%x, Bv%x_d, n, DEVICE_TO_HOST, .true.)
+    end if
+
+    lhs = glsc3(Fw%x, coef%B, v%x, n)
+    rhs = glsc3(w%x, coef%B, Bv%x, n)
+
+    @assertRelativelyEqual(lhs, rhs, adjoint_rtol)
+
+    call v%free()
+    call w%free()
+    call X0%free()
+    call Fw%free()
+    call Bv%free()
+
+  end subroutine check_adjoint
+
+  ! ========================================================================== !
+  ! Check 3: secondary regression guard (NOT proof of adjointness on its own)
+  ! -- backward_mapping and forward_mapping run structurally identical solves,
+  ! so should agree tightly for any input.
+
+  subroutine check_regression(map, coef, v)
+    type(PDE_filter_t), intent(inout) :: map
+    type(coef_t), intent(inout) :: coef
+    type(field_t), intent(inout) :: v
+
+    type(field_t) :: X0, Fv, Bv
+
+    call X0%init(coef%dof, 'X0')
+    call Fv%init(coef%dof, 'Fv')
+    call Bv%init(coef%dof, 'Bv')
+
+    call field_cfill(X0, x0_val)
+
+    call map%forward_mapping(Fv, v)
+    call map%backward_mapping(Bv, v, X0)
+
+    call assert_fields_relatively_equal(Bv, Fv, coef, regression_rtol)
+
+    call X0%free()
+    call Fv%free()
+    call Bv%free()
+
+  end subroutine check_regression
+
+  ! ========================================================================== !
+  ! Test entry points.
+
+  @test(npes=[1])
+  subroutine test_pde_filter_linearity(this)
+    class(test_pde_filter), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: map
+    type(field_t) :: delta
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call build_map(map, coef)
+
+    call delta%init(coef%dof, 'delta')
+
+    call make_interior_impulse(delta, impulse_amp)
+    call check_linearity(map, coef, delta)
+
+    call make_interface_impulse(delta, impulse_amp)
+    call check_linearity(map, coef, delta)
+
+    call delta%free()
+    call map%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine test_pde_filter_linearity
+
+  @test(npes=[1])
+  subroutine test_pde_filter_adjoint(this)
+    class(test_pde_filter), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: map
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call build_map(map, coef)
+
+    call check_adjoint(map, coef)
+
+    call map%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine test_pde_filter_adjoint
+
+  @test(npes=[1])
+  subroutine test_pde_filter_regression(this)
+    class(test_pde_filter), intent(inout) :: this
+    type(mesh_t) :: msh
+    type(space_t) :: Xh
+    type(dofmap_t) :: dof
+    type(gs_t) :: gs
+    type(coef_t), target :: coef
+    type(PDE_filter_t) :: map
+    type(field_t) :: v
+    integer :: ierr
+
+    call MPI_Comm_dup(this%getMpiCommunicator(), NEKO_COMM%mpi_val, ierr)
+    pe_rank = this%getProcessRank()
+    pe_size = this%getNumProcesses()
+
+    call build_fixture(msh, Xh, dof, gs, coef)
+    call build_map(map, coef)
+
+    call v%init(coef%dof, 'v')
+
+    call make_interior_impulse(v, impulse_amp)
+    call check_regression(map, coef, v)
+
+    call make_interface_impulse(v, impulse_amp)
+    call check_regression(map, coef, v)
+
+    call v%free()
+    call map%free()
+    call coef%free()
+    call gs%free()
+    call dof%free()
+    call Xh%free()
+    call msh%free()
+
+  end subroutine test_pde_filter_regression
+
+end module mapping_pde_filter
