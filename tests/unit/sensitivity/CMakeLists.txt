@@ -5,6 +5,8 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 set(test_list
     "volume.case"
     "volume_filtered.case"
+    "viscous_dissipation.case"
+    "brinkman_dissipation.case"
 )
 
 # Path to the common driver source
