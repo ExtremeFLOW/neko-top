@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 12.0,
-            "timestep": 5.0e-4
+            "timestep": 4.0e-4
         },
         "numerics": {
             "time_order": 3,

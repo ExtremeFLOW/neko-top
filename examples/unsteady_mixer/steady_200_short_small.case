@@ -7,7 +7,7 @@
         "output_boundary": false,
         "time": {
             "end_time": 4.0,
-            "timestep": 5.0e-4
+            "timestep": 4.0e-4
         },
         "numerics": {
             "time_order": 3,
@@ -184,7 +184,7 @@
         },
         "solver": {
             "type": "mma",
-            "max_iterations": 200,
+            "max_iterations": 25,
             "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
