@@ -42,6 +42,7 @@ module mapping_finite_difference
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_init, device_finalize, device_memcpy, &
        HOST_TO_DEVICE, DEVICE_TO_HOST
+  use field_math, only: field_cfill
   implicit none
 
   !> Central-difference step sizes.
@@ -125,15 +126,6 @@ contains
     call msh%generate_conn()
 
   end subroutine gen_msh
-
-  !> Fill a field with a uniform value (on host and device).
-  subroutine fill_field(f, val)
-    type(field_t), intent(inout) :: f
-    real(kind=rp), intent(in) :: val
-
-    f = val
-
-  end subroutine fill_field
 
   !> Read back the first entry of a field, copying from device if needed.
   function first_value(f) result(val)
@@ -236,24 +228,24 @@ contains
 
        ! (B) Hardcoded analytic derivative vs. backward_mapping (unit
        ! incoming sensitivity).
-       call fill_field(X_in, x)
-       call fill_field(sens_in, 1.0_rp)
+       call field_cfill(X_in, x)
+       call field_cfill(sens_in, 1.0_rp)
        call map%backward_mapping(sens_out, sens_in, X_in)
        analytic = first_value(sens_out)
        @assertRelativelyEqual(fp, analytic, backward_rtol)
 
        ! (A) Central difference of the forward mapping, h = 1e-4.
-       call fill_field(X_in, x + fd_h1)
+       call field_cfill(X_in, x + fd_h1)
        call map%forward_mapping(X_out_p, X_in)
-       call fill_field(X_in, x - fd_h1)
+       call field_cfill(X_in, x - fd_h1)
        call map%forward_mapping(X_out_m, X_in)
        fd = (first_value(X_out_p) - first_value(X_out_m)) / (2.0_rp * fd_h1)
        @assertRelativelyEqual(fp, fd, fd_tol_h1)
 
        ! (A) Central difference of the forward mapping, h = 1e-6.
-       call fill_field(X_in, x + fd_h2)
+       call field_cfill(X_in, x + fd_h2)
        call map%forward_mapping(X_out_p, X_in)
-       call fill_field(X_in, x - fd_h2)
+       call field_cfill(X_in, x - fd_h2)
        call map%forward_mapping(X_out_m, X_in)
        fd = (first_value(X_out_p) - first_value(X_out_m)) / (2.0_rp * fd_h2)
        @assertRelativelyEqual(fp, fd, fd_tol_h2)
@@ -284,11 +276,11 @@ contains
     call X_in%init(msh, Xh, 'X_in')
     call X_out%init(msh, Xh, 'X_out')
 
-    call fill_field(X_in, 0.0_rp)
+    call field_cfill(X_in, 0.0_rp)
     call map%forward_mapping(X_out, X_in)
     @assertEqual(f_at_0, first_value(X_out), end_tol)
 
-    call fill_field(X_in, 1.0_rp)
+    call field_cfill(X_in, 1.0_rp)
     call map%forward_mapping(X_out, X_in)
     @assertEqual(f_at_1, first_value(X_out), end_tol)
 

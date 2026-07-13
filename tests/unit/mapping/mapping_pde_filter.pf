@@ -49,6 +49,7 @@ module mapping_pde_filter
   use neko_config, only: NEKO_BCKND_DEVICE
   use device, only: device_init, device_finalize, device_memcpy, &
        HOST_TO_DEVICE, DEVICE_TO_HOST
+  use field_math, only: field_cfill
   implicit none
 
   !> Polynomial order of the test space (order 7 => lx = 8).
@@ -170,15 +171,6 @@ contains
 
   end subroutine build_map
 
-  !> Fill a field with a uniform value (on host and device).
-  subroutine fill_uniform(f, val)
-    type(field_t), intent(inout) :: f
-    real(kind=rp), intent(in) :: val
-
-    f = val
-
-  end subroutine fill_uniform
-
   !> Set a single field entry (on host and device).
   subroutine set_point(f, i, j, k, e, val)
     type(field_t), intent(inout) :: f
@@ -198,7 +190,7 @@ contains
     type(field_t), intent(inout) :: f
     real(kind=rp), intent(in) :: amp
 
-    call fill_uniform(f, 0.0_rp)
+    call field_cfill(f, 0.0_rp)
     call set_point(f, 4, 4, 4, 1, amp)
 
   end subroutine make_interior_impulse
@@ -211,7 +203,7 @@ contains
     type(field_t), intent(inout) :: f
     real(kind=rp), intent(in) :: amp
 
-    call fill_uniform(f, 0.0_rp)
+    call field_cfill(f, 0.0_rp)
     call set_point(f, 8, 4, 4, 1, amp)
     call set_point(f, 1, 4, 4, 2, amp)
 
@@ -265,7 +257,7 @@ contains
     call Fd%init(coef%dof, 'Fd')
     call jvp%init(coef%dof, 'jvp')
 
-    call fill_uniform(X0, x0_val)
+    call field_cfill(X0, x0_val)
 
     call field_copy(Xp, X0)
     call field_add2s2(Xp, delta, jvp_h)
@@ -312,7 +304,7 @@ contains
 
     call make_interior_impulse(v, impulse_amp)
     call make_interface_impulse(w, impulse_amp)
-    call fill_uniform(X0, x0_val)
+    call field_cfill(X0, x0_val)
 
     ! glsc3(forward(w), B, v)
     call map%forward_mapping(Fw, w)
@@ -356,7 +348,7 @@ contains
     call Fv%init(coef%dof, 'Fv')
     call Bv%init(coef%dof, 'Bv')
 
-    call fill_uniform(X0, x0_val)
+    call field_cfill(X0, x0_val)
 
     call map%forward_mapping(Fv, v)
     call map%backward_mapping(Bv, v, X0)
