@@ -6,7 +6,7 @@
         "output_at_end": false,
         "output_boundary": false,
         "time": {
-            "end_time": 4.0,
+            "end_time": 12.0,
             "timestep": 4.0e-4
         },
         "numerics": {
@@ -143,15 +143,13 @@
                 "y_bounds": [ 0.2, 0.5 ],
                 "z_bounds": [ 0.2, 0.5 ]
             }
-        ],
-        "simulation_components": [
-            {
-                "type": "steady",
-                "tol": 1e-6,
-                "compute_control": "tsteps",
-                "compute_value": 5
-            }
         ]
+    },
+    "unsteady": true,
+    "checkpoints": {
+        "enabled": true,
+        "format": "chkp",
+        "n_memory": 200
     },
     "optimization": {
         "design": {

@@ -23,7 +23,7 @@
 #SBATCH --cpus-per-task=6
 
 # Time specifications (dd-hh:mm:ss)
-#SBATCH --time 02-00:00:00
+#SBATCH --time 02:00:00
 
 # -- Notification options
 
