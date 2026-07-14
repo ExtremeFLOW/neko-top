@@ -56,7 +56,7 @@ program topopt
   character(8) :: date
 
   !> The simulation we are working with
-  type(simulation_t) :: sim
+  type(simulation_t), target :: sim
   !> The design type
   class(design_t), allocatable :: des
   !> The problem type
