@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export a status notebook to markdown with embedded image files.
 
-This script mirrors the notebook export cell behavior in a pure Python entrypoint:
+This script provide a pure Python entrypoint:
 1. load notebook,
 2. drop export cells to avoid recursion,
 3. execute notebook,
@@ -12,7 +12,6 @@ This script mirrors the notebook export cell behavior in a pure Python entrypoin
 from __future__ import annotations
 
 import argparse
-import os
 import re
 import sys
 from pathlib import Path
@@ -27,6 +26,11 @@ def _parse_args() -> argparse.Namespace:
         default=None,
         help=("Notebook file to export. If omitted, uses status.ipynb next to "
               "this script."),
+    )
+    parser.add_argument(
+        "--input-dir",
+        default=".",
+        help="Directory for the notebook input (default: notebook directory).",
     )
     parser.add_argument(
         "--markdown",
@@ -55,6 +59,19 @@ def _replace_markdown_image_links(markdown: str, filename: str,
 
 
 def main() -> int:
+    try:
+        import nbformat
+        from nbclient import NotebookClient
+        from nbconvert import MarkdownExporter
+    except ImportError as exc:
+        print(
+            "Missing dependency for notebook export. "
+            "Install with: pip install nbformat nbconvert nbclient",
+            file=sys.stderr,
+        )
+        print(f"Import error: {exc}", file=sys.stderr)
+        return 2
+
     args = _parse_args()
 
     script_dir = Path(__file__).resolve().parent
@@ -66,35 +83,27 @@ def main() -> int:
         print(f"Notebook not found: {notebook_path}", file=sys.stderr)
         return 1
 
-    workdir = notebook_path.parent
+    if args.input_dir != ".":
+        workdir = Path(args.input_dir).expanduser().resolve()
+    else:
+        workdir = notebook_path.parent
+
     markdown_path = workdir / args.markdown
     image_dir = workdir / args.image_dir
     image_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        import nbformat
-        from nbconvert import MarkdownExporter
-        from nbconvert.preprocessors import ExecutePreprocessor
-    except ImportError as exc:
-        print(
-            "Missing dependency for notebook export. "
-            "Install with: pip install nbformat nbconvert",
-            file=sys.stderr,
-        )
-        print(f"Import error: {exc}", file=sys.stderr)
-        return 2
-
     with notebook_path.open(encoding="utf-8") as f:
-        notebook_node = nbformat.read(f, as_version=4)
+        notebook_node = nbformat.read(f, as_version=nbformat.NO_CONVERT)
 
-    notebook_node.cells = [
-        cell for cell in notebook_node.cells if not str(cell.get(
-            "source", "")).lstrip().startswith("# Export Notebook as")
-    ]
-    notebook_node.metadata.title = "Status of optimization"
-
-    executor = ExecutePreprocessor(timeout=args.timeout, kernel_name="python3")
-    executor.preprocess(notebook_node, {"metadata": {"path": str(workdir)}})
+    client = NotebookClient(
+        notebook_node,
+        timeout=args.timeout,
+        kernel_name="python3",
+        resources={"metadata": {
+            "path": str(workdir)
+        }},
+    )
+    client.execute()
 
     exporter = MarkdownExporter(exclude_input=True, exclude_input_prompt=True)
     markdown, resources = exporter.from_notebook_node(notebook_node)
