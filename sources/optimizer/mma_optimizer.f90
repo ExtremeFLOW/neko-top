@@ -52,7 +52,8 @@ module mma_optimizer
   use math, only: abscmp
   use profiler, only: profiler_start_region, profiler_end_region
   use logger, only: neko_log
-  use vector_math, only: vector_cmult, vector_absval, vector_sub2, vector_glmax
+  use vector_math, only: vector_cmult, vector_absval, vector_sub2, vector_glmax, &
+       vector_glsubnorm
   use matrix_math, only: matrix_cmult
   use device, only: device_memcpy, DEVICE_TO_HOST
   use scratch_registry, only: neko_scratch_registry
@@ -369,6 +370,9 @@ contains
          constraint_value, constraint_sensitivities)
 
     converged = this%mma%get_residumax() .lt. this%tolerance
+
+    ! Compute L2 norm of design change
+    this%norm2_design_change = vector_glsubnorm(x, x_old)
 
     ! Compute maximum absolute change
     call vector_sub2(x_old, x)

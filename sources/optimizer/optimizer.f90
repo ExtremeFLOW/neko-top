@@ -69,6 +69,8 @@ module optimizer
      real(kind=rp), private :: stop_design_change = -1.0_rp
      !> The maximum observed design change.
      real(kind=rp), public :: max_design_change = 0.0_rp
+     !> The L2 norm of the design change.
+     real(kind=rp), public :: norm2_design_change = 0.0_rp
 
      ! ----------------------------------------------------------------------- !
      ! Restart related members
@@ -599,7 +601,7 @@ contains
     this%log_extra_size = 0
     if (present(extra_headers)) this%log_extra_size = size(extra_headers)
 
-    total_size = 1 + base_size + this%log_extra_size + 1 + n_cont
+    total_size = 1 + base_size + this%log_extra_size + 2 + n_cont
     call this%log_data%init(total_size)
 
     if (present(filename)) then
@@ -621,7 +623,7 @@ contains
        end do
     end if
 
-    header = trim(header) // ', max_design_change'
+    header = trim(header) // ', max_design_change, norm2_design_change'
 
     ! continuation parameters
     do i = 1, n_cont
@@ -668,9 +670,10 @@ contains
     ! Save maximum design change
     offset = offset + this%log_extra_size
     this%log_data%x(offset:offset + 1 - 1) = this%max_design_change
+    this%log_data%x(offset + 1:offset + 2 - 1) = this%norm2_design_change
 
     ! Continuation parameter values
-    offset = offset + 1
+    offset = offset + 2
     do i = 1, n_cont
        this%log_data%x(offset + i) = &
             nekotop_continuation%params(i)%target
