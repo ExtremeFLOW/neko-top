@@ -412,11 +412,8 @@ contains
     if (trim(this%checkpoint_file) .ne. '') then
        checkpoint_file = trim(this%checkpoint_file)
     else
-       select case (trim(this%checkpoint_format))
-       case ('h5', 'hdf5', 'hf5', 'hdf')
-          checkpoint_file = trim(this%checkpoint_path) // &
-               'optimizer_rt_checkpoint.h5'
-       end select
+       checkpoint_file = optimizer_checkpoint_filename(this, &
+            basename = 'optimizer_rt_checkpoint')
     end if
 
     inquire(file = checkpoint_file, exist = file_exists)
@@ -683,6 +680,53 @@ contains
   ! ========================================================================== !
   ! IO Functions
 
+  !> Construct a checkpoint filename from path/basename/format, applying the
+  !! optimizer's stored `checkpoint_path`/`checkpoint_base`/`checkpoint_format`
+  !! defaults for any component not given. Shared by `optimizer_load_checkpoint`
+  !! and `optimizer_run`'s restart logic so the default path is built in one
+  !! place.
+  !! @param this The optimizer object.
+  !! @param path The path where the checkpoint file is located.
+  !! @param basename The base name of the checkpoint file.
+  !! @param format The file format of the checkpoint file.
+  function optimizer_checkpoint_filename(this, path, basename, format) &
+       result(file_full)
+    class(optimizer_t), intent(in) :: this
+    character(len=*), intent(in), optional :: path
+    character(len=*), intent(in), optional :: basename
+    character(len=*), intent(in), optional :: format
+    character(len=256) :: file_full
+    character(len=:), allocatable :: checkpoint_format
+    character(len=256) :: file_path, file_base, file_ext
+
+    file_path = trim(this%checkpoint_path)
+    file_base = trim(this%checkpoint_base)
+    checkpoint_format = trim(this%checkpoint_format)
+
+    if (present(path)) file_path = trim(path)
+    if (present(basename)) file_base = trim(basename)
+    if (present(format)) checkpoint_format = trim(format)
+
+    if (len_trim(file_path) .eq. 0) then
+       file_path = './'
+    else if (file_path(len_trim(file_path):len_trim(file_path)) &
+         .ne. '/') then
+       file_path = trim(file_path) // '/'
+    end if
+
+    select case (trim(checkpoint_format))
+    case ('h5', 'hdf5', 'hf5', 'hdf')
+       file_ext = 'h5'
+    case default
+       call neko_error('optimizer: Unsupported checkpoint format: "' // &
+            trim(checkpoint_format) // '"')
+    end select
+
+    write(file_full, '(4A)') &
+         trim(file_path), trim(file_base), ".", trim(file_ext)
+
+  end function optimizer_checkpoint_filename
+
   !> Save the optimizer checkpoint to a file.
   !! @param this The optimizer object.
   !! @param iter The current iteration number.
@@ -770,37 +814,55 @@ contains
   end subroutine optimizer_save_checkpoint
 
   !> Load the optimizer checkpoint from a file based on file suffix.
+  !! If `filename` is not given, the file is located from `path`/`basename`/
+  !! `format`, defaulting to `this%checkpoint_path`/`checkpoint_base`/
+  !! `checkpoint_format` exactly as `optimizer_save_checkpoint` does when
+  !! saving in overwrite mode.
   !! @param this The optimizer object.
   !! @param filename The name of the file to load the checkpoint from.
   !! @param iter The iteration number read from the checkpoint.
   !! @param design The design object.
-  subroutine optimizer_load_checkpoint(this, filename, iter, design)
+  !! @param path The path where the checkpoint file is located.
+  !! @param basename The base name of the file to load the checkpoint from.
+  !! @param format The file format to use for the checkpoint file.
+  subroutine optimizer_load_checkpoint(this, filename, iter, design, &
+       path, basename, format)
     class(optimizer_t), intent(inout) :: this
-    character(len=*), intent(in) :: filename
+    character(len=*), intent(in), optional :: filename
     integer, intent(out) :: iter
     class(design_t), intent(inout) :: design
+    character(len=*), intent(in), optional :: path
+    character(len=*), intent(in), optional :: basename
+    character(len=*), intent(in), optional :: format
+    character(len=256) :: file_full
     character(len=12) :: file_ext
 
+    if (present(filename)) then
+       file_full = trim(filename)
+    else
+       file_full = optimizer_checkpoint_filename(this, path, basename, format)
+    end if
+
     ! Get the file extension
-    call filename_suffix(filename, file_ext)
+    call filename_suffix(trim(file_full), file_ext)
 
     select case (trim(file_ext))
     case ('h5', 'hdf5', 'hf5')
-       call optimizer_load_checkpoint_hdf5(this, filename, iter)
+       call optimizer_load_checkpoint_hdf5(this, trim(file_full), iter)
     case default
        call neko_error('optimizer: Unsupported checkpoint format: "' // &
             trim(file_ext) // '"')
     end select
 
-    call this%load_checkpoint_components(filename)
-    call design%load_checkpoint(filename)
+    call this%load_checkpoint_components(trim(file_full))
+    call design%load_checkpoint(trim(file_full))
 
     ! Set the current iteration to the loaded iteration
     this%current_iteration = iter
 
     if (pe_rank .eq. 0) then
        write(*,*) 'Restarted simulation from checkpoint.'
-       write(*,*) '    Checkpoint file: "', trim(filename), '"'
+       write(*,*) '    Checkpoint file: "', trim(file_full), '"'
        write(*,*) '    Iteration      : ', this%current_iteration
     end if
 

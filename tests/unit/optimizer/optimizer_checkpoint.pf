@@ -147,7 +147,7 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%load_checkpoint('checkpoints/optimizer_checkpoint.h5', iter0, des)
+    call opt%load_checkpoint(iter = iter0, design = des)
     call opt%initialize(prob, des, sim)
 
     ! ------------------------------------------------------------------------ !
