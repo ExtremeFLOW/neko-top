@@ -43,7 +43,7 @@ contains
   ! Shared case bootstrapping used by multiple checkpoint tests.
   subroutine initialize_case_from_file(parameter_file, sim, des, prob)
     character(len=*), intent(in) :: parameter_file
-    type(simulation_t), intent(inout) :: sim
+    type(simulation_t), intent(inout), target :: sim
     class(design_t), allocatable, intent(inout) :: des
     type(problem_t), intent(inout) :: prob
     type(json_file) :: parameters, design_parameters

@@ -50,7 +50,7 @@ contains
   subroutine restore_consistency_hdf5(this)
     class(test_checkpoint_restore_consistency_hdf5_case), intent(inout) :: this
 
-    type(simulation_t) :: sim
+    type(simulation_t), target :: sim
     type(simulation_checkpoint_t) :: chkp
     class(design_t), allocatable :: des
     type(problem_t) :: prob
