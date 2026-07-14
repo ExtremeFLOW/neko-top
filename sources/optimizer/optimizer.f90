@@ -481,7 +481,7 @@ contains
        else if (this%out_of_time(iteration_time)) then
           call this%save_checkpoint(this%current_iteration, design, .true., &
                basename = 'optimizer_rt_checkpoint')
-          stop_flag = -1
+          stop_flag = 3
           exit
        end if
     end do
@@ -525,6 +525,9 @@ contains
        write(msg, '(A,A,F8.2,A)') 'Optimizer stopped after reaching the ', &
             'maximum runtime of ', this%max_runtime, ' seconds.'
        call neko_error(trim(msg))
+    case (3)
+       write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
+       call neko_error(msg)
 
     case default
        write(msg, '(A)') 'Optimizer stopped for an unknown reason.'
@@ -835,7 +838,7 @@ contains
     character(len=*), intent(in), optional :: basename
     character(len=*), intent(in), optional :: format
     character(len=256) :: file_full
-    character(len=12) :: file_ext
+    character(len=12) :: suffix
 
     if (present(filename)) then
        file_full = trim(filename)
@@ -844,14 +847,14 @@ contains
     end if
 
     ! Get the file extension
-    call filename_suffix(trim(file_full), file_ext)
+    call filename_suffix(trim(file_full), suffix)
 
-    select case (trim(file_ext))
+    select case (trim(suffix))
     case ('h5', 'hdf5', 'hf5')
        call optimizer_load_checkpoint_hdf5(this, trim(file_full), iter)
     case default
        call neko_error('optimizer: Unsupported checkpoint format: "' // &
-            trim(file_ext) // '"')
+            trim(suffix) // '"')
     end select
 
     call this%load_checkpoint_components(trim(file_full))
