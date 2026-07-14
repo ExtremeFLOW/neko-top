@@ -18,18 +18,13 @@ set(CMAKE_Fortran_MODULE_DIRECTORY ${LOCAL_MOD_DIR} CACHE PATH
     "Fortran module directory" FORCE)
 
 # --------------------------------------------------------------------------- #
-# The finite-difference checker module is shared with the unit sensitivity
-# tests (single source of truth for the MPI-safe reduction handling and the
-# tolerance assertion); see tests/unit/sensitivity/sensitivity.f90.
-set(SENSITIVITY_CHECKER
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../unit/sensitivity/sensitivity.f90)
-
-# --------------------------------------------------------------------------- #
 # Build the single driver executable for regression
 add_executable(reg_problem_tester_sensitivity_bin
-    ${SENSITIVITY_CHECKER}
     ${CMAKE_CURRENT_SOURCE_DIR}/user.f90
     ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90
+
+    # Shared sensitivity module.
+    ${SHARED_TEST_SOURCES}/sensitivity.f90
 )
 target_link_libraries(reg_problem_tester_sensitivity_bin
     PRIVATE Neko-TOP::neko-top
