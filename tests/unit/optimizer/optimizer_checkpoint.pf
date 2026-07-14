@@ -66,7 +66,7 @@ contains
     type(json_file) :: parameters, design_parameters
 
     !> The simulation we are working with
-    type(simulation_t) :: sim
+    type(simulation_t), target :: sim
     !> The design type
     class(design_t), allocatable :: des
     !> The problem type
@@ -147,7 +147,7 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%load_checkpoint('checkpoints/optimizer_checkpoint.h5', iter0, des)
+    call opt%load_checkpoint(iter = iter0, design = des)
     call opt%initialize(prob, des, sim)
 
     ! ------------------------------------------------------------------------ !
