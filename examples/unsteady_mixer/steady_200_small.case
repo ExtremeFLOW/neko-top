@@ -167,8 +167,8 @@
                 },
                 {
                     "type": "RAMP",
-                    "f_max": 1.0e3,
-                    "q": 10.0
+                    "f_max": 500.0,
+                    "q": 8.0
                 }
             ],
             "initial_distribution": {
