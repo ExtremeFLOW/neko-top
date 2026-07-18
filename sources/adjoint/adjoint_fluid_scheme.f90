@@ -62,6 +62,8 @@ module adjoint_fluid_scheme
 
   !> Base type of all fluid formulations.
   type, abstract :: adjoint_fluid_scheme_t
+     !> A logical to distinguish between adjoint or linearized NS
+     logical :: if_adjoint = .true.
      !> A name that can be used to distinguish this solver in e.g. user routines
      character(len=:), allocatable :: name
 
@@ -202,10 +204,11 @@ module adjoint_fluid_scheme
      end subroutine adjoint_fluid_free_intrf
   end interface
 
+
   !> Abstract interface to initialize an adjoint formulation
   abstract interface
      subroutine adjoint_fluid_scheme_init_intrf(this, msh, lx, params, user, &
-          chkp)
+          chkp, if_adjoint)
        import adjoint_fluid_scheme_t
        import json_file
        import mesh_t
@@ -217,6 +220,7 @@ module adjoint_fluid_scheme
        type(json_file), target, intent(inout) :: params
        type(user_t), target, intent(in) :: user
        type(chkp_t), target, intent(inout) :: chkp
+       logical, intent(in) :: if_adjoint
      end subroutine adjoint_fluid_scheme_init_intrf
   end interface
 

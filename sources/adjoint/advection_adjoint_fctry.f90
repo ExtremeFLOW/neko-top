@@ -57,7 +57,7 @@ contains
   !! This can be used to kill the advection term.
   !! @note The factory both allocates and initializes `object`.
   module subroutine advection_adjoint_factory(object, json, coef, ulag, vlag, wlag, &
-       dtlag, tlag, time_scheme, use_dummy, slag)
+       dtlag, tlag, time_scheme, if_adjoint, use_dummy, slag)
     class(advection_adjoint_t), allocatable, intent(inout) :: object
     type(json_file), intent(inout) :: json
     type(coef_t), intent(inout), target :: coef
@@ -65,6 +65,7 @@ contains
     real(kind=rp), intent(in), target :: dtlag(10)
     real(kind=rp), intent(in), target :: tlag(10)
     type(time_scheme_controller_t), intent(in), target :: time_scheme
+    logical, intent(in) :: if_adjoint
     logical, optional, intent(in) :: use_dummy
     type(field_series_t), target, optional, intent(in) :: slag
 
@@ -106,17 +107,9 @@ contains
 
     select type (adv => object)
     type is (adv_lin_dealias_t)
-       call adv%init(lxd, coef)
+       call adv%init(lxd, coef, if_adjoint)
     type is (adv_lin_no_dealias_t)
-       call adv%init(coef)
-       ! type is (adv_oifs_t)
-       !    if (present(slag)) then
-       !       call adv%init(lxd, coef, ctarget, ulag, vlag, wlag, &
-       !            dtlag, tlag, time_scheme, slag)
-       !    else
-       !       call adv%init(lxd, coef, ctarget, ulag, vlag, wlag, &
-       !            dtlag, tlag, time_scheme)
-       !    end if
+       call adv%init(coef, if_adjoint)
     end select
 
   end subroutine advection_adjoint_factory

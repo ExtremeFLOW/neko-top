@@ -61,6 +61,7 @@ module simulation_m
   use file, only: file_t
   use utils, only: neko_warning, neko_error
   use comm, only: pe_rank
+  use user_access_singleton, only: neko_user_access
   use json_file_module, only: json_file
   use json_utils, only: json_get, json_get_or_default
   use num_types, only: rp, sp, dp
@@ -123,6 +124,10 @@ module simulation_m
      procedure, pass(this) :: run_backward => simulation_run_backward
      !> Reset the simulation
      procedure, pass(this) :: reset => simulation_reset
+     !> Reset the adjoint only
+     procedure, pass(this) :: reset_adjoint => simulation_reset_adjoint
+     !> Reset the forward only
+     procedure, pass(this) :: reset_forward => simulation_reset_forward
      !> Set simulation output counters.
      procedure, pass(this) :: set_output_counter => &
           simulation_set_output_counter
@@ -150,7 +155,6 @@ contains
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
     call neko_user_access%init(this%neko_case)
-
     call neko_rt_stats%init(parameters)
     call neko_simcomps%init(this%neko_case)
 
@@ -287,6 +291,7 @@ contains
     call profiler_stop
 
     ! Free the objects
+    call neko_user_access%free()
     call this%neko_case%free()
     call this%adjoint_case%free()
     call this%output_forward%free()
@@ -372,6 +377,23 @@ contains
     call this%checkpoint%reset()
 
   end subroutine simulation_reset
+
+  !> Reset the simulation
+  subroutine simulation_reset_adjoint(this)
+    class(simulation_t), intent(inout) :: this
+
+    call reset_adjoint(this%adjoint_case, this%neko_case)
+
+  end subroutine simulation_reset_adjoint
+
+  !> Reset the simulation
+  subroutine simulation_reset_forward(this)
+    class(simulation_t), intent(inout) :: this
+
+    call reset(this%neko_case)
+    call this%checkpoint%reset()
+
+  end subroutine simulation_reset_forward
 
   subroutine simulation_set_output_counter(this, idx)
     class(simulation_t), intent(inout) :: this

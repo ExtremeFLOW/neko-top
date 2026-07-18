@@ -1,0 +1,78 @@
+{
+    "version": 1.0,
+    "case": {
+        "mesh_file": "newton.nmsh",
+        "output_checkpoints": false,
+        "output_at_end": false,
+        "output_boundary": true,
+        "time": {
+            "end_time": 1.0,
+            "timestep": 1e-2
+        },
+        "numerics": {
+            "time_order": 1,
+            "polynomial_order": 5,
+            "dealias": true
+        },
+        "fluid": {
+            "scheme": "pnpn",
+            "Re": 100.0,
+            "initial_condition": {
+                 "type": "uniform",
+                 "value": [
+                     0.0, 0.0, 0.0
+                 ]
+            },
+            "velocity_solver": {
+                "type": "cg",
+                "preconditioner": {
+                    "type": "jacobi"
+                },
+                "absolute_tolerance": 1e-5,
+                "max_iterations": 800
+            },
+            "pressure_solver": {
+                "type": "gmres",
+                "preconditioner": {
+                    "type": "hsmg"
+                },
+                "absolute_tolerance": 1e-5,
+                "max_iterations": 800
+            },
+            "output_control": "never",
+            "boundary_conditions": [ 
+                {
+                    "type": "no_slip",
+                    "zone_indices": [ 1]
+                },
+                {
+                    "type": "velocity_value",
+                    "value": [ 1.0, 0.0, 0.0 ],
+                    "zone_indices": [ 5, 2, 4]
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [3]
+                }
+            ],
+        },
+        "adjoint_fluid": {
+            "initial_condition": {
+                "type": "uniform",
+                "value": [
+                    0.0, 0.0, 0.0
+                ]
+            },
+            "boundary_conditions": [
+                {
+                    "type": "no_slip",
+                    "zone_indices": [1, 2, 4, 5] // note these are lin and adj
+                },
+                {
+                    "type": "outflow",
+                    "zone_indices": [3]
+                }
+            ],
+        },
+    }
+}

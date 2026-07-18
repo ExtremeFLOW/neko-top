@@ -45,6 +45,7 @@ module simulation_adjoint
   use time_state, only : time_state_t
   use time_step_controller, only: time_step_controller_t
   use adjoint_case, only: adjoint_case_t
+  use field_math, only: field_rzero
   use scratch_registry, only: neko_scratch_registry
   use device_math, only: device_glsc3
   use math, only: glsc3

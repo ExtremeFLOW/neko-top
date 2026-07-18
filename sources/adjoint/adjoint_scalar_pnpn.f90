@@ -192,7 +192,7 @@ contains
 
     ! Initiliaze base type.
     call this%scheme_init(msh, coef, gs, params_adjoint, params_primal, &
-         scheme, user, rho)
+         scheme, user, rho, .true.)
 
     ! Setup backend dependent Ax routines
     call ax_helm_factory(this%ax, full_formulation = .false.)
@@ -259,7 +259,7 @@ contains
 
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          ulag, vlag, wlag, this%chkp%dtlag, &
-         this%chkp%tlag, time_scheme, .not. advection, &
+         this%chkp%tlag, time_scheme, .true., .not. advection, &
          this%s_adj_lag)
     ! Add lagged term to checkpoint
     ! @todo Init chkp object, note, adding 3 slags
@@ -374,6 +374,8 @@ contains
          msh => this%msh, res => this%res, makeoifs => this%makeoifs, &
          makeext => this%makeext, makebdf => this%makebdf, &
          t => time%t, tstep => time%tstep, dt => time%dt)
+
+
 
       ! Logs extra information the log level is NEKO_LOG_DEBUG or above.
       call print_debug(this)

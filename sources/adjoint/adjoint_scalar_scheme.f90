@@ -86,6 +86,8 @@ module adjoint_scalar_scheme
 
   !> Base type for a scalar advection-diffusion solver.
   type, abstract :: adjoint_scalar_scheme_t
+     !> A logical to determine if solving the adjoint or linearized NS equations
+     logical :: if_adjoint = .true.
      !> A name that can be used to distinguish this solver in e.g. user routines
      character(len=:), allocatable :: name
      !> The name of the corresponding primal scalar
@@ -254,8 +256,9 @@ contains
   !! @param scheme The name of the scalar scheme.
   !! @param user Type with user-defined procedures.
   !! @param rho The density of the fluid.
+  !! @param if_adjoint if adjoint or linearized.
   subroutine adjoint_scalar_scheme_init(this, msh, c_Xh, gs_Xh, &
-       params_adjoint, params_primal, scheme, user, rho)
+       params_adjoint, params_primal, scheme, user, rho, if_adjoint)
     class(adjoint_scalar_scheme_t), target, intent(inout) :: this
     type(mesh_t), target, intent(in) :: msh
     type(coef_t), target, intent(in) :: c_Xh
@@ -265,6 +268,7 @@ contains
     type(user_t), target, intent(in) :: user
     type(field_t), target, intent(in) :: rho
     type(json_file), pointer :: params_selected
+    logical, intent(in) :: if_adjoint
     ! IO buffer for log output
     character(len=LOG_SIZE) :: log_buf
     ! Variables for retrieving json parameters
@@ -273,6 +277,8 @@ contains
     integer :: integer_val
     character(len=:), allocatable :: solver_type, solver_precon
     type(json_file) :: precon_params
+
+    this%if_adjoint = if_adjoint
 
     this%u => neko_registry%get_field('u')
     this%v => neko_registry%get_field('v')

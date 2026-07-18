@@ -44,6 +44,9 @@ module adjoint_fluid_pnpn
   use adjoint_pnpn_residual, only: adjoint_pnpn_prs_res_t, &
        adjoint_pnpn_vel_res_t, adjoint_pnpn_prs_res_factory, &
        adjoint_pnpn_vel_res_factory
+  use pnpn_residual, only: pnpn_prs_res_t, pnpn_vel_res_t, &
+       pnpn_prs_res_factory, pnpn_vel_res_factory, &
+       pnpn_prs_res_stress_factory, pnpn_vel_res_stress_factory
   use rhs_maker, only: rhs_maker_sumab_t, rhs_maker_bdf_t, rhs_maker_ext_t, &
        rhs_maker_oifs_t, rhs_maker_sumab_fctry, rhs_maker_bdf_fctry, &
        rhs_maker_ext_fctry, rhs_maker_oifs_fctry
@@ -77,11 +80,10 @@ module adjoint_fluid_pnpn
   use bc_list, only: bc_list_t
   use zero_dirichlet, only: zero_dirichlet_t
   use utils, only: neko_error
-  use field_math, only: field_add2, field_copy, &
-       field_add2s2
+  use field_math, only: field_add2, field_copy, field_rzero, field_add2s2
   use bc, only: bc_t
   use file, only: file_t
-  use operators, only: ortho
+  use operators, only: ortho, rotate_cyc
   use opr_device, only: device_ortho
   use inflow, only: inflow_t
   use field_dirichlet, only: field_dirichlet_t
@@ -183,11 +185,17 @@ module adjoint_fluid_pnpn
      ! Advection terms for the oifs method
      type(field_t) :: advx, advy, advz
 
-     !> Pressure residual equation for computing `p_res`.
-     class(adjoint_pnpn_prs_res_t), allocatable :: prs_res
+     !> Pressure residual equation for the adjoint step.
+     class(adjoint_pnpn_prs_res_t), allocatable :: adjoint_prs_res
 
-     !> Velocity residual equation for computing `u_res`, `v_res`, `w_res`.
-     class(adjoint_pnpn_vel_res_t), allocatable :: vel_res
+     !> Velocity residual equation for the adjoint step.
+     class(adjoint_pnpn_vel_res_t), allocatable :: adjoint_vel_res
+
+     !> Pressure residual equation for the linearized step.
+     class(pnpn_prs_res_t), allocatable :: linearized_prs_res
+
+     !> Velocity residual equation for the linearized step.
+     class(pnpn_vel_res_t), allocatable :: linearized_vel_res
 
      !> Summation of AB/BDF contributions
      class(rhs_maker_sumab_t), allocatable :: sumab
@@ -235,6 +243,12 @@ module adjoint_fluid_pnpn
      procedure, pass(this) :: free => adjoint_fluid_pnpn_free
      !> Perform a single time-step of the scheme.
      procedure, pass(this) :: step => adjoint_fluid_pnpn_step
+     !> Perform a single adjoint time-step of the scheme.
+     procedure, pass(this) :: step_adjoint => &
+          adjoint_fluid_pnpn_step_adjoint
+     !> Perform a single linearized time-step of the scheme.
+     procedure, pass(this) :: step_linearized => &
+          adjoint_fluid_pnpn_step_linearized
      !> Restart from a previous solution.
      procedure, pass(this) :: restart => adjoint_fluid_pnpn_restart
      !> Set up boundary conditions.
@@ -245,6 +259,9 @@ module adjoint_fluid_pnpn
 
      !> Compute the power_iterations field.
      procedure, public, pass(this) :: PW_compute_ => power_iterations_compute
+
+     !> Reset a simulation
+     procedure, public, pass(this) :: reset => adjoint_fluid_pnpn_reset
 
   end type adjoint_fluid_pnpn_t
 
@@ -284,13 +301,15 @@ module adjoint_fluid_pnpn
 
 contains
 
-  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, chkp)
+  subroutine adjoint_fluid_pnpn_init(this, msh, lx, params, user, chkp, &
+       if_adjoint)
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(mesh_t), target, intent(inout) :: msh
     integer, intent(in) :: lx
     type(json_file), target, intent(inout) :: params
     type(user_t), target, intent(in) :: user
     type(chkp_t), target, intent(inout) :: chkp
+    logical, intent(in) :: if_adjoint
     character(len=15), parameter :: scheme = 'Adjoint (Pn/Pn)'
     real(kind=rp) :: abs_tol
     character(len=LOG_SIZE) :: log_buf
@@ -305,6 +324,8 @@ contains
     character(len=256) :: header_line
 
     call this%free()
+
+    this%if_adjoint = if_adjoint
 
     ! Initialize base class
     call this%init_base(msh, lx, params, scheme, user, .true.)
@@ -326,25 +347,31 @@ contains
          this%full_stress_formulation, .false.)
 
     if (this%full_stress_formulation .eqv. .true.) then
-       call neko_error( &
-            "Full stress formulation is not supported in the adjoint module.")
-       !  ! Setup backend dependent Ax routines
-       !  call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
+       if (this%if_adjoint) then
+          call neko_error( &
+               "Full stress formulation is not supported in the adjoint " // &
+               "module.")
+       else
+          ! Setup backend dependent Ax routines
+          call ax_helm_factory(this%Ax_vel, full_formulation = .true.)
 
-       !  ! Setup backend dependent prs residual routines
-       !  call pnpn_prs_res_stress_factory(this%prs_res)
-
-       !  ! Setup backend dependent vel residual routines
-       !  call pnpn_vel_res_stress_factory(this%vel_res)
+          ! Setup backend dependent residual routines for the linearized step
+          call pnpn_prs_res_stress_factory(this%linearized_prs_res)
+          call pnpn_vel_res_stress_factory(this%linearized_vel_res)
+       end if
     else
        ! Setup backend dependent Ax routines
        call ax_helm_factory(this%Ax_vel, full_formulation = .false.)
 
-       ! Setup backend dependent prs residual routines
-       call adjoint_pnpn_prs_res_factory(this%prs_res)
-
-       ! Setup backend dependent vel residual routines
-       call adjoint_pnpn_vel_res_factory(this%vel_res)
+       if (this%if_adjoint) then
+          ! Setup backend dependent residual routines for the adjoint step
+          call adjoint_pnpn_prs_res_factory(this%adjoint_prs_res)
+          call adjoint_pnpn_vel_res_factory(this%adjoint_vel_res)
+       else
+          ! Setup backend dependent residual routines for the linearized step
+          call pnpn_prs_res_factory(this%linearized_prs_res)
+          call pnpn_vel_res_factory(this%linearized_vel_res)
+       end if
     end if
 
     if (params%valid_path('case.fluid.nut_field')) then
@@ -450,7 +477,7 @@ contains
     call json_get(params, 'case.numerics', numerics_params)
     call advection_adjoint_factory(this%adv, numerics_params, this%c_Xh, &
          this%ulag, this%vlag, this%wlag, &
-         chkp%dtlag, chkp%tlag, this%ext_bdf, &
+         chkp%dtlag, chkp%tlag, this%ext_bdf, this%if_adjoint, &
          .not. advection)
     ! Should be in init_base maybe?
     this%chkp => chkp
@@ -648,12 +675,20 @@ contains
        deallocate(this%Ax_prs)
     end if
 
-    if (allocated(this%prs_res)) then
-       deallocate(this%prs_res)
+    if (allocated(this%adjoint_prs_res)) then
+       deallocate(this%adjoint_prs_res)
     end if
 
-    if (allocated(this%vel_res)) then
-       deallocate(this%vel_res)
+    if (allocated(this%adjoint_vel_res)) then
+       deallocate(this%adjoint_vel_res)
+    end if
+
+    if (allocated(this%linearized_prs_res)) then
+       deallocate(this%linearized_prs_res)
+    end if
+
+    if (allocated(this%linearized_vel_res)) then
+       deallocate(this%linearized_vel_res)
     end if
 
     if (allocated(this%sumab)) then
@@ -688,6 +723,23 @@ contains
     class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
     type(time_state_t), intent(in) :: time
     type(time_step_controller_t), intent(in) :: dt_controller
+
+    if (this%if_adjoint) then
+      call this%step_adjoint(time, dt_controller)
+    else
+      call this%step_linearized(time, dt_controller)
+    end if
+
+  end subroutine adjoint_fluid_pnpn_step
+
+  !> Advance adjoint fluid simulation in time.
+  !! @param this The fluid simulation object.
+  !! @param time The time state object.
+  !! @param dt_controller timestep controller
+  subroutine adjoint_fluid_pnpn_step_adjoint(this, time, dt_controller)
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+    type(time_step_controller_t), intent(in) :: dt_controller
     ! number of degrees of freedom
     integer :: n
     ! Solver results monitors (pressure + 3 velocity)
@@ -713,8 +765,8 @@ contains
          Xh => this%Xh, &
          c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
          ulag => this%ulag, vlag => this%vlag, wlag => this%wlag, &
-         msh => this%msh, prs_res => this%prs_res, &
-         source_term => this%source_term, vel_res => this%vel_res, &
+         msh => this%msh, prs_res => this%adjoint_prs_res, &
+         source_term => this%source_term, vel_res => this%adjoint_vel_res, &
          sumab => this%sumab, &
          makeabf => this%makeabf, makebdf => this%makebdf, &
          vel_projection_dim => this%vel_projection_dim, &
@@ -990,7 +1042,176 @@ contains
     end associate
     call profiler_end_region('Adjoint')
 
-  end subroutine adjoint_fluid_pnpn_step
+  end subroutine adjoint_fluid_pnpn_step_adjoint
+
+  !> Advance linearized fluid simulation in time.
+  !! @param this The fluid simulation object.
+  !! @param time The time state object.
+  !! @param dt_controller timestep controller
+  subroutine adjoint_fluid_pnpn_step_linearized(this, time, dt_controller)
+    class(adjoint_fluid_pnpn_t), target, intent(inout) :: this
+    type(time_state_t), intent(in) :: time
+    type(time_step_controller_t), intent(in) :: dt_controller
+    integer :: n
+    type(ksp_monitor_t) :: ksp_results(4)
+
+    if (this%freeze) return
+
+    n = this%dm_Xh%size()
+
+    call profiler_start_region('Linearized')
+    associate(u => this%u_adj, v => this%v_adj, w => this%w_adj, &
+         p => this%p_adj, &
+         u_e => this%u_adj_e, v_e => this%v_adj_e, w_e => this%w_adj_e, &
+         du => this%du, dv => this%dv, dw => this%dw, dp => this%dp, &
+         u_b => this%u_b, v_b => this%v_b, w_b => this%w_b, &
+         u_res => this%u_res, v_res => this%v_res, w_res => this%w_res, &
+         p_res => this%p_res, Ax_vel => this%Ax_vel, Ax_prs => this%Ax_prs, &
+         Xh => this%Xh, &
+         c_Xh => this%c_Xh, dm_Xh => this%dm_Xh, gs_Xh => this%gs_Xh, &
+         ulag => this%ulag, vlag => this%vlag, wlag => this%wlag, &
+         msh => this%msh, prs_res => this%linearized_prs_res, &
+         source_term => this%source_term, vel_res => this%linearized_vel_res, &
+         sumab => this%sumab, &
+         makeabf => this%makeabf, makebdf => this%makebdf, &
+         vel_projection_dim => this%vel_projection_dim, &
+         pr_projection_dim => this%pr_projection_dim, &
+         oifs => this%oifs, &
+         rho => this%rho, mu => this%mu, &
+         f_x => this%f_adj_x, f_y => this%f_adj_y, f_z => this%f_adj_z, &
+         t => time%t, tstep => time%tstep, dt => time%dt, &
+         ext_bdf => this%ext_bdf, event => glb_cmd_event)
+
+      call sumab%compute_fluid(u_e, v_e, w_e, u, v, w, &
+           ulag, vlag, wlag, ext_bdf%advection_coeffs%x, ext_bdf%nadv)
+
+      call this%source_term%compute(time)
+
+      call this%bcs_vel%apply_vector(f_x%x, f_y%x, f_z%x, &
+           this%dm_Xh%size(), time, strong = .false.)
+
+      if (oifs) then
+         call neko_error("OIFS not implemented for the linearized fluid")
+      else
+         call this%adv%compute_linear(u, v, w, u_b, v_b, w_b, &
+              f_x, f_y, f_z, Xh, this%c_Xh, dm_Xh%size())
+
+         call makeabf%compute_fluid(this%abx1, this%aby1, this%abz1, &
+              this%abx2, this%aby2, this%abz2, &
+              f_x%x, f_y%x, f_z%x, rho%x(1,1,1,1), &
+              ext_bdf%advection_coeffs%x, n)
+
+         call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
+              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n, &
+              c_Xh%Blag, c_Xh%Blaglag)
+      end if
+
+      call ulag%update()
+      call vlag%update()
+      call wlag%update()
+
+      call this%bc_apply_vel(time, strong = .true.)
+      call this%bc_apply_prs(time)
+
+      call this%update_material_properties(time)
+
+      call profiler_start_region('Linearized_pressure_residual')
+
+      call prs_res%compute(p, p_res, u, v, w, u_e, v_e, w_e, f_x, f_y, f_z, &
+           c_Xh, gs_Xh, this%bc_prs_surface, this%bc_sym_surface, Ax_prs, &
+           ext_bdf%diffusion_coeffs%x(1), dt, mu, rho, event)
+
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p_res%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p_res%x, this%glb_n_points, n)
+      end if
+
+      call gs_Xh%op(p_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+
+      call this%bclst_dp%apply_scalar(p_res%x, p%dof%size(), time)
+
+      call profiler_end_region('Linearized_pressure_residual')
+
+      call this%proj_prs%pre_solving(p_res%x, tstep, c_Xh, n, dt_controller, &
+           'Pressure')
+
+      call this%pc_prs%update()
+
+      call profiler_start_region('Linearized_pressure_solve')
+      ksp_results(1) = this%ksp_prs%solve(Ax_prs, dp, p_res%x, n, c_Xh, &
+           this%bclst_dp, gs_Xh)
+      call profiler_end_region('Linearized_pressure_solve')
+
+      call this%proj_prs%post_solving(dp%x, Ax_prs, c_Xh, &
+           this%bclst_dp, gs_Xh, n, tstep, dt_controller)
+
+      call field_add2(p, dp, n)
+      if (.not. this%prs_dirichlet .and. NEKO_BCKND_DEVICE .eq. 1) then
+         call device_ortho(p%x_d, this%glb_n_points, n)
+      else if (.not. this%prs_dirichlet) then
+         call ortho(p%x, this%glb_n_points, n)
+      end if
+
+      call profiler_start_region('Linearized_velocity_residual')
+      call vel_res%compute(Ax_vel, u, v, w, u_res, v_res, w_res, p, f_x, &
+           f_y, f_z, c_Xh, msh, Xh, mu, rho, &
+           ext_bdf%diffusion_coeffs%x(1), dt, dm_Xh%size())
+
+      call rotate_cyc(u_res%x, v_res%x, w_res%x, 1, c_Xh)
+      call gs_Xh%op(u_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(v_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call gs_Xh%op(w_res, GS_OP_ADD, event)
+      call device_event_sync(event)
+      call rotate_cyc(u_res%x, v_res%x, w_res%x, 0, c_Xh)
+
+      call this%bclst_vel_res%apply(u_res, v_res, w_res, time)
+
+      call profiler_end_region('Linearized_velocity_residual')
+
+      call this%proj_vel%pre_solving(u_res%x, v_res%x, w_res%x, tstep, c_Xh, &
+           n, dt_controller, 'Velocity')
+
+      call this%pc_vel%update()
+
+      call profiler_start_region('Linearized_velocity_solve')
+      ksp_results(2:4) = this%ksp_vel%solve_coupled(Ax_vel, du, dv, dw, &
+           u_res%x, v_res%x, w_res%x, n, c_Xh, this%bclst_du, &
+           this%bclst_dv, this%bclst_dw, gs_Xh, this%ksp_vel%max_iter)
+      call profiler_end_region('Linearized_velocity_solve')
+
+      ksp_results(1)%name = 'LNS Pressure'
+      ksp_results(2)%name = 'LNS Velocity U'
+      ksp_results(3)%name = 'LNS Velocity V'
+      ksp_results(4)%name = 'LNS Velocity W'
+
+      call this%proj_vel%post_solving(du%x, dv%x, dw%x, Ax_vel, c_Xh, &
+           this%bclst_du, this%bclst_dv, this%bclst_dw, gs_Xh, n, tstep, &
+           dt_controller)
+
+      if (NEKO_BCKND_DEVICE .eq. 1) then
+         call device_opadd2cm(u%x_d, v%x_d, w%x_d, du%x_d, dv%x_d, dw%x_d, &
+              1.0_rp, n, msh%gdim)
+      else
+         call opadd2cm(u%x, v%x, w%x, du%x, dv%x, dw%x, 1.0_rp, n, msh%gdim)
+      end if
+
+      if (this%forced_flow_rate) then
+         call neko_error('Forced flow rate is not implemented for the '// &
+              'linearized fluid')
+      end if
+
+      call fluid_step_info(time, ksp_results, &
+           this%full_stress_formulation, this%strict_convergence)
+
+    end associate
+    call profiler_end_region('Linearized')
+
+  end subroutine adjoint_fluid_pnpn_step_linearized
 
   !> Sets up the boundary condition for the scheme.
   !! @param this The fluid simulation object.
@@ -1556,4 +1777,62 @@ contains
     call neko_log%end_section('Power Iterations')
   end subroutine power_iterations_compute
 
+  subroutine adjoint_fluid_pnpn_reset(this)
+  class(adjoint_fluid_pnpn_t), intent(inout) :: this
+  integer :: i
+
+    ! zero out flds
+    call field_rzero(this%u_adj)
+    call field_rzero(this%v_adj)
+    call field_rzero(this%w_adj)
+    call field_rzero(this%p_adj)
+
+    ! zero out lag fields (weird notation... but this%u_adj will now be zero)
+    ! call this%ulag%set(this%u_adj)
+    ! call this%vlag%set(this%u_adj)
+    ! call this%wlag%set(this%u_adj)
+
+    ! just in case "set" doesn't work properly
+       do i = 1, this%ulag%size()
+          call field_rzero(this%ulag%lf(i))
+          call field_rzero(this%vlag%lf(i))
+          call field_rzero(this%wlag%lf(i))
+       end do
+
+    ! zero out RHS
+    call field_rzero(this%f_adj_x)
+    call field_rzero(this%f_adj_y)
+    call field_rzero(this%f_adj_z)
+
+    ! zero out time variables
+    call field_rzero(this%abx1)
+    call field_rzero(this%aby1)
+    call field_rzero(this%abz1)
+    call field_rzero(this%abx2)
+    call field_rzero(this%aby2)
+    call field_rzero(this%abz2)
+
+    ! There may be more related to the time scheme controller, but I think
+    ! this is sufficient and will be handled in the beginning of the simulation
+
+  end subroutine adjoint_fluid_pnpn_reset
+
+  subroutine z_plane_fix(fld)
+  type(field_t), intent(inout) :: fld
+  integer :: iel, iz, iy, ix, nel
+  ! note this wont work on GPUs
+
+  do iel = 1, fld%msh%nelv
+     do iz = 2, fld%xh%lz
+     do iy = 1, fld%xh%ly
+     do ix = 1, fld%xh%lx
+
+     fld%x(ix, iy, iz, iel) = fld%x(ix, iy, 1, iel)
+     
+     end do
+     end do
+     end do
+  end do
+
+  end subroutine z_plane_fix
 end module adjoint_fluid_pnpn

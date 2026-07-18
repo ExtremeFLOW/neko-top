@@ -53,6 +53,7 @@ module adv_lin_dealias
 
   !> Type encapsulating advection routines with dealiasing
   type, public, extends(advection_adjoint_t) :: adv_lin_dealias_t
+     logical :: if_adjoint
      !> Coeffs of the higher-order space
      type(coef_t) :: coef_GL
      !> Coeffs of the original space in the simulation
@@ -131,6 +132,7 @@ module adv_lin_dealias
      ! If one integrates by parts, this essentially switches sign and adds some
      ! boundary terms.
      ! We keep the differential operator on the test function
+
      procedure, pass(this) :: compute_adjoint_scalar => &
           compute_adjoint_scalar_advection_dealias
      ! NOTE
@@ -148,11 +150,14 @@ contains
   !! @param this The object.
   !! @param lxd The polynomial order of the space used in the dealiasing.
   !! @param coef The coefficients of the (space, mesh) pair.
-  subroutine init_dealias(this, lxd, coef)
+  subroutine init_dealias(this, lxd, coef, if_adjoint)
     class(adv_lin_dealias_t), target, intent(inout) :: this
     integer, intent(in) :: lxd
     type(coef_t), intent(inout), target :: coef
+    logical, intent(in) :: if_adjoint
     integer :: nel, n_GL, n
+
+    this%if_adjoint = if_adjoint
 
     call this%Xh_GL%init(GL, lxd, lxd, lxd)
     this%Xh_GLL => coef%Xh
@@ -228,7 +233,6 @@ contains
   subroutine free_dealias(this)
     class(adv_lin_dealias_t), intent(inout) :: this
   end subroutine free_dealias
-
 
   !> Add the adjoint advection term for the fluid in weak form, i.e.
   !! \f$ \int_\Omega v \cdot u' (\nabla \bar{U})^T u^\dagger d\Omega
