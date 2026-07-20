@@ -91,7 +91,7 @@ contains
   end subroutine device_update_hessian_z
 
 
-  !> Prepare AA matrix for dual-primal solver on device
+  !> Prepare AA matrix for primal-dual solver on device
   subroutine device_prepare_aa_matrix(AA_d, s_d, lambda_d, d_d, mu_d, y_d, &
        a_d, zeta, z, m)
     type(c_ptr) :: AA_d, s_d, lambda_d, d_d, mu_d, y_d, a_d
