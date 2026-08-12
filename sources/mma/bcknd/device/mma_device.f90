@@ -119,12 +119,12 @@ contains
     type(c_ptr), intent(in) :: x, df0dx
 
     type(vector_t), pointer :: rex
-    integer :: ind(1)
+    integer :: ind
     real(kind=rp) :: re_sq_norm
     integer :: ierr
 
     ! Request temporary scratch space for rex on the device
-    call this%scratch%request(rex, ind(1), this%n, .false.)
+    call this%scratch%request(rex, ind, this%n, .false.)
 
     ! Launch the custom element-wise KKT kernel via our abstraction layer
     call device_unconstrained_kkt(rex%x_d, x, this%xmin%x_d, this%xmax%x_d, &
@@ -1100,9 +1100,9 @@ contains
     class(mma_t), intent(inout) :: this
     type(c_ptr), intent(in) :: designx_d
     type(vector_t), pointer :: x
-    integer :: ind(1)
+    integer :: ind
 
-    call this%scratch%request(x, ind(1), this%n, .false.)
+    call this%scratch%request(x, ind, this%n, .false.)
     associate(p0j => this%p0j, q0j => this%q0j, &
          low => this%low, upp => this%upp, &
          alpha => this%alpha, beta => this%beta)
