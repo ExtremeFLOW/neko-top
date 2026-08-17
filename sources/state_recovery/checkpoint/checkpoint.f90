@@ -467,6 +467,8 @@ contains
                si%size(), DEVICE_TO_HOST, this%state_list%size() .eq. i)
        end do
     end if
+
+    nullify(si)
   end subroutine checkpoint_save_data
 
   !> Restore data from the RAM checkpoint at the specified index to the current
@@ -498,8 +500,9 @@ contains
           call device_memcpy(this%state_storage(index, i)%data, si%x_d, &
                si%size(), HOST_TO_DEVICE, this%state_list%size() .eq. i)
        end do
-
     end if
+
+    nullify(si)
   end subroutine checkpoint_load_data
 
   ! ========================================================================== !

@@ -183,12 +183,14 @@ pkg_get_variable(DEVICE_TYPE neko backend)
 # ............................................................................ #
 # HDF5 Support
 
-if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
-    set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
-        "Path to the HDF5 installation")
-elseif(DEFINED ENV{HDF5_DIR})
-    set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
-        CACHE STRING "Path to the HDF5 installation")
+if (NOT DEFINED HDF5_DIR)
+    if (DEFINED ENV{HDF5_DIR} AND IS_ABSOLUTE $ENV{HDF5_DIR})
+        set(HDF5_DIR $ENV{HDF5_DIR} CACHE STRING
+            "Path to the HDF5 installation")
+    elseif(DEFINED ENV{HDF5_DIR})
+        set(HDF5_DIR ${EXTERNAL_DIR}/$ENV{HDF5_DIR}
+            CACHE STRING "Path to the HDF5 installation")
+    endif()
 endif()
 
 if (DEFINED HDF5_DIR)

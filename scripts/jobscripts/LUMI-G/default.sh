@@ -30,6 +30,7 @@
 # -- Mandatory options, change with great care.
 
 # Definitions of output files.
+#SBATCH --open-mode=append
 #SBATCH --output output.log
 #SBATCH --error error.log
 #SBATCH --account=project_465002526

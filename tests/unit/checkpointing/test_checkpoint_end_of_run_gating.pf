@@ -1,0 +1,253 @@
+module test_checkpoint_end_of_run_gating
+  use pfunit
+  use num_types, only: dp, rp
+  use math, only: abscmp, NEKO_EPS
+  use simulation_m, only: simulation_t
+  use simulation_checkpoint, only: simulation_checkpoint_t
+  use simulation, only: simulation_init, simulation_step, simulation_finalize
+  use time_step_controller, only: time_step_controller_t
+  use design, only: design_t
+  use problem, only: problem_t
+  use field_array, only: field_array_t
+  use field, only: field_t
+  use field_math, only: field_copy
+  use checkpointing_test_utils, only: initialize_runtime_once, &
+       initialize_case_from_file, finalize_case_objects, &
+       allocate_snapshot_fields, free_snapshot_fields, &
+       allocate_scalar_snapshot_fields, free_scalar_snapshot_fields, rmse
+  implicit none
+
+  integer, parameter :: checkpoint_saves_in_memory = 4
+  integer, parameter :: n_forward_steps = 13
+  integer, parameter :: tstep_before_threshold = 11
+  integer, parameter :: tstep_at_threshold = 12
+  integer, parameter :: tstep_after_threshold = 13
+  real(kind=dp), parameter :: end_time_in_steps = 13.0_dp
+  real(kind=rp), parameter :: restore_tolerance = NEKO_EPS
+
+  @TestCase
+  type, extends(MPITestCase) :: test_checkpoint_end_of_run_gating_case
+   contains
+     procedure :: setUp
+     procedure :: tearDown
+  end type test_checkpoint_end_of_run_gating_case
+
+  logical :: initialized_lock = .false.
+
+contains
+
+  subroutine setUp(this)
+    class(test_checkpoint_end_of_run_gating_case), intent(inout) :: this
+
+    if (initialized_lock) return
+    initialized_lock = .true.
+
+    call initialize_runtime_once()
+  end subroutine setUp
+
+  subroutine tearDown(this)
+    class(test_checkpoint_end_of_run_gating_case), intent(inout) :: this
+  end subroutine tearDown
+
+  subroutine restore_errors_for_tstep(chkp, sim, p_refs, u_refs, v_refs, &
+       w_refs, scalar_refs, tstep, err_p, err_u, err_v, err_w, err_scalar, &
+       scalar_restore_ok, failing_scalar, failing_scalar_name)
+    type(simulation_checkpoint_t), intent(inout) :: chkp
+    type(simulation_t), intent(inout) :: sim
+    type(field_array_t), intent(inout) :: p_refs, u_refs, v_refs, w_refs
+    type(field_array_t), allocatable, intent(inout) :: scalar_refs(:)
+    integer, intent(in) :: tstep
+    real(kind=rp), intent(out) :: err_p, err_u, err_v, err_w
+    real(kind=rp), intent(out) :: err_scalar
+    logical, intent(out) :: scalar_restore_ok
+    integer, intent(out) :: failing_scalar
+    character(len=*), intent(out) :: failing_scalar_name
+
+    integer :: i_scalar
+    type(field_t), pointer :: p_ref, u_ref, v_ref, w_ref
+    type(field_t), pointer :: scalar_ref, scalar
+    type(field_t), pointer :: p, u, v, w
+
+    p => sim%neko_case%fluid%p
+    u => sim%neko_case%fluid%u
+    v => sim%neko_case%fluid%v
+    w => sim%neko_case%fluid%w
+
+    p_ref => p_refs%get(tstep)
+    u_ref => u_refs%get(tstep)
+    v_ref => v_refs%get(tstep)
+    w_ref => w_refs%get(tstep)
+
+    call chkp%restore(sim%neko_case, tstep)
+
+    err_p = rmse(p_ref, p)
+    err_u = rmse(u_ref, u)
+    err_v = rmse(v_ref, v)
+    err_w = rmse(w_ref, w)
+
+    err_scalar = 0.0_rp
+    scalar_restore_ok = .true.
+    failing_scalar = 0
+    failing_scalar_name = ''
+
+    if (.not. allocated(scalar_refs)) return
+
+    do i_scalar = 1, size(scalar_refs)
+       scalar => sim%neko_case%scalars%scalar_fields(i_scalar)%scalar%s
+       scalar_ref => scalar_refs(i_scalar)%get(tstep)
+       err_scalar = rmse(scalar_ref, scalar)
+
+       if (.not. abscmp(err_scalar, 0.0_rp, restore_tolerance)) then
+          scalar_restore_ok = .false.
+          failing_scalar = i_scalar
+          failing_scalar_name = scalar%name
+          return
+       end if
+    end do
+  end subroutine restore_errors_for_tstep
+
+  @test(npes=[2])
+  subroutine runtime_end_of_run_gating_boundary(this)
+    class(test_checkpoint_end_of_run_gating_case), intent(inout) :: this
+
+    type(simulation_t), target :: sim
+    type(simulation_checkpoint_t) :: chkp
+    class(design_t), allocatable :: des
+    type(problem_t) :: prob
+    type(time_step_controller_t) :: dt_controller
+    type(field_t), pointer :: p, u, v, w
+    type(field_t), pointer :: scalar, scalar_snapshot
+    type(field_t), pointer :: p_snapshot, u_snapshot, v_snapshot, w_snapshot
+    type(field_array_t) :: p_fields, u_fields, v_fields, w_fields
+    type(field_array_t), allocatable :: scalar_fields(:)
+
+    integer :: i, i_scalar
+    integer :: failing_scalar
+    logical :: restore_matches, scalar_restore_ok
+    real(kind=rp) :: err_p, err_u, err_v, err_w, err_scalar
+    character(len=256) :: failing_scalar_name
+    character(len=256) :: msg
+
+    call initialize_case_from_file('checkpoint.case', sim, des, prob)
+
+    p => sim%neko_case%fluid%p
+    u => sim%neko_case%fluid%u
+    v => sim%neko_case%fluid%v
+    w => sim%neko_case%fluid%w
+
+    call allocate_snapshot_fields(p, u, v, w, n_forward_steps, &
+         p_fields, u_fields, v_fields, w_fields)
+    call allocate_scalar_snapshot_fields(sim, n_forward_steps, scalar_fields)
+
+    call chkp%init(sim%neko_case, 'linear', &
+         n_saves_memory = checkpoint_saves_in_memory, &
+         path = 'checkpoint_end_of_run_gating', &
+         filename = 'checkpoint', &
+         fmt = 'chkp', &
+         keep_checkpoints = .false.)
+
+    call dt_controller%init(sim%neko_case%params)
+    call simulation_init(sim%neko_case, dt_controller)
+
+    sim%neko_case%time%end_time = end_time_in_steps * sim%neko_case%time%dt
+
+    do i = 1, n_forward_steps
+       call simulation_step(sim%neko_case, dt_controller)
+
+       p_snapshot => p_fields%get(i)
+       u_snapshot => u_fields%get(i)
+       v_snapshot => v_fields%get(i)
+       w_snapshot => w_fields%get(i)
+
+       call field_copy(p_snapshot, p)
+       call field_copy(u_snapshot, u)
+       call field_copy(v_snapshot, v)
+       call field_copy(w_snapshot, w)
+
+       if (allocated(scalar_fields)) then
+          do i_scalar = 1, size(scalar_fields)
+             scalar => sim%neko_case%scalars%scalar_fields(i_scalar)%scalar%s
+             scalar_snapshot => scalar_fields(i_scalar)%get(i)
+             call field_copy(scalar_snapshot, scalar)
+          end do
+       end if
+
+       call chkp%save(sim%neko_case)
+    end do
+
+    call simulation_finalize(sim%neko_case)
+
+    call dt_controller%init(sim%neko_case%params)
+    call simulation_init(sim%neko_case, dt_controller)
+
+    ! Final step restore is checked first to exercise end-of-run RAM save path.
+    call restore_errors_for_tstep(chkp, sim, p_fields, u_fields, v_fields, &
+         w_fields, scalar_fields, tstep_after_threshold, err_p, err_u, &
+         err_v, err_w, err_scalar, scalar_restore_ok, failing_scalar, &
+         failing_scalar_name)
+    if (failing_scalar .gt. 0) then
+       write(msg, '(A,I0,A,I0,A,A,A,ES12.4)') &
+            'Mismatch at tstep ', tstep_after_threshold, &
+            ' scalar[', failing_scalar, '] ', trim(failing_scalar_name), &
+            ' RMSE=', err_scalar
+    else
+       write(msg, '(A,I0,A,4(ES12.4,1X),A)') &
+            'Mismatch at end-of-run tstep ', tstep_after_threshold, &
+            ' (p/u/v/w RMSE = ', err_p, err_u, err_v, err_w, ')'
+    end if
+    restore_matches = abscmp(err_p, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_u, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_v, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_w, 0.0_rp, restore_tolerance) .and. &
+         scalar_restore_ok
+    @assertTrue(restore_matches, trim(msg))
+
+    call restore_errors_for_tstep(chkp, sim, p_fields, u_fields, v_fields, &
+         w_fields, scalar_fields, tstep_at_threshold, err_p, err_u, &
+         err_v, err_w, err_scalar, scalar_restore_ok, failing_scalar, &
+         failing_scalar_name)
+    if (failing_scalar .gt. 0) then
+       write(msg, '(A,I0,A,I0,A,A,A,ES12.4)') &
+            'Mismatch at tstep ', tstep_at_threshold, &
+            ' scalar[', failing_scalar, '] ', trim(failing_scalar_name), &
+            ' RMSE=', err_scalar
+    else
+       write(msg, '(A,I0,A,4(ES12.4,1X),A)') &
+            'Mismatch at threshold tstep ', tstep_at_threshold, &
+            ' (p/u/v/w RMSE = ', err_p, err_u, err_v, err_w, ')'
+    end if
+    restore_matches = abscmp(err_p, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_u, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_v, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_w, 0.0_rp, restore_tolerance) .and. &
+         scalar_restore_ok
+    @assertTrue(restore_matches, trim(msg))
+
+    call restore_errors_for_tstep(chkp, sim, p_fields, u_fields, v_fields, &
+         w_fields, scalar_fields, tstep_before_threshold, err_p, err_u, &
+         err_v, err_w, err_scalar, scalar_restore_ok, failing_scalar, &
+         failing_scalar_name)
+    if (failing_scalar .gt. 0) then
+       write(msg, '(A,I0,A,I0,A,A,A,ES12.4)') &
+            'Mismatch at tstep ', tstep_before_threshold, &
+            ' scalar[', failing_scalar, '] ', trim(failing_scalar_name), &
+            ' RMSE=', err_scalar
+    else
+       write(msg, '(A,I0,A,4(ES12.4,1X),A)') &
+            'Mismatch below threshold tstep ', tstep_before_threshold, &
+            ' (p/u/v/w RMSE = ', err_p, err_u, err_v, err_w, ')'
+    end if
+    restore_matches = abscmp(err_p, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_u, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_v, 0.0_rp, restore_tolerance) .and. &
+         abscmp(err_w, 0.0_rp, restore_tolerance) .and. &
+         scalar_restore_ok
+    @assertTrue(restore_matches, trim(msg))
+
+    call simulation_finalize(sim%neko_case)
+    call free_scalar_snapshot_fields(scalar_fields)
+    call free_snapshot_fields(p_fields, u_fields, v_fields, w_fields)
+    call finalize_case_objects(sim, des, prob, chkp)
+  end subroutine runtime_end_of_run_gating_boundary
+
+end module test_checkpoint_end_of_run_gating

@@ -55,7 +55,7 @@ void hip_SIMP_mapping_apply(real* f_min, real* f_max, real* p,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(SIMP_mapping_apply_kernel<real>,
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(SIMP_mapping_apply_kernel<real>),
         nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         *f_min, *f_max, *p, (real*)X_out_d, (real*)X_in_d, *n);
     HIP_CHECK(hipGetLastError());
@@ -69,7 +69,7 @@ void hip_SIMP_mapping_apply_backward(real* f_min, real* f_max,
     const dim3 nthrds(1024, 1, 1);
     const dim3 nblcks(((*n) + 1024 - 1) / 1024, 1, 1);
 
-    hipLaunchKernelGGL(SIMP_mapping_apply_backward_kernel<real>,
+    hipLaunchKernelGGL(HIP_KERNEL_NAME(SIMP_mapping_apply_backward_kernel<real>),
         nblcks, nthrds, 0, (hipStream_t)glb_cmd_queue,
         *f_min, *f_max, *p, (real*)sens_out_d, (real*)sens_in_d,
         (real*)X_in_d, *n);

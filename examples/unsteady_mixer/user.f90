@@ -15,7 +15,7 @@ module user
   use neko_config, only: NEKO_BCKND_DEVICE
   use operators, only: curl
   use scratch_registry, only : neko_scratch_registry
-  use device, only: HOST_TO_DEVICE, device_memcpy
+  use device, only: HOST_TO_DEVICE, DEVICE_TO_HOST, device_memcpy
   implicit none
   !> Case parameters
   ! To define the initial boundary conditions we don't wish to introduce a
@@ -60,6 +60,10 @@ contains
        v => fields%get("v")
        w => fields%get("w")
 
+       call u%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call v%copy_from(DEVICE_TO_HOST, sync = .false.)
+       call w%copy_from(DEVICE_TO_HOST, sync = .true.)
+
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
           x = u%dof%x(idx, 1, 1, 1)
@@ -67,20 +71,19 @@ contains
           z = u%dof%z(idx, 1, 1, 1)
 
           ! Inflow velocity profile is a paraboloid
-          u%x(idx, 1, 1, 1) = - (y - 0.5_rp)**2 - &
-               (z - 0.5_rp)**2 + 1.0_rp
+          u%x(idx, 1, 1, 1) = 36.0_rp * y*(y-1.0_rp) * z*(z-1.0_rp)
           v%x(idx, 1, 1, 1) = 0.0_rp
           w%x(idx, 1, 1, 1) = 0.0_rp
        end do
 
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, sync=.false.)
-          call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, sync=.false.)
-          call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, sync=.false.)
-       end if
+       call u%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call v%copy_from(HOST_TO_DEVICE, sync = .false.)
+       call w%copy_from(HOST_TO_DEVICE, sync = .true.)
 
+       nullify(u, v, w)
     else
        s => fields%get("s")
+       call s%copy_from(DEVICE_TO_HOST, sync = .true.)
 
        do i = 1, bc%msk(0)
           idx = bc%msk(i)
@@ -88,9 +91,9 @@ contains
           ! Inflow scalar profile is a sigmoid separating the two species
           s%x(idx, 1, 1, 1) = L / (1.0_rp + exp(-k*(z - z_0)))
        end do
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync=.false.)
-       end if
+
+       call s%copy_from(HOST_TO_DEVICE, sync = .true.)
+       nullify(s)
     end if
   end subroutine user_bc
 
@@ -112,7 +115,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_memcpy(s%x, s%x_d, s%size(), HOST_TO_DEVICE, sync=.false.)
     end if
-
+    nullify(s)
 
   end subroutine scalar_ic
 

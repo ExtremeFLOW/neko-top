@@ -19,8 +19,34 @@ function run {
         logfile=$(basename -- $(dirname $(realpath $0))).log
     fi
 
+    # Check for recoverable errors in the error log
+    if [ -s error.log ]; then
+        grep "ERROR: Optimizer stopped after reaching the maximum runtime" \
+            error.log >/dev/null || return 1
+
+        # If the error is recoverable, clear the error log and continue
+        echo "" > error.log
+    fi
+
+    if [ -f "$logfile" ]; then
+        # Move old log files to folder with counter padded to 2 digits
+
+        old_run=run_$(find ./ -maxdepth 1 -type d -name "run_*" | wc -l)
+        old_run=$(printf "%s_%02d" "run" $((10#${old_run#run_} + 1)))
+        mkdir -p ./$old_run
+
+        find ./ -maxdepth 1 -not -empty -type f -name "*.log" \
+            -not -name "output.log" -not -name "error.log" \
+            -exec mv -ft ./$old_run {} \;
+        cp -ft ./$old_run output.log
+        [ -s error.log ] && cp -ft ./$old_run error.log
+
+        # Reset the log files
+        printf "Ready" >./output.log
+    fi
+
     # Run the example
-    printf "Executing Neko.\n"
+    printf "Executing Neko.\n" > ./output.log
     printf "See $logfile for the status output.\n"
     export NEKO_LOG_FILE=$logfile
 
@@ -182,7 +208,7 @@ function prepare {
         fi
 
         if [[ -n "$SLURM_JOB_NAME" && -n "$CPU_BIND" ]]; then
-            srun --ntasks=1 --cpu-bind=${CPU_BIND} $prep_sh
+            srun --nodes=1 --ntasks=1 $prep_sh
             sleep 1 # Make sure SLURM have time to clean up.
         else
             $prep_sh
@@ -279,6 +305,11 @@ function cleanup {
         --exclude "neko" \
         --exclude "*.smod" \
         ./ $results
+
+    if [ -s ./error.log ]; then
+        printf >&2 "ERROR: An error occurred during rsync.\n"
+        return 1
+    fi
 
     # Remove all but the log files
     find ./ -type f -not -name "error.log" -not -name "output.log" -delete

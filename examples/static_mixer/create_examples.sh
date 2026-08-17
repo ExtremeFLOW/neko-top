@@ -1,6 +1,6 @@
 #!/bin/bash
 
-example_list=(petsc)
+example_list=(petsc petsc_phmg)
 N=(64 128)
 Re=(1000 1500 3000)
 
@@ -37,7 +37,7 @@ for example in "${example_list[@]}"; do
 
             output_file="${data_path}/${mesh_pattern}_${Nx}x${Ny}x${Nz}.nmsh"
             case_file="${example_path}/${example}/${n}_re_${re}_pe_${pe}.case"
-            cache_file="${data_path}/${example}/cache_${n}_0.nek5000"
+            cache_file="${data_path}/petsc/cache_${n}_0.nek5000"
             job_file="${job_path}/${example}/${n}_re_${re}_pe_${pe}.sh"
 
             if [[ "$1" == "mesh" && ! -f ${output_file} ]]; then
@@ -50,7 +50,7 @@ for example in "${example_list[@]}"; do
             sed -i "s|\"Re\": .*|\"Re\": ${re}.0,|g" ${case_file}
             sed -i "s|\"Pe\": .*|\"Pe\": ${pe}.0,|g" ${case_file}
             sed -i "s|\"mesh_file\": .*|\"mesh_file\": \"${output_file}\",|g" ${case_file}
-            sed -i "s|\"cache_file\": .*|\"cache_file\": \"${data_path}/${example}/cache_${n}_\",|g" ${case_file}
+            sed -i "s|\"cache_file\": .*|\"cache_file\": \"${cache_file%0.nek5000}\",|g" ${case_file}
             sed -i "s|\"radius\": .*|\"radius\": ${element_size}|g" ${case_file}
             sed -i "s|\"element_size\": .*|\"element_size\": ${element_size},|g" ${case_file}
 

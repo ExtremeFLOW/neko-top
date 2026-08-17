@@ -388,8 +388,10 @@ contains
   !> Deallocate a fluid formulation
   subroutine adjoint_fluid_scheme_free(this)
     class(adjoint_fluid_scheme_incompressible_t), intent(inout) :: this
+    class(bc_t), pointer :: bc
+    integer :: i
 
-    call this%Xh%free()
+    bc => null()
 
     if (allocated(this%ksp_vel)) then
        call this%ksp_vel%free()
@@ -411,11 +413,35 @@ contains
        deallocate(this%pc_prs)
     end if
 
+    do i = 1, this%bcs_vel%size()
+       bc => this%bcs_vel%get(i)
+       if (associated(bc)) then
+          call bc%free()
+          deallocate(bc)
+       end if
+    end do
+    call this%bcs_vel%free()
+
+    do i = 1, this%bcs_prs%size()
+       bc => this%bcs_prs%get(i)
+       if (associated(bc)) then
+          call bc%free()
+          deallocate(bc)
+       end if
+    end do
+    call this%bcs_prs%free()
+
     call this%source_term%free()
+
+    call this%GLL_to_GL%free()
 
     call this%gs_Xh%free()
 
+    call this%gs_Xh_GL%free()
+
     call this%c_Xh%free()
+
+    call this%c_Xh_GL%free()
 
     call this%scratch_GL%free()
 
@@ -435,14 +461,17 @@ contains
 
     if (associated(this%f_adj_x)) then
        call this%f_adj_x%free()
+       deallocate(this%f_adj_x)
     end if
 
     if (associated(this%f_adj_y)) then
        call this%f_adj_y%free()
+       deallocate(this%f_adj_y)
     end if
 
     if (associated(this%f_adj_z)) then
        call this%f_adj_z%free()
+       deallocate(this%f_adj_z)
     end if
 
     nullify(this%f_adj_x)
@@ -451,6 +480,13 @@ contains
 
     call this%rho%free()
     call this%mu%free()
+    call this%dm_Xh%free()
+    call this%dm_Xh_GL%free()
+    call this%Xh%free()
+    call this%Xh_GL%free()
+
+    nullify(this%msh)
+    nullify(bc)
 
   end subroutine adjoint_fluid_scheme_free
 

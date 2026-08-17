@@ -559,6 +559,18 @@ function find_parmetis() {
     #     tar xzf parmetis-4.0.3.tar.gz
     #     cd parmetis-4.0.3
 
+    #     # Modify the minimum requirement of cmake
+    #     cmake_lists=$(find . -name CMakeLists.txt)
+    #     for file in $cmake_lists; do
+    #         sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
+    #     done
+
+    #     # Compile the bundled metis library
+    #     cd metis
+    #     make config prefix=${PARMETIS_DIR}
+    #     make -j && make install
+    #     cd ../
+
     #     # Compile the bundled metis library
     #     cd metis
     #     make config prefix=${PARMETIS_DIR}
@@ -612,7 +624,7 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
 
@@ -658,6 +670,16 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+
+            if [ -n "$NEKO_CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=$NEKO_CUDA_ARCH"
+            elif [ -n "$CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=-arch=sm_$CUDA_ARCH"
+            else
+                error "CUDA architecture not set."
+                exit 1
+            fi
+
         elif [ "$DEVICE_TYPE" == "HIP" ]; then
             if [ -d "$HIP_DIR" ]; then
                 FEATURES+=" --with-hip=$HIP_DIR"
@@ -718,11 +740,11 @@ function find_neko() {
         fi
     fi
 
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [ ! -d "$NEKO_LIB" ]; then
         error "Neko not found at:"
-        error "\$tNEKO_DIR"
+        error "\t$NEKO_DIR"
         error "Please set NEKO_DIR to the directory containing"
         error "the Neko source code."
         error "You can download the source code from:"

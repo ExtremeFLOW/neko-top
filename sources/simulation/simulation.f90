@@ -37,6 +37,7 @@
 module simulation_m
   use case, only: case_t
   use neko, only: neko_solve
+  use user_access_singleton, only: neko_user_access
   use adjoint_case, only: adjoint_case_t
   use fluid_scheme_incompressible, only: fluid_scheme_incompressible_t
   use adjoint_fluid_scheme, only: adjoint_fluid_scheme_t
@@ -149,6 +150,8 @@ contains
 
     ! initialize the primal Neko objects
     call this%neko_case%init(parameters)
+    call neko_user_access%init(this%neko_case)
+
     call neko_rt_stats%init(parameters)
     call neko_simcomps%init(this%neko_case)
 

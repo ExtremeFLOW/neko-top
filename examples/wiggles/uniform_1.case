@@ -24,7 +24,7 @@
                 "value": [ 1.0, 0.0, 0.0 ]
             },
             "velocity_solver": {
-                "type": "fused_coupled_cg",
+                "type": "cg",
                 "preconditioner": {
                     "type": "jacobi"
                 },
@@ -176,8 +176,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 1000.0,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 3.0
                 }
             ],
             "initial_distribution": {
