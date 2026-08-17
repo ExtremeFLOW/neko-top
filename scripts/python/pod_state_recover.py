@@ -66,13 +66,19 @@ def init_runtime(
 
 
 def main() -> None:
+    if len(sys.argv) < 2:
+        raise SystemExit(
+            f"Usage: {os.path.basename(sys.argv[0])} <case-file>"
+        )
+
     world = MPI.COMM_WORLD
     comm = make_local_comm(world)
     rank = comm.Get_rank()
     peer_root = get_peer_root()
 
-    case_path = sys.argv[1] if len(sys.argv) > 1 else "POD_rugby_ball.case"
-    case_path = os.path.abspath(case_path)
+    case_path = os.path.abspath(sys.argv[1])
+    if not os.path.isfile(case_path):
+        raise FileNotFoundError(f"Case file not found: {case_path}")
     _, cfg = load_pod_config(case_path)
     set_debug(cfg.debug)
 
