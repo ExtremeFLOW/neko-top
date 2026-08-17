@@ -54,7 +54,11 @@ add_subdirectory(${EXAMPLES_DIR}/POD_parametric_study)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_mixer_practice)
 add_subdirectory(${EXAMPLES_DIR}/med_mixer)
 add_subdirectory(${EXAMPLES_DIR}/wiggles)
-add_subdirectory(${EXAMPLES_DIR}/Re3000)
+
+# This case is not present in every branch/checkout.
+if (EXISTS ${EXAMPLES_DIR}/Re3000/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/Re3000)
+endif()
 
 # If the benchmark_mixer folder exists, add it as well
 if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)

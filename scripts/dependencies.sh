@@ -533,78 +533,135 @@ function find_pod_python_runtime() {
 # Ensure ParMETIS is installed, if not install it.
 
 function find_parmetis() {
+    # Determine the Parmetis installation directory
+    check_external_dir
+    if [[ $# -ge 1 ]]; then
+        PARMETIS_DIR="$1"
+    elif [ -z "$PARMETIS_DIR" ]; then
+        PARMETIS_DIR="parmetis"
+    fi
 
-    echo "skipping parmetis"
+    if [[ "${PARMETIS_DIR:0:1}" != "/" && "${PARMETIS_DIR:0:1}" != "~" ]]; then
+        PARMETIS_DIR="$(realpath $EXTERNAL_DIR/$PARMETIS_DIR)"
+    fi
 
-    # # Determine the Parmetis installation directory
-    # check_external_dir
-    # if [[ $# -ge 1 ]]; then
-    #     PARMETIS_DIR="$1"
-    # elif [ -z "$PARMETIS_DIR" ]; then
-    #     PARMETIS_DIR="parmetis"
-    # fi
+    if [[ -z "$(find $PARMETIS_DIR -name libparmetis.a)" ]]; then
+        [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
+        CMAKE_GENERATOR_OLD=$CMAKE_GENERATOR
+        CMAKE_GENERATOR="Unix Makefiles"
 
-    # if [[ "${PARMETIS_DIR:0:1}" != "/" && "${PARMETIS_DIR:0:1}" != "~" ]]; then
-    #     PARMETIS_DIR="$(realpath $EXTERNAL_DIR/$PARMETIS_DIR)"
-    # fi
+        # Download and install ParMETIS
+        mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
+        wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
+        tar xzf parmetis-4.0.3.tar.gz
+        cd parmetis-4.0.3
 
-    # if [[ -z "$(find $PARMETIS_DIR -name libparmetis.a)" ]]; then
-    #     [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
-    #     CMAKE_GENERATOR_OLD=$CMAKE_GENERATOR
-    #     CMAKE_GENERATOR="Unix Makefiles"
+        # Modify the bundled CMake files to satisfy newer toolchains.
+        cmake_lists=$(find . -name CMakeLists.txt)
+        for file in $cmake_lists; do
+            sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
+        done
 
-    #     # Download and install ParMETIS
-    #     mkdir -p $PARMETIS_DIR && cd $PARMETIS_DIR
-    #     wget https://github.com/mfem/tpls/raw/refs/heads/gh-pages/parmetis-4.0.3.tar.gz
-    #     tar xzf parmetis-4.0.3.tar.gz
-    #     cd parmetis-4.0.3
+        # Compile the bundled metis library
+        cd metis
+        make config prefix=${PARMETIS_DIR}
+        make -j && make install
+        cd ../
 
-    #     # Modify the minimum requirement of cmake
-    #     cmake_lists=$(find . -name CMakeLists.txt)
-    #     for file in $cmake_lists; do
-    #         sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
-    #     done
+        # Compile parmetis
+        make config prefix=${PARMETIS_DIR}
+        make -j && make install
+        cd ../
+        rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
+        CMAKE_GENERATOR=$CMAKE_GENERATOR_OLD
+        cd $CURRENT_DIR
+    fi
 
-    #     # Compile the bundled metis library
-    #     cd metis
-    #     make config prefix=${PARMETIS_DIR}
-    #     make -j && make install
-    #     cd ../
+    PARMETIS_LIB=$(find $PARMETIS_DIR -type d -name 'lib*' \
+        -exec test -f '{}'/libparmetis.a \; -print)
+    if [ -z "$PARMETIS_LIB" ]; then
+        error "ParMETIS not found at:"
+        error "\t$PARMETIS_DIR"
+        error "Please set PARMETIS_DIR to the directory containing"
+        error "the ParMETIS source code."
+        error "You can download the source code from:"
+        error "\thttps://github.com/KarypisLab/ParMETIS.git"
+        exit 1
+    fi
 
-    #     # Compile the bundled metis library
-    #     cd metis
-    #     make config prefix=${PARMETIS_DIR}
-    #     make -j && make install
-    #     cd ../
+    export PARMETIS_DIR=$(realpath $PARMETIS_DIR)
+}
 
-    #     # Compile parmetis
-    #     make config prefix=${PARMETIS_DIR}
-    #     make -j && make install
-    #     cd ../
-    #     rm -rf parmetis-4.0.3 parmetis-4.0.3.tar.gz
-    #     CMAKE_GENERATOR=$CMAKE_GENERATOR_OLD
-    #     cd $CURRENT_DIR
-    # fi
+# ============================================================================ #
+# Patch vendored Neko for ADIOS2/libtool link ordering on newer toolchains.
+function patch_neko_adios2_linking() {
+    local neko_dir="$1"
+    local adios_m4
 
-    # PARMETIS_LIB=$(find $PARMETIS_DIR -type d -name 'lib*' \
-    #     -exec test -f '{}'/libparmetis.a \; -print)
-    # if [ -z "$PARMETIS_LIB" ]; then
-    #     error "ParMETIS not found at:"
-    #     error "\t$PARMETIS_DIR"
-    #     error "Please set PARMETIS_DIR to the directory containing"
-    #     error "the ParMETIS source code."
-    #     error "You can download the source code from:"
-    #     error "\thttps://github.com/KarypisLab/ParMETIS.git"
-    #     exit 1
-    # fi
+    adios_m4="${neko_dir}/m4/ax_adios.m4"
 
-    # export PARMETIS_DIR=$(realpath $PARMETIS_DIR)
+    if [ ! -f "${adios_m4}" ]; then
+        return
+    fi
+
+    cat >"${adios_m4}" <<'EOF'
+AC_DEFUN([AX_ADIOS2],[
+	AC_ARG_WITH([adios2],
+	AS_HELP_STRING([--with-adios2=DIR],
+	[Directory for ADIOS2]),
+	[
+	if test -d "$withval"; then
+	   ac_adios2_path="$withval";
+	fi
+	],[with_adios2=no])
+
+	if test "x${with_adios2}" != xno; then
+	   PATH_SAVED="$PATH"
+	   if test -d "$ac_adios2_path"; then
+	      PATH="$ac_adios2_path/bin:$PATH"
+	   fi
+
+	   AC_CHECK_PROG(ADIOS2CONF,adios2-config,yes)
+
+	   if test x"${ADIOS2CONF}" == x"yes"; then
+	      ADIOS2_CXXFLAGS=`adios2-config --cxx-flags`
+	      CXXFLAGS="$ADIOS2_CXXFLAGS $CXXFLAGS"
+
+	      ADIOS2_LIBS=""
+	      for adios2_lib in `adios2-config --cxx-libs`; do
+	         case "$adios2_lib" in
+	            */lib*.so*)
+	               adios2_lib_dir=`dirname "$adios2_lib"`
+	               adios2_lib_name=`basename "$adios2_lib"`
+	               adios2_lib_name=${adios2_lib_name#lib}
+	               adios2_lib_name=${adios2_lib_name%%.so*}
+	               ADIOS2_LIBS="$ADIOS2_LIBS -L$adios2_lib_dir -l$adios2_lib_name"
+	               ;;
+	            *)
+	               ADIOS2_LIBS="$ADIOS2_LIBS $adios2_lib"
+	               ;;
+	         esac
+	      done
+	      LIBS="$LIBS $ADIOS2_LIBS -lstdc++"
+      	      with_adios2=yes
+	      have_adios2=yes
+	      AC_SUBST(have_adios2)
+              AC_DEFINE(HAVE_ADIOS2,1,[Define if you have ADIOS2.])
+	    else
+	      with_adios2=no
+	    fi
+            PATH="$PATH_SAVED"
+
+	fi
+])
+EOF
 }
 
 # ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_external_dir
+    local force_neko_regen=false
 
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
@@ -702,7 +759,13 @@ function find_neko() {
 
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
-        if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
+
+        if [ -n "$ADIOS2_DIR" ] || [ "${NEKO_WITH_ADIOS2:-false}" == true ]; then
+            patch_neko_adios2_linking "$NEKO_DIR"
+            force_neko_regen=true
+        fi
+
+        if [[ ! -f "configure" || "$CLEAN_NEKO" == true || "$force_neko_regen" == true ]]; then
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
