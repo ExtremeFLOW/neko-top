@@ -68,6 +68,18 @@ module simulation_POD_state_recover
   implicit none
   private
 
+  ! Control protocol used by save()/restore() and the Python POD driver:
+  ! - MODE_IDLE + PHASE_INIT is a startup tick sent after ctrl init.
+  ! - MODE_FORWARD + PHASE_FWD_RUNNING is emitted before each streamed forward
+  !   snapshot batch.
+  ! - MODE_FORWARD + PHASE_FWD_DONE marks the forward-to-adjoint boundary.
+  !   Neko then blocks until Python has updated the POD basis and responds with
+  !   MODE_ADJOINT + PHASE_ADJ_RUNNING.
+  ! - MODE_ADJOINT + PHASE_ADJ_RUNNING means restore() may reconstruct states
+  !   from the received POD basis and time coefficients.
+  ! - MODE_ADJOINT + PHASE_ADJ_DONE is emitted on reset after an adjoint pass
+  !   so that Python can clear its old POD state before the next forward pass.
+  ! - MODE_STOP is emitted during free() to terminate the Python control loop.
   !> POD state recovery implementation for forward/adjoint runs.
   type, public, extends(state_recover_t) :: POD_state_recover_t
      private

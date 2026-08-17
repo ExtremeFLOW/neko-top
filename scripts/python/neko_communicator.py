@@ -7,6 +7,24 @@ import numpy as np
 from mpi4py import MPI
 
 
+# Control protocol:
+# - mode describes the coarse solver stage, while phase describes the
+#   synchronization point inside that stage.
+# - MODE_IDLE + PHASE_INIT is a one-off startup tick used to prove that the
+#   control channel is alive. The Python driver may ignore it.
+# - MODE_FORWARD + PHASE_FWD_RUNNING means Neko is in the forward solve and is
+#   currently streaming snapshots to Python.
+# - MODE_FORWARD + PHASE_FWD_DONE means the forward window is complete. Neko is
+#   now blocked at the forward-to-adjoint boundary while Python finalizes the
+#   POD basis, writes outputs, and prepares the adjoint data.
+# - MODE_ADJOINT + PHASE_ADJ_RUNNING is Python's reply that POD modes and time
+#   coefficients are ready, so Neko may enter adjoint restore/reconstruction.
+# - MODE_ADJOINT + PHASE_ADJ_DONE means the adjoint window is complete and the
+#   Python side should discard the old POD state and wait for a new forward
+#   window.
+# - MODE_STOP is a terminal shutdown message. The current implementation pairs
+#   it with PHASE_ADJ_DONE as a placeholder phase, but the phase is not
+#   semantically important once MODE_STOP is seen.
 MODE_IDLE = 0
 MODE_FORWARD = 1
 MODE_ADJOINT = 2
