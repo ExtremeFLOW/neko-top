@@ -55,7 +55,6 @@ module simulation_m
   use simcomp_executor, only: neko_simcomps
   use neko_ext, only: reset, reset_adjoint
   use field, only: field_t
-  use registry, only: neko_registry
   use field_math, only: field_rzero, field_copy
   use checkpoint, only: chkp_t
   use file, only: file_t
@@ -73,6 +72,8 @@ module simulation_m
        simulation_adjoint_step, simulation_adjoint_finalize
   use simulation, only: simulation_init, simulation_step, simulation_finalize, &
        simulation_restart
+  use state_recover, only: state_recover_t
+  use state_recover_factory, only: state_recover_create
   use simulation_checkpoint, only: simulation_checkpoint_t
   use runtime_stats, only: neko_rt_stats
   use scratch_registry, only: neko_scratch_registry
@@ -107,10 +108,10 @@ module simulation_m
      integer :: n_timesteps = 0
 
      ! ----------------------------------------------------------------------- !
-     ! Checkpoint system
+     ! State recovery system
 
-     !> The checkpoint system data
-     type(simulation_checkpoint_t) :: checkpoint
+     !> The state recovery system data
+     class(state_recover_t), allocatable :: state_recover
 
    contains
      !> Initialize the simulation
@@ -141,8 +142,8 @@ contains
   subroutine simulation_initialize(this, parameters)
     class(simulation_t), intent(inout), target :: this
     type(json_file), intent(inout) :: parameters
-    type(json_file) :: checkpoint_params
-    integer :: i, n_scalars, unsteady_support
+    type(json_file) :: state_recovery_params
+    integer :: i, n_scalars
     character(len=:), allocatable :: output_directory, precision_s, file_format
     integer :: precision
     logical :: unsteady, subdivide
@@ -255,27 +256,18 @@ contains
     this%unsteady = unsteady
 
     ! Ensure there is a means to deal with unsteadiness
-    if (this%unsteady) then
-       unsteady_support = 0
-       if ("checkpoints" .in. parameters) then
-          unsteady_support = unsteady_support + 1
-       end if
-
-       if (unsteady_support .eq. 0) then
-          call neko_error("No support for unsteady simulation provided, \\ &
-          & \\ current options include enabling checkpoints.")
-       end if
-
-       if (unsteady_support .gt. 1) then
-          call neko_error("Too many supports for unsteady simulation \\ &
-          & \\ provided, please select one.")
-       end if
+    if (this%unsteady .and. .not. ("state_recovery" .in. parameters)) then
+       call neko_error("please provide a means of recovering the forward \\ &
+       & state under state_recovery. Current options include checkpoint or \\ &
+       & POD.")
     end if
 
-    if ("checkpoints" .in. parameters) then
-       call json_get(parameters, 'checkpoints', checkpoint_params)
-       call this%checkpoint%init(this%neko_case, checkpoint_params)
+    if ("state_recovery" .in. parameters) then
+       call json_get(parameters, 'state_recovery', state_recovery_params)
+       call state_recover_create(this%state_recover, this%neko_case, &
+            state_recovery_params)
     end if
+
 
   end subroutine simulation_initialize
 
@@ -286,12 +278,16 @@ contains
     ! Stop the profiler
     call profiler_stop
 
+    if (allocated(this%state_recover)) then
+       call this%state_recover%free()
+       deallocate(this%state_recover)
+    end if
+
     ! Free the objects
     call this%neko_case%free()
     call this%adjoint_case%free()
     call this%output_forward%free()
     call this%output_adjoint%free()
-    call this%checkpoint%free()
 
     ! Nullify pointers
     nullify(this%fluid)
@@ -328,7 +324,10 @@ contains
 
        call simulation_step(this%neko_case, dt_controller, loop_start)
 
-       call this%checkpoint%save(this%neko_case)
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call this%state_recover%save(this%neko_case, this%neko_case%time)
     end do
     call profiler_end_region("Forward simulation")
 
@@ -342,6 +341,7 @@ contains
     type(time_step_controller_t) :: dt_controller
     real(kind=dp) :: loop_start
     real(kind=rp) :: cfl
+    type(time_state_t) :: time
     integer :: i
 
     call dt_controller%init(this%neko_case%params)
@@ -352,7 +352,12 @@ contains
     cfl = this%adjoint_case%fluid_adj%compute_cfl(this%adjoint_case%time%dt)
     loop_start = MPI_WTIME()
     do i = this%n_timesteps, 1, -1
-       call this%checkpoint%restore(this%neko_case, i)
+       time = this%neko_case%time
+       time%tstep = i
+       if (.not. allocated(this%state_recover)) then
+          call neko_error("State recovery not initialized.")
+       end if
+       call this%state_recover%restore(this%neko_case, time)
 
        call simulation_adjoint_step(this%adjoint_case, dt_controller, cfl, &
             loop_start)
@@ -369,7 +374,10 @@ contains
 
     call reset(this%neko_case)
     call reset_adjoint(this%adjoint_case, this%neko_case)
-    call this%checkpoint%reset()
+    if (.not. allocated(this%state_recover)) then
+       call neko_error("State recovery not initialized.")
+    end if
+    call this%state_recover%reset()
 
   end subroutine simulation_reset
 

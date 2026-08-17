@@ -90,8 +90,9 @@
             }
         ]
     },
-    "unsteady": true,
-    "checkpoints": {
+    "unsteady" : true,
+    "state_recovery": {
+        "type": "checkpoint",
         "enabled": true,
         "n_memory": 100
     },
