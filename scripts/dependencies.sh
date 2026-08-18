@@ -525,75 +525,49 @@ function find_parmetis() {
 }
 
 # ============================================================================ #
-# Patch vendored Neko for ADIOS2/libtool link ordering on newer toolchains.
-function patch_neko_adios2_linking() {
-    local neko_dir="$1"
-    local adios_m4
+# Convert ADIOS2 link flags into standard -L/-l entries so they can be passed
+# through LIBS and remain after libneko.a during the final Neko link step.
+function adios2_neko_link_libs() {
+    local adios2_config
+    local flag
+    local lib_dir
+    local lib_name
+    local link_flags=""
 
-    adios_m4="${neko_dir}/m4/ax_adios.m4"
-
-    if [ ! -f "${adios_m4}" ]; then
-        return
+    adios2_config="${ADIOS2_CONFIG:-}"
+    if [ -z "${adios2_config}" ]; then
+        adios2_config=$(command -v adios2-config 2>/dev/null || true)
     fi
 
-    cat >"${adios_m4}" <<'EOF'
-AC_DEFUN([AX_ADIOS2],[
-	AC_ARG_WITH([adios2],
-	AS_HELP_STRING([--with-adios2=DIR],
-	[Directory for ADIOS2]),
-	[
-	if test -d "$withval"; then
-	   ac_adios2_path="$withval";
-	fi
-	],[with_adios2=no])
+    if [ -z "${adios2_config}" ] || [ ! -x "${adios2_config}" ]; then
+        return 1
+    fi
 
-	if test "x${with_adios2}" != xno; then
-	   PATH_SAVED="$PATH"
-	   if test -d "$ac_adios2_path"; then
-	      PATH="$ac_adios2_path/bin:$PATH"
-	   fi
+    for flag in $("${adios2_config}" --fortran-libs) $("${adios2_config}" --cxx-libs); do
+        case "${flag}" in
+            */lib*.so*|*/lib*.a)
+                lib_dir=$(dirname "${flag}")
+                lib_name=$(basename "${flag}")
+                lib_name=${lib_name#lib}
+                lib_name=${lib_name%%.so*}
+                lib_name=${lib_name%%.a}
+                link_flags+=" -L${lib_dir} -l${lib_name}"
+                ;;
+            -Wl,-rpath,*|-Wl,-rpath-link,*)
+                ;;
+            *)
+                link_flags+=" ${flag}"
+                ;;
+        esac
+    done
 
-	   AC_CHECK_PROG(ADIOS2CONF,adios2-config,yes)
-
-	   if test x"${ADIOS2CONF}" == x"yes"; then
-	      ADIOS2_CXXFLAGS=`adios2-config --cxx-flags`
-	      CXXFLAGS="$ADIOS2_CXXFLAGS $CXXFLAGS"
-
-	      ADIOS2_LIBS=""
-	      for adios2_lib in `adios2-config --cxx-libs`; do
-	         case "$adios2_lib" in
-	            */lib*.so*)
-	               adios2_lib_dir=`dirname "$adios2_lib"`
-	               adios2_lib_name=`basename "$adios2_lib"`
-	               adios2_lib_name=${adios2_lib_name#lib}
-	               adios2_lib_name=${adios2_lib_name%%.so*}
-	               ADIOS2_LIBS="$ADIOS2_LIBS -L$adios2_lib_dir -l$adios2_lib_name"
-	               ;;
-	            *)
-	               ADIOS2_LIBS="$ADIOS2_LIBS $adios2_lib"
-	               ;;
-	         esac
-	      done
-	      LIBS="$LIBS $ADIOS2_LIBS -lstdc++"
-      	      with_adios2=yes
-	      have_adios2=yes
-	      AC_SUBST(have_adios2)
-              AC_DEFINE(HAVE_ADIOS2,1,[Define if you have ADIOS2.])
-	    else
-	      with_adios2=no
-	    fi
-            PATH="$PATH_SAVED"
-
-	fi
-])
-EOF
+    printf '%s -lstdc++' "${link_flags}"
 }
 
 # ============================================================================ #
 # Ensure Neko is installed, if not install it.
 function find_neko() {
     check_external_dir
-    local force_neko_regen=false
 
     # Find the required dependencies for Neko
     find_json_fortran $JSON_FORTRAN_DIR
@@ -616,6 +590,7 @@ function find_neko() {
     NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
+        local neko_libs=""
 
         # Clone Neko from the repository if it does not exist.
         if [[ ! -d "$NEKO_DIR" || $(ls -A $NEKO_DIR | wc -l) -eq 0 ]]; then
@@ -645,7 +620,10 @@ function find_neko() {
         [ -n "$GSLIB_DIR" ] && FEATURES+=" --with-gslib=$GSLIB_DIR"
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
-        [ -n "$ADIOS2_DIR" ] && FEATURES+=" --with-adios2=$ADIOS2_DIR"
+        if [ -n "$ADIOS2_DIR" ]; then
+            FEATURES+=" --with-adios2=$ADIOS2_DIR"
+            FEATURES+=" --with-adios2-fortran=$ADIOS2_DIR"
+        fi
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
         [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
@@ -692,18 +670,22 @@ function find_neko() {
         [ -z "$CURRENT_DIR" ] && CURRENT_DIR=$(pwd)
         cd $NEKO_DIR
 
-        if [ -n "$ADIOS2_DIR" ] || [ "${NEKO_WITH_ADIOS2:-false}" == true ]; then
-            patch_neko_adios2_linking "$NEKO_DIR"
-            force_neko_regen=true
+        if [ -n "$ADIOS2_DIR" ]; then
+            neko_libs=$(adios2_neko_link_libs) || {
+                error "Failed to derive ADIOS2 link flags for Neko."
+                exit 1
+            }
         fi
 
-        if [[ ! -f "configure" || "$CLEAN_NEKO" == true || "$force_neko_regen" == true ]]; then
+        if [[ ! -f "configure" || "$CLEAN_NEKO" == true ]]; then
             ./regen.sh
         fi
         if [[ ! -f Makefile || "$CLEAN_NEKO" == true ]]; then
             ./configure --prefix="$(realpath ./)" $FEATURES \
                 FC=$FC MPIFC=$MPIFC FCFLAGS="$NEKO_FCFLAGS" \
                 CC=$CC MPICC=$MPICC MPICXX=$MPICXX CFLAGS="$NEKO_CFLAGS" \
+                CXX=${MPICXX:-$CXX} \
+                LIBS="$neko_libs" \
                 HIPCC=$HIPCC HIP_HIPCC_FLAGS="$NEKO_HIPCC_FLAGS" \
                 CUDA_CFLAGS="$NEKO_CUDA_CFLAGS"
         fi
