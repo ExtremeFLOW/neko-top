@@ -347,8 +347,6 @@ function find_adios2() {
 
     if [[ $# -ge 1 && -n "$1" ]]; then
         ADIOS2_DIR="$1"
-    elif [ -n "${ADIOS2_PATH:-}" ] && [ -z "${ADIOS2_DIR:-}" ]; then
-        ADIOS2_DIR="$ADIOS2_PATH"
     elif [ -z "${ADIOS2_DIR:-}" ]; then
         return
     fi
