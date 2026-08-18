@@ -41,7 +41,7 @@ module adjoint_fluid_scheme
   use dofmap, only: dofmap_t
   use coefs, only: coef_t
   use dirichlet, only: dirichlet_t
-  use precon, only: pc_t, precon_factory, precon_destroy
+  use precon, only: pc_t, precon_allocator, precon_destroy
   use fluid_stats, only: fluid_stats_t
   use bc_list, only: bc_list_t
   use mesh, only: mesh_t, NEKO_MSH_MAX_ZLBL_LEN
