@@ -10,13 +10,6 @@ if (NOT Doxygen_FOUND)
     return()
 endif()
 
-# Skip configuring documentation when it is not requested. Avoids fetching
-# the doxygen-awesome theme during normal code builds.
-if (NOT BUILD_DOCS AND NOT ONLY_DOCS)
-    message(STATUS "Doxygen found, but BUILD_DOCS is OFF. Skipping docs setup.")
-    return()
-endif()
-
 # ============================================================================ #
 # Doxygen Documentation
 # ============================================================================ #
