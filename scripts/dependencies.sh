@@ -347,24 +347,19 @@ function find_adios2() {
 
     if [[ $# -ge 1 && -n "$1" ]]; then
         ADIOS2_DIR="$1"
+    elif [ -n "${ADIOS2_PATH:-}" ] && [ -z "${ADIOS2_DIR:-}" ]; then
+        ADIOS2_DIR="$ADIOS2_PATH"
+    elif [ -z "${ADIOS2_DIR:-}" ]; then
+        return
     fi
 
-    if [ -z "${ADIOS2_DIR:-}" ] && command -v adios2-config >/dev/null 2>&1; then
-        ADIOS2_CONFIG=$(realpath "$(command -v adios2-config)")
-        ADIOS2_DIR=$(dirname "$(dirname "$ADIOS2_CONFIG")")
-    else
-        if [ -z "${ADIOS2_DIR:-}" ]; then
-            ADIOS2_DIR="$EXTERNAL_DIR/adios2"
-        fi
-
-        if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
-            ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
-        fi
-
-        mkdir -p "$ADIOS2_DIR"
-        ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
-        ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
+    if [[ "${ADIOS2_DIR:0:1}" != "/" && "${ADIOS2_DIR:0:1}" != "~" ]]; then
+        ADIOS2_DIR="$EXTERNAL_DIR/$ADIOS2_DIR"
     fi
+
+    mkdir -p "$ADIOS2_DIR"
+    ADIOS2_DIR=$(realpath "$ADIOS2_DIR")
+    ADIOS2_CONFIG="$ADIOS2_DIR/bin/adios2-config"
 
     if [[ ! -x "${ADIOS2_CONFIG}" ]]; then
         [ -z "${ADIOS2_VERSION:-}" ] && ADIOS2_VERSION="2.10.1"
@@ -573,9 +568,7 @@ function find_neko() {
     find_json_fortran $JSON_FORTRAN_DIR
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
-    if [ -n "$ADIOS2_DIR" ] || [ "${NEKO_WITH_ADIOS2:-false}" == true ]; then
-        find_adios2 $ADIOS2_DIR
-    fi
+    find_adios2 $ADIOS2_DIR
     find_parmetis $PARMETIS_DIR
     [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
 
