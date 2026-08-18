@@ -131,12 +131,6 @@ printf "Compiling the example codes and Neko-TOP\n"
 
 # Clean the build directory if the clean flag is set
 [ "$CLEAN" == true ] && rm -fr $MAIN_DIR/build
-mkdir -p $MAIN_DIR/build
-
-# Validate and persist the POD Python runtime when example launchers are built.
-if [ "$EXAMPLES" == "ON" ]; then
-    find_pod_python_runtime $MAIN_DIR
-fi
 
 # If CMAKE_VARIABLES is a string, convert it to an array
 if [ -n "$CMAKE_VARIABLES" ]; then
