@@ -369,7 +369,11 @@ function find_neko() {
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
-    [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
+    # Wired in whenever pFUnit is available (PFUNIT_DIR set, e.g. via
+    # prepare.env), independent of whether tests should auto-run -- that is
+    # NEKO_TEST's job below, at the `make check` call. This way individual
+    # tests can always be built and run by hand even with NEKO_TEST unset.
+    [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -412,7 +416,7 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
-        [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -479,6 +483,10 @@ function find_neko() {
 
         [ "$CLEAN_NEKO" == true ] && make clean
         [ "$QUIET" == true ] && make -s -j || make -j
+        # Deliberately independent of Neko-TOP's own TEST/-t: NEKO_TEST lets
+        # a caller (e.g. prepare.env) control whether Neko's own suite runs
+        # automatically as part of this build, separately from whether
+        # Neko-TOP's own tests are built.
         [ "$NEKO_TEST" == true ] && make check -j
         make install
 
