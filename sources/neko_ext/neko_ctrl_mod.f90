@@ -32,13 +32,12 @@
 !
 !> @brief Control stream helpers for POD in-situ coordination.
 module neko_ctrl_mod
-  use, intrinsic :: iso_c_binding, only: c_int, c_double
-  use, intrinsic :: iso_fortran_env, only: int32
+  use, intrinsic :: iso_fortran_env, only: int32, real64
   use comm, only: neko_comm
   use utils, only: neko_error
   use mpi_f08, only: MPI_Bcast, MPI_Comm_rank, MPI_Comm_size, &
-       MPI_INTEGER, MPI_COMM_WORLD, MPI_Send, MPI_Recv, &
-       MPI_DOUBLE_PRECISION, MPI_STATUS_IGNORE
+       MPI_INTEGER4, MPI_COMM_WORLD, MPI_Send, MPI_Recv, &
+       MPI_REAL8, MPI_STATUS_IGNORE
   implicit none
   private
 
@@ -61,16 +60,16 @@ module neko_ctrl_mod
   ! - MODE_STOP is a terminal shutdown message. The current implementation
   !   pairs it with PHASE_ADJ_DONE as a placeholder phase, but the phase is not
   !   semantically important once MODE_STOP is seen.
-  integer(c_int), public, parameter :: MODE_IDLE = 0_c_int
-  integer(c_int), public, parameter :: MODE_FORWARD = 1_c_int
-  integer(c_int), public, parameter :: MODE_ADJOINT = 2_c_int
-  integer(c_int), public, parameter :: MODE_STOP = 9_c_int
+  integer(int32), public, parameter :: MODE_IDLE = 0_int32
+  integer(int32), public, parameter :: MODE_FORWARD = 1_int32
+  integer(int32), public, parameter :: MODE_ADJOINT = 2_int32
+  integer(int32), public, parameter :: MODE_STOP = 9_int32
 
-  integer(c_int), public, parameter :: PHASE_INIT = 0_c_int
-  integer(c_int), public, parameter :: PHASE_FWD_RUNNING = 10_c_int
-  integer(c_int), public, parameter :: PHASE_FWD_DONE = 11_c_int
-  integer(c_int), public, parameter :: PHASE_ADJ_RUNNING = 20_c_int
-  integer(c_int), public, parameter :: PHASE_ADJ_DONE = 21_c_int
+  integer(int32), public, parameter :: PHASE_INIT = 0_int32
+  integer(int32), public, parameter :: PHASE_FWD_RUNNING = 10_int32
+  integer(int32), public, parameter :: PHASE_FWD_DONE = 11_int32
+  integer(int32), public, parameter :: PHASE_ADJ_RUNNING = 20_int32
+  integer(int32), public, parameter :: PHASE_ADJ_DONE = 21_int32
 
   integer, parameter :: CTRL_TAG_STATE_INT = 4101
   integer, parameter :: CTRL_TAG_STATE_REAL = 4102
@@ -104,7 +103,7 @@ contains
 
   !> Convert mode enum to human-readable name.
   function mode_name(m) result(nm)
-    integer(c_int), intent(in) :: m
+    integer(int32), intent(in) :: m
     character(len=16) :: nm
 
     select case (m)
@@ -123,7 +122,7 @@ contains
 
   !> Convert phase enum to human-readable name.
   function phase_name(p) result(nm)
-    integer(c_int), intent(in) :: p
+    integer(int32), intent(in) :: p
     character(len=16) :: nm
 
     select case (p)
@@ -183,8 +182,8 @@ contains
   !> Send current mode/phase/step/time over the control stream.
   subroutine ctrl_stream_send(this, mode, phase, step, time)
     class(ctrl_stream_t), intent(inout) :: this
-    integer(c_int), intent(in) :: mode, phase, step
-    real(c_double), intent(in) :: time
+    integer(int32), intent(in) :: mode, phase, step
+    real(real64), intent(in) :: time
     integer(int32) :: state_i(3)
     character(len=128) :: msg
     integer :: ierr
@@ -201,20 +200,20 @@ contains
 
     write(msg, '(A,A,A,A,A,I0,A,ES12.4)') 'ctrl_send: mode=', &
          trim(mode_name(mode)), ' phase=', trim(phase_name(phase)), &
-         ' step=', int(step), ' t=', real(time, kind=c_double)
+         ' step=', int(step), ' t=', real(time, kind=real64)
     call ctrl_dbg_print(this, msg)
-    call MPI_Send(state_i, size(state_i), MPI_INTEGER, this%peer_root, &
+    call MPI_Send(state_i, size(state_i), MPI_INTEGER4, this%peer_root, &
          CTRL_TAG_STATE_INT, MPI_COMM_WORLD, ierr)
-    call MPI_Send(time, 1, MPI_DOUBLE_PRECISION, this%peer_root, &
+    call MPI_Send(time, 1, MPI_REAL8, this%peer_root, &
          CTRL_TAG_STATE_REAL, MPI_COMM_WORLD, ierr)
   end subroutine ctrl_stream_send
 
   !> Recieve a control command and broadcast it to all ranks.
   subroutine ctrl_stream_recieve(this, mode_cmd, phase_cmd)
     class(ctrl_stream_t), intent(inout) :: this
-    integer(c_int), intent(inout) :: mode_cmd, phase_cmd
+    integer(int32), intent(inout) :: mode_cmd, phase_cmd
     integer :: ierr, rank
-    integer :: mode_i, phase_i
+    integer(int32) :: mode_i, phase_i
     integer(int32) :: cmd_i(2)
     character(len=128) :: msg
 
@@ -228,24 +227,24 @@ contains
 
     if (rank == 0) then
        call ctrl_dbg_print(this, 'ctrl_recieve: rank0 waiting on MPI cmd')
-       call MPI_Recv(cmd_i, size(cmd_i), MPI_INTEGER, this%peer_root, &
+       call MPI_Recv(cmd_i, size(cmd_i), MPI_INTEGER4, this%peer_root, &
             CTRL_TAG_CMD, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-       mode_i = int(cmd_i(1))
-       phase_i = int(cmd_i(2))
+       mode_i = cmd_i(1)
+       phase_i = cmd_i(2)
     else
        call ctrl_dbg_print(this, &
             'ctrl_recieve: non-root waiting for Bcast from rank0')
-       mode_i = 0
-       phase_i = 0
+       mode_i = 0_int32
+       phase_i = 0_int32
     end if
 
     call ctrl_dbg_print(this, 'ctrl_recieve: MPI_Bcast(mode)')
-    call MPI_Bcast(mode_i, 1, MPI_INTEGER, 0, neko_comm, ierr)
+    call MPI_Bcast(mode_i, 1, MPI_INTEGER4, 0, neko_comm, ierr)
     call ctrl_dbg_print(this, 'ctrl_recieve: MPI_Bcast(phase)')
-    call MPI_Bcast(phase_i, 1, MPI_INTEGER, 0, neko_comm, ierr)
+    call MPI_Bcast(phase_i, 1, MPI_INTEGER4, 0, neko_comm, ierr)
 
-    mode_cmd = int(mode_i, c_int)
-    phase_cmd = int(phase_i, c_int)
+    mode_cmd = mode_i
+    phase_cmd = phase_i
 
     write(msg, '(A,A,A,A)') 'ctrl_recieve: exit with mode=', &
          trim(mode_name(mode_cmd)), ' phase=', trim(phase_name(phase_cmd))
