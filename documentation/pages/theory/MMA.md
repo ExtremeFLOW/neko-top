@@ -284,5 +284,7 @@ Compared to a standard primal MMA subsolve:
 
 ## References
 
-- Krister Svanberg, *The Method of Moving Asymptotes*
-- Lazarov & Sigmund (2011)
+- Svanberg, K. (1987). The method of moving asymptotes—a new method for structural optimization. *International Journal for Numerical Methods in Engineering*, 24(2), 359-373.
+- Svanberg, K. (1993). The Method of Moving Asymptotes (MMA) with Some Extensions. *Optimization of Large Structural Systems*, 191–207.
+- Svanberg, K. (2002). A class of globally convergent optimization methods based on conservative convex separable approximations. *SIAM Journal on Optimization*, 12(2), 555-573.
+- Aage, N., & Lazarov, B. S. (2013). Parallel framework for topology optimization using the method of moving asymptotes. *Structural and Multidisciplinary Optimization*, 47(4), 493-505.
