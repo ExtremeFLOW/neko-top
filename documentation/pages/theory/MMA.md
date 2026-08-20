@@ -6,7 +6,7 @@
 
 The Method of Moving Asymptotes (MMA) is a gradient-based optimization algorithm
 widely used in topology optimization. It is particularly effective for
-large-scale, constrained, nonlinear optimization problems.
+large-scale, constrained, non-linear optimization problems.
 
 The method transforms the original non-convex optimization problem into a
 sequence of strictly convex subproblems that are easier to solve.
@@ -33,7 +33,7 @@ Here:
 ---
 ## Convex Approximation
 
-At each iteration, MMA constructs a **separable convex approximation** of the original nonlinear problem by replacing each function \f$ f_i(x) \f$ with an **asymptotic approximation** built from (note that \f$f_0\f$ is also approximated in the same way):
+At each iteration, MMA constructs a **separable convex approximation** of the original non-linear problem by replacing each function \f$ f_i(x) \f$ with an **asymptotic approximation** built from (note that \f$f_0\f$ is also approximated in the same way):
 
 - the **current function value** \f$ f_i(x^k) \f$
 - the **first-order sensitivities** \f$ \nabla f_i(x^k) \f$
@@ -42,7 +42,7 @@ At each iteration, MMA constructs a **separable convex approximation** of the or
 
 ### Asymptotic Approximation
 
-Instead of a standard Taylor expantion, MMA uses a **asymptotic model** of the form:
+Instead of a standard Taylor expansion, MMA uses a **asymptotic model** of the form:
 
 \f[
 f_i(x) \;\approx\; \tilde{f}_i(x)
@@ -140,7 +140,7 @@ subject to:
 
 - **Asymptotic behavior near bounds**:
   - singularities at \f$ x_j \to l_j \f$ and \f$ x_j \to u_j \f$.
-  - more conservative bounds (`"alpha"`, `"beta"`) for the updated design variables are choosen to prevent them from hitting bounds caused by too aggressive updates.
+  - more conservative bounds (`"alpha"`, `"beta"`) for the updated design variables are chosen to prevent them from hitting bounds caused by too aggressive updates.
 
 ---
 
@@ -171,13 +171,13 @@ A key feature of MMA is the adaptive update of asymptotes:
 The update is governed by:
 - `asyinit` (initial spacing)
 - `asyincr` (expansion factor to push the asymptotes apart to help with faster convergence using larger steps)
-- `asydecr` (contraction factor to pull the asymtotes together to take more conservative steps)
+- `asydecr` (contraction factor to pull the asymptotes together to take more conservative steps)
 
 ---
 
 ## Subproblem Solution
 
-The convex subproblem is solved using a **primal-dual interior point method** `"pdip"`  and a pure **dual interior point method** `"dip"`.
+The convex subproblem is solved using a **primal-dual interior point method** `"pdip"` and a pure **dual interior point method** `"dip"`.
 
 In this implementation both subsolvers support both **CPU and device (GPU)** execution
 
@@ -213,7 +213,7 @@ The implementation is encapsulated in the `mma_t` type and includes the followin
 | `mma.backend` | `cpu` or `device` | auto based on Neko backend |
 | `mma.subsolver` | Subsolver type | `dip` |
 | `mma.scale` | Scaling factor applied to constraint functions \( f_i \) and their sensitivities. This does **not** affect the objective function \( f_0 \). It is used to improve numerical conditioning when constraint magnitudes and sensitivities differ significantly from those of the objective function. | `1.0` |
-| `mma.auto_scale` | If `true`, sensitivity and function values for the constriant \f$ f_i \f$ are scaled at each iteration with a differnt value such that we get \f$ f_1(x_k)= \f$`mma.scale`. This would be an adaptive scaling based on the value of the first constriant. | `false` |
+| `mma.auto_scale` | If `true`, sensitivity and function values for the constraint \f$ f_i \f$ are scaled at each iteration with a different value such that we get \f$ f_1(x_k)= \f$`mma.scale`. This would be an adaptive scaling based on the value of the first constraint. | `false` |
 
 ---
 
