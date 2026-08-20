@@ -180,9 +180,13 @@ function find_pfunit() {
 
     # Determine the pFUnit installation directory
     if [[ $# -ge 1 ]]; then
-        PFUNIT_DIR="$(realpath $1)"
+        PFUNIT_DIR="$1"
     elif [ -z "$PFUNIT_DIR" ]; then
-        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/pfunit)"
+        return
+    fi
+
+    if [[ "${PFUNIT_DIR:0:1}" != "/" && "${PFUNIT_DIR:0:1}" != "~" ]]; then
+        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/$PFUNIT_DIR)"
     fi
 
     # Clone pFUnit from the repository if it does not exist.
