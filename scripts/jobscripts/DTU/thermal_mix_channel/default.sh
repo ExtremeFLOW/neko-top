@@ -46,7 +46,9 @@
 
 set -e
 
-if [[ -z "$LSB_JOBNAME" && (($# > 0)) ]]; then
+if [[ ! -f "functions.sh" ]]; then
+    exit 0
+elif [[ -z "$LSB_JOBNAME" && (($# > 0)) ]]; then
     example=$1
 elif [ ! -z "$LSB_JOBNAME" ]; then
     example=$LSB_JOBNAME

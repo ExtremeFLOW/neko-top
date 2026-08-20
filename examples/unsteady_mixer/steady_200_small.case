@@ -185,7 +185,7 @@
         "solver": {
             "type": "mma",
             "max_iterations": 25,
-            "max_runtime": "02:00:00",
+            "max_runtime": "2-00:00:00",
             "tolerance": 1.0e-13,
             "mma": {
                 "scale": 1.0,
