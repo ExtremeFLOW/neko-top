@@ -31,6 +31,8 @@ function help() {
     printf "  -%-1s, --%-10s %-60s\n" " " "dry-run" "Dry run the script."
     printf "  -%-1s, --%-10s %-60s\n" "r" "re-run" "Re-run the examples."
     printf "  -%-1s, --%-10s %-60s\n" "p" "procs" "Number of processors to use."
+    printf "  -%-1s, --%-10s %-60s\n" " " "sequential" "Submit the examples sequentially."
+    printf "  -%-1s, --%-10s %-60s\n" " " "njobs" "Number of jobs to submit per example."
 
     printf "\n\e[4mEnvironment:\e[0m\n"
     printf "  -%-1s %-60s\n" "NEKO_DIR" "Path to the Neko installation."
@@ -62,9 +64,10 @@ CLUSTER=""
 SEQUENTIAL=false
 DRY=false
 RERUN=false
+N_JOBS=1
 
 # List possible options
-OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:
+OPTIONS=all,clean,help,neko,delete,submit:,dry-run,re-run,sequential,procs:,njobs:
 OPT=a,c,h,n,s:,d,r,p:
 
 # Parse the inputs for options
@@ -86,6 +89,7 @@ while true; do
     # Long option with no short option
     "--dry-run") DRY=true && shift ;;             # Dry run
     "--sequential") SEQUENTIAL=true && shift ;;   # Submit sequentially
+    "--njobs") N_JOBS="$2" && shift 2 ;;          # Number of jobs to submit per example
 
     # End of options
     "--") shift && break ;;
@@ -305,7 +309,7 @@ function Submit() {
             printf >&2 "Assign the 'MN5_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$MN5_ACCOUNT"
+            export SBATCH_ACCOUNT="$MN5_ACCOUNT"
         fi
 
     elif [[ $CLUSTER == "LUMI-C" || $CLUSTER == "LUMI-G" ]]; then
@@ -315,7 +319,7 @@ function Submit() {
             printf >&2 "Assign the 'LUMI_ACCOUNT' environment variable to avoid"
             printf >&2 "this message."
         else
-            ACCOUNT="$LUMI_ACCOUNT"
+            export SBATCH_ACCOUNT="$LUMI_ACCOUNT"
         fi
     fi
 
@@ -328,15 +332,23 @@ function Submit() {
             return
         fi
 
-        sbatch -J $1 -A $ACCOUNT $DEPENDENCY job_script.sh 1>/dev/null 2>error.log
-        if [ "$SEQUENTIAL" == true ]; then
-            job_list=$(squeue -ho "%i" -S "i" --me | tail -n 1)
-            if [ -n "$job_list" ]; then
-                DEPENDENCY="--dependency=afterany:$job_list"
-            else
-                DEPENDENCY=""
+        # Deal with sequential submission and job dependencies
+        id=""
+        DEP=""
+        for i in $(seq 1 $N_JOBS); do
+            if [[ -n "$id" && -n "$SEQ_DEP" ]]; then
+                DEP="--dependency=afterany:$id:$SEQ_DEP"
+            elif [ -n "$id" ]; then
+                DEP="--dependency=afterany:$id"
+            elif [ -n "$SEQ_DEP" ]; then
+                DEP="--dependency=afterany:$SEQ_DEP"
             fi
-        fi
+
+            id=$(sbatch --parsable -J $1 $DEP job_script.sh)
+            if [ "$SEQUENTIAL" == true ]; then
+                SEQ_DEP="$SEQ_DEP:$id"
+            fi
+        done
     else
         printf >&2 "Unknown submission system.\n"
         exit 1
