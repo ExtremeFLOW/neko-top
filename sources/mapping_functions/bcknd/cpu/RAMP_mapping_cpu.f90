@@ -40,8 +40,6 @@ module RAMP_mapping_cpu
 
   public :: convex_down_RAMP_mapping_apply_cpu
   public :: convex_down_RAMP_mapping_apply_backward_cpu
-  public :: convex_up_RAMP_mapping_apply_cpu
-  public :: convex_up_RAMP_mapping_apply_backward_cpu
 
 contains
 
@@ -83,44 +81,6 @@ contains
 
   end subroutine convex_down_RAMP_mapping_apply_backward_cpu
 
-  !> @brief Apply convex-up RAMP forward mapping on CPU.
-  !! @param[in] f_min Minimum mapped value.
-  !! @param[in] f_max Maximum mapped value.
-  !! @param[in] q RAMP penalty parameter.
-  !! @param[out] X_out Mapped field values.
-  !! @param[in] X_in Unmapped field values.
-  !! @param[in] n Number of degrees of freedom.
-  subroutine convex_up_RAMP_mapping_apply_cpu(f_min, f_max, q, X_out, X_in, n)
-    integer, intent(in) :: n
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    real(kind=rp), dimension(n), intent(out) :: X_out
-    real(kind=rp), dimension(n), intent(in) :: X_in
-
-    X_out = convex_up_RAMP_mapping_kernel(f_min, f_max, q, X_in)
-
-  end subroutine convex_up_RAMP_mapping_apply_cpu
-
-  !> @brief Apply convex-up RAMP chain rule on CPU.
-  !! @param[in] f_min Minimum mapped value.
-  !! @param[in] f_max Maximum mapped value.
-  !! @param[in] q RAMP penalty parameter.
-  !! @param[out] sens_out Sensitivity with respect to the unmapped field.
-  !! @param[in] sens_in Sensitivity with respect to the mapped field.
-  !! @param[in] X_in Unmapped field values.
-  !! @param[in] n Number of degrees of freedom.
-  subroutine convex_up_RAMP_mapping_apply_backward_cpu(f_min, f_max, q, &
-       sens_out, sens_in, X_in, n)
-    integer, intent(in) :: n
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    real(kind=rp), dimension(n), intent(out) :: sens_out
-    real(kind=rp), dimension(n), intent(in) :: sens_in
-    real(kind=rp), dimension(n), intent(in) :: X_in
-
-    sens_out = convex_up_RAMP_mapping_backward_kernel(f_min, f_max, q, &
-         sens_in, X_in)
-
-  end subroutine convex_up_RAMP_mapping_apply_backward_cpu
-
   !> @brief Elemental kernel for convex-down RAMP forward mapping.
   !! @param[in] f_min Minimum mapped value.
   !! @param[in] f_max Maximum mapped value.
@@ -154,38 +114,5 @@ contains
          ((1.0_rp - q * (X_in - 1.0_rp))**2)
 
   end function convex_down_RAMP_mapping_backward_kernel
-
-  !> @brief Elemental kernel for convex-up RAMP forward mapping.
-  !! @param[in] f_min Minimum mapped value.
-  !! @param[in] f_max Maximum mapped value.
-  !! @param[in] q RAMP penalty parameter.
-  !! @param[in] X_in Unmapped scalar value.
-  !! @return Mapped scalar value.
-  elemental function convex_up_RAMP_mapping_kernel(f_min, f_max, q, X_in) &
-       result(X_out)
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    real(kind=rp), intent(in) :: X_in
-    real(kind=rp) :: X_out
-
-    X_out = f_min + (f_max - f_min) * X_in * (1.0_rp + q) / (X_in + q)
-
-  end function convex_up_RAMP_mapping_kernel
-
-  !> @brief Elemental kernel for convex-up RAMP chain rule.
-  !! @param[in] f_min Minimum mapped value.
-  !! @param[in] f_max Maximum mapped value.
-  !! @param[in] q RAMP penalty parameter.
-  !! @param[in] sens_in Sensitivity with respect to mapped scalar value.
-  !! @param[in] X_in Unmapped scalar value.
-  !! @return Sensitivity with respect to unmapped scalar value.
-  elemental function convex_up_RAMP_mapping_backward_kernel(f_min, f_max, q, &
-       sens_in, X_in) result(sens_out)
-    real(kind=rp), intent(in) :: f_min, f_max, q
-    real(kind=rp), intent(in) :: sens_in, X_in
-    real(kind=rp) :: sens_out
-
-    sens_out = sens_in * (f_max - f_min) * (q + 1.0_rp) * q / ((X_in + q)**2)
-
-  end function convex_up_RAMP_mapping_backward_kernel
 
 end module RAMP_mapping_cpu

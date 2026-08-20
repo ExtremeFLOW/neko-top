@@ -56,7 +56,7 @@ module heat_compliance
   use math, only: col2, cmult, copy, glsc2, glsum
   use ax_product, only: ax_t, ax_helm_factory
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
-  use precon, only: pc_t, precon_factory, precon_destroy
+  use precon, only: pc_t, precon_allocator, precon_destroy
   use jacobi, only: jacobi_t
   use device_jacobi, only: device_jacobi_t
   use sx_jacobi, only: sx_jacobi_t
@@ -448,7 +448,7 @@ contains
     type(bc_list_t),target,     intent(inout)         :: bclst
     character(len=*),           intent(in)            :: pctype
 
-    call precon_factory(pc, pctype)
+    call precon_allocator(pc, pctype)
 
     select type (pcp => pc)
     type is (jacobi_t)

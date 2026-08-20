@@ -58,6 +58,7 @@ module adjoint_scalar_pnpn
   use time_scheme_controller, only : time_scheme_controller_t
   use projection, only : projection_t
   use math, only : glsc2, col2, add2s2
+  use field_math, only : field_col3
   use logger, only : neko_log, LOG_SIZE, NEKO_LOG_DEBUG
   use advection_adjoint, only : advection_adjoint_t, advection_adjoint_factory
   use profiler, only : profiler_start_region, profiler_end_region
@@ -314,6 +315,7 @@ contains
     call this%scheme_free()
 
     call this%bclst_ds%free()
+    call this%bc_res%free()
     call this%proj_s%free()
 
     call this%s_adj_res%free()
@@ -354,12 +356,15 @@ contains
     type(time_scheme_controller_t), intent(in) :: ext_bdf
     type(time_step_controller_t), intent(in) :: dt_controller
     type(ksp_monitor_t), intent(inout) :: ksp_results
+    type(field_t), pointer :: rho_cp
+    integer :: rho_cp_index
     ! Number of degrees of freedom
     integer :: n
 
     if (this%freeze) return
 
     n = this%dm_Xh%size()
+    call neko_scratch_registry%request_field(rho_cp, rho_cp_index, .false.)
 
     call profiler_start_region('Adjoint Scalar')
     associate(u => this%u, v => this%v, w => this%w, s_adj => this%s_adj, &
@@ -403,11 +408,11 @@ contains
       ! Now, this value is used in the explicit time scheme to advance these
       ! terms in time.
       call makeext%compute_scalar(this%abx1, this%abx2, f_Xh%x, &
-           rho%x(1,1,1,1), ext_bdf%advection_coeffs%x, n)
+           ext_bdf%advection_coeffs%x, n)
 
       ! Add the RHS contributions coming from the BDF scheme.
       call makebdf%compute_scalar(s_adj_lag, f_Xh%x, s_adj, c_Xh%B, &
-           rho%x(1,1,1,1), dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
+           rho_cp, dt, ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       ! end if
 
       call s_adj_lag%update()
@@ -418,11 +423,12 @@ contains
 
       ! Update material properties if necessary
       call this%update_material_properties(time)
+      call field_col3(rho_cp, rho, cp)
 
       ! Compute scalar residual.
       call profiler_start_region('Adjoint_scalar_residual')
       call res%compute(Ax, s_adj, s_adj_res, f_Xh, c_Xh, msh, Xh, &
-           lambda, rho%x(1,1,1,1)*cp%x(1,1,1,1), ext_bdf%diffusion_coeffs%x(1), &
+           lambda, rho_cp, ext_bdf%diffusion_coeffs%x(1), &
            dt, dm_Xh%size())
 
       call gs_Xh%op(s_adj_res, GS_OP_ADD)
@@ -454,6 +460,7 @@ contains
       end if
 
     end associate
+    call neko_scratch_registry%relinquish_field(rho_cp_index)
     call profiler_end_region('Adjoint Scalar')
   end subroutine adjoint_scalar_pnpn_step
 

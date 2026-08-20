@@ -36,7 +36,7 @@
 !
 ! I promise I'll write this document properly in the future...
 !
-! But the Borval Peterson (I think) paper had an objective function
+! But the Borrvall & Petersson (I think) paper had an objective function
 ! that had 2 terms, dissipation and this term they claimed represented
 ! out of plane stresses.
 ! I never really understood that extra term, I also don't think it
@@ -156,7 +156,7 @@ contains
     call nekotop_continuation%json_get_or_register(json, 'weight', &
          this%weight, weight, 1.0_rp)
     call json_get_or_default(json, "mask_name", mask_name, "")
-    call json_get_or_default(json, "name", name, "Dissipation")
+    call json_get_or_default(json, "name", name, "Viscous dissipation")
     call json_get_or_default(json, "start_time", start_time, 0.0_rp)
     call json_get_or_default(json, "end_time", end_time, huge(0.0_rp))
 

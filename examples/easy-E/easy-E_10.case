@@ -58,6 +58,8 @@
             "source_terms": [
                 {
                     "type": "brinkman",
+                    "limits": [ 0.0, 1500.0 ],
+                    "penalty": 1.0,
                     "objects": [
                         {
                             "type": "point_zone",
@@ -67,11 +69,7 @@
                             "type": "point_zone",
                             "name": "ball"
                         }
-                    ],
-                    "brinkman": {
-                        "limits": [ 0.0, 1500.0 ],
-                        "penalty": 1.0
-                    }
+                    ]
                 }
             ]
         },

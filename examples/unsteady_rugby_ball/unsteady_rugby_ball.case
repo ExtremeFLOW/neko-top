@@ -77,18 +77,9 @@
             {
                 "name": "objective_domain",
                 "geometry": "box",
-                "x_bounds": [
-                    1.0,
-                    2.5,
-                ],
-                "y_bounds": [
-                    -0.1,
-                    1.1,
-                ],
-                "z_bounds": [
-                    -1.0,
-                    1.0,
-                ],
+                "x_bounds": [ 1.0, 2.5 ],
+                "y_bounds": [ -0.1, 1.1 ],
+                "z_bounds": [ -1.0, 1.0 ]
             },
             {
                 "name": "initial_ball",
@@ -96,7 +87,7 @@
                 "start": [ 0.5, 0.5, -0.5 ],
                 "end": [ 0.5, 0.5, 1.5 ],
                 "radius": 0.15
-            },
+            }
         ]
     },
     "unsteady": true,
@@ -115,8 +106,7 @@
                 {
                     "type": "RAMP",
                     "f_max": 100.0,
-                    "q": 3.0,
-                    "convex_up": true
+                    "q": 3.0
                 }
             ],
             "initial_distribution": {

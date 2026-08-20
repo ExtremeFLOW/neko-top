@@ -5,36 +5,24 @@ set(CMAKE_FOLDER "Tests/Unit/Sensitivity")
 set(test_list
     "volume.case"
     "volume_filtered.case"
+    "viscous_dissipation.case"
+    "brinkman_dissipation.case"
 )
 
 # Path to the common driver source
 set(SENSITIVITY_DRIVER ${CMAKE_CURRENT_SOURCE_DIR}/problem_tester.f90)
 
 # ============================================================================ #
-# Ensure the neko library is found correctly
-get_target_property(NEKO_TOP_MODDIR neko-top Fortran_MODULE_DIRECTORY)
+# Use a private .mod folder to avoid clashes with regression targets
+set(LOCAL_MOD_DIR ${CMAKE_CURRENT_BINARY_DIR}/modules)
+set(CMAKE_Fortran_MODULE_DIRECTORY ${LOCAL_MOD_DIR} CACHE PATH
+    "Fortran module directory" FORCE)
 
 # ============================================================================ #
 # Preparation target
 add_custom_target(sensitivity_test_prepare
     COMMENT "Preparing sensitivity test files"
 )
-
-# Sensitivity utils library
-add_library(sensitivity_utils EXCLUDE_FROM_ALL
-    ${CMAKE_CURRENT_SOURCE_DIR}/sensitivity.f90
-)
-target_include_directories(sensitivity_utils PUBLIC ${NEKO_TOP_MODDIR})
-target_link_libraries(sensitivity_utils
-    PUBLIC
-        Neko-TOP::neko-top
-        PkgConfig::neko
-        PkgConfig::json-fortran
-        MPI::MPI_Fortran
-        $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
-        $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
-)
-add_dependencies(sensitivity_test_prepare sensitivity_utils)
 
 # ============================================================================ #
 # Neko environment
@@ -63,12 +51,18 @@ add_dependencies(sensitivity_test_prepare sensitivity_prepare_script)
 # ============================================================================ #
 # Build the single driver executable
 add_executable(problem_tester_sensitivity_bin EXCLUDE_FROM_ALL
+    ${SHARED_TEST_SOURCES}/sensitivity.f90
     ${SENSITIVITY_DRIVER}
 )
 target_link_libraries(problem_tester_sensitivity_bin
-    sensitivity_utils
+    PRIVATE Neko-TOP::neko-top
 )
+target_include_directories(problem_tester_sensitivity_bin
+    PRIVATE ${LOCAL_MOD_DIR})
 add_dependencies(Unit problem_tester_sensitivity_bin)
+
+set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_BINARY_DIR}/modules CACHE PATH
+    "Fortran module directory" FORCE)
 
 # ============================================================================ #
 # Loop over all case files and create tests

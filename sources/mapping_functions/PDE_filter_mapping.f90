@@ -33,7 +33,7 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 !
 !> A PDE based filter
-module PDE_filter
+module PDE_filter_mapping
   use num_types, only: rp
   use json_module, only: json_file
   use registry, only: neko_registry
@@ -41,7 +41,7 @@ module PDE_filter
   use coefs, only: coef_t
   use ax_product, only: ax_t, ax_helm_factory
   use krylov, only: ksp_t, ksp_monitor_t, krylov_solver_factory
-  use precon, only: pc_t, precon_factory, precon_destroy
+  use precon, only: pc_t, precon_allocator, precon_destroy
   use bc_list, only: bc_list_t
   use neumann, only: neumann_t
   use profiler, only: profiler_start_region, profiler_end_region
@@ -403,7 +403,7 @@ contains
     type(bc_list_t), target, intent(inout) :: bclst
     character(len=*) :: pctype
 
-    call precon_factory(pc, pctype)
+    call precon_allocator(pc, pctype)
 
     select type (pcp => pc)
     type is (jacobi_t)
@@ -418,4 +418,4 @@ contains
 
   end subroutine filter_precon_factory
 
-end module PDE_filter
+end module PDE_filter_mapping

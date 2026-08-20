@@ -66,7 +66,7 @@ contains
     type(json_file) :: parameters, design_parameters
 
     !> The simulation we are working with
-    type(simulation_t) :: sim
+    type(simulation_t), target :: sim
     !> The design type
     class(design_t), allocatable :: des
     !> The problem type
@@ -147,7 +147,7 @@ contains
     call prob%init(parameters, des, sim)
     call optimizer_factory(opt, parameters, prob, des, sim)
 
-    call opt%load_checkpoint('optimizer_checkpoint.h5', iter0, des)
+    call opt%load_checkpoint(iter = iter0, design = des)
     call opt%initialize(prob, des, sim)
 
     ! ------------------------------------------------------------------------ !
@@ -159,9 +159,9 @@ contains
     call x%copy_from(DEVICE_TO_HOST, sync = .false.)
     call x_half%copy_from(DEVICE_TO_HOST, sync = .true.)
 
-    write(msg, *) "Loaded iteration does not match"
+    write(msg, '(A)') "Loaded iteration does not match"
     @assertEqual(max_iter / 2, iter0, trim(msg))
-    write(msg, *) "Loaded objective does not match"
+    write(msg, '(A)') "Loaded objective does not match"
     @assertEqual(f_half, f, tol, trim(msg))
 
     do i = 1, des%size()
@@ -183,9 +183,9 @@ contains
     call prob%get_objective_value(f)
     call des%get_values(x)
 
-    write(msg, *) "Final objective does not match original objective"
+    write(msg, '(A)') "Final objective does not match original objective"
     @assertEqual(0.0_rp, abs((f_ref - f) / f_ref), tol, trim(msg))
-    write(msg, *) "Final design does not match original design"
+    write(msg, '(A)') "Final design does not match original design"
     @assertEqual(0.0_rp, rmse(x_ref, x), tol, trim(msg))
 
     ! ------------------------------------------------------------------------ !

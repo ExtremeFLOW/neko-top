@@ -41,17 +41,6 @@ module device_math_ext
 #if HAVE_HIP
 
   interface
-     subroutine hip_copy_mask(a_d, b_d, size, mask_d, mask_size) &
-          bind(c, name = 'hip_copy_mask')
-       import c_rp, c_int, c_ptr
-       type(c_ptr), value :: a_d
-       type(c_ptr), value :: b_d
-       integer(c_int) :: size
-       type(c_ptr), value :: mask_d
-       integer(c_int) :: mask_size
-     end subroutine hip_copy_mask
-  end interface
-  interface
      subroutine hip_cadd_mask(a_d, c, size, mask_d, mask_size) &
           bind(c, name = 'hip_cadd_mask')
        import c_rp, c_int, c_ptr
@@ -110,17 +99,6 @@ module device_math_ext
 
 #elif HAVE_CUDA
 
-  interface
-     subroutine cuda_copy_mask(a_d, b_d, size, mask_d, mask_size) &
-          bind(c, name = 'cuda_copy_mask')
-       import c_rp, c_int, c_ptr
-       type(c_ptr), value :: a_d
-       type(c_ptr), value :: b_d
-       integer(c_int) :: size
-       type(c_ptr), value :: mask_d
-       integer(c_int) :: mask_size
-     end subroutine cuda_copy_mask
-  end interface
   interface
      subroutine cuda_cadd_mask(a_d, c, size, mask_d, mask_size) &
           bind(c, name = 'cuda_cadd_mask')
@@ -183,21 +161,6 @@ module device_math_ext
 #endif
 
 contains
-
-  subroutine device_copy_mask(a_d, b_d, size, mask_d, mask_size)
-    type(c_ptr) :: a_d
-    type(c_ptr) :: b_d
-    integer :: size
-    type(c_ptr) :: mask_d
-    integer :: mask_size
-#if HAVE_HIP
-    call hip_copy_mask(a_d, b_d, size, mask_d, mask_size)
-#elif HAVE_CUDA
-    call cuda_copy_mask(a_d, b_d, size, mask_d, mask_size)
-#else
-    call neko_error('No device backend configured for device_copy_mask')
-#endif
-  end subroutine device_copy_mask
 
   subroutine device_cadd_mask(a_d, c, size, mask_d, mask_size)
     type(c_ptr) :: a_d

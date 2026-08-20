@@ -128,7 +128,6 @@ source $MAIN_DIR/scripts/meshing.sh
 
 if [ "$BOX" == "true" ]; then
     # Create the box mesh using Neko genmeshbox
-    printf "\n\e[4mCreating box mesh.\e[0m\n"
     find_neko $NEKO_DIR
 
     [ -z "$OUTPUT_FILE" ] && OUTPUT_FILE="box.nmsh"
@@ -138,6 +137,7 @@ if [ "$BOX" == "true" ]; then
         mkdir -p $OUTPUT_PATH/box_mesh.tmp
         cd $OUTPUT_PATH/box_mesh.tmp
 
+        printf "\n\e[4mCreating box mesh.\e[0m\n"
         echo "Finding Neko in $NEKO_DIR"
 
         if ! command -v genmeshbox &>/dev/null; then
@@ -159,7 +159,7 @@ if [ "$BOX" == "true" ]; then
         printf '  %-11s %-67s\n' "Box Mesh:" "Already exists, skipping."
     fi
 
-    if [[ $PREPART -gt 0 && ! -f $OUTPUT_PATH/${OUTPUT_FILE%.*}_$PREPART.nmsh ]]; then
+    if [[ $PREPART -gt 1 && ! -f $OUTPUT_PATH/${OUTPUT_FILE%.*}_$PREPART.nmsh ]]; then
         prepart $OUTPUT_PATH/$OUTPUT_FILE $PREPART
     fi
 

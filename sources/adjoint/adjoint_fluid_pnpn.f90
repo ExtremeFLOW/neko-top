@@ -603,7 +603,17 @@ contains
     call this%bc_prs_surface%free()
     call this%bc_sym_surface%free()
     call this%bc_curl_curl%free()
+
+    call this%bc_vel_res%free()
+    call this%bc_du%free()
+    call this%bc_dv%free()
+    call this%bc_dw%free()
+    call this%bc_dp%free()
+
     call this%bclst_vel_res%free()
+    call this%bclst_du%free()
+    call this%bclst_dv%free()
+    call this%bclst_dw%free()
     call this%bclst_dp%free()
     call this%proj_prs%free()
     call this%proj_vel%free()
@@ -746,9 +756,8 @@ contains
 
          ! Add the RHS contributions coming from the BDF scheme.
          call makebdf%compute_fluid(ulag, vlag, wlag, f_x%x, f_y%x, f_z%x, &
-              u, v, w, c_Xh%B, rho%x(1,1,1,1), dt, &
-              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n, &
-              c_Xh%Blag, c_Xh%Blaglag)
+              u, v, w, c_Xh%B, c_Xh%Blag, c_Xh%Blaglag, rho%x(1,1,1,1), dt, &
+              ext_bdf%diffusion_coeffs%x, ext_bdf%ndiff, n)
       end if
 
       call ulag%update()

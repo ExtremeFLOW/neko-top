@@ -10,7 +10,7 @@
 # - "user"    : Driver initializing the neko library and calling the user code.
 #                This is equivalent to calling makeneko from the original neko.
 # - "custom"  : Custom driver defined by a f90 file. Either set through the
-#                DRIVER cmake vatiable in the example CMakeLists.txt file or
+#                DRIVER cmake variable in the example CMakeLists.txt file or
 #                stored as a file named "driver.f90" in the example directory.
 # - "topopt"  : Topology optimization driver.
 
@@ -45,14 +45,20 @@ add_subdirectory(${EXAMPLES_DIR}/easy-E)
 add_subdirectory(${EXAMPLES_DIR}/mma)
 add_subdirectory(${EXAMPLES_DIR}/passive_scalar)
 add_subdirectory(${EXAMPLES_DIR}/rugby_ball)
-add_subdirectory(${EXAMPLES_DIR}/rugby_verification)
-add_subdirectory(${EXAMPLES_DIR}/thermal_mix_channel)
 add_subdirectory(${EXAMPLES_DIR}/1d_beam)
 add_subdirectory(${EXAMPLES_DIR}/static_mixer)
+add_subdirectory(${EXAMPLES_DIR}/unsteady_mixer)
 add_subdirectory(${EXAMPLES_DIR}/unsteady_rugby_ball)
 add_subdirectory(${EXAMPLES_DIR}/heat_compliance)
 add_subdirectory(${EXAMPLES_DIR}/heat_compliance_withB)
+add_subdirectory(${EXAMPLES_DIR}/wiggles)
+
 # If the benchmark_mixer folder exists, add it as well
 if (EXISTS ${EXAMPLES_DIR}/benchmark_mixer/CMakeLists.txt)
     add_subdirectory(${EXAMPLES_DIR}/benchmark_mixer)
+endif()
+
+# Add the benchmark directory if it exists.
+if (EXISTS ${EXAMPLES_DIR}/benchmark/CMakeLists.txt)
+    add_subdirectory(${EXAMPLES_DIR}/benchmark)
 endif()

@@ -117,13 +117,13 @@ module simplefield_design
 
 contains
 
-
   subroutine design_simple_init_from_components(this, n, x, y, z, neko_field)
     class(simplefield_design_t), intent(inout) :: this
     integer, intent(in) :: n
     type(vector_t), intent(in) :: x, y, z
     type(field_t) :: neko_field
 
+    call this%free()
     call this%init_base('simplefield_design', n)
 
     this%x_coord = x

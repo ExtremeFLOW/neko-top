@@ -14,11 +14,37 @@ if (${DEVICE_TYPE} STREQUAL "CUDA")
     enable_language(CUDA)
     add_compile_definitions(HAVE_CUDA=1)
     find_package(CUDAToolkit REQUIRED)
+
+    if(DEFINED ENV{CUDA_ARCH})
+        set(CMAKE_CUDA_ARCHITECTURES "$ENV{CUDA_ARCH}")
+    endif()
+
+    message(STATUS "CUDA architecture(s) set to: ${CMAKE_CUDA_ARCHITECTURES}")
+
 elseif(${DEVICE_TYPE} STREQUAL "HIP")
     enable_language(HIP)
     enable_language(C)
     add_compile_definitions(HAVE_HIP=1)
     add_compile_options($<$<COMPILE_LANGUAGE:HIP>:-fPIE>)
+
+    # Keep HIP compiler flags consistent with external Neko when provided.
+    set(NEKO_TOP_HIP_FLAGS "")
+    if(DEFINED ENV{NEKO_HIPCC_FLAGS} AND
+       NOT "$ENV{NEKO_HIPCC_FLAGS}" STREQUAL "")
+        set(NEKO_TOP_HIP_FLAGS "$ENV{NEKO_HIPCC_FLAGS}")
+    elseif(DEFINED ENV{HIP_HIPCC_FLAGS} AND
+           NOT "$ENV{HIP_HIPCC_FLAGS}" STREQUAL "")
+        set(NEKO_TOP_HIP_FLAGS "$ENV{HIP_HIPCC_FLAGS}")
+    endif()
+
+    if(NOT "${NEKO_TOP_HIP_FLAGS}" STREQUAL "")
+        separate_arguments(NEKO_TOP_HIP_FLAGS_LIST NATIVE_COMMAND
+                           "${NEKO_TOP_HIP_FLAGS}")
+        foreach(flag IN LISTS NEKO_TOP_HIP_FLAGS_LIST)
+            add_compile_options($<$<COMPILE_LANGUAGE:HIP>:${flag}>)
+        endforeach()
+    endif()
+
     find_package(hipblas REQUIRED)
     find_package(hipsolver REQUIRED)
 
@@ -73,14 +99,13 @@ target_link_libraries(neko-top PUBLIC
     PkgConfig::neko
     PkgConfig::json-fortran
     MPI::MPI_Fortran
+    OpenMP::OpenMP_Fortran
     $<$<BOOL:${BLAS_FOUND}>:BLAS::BLAS>
     $<$<BOOL:${LAPACK_FOUND}>:LAPACK::LAPACK>
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cusolver>
     $<$<BOOL:${CUDAToolkit_FOUND}>:CUDA::cudart>
     $<$<BOOL:${hipblas_FOUND}>:roc::hipblas>
     $<$<BOOL:${hipsolver_FOUND}>:roc::hipsolver>
-    $<$<BOOL:${HDF5_PKG_FOUND}>:PkgConfig::hdf5>
-    $<$<BOOL:${HDF5_FOUND}>:HDF5::HDF5>
 )
 
 # ============================================================================ #

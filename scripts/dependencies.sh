@@ -180,9 +180,13 @@ function find_pfunit() {
 
     # Determine the pFUnit installation directory
     if [[ $# -ge 1 ]]; then
-        PFUNIT_DIR="$(realpath $1)"
+        PFUNIT_DIR="$1"
     elif [ -z "$PFUNIT_DIR" ]; then
-        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/pfunit)"
+        return
+    fi
+
+    if [[ "${PFUNIT_DIR:0:1}" != "/" && "${PFUNIT_DIR:0:1}" != "~" ]]; then
+        PFUNIT_DIR="$(realpath $EXTERNAL_DIR/$PFUNIT_DIR)"
     fi
 
     # Clone pFUnit from the repository if it does not exist.
@@ -325,6 +329,12 @@ function find_parmetis() {
         tar xzf parmetis-4.0.3.tar.gz
         cd parmetis-4.0.3
 
+        # Modify the minimum requirement of cmake
+        cmake_lists=$(find . -name CMakeLists.txt)
+        for file in $cmake_lists; do
+            sed -i 's/cmake_minimum_required(VERSION 2.8)/cmake_minimum_required(VERSION 3.11)/g' $file
+        done
+
         # Compile the bundled metis library
         cd metis
         make config prefix=${PARMETIS_DIR}
@@ -365,7 +375,7 @@ function find_neko() {
     find_gslib $GSLIB_DIR
     find_hdf5 $HDF5_DIR
     find_parmetis $PARMETIS_DIR
-    [ "$NEKO_TEST" == true ] && find_pfunit $PFUNIT_DIR
+    [ -n "$PFUNIT_DIR" ] && find_pfunit $PFUNIT_DIR
 
     # Determine the Neko installation directory
     if [[ $# -ge 1 ]]; then
@@ -375,7 +385,7 @@ function find_neko() {
     fi
 
     # Check if Neko is installed, if not install it.
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [[ ! -d "$NEKO_LIB" || "$CLEAN_NEKO" == true ]]; then
 
@@ -385,6 +395,21 @@ function find_neko() {
 
             git clone --depth 1 --branch $NEKO_VERSION \
                 https://github.com/ExtremeFLOW/neko.git $NEKO_DIR
+
+        fi
+
+        # Apply Cray-specific patches before building on Cray systems
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            cray_patches=(
+                "patches/cce_stack.patch"
+                "patches/cce_time_state.patch"
+                "patches/cce_openmp.patch"
+            )
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply "$patch"
+                fi
+            done
         fi
 
         # Determine available features
@@ -393,7 +418,7 @@ function find_neko() {
         [ -n "$BLAS_DIR" ] && FEATURES+=" --with-blas=$BLAS_DIR"
         [ -n "$HDF5_DIR" ] && FEATURES+=" --with-hdf5=$HDF5_DIR"
         [ -n "$PARMETIS_DIR" ] && FEATURES+=" --with-parmetis=$PARMETIS_DIR"
-        [ "$NEKO_TEST" == true ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
+        [ -n "$PFUNIT_DIR" ] && FEATURES+=" --with-pfunit=$PFUNIT_DIR"
 
         # Handle device specific features
         if [ "$DEVICE_TYPE" == "CUDA" ]; then
@@ -405,6 +430,16 @@ function find_neko() {
                 error "the CUDA installation."
                 exit 1
             fi
+
+            if [ -n "$NEKO_CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=$NEKO_CUDA_ARCH"
+            elif [ -n "$CUDA_ARCH" ]; then
+                FEATURES+=" CUDA_ARCH=-arch=sm_$CUDA_ARCH"
+            else
+                error "CUDA architecture not set."
+                exit 1
+            fi
+
         elif [ "$DEVICE_TYPE" == "HIP" ]; then
             if [ -d "$HIP_DIR" ]; then
                 FEATURES+=" --with-hip=$HIP_DIR"
@@ -454,13 +489,22 @@ function find_neko() {
         make install
 
         cd $CURRENT_DIR
+
+        # Revert the patches to keep the repository clean
+        if [[ -n "${CRAYPE_VERSION:-}" || "${PE_ENV:-}" == "CRAY" || -d "/opt/cray" ]]; then
+            for patch in "${cray_patches[@]}"; do
+                if git -C "$NEKO_DIR" apply --reverse --check "$patch" 2>/dev/null; then
+                    git -C "$NEKO_DIR" apply --reverse "$patch"
+                fi
+            done
+        fi
     fi
 
-    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' \
+    NEKO_LIB=$(find $NEKO_DIR -type d -name 'lib*' -maxdepth 1 \
         -exec test -f '{}'/libneko.a \; -print 2>/dev/null) || true
     if [ ! -d "$NEKO_LIB" ]; then
         error "Neko not found at:"
-        error "\$tNEKO_DIR"
+        error "\t$NEKO_DIR"
         error "Please set NEKO_DIR to the directory containing"
         error "the Neko source code."
         error "You can download the source code from:"

@@ -33,7 +33,7 @@
 !! POSSIBILITY OF SUCH DAMAGE.
 
 program topopt_user
-  use neko, only: neko_init, neko_finalize
+  use neko, only: neko_init, neko_finalize, neko_job_info
   use simulation_m, only: simulation_t
   use design, only: design_t, design_factory
   use problem, only: problem_t
@@ -53,9 +53,11 @@ program topopt_user
   integer :: argc
   character(len=256) :: parameter_file
   type(json_file) :: parameters, design_parameters
+  character(10) :: time
+  character(8) :: date
 
   !> The simulation we are working with
-  type(simulation_t) :: sim
+  type(simulation_t), target :: sim
   !> The design type
   class(design_t), allocatable :: des
   !> The problem type
@@ -66,7 +68,9 @@ program topopt_user
   ! -------------------------------------------------------------------------- !
   ! Initialize the Neko environment
 
+  call date_and_time(time = time, date = date)
   call neko_init()
+  call neko_job_info(date, time)
   call neko_top_register_types()
 
   ! -------------------------------------------------------------------------- !
