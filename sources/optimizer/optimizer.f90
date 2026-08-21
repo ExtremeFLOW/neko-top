@@ -346,6 +346,13 @@ contains
     this%log_extra_size = 0
     this%log_include_constraints = .true.
 
+    ! Reset the log file's write state so a free()-then-init() cycle on the
+    ! same optimizer object does not carry a stale `header_is_written`/
+    ! `overwrite` flag into what init_log() will treat as a brand-new file.
+    this%log_file%header = ''
+    this%log_file%header_is_written = .false.
+    call this%log_file%set_overwrite(.false.)
+
   end subroutine optimizer_free_base
 
   !> Read settings from JSON parameters file.
@@ -435,7 +442,19 @@ contains
     ! Prepare the problem state before starting the optimization
     call this%initialize(problem, design, simulation)
 
-    call this%write(this%current_iteration, problem)
+    ! Only log the initial state on a fresh start. On a restart, this
+    ! iteration was already logged (with real design-change/KKT values) by
+    ! the previous run right before the checkpoint was taken; the log's CSV
+    ! file is append-only, so re-writing it here would append a conflicting
+    ! duplicate row with reset (zero) design-change values, since those are
+    ! not part of the checkpoint.
+    if (this%current_iteration .eq. 0) then
+       call this%write(this%current_iteration, problem)
+    end if
+    ! Unlike the CSV log above, design output is overwrite-per-index rather
+    ! than append-only, so re-emitting the already-checkpointed iteration's
+    ! design here on a restart is harmless and intentionally left
+    ! unconditional.
     call design%write(this%current_iteration)
 
     call neko_log%section('Optimization Loop')
@@ -580,6 +599,10 @@ contains
   !! @param[in] extra_headers Header labels for extra log entries.
   !! @param[in] include_constraints Include constraints in the log.
   !! @param[in] filename Output filename for the log.
+  !! @note If the target log file already exists with content, this is
+  !! treated as a restart appending to it: no header is (re-)written and no
+  !! existing rows are overwritten. Otherwise it is treated as a fresh
+  !! start: any stale/leftover file at that path is overwritten.
   subroutine optimizer_init_log(this, problem, extra_headers, &
        include_constraints, filename)
     class(optimizer_t), intent(inout) :: this
@@ -591,6 +614,8 @@ contains
     character(len=4096) :: header
     integer :: total_size, base_size, i, n_cont
     character(len=256) :: log_name
+    logical :: log_file_exists
+    integer :: log_file_size
 
     if (present(include_constraints)) then
        this%log_include_constraints = include_constraints
@@ -631,6 +656,26 @@ contains
             trim(nekotop_continuation%get_param_name(i))
     end do
     call this%log_file%set_header(trim(header))
+
+    ! Whether this is a restart cannot be inferred from `current_iteration`
+    ! here: `init_log` runs from the optimizer constructor, which executes
+    ! before `optimizer_run` calls `load_checkpoint` -- `current_iteration`
+    ! is therefore always still 0 at this point, restart or not. Instead,
+    ! detect a restart directly from the log file itself: if it already
+    ! exists with content, a previous run already wrote its header, and the
+    ! CSV file is append-only, so writing the header again here would
+    ! insert a duplicate header row in the middle of the file. Otherwise
+    ! (missing, or a leftover empty/partial file) this is a fresh start,
+    ! so any stale content is overwritten and a fresh header is written.
+    inquire(file = trim(log_name), exist = log_file_exists, &
+         size = log_file_size)
+    if (log_file_exists .and. log_file_size .gt. 0) then
+       call this%log_file%set_overwrite(.false.)
+       this%log_file%header_is_written = .true.
+    else
+       call this%log_file%set_overwrite(.true.)
+       this%log_file%header_is_written = .false.
+    end if
 
     this%log_initialized = .true.
   end subroutine optimizer_init_log
