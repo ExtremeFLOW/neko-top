@@ -16,7 +16,7 @@
         },
         "fluid": {
             "scheme": "pnpn",
-            "Re": 200.0,
+            "Re": 20.0,
             "output_control": "never",
             "output_format": "vtkhdf",
             "strict_convergence": true,
