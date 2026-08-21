@@ -255,17 +255,19 @@ contains
     call json_get_or_default(parameters, "unsteady", unsteady, .false.)
     this%unsteady = unsteady
 
-    ! Ensure there is a means to deal with unsteadiness
-    if (this%unsteady .and. .not. ("state_recovery" .in. parameters)) then
-       call neko_error("please provide a means of recovering the forward \\ &
-       & state under state_recovery. Current options include checkpoint or \\ &
-       & POD.")
-    end if
+    ! State recovery is only needed for unsteady runs.
+    if (this%unsteady) then
+       if (.not. ("state_recovery" .in. parameters)) then
+          call neko_error("please provide a means of recovering the forward \\ &
+          & state under state_recovery. Current options include checkpoint or \\ &
+          & POD.")
+       end if
 
-    if ("state_recovery" .in. parameters) then
        call json_get(parameters, 'state_recovery', state_recovery_params)
        call state_recover_create(this%state_recover, this%neko_case, &
             state_recovery_params)
+    else if ("state_recovery" .in. parameters) then
+       call neko_warning("Ignoring state_recovery for steady simulation.")
     end if
 
 
