@@ -1,6 +1,11 @@
 # Runtime-only suppressions for clean-exit leak audits in unsteady_mixer.
 # These entries target OpenMPI/hwloc/libevent/CUDA initialization allocations
 # that persist at process teardown and are outside project ownership.
+#
+# The OpenMPI-specific rules below are tuned against OpenMPI 5.0.10's
+# PRRTE/PMIx runtime (see `ompi_info --version`). OpenMPI's internal call
+# graph has changed across major versions before and may again, so a future
+# OpenMPI upgrade re-breaking these is expected, not a regression.
 
 {
    openmpi_ompi_op_init
@@ -10,30 +15,19 @@
    ...
    fun:ompi_op_base_op_select
    fun:ompi_op_init
+   ...
    fun:ompi_mpi_init
    ...
    fun:__comm_MOD_comm_init
 }
 
 {
-   openmpi_orte_init_hwloc
+   openmpi_pmix_rte_init
    Memcheck:Leak
    match-leak-kinds: definite,indirect
    ...
-   fun:hwloc_topology_load
+   fun:pmix_rte_init
    ...
-   fun:orte_init
-   fun:ompi_mpi_init
-   ...
-   fun:__comm_MOD_comm_init
-}
-
-{
-   openmpi_orte_init_generic
-   Memcheck:Leak
-   match-leak-kinds: definite,indirect
-   ...
-   fun:orte_init
    fun:ompi_mpi_init
    ...
    fun:__comm_MOD_comm_init
@@ -46,6 +40,7 @@
    fun:malloc
    ...
    fun:mca_base_framework_open
+   ...
    fun:ompi_mpi_init
    ...
    fun:__comm_MOD_comm_init
@@ -62,6 +57,55 @@
    fun:ompi_mpi_init
    ...
    fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_mca_btl_base_select_cxxnew
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   ...
+   fun:mca_btl_base_select
+   ...
+   fun:ompi_mpi_init
+   ...
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_mca_framework_open_cxxnew
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:_Znwm
+   ...
+   fun:mca_base_framework_open
+   ...
+   fun:ompi_mpi_init
+   ...
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_comm_init_mpi3
+   Memcheck:Leak
+   match-leak-kinds: definite
+   fun:malloc
+   fun:ompi_comm_init_mpi3
+   ...
+   fun:ompi_mpi_init
+   ...
+   fun:__comm_MOD_comm_init
+}
+
+{
+   openmpi_pmix_bfrops_indirect
+   Memcheck:Leak
+   match-leak-kinds: indirect
+   fun:malloc
+   fun:strdup
+   fun:pmix_bfrops_base_value_load
+   ...
+   fun:ompi_mpi_init
 }
 
 {
