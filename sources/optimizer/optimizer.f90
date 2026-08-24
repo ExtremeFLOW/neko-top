@@ -52,6 +52,7 @@ module optimizer
   use json_utils, only: json_get_or_default
   use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
   use continuation_scheduler, only: nekotop_continuation
+  use math, only: Neko_EPS
 
   implicit none
   private
@@ -66,7 +67,7 @@ module optimizer
      !> The current iteration number
      integer, private :: current_iteration = 0
      !> The smallest change in design variables.
-     real(kind=rp), private :: stop_design_change = -1.0_rp
+     real(kind=rp), private :: stop_design_change = NEKO_EPS
      !> The maximum observed design change.
      real(kind=rp), public :: max_design_change = 0.0_rp
      !> The L2 norm of the design change.
@@ -524,9 +525,9 @@ contains
             this%max_iterations, ' iterations.'
        call neko_log%warning(msg)
     case (2)
-       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped after reaching the ', &
-            'maximum runtime of ', this%max_runtime, ' seconds.'
-       call neko_error(trim(msg))
+       write(msg, '(A,A,F8.2,A)') 'Optimizer stopped, design change ', &
+            'below threshold of: ', this%stop_design_change, '.'
+       call neko_log%warning(msg)
     case (3)
        write(msg, '(A)') 'Optimizer stopped due to runtime limit.'
        call neko_error(msg)
