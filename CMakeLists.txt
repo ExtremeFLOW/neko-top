@@ -158,69 +158,14 @@ if (DEFINED HDF5_DIR)
     set(CMAKE_PREFIX_PATH ${HDF5_DIR} ${CMAKE_PREFIX_PATH})
 endif()
 
-# Accept a found HDF5 only if it is actually MPI-parallel. Neko-TOP's own
-# HDF5 IO (sources/IO/hdf5/*.f90) calls parallel-only property-list
-# routines (h5pset_fapl_mpio_f, h5pset_dxpl_mpio_f) unconditionally, so a
-# serial HDF5 archives libneko-top.a fine (unresolved symbols in a static
-# archive aren't an error) but leaves every executable/test/example failing
-# to link -- see known-bugs-backlog.md item #12. find_package(HDF5)'s own
-# HDF5_IS_PARALLEL is not reliably set when HDF5 is located via
-# CMAKE_PREFIX_PATH pointing straight at an install prefix (confirmed
-# empirically: blank rather than TRUE/FALSE in that mode, only reliable via
-# the compiler-wrapper detection path) -- check the H5_HAVE_PARALLEL macro
-# in H5pubconf.h directly instead of trusting it.
-function(neko_top_hdf5_is_parallel include_dirs result_var)
-    set(${result_var} FALSE PARENT_SCOPE)
-    foreach(_dir ${include_dirs})
-        if (EXISTS "${_dir}/H5pubconf.h")
-            file(STRINGS "${_dir}/H5pubconf.h" _match
-                 REGEX "^[ \t]*#[ \t]*define[ \t]+H5_HAVE_PARALLEL[ \t]+1")
-            if (_match)
-                set(${result_var} TRUE PARENT_SCOPE)
-                return()
-            endif()
-        endif()
-    endforeach()
-endfunction()
-
 find_package(HDF5 QUIET COMPONENTS Fortran)
+if (HDF5_FOUND AND NOT HDF5_IS_PARALLEL)
+    message(STATUS "Ignoring HDF5 without MPI support at "
+        "${HDF5_INCLUDE_DIRS}")
+    set(HDF5_FOUND FALSE)
+endif()
+
 if (HDF5_FOUND)
-    neko_top_hdf5_is_parallel("${HDF5_INCLUDE_DIRS}" _hdf5_is_parallel)
-    if (NOT _hdf5_is_parallel)
-        message(STATUS "HDF5 found by find_package() at "
-            "${HDF5_INCLUDE_DIRS} is not MPI-parallel; ignoring")
-        set(HDF5_FOUND FALSE)
-    endif()
-endif()
-if (NOT HDF5_FOUND)
-    pkg_check_modules(HDF5 QUIET IMPORTED_TARGET hdf5)
-    if (HDF5_FOUND)
-        neko_top_hdf5_is_parallel("${HDF5_INCLUDE_DIRS}" _hdf5_is_parallel)
-        if (NOT _hdf5_is_parallel)
-            message(STATUS "HDF5 found by pkg-config (hdf5) at "
-                "${HDF5_INCLUDE_DIRS} is not MPI-parallel; ignoring")
-            set(HDF5_FOUND FALSE)
-        endif()
-    endif()
-    if (NOT HDF5_FOUND)
-        pkg_check_modules(HDF5 QUIET IMPORTED_TARGET hdf5_parallel)
-        if (HDF5_FOUND)
-            neko_top_hdf5_is_parallel("${HDF5_INCLUDE_DIRS}" _hdf5_is_parallel)
-            if (NOT _hdf5_is_parallel)
-                message(STATUS "HDF5 found by pkg-config (hdf5_parallel) "
-                    "at ${HDF5_INCLUDE_DIRS} is not MPI-parallel; ignoring")
-                set(HDF5_FOUND FALSE)
-            endif()
-        endif()
-    endif()
-
-    if (HDF5_FOUND)
-        set(HDF5_PKG_FOUND TRUE)
-        set(HDF5_FOUND FALSE)
-    endif()
-endif()
-
-if (HDF5_FOUND OR HDF5_PKG_FOUND)
     set(HAVE_HDF5 TRUE)
     add_compile_definitions(HAVE_HDF5=1)
 endif()
